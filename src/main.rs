@@ -11,7 +11,7 @@ fn main() -> Result<(), Error> {
 
     for info in &mut signals {
         println!("Received a signal {:?}", info);
-        #[cfg(feature="extended-siginfo")]
+        #[cfg(feature = "extended-siginfo")]
         match info.signal {
             SIGCHLD => {
                 println!("CHLD received");
