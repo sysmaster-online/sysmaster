@@ -1,3 +1,5 @@
+use utils::syscall;
+
 use std::io::Error;
 use std::io::BufRead;
 use std::fs::File;
@@ -29,6 +31,7 @@ fn main() -> Result<(), Error> {
     // inittab is obsolated by systemd, should we honor the legacy config in that ?
     // systemd use /etc/systemd/system/default.target, which is a sym link to actual target.
     // fork process to do system initializaion
+    println!("PID: {:?}", syscall!(fork()));
 
     match parse_inittab() {
         Err(why) => panic!("{:?}", why),
@@ -52,6 +55,5 @@ fn main() -> Result<(), Error> {
             }
         }
     }
-    println!("Hello, world!");
     Ok(())
 }
