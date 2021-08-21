@@ -68,16 +68,27 @@ impl UeCondition {
             _ => ConditionType::_MAX,
         };
 
+        if c_type == ConditionType::_MAX {
+            return;
+        }
         let condition = self.new_condition(c_type, _params);
         self.conditions.borrow_mut().0.push(condition);
     }
 
     pub(super) fn add_assert(&self, assertop: &str, _params: String) {
+        if _params.is_empty() {
+            return;
+        }
         let c_type = match assertop {
             ASSERT_PATH_EXISTS => ConditionType::PathExists,
             ASSERT_FILE_NOT_EMPTY => ConditionType::FileNotEmpty,
             _ => ConditionType::_MAX,
         };
+
+        if c_type == ConditionType::_MAX {
+            return;
+        }
+
         let condition = self.new_condition(c_type, _params);
         self.asserts.borrow_mut().0.push(condition);
     }
