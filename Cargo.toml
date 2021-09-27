@@ -1,8 +1,5 @@
 [workspace]
 members = [
-  "libs/utils",
-  "libs/event",
-  "libs/dbus",
-  "src/main",
+  "src/init",
   "tests",
 ]

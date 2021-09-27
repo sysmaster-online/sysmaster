@@ -1,20 +1,13 @@
 [package]
-name = "process1"
+name = "init"
 version = "0.1.0"
-authors = ["Shinwell Hu <huxinwei@huawei.com>"]
+authors = ["h00277865 <hexiaowen@huawei.com>"]
 edition = "2018"
-
-license = "MulanPSL-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 signal-hook = { version = "0.3.7", features = ["extended-siginfo"] }
 signal-hook-registry = ""
-#socket2 = { version = "0.3.8"}
-#async-std = { version = "", features = ["unstable"] }
-#async-std = { version = "1.9" }
-#async-attributes = ""
-utils = { path = "../../libs/utils" }
+utils = { path = "../utils" }
 libc = { version = "^0.2" }
-
