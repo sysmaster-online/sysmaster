@@ -52,4 +52,4 @@ docker build --no-cache --tag process1 `pwd` || exit 1
 
 #!.docker run
 echo -e "\n\n\n---!!!RUN PROCESS1 IN DOCKER!!!---"
-docker run process1 || exit 1
+docker run process1 init $* || exit 1
