@@ -8,6 +8,6 @@ edition = "2018"
 
 [dependencies]
 signal-hook = { version = "0.3.7", features = ["extended-siginfo"] }
-signal-hook-registry = ""
+signal-hook-registry = "*"
 utils = { path = "../utils" }
 libc = { version = "^0.2" }
