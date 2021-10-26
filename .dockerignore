@@ -1,0 +1,11 @@
+*
+!target/x86_64-unknown-linux-musl/debug/
+target/x86_64-unknown-linux-musl/debug/build
+target/x86_64-unknown-linux-musl/debug/deps
+target/x86_64-unknown-linux-musl/debug/examples
+target/x86_64-unknown-linux-musl/debug/incremental
+!target/x86_64-unknown-linux-musl/release/
+target/x86_64-unknown-linux-musl/release/build
+target/x86_64-unknown-linux-musl/release/deps
+target/x86_64-unknown-linux-musl/release/examples
+target/x86_64-unknown-linux-musl/release/incremental

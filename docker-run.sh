@@ -26,7 +26,7 @@ if [ $? -ne 0 ]; then
 你的环境缺少docker工具, 你可以:
 
 1.安装docker环境...
-dnf install docker
+dnf install docker -y
 或
 curl -sSL https://get.docker.com | sh
 
@@ -34,8 +34,7 @@ curl -sSL https://get.docker.com | sh
 systemctl start docker; systemctl enable docker
 
 3.如果不支持cgroupv2, 修改后重启系统
-sudo dnf install -y grubby && sudo grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0"
-
+sudo dnf install -y grubby ; sudo grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0"
 EOF
 exit 1
 fi
@@ -44,12 +43,12 @@ fi
 echo -e "---!!!CARGO BUILD!!!---"
 cargo build --target x86_64-unknown-linux-musl || exit 1
 
-
 #!.docker build
 echo -e "\n\n\n---!!!DOCKER BUILD!!!---"
+docker stop prun
 docker rmi process1 -f > /dev/null 2>&1
 docker build --no-cache --tag process1 `pwd` || exit 1
 
 #!.docker run
 echo -e "\n\n\n---!!!RUN PROCESS1 IN DOCKER!!!---"
-docker run process1 init $* || exit 1
+docker run --rm --name prun --privileged -ti process1 init $* || exit 1
