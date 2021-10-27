@@ -1,4 +1,5 @@
 use super::manager;
+use super::service;
 use std::collections::HashSet;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -12,7 +13,7 @@ enum UnitType {
     UNIT_DEVICE,
 }
 
-enum UnitLoadState {
+pub enum UnitLoadState {
     UNIT_STUB = 0,
     UNIT_LOADED, 
     UNIT_NOT_FOUND,
@@ -37,7 +38,7 @@ enum UnitNameFlags {
     UNIT_NAME_ANY = 1|2|4,
 }
 
-struct Unit {
+pub struct Unit {
     unit_type: UnitType,
     load_state: UnitLoadState,
     id: String,
@@ -82,7 +83,7 @@ struct Unit {
 pub trait UnitObj {
     fn init(&self){}
     fn done(&self){}
-    fn load(&self){}
+    fn load(&mut self) -> bool {false}
     fn coldplug(&self){}
     fn dump(&self){}
     fn start(&self){}
@@ -152,6 +153,10 @@ impl Unit {
     pub fn set_manager(&mut self,manger: Option<Arc<UnitManager>>){
         self.manager = manger;
     }
+    
+    pub fn set_load_state(&mut self, load_state: UnitLoadState){
+        self.load_state = load_state;
+    }
 }
 /*
 impl <'l> Default for Unit<'l> {
@@ -211,23 +216,33 @@ impl UnitObj for Unit{
 }
 
 impl  UnitObj for MountUnit{
-
-fn init(&self) { todo!() }
-fn done(&self) { todo!() }
-fn load(&self) { todo!() }
-fn coldplug(&self) { todo!() }
-fn start(&self) { todo!() }
-fn dump(&self) { todo!() }
-fn stop(&self) { todo!() }
-fn reload(&self) { todo!() }
-fn kill(&self) { todo!() }
-fn check_gc(&self) -> bool { todo!() }
-fn release_resources(&self) { todo!() }
-fn check_snapshot(&self) { todo!() }
-fn sigchld_events(&self, _: u64, _: i32, _: i32) { todo!() }
-fn reset_failed(&self) { todo!() }
+    fn init(&self) { todo!() }
+    fn done(&self) { todo!() }
+    fn load(&mut self) -> bool { todo!() }
+    fn coldplug(&self) { todo!() }
+    fn start(&self) { todo!() }
+    fn dump(&self) { todo!() }
+    fn stop(&self) { todo!() }
+    fn reload(&self) { todo!() }
+    fn kill(&self) { todo!() }
+    fn check_gc(&self) -> bool { todo!() }
+    fn release_resources(&self) { todo!() }
+    fn check_snapshot(&self) { todo!() }
+    fn sigchld_events(&self, _: u64, _: i32, _: i32) { todo!() }
+    fn reset_failed(&self) { todo!() }
 }
- 
+
+fn unit_new(unit_type: UnitType) -> Box<dyn UnitObj> {
+    match unit_type {
+        UnitType::UNIT_SERVICE => Box::new(service::ServiceUnit::new(Unit::new())),
+        UnitType::UNIT_SOCKET => Box::new(service::ServiceUnit::new(Unit::new())),
+        UnitType::UNIT_BUSNAME => Box::new(service::ServiceUnit::new(Unit::new())),
+        UnitType::UNIT_TARGET => Box::new(service::ServiceUnit::new(Unit::new())),
+        UnitType::UNIT_SNAPSHOT => Box::new(service::ServiceUnit::new(Unit::new())),
+        UnitType::UNIT_DEVICE => Box::new(service::ServiceUnit::new(Unit::new())),
+        //TODO
+    }
+}
 
 pub struct UnitManager {
     units: RefCell<Vec<RefCell <Box<dyn UnitObj>>>>,
@@ -246,9 +261,9 @@ impl  manager::Mangerobj for UnitManager  {
     fn load(&self){
         let mut units_vec = self.units.borrow_mut();
         
-        let unit: Unit = Unit::new();
+        let mut unit = unit_new(UnitType::UNIT_SERVICE);
 
-        units_vec.push(RefCell::new(Box::new(unit)));
+        units_vec.push(RefCell::new(unit));
     }
 
     fn dispatch(&self) -> i32 {
@@ -280,5 +295,11 @@ mod tests {
         let mut mp = manager::MangerLoader::new();
         mp.load_plugins(Box::new(unit_manger));
         assert_eq!(mp.run(),0);
+    }
+
+    #[test]
+    fn  test_unit_load(){
+        let mut unit = unit_new(UnitType::UNIT_SERVICE);
+        assert_eq!(unit.load(), true)
     }
 }
