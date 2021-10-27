@@ -7,8 +7,4 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-signal-hook = { version = "0.3.7", features = ["extended-siginfo"] }
-signal-hook-registry = "*"
-utils = { path = "../utils" }
-libc = { version = "^0.2" }
 nix = "0.23.0"
