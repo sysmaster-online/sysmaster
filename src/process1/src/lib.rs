@@ -6,18 +6,6 @@ mod tests {
     }
 }
 
-
-
-pub mod front_of_hourse {
-    pub mod hosting {
-        pub fn add_to_waitlist(name:String) -> Vec<String> {
-            let mut result = Vec::new();
-            result.push(name);
-            return result;
-        }
-    }
-}
-
 pub mod manager;
 
 pub mod plugin;

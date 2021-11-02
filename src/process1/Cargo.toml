@@ -11,3 +11,4 @@ path = "src/lib.rs"
 
 [dependencies]
 dynamic_reload = "0.4.0"
+walkdir = "2"
