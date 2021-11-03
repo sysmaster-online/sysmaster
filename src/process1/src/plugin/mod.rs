@@ -1,35 +1,36 @@
 
-use dynamic_reload;
+use dynamic_reload as dy_re;
 use std::sync::Arc;
-use std::time::Duration;
 use walkdir::{DirEntry,WalkDir};
 use std::path::Path;
+use log::*;
+use super::manager::*;
 
 struct LibLoaders{
     libs: Vec<Arc<dynamic_reload::Lib>>,
 }
 
 impl LibLoaders {
-    fn add_lib(&mut self, lib: &Arc<dynamic_reload::Lib>) {
+    fn add_lib(&mut self, lib: &Arc<dy_re::Lib>) {
         self.libs.push(lib.clone());
     }
 
-    fn unload_lib(&mut self, lib: &Arc<dynamic_reload::Lib>) {
+    fn unload_lib(&mut self, lib: &Arc<dy_re::Lib>) {
         for i in (0..self.libs.len()).rev() {
             if &self.libs[i] == lib {
                 self.libs.swap_remove(i);
             }
         }
     }
-    fn reload_lib(&mut self,lib:&Arc<dynamic_reload::Lib>){
+    fn reload_lib(&mut self,lib: &Arc<dy_re::Lib>){
         Self::add_lib(self,lib);
     }
 
-    fn reload_callback(&mut self, state:dynamic_reload::UpdateState, lib: Option<&Arc<dynamic_reload::Lib>>){
+    fn reload_callback(&mut self, state: dy_re::UpdateState, lib: Option<&Arc<dy_re::Lib>>){
         match state {
             dynamic_reload::UpdateState::Before => Self::unload_lib(self,lib.unwrap()),
             dynamic_reload::UpdateState::After => Self::reload_lib(self,lib.unwrap()),
-            dynamic_reload::UpdateState::ReloadFailed(_) =>println!("Reload plugin failed"),
+            dynamic_reload::UpdateState::ReloadFailed(_) =>error!("Reload plugin failed"),
         }
     }
 }
@@ -38,21 +39,24 @@ impl LibLoaders {
 pub struct Plugin<T> {
     plugin_lists: Vec<Arc<T>>,
     library_dir: String,
-    lib_loader: LibLoaders    
+    lib_loader: LibLoaders
 }
 
 #[allow(dead_code)]
-impl <T>Plugin<T> {
+impl <T: unit::UnitObj>Plugin<T> {
     fn new() -> Self {
         Self{
             plugin_lists: Vec::new(),
             library_dir: String::new(),
-            lib_loader:  LibLoaders{libs:Vec::new()},
+            lib_loader:  LibLoaders{libs: Vec::new()},
 
         }
     }
+    pub fn add_plugin_to_list(&mut self,p: T){
+        self.plugin_lists.push(Arc::new(p));
+    }
 
-    pub fn set_library_dir(&mut self,library_dir:&str){
+    pub fn set_library_dir(&mut self,library_dir: &str){
         self.library_dir.push_str(library_dir);
     }
 
@@ -90,26 +94,35 @@ impl <T>Plugin<T> {
                     continue;
                 }else{
                     let file_name = path.file_name();
-                    match file_name {
-                        Some(v) => {
-                            let str_name = v.to_str().unwrap();
-                            match reload_handler.add_library(&str_name, dynamic_reload::PlatformName::Yes){
-                                Ok(lib) =>{
-                                    println!("loader dynamic lib in to lib_loader");
-                                    self.lib_loader.add_lib(&lib);
-                                }
-                                Err(e) =>{
-                                    println!("Unable to load dynamic lib, err {:?}", e);
-                                }
+                    if let Some(v) = file_name {
+                        let str_name = v.to_str().unwrap();
+                        match reload_handler.add_library(&str_name, dynamic_reload::PlatformName::Yes){
+                            Ok(lib) =>{
+                                info!("loader dynamic lib in to lib_loader");
+                                self.lib_loader.add_lib(&lib);
+                            }
+                            Err(e) =>{
+                                error!("error loadingUnable to load dynamic lib, err {:?}", e);
                             }
                         }
-                        None =>{
-                            println!("file name is None");
-                        }
+                    } else {
+                        warn!("loader dynamic lib file name is None");
                     }
                 }
-                
-            }               
+            }
         }
     }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_plugin_load_library(){
+        let mut plugins: Plugin<super::unit::Unit> = Plugin::new();
+        plugins.load_lib();
+    }
+
 }
