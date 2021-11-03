@@ -5,6 +5,9 @@ authors = ["overweight <hexiaowen@huawei.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "process1"
+path = "src/bin/process1.rs"
 
 [lib]
 path = "src/lib.rs"
@@ -12,3 +15,6 @@ path = "src/lib.rs"
 [dependencies]
 dynamic_reload = "0.4.0"
 walkdir = "2"
+log = "0.4"
+log4rs = "1.0"
+#log4rs = { version="1.0", optional=true}
