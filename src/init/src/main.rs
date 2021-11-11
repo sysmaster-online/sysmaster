@@ -1,17 +1,16 @@
-use std::fs::write;
-use std::io::{self, Error};
+use std::io::Error;
 use std::mem::MaybeUninit;
 use std::path::Path;
-use std::process::{Child, Command};
+use std::process::{Command, exit};
+use std::os::unix::process::CommandExt;
 
 use libc::{siginfo_t, waitid};
 use nix::libc;
 use nix::sys::wait::waitpid;
-use nix::unistd::Pid;
+use nix::unistd::{Pid, fork, ForkResult};
 
 const PROCESS1_PATH: &'static str = "/usr/lib/process1/process1";
 const SYSTEMD_PATH: &'static str = "/usr/lib/systemd/systemd";
-const PIDFILE: &'static str = "/.init.pid";
 const SELF_CODE_OFFSET: i32 = 14;
 const SELF_SIG_OFFSET: i32 = 7;
 
@@ -47,10 +46,9 @@ fn detect_init() -> String {
 }
 
 fn execute_mode(s: &String) -> Result<(), Error> {
-    println!("Running to execute command : {:?}", s);
-
     let mut error_count = 0;
-    let mut child = create_init(s)?;
+    let mut child = create_init(s);
+
     loop {
         let mut siginfo = MaybeUninit::<siginfo_t>::zeroed();
         let pid = unsafe {
@@ -62,34 +60,38 @@ fn execute_mode(s: &String) -> Result<(), Error> {
         };
         if pid <= 0 {
             continue;
-        } else if pid == child.id() as i32 {
-            if let Ok(status) = child.wait() {
-                if !status.success() {
-                    error_count += 1;
-                    if error_count >= 3 {
-                        break;
-                    }
-                    println!("Exited with error, Again");
-                    child = create_init(s)?;
-                }
+        } else if pid == child.as_raw() {
+            error_count += 1;
+            if error_count >= 3 {
+                println!("Manager({}) failed 3 times, exit", pid); 
+                let _ = waitpid(Pid::from_raw(pid), None);
+                break;
             }
+            child = create_init(s); 
         } else {
-            println!("Receiving {} exited", pid);
-            send_signal(child.id(), siginfo);
-            let _result = waitpid(Pid::from_raw(pid), None);
-            println!("Reaped {}", pid);
+            send_signal(pid, siginfo); 
         }
+
+        println!("Reaped child {}", pid); 
+        let _ = waitpid(Pid::from_raw(pid), None);
     }
     Ok(())
 }
 
-fn create_init(s: &String) -> io::Result<Child> {
-    let child = Command::new(s).spawn()?;
-    let _ = write(String::from(PIDFILE), child.id().to_string());
-    Ok(child)
+fn create_init(s: &String) -> Pid  {
+    println!("Running to execute command : {:?}", s);
+
+    if let Ok(ForkResult::Parent { child, .. }) = unsafe{fork()} {
+        child
+    } else {
+        let mut command = Command::new(s);
+        let comm = command.env("SYSTEMD_MAINPID", format!("{}", unsafe{ libc::getpid() }));
+        comm.exec();
+        exit(0)
+    }
 }
 
-fn send_signal(pid: u32, mut siginfo: MaybeUninit<siginfo_t>) {
+fn send_signal(pid: i32, mut siginfo: MaybeUninit<siginfo_t>) {
     unsafe {
         siginfo.assume_init_mut().si_code -= SELF_CODE_OFFSET;
         if libc::syscall(libc::SYS_rt_sigqueueinfo, pid, libc::SIGRTMIN() + SELF_SIG_OFFSET,
