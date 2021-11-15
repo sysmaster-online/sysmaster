@@ -1,18 +1,34 @@
 use super::manager;
 use super::service;
-use std::collections::HashSet;
+use std::io;
+use std::fs;
+use std::collections::{HashSet, HashMap};
 use std::cell::RefCell;
 use std::sync::Arc;
+use std::fs::File;
+use std::time::SystemTime;
+use std::os::unix::fs::FileTypeExt;
+
+use utils:: {time_util, path_lookup, unit_load};
 
 enum UnitType {
-    UNIT_SERVICE = 0,
-    UNIT_SOCKET,
-    UNIT_BUSNAME,
-    UNIT_TARGET, 
-    UNIT_SNAPSHOT,
-    UNIT_DEVICE,
+    UnitService = 0,
+    UnitMount,
+    UnitSwap,
+    UnitSocket,
+    UnitTarget,
+    UnitDevice,
+    UnitAutomount,
+    UnitTimer,
+    UnitPath,
+    UnitSlice,
+    UnitScope,
+    UnitTypeMax,
+    UnitTypeInvalid,
+    UnitTypeErrnoMax,
 }
 
+#[derive(PartialEq)]
 pub enum UnitLoadState {
     UNIT_STUB = 0,
     UNIT_LOADED, 
@@ -38,9 +54,28 @@ enum UnitNameFlags {
     UNIT_NAME_ANY = 1|2|4,
 }
 
+enum UnitFileState {
+    UnitFileEnabled,
+    UnitFileEnabledRuntime,
+    UnitFileLinked,
+    UnitFileLinkedRuntime,
+    UnitFileAlias,
+    UnitFileMasked,
+    UnitFileMaskedRuntime,
+    UnitFileStatic,
+    UnitFileDisabled,
+    UnitFileIndirect,
+    UnitFileGenerated,
+    UnitFileTransient,
+    UnitFileBad,
+    UnitFileStateMax,
+    UnitFileStateInvalid,
+}
+
 pub struct Unit {
     unit_type: UnitType,
     load_state: UnitLoadState,
+    unit_file_state: UnitFileState,
     id: String,
     instance: Option<String>,
     name: String,
@@ -49,8 +84,8 @@ pub struct Unit {
     documnetation: String,
     fragment_path: String,
     source_path: String,
-    fragment_mtine: u64,
-    source_mtime: u64,
+    fragment_mtine: u128,
+    source_mtime: u128,
     dropin_mtime: u64,
     
     units_by_type: Vec<Unit>,
@@ -77,6 +112,9 @@ pub struct Unit {
     in_dubs_queue: bool,
     in_cleanup_queue: bool,
     in_gc_queue: bool,
+    default_dependencies: bool,
+    perpetual: bool,
+    conf: Option<unit_load::Conf>,
     manager: Option<Arc<UnitManager>>,
 }
 
@@ -110,7 +148,7 @@ macro_rules! null_str{
 impl Unit {
     pub fn new() -> Self {
         Unit{
-            unit_type: UnitType::UNIT_SERVICE,
+            unit_type: UnitType::UnitTypeInvalid,
             load_state: UnitLoadState::UNIT_STUB,
             id: String::from(""),
             instance: Some(String::from("")),
@@ -147,15 +185,117 @@ impl Unit {
             in_dubs_queue: false,
             in_cleanup_queue: false,
             in_gc_queue: false,
-            manager:None,
+            default_dependencies: true,
+            perpetual: false,
+            unit_file_state: UnitFileState::UnitFileStateInvalid,
+            manager: None,
+            conf: None,
         }
     }
-    pub fn set_manager(&mut self,manger: Option<Arc<UnitManager>>){
-        self.manager = manger;
+    pub fn set_manager(&mut self,manager: Option<Arc<UnitManager>>) {
+        self.manager = manager;
     }
     
     pub fn set_load_state(&mut self, load_state: UnitLoadState){
         self.load_state = load_state;
+    }
+
+    pub fn unit_load_fragment_and_dropin(&mut self, frament_required: bool) -> bool {
+        if !self.unit_load_fragment() {
+            return false;
+        }
+
+        if self.load_state == UnitLoadState::UNIT_STUB {
+                if frament_required {
+                    return false;
+                }
+                self.load_state = UnitLoadState::UNIT_LOADED;
+        }
+
+        if !self.unit_load_dropin() {
+            return false;
+        }
+
+        if !self.source_path.is_empty() {
+            match fs::metadata(&self.source_path) {
+                Ok(metadata) => match metadata.modified() {
+                    Ok(time) => {
+                        self.source_mtime = time_util::timespec_load(time);
+                    },
+                    _ => {
+                        self.source_mtime = 0;
+                    },
+                }
+
+                _ => {
+                    self.source_mtime = 0;
+                }
+            }
+        }
+
+        return true;
+
+    }
+
+    fn unit_load_dropin(&mut self) -> bool { 
+        todo!();
+        true
+    }
+
+    fn unit_load_fragment(&mut self) -> bool {
+        let r: isize = 0;
+        let fragment: String = String::from("/usr/lib/systemd/system/dbus.service");
+
+        if self.transient {
+            self.load_state = UnitLoadState::UNIT_LOADED;
+            return true;
+        }
+
+        if self.fragment_path != fragment {
+            self.fragment_path = fragment;
+        }
+
+        if !self.fragment_path.is_empty() {
+            let file = File::open(&self.fragment_path);
+            let time: SystemTime;
+
+            match file {
+                Err(_e) => {println!("open file failed**********************");return false;},
+                Ok(f) => 
+                    match f.metadata(){
+                        Err(e) => return false,
+                        Ok(m) => 
+
+			    if ((m.is_file() && m.len() <=0) || m.file_type().is_char_device()) {
+                                self.load_state = UnitLoadState::UNIT_MASKED;
+                                if self.perpetual {
+                                    self.load_state = UnitLoadState::UNIT_LOADED;
+                                }
+                                self.fragment_mtine = 0;
+                            } else {
+                                self.load_state = UnitLoadState::UNIT_LOADED;
+                                // self.fragment_mtine = time_util::timespec_load(time);
+                                match unit_load::unit_file_load(self.fragment_path.to_string()) {
+                                    Ok(conf) => self.conf = Some(conf),
+                                    Err(e) => {
+					return false;},
+                                }
+                            }
+                    },
+            }
+
+          
+            println!("fragmeng_mtime is: {}", self.fragment_mtine);
+
+        }
+
+        return true;
+
+    }
+
+
+    fn unit_file_build_name_map(&mut self) { 
+        todo!()
     }
 }
 /*
@@ -232,25 +372,57 @@ impl  UnitObj for MountUnit{
     fn reset_failed(&self) { todo!() }
 }
 
-fn unit_new(unit_type: UnitType) -> Box<dyn UnitObj> {
+fn unit_new(manager: Arc<UnitManager>, unit_type: UnitType) -> Box<dyn UnitObj> {
+    let mut unit = Unit::new();
+    unit.set_manager(Some(manager));
     match unit_type {
-        UnitType::UNIT_SERVICE => Box::new(service::ServiceUnit::new(Unit::new())),
-        UnitType::UNIT_SOCKET => Box::new(service::ServiceUnit::new(Unit::new())),
-        UnitType::UNIT_BUSNAME => Box::new(service::ServiceUnit::new(Unit::new())),
-        UnitType::UNIT_TARGET => Box::new(service::ServiceUnit::new(Unit::new())),
-        UnitType::UNIT_SNAPSHOT => Box::new(service::ServiceUnit::new(Unit::new())),
-        UnitType::UNIT_DEVICE => Box::new(service::ServiceUnit::new(Unit::new())),
+        UnitType::UnitService => {
+            return Box::new(service::ServiceUnit::new(unit))
+        },
+        UnitType::UnitSocket => {
+            return Box::new(service::ServiceUnit::new(unit))
+        }
+        UnitType::UnitTarget => Box::new(service::ServiceUnit::new(unit)),
+        UnitType::UnitDevice => Box::new(service::ServiceUnit::new(unit)),
+        UnitType::UnitDevice => Box::new(service::ServiceUnit::new(unit)),
+        UnitType::UnitTimer => Box::new(service::ServiceUnit::new(unit)),
+        (_) => Box::new(service::ServiceUnit::new(unit)),
         //TODO
+
+        /*
+        UnitPath,
+        UnitSlice,
+        UnitScope,
+        UnitTypeMax,
+        UnitTypeInvalid,
+        UnitTypeErrnoMax,
+        */
     }
 }
 
 pub struct UnitManager {
-    units: RefCell<Vec<RefCell <Box<dyn UnitObj>>>>,
+    units: RefCell<HashMap<String, RefCell<Box<dyn UnitObj>>>>,
+    unit_id_map: HashMap<String, String>,
+    unit_name_map: HashMap<String, String>,
+    lookup_path: RefCell<path_lookup::LookupPaths>,
+    unit_cache_timestamp_hash: u64,
+
 }
 
 impl UnitManager{
     pub fn new() -> Self{
-        UnitManager {units: RefCell::new(Vec::new())}
+        UnitManager {
+            units: RefCell::new(HashMap::new()),
+            unit_id_map: HashMap::new(),
+            unit_name_map: HashMap::new(),
+            unit_cache_timestamp_hash:0,
+            lookup_path: RefCell::new(path_lookup::LookupPaths::new()),
+        }
+    }
+
+    pub fn insert_unit(&self, name: String, unit: Box<dyn UnitObj>) {
+	let mut units = self.units.borrow_mut();
+	units.insert(name, RefCell::new(unit));
     }
 }
 
@@ -261,9 +433,9 @@ impl  manager::Mangerobj for UnitManager  {
     fn load(&self){
         let mut units_vec = self.units.borrow_mut();
         
-        let mut unit = unit_new(UnitType::UNIT_SERVICE);
+        // let mut unit = unit_new(*self, UnitType::UNIT_SERVICE);
 
-        units_vec.push(RefCell::new(unit));
+        // units_vec.insert(String::from("systemd"), RefCell::new(unit));
     }
 
     fn dispatch(&self) -> i32 {
@@ -299,7 +471,9 @@ mod tests {
 
     #[test]
     fn  test_unit_load(){
-        let mut unit = unit_new(UnitType::UNIT_SERVICE);
-        assert_eq!(unit.load(), true)
+        let unit_manager = UnitManager::new();
+        let mut unit = unit_new(Arc::new(unit_manager), UnitType::UnitService);
+        // unit_manager.insert_unit(String::from("systemd"), unit);
+        assert_eq!(unit.load(), true);
     }
 }

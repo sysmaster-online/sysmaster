@@ -18,3 +18,4 @@ walkdir = "2"
 log = "0.4"
 log4rs = "1.0"
 #log4rs = { version="1.0", optional=true}
+utils = { path = "../utils" }
