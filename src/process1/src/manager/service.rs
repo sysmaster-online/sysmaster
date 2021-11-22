@@ -43,6 +43,7 @@ impl Default for ServiceType {
     fn default() => Self {ServiceType::ServiceTypeInvalid}
 }
 */
+
 struct DualTimestamp {
 
 }
@@ -102,9 +103,9 @@ impl ServiceUnit {
         }
     }
 
-    pub fn unit_load_fragment_and_dropin(&self) -> Result<isize, io::Error> {
+    pub fn unit_load_fragment_and_dropin(&mut self) -> bool {
         println!("load frament and dropin");
-        Ok(0)
+        return self.service_unit.unit_load_fragment_and_dropin(true);
     }
 
     pub fn service_add_extras(&mut self) -> Result<isize, io::Error> {
@@ -127,9 +128,8 @@ impl unit::UnitObj for ServiceUnit {
     }
     fn done(&self) { todo!() }
     fn load(&mut self) -> bool { 
-        match self.unit_load_fragment_and_dropin() {
-            Err(e) => return false,
-            Ok(v) => (),
+        if !self.unit_load_fragment_and_dropin() {
+            return false;
         }
 
         self.service_add_extras();

@@ -3,5 +3,6 @@ members = [
   "src/init",
   "src/process1",
   "src/systemd",
+  "src/utils",
   "tests",
 ]
