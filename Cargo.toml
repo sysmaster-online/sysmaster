@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "src/event",
   "src/init",
   "src/process1",
   "src/systemd",
