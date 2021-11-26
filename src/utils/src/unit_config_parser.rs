@@ -68,9 +68,9 @@ struct ConfInstall {
 #[derive(Deserialize)]
 #[derive(Debug)]
 pub struct Conf {
-    Unit: Option<ConfUnit>,
-    Service: Option<ConfService>,
-    Install: Option<ConfInstall>,
+    unit: Option<ConfUnit>,
+    service: Option<ConfService>,
+    install: Option<ConfInstall>,
 }
 
 pub fn unit_file_load(file_path: String) -> Result<Conf, Error> {

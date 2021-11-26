@@ -15,20 +15,11 @@ use std::hash::Hasher;
 use walkdir::WalkDir;
 use std::path::Path;
 
-use utils:: {time_util, path_lookup, unit_load};
+use utils:: {time_util, path_lookup, unit_config_parser};
 
 enum UnitType {
     UnitService = 0,
-    UnitMount,
-    UnitSwap,
-    UnitSocket,
     UnitTarget,
-    UnitDevice,
-    UnitAutomount,
-    UnitTimer,
-    UnitPath,
-    UnitSlice,
-    UnitScope,
     UnitTypeMax,
     UnitTypeInvalid,
     UnitTypeErrnoMax,
@@ -81,46 +72,26 @@ enum UnitFileState {
 pub struct Unit {
     unit_type: UnitType,
     load_state: UnitLoadState,
-    unit_file_state: UnitFileState,
     id: String,
     instance: Option<String>,
     name: String,
     depencies: Vec<Unit>,
     desc: String,
     documnetation: String,
-    fragment_path: String,
-    source_path: String,
-    fragment_mtine: u128,
-    source_mtime: u128,
-    dropin_mtime: u64,
+    config_file_path: String,
+    config_file_mtime: u128,
     
-    units_by_type: Vec<Unit>,
-    has_requires_mounts_for: Vec<Unit>,
     load_queue: Vec<Unit>,
-    dbus_queue: Vec<Unit>,
     cleanup_queue: Vec<Unit>,
-    gc_queue: Vec<Unit>,
-    cgroup_queue: Vec<Unit>,
     pids: HashSet<u64>,
     sigchldgen: u64,
-    gc_marker: u64,
     deseialize_job: i32,
     load_error: i32,
     stop_when_unneeded: bool,
-    refuse_manual_start: bool,
-    allow_isolate: bool,
-    ignore_on_isolate: bool,
-    ignore_on_snapshot: bool,
-    condition_result: bool,
-    assert_result: bool,
     transient: bool,
     in_load_queue: bool,
-    in_dubs_queue: bool,
-    in_cleanup_queue: bool,
-    in_gc_queue: bool,
     default_dependencies: bool,
-    perpetual: bool,
-    conf: Option<unit_load::Conf>,
+    conf: Option<unit_config_parser::Conf>,
     manager: Option<RefCell<UnitManager>>,
 }
 
@@ -162,38 +133,18 @@ impl Unit {
             depencies: Vec::<Unit>::new(),
             desc: String::from(""),
             documnetation: null_str!(""),
-            fragment_path: null_str!(""),
-            source_path: null_str!(""),
-            fragment_mtine: 0,
-            source_mtime: 0,
-            dropin_mtime: 0,
-            units_by_type: Vec::<Unit>::new(),
-            has_requires_mounts_for: Vec::<Unit>::new(),
+            config_file_path: null_str!(""),
+            config_file_mtime: 0,
             load_queue: Vec::<Unit>::new(),
-            dbus_queue: Vec::<Unit>::new(),
             cleanup_queue: Vec::<Unit>::new(),
-            gc_queue: Vec::<Unit>::new(),
-            cgroup_queue: Vec::<Unit>::new(),
+            deseialize_job:0,
             pids: HashSet::<u64>::new(),
             sigchldgen: 0,
-            gc_marker: 0,
-            deseialize_job: 0,
             load_error: 0,
             stop_when_unneeded: false,
-            refuse_manual_start: false,
-            allow_isolate: false,
-            ignore_on_isolate: false,
-            ignore_on_snapshot: false,
-            condition_result: false,
-            assert_result: false,
             transient: false,
             in_load_queue: false,
-            in_dubs_queue: false,
-            in_cleanup_queue: false,
-            in_gc_queue: false,
             default_dependencies: true,
-            perpetual: false,
-            unit_file_state: UnitFileState::UnitFileStateInvalid,
             manager: None,
             conf: None,
         }
@@ -221,24 +172,6 @@ impl Unit {
         if !self.unit_load_dropin() {
             return false;
         }
-
-        if !self.source_path.is_empty() {
-            match fs::metadata(&self.source_path) {
-                Ok(metadata) => match metadata.modified() {
-                    Ok(time) => {
-                        self.source_mtime = time_util::timespec_load(time);
-                    },
-                    _ => {
-                        self.source_mtime = 0;
-                    },
-                }
-
-                _ => {
-                    self.source_mtime = 0;
-                }
-            }
-        }
-
         return true;
 
     }
@@ -271,13 +204,13 @@ impl Unit {
 		}
             }
 	}
-	
-        if self.fragment_path != unit_path {
-            self.fragment_path = unit_path;
+
+        if self.config_file_path!= unit_path {
+            self.config_file_path = unit_path;
         }
 
-        if !self.fragment_path.is_empty() {
-            let file = File::open(&self.fragment_path);
+        if !self.config_file_path.is_empty() {
+            let file = File::open(&self.config_file_path);
             let time: SystemTime;
 
             match file {
@@ -286,26 +219,23 @@ impl Unit {
                     match f.metadata(){
                         Err(e) => return false,
                         Ok(m) => 
-			    if (m.is_file() && m.len() <=0) || m.file_type().is_char_device() {
-                                self.load_state = UnitLoadState::UNIT_MASKED;
-                                if self.perpetual {
-                                    self.load_state = UnitLoadState::UNIT_LOADED;
-                                }
-                                self.fragment_mtine = 0;
+                            if (m.is_file() && m.len() <=0) || m.file_type().is_char_device() {
+                                self.load_state = UnitLoadState::UNIT_LOADED;
+                                self.config_file_mtime = 0;
                             } else {
                                 self.load_state = UnitLoadState::UNIT_LOADED;
-                                // self.fragment_mtine = time_util::timespec_load(time);
-                                match unit_load::unit_file_load(self.fragment_path.to_string()) {
-                                    Ok(conf) => {self.conf = Some(conf);},
+                                match unit_config_parser::unit_file_load(self.config_file_path.to_string()) {
+                                    Ok(conf) => self.conf = Some(conf),
                                     Err(e) => {
-					return false;
-				    },
+                                        return false;
+                                    },
                                 }
                             }
                     },
             }
           
-            println!("fragmeng_mtime is: {}", self.fragment_mtine);
+            println!("config file _mtime is: {}", self.config_file_mtime);
+
         }
 
         return true;
@@ -324,9 +254,9 @@ impl <'l> Default for Unit<'l> {
             depencies: Vec::<Unit>::new(),
             desc: String::from(""),
             documnetation: null_str!(""),
-            fragment_path: null_str!(""),
+            config_file_path: null_str!(""),
             source_path: null_str!(""),
-            fragment_mtine: 0,
+            config_file_mtime: 0,
             source_mtime: 0,
             dropin_mtime: 0,
             units_by_type: Vec::<Unit>::new(),
@@ -393,16 +323,12 @@ fn unit_new(manager: RefCell<UnitManager>, unit_type: UnitType) -> Box<dyn UnitO
         UnitType::UnitService => {
             return Box::new(service::ServiceUnit::new(unit))
         },
-        UnitType::UnitSocket => {
+        UnitType::UnitTarget => {
             return Box::new(service::ServiceUnit::new(unit))
-        }
-        UnitType::UnitTarget => Box::new(service::ServiceUnit::new(unit)),
-        UnitType::UnitDevice => Box::new(service::ServiceUnit::new(unit)),
-        UnitType::UnitDevice => Box::new(service::ServiceUnit::new(unit)),
-        UnitType::UnitTimer => Box::new(service::ServiceUnit::new(unit)),
-        (_) => Box::new(service::ServiceUnit::new(unit)),
-        //TODO
-
+        },
+        _ => {
+            return Box::new(service::ServiceUnit::new(unit))
+        },
         /*
         UnitPath,
         UnitSlice,
