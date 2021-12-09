@@ -103,9 +103,9 @@ impl ServiceUnit {
         }
     }
 
-    pub fn unit_load_fragment_and_dropin(&mut self) -> bool {
+    pub fn unit_service_load_and_parse(&mut self) -> bool {
         println!("load frament and dropin");
-        return self.service_unit.unit_load_fragment_and_dropin(true);
+        return self.service_unit.unit_load_and_parse(true);
     }
 
     pub fn service_add_extras(&mut self) -> Result<isize, io::Error> {
@@ -128,7 +128,7 @@ impl unit::UnitObj for ServiceUnit {
     }
     fn done(&self) { todo!() }
     fn load(&mut self) -> bool { 
-        if !self.unit_load_fragment_and_dropin() {
+        if !self.unit_service_load_and_parse() {
             return false;
         }
 

@@ -1,3 +1,5 @@
+extern crate siphasher;
+
 use super::manager;
 use super::service;
 use std::io;
@@ -8,6 +10,10 @@ use std::sync::Arc;
 use std::fs::File;
 use std::time::SystemTime;
 use std::os::unix::fs::FileTypeExt;
+use siphasher::sip::SipHasher24;
+use std::hash::Hasher;
+use walkdir::WalkDir;
+use std::path::Path;
 
 use utils:: {time_util, path_lookup, unit_load};
 
@@ -115,7 +121,7 @@ pub struct Unit {
     default_dependencies: bool,
     perpetual: bool,
     conf: Option<unit_load::Conf>,
-    manager: Option<Arc<UnitManager>>,
+    manager: Option<RefCell<UnitManager>>,
 }
 
 pub trait UnitObj {
@@ -150,7 +156,7 @@ impl Unit {
         Unit{
             unit_type: UnitType::UnitTypeInvalid,
             load_state: UnitLoadState::UNIT_STUB,
-            id: String::from(""),
+            id: String::from("config.toml"),
             instance: Some(String::from("")),
             name: String::from(""),
             depencies: Vec::<Unit>::new(),
@@ -192,7 +198,7 @@ impl Unit {
             conf: None,
         }
     }
-    pub fn set_manager(&mut self,manager: Option<Arc<UnitManager>>) {
+    pub fn set_manager(&mut self,manager: Option<RefCell<UnitManager>>) {
         self.manager = manager;
     }
     
@@ -200,8 +206,8 @@ impl Unit {
         self.load_state = load_state;
     }
 
-    pub fn unit_load_fragment_and_dropin(&mut self, frament_required: bool) -> bool {
-        if !self.unit_load_fragment() {
+    pub fn unit_load_and_parse(&mut self, frament_required: bool) -> bool {
+        if !self.unit_config_parse() {
             return false;
         }
 
@@ -238,21 +244,36 @@ impl Unit {
     }
 
     fn unit_load_dropin(&mut self) -> bool { 
-        todo!();
         true
     }
 
-    fn unit_load_fragment(&mut self) -> bool {
+    fn unit_config_parse(&mut self) -> bool {
         let r: isize = 0;
-        let fragment: String = String::from("/usr/lib/systemd/system/dbus.service");
+        let unit_path: String;
 
         if self.transient {
             self.load_state = UnitLoadState::UNIT_LOADED;
             return true;
         }
+	
+	match &mut self.manager {
+            None => {return false;},
+	    Some(manager) => {
+		let mut m = manager.borrow_mut();
+		m.build_name_map();
 
-        if self.fragment_path != fragment {
-            self.fragment_path = fragment;
+		match m.get_unit_file_path(&self.id) {
+		    Some(v) => {unit_path = v.to_string()},
+	     	    None => {
+			log::error!("not find unit file {}", self.id);
+			return false;
+		    },
+		}
+            }
+	}
+	
+        if self.fragment_path != unit_path {
+            self.fragment_path = unit_path;
         }
 
         if !self.fragment_path.is_empty() {
@@ -265,8 +286,7 @@ impl Unit {
                     match f.metadata(){
                         Err(e) => return false,
                         Ok(m) => 
-
-			    if ((m.is_file() && m.len() <=0) || m.file_type().is_char_device()) {
+			    if (m.is_file() && m.len() <=0) || m.file_type().is_char_device() {
                                 self.load_state = UnitLoadState::UNIT_MASKED;
                                 if self.perpetual {
                                     self.load_state = UnitLoadState::UNIT_LOADED;
@@ -276,27 +296,21 @@ impl Unit {
                                 self.load_state = UnitLoadState::UNIT_LOADED;
                                 // self.fragment_mtine = time_util::timespec_load(time);
                                 match unit_load::unit_file_load(self.fragment_path.to_string()) {
-                                    Ok(conf) => self.conf = Some(conf),
+                                    Ok(conf) => {self.conf = Some(conf);},
                                     Err(e) => {
-					return false;},
+					return false;
+				    },
                                 }
                             }
                     },
             }
-
           
             println!("fragmeng_mtime is: {}", self.fragment_mtine);
-
         }
 
         return true;
-
     }
 
-
-    fn unit_file_build_name_map(&mut self) { 
-        todo!()
-    }
 }
 /*
 impl <'l> Default for Unit<'l> {
@@ -372,7 +386,7 @@ impl  UnitObj for MountUnit{
     fn reset_failed(&self) { todo!() }
 }
 
-fn unit_new(manager: Arc<UnitManager>, unit_type: UnitType) -> Box<dyn UnitObj> {
+fn unit_new(manager: RefCell<UnitManager>, unit_type: UnitType) -> Box<dyn UnitObj> {
     let mut unit = Unit::new();
     unit.set_manager(Some(manager));
     match unit_type {
@@ -404,8 +418,8 @@ pub struct UnitManager {
     units: RefCell<HashMap<String, RefCell<Box<dyn UnitObj>>>>,
     unit_id_map: HashMap<String, String>,
     unit_name_map: HashMap<String, String>,
-    lookup_path: RefCell<path_lookup::LookupPaths>,
-    unit_cache_timestamp_hash: u64,
+    lookup_path: path_lookup::LookupPaths,
+    last_updated_timestamp_hash: u64,
 
 }
 
@@ -415,14 +429,78 @@ impl UnitManager{
             units: RefCell::new(HashMap::new()),
             unit_id_map: HashMap::new(),
             unit_name_map: HashMap::new(),
-            unit_cache_timestamp_hash:0,
-            lookup_path: RefCell::new(path_lookup::LookupPaths::new()),
+            last_updated_timestamp_hash: 0,
+            lookup_path: path_lookup::LookupPaths::new(),
         }
     }
 
     pub fn insert_unit(&self, name: String, unit: Box<dyn UnitObj>) {
-	let mut units = self.units.borrow_mut();
-	units.insert(name, RefCell::new(unit));
+	    let mut units = self.units.borrow_mut();
+	    units.insert(name, RefCell::new(unit));
+    }
+
+    pub fn build_name_map(&mut self) -> bool {
+	let mut timestamp_hash_new: u64 = 0;
+        if !self.lookup_paths_updated(&mut timestamp_hash_new) {
+            return false;
+        }
+
+        for dir in &self.lookup_path.search_path {
+	    if !std::path::Path::new(&dir).exists() {
+                log::warn!("dir {} is not exist", dir);
+		continue;
+	    }
+            for entry in WalkDir::new(&dir)
+	    .max_depth(1)
+            .into_iter() {
+		let entry = entry.unwrap();
+                let filename = entry.file_name().to_str().unwrap().to_string();
+                let file_path = entry.path().to_str().unwrap().to_string();
+		if self.unit_id_map.contains_key(&filename) {
+		    continue;
+		} 
+                self.unit_id_map.insert(filename, file_path);
+            }
+        }
+	self.last_updated_timestamp_hash = timestamp_hash_new;
+        return true;
+    }
+
+    pub fn get_unit_file_path(&self, unit_name: &str) -> Option<&String> {
+	match self.unit_id_map.get(unit_name) {
+	    None => { return None; },
+	    Some(v) => {
+		return Some(v);
+	    },
+	}
+    }
+
+    fn lookup_paths_updated(&mut self, timestamp_new: &mut u64) -> bool {
+        let updated: u64;
+        let mut siphash24 = SipHasher24::new_with_keys(0, 0);
+        for dir in &self.lookup_path.search_path {
+	    match fs::metadata(&dir) {
+                Ok(metadata) => match metadata.modified() {
+                    Ok(time) => {
+                        siphash24.write_u128(time_util::timespec_load(time));
+                    },
+                    _ => {
+                        log::error!("failed to get mtime {}", dir);
+                    },
+                }
+                _ => {
+                    log::error!("failed to get metadata of {}", dir);
+                }
+            }
+        }
+
+        updated = siphash24.finish();
+        *timestamp_new = updated;
+        return updated != self.last_updated_timestamp_hash;
+    }
+
+    pub fn init_lookup_path(&mut self) {
+        self.lookup_path.init_lookup_paths();
     }
 }
 
@@ -463,16 +541,19 @@ mod tests {
     
     #[test]
     fn  test_mangerplugin(){
-        let unit_manger = UnitManager::new();
+        let mut unit_manager = UnitManager::new();
+
+        unit_manager.init_lookup_path();
         let mut mp = manager::MangerLoader::new();
-        mp.load_plugins(Box::new(unit_manger));
+        mp.load_plugins(Box::new(unit_manager));
         assert_eq!(mp.run(),0);
     }
 
     #[test]
     fn  test_unit_load(){
-        let unit_manager = UnitManager::new();
-        let mut unit = unit_new(Arc::new(unit_manager), UnitType::UnitService);
+        let mut unit_manager = UnitManager::new();
+        unit_manager.init_lookup_path();
+        let mut unit = unit_new(RefCell::new(unit_manager), UnitType::UnitService);
         // unit_manager.insert_unit(String::from("systemd"), unit);
         assert_eq!(unit.load(), true);
     }
