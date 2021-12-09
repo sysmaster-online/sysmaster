@@ -9,4 +9,9 @@
 - [openEuler贡献攻略](https://www.openeuler.org/zh/community/contribution/)。
 - [行为准则](https://www.openeuler.org/zh/community/conduct/)
 
+我们强烈推荐，
+
+- 在linux下开发
+- 提交代码前，先执行requirements.sh脚本，安装必要的代码检查工具
+
 我们会以issue的方式发布任务, 欢迎感兴趣的同学认领.
