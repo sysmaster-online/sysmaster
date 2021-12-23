@@ -17,8 +17,6 @@ pub trait  Mangerobj {
     fn event_dispatch(&self) -> Option<i32>;
 }
 
-
-
 pub struct MangerLoader  {
     pub managers: Vec<Box <dyn Mangerobj>>,
 }

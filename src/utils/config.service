@@ -1,0 +1,12 @@
+[Unit]
+Description="CN"
+Documentation="192.168.1.1"
+Requires="c.service"
+Wants = "b.service"
+
+[Service]
+ExecStart="/usr/bin/reboot"
+
+
+[Install]
+WantedBy="dbus"

@@ -4,73 +4,76 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind};
  
-#[derive(Deserialize)]
-#[derive(Debug)]
-struct ConfUnit {
+#[derive(Debug, Deserialize)]
+pub struct ConfUnit {
     #[serde(alias = "Description")]
-    description: Option<String>,
+    pub description: Option<String>,
     #[serde(alias = "Documentation")]
-    documentation: Option<String>,
+    pub documentation: Option<String>,
     #[serde(alias = "Requires")]
-    requires: Option<String>,
+    pub requires: Option<String>,
     #[serde(alias = "Wants")]
-    wants: Option<String>,
+    pub wants: Option<String>,
+    #[serde(alias = "Before")]
+    pub before: Option<String>,
+    #[serde(alias = "After")]
+    pub after: Option<String>,
 }
 
-#[derive(Deserialize)]
-#[derive(Debug)]
-struct ConfService {
+#[derive(Debug, Deserialize)]
+pub struct ConfService {
     #[serde(alias = "ExecStart")]
-    exec_start: Option<String>,
+    pub exec_start: Option<String>,
     #[serde(alias = "Sockets")]
-    sockets: Option<String>,
+    pub sockets: Option<String>,
     #[serde(alias = "Restart")]
-    restart: Option<String>,
+    pub restart: Option<String>,
     #[serde(alias = "RestrictRealtime")]
-    restrict_realtime: Option<String>,
+    pub restrict_realtime: Option<String>,
     #[serde(alias = "RebootArgument")]
-    reboot_argument: Option<String>,
+    pub reboot_argument: Option<String>,
     #[serde(alias = "ExecReload")]
-    exec_reload: Option<String>,
+    pub exec_reload: Option<String>,
     #[serde(alias = "OOMScoreAdjust")]
-    oom_score_adjust: Option<String>,
+    pub oom_score_adjust: Option<String>,
     #[serde(alias = "RestartSec")]
-    restart_sec: Option<u64>,
+    pub restart_sec: Option<u64>,
     #[serde(alias = "Slice")]
-    slice: Option<String>,
+    pub slice: Option<String>,
     #[serde(alias = "MemoryLimit")]
-    memory_limit: Option<u64>,
+    pub memory_limit: Option<u64>,
     #[serde(alias = "MemoryLow")]
-    memory_low: Option<u64>,
+    pub memory_low: Option<u64>,
     #[serde(alias = "MemoryMin")]
-    memory_min: Option<u64>,
+    pub memory_min: Option<u64>,
     #[serde(alias = "MemoryMax")]
-    memory_max: Option<u64>,
+    pub memory_max: Option<u64>,
     #[serde(alias = "MemoryHigh")]
-    memory_high: Option<u64>,
+    pub memory_high: Option<u64>,
     #[serde(alias = "MemorySwapMax")]
-    memory_swap_max: Option<u64>,
+    pub memory_swap_max: Option<u64>,
 }
 
-#[derive(Deserialize)]
-#[derive(Debug)]
-struct ConfInstall {
+#[derive(Debug, Deserialize)]
+pub struct ConfInstall {
     #[serde(alias = "WantedBy")]
-    wanted_by: Option<String>,
+    pub wanted_by: Option<String>,
     #[serde(alias = "Alias")]
-    alias: Option<String>,
+    pub alias: Option<String>,
     #[serde(alias = "RequiredBy")]
-    required_by: Option<String>,
+    pub required_by: Option<String>,
     #[serde(alias = "DefaultInstance")]
-    default_instance: Option<String>,
+    pub default_instance: Option<String>,
 }
 
-#[derive(Deserialize)]
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Conf {
-    unit: Option<ConfUnit>,
-    service: Option<ConfService>,
-    install: Option<ConfInstall>,
+    #[serde(alias = "Unit")]
+    pub unit: Option<ConfUnit>,
+    #[serde(alias = "Service")]
+    pub service: Option<ConfService>,
+    #[serde(alias = "Install")]
+    pub install: Option<ConfInstall>,
 }
 
 pub fn unit_file_load(file_path: String) -> Result<Conf, Error> {
@@ -102,10 +105,10 @@ mod tests {
     
     #[test]
     fn  test_unit_file_load() -> Result<(), Error>{
-        let file: String = String::from("config.toml");
-        let conf = match unit_file_load(file) {
+        let file: String = String::from("config.service");
+        match unit_file_load(file) {
             Ok(conf) => {
-                match conf.Install {
+                match conf.install {
                     Some(c) => assert_eq!(c.wanted_by, Some("dbus".to_string())),
                     None => {
                         return Err(Error::new(ErrorKind::Other,
@@ -113,7 +116,8 @@ mod tests {
                     }
                 }
             }
-            Err(e) => { return Err(Error::new(ErrorKind::Other,
+            Err(e) => {
+                return Err(Error::new(ErrorKind::Other,
                 e.to_string()));}
         };
         

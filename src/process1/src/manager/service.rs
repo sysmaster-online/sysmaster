@@ -1,11 +1,15 @@
 use super::unit;
+use std::any::{TypeId, Any};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::io;
-use std::ops::{Deref, DerefMut};
 
+#[derive(PartialEq)]
 struct ExitStatusSet {
 
 }
 
+#[derive(PartialEq)]
 enum ServiceTimeoutFailureMode {
     ServiceTimeoutTerminate,
     ServiceTimeoutAbort,
@@ -14,6 +18,7 @@ enum ServiceTimeoutFailureMode {
     ServiceTimeoutFailureModeInvalid = -1,
 }
 
+#[derive(PartialEq)]
 enum ServiceRestart {
     ServiceRestartNo,
     ServiceRestartOnSuccess,
@@ -44,10 +49,12 @@ impl Default for ServiceType {
 }
 */
 
+#[derive(PartialEq)]
 struct DualTimestamp {
 
 }
 
+#[derive(PartialEq)]
 pub struct ServiceUnit {
     service_unit: unit::Unit,
     service_type: ServiceType,
@@ -148,4 +155,22 @@ impl unit::UnitObj for ServiceUnit {
     fn check_snapshot(&self) { todo!() }
     fn sigchld_events(&self, _: u64, _: i32, _: i32) { todo!() }
     fn reset_failed(&self) { todo!() }
+
+    fn eq(&self, other: &dyn unit::UnitObj) -> bool {
+        if let Some(other) = other.as_any().downcast_ref::<ServiceUnit>() {
+            return self == other;
+        }
+        false
+    }
+
+    fn hash(&self) -> u64 {
+        let mut h = DefaultHasher::new();
+        Hash::hash(&(TypeId::of::<ServiceUnit>()), &mut h);
+        h.write(self.service_unit.id.as_bytes());
+        h.finish()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
