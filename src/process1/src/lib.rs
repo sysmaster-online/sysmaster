@@ -3,3 +3,4 @@ extern crate strum;
 
 pub mod manager;
 pub mod plugin;
+pub mod watchdog;
