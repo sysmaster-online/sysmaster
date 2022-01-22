@@ -1,11 +1,10 @@
 extern crate siphasher;
 
-use super::manager;
-use super::service;
+use super::{manager, service};
 use std::any::Any;
 use std::error::Error;
 use std::fs;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashSet, HashMap, VecDeque};
 use std::cell::RefCell;
 use std::fs::File;
 use std::rc::Rc;
@@ -52,10 +51,10 @@ pub enum UnitLoadState {
 }
 
 enum UnitNameFlags {
-    UNIT_NAME_PLAIN =1,
-    UNIT_NAME_INSTANCE = 2,
-    UNIT_NAME_TEMPLATE = 4,
-    UNIT_NAME_ANY = 1|2|4,
+    UnitNamePlain =1,
+    UnitNameInstance = 2,
+    UnitNameTemplate = 4,
+    UnitNameAny = 1|2|4,
 }
 
 enum UnitFileState {
@@ -82,14 +81,12 @@ pub struct Unit {
     pub id: String,
     instance: Option<String>,
     pub name: String,
-    depencies: HashMap<UnitRelations, RefCell<HashSet<Rc<Box<dyn UnitObj>>>>>,
+    dependencies: HashMap<UnitRelations, RefCell<HashSet<UnitObjWrapper>>>,
     desc: String,
     documnetation: String,
     config_file_path: String,
     config_file_mtime: u128,
 
-    load_queue: Vec<Unit>,
-    cleanup_queue: Vec<Unit>,
     pids: HashSet<u64>,
     sigchldgen: u64,
     deseialize_job: i32,
@@ -98,8 +95,7 @@ pub struct Unit {
     transient: bool,
     in_load_queue: bool,
     default_dependencies: bool,
-    conf: Option<Rc<unit_config_parser::Conf>>,
-    manager: Rc<RefCell<UnitManager>>,
+    pub conf: Option<Rc<unit_config_parser::Conf>>,
 }
 
 impl PartialEq for Unit {
@@ -111,7 +107,7 @@ impl PartialEq for Unit {
 pub trait UnitObj {
     fn init(&self){}
     fn done(&self){}
-    fn load(&mut self) -> bool {false}
+    fn load(&mut self, _manager: &mut UnitManager) -> Result<(), Box<dyn Error>> {Ok(())}
     fn coldplug(&self){}
     fn dump(&self){}
     fn start(&self){}
@@ -121,7 +117,7 @@ pub trait UnitObj {
     fn check_gc(&self)->bool;
     fn release_resources(&self){}
     fn check_snapshot(&self){}
-    fn sigchld_events(&self, pid:u64,code:i32, status:i32){}
+    fn sigchld_events(&self, _pid:u64,_code:i32, _status:i32){}
     fn reset_failed(&self){}
 
     fn eq(&self, other: &dyn UnitObj) -> bool;
@@ -143,6 +139,16 @@ impl Hash for Box<dyn UnitObj> {
         state.write_u64(key_hash);
     }
 }
+
+#[derive(Eq, PartialEq)]
+struct UnitObjWrapper(Rc<RefCell<Box<dyn UnitObj>>>);
+
+impl Hash for UnitObjWrapper {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.borrow().hash(state);
+    }
+}
+
 // #[derive(Hash, PartialEq, Eq)]
 struct MountUnit {
     mount_unit:Unit,
@@ -156,20 +162,18 @@ macro_rules! null_str{
 }
 
 impl Unit {
-    pub fn new(manager: Rc<RefCell<UnitManager>>, name: String) -> Self {
+    pub fn new(name: String) -> Self {
         Unit{
             unit_type: UnitType::UnitTypeInvalid,
             load_state: UnitLoadState::UnitStub,
             id: name,
             instance: Some(String::from("")),
             name: String::from(""),
-            depencies: HashMap::new(),
+            dependencies: HashMap::new(),
             desc: String::from(""),
             documnetation: null_str!(""),
             config_file_path: null_str!(""),
             config_file_mtime: 0,
-            load_queue: Vec::<Unit>::new(),
-            cleanup_queue: Vec::<Unit>::new(),
             deseialize_job:0,
             pids: HashSet::<u64>::new(),
             sigchldgen: 0,
@@ -178,7 +182,6 @@ impl Unit {
             transient: false,
             in_load_queue: false,
             default_dependencies: true,
-            manager: manager,
             conf: None,
         }
     }
@@ -187,44 +190,40 @@ impl Unit {
         self.load_state = load_state;
     }
 
-    pub fn unit_load_and_parse(&mut self, frament_required: bool) -> bool {
-        if !self.unit_config_parse() {
-            return false;
-        }
+    pub fn unit_load(&mut self, manager: &mut UnitManager, frament_required: bool) -> Result<(), Box<dyn Error>> {
+        self.unit_config_load(manager)?;
 
         if self.load_state == UnitLoadState::UnitStub {
                 if frament_required {
-                    return false;
+                    return Ok(());
                 }
                 self.load_state = UnitLoadState::UnitLoaded;
         }
 
-        if !self.unit_load_dropin() {
-            return false;
-        }
-        return true;
+        self.unit_load_dropin()?;
+        return Ok(());
 
     }
 
-    fn unit_load_dropin(&mut self) -> bool {
-        true
+    fn unit_load_dropin(&mut self) -> Result<(), Box<dyn Error>> {
+        Ok(())
     }
 
-    fn unit_config_parse(&mut self) -> bool {
+    fn unit_config_load(&mut self, manager: &mut UnitManager) -> Result<(), Box<dyn Error>> {
         let unit_path: String;
 
         if self.transient {
             self.load_state = UnitLoadState::UnitLoaded;
-            return true;
+            return Ok(());
         }
 
-        self.build_name_map();
+        self.build_name_map(manager);
 
-        match self.get_unit_file_path() {
+        match self.get_unit_file_path(manager) {
             Some(v) => {unit_path = v.to_string()},
             None => {
-                log::error!("not find unit file {}", self.id);
-                return false;
+                log::error!("not found unit file {}", self.id);
+                return Err(format!("not found unit file {}", self.id).into());
             },
         }
 
@@ -233,51 +232,39 @@ impl Unit {
             self.config_file_path = unit_path;
         }
 
-        if !self.config_file_path.is_empty() {
-            let file = File::open(&self.config_file_path);
-
-            match file {
-                Err(_e) => {println!("open file failed**********************");return false;},
-                Ok(f) =>
-                    match f.metadata(){
-                        Err(e) => return false,
-                        Ok(m) =>
-                            if (m.is_file() && m.len() <=0) || m.file_type().is_char_device() {
-                                self.load_state = UnitLoadState::UnitLoaded;
-                                self.config_file_mtime = 0;
-                            } else {
-                                self.load_state = UnitLoadState::UnitLoaded;
-                                match unit_config_parser::unit_file_load(self.config_file_path.to_string()) {
-                                    Ok(conf) => self.conf = Some(Rc::new(conf)),
-                                    Err(e) => {
-                                        return false;
-                                    },
-                                }
-                            }
-                    },
-            }
-
-            match self.unit_config_parse_relations() {
-                Err(e) => { println!("{}", e); return false;}
-                _ => true,
-            };
-            log::info!("config file _mtime is: {}", self.config_file_mtime);
+        if self.config_file_path.is_empty() {
+            return Err(format!("config file path is empty").into());
         }
 
-        return true;
+        let file = File::open(&self.config_file_path)?;
+        let meta = file.metadata()?;
+
+        if (meta.is_file() && meta.len() <=0) || meta.file_type().is_char_device() {
+            self.load_state = UnitLoadState::UnitLoaded;
+            self.config_file_mtime = 0;
+        } else {
+            let mtime = meta.modified()?;
+            self.config_file_mtime = time_util::timespec_load(mtime);
+            self.load_state = UnitLoadState::UnitLoaded;
+            match unit_config_parser::unit_file_load(self.config_file_path.to_string()) {
+                Ok(conf) => self.conf = Some(Rc::new(conf)),
+                Err(e) => {
+                    return Err(format!("file load err {:?}", e).into());
+                },
+            }
+
+            log::debug!("config file mtime is: {}", self.config_file_mtime);
+        }
+
+        return Ok(());
     }
 
-    fn build_name_map(&self) {
-        let manager = self.manager.clone();
-        let mut m = manager.borrow_mut();
-        m.build_name_map();
+    fn build_name_map(&self, manager: &mut UnitManager) {
+        manager.build_name_map();
     }
 
-    fn get_unit_file_path(&self) -> Option<String> {
-        let manager = self.manager.clone();
-        let m = manager.borrow();
-
-        match m.get_unit_file_path(&self.id) {
+    fn get_unit_file_path(&self, manager: &mut UnitManager) -> Option<String> {
+        match manager.get_unit_file_path(&self.id) {
             Some(v) => { return  Some(v.to_string())},
             None => {
                 log::error!("not find unit file {}", self.id);
@@ -286,94 +273,44 @@ impl Unit {
         }
     }
 
-    fn unit_config_parse_relations(&mut self) -> Result<(), Box<dyn Error>> {
-        // impl ugly
-        if self.conf.is_none() {
-            return Err(format!("load config file failed").into());
-        }
-        let conf = self.conf.as_ref().unwrap().clone();
-
-        if conf.unit.is_none() {
-            return Err(format!("config unit section is not configured").into());
-        }
-        let unit = conf.unit.as_ref().unwrap();
-
-        match &unit.wants {
-            None => {},
-            Some(w) => {
-                self.parse_unit_relations(w, UnitRelations::UnitWants)?;
-            }
-        }
-
-        match &unit.before {
-            None => {},
-            Some(w) => {
-                self.parse_unit_relations(w, UnitRelations::UnitBefore)?;
-            }
-        }
-
-        match &unit.after {
-            None => {},
-            Some(w) => {
-                self.parse_unit_relations(w, UnitRelations::UnitAfter)?;
-            }
-        }
-
-        match &unit.requires {
-            None => {},
-            Some(w) => {
-                self.parse_unit_relations(w, UnitRelations::UnitRequires)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn parse_unit_relations(&mut self, units: &str, relation: UnitRelations) -> Result<(), Box<dyn Error>> {
+    fn parse_unit_relations(&mut self, manager: &mut UnitManager, units: &str, relation: UnitRelations) -> Result<(), Box<dyn Error>> {
         let units = units.split_whitespace();
         for unit in units {
-            self.parse_unit_relation(unit, relation)?;
+            self.parse_unit_relation(manager, unit, relation)?;
         }
         Ok(())
     }
 
-    fn parse_unit_relation(&mut self, unit_name: &str, relation: UnitRelations) -> Result<(), Box<dyn Error>> {
+    fn parse_unit_relation(&mut self, manager: &mut UnitManager, unit_name: &str, relation: UnitRelations) -> Result<(), Box<dyn Error>> {
         log::debug!("parse relation unit relation name is {}, relation is {:?}", unit_name, relation);
 
-        let unit_type = self.unit_name_to_type(unit_name);
+        let unit_type = manager.unit_name_to_type(unit_name);
         if unit_type == UnitType::UnitTypeInvalid {
             return Err(format!("invalid unit type of unit {}", unit_name).into());
         }
 
-        let manager = self.manager.clone();
-        let other = if let Some(unit) = manager.borrow().get_unit_on_name(&unit_name) {
-             unit
+        let other = if let Some(_unit) = manager.get_unit_on_name(&unit_name) {
+             return Ok(());
         } else {
-            let unit = unit_new(self.manager.clone(), unit_type, unit_name.to_string());
-            // todo
-            // can not call unit.load() directily because manager already borrowed mut, will be borrowed error;
-            Rc::new(unit)
+            let unit = unit_new(unit_type, unit_name.to_string());
+            let u = Rc::new(RefCell::new(unit));
+            manager.push_load_queue(u.clone());
+            u
         };
 
+        manager.insert_unit(unit_name.to_string(), other.clone());
         self.unit_update_dependency(relation, other.clone());
         Ok(())
     }
 
-    fn unit_name_to_type(&self, unit_name: &str) -> UnitType {
-        let words: Vec<&str> = unit_name.split(".").collect();
-        match words[words.len()-1] {
-            "service" => UnitType::UnitService,
-            "target" => UnitType::UnitTarget,
-            _ => UnitType::UnitTypeInvalid,
-        }
-    }
+    fn unit_update_dependency(&mut self, relation: UnitRelations, other: Rc<RefCell<Box<dyn UnitObj>>>) {
 
-    fn unit_update_dependency(&mut self, relation: UnitRelations, other: Rc<Box<dyn UnitObj>>) {
-
-        if !self.depencies.contains_key(&relation.clone()) {
-            self.depencies.insert(relation.clone(), RefCell::new(HashSet::new()));
+        if !self.dependencies.contains_key(&relation.clone()) {
+            self.dependencies.insert(relation.clone(), RefCell::new(HashSet::new()));
         }
 
-        self.depencies.get(&relation).unwrap().borrow_mut().insert(other.clone());
+        let mut dependencies = self.dependencies.get(&relation).unwrap().borrow_mut();
+        dependencies.insert(UnitObjWrapper(other.clone()));
     }
  }
 
@@ -434,7 +371,7 @@ impl UnitObj for Unit{
     }
     fn check_gc(&self) -> bool { todo!() }
 
-    fn eq(&self, other: &dyn UnitObj) -> bool {
+    fn eq(&self, _other: &dyn UnitObj) -> bool {
         todo!()
     }
 
@@ -450,7 +387,7 @@ impl UnitObj for Unit{
 impl  UnitObj for MountUnit{
     fn init(&self) { todo!() }
     fn done(&self) { todo!() }
-    fn load(&mut self) -> bool { todo!() }
+    fn load(&mut self, _manager: &mut UnitManager) -> Result<(), Box<dyn Error>> { todo!() }
     fn coldplug(&self) { todo!() }
     fn start(&self) { todo!() }
     fn dump(&self) { todo!() }
@@ -463,7 +400,7 @@ impl  UnitObj for MountUnit{
     fn sigchld_events(&self, _: u64, _: i32, _: i32) { todo!() }
     fn reset_failed(&self) { todo!() }
 
-    fn eq(&self, other: &dyn UnitObj) -> bool {
+    fn eq(&self, _other: &dyn UnitObj) -> bool {
         todo!()
     }
 
@@ -476,8 +413,8 @@ impl  UnitObj for MountUnit{
     }
 }
 
-fn unit_new(manager: Rc<RefCell<UnitManager>>, unit_type: UnitType, name: String) -> Box<dyn UnitObj> {
-    let unit = Unit::new(manager, name);
+fn unit_new(unit_type: UnitType, name: String) -> Box<dyn UnitObj> {
+    let unit = Unit::new(name);
 
     match unit_type {
         UnitType::UnitService => {
@@ -493,12 +430,12 @@ fn unit_new(manager: Rc<RefCell<UnitManager>>, unit_type: UnitType, name: String
 }
 
 pub struct UnitManager {
-    units: RefCell<HashMap<String, Rc<Box<dyn UnitObj>>>>,
+    units: RefCell<HashMap<String, Rc<RefCell<Box<dyn UnitObj>>>>>,
     unit_id_map: HashMap<String, String>,
     unit_name_map: HashMap<String, String>,
     lookup_path: path_lookup::LookupPaths,
     last_updated_timestamp_hash: u64,
-
+    load_queue: VecDeque<Rc<RefCell<Box<dyn UnitObj>>>>,
 }
 
 impl UnitManager{
@@ -509,15 +446,16 @@ impl UnitManager{
             unit_name_map: HashMap::new(),
             last_updated_timestamp_hash: 0,
             lookup_path: path_lookup::LookupPaths::new(),
+            load_queue: VecDeque::new(),
         }
     }
 
-    pub fn insert_unit(&self, name: String, unit: Rc<Box<dyn UnitObj>>) {
+    pub fn insert_unit(&self, name: String, unit: Rc<RefCell<Box<dyn UnitObj>>>) {
 	    let mut units = self.units.borrow_mut();
 	    units.insert(name, unit);
     }
 
-    pub fn get_unit_on_name(&self, name: &str) -> Option<Rc<Box<dyn UnitObj>>> {
+    pub fn get_unit_on_name(&self, name: &str) -> Option<Rc<RefCell<Box<dyn UnitObj>>>> {
         self.units.borrow().get(name).and_then(|u| Some(u.clone()))
     }
 
@@ -529,15 +467,16 @@ impl UnitManager{
 
         for dir in &self.lookup_path.search_path {
             if !std::path::Path::new(&dir).exists() {
-                    log::warn!("dir {} is not exist", dir);
-            continue;
+                log::warn!("dir {} is not exist", dir);
+                continue;
 	        }
             for entry in WalkDir::new(&dir)
+                .min_depth(1)
 	            .max_depth(1)
                 .into_iter() {
                 let entry = entry.unwrap();
-                        let filename = entry.file_name().to_str().unwrap().to_string();
-                        let file_path = entry.path().to_str().unwrap().to_string();
+                let filename = entry.file_name().to_str().unwrap().to_string();
+                let file_path = entry.path().to_str().unwrap().to_string();
                 if self.unit_id_map.contains_key(&filename) {
                     continue;
                 }
@@ -585,6 +524,70 @@ impl UnitManager{
         self.lookup_path.init_lookup_paths();
     }
 
+
+    pub fn dispatch_load_queue(&mut self) {
+        log::debug!("dispatch load queue");
+
+        loop {
+            match self.load_queue.pop_front() {
+                None => {break},
+                Some(unit) => {
+                    match unit.borrow_mut().load(self) {
+                        Ok(()) => {continue},
+                        Err(e) => {
+                            log::error!("load unit config failed: {}", e.to_string())
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn push_load_queue(&mut self, unit: Rc<RefCell<Box<dyn UnitObj>>>) {
+        self.load_queue.push_back(unit);
+    }
+
+    pub fn unit_name_to_type(&self, unit_name: &str) -> UnitType {
+        let words: Vec<&str> = unit_name.split(".").collect();
+        match words[words.len()-1] {
+            "service" => UnitType::UnitService,
+            "target" => UnitType::UnitTarget,
+            _ => UnitType::UnitTypeInvalid,
+        }
+    }
+
+
+    fn prepare_unit(&mut self, name: &str) -> Option<Rc<RefCell<Box<dyn UnitObj>>>> { 
+        let unit_type = self.unit_name_to_type(name);
+        if unit_type == UnitType::UnitTypeInvalid {
+            return None;
+        }
+
+        let unit = unit_new(unit_type, name.to_string());
+        let u = Rc::new(RefCell::new(unit));
+        self.insert_unit(name.to_string(), u.clone());
+
+        Some(u.clone())
+    }
+
+    pub fn load_unit(&mut self, name: &str) -> Option<Rc<RefCell<Box<dyn UnitObj>>>> {
+        if let Some(unit) = self.get_unit_on_name(name) {
+             return Some(unit);
+        }; 
+
+        let unit = self.prepare_unit(name);
+        let u = if let Some(u) = unit {
+            u
+        } else {
+            return None;
+        };
+
+        self.push_load_queue(u.clone());
+
+        self.dispatch_load_queue();
+
+        Some(u.clone())
+    }
 }
 
 impl  manager::Mangerobj for UnitManager  {
@@ -616,16 +619,65 @@ impl  manager::Mangerobj for UnitManager  {
     }
 }
 
+pub trait ConfigParser {
+    fn parse(&mut self, _manager: &mut UnitManager) -> Result<(), Box<dyn Error>> { Ok(())}
+}
+
+impl ConfigParser for Unit {
+    fn parse(&mut self, manager: &mut UnitManager)  -> Result<(), Box<dyn Error>> {
+        // impl ugly
+        if self.conf.is_none() {
+            return Err(format!("load config file failed").into());
+        }
+        let conf = self.conf.as_ref().unwrap().clone();
+
+        if conf.unit.is_none() {
+            return Err(format!("config unit section is not configured").into());
+        }
+        let unit = conf.unit.as_ref().unwrap();
+
+        match &unit.wants {
+            None => {},
+            Some(w) => {
+                self.parse_unit_relations(manager, w, UnitRelations::UnitWants)?;
+            }
+        }
+
+        match &unit.before {
+            None => {},
+            Some(w) => {
+                self.parse_unit_relations(manager, w, UnitRelations::UnitBefore)?;
+            }
+        }
+
+        match &unit.after {
+            None => {},
+            Some(w) => {
+                self.parse_unit_relations(manager, w, UnitRelations::UnitAfter)?;
+            }
+        }
+
+        match &unit.requires {
+            None => {},
+            Some(w) => {
+                self.parse_unit_relations(manager, w, UnitRelations::UnitRequires)?;
+            }
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
+    use crate::manager::service::ServiceUnit;
+
     use super::*;
 
     #[test]
     fn  test_mangerplugin(){
         let mut unit_manager = UnitManager::new();
-
         unit_manager.init_lookup_path();
+
         let mut mp = manager::MangerLoader::new();
         mp.load_plugins(Box::new(unit_manager));
         assert_eq!(mp.run(),0);
@@ -635,8 +687,16 @@ mod tests {
     fn  test_unit_load(){
         let mut unit_manager = UnitManager::new();
         unit_manager.init_lookup_path();
-        let mut unit = unit_new(Rc::new(RefCell::new(unit_manager)), UnitType::UnitService, String::from("config.service"));
-        // unit_manager.insert_unit(String::from("systemd"), unit);
-        assert_eq!(unit.load(), true);
+
+        let unit_name = String::from("config.service");
+        unit_manager.load_unit(&unit_name);
+
+        assert_ne!(unit_manager.units.borrow().len(), 0);
+
+        let unit_obj = unit_manager.get_unit_on_name(&unit_name).unwrap();
+        let unit = unit_obj.borrow();
+        let service_unit = unit.as_any().downcast_ref::<ServiceUnit>().unwrap();
+
+        assert_eq!(&service_unit.get_unit_name(), &unit_name);
     }
 }

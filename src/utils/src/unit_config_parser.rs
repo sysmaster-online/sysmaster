@@ -22,6 +22,8 @@ pub struct ConfUnit {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfService {
+    #[serde(alias = "Type")]
+    pub service_type: Option<String>,
     #[serde(alias = "ExecStart")]
     pub exec_start: Option<String>,
     #[serde(alias = "Sockets")]
