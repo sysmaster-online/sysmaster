@@ -1,19 +1,20 @@
-mod epoll;
-
-use epoll::Epoll;
 use libc::epoll_event;
+use std::io;
 use std::os::unix::{io::AsRawFd, io::RawFd};
-use std::{io, time};
+
+pub mod epoll;
+#[cfg(unix)]
+use epoll::Epoll as Poller;
 
 #[derive(Debug, Default)]
 pub struct Poll {
-    poller: Epoll,
+    poller: Poller,
 }
 
 impl Poll {
     pub fn new() -> io::Result<Poll> {
         Ok(Poll {
-            poller: Epoll::new()?,
+            poller: Poller::new()?,
         })
     }
 
@@ -23,7 +24,7 @@ impl Poll {
         })
     }
 
-    pub fn poll(&mut self, timeout: Option<time::Duration>) -> io::Result<Vec<epoll_event>> {
+    pub fn poll(&self, timeout: i32) -> io::Result<Vec<epoll_event>> {
         self.poller.poll(timeout)
     }
 

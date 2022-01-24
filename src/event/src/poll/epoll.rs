@@ -3,7 +3,18 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::{io, ptr};
 
-use crate::syscall;
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! syscall {
+    ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
+        let res = unsafe { libc::$fn($($arg, )*) };
+        if res == -1 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(res)
+        }
+    }};
+}
 
 const LOWEST_FD: libc::c_int = 3;
 
@@ -28,19 +39,18 @@ impl Epoll {
         })
     }
 
-    pub(crate) fn poll(
-        &mut self,
-        timeout: Option<std::time::Duration>,
-    ) -> io::Result<Vec<epoll_event>> {
+    pub(crate) fn poll(&self, timeout: i32) -> io::Result<Vec<epoll_event>> {
         let mut events = Vec::<epoll_event>::with_capacity(self.n_sources.load(Relaxed));
-        let _n_ready = syscall!(epoll_wait(
+        events.clear();
+        let n_ready = syscall!(epoll_wait(
             self.epoll_fd,
             events.as_mut_ptr(),
             events.capacity() as i32,
-            timeout
-                .map(|to| to.as_millis() as libc::c_int)
-                .unwrap_or(-1),
+            timeout,
         ));
+        unsafe {
+            events.set_len(n_ready.unwrap() as usize);
+        }
         Ok(events)
     }
 
@@ -76,13 +86,11 @@ mod test {
     use super::Epoll;
     use libc::EPOLLIN;
 
-    #[cfg(unix)]
     #[test]
     fn epoll_new() {
         let _ = Epoll::new();
     }
 
-    #[cfg(unix)]
     #[test]
     fn epoll_add() {
         let mut poll = Epoll::new().unwrap();
