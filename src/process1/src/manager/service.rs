@@ -1,55 +1,99 @@
-use super::unit;
-use std::io;
-use std::ops::{Deref, DerefMut};
+use super::unit::{self, ConfigParser, UnitManager};
+use std::any::{TypeId, Any};
+use std::collections::LinkedList;
+use std::collections::hash_map::DefaultHasher;
+use std::error::Error;
+use std::fmt;
+use std::io::{Error as IOError, ErrorKind};
+use std::hash::{Hash, Hasher};
+use std::str::FromStr;
 
+#[derive(PartialEq)]
 struct ExitStatusSet {
 
 }
 
+#[derive(PartialEq, EnumString, Display, Debug)]
 enum ServiceTimeoutFailureMode {
+    #[strum(serialize = "terminate")]
     ServiceTimeoutTerminate,
+    #[strum(serialize = "abort")]
     ServiceTimeoutAbort,
+    #[strum(serialize = "kill")]
     ServiceTimeoutKill,
     ServiceTimeoutFailureModeMax,
     ServiceTimeoutFailureModeInvalid = -1,
 }
 
+#[derive(PartialEq, EnumString, Display, Debug)]
 enum ServiceRestart {
+    #[strum(serialize = "no")]
     ServiceRestartNo,
+    #[strum(serialize = "on-success")]
     ServiceRestartOnSuccess,
+    #[strum(serialize = "on-failure")]
     ServiceRestartOnFailure,
+    #[strum(serialize = "on-abnormal")]
     ServiceRestartOnAbnormal,
+    #[strum(serialize = "on-abort")]
     ServiceRestartOnAbort,
+    #[strum(serialize = "always")]
     ServiceRestartAlways,
     ServiceRestartMax,
     ServiceRestartInvalid = -1
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, EnumString, Display, Debug)]
 enum ServiceType {
+    #[strum(serialize = "simple")]
     ServiceSimple,
+    #[strum(serialize = "forking")]
     SserviceForking,
+    #[strum(serialize = "oneshot")]
     ServiceOneshot,
+    #[strum(serialize = "dbus")]
     ServiceDbus,
+    #[strum(serialize = "notify")]
     ServiceNotify,
+    #[strum(serialize = "idle")]
     SserviceIdle,
+    #[strum(serialize = "exec")]
     ServiceExec,
     ServiceTypeMax,
     ServiceTypeInvalid = -1,
 }
 
-/*
-impl Default for ServiceType {
-    fn default() => Self {ServiceType::ServiceTypeInvalid}
+enum ServiceCommand {
+    ServiceCondition,
+    ServiceStartPre,
+    ServiceStart,
+    ServiceStartPost,
+    ServiceReload,
+    ServiceStop,
+    ServiceStopPost,
+    ServiceCommandMax,
 }
-*/
 
+#[derive(PartialEq)]
 struct DualTimestamp {
 
 }
 
+#[derive(PartialEq)]
+struct CommandLine {
+    cmd: String,
+    args: Vec<String>,
+}
+
+impl fmt::Display for CommandLine {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Display: {}", self.cmd)
+    }
+}
+
+#[derive(PartialEq)]
 pub struct ServiceUnit {
-    service_unit: unit::Unit,
+    unit: unit::Unit,
     service_type: ServiceType,
     restart: ServiceRestart,
     restart_prevent_status: ExitStatusSet,
@@ -71,6 +115,7 @@ pub struct ServiceUnit {
     watchdog_override_enable:bool,
     socket_fd: isize,
     bus_name:String,
+    exec_commands: [LinkedList<CommandLine>; ServiceCommand::ServiceCommandMax as usize],
     // TODO
 
 }   
@@ -78,7 +123,7 @@ pub struct ServiceUnit {
 impl ServiceUnit {
     pub fn new(unit: unit::Unit) -> Self {
         Self {
-            service_unit: unit,
+            unit,
             service_type: ServiceType::ServiceTypeInvalid,
             restart: ServiceRestart::ServiceRestartInvalid,
             restart_prevent_status: ExitStatusSet{},
@@ -100,25 +145,29 @@ impl ServiceUnit {
             watchdog_override_enable:false,
             socket_fd:-1,
             bus_name:String::from(""),
+            exec_commands: Default::default(),
         }
     }
 
-    pub fn unit_service_load_and_parse(&mut self) -> bool {
-        println!("load frament and dropin");
-        return self.service_unit.unit_load_and_parse(true);
+    pub fn unit_service_load(&mut self, manager: &mut UnitManager) -> Result<(), Box<dyn Error>> {
+        return self.unit.unit_load(manager, true);
     }
 
-    pub fn service_add_extras(&mut self) -> Result<isize, io::Error> {
+    pub fn service_add_extras(&mut self) -> bool {
         if self.service_type == ServiceType::ServiceTypeInvalid {
             if !self.bus_name.is_empty() {
                 self.service_type = ServiceType::ServiceDbus;
             }
         }
-        Ok(0)
+        true
     }
 
-    pub fn service_verify(&self) -> bool {
-        true
+    pub fn service_verify(&self) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
+
+    pub fn get_unit_name(&self) -> String {
+        self.unit.id.to_string()
     }
 }
 
@@ -127,10 +176,10 @@ impl unit::UnitObj for ServiceUnit {
          todo!() 
     }
     fn done(&self) { todo!() }
-    fn load(&mut self) -> bool { 
-        if !self.unit_service_load_and_parse() {
-            return false;
-        }
+    fn load(&mut self, manager: &mut UnitManager) -> Result<(), Box<dyn Error>> { 
+        self.unit_service_load(manager)?;
+
+        self.parse(manager)?;
 
         self.service_add_extras();
 
@@ -138,7 +187,14 @@ impl unit::UnitObj for ServiceUnit {
 
      }
     fn coldplug(&self) { todo!() }
-    fn start(&self) { todo!() }
+    fn start(&self) {
+        let commands = &self.exec_commands[ServiceCommand::ServiceStart as usize];
+
+        for command in commands.iter() { 
+            println!("{}", command);
+        }
+        
+    }
     fn dump(&self) { todo!() }
     fn stop(&self) { todo!() }
     fn reload(&self) { todo!() }
@@ -148,4 +204,50 @@ impl unit::UnitObj for ServiceUnit {
     fn check_snapshot(&self) { todo!() }
     fn sigchld_events(&self, _: u64, _: i32, _: i32) { todo!() }
     fn reset_failed(&self) { todo!() }
+
+    fn eq(&self, other: &dyn unit::UnitObj) -> bool {
+        if let Some(other) = other.as_any().downcast_ref::<ServiceUnit>() {
+            return self == other;
+        }
+        false
+    }
+
+    fn hash(&self) -> u64 {
+        let mut h = DefaultHasher::new();
+        Hash::hash(&(TypeId::of::<ServiceUnit>()), &mut h);
+        h.write(self.unit.id.as_bytes());
+        h.finish()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl unit::ConfigParser for ServiceUnit {
+    fn parse(&mut self, manager: &mut UnitManager)  -> Result<(), Box<dyn Error>> {
+        self.unit.parse(manager)?;
+        let conf = self.unit.conf.as_ref().ok_or_else(|| IOError::new(ErrorKind::Other, "config file not loaded"))?;
+        
+        let service = conf.service.as_ref().unwrap();
+        match &service.exec_start {
+            None => {self.exec_commands[ServiceCommand::ServiceStart as usize] = LinkedList::new();},
+            Some(exec_start) => {
+                let commands = &mut self.exec_commands[ServiceCommand::ServiceStart as usize];
+                commands.push_back(CommandLine{cmd: exec_start.to_string(), args: Vec::new()});
+            }
+        }
+
+        match &service.restart {
+            None => {self.restart = ServiceRestart::ServiceRestartNo;},
+            Some(restart) => {self.restart = ServiceRestart::from_str(restart)?;}
+        }
+        
+        match &service.service_type {
+            None => {self.service_type = ServiceType::ServiceTypeInvalid;},
+            Some(service_type) => {self.service_type = ServiceType::from_str(service_type)?;}
+        }
+
+        Ok(())
+    }
 }
