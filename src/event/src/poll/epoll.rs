@@ -41,6 +41,7 @@ impl Epoll {
 
     pub(crate) fn poll(&self, timeout: i32) -> io::Result<Vec<epoll_event>> {
         let mut events = Vec::<epoll_event>::with_capacity(self.n_sources.load(Relaxed));
+
         events.clear();
         let n_ready = syscall!(epoll_wait(
             self.epoll_fd,
