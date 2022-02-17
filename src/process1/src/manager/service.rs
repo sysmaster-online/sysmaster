@@ -7,6 +7,7 @@ use std::fmt;
 use std::io::{Error as IOError, ErrorKind};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
+use crate::watchdog;
 
 #[derive(PartialEq)]
 struct ExitStatusSet {
@@ -168,6 +169,23 @@ impl ServiceUnit {
 
     pub fn get_unit_name(&self) -> String {
         self.unit.id.to_string()
+    }
+}
+
+impl ServiceUnit {
+    pub fn start_watchdog(self) {
+        let watchdog_usec = if self.watchdog_override_enable {
+            self.watchdog_override_usec
+        } else { self.watchdog_original_usec };
+        if watchdog_usec == 0 || watchdog_usec == u64::MAX {
+            self.stop_watchdog()
+        }
+        watchdog::register_timer();
+        watchdog::event_source_set_enabled(true);
+    }
+
+    pub fn stop_watchdog(self) {
+        watchdog::event_source_set_enabled(false);
     }
 }
 

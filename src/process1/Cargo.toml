@@ -21,3 +21,4 @@ log4rs = "1.0"
 siphasher = { version = "0.3", features = ["serde"] }
 utils = { path = "../utils" }
 strum = { version = "0.23", features = ["derive"] }
+nix = "0.23.0"
