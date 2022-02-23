@@ -9,7 +9,8 @@ use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 use crate::watchdog;
 
-#[derive(PartialEq)]
+
+#[derive(PartialEq,Default)]
 struct ExitStatusSet {
 
 }
@@ -25,6 +26,13 @@ enum ServiceTimeoutFailureMode {
     ServiceTimeoutFailureModeMax,
     ServiceTimeoutFailureModeInvalid = -1,
 }
+
+impl Default for ServiceTimeoutFailureMode{
+    fn default() -> Self {
+        ServiceTimeoutFailureMode::ServiceTimeoutTerminate
+    }
+}
+
 
 #[derive(PartialEq, EnumString, Display, Debug)]
 enum ServiceRestart {
@@ -44,6 +52,10 @@ enum ServiceRestart {
     ServiceRestartInvalid = -1
 }
 
+
+impl Default for ServiceRestart {
+    fn default() -> Self { ServiceRestart::ServiceRestartNo}
+}
 #[derive(PartialEq, EnumString, Display, Debug)]
 enum ServiceType {
     #[strum(serialize = "simple")]
@@ -64,6 +76,10 @@ enum ServiceType {
     ServiceTypeInvalid = -1,
 }
 
+
+impl Default for ServiceType {
+     fn default() -> Self { ServiceType::ServiceSimple}
+}
 enum ServiceCommand {
     ServiceCondition,
     ServiceStartPre,
@@ -75,7 +91,7 @@ enum ServiceCommand {
     ServiceCommandMax,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq,Default)]
 struct DualTimestamp {
 
 }
@@ -92,7 +108,7 @@ impl fmt::Display for CommandLine {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq,Default)]
 pub struct ServiceUnit {
     unit: unit::Unit,
     service_type: ServiceType,
@@ -241,6 +257,9 @@ impl unit::UnitObj for ServiceUnit {
         self
     }
 }
+
+use crate::declure_unitobj_plugin;
+declure_unitobj_plugin!(ServiceUnit,ServiceUnit::default);
 
 impl unit::ConfigParser for ServiceUnit {
     fn parse(&mut self, manager: &mut UnitManager)  -> Result<(), Box<dyn Error>> {

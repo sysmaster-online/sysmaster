@@ -3,70 +3,24 @@ use dynamic_reload as dy_re;
 use std::sync::Arc;
 use walkdir::{DirEntry,WalkDir};
 use std::path::Path;
+use std::ffi::OsStr;
 use log::*;
+use std::io;
 use super::manager::*;
 
-struct LibLoaders{
-    libs: Vec<Arc<dynamic_reload::Lib>>,
-}
-
-impl LibLoaders {
-    fn add_lib(&mut self, lib: &Arc<dy_re::Lib>) {
-        self.libs.push(lib.clone());
-    }
-
-    fn unload_lib(&mut self, lib: &Arc<dy_re::Lib>) {
-        for i in (0..self.libs.len()).rev() {
-            if &self.libs[i] == lib {
-                self.libs.swap_remove(i);
-            }
-        }
-    }
-    fn reload_lib(&mut self,lib: &Arc<dy_re::Lib>){
-        Self::add_lib(self,lib);
-    }
-
-    fn reload_callback(&mut self, state: dy_re::UpdateState, lib: Option<&Arc<dy_re::Lib>>){
-        match state {
-            dynamic_reload::UpdateState::Before => Self::unload_lib(self,lib.unwrap()),
-            dynamic_reload::UpdateState::After => Self::reload_lib(self,lib.unwrap()),
-            dynamic_reload::UpdateState::ReloadFailed(_) =>error!("Reload plugin failed"),
-        }
-    }
-}
-
-
-pub struct Plugin<T> {
-    plugin_lists: Vec<Arc<T>>,
+pub struct Plugin {
+    unitobj_lists: Vec<Arc<Box<dyn unit::UnitObj>>>,
     library_dir: String,
-    lib_loader: LibLoaders
+    load_libs: Vec<Arc<dy_re::Lib>>,
 }
 
 #[allow(dead_code)]
-impl <T: unit::UnitObj>Plugin<T> {
+impl Plugin  {
     fn new() -> Self {
         Self{
-            plugin_lists: Vec::new(),
+            unitobj_lists: Vec::new(),
             library_dir: String::new(),
-            lib_loader:  LibLoaders{libs: Vec::new()},
-
-        }
-    }
-    pub fn add_plugin_to_list(&mut self,p: T){
-        self.plugin_lists.push(Arc::new(p));
-    }
-
-    pub fn set_library_dir(&mut self,library_dir: &str){
-        self.library_dir.push_str(library_dir);
-    }
-
-    pub fn is_dynamic_lib(entry: &DirEntry) -> bool{
-        let file_type = entry.file_type();
-        let file_name = entry.file_name();
-        if file_type.is_file() && file_name.to_str().map(|s| s.ends_with(".so.*")).unwrap_or(false) {
-            true
-        } else {
-            false
+            load_libs:  Vec::new(),
         }
     }
 
@@ -94,24 +48,43 @@ impl <T: unit::UnitObj>Plugin<T> {
                     continue;
                 }else{
                     let file_name = path.file_name();
-                    if let Some(v) = file_name {
-                        let str_name = v.to_str().unwrap();
-                        match reload_handler.add_library(&str_name, dynamic_reload::PlatformName::Yes){
-                            Ok(lib) =>{
-                                info!("loader dynamic lib in to lib_loader");
-                                self.lib_loader.add_lib(&lib);
-                            }
-                            Err(e) =>{
-                                error!("error loadingUnable to load dynamic lib, err {:?}", e);
-                            }
-                        }
-                    } else {
-                        warn!("loader dynamic lib file name is None");
-                    }
+                    Self::load_plugin(self,file_name.unwrap(),&mut reload_handler);
                 }
             }
         }
     }
+
+    pub fn load_plugin(&mut self, filename: &OsStr, reload_handler: & mut dynamic_reload::DynamicReload) -> io::Result<()> {
+        if let Some(v)  = filename.to_str(){    
+            match reload_handler.add_library(v,dynamic_reload::PlatformName::Yes){
+                Ok(lib) =>{
+                    self.load_libs.push(lib.clone());
+                    let dy_lib = self.load_libs.last().unwrap();
+                    let fun: dynamic_reload::Symbol< fn()-> *mut dyn unit::UnitObj> = unsafe{dy_lib.lib.get(b"__unit_obj_create").unwrap()};
+                    let boxed_raw = fun();
+                    self.unitobj_lists.push(Arc::new(unsafe{Box::from_raw(boxed_raw)}));
+                    debug!("loading dynamic lib sucessfully");
+                }
+                Err(e)  => error!("error loading Unable to load dynamic lib, err {:?}", e),
+            }
+        }
+        Ok(())
+    }
+
+    pub fn set_library_dir(&mut self,library_dir: &str){
+        self.library_dir.push_str(library_dir);
+    }
+
+    pub fn is_dynamic_lib(entry: &DirEntry) -> bool{
+        let file_type = entry.file_type();
+        let file_name = entry.file_name();
+        if file_type.is_file() && file_name.to_str().map(|s| s.ends_with(".so.*")).unwrap_or(false) {
+            true
+        } else {
+            false
+        }
+    }
+
 }
 
 
@@ -121,8 +94,15 @@ mod tests {
 
     #[test]
     fn test_plugin_load_library(){
-        let mut plugins: Plugin<super::unit::Unit> = Plugin::new();
+        let mut plugins: Plugin = Plugin::new();
+        plugins.set_library_dir("target/debug");
         plugins.load_lib();
+        for uniobj in plugins.unitobj_lists {
+            let u = Arc::clone(&uniobj);
+            let u_box = unsafe{Arc::into_raw(u).as_ref().unwrap()};
+            let service_unit = u_box.as_any().downcast_ref::<service::ServiceUnit>().unwrap();
+            assert_eq!(service_unit.get_unit_name(),"");
+        }
     }
 
 }

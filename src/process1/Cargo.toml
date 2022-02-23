@@ -10,7 +10,9 @@ name = "process1"
 path = "src/bin/process1.rs"
 
 [lib]
+crate_type = ["dylib"]
 path = "src/lib.rs"
+name = "service"
 
 [dependencies]
 dynamic_reload = "0.4.0"
