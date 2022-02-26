@@ -16,6 +16,9 @@ use std::hash::Hash;
 
 use utils:: {time_util, path_lookup, unit_config_parser};
 
+
+
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum UnitType {
     UnitService = 0,
@@ -24,6 +27,11 @@ pub enum UnitType {
     UnitTypeInvalid,
     UnitTypeErrnoMax,
 }
+
+impl Default for UnitType {
+    fn default() -> Self { UnitType::UnitService }
+}
+
 #[derive(Hash, PartialEq, Eq, Debug, Copy, Clone)]
 enum UnitRelations {
     UnitRequires,
@@ -48,6 +56,11 @@ pub enum UnitLoadState {
     UnitMasked,
     UnitLoadStateMax,
     UnitLoadStateInvalid = -1,
+}
+
+
+impl Default for UnitLoadState {
+    fn default() -> Self { UnitLoadState::UnitStub}
 }
 
 enum UnitNameFlags {
@@ -75,6 +88,7 @@ enum UnitFileState {
     UnitFileStateInvalid,
 }
 
+#[derive(Default)]
 pub struct Unit {
     pub unit_type: UnitType,
     pub load_state: UnitLoadState,
@@ -124,6 +138,21 @@ pub trait UnitObj {
     fn hash(&self) -> u64;
     fn as_any(&self) -> &dyn Any;
 }
+
+#[macro_export]
+macro_rules! declure_unitobj_plugin {
+    ($unit_type:ty, $constructor:path) => {
+        #[no_mangle]
+        pub fn __unit_obj_create() -> *mut dyn $crate::manager::unit::UnitObj {
+            let construcotr: fn() ->$unit_type = $constructor;
+
+            let obj = construcotr();
+            let boxed: Box<dyn $crate::manager::unit::UnitObj>  = Box::new(obj);
+            Box::into_raw(boxed)
+        }
+    };
+}
+
 
 impl PartialEq for Box<dyn UnitObj> {
     fn eq(&self, other: &Self) -> bool {
