@@ -1,19 +1,24 @@
+use crate::manager::sigchld::ProcessExit;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::collections::{HashSet, HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use utils::path_lookup::LookupPaths;
-use super::{UnitType, Unit,UnitObj};
-use super::{unit_new};
+use super::{UnitType,UnitObj, unit_name_to_type};
+use super::unit_new;
 use std::fs;
-use utils:: {time_util, path_lookup, unit_config_parser};
-use crate::manager::service;
+use utils:: {time_util, path_lookup};
+
 use siphasher::sip::SipHasher24;
-use walkdir::{DirEntry,WalkDir};
+use walkdir::{WalkDir};
 use std::hash::Hasher;
 
-#[macro_use]
-use crate::unit_name_to_type;
+use nix::unistd::Pid;
+
+// #[macro_use]
+// use crate::unit_name_to_type;
 //unitManger composition of units with hash map
+
+#[derive(Debug)]
 pub struct UnitManager {
     units: Rc<RefCell<HashMap<String, Rc<RefCell<Box<dyn UnitObj>>>>>>,
     unit_id_map: HashMap<String, String>,
@@ -21,6 +26,7 @@ pub struct UnitManager {
     lookup_path: LookupPaths,
     last_updated_timestamp_hash: u64,
     load_queue: VecDeque<Rc<RefCell<Box<dyn UnitObj>>>>,
+    pub watch_pids: HashMap<Pid, Rc<RefCell<Box<dyn UnitObj>>>>,
 }
 
 
@@ -33,6 +39,7 @@ impl UnitManager{
             last_updated_timestamp_hash: 0,
             lookup_path: path_lookup::LookupPaths::new(),
             load_queue: VecDeque::new(),
+            watch_pids: HashMap::new(),
         }
     }
 
@@ -86,7 +93,7 @@ impl UnitManager{
         let updated: u64;
         let mut siphash24 = SipHasher24::new_with_keys(0, 0);
         for dir in &self.lookup_path.search_path {
-	    match fs::metadata(&dir) {
+	        match fs::metadata(&dir) {
                 Ok(metadata) => match metadata.modified() {
                     Ok(time) => {
                         siphash24.write_u128(time_util::timespec_load(time));
@@ -95,8 +102,8 @@ impl UnitManager{
                         log::error!("failed to get mtime {}", dir);
                     },
                 }
-                _ => {
-                    log::error!("failed to get metadata of {}", dir);
+                Err(e) => {
+                    log::error!("failed to get metadata of {}, err: {}", dir, e);
                 }
             }
         }
@@ -113,7 +120,7 @@ impl UnitManager{
 
     pub fn dispatch_load_queue(&mut self) {
         log::debug!("dispatch load queue");
-
+    
         loop {
             match self.load_queue.pop_front() {
                 None => {break},
@@ -121,7 +128,8 @@ impl UnitManager{
                     match unit.borrow_mut().load(self) {
                         Ok(()) => {continue},
                         Err(e) => {
-                            log::error!("load unit config failed: {}", e.to_string())
+                            log::error!("load unit config failed: {}", e.to_string());
+                            println!("load unit config failed: {}", e.to_string())
                         }
                     }
                 }
@@ -130,21 +138,28 @@ impl UnitManager{
     }
 
     pub fn push_load_queue(&mut self, unit: Rc<RefCell<Box<dyn UnitObj>>>) {
+        if unit.borrow().in_load_queue() {
+            return;
+        }
         self.load_queue.push_back(unit);
     }
 
     
     
     fn prepare_unit(&mut self, name: &str) -> Option<Rc<RefCell<Box<dyn UnitObj>>>> { 
-        let unit_type = unit_name_to_type!(name);
+        let unit_type = unit_name_to_type(name);
         if unit_type == UnitType::UnitTypeInvalid {
             return None;
         }
 
-        let unit = unit_new(unit_type, name);
-        let u = Rc::new(RefCell::new(unit));
-        self.insert_unit(name.to_string(), u.clone());
-        Some(u.clone())
+        match unit_new(unit_type, name) {
+            Ok(unit) => {
+                let u = Rc::new(RefCell::new(unit));
+                self.insert_unit(name.to_string(), u.clone());
+                return Some(u.clone())
+            },
+            Err(_e) => return None,
+        };
     }
 
     pub fn load_unit(&mut self, name: &str) -> Option<Rc<RefCell<Box<dyn UnitObj>>>> {
@@ -163,13 +178,38 @@ impl UnitManager{
         self.dispatch_load_queue();
         Some(u.clone())
     }
+
+    pub fn dispatch_sigchld(&mut self, exit: ProcessExit) {
+        match exit {
+            ProcessExit::Status(pid, code, signal) => {
+                match self.watch_pids.get(&pid) {
+                    Some(unit) => {
+                        unit.clone().borrow_mut().sigchld_events(self, pid, code, signal);
+                    }
+                    None => log::debug!("not found unit obj of pid: {:?}", pid),
+                }
+
+                self.watch_pids.remove(&pid);
+            },
+        }
+    }
+
+    pub fn add_watch_pid(&mut self, pid: Pid, id: &str) {
+        let unit_obj = self.get_unit_on_name(id).unwrap();
+        self.watch_pids.insert(pid, unit_obj.clone());
+    }
+
+    pub fn unwatch_pid(&mut self, pid: Pid) {
+        self.watch_pids.remove(&pid);
+    }
+        
 }
 
 
 
 #[cfg(test)]
 mod tests {
-    use crate::manager::service::ServiceUnit;
+    // use services::service::ServiceUnit;
 
     use super::*;
 
@@ -184,9 +224,25 @@ mod tests {
 
         assert_ne!(unit_manager.units.borrow().len(), 0);
 
-        let unit_obj = unit_manager.get_unit_on_name(&unit_name).unwrap();
-        let unit = unit_obj.borrow();
-        let service_unit = unit.as_any().downcast_ref::<ServiceUnit>().unwrap();
-        assert_eq!(&service_unit.get_unit_name(), &unit_name);
+        match unit_manager.get_unit_on_name(&unit_name) {
+            Some(_unit_obj) => println!("found unit obj {}", unit_name),
+            None => println!("not fount unit: {}", unit_name),
+        };
+
     }
+
+    #[test]
+    fn  test_unit_start(){
+        let mut unit_manager = UnitManager::new();
+        unit_manager.init_lookup_path();
+
+        let unit_name = String::from("config.service");
+        unit_manager.load_unit(&unit_name);
+
+        match unit_manager.get_unit_on_name(&unit_name) {
+            Some(_unit_obj) => println!("found unit obj {}", unit_name),
+            None => println!("not fount unit: {}", unit_name),
+        };
+    }
+
 }

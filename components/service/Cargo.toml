@@ -1,0 +1,19 @@
+[package]
+name = "service"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+name = "service"
+
+[dependencies]
+dynamic_reload = "0.4.0"
+utils = { path = "../../libutils" }
+process1 = { path = "../../process1" }
+strum = { version = "0.23", features = ["derive"] }
+nix = "0.23.0"
+log = "0.4"
+regex = "1"

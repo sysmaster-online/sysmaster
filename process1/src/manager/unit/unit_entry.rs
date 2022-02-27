@@ -2,21 +2,27 @@ extern crate siphasher;
 
 use std::any::Any;
 use std::error::Error;
-use std::fs;
 
 use std::fs::File;
 use std::rc::Rc;
 use std::os::unix::fs::FileTypeExt;
 use std::hash::Hasher;
-use walkdir::WalkDir;
+
 use std::hash::Hash;
-use utils:: {time_util, path_lookup, unit_config_parser};
+use utils:: {time_util, unit_config_parser};
 use super::unit_manager::*;
 
 use std::collections::{HashMap, HashSet};
 use std::cell::RefCell;
 
-#[derive(Debug, PartialEq, Eq)]
+
+
+use std::ops::Deref;
+use nix::sys::signal::Signal;
+use nix::unistd::Pid;
+
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum UnitType {
     UnitService = 0,
     UnitTarget,
@@ -41,6 +47,9 @@ pub enum UnitRelations {
 
     UnitBefore,
     UnitAfter,
+
+    UnitTriggers,
+    UnitTriggeredBy,
 }
 
 impl Default for UnitRelations {
@@ -100,12 +109,43 @@ enum UnitFileState {
     UnitFileStateInvalid,
 }
 
-#[derive(Default)]
+#[derive(Eq, PartialEq, Debug)]
+pub enum UnitActiveState {
+    UnitActive,
+    UnitReloading,
+    UnitInactive,
+    UnitFailed,
+    UnitActivating,
+    UnitDeactiviting,
+    UnitMaintenance,
+}
+
+pub enum KillOperation {
+    KillTerminate,
+    KillTerminateAndLog,
+    KillRestart,
+    KillKill,
+    KillWatchdog,
+    KillInvalid,
+}
+
+impl KillOperation {
+    pub fn to_signal(&self) -> Signal {
+        match *self {
+            KillOperation::KillTerminate | KillOperation::KillTerminateAndLog |
+                KillOperation::KillRestart => Signal::SIGTERM,
+            KillOperation::KillKill => Signal::SIGKILL,
+            KillOperation::KillWatchdog => Signal::SIGABRT,
+            _ => Signal::SIGTERM,
+        }
+    }
+}
+
+#[derive(Default, Debug)]
 pub struct Unit {
     pub unit_type: UnitType,
     pub load_state: UnitLoadState,
     pub id: String,
-    instance: Option<String>,
     pub name: String,
     dependencies: HashMap<UnitRelations, RefCell<HashSet<UnitObjWrapper>>>,
     desc: String,
@@ -114,10 +154,6 @@ pub struct Unit {
     config_file_mtime: u128,
     pids: HashSet<u64>,
     sigchldgen: u64,
-    deseialize_job: i32,
-    load_error: i32,
-    stop_when_unneeded: bool,
-    transient: bool,
     in_load_queue: bool,
     default_dependencies: bool,
     pub conf: Option<Rc<unit_config_parser::Conf>>,
@@ -129,21 +165,25 @@ impl PartialEq for Unit {
      }
 }
 
-pub trait UnitObj {
+pub trait UnitObj: std::fmt::Debug {
     fn init(&self){}
     fn done(&self){}
-    fn load(&mut self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {Ok(())}
+    fn load(&mut self, _m: &mut UnitManager) -> Result<(), Box<dyn Error>> {Ok(())}
     fn coldplug(&self){}
     fn dump(&self){}
-    fn start(&self){}
-    fn stop(&self){}
-    fn reload(&self){}
+    fn start(&mut self, _m: &mut UnitManager){}
+    fn stop(&mut self, _m: &mut UnitManager){}
+    fn reload(&mut self, _m: &mut UnitManager){}
+    
     fn kill(&self){}
     fn check_gc(&self)->bool;
     fn release_resources(&self){}
     fn check_snapshot(&self){}
-    fn sigchld_events(&self, _pid:u64,_code:i32, _status:i32){}
+    fn sigchld_events(&mut self,_m: &mut UnitManager, _pid:Pid,_code:i32, _status:Signal) {}
     fn reset_failed(&self){}
+    fn trigger(&mut self, _other: Rc<RefCell<Box<dyn UnitObj>>>) {}
+    fn in_load_queue(&self) -> bool;
+
     fn eq(&self, other: &dyn UnitObj) -> bool;
     fn hash(&self) -> u64;
     fn as_any(&self) -> &dyn Any;
@@ -181,9 +221,16 @@ impl Hash for Box<dyn UnitObj> {
     }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Debug)]
 struct UnitObjWrapper(Rc<RefCell<Box<dyn UnitObj>>>);
 
+impl Deref for UnitObjWrapper {
+    type Target = Rc<RefCell<Box<dyn UnitObj>>>;
+    
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl Hash for UnitObjWrapper {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -198,15 +245,25 @@ macro_rules! null_str{
         String::from($name)
     }
 }
-#[macro_export]
-macro_rules! unit_name_to_type{
-    ($name:expr) => {
-        match $name{
-            "*.service" => UnitType::UnitService,
-            "*.target" => UnitType::UnitTarget,
-            _ => UnitType::UnitTypeInvalid,
-        }
-    };
+
+// #[macro_export]
+// macro_rules! unit_name_to_type{
+//     ($name:expr) => {
+//         match $name{
+//             "*.service" => UnitType::UnitService,
+//             "*.target" => UnitType::UnitTarget,
+//             _ => UnitType::UnitTypeInvalid,
+//         }
+//     };
+// }
+
+pub fn unit_name_to_type(unit_name: &str) -> UnitType {
+    let words: Vec<&str> = unit_name.split(".").collect();
+    match words[words.len()-1] {
+        "service" => UnitType::UnitService,
+        "target" => UnitType::UnitTarget,
+        _ => UnitType::UnitTypeInvalid,
+    }
 }
 
 impl Unit {
@@ -215,19 +272,14 @@ impl Unit {
             unit_type: UnitType::UnitTypeInvalid,
             load_state: UnitLoadState::UnitStub,
             id: String::from(name),
-            instance: Some(String::from("")),
             name: String::from(""),
             dependencies: HashMap::new(),
             desc: String::from(""),
             documnetation: null_str!(""),
             config_file_path: null_str!(""),
             config_file_mtime: 0,
-            deseialize_job:0,
             pids: HashSet::<u64>::new(),
             sigchldgen: 0,
-            load_error: 0,
-            stop_when_unneeded: false,
-            transient: false,
             in_load_queue: false,
             default_dependencies: true,
             conf: None,
@@ -246,6 +298,11 @@ impl Unit {
     pub fn setDesc(&mut self, desc:&str){
         self.desc.clear();
         self.desc.push_str(desc);
+    }
+
+    pub fn set_doc(&mut self, doc:&str){
+        self.documnetation.clear();
+        self.documnetation.push_str(doc);
     }
 
     pub fn set_In_load_queue(&mut self, t:bool){
@@ -328,14 +385,17 @@ impl Unit {
     fn parse_unit_relation(&mut self, m: &mut UnitManager, unit_name: &str, relation: UnitRelations) -> Result<(), Box<dyn Error>> {
         log::debug!("parse relation unit relation name is {}, relation is {:?}", unit_name, relation);
 
-        let unit_type = unit_name_to_type!(unit_name);
+        let unit_type = unit_name_to_type(unit_name);
         if unit_type == UnitType::UnitTypeInvalid {
             return Err(format!("invalid unit type of unit {}", unit_name).into());
         }
         let other = if let Some(_unit) = m.get_unit_on_name(unit_name) {
              return Ok(());
         } else {
-            let unit = super::unit_new(unit_type, unit_name);
+            let unit = match super::unit_new(unit_type, unit_name) {
+                Ok(u) => u,
+                Err(e) => return Err(e),
+            };
             let u = Rc::new(RefCell::new(unit));
             m.push_load_queue(u.clone());
             u
@@ -347,19 +407,45 @@ impl Unit {
     }
 
     fn unit_load(&mut self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
+        self.in_load_queue = false;
+        self.build_name_map(m);
+
+        if let Some(p) = self.get_unit_file_path(m) {
+            self.setConfig_file_path(&p);
+        }
+        
         if self.config_file_path.is_empty(){
             return Err(format!("config file path is empty").into());
-        }else{
-           match self.unit_config_load(){
-               Ok(conf) =>{
-                   self.parse(m);
-               } 
-               Err(e) =>{
-                   return Err(e);
-               }
-           }
+        }
+
+        match self.unit_config_load(){
+            Ok(conf) =>{
+                self.parse(m);
+            } 
+            Err(e) =>{
+                return Err(e);
+            }
         }
         return Ok(());
+    }
+
+    pub fn in_load_queue(&self) -> bool {
+        self.in_load_queue == true
+    }
+
+    pub fn notify(&mut self, manager: &mut UnitManager, original_state: UnitActiveState, new_state: UnitActiveState) {
+        if original_state != new_state {
+            log::debug!("unit active state change from: {:?} to {:?}", original_state, new_state);
+        }
+
+        match self.dependencies.get(&UnitRelations::UnitTriggeredBy) {
+            Some(d) => {
+                d.borrow_mut().iter().for_each(
+                    |u| u.borrow_mut().trigger(manager.get_unit_on_name(&self.id).unwrap().clone())
+                );
+            },
+            None => {},
+        }
     }
 
  }
@@ -388,6 +474,10 @@ impl UnitObj for Unit{
 
     fn as_any(&self) -> &dyn Any {
         todo!()
+    }
+
+    fn in_load_queue(&self) -> bool {
+        self.in_load_queue()
     }
 }
 
@@ -439,6 +529,20 @@ impl ConfigParser for Unit {
             None => {},
             Some(w) => {
                 self.parse_unit_relations(m, w, UnitRelations::UnitRequires)?;
+            }
+        }
+
+        match &unit.description {
+            None => {},
+            Some(des) => {
+                self.setDesc(des);
+            }
+        }
+
+        match &unit.documentation {
+            None => {},
+            Some(doc) => {
+                self.set_doc(doc);
             }
         }
         Ok(())

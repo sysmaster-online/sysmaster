@@ -7,4 +7,5 @@ members = [
   "systemd",
   "libutils",
   "tests",
+  "components/service",
 ]
