@@ -1,10 +1,10 @@
 [workspace]
 members = [
-  "src/event",
-  "src/init",
-  "src/process1",
-  "src/sysmonitor",
-  "src/systemd",
-  "src/utils",
+  "libevent",
+  "init",
+  "process1",
+  "sysmonitor",
+  "systemd",
+  "libutils",
   "tests",
 ]

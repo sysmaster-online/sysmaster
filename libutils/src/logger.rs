@@ -1,7 +1,6 @@
 use std::path::Path;
 use log4rs::{
     append::console::{ConsoleAppender, Target},
-    append::file::FileAppender,
     config::{Appender,Config,Logger,Root},
     encode::pattern::PatternEncoder,
 };
