@@ -3,6 +3,7 @@ name = "process1"
 version = "0.1.0"
 authors = ["overweight <hexiaowen@huawei.com>"]
 edition = "2018"
+default-run = "process1"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
@@ -10,17 +11,17 @@ name = "process1"
 path = "src/bin/process1.rs"
 
 [lib]
-crate_type = ["dylib"]
+#crate_type = ["dylib"]
 path = "src/lib.rs"
-name = "service"
+name = "core"
 
 [dependencies]
 dynamic_reload = "0.4.0"
 walkdir = "2"
-log = "0.4"
-log4rs = "1.0"
-#log4rs = { version="1.0", optional=true}
 siphasher = { version = "0.3", features = ["serde"] }
-utils = { path = "../utils" }
+utils = { path = "../libutils" }
+event = { path = "../libevent" }
 strum = { version = "0.23", features = ["derive"] }
 nix = "0.23.0"
+log = "0.4"
+libc = "0.2.*"
