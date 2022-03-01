@@ -1,4 +1,4 @@
-use super::unit::{self, ConfigParser, UnitManager};
+use super::unit::{ConfigParser, UnitManager,UnitObj,Unit};
 use std::any::{TypeId, Any};
 use std::collections::LinkedList;
 use std::collections::hash_map::DefaultHasher;
@@ -8,7 +8,6 @@ use std::io::{Error as IOError, ErrorKind};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 use crate::watchdog;
-
 
 #[derive(PartialEq,Default)]
 struct ExitStatusSet {
@@ -110,7 +109,7 @@ impl fmt::Display for CommandLine {
 
 #[derive(PartialEq,Default)]
 pub struct ServiceUnit {
-    unit: unit::Unit,
+    unit: Unit,
     service_type: ServiceType,
     restart: ServiceRestart,
     restart_prevent_status: ExitStatusSet,
@@ -138,7 +137,7 @@ pub struct ServiceUnit {
 }   
 
 impl ServiceUnit {
-    pub fn new(unit: unit::Unit) -> Self {
+    pub fn new(unit: Unit) -> Self {
         Self {
             unit,
             service_type: ServiceType::ServiceTypeInvalid,
@@ -167,7 +166,7 @@ impl ServiceUnit {
     }
 
     pub fn unit_service_load(&mut self, manager: &mut UnitManager) -> Result<(), Box<dyn Error>> {
-        return self.unit.unit_load(manager, true);
+        return self.unit.load(manager);
     }
 
     pub fn service_add_extras(&mut self) -> bool {
@@ -205,15 +204,15 @@ impl ServiceUnit {
     }
 }
 
-impl unit::UnitObj for ServiceUnit {
+impl UnitObj for ServiceUnit {
     fn init(&self) {
          todo!() 
     }
     fn done(&self) { todo!() }
-    fn load(&mut self, manager: &mut UnitManager) -> Result<(), Box<dyn Error>> { 
-        self.unit_service_load(manager)?;
+    fn load(&mut self,m: &mut UnitManager) -> Result<(), Box<dyn Error>> { 
+        self.unit_service_load(m)?;
 
-        self.parse(manager)?;
+        self.parse(m)?;
 
         self.service_add_extras();
 
@@ -239,7 +238,7 @@ impl unit::UnitObj for ServiceUnit {
     fn sigchld_events(&self, _: u64, _: i32, _: i32) { todo!() }
     fn reset_failed(&self) { todo!() }
 
-    fn eq(&self, other: &dyn unit::UnitObj) -> bool {
+    fn eq(&self, other: &dyn UnitObj) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<ServiceUnit>() {
             return self == other;
         }
@@ -261,7 +260,7 @@ impl unit::UnitObj for ServiceUnit {
 use crate::declure_unitobj_plugin;
 declure_unitobj_plugin!(ServiceUnit,ServiceUnit::default);
 
-impl unit::ConfigParser for ServiceUnit {
+impl ConfigParser for ServiceUnit {
     fn parse(&mut self, manager: &mut UnitManager)  -> Result<(), Box<dyn Error>> {
         self.unit.parse(manager)?;
         let conf = self.unit.conf.as_ref().ok_or_else(|| IOError::new(ErrorKind::Other, "config file not loaded"))?;
