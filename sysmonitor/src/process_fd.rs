@@ -28,8 +28,8 @@ impl Monitor for ProcessFd {
         let monitor: Self = toml::from_str(content.as_str()).unwrap();
         *self = ProcessFd {
             config: Switch {
-                monitor: sysmonitor.pscnt_monitor,
-                alarm: sysmonitor.pscnt_alarm,
+                monitor: sysmonitor.process_fd_num_monitor,
+                alarm: sysmonitor.process_fd_num_alarm,
             },
             ..monitor
         };

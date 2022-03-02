@@ -34,8 +34,8 @@ impl Monitor for ZombieCount {
         let monitor: Self = toml::from_str(content.as_str()).unwrap();
         *self = ZombieCount {
             config: Switch {
-                monitor: sysmonitor.pscnt_monitor,
-                alarm: sysmonitor.pscnt_alarm,
+                monitor: sysmonitor.zombie_monitor,
+                alarm: sysmonitor.zombie_alarm,
             },
             ..monitor
         };
