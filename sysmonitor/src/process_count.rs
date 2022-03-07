@@ -90,7 +90,7 @@ impl Monitor for ProcessCount {
 #[cfg(test)]
 mod tests {
     use crate::Monitor;
-    use crate::process_count::{new, ProcessCount};
+    use crate::process_count::ProcessCount;
 
     #[test]
     fn test_decode_config() {
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn test_check_status() {
-        let mut p = new();
+        let mut p = ProcessCount::default();
         let _ = p.check_status();
     }
 }

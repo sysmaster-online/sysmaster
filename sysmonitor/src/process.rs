@@ -56,8 +56,8 @@ impl Monitor for ProcessMonitor {
         let monitor: Self = toml::from_str(content.as_str()).unwrap();
         *self = ProcessMonitor {
             config: Switch {
-                monitor: sysmonitor.pscnt_monitor,
-                alarm: sysmonitor.pscnt_alarm,
+                monitor: sysmonitor.process_monitor,
+                alarm: sysmonitor.process_alarm,
             },
             ..monitor
         };
