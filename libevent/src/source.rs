@@ -1,8 +1,9 @@
 use crate::EventType;
 use crate::Events;
+use std::fmt::Debug;
 use std::os::unix::io::RawFd;
 
-pub trait Source: std::fmt::Debug {
+pub trait Source {
     fn fd(&self) -> RawFd {
         todo!()
     }
@@ -61,5 +62,11 @@ impl Ord for dyn Source {
 impl PartialOrd for dyn Source {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.priority().cmp(&other.priority()).reverse())
+    }
+}
+
+impl Debug for dyn Source {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Source { ... }")
     }
 }

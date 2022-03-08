@@ -18,6 +18,7 @@ pub enum Action {
 }
 
 pub enum Stats {
+    INIT,
     OK,
     EXIT,
     RELOAD,
@@ -29,11 +30,12 @@ pub enum Stats {
     SWITCHROOT,
 }
 
-#[derive(Debug)]
-struct Signals {}
+pub struct Signals {
+    manager: Rc<RefCell<Manager>>,
+}
 impl Signals {
-    fn new() -> Signals {
-        Signals {}
+    pub fn new(m: Rc<RefCell<Manager>>) -> Signals {
+        Signals { manager: m.clone() }
     }
 }
 
@@ -47,28 +49,48 @@ impl Source for Signals {
     }
 
     fn epoll_event(&self) -> u32 {
-        (libc::EPOLLIN | libc::EPOLLONESHOT) as u32
+        (libc::EPOLLIN) as u32
     }
 
     fn priority(&self) -> i8 {
         0i8
     }
 
-    fn dispatch(&self, _: &mut Events) {
+    fn dispatch(&self, e: &mut Events) {
         println!("Dispatching signal!");
+        loop {
+            match e.read_signals() {
+                Ok(Some(info)) => {
+                    println!("read signo: {:?}", info.si_signo);
+                    break;
+                }
+                Ok(None) => break,
+                Err(e) => {
+                    println!("{:?}", e);
+                    break;
+                }
+            }
+        }
     }
 
     fn token(&self) -> u64 {
         let data: u64 = unsafe { std::mem::transmute(self) };
         data
     }
+
+    fn fd(&self) -> std::os::unix::prelude::RawFd {
+        todo!()
+    }
+
+    fn pid(&self) -> libc::pid_t {
+        0
+    }
 }
 
 pub struct Manager {
     mode: Mode,
     action: Action,
-    event: Events,
-    signal: Rc<RefCell<Signals>>,
+    stat: Stats,
 }
 
 type JobId = i32;
@@ -80,13 +102,11 @@ impl Manager {
         Manager {
             mode,
             action,
-            event: Events::new().unwrap(),
-            signal: Rc::new(RefCell::new(Signals::new())),
+            stat: Stats::INIT,
         }
     }
 
     pub fn startup(&mut self) -> Result<(), Error> {
-        self.event.add_source(self.signal.clone());
         Ok(())
     }
 
@@ -111,8 +131,7 @@ impl Manager {
     }
 
     pub fn rloop(&mut self) -> Result<Stats, Error>  {
-        self.event.rloop();
-        Ok(Stats::OK)
+        Ok(Stats::REEXECUTE)
     }
 
     pub fn reload(&mut self) -> Result<(), Error> {
@@ -124,7 +143,7 @@ impl Manager {
     }
 
     pub fn reexec(&mut self) -> Result<(), Error> {
-        todo!()
+        Ok(())
     }
 
     pub fn switch_root(&mut self) -> Result<(), Error> {
@@ -139,8 +158,12 @@ impl Manager {
         todo!()
     }
 
-    pub fn state(&self) -> Result<(), Error> {
-        todo!()
+    pub fn exit(&mut self) {
+        self.stat =  Stats::EXIT;
+    }
+
+    pub fn state(&self) -> Result<Stats, Error> {
+        Ok(Stats::REEXECUTE)
     }
 }
 
@@ -160,7 +183,7 @@ pub trait  Mangerobj {
     fn reload(&self) -> Option<i32>;
 
     fn destroy(&self);
-    
+
     // reserved for sd event
     fn event_dispatch(&self) -> Option<i32>;
 }
@@ -210,6 +233,6 @@ mod tests {
 
 #[test]
 fn  test_mangerplugin(){
-    
+
 }
 }

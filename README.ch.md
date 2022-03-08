@@ -114,3 +114,10 @@ systemd是为了解决启动时间长，启动脚本复杂问题而诞生的。�
 ## 架构图
 
 ## 代码目录结构说明
+源码仓库以workspaces方式管理，每一个目录是一个package，每个package包含一个crate（lib或bin形式），
+公共lib crate的目录带lib前缀，daemon类型的bin crate的目录以d结尾。
+
+如：
+  - lib crate: libevent, libutils
+  - bin crate: init, process1
+  - daemon crate: udevd, logind
