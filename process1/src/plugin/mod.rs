@@ -6,7 +6,7 @@ use std::path::Path;
 use std::ffi::OsStr;
 use log::*;
 use std::io;
-use super::manager::*;
+use super::manager::unit;
 
 pub struct Plugin {
     unitobj_lists: Vec<Arc<Box<dyn unit::UnitObj>>>,
@@ -91,6 +91,7 @@ impl Plugin  {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::manager::service::ServiceUnit;
 
     #[test]
     fn test_plugin_load_library(){
@@ -100,7 +101,7 @@ mod tests {
         for uniobj in plugins.unitobj_lists {
             let u = Arc::clone(&uniobj);
             let u_box = unsafe{Arc::into_raw(u).as_ref().unwrap()};
-            let service_unit = u_box.as_any().downcast_ref::<service::ServiceUnit>().unwrap();
+            let service_unit = u_box.as_any().downcast_ref::<ServiceUnit>().unwrap();
             assert_eq!(service_unit.get_unit_name(),"");
         }
     }

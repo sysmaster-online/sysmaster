@@ -202,5 +202,14 @@ impl  MangerLoader{
             }
         }
 }
+#[cfg(test)]
+mod tests {
+    use crate::manager::service::ServiceUnit;
 
+    use super::*;
 
+#[test]
+fn  test_mangerplugin(){
+    
+}
+}
