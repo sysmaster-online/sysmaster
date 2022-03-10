@@ -86,8 +86,7 @@ impl Signals {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn read_signal(&mut self) -> std::io::Result<Option<libc::siginfo_t>> {
+    pub fn read_signals(&mut self) -> std::io::Result<Option<libc::siginfo_t>> {
         let mut buffer = mem::MaybeUninit::<libc::siginfo_t>::uninit();
 
         let size = mem::size_of_val(&buffer);

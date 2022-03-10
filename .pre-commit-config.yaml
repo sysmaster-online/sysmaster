@@ -1,7 +1,7 @@
 fail_fast: true
 repos:
-  - repo: "https://hub.fastgit.org/pre-commit/pre-commit-hooks.git"
-    rev: v4.0.1
+  - repo: "https://github.com/pre-commit/pre-commit-hooks.git"
+    rev: v4.1.0
     hooks:
       - id: check-byte-order-marker
       - id: check-case-conflict
@@ -11,26 +11,12 @@ repos:
         # - id: end-of-file-fixer
       - id: mixed-line-ending
       - id: trailing-whitespace
-  - repo: "https://hub.fastgit.org/psf/black.git"
-    rev: 21.12b0
+  - repo: "https://github.com/psf/black.git"
+    rev: 22.1.0
     hooks:
       - id: black
   - repo: local
     hooks:
-      - id: cargo-check
-        name: cargo check
-        description: Check the package for errors.
-        entry: bash -c 'cargo check --all'
-        language: rust
-        files: \.rs$
-        pass_filenames: false
-      - id: cargo-test
-        name: cargo test
-        description: unit test for the project
-        entry: bash -c 'cargo test --all-features --all'
-        language: rust
-        files: \.rs$
-        pass_filenames: false
       - id: cargo-clippy
         name: cargo clippy
         description: Lint rust sources
@@ -45,6 +31,20 @@ repos:
         language: rust
         files: \.rs$
         args: []
+      - id: cargo-check
+        name: cargo check
+        description: Check the package for errors.
+        entry: bash -c 'cargo check --all'
+        language: rust
+        files: \.rs$
+        pass_filenames: false
+      - id: cargo-test
+        name: cargo test
+        description: unit test for the project
+        entry: bash -c 'cargo test --all-features --all'
+        language: rust
+        files: \.rs$
+        pass_filenames: false
       #- id: cargo-deny
       #  name: cargo deny check
       #  description: Check cargo depencencies

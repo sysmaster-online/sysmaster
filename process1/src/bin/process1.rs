@@ -1,6 +1,7 @@
+use event::{Events, Source};
 use log::info;
-use core::manager::manager::{Mode, Action, Manager, Stats};
-use std::io::Error;
+use core::manager::manager::{Mode, Action, Manager, Stats, Signals};
+use std::{io::Error, cell::RefCell, rc::Rc};
 use utils::logger;
 
 fn main() -> Result<(), Error>{
@@ -9,15 +10,27 @@ fn main() -> Result<(), Error>{
 
     const MODE: Mode = Mode::SYSTEM;
     const ACTION: Action = Action::RUN;
-    let mut manager = Manager::new(MODE, ACTION);
+    let manager = Rc::new(RefCell::new(Manager::new(MODE, ACTION)));
+    let mut m = manager.try_borrow_mut().unwrap();
 
-    manager.startup().unwrap();
+    m.startup().unwrap();
 
-    manager.add_job(0).unwrap();
+    m.add_job(0).unwrap();
 
-    match manager.rloop() {
-        Ok(Stats::REEXECUTE) => manager.reexec(),
-        Ok(_) => todo!(),
-        Err(_) => todo!(),
-    }
+    let mut event = Events::new().unwrap();
+    let source: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Signals::new(manager.clone())));
+
+    event.add_source(source.clone());
+
+    loop {
+        event.run(0);
+        match m.state() {
+            Ok(Stats::REEXECUTE) => m.reexec(),
+            Ok(_) => todo!(),
+            Err(_) => todo!(),
+        };
+    };
+
+    info!("process1 shutdown.");
+    Ok(())
 }

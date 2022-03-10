@@ -22,6 +22,8 @@ echo "5s 后自动安装！！！"
 sleep 5
 pip install pre-commit
 pre-commit install
+git config --global init.templateDir ~/.git-template
+pre-commit init-templatedir ~/.git-template
 fi
 
 #echo -e "---!!!CHECK cargo-deny !!!---"

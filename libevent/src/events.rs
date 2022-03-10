@@ -115,6 +115,10 @@ impl Events {
         self.sources.remove(&s.token());
     }
 
+    pub fn read_signals(&mut self) -> std::io::Result<Option<libc::siginfo_t>> {
+        self.signal.read_signals()
+    }
+
     /// Wait for the event event through poller
     /// And add the corresponding events to the pengding queue
     fn wait(&mut self, timeout: i32) -> bool {
@@ -200,6 +204,9 @@ impl Events {
 
     /// Scheduling once, processing an event
     pub fn run(&mut self, timeout: i32) {
+        if self.exit == true {
+            return;
+        }
         if self.prepare() {
             self.wait(timeout);
         }
@@ -210,11 +217,7 @@ impl Events {
     pub fn rloop(&mut self) {
         loop {
             if self.exit == true {
-                loop {
-                    let first = self.pending_top();
-                    let top = first.try_borrow().unwrap();
-                    top.dispatch(self);
-                }
+                return;
             }
             self.run(-1i32);
         }
