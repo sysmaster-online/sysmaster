@@ -20,7 +20,7 @@ use std::cell::RefCell;
 use std::ops::Deref;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
-
+use log;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum UnitType {
@@ -187,6 +187,7 @@ pub trait UnitObj: std::fmt::Debug {
     fn eq(&self, other: &dyn UnitObj) -> bool;
     fn hash(&self) -> u64;
     fn as_any(&self) -> &dyn Any;
+    fn getDependencies(&self) -> Vec<(UnitRelations,Rc<RefCell<Box<dyn UnitObj>>>)>  { let v: Vec<(UnitRelations,Rc<RefCell<Box<dyn UnitObj>>>)> = Vec::new(); v}
 }
 
 
@@ -333,6 +334,16 @@ impl Unit {
         Ok(())
     }
 
+    fn getDependencies(&self) -> Vec<(UnitRelations,Rc<RefCell<Box<dyn UnitObj>>>)> {
+        let mut v_dependencies: Vec<(UnitRelations,Rc<RefCell<Box<dyn UnitObj>>>)>  = Vec::new();
+        for (k_r,v_set) in self.dependencies.iter(){
+            for v_u in v_set.borrow().iter() {
+                v_dependencies.push((*k_r,Rc::clone(&v_u.0)));
+            }
+        }
+        v_dependencies
+    }
+
     fn unit_config_load(&mut self) -> Result<(), Box<dyn Error>> {
         if self.config_file_path.is_empty() {
             return Err(format!("config file path is empty").into());
@@ -448,6 +459,7 @@ impl Unit {
         }
     }
 
+
  }
 
 impl UnitObj for Unit{
@@ -478,6 +490,10 @@ impl UnitObj for Unit{
 
     fn in_load_queue(&self) -> bool {
         self.in_load_queue()
+    }
+
+    fn getDependencies(&self) -> Vec<(UnitRelations,Rc<RefCell<Box<dyn UnitObj>>>)>  {
+        self.getDependencies()
     }
 }
 

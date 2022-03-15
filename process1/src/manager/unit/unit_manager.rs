@@ -120,7 +120,7 @@ impl UnitManager{
 
     pub fn dispatch_load_queue(&mut self) {
         log::debug!("dispatch load queue");
-    
+
         loop {
             match self.load_queue.pop_front() {
                 None => {break},
@@ -158,11 +158,15 @@ impl UnitManager{
                 self.insert_unit(name.to_string(), u.clone());
                 return Some(u.clone())
             },
-            Err(_e) => return None,
+            Err(_e) => {
+                log::error!("create unit obj failed {:?}",_e);
+                return None
+            }
         };
     }
 
     pub fn load_unit(&mut self, name: &str) -> Option<Rc<RefCell<Box<dyn UnitObj>>>> {
+        
         if let Some(unit) = self.get_unit_on_name(name) {
              return Some(unit);
         }; 
@@ -173,7 +177,7 @@ impl UnitManager{
         } else {
             return None;
         };
-
+        log::info!("push new unit into load queue");
         self.push_load_queue(u.clone());
         self.dispatch_load_queue();
         Some(u.clone())
@@ -212,10 +216,12 @@ mod tests {
     // use services::service::ServiceUnit;
 
     use super::*;
-
+    use utils::{logger};
 
     #[test]
     fn  test_unit_load(){
+        logger::init_log_with_console("test",4);
+        log::info!("test");
         let mut unit_manager = UnitManager::new();
         unit_manager.init_lookup_path();
 
