@@ -182,19 +182,46 @@ impl UnitManager{
         self.dispatch_load_queue();
         Some(u.clone())
     }
+    pub fn dispatch_sigchld(&mut self) ->  Result<(), Box<dyn Error>> {
+        log::debug!("Dispatching sighandler waiting for pid");
+        let wait_pid = Pid::from_raw(-1);
+        let flags = WaitPidFlag::WNOHANG;
+        let process_exit = {
+            match nix::sys::wait::waitpid(wait_pid, Some(flags)) {
+                Ok(wait_status) => match wait_status {
+                    WaitStatus::Exited(pid, code) => {
+                        ProcessExit::Status(pid, code, Signal::SIGCHLD)
+                    }
+                    WaitStatus::Signaled(pid, signal, _dumped_core) => {
+                        ProcessExit::Status(pid, -1, signal)
+                    }
+                    _ => {
+                        log::debug!("Ignored child signal: {:?}", wait_status);
+                        return Err(format!("Ignored child signal: {:?}", wait_status).into())
+                    }
+                },
+                Err(e) => {
+                    log::error!("Error while waiting pid: {}", e);
+                    return Err(format!("Error while waiting pid: {}", e).into())
+                }
+            }
+        };
 
-    pub fn dispatch_sigchld(&mut self, exit: ProcessExit) {
-        match exit {
+        match process_exit {
             ProcessExit::Status(pid, code, signal) => {
                 match self.watch_pids.get(&pid) {
                     Some(unit) => {
                         unit.clone().borrow_mut().sigchld_events(self, pid, code, signal);
                     }
-                    None => log::debug!("not found unit obj of pid: {:?}", pid),
+                    None => {
+                        log::debug!("not found unit obj of pid: {:?}", pid);
+                        return Err(format!("not found unit obj of pid: {:?}", pid).into())
+                    },
                 }
 
                 self.watch_pids.remove(&pid);
-            },
+                Ok(())
+            }
         }
     }
 
