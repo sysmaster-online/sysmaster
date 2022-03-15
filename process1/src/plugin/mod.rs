@@ -127,7 +127,7 @@ impl Plugin  {
         }
     }
 
-    pub fn create_unit_obj(&self, unit_type: UnitType, _unit: Unit) -> Result<Box<dyn unit::UnitObj>, Box<dyn Error>> {
+    pub fn create_unit_obj(&self, unit_type: UnitType)  -> Result<Box<dyn unit::UnitObj>, Box<dyn Error>> {
         let dy_lib = match self.load_libs.get(&unit_type) {
             Some(lib) => {lib.clone()},
             None => return Err(format!("the {:?} plugin is not exist", unit_type).into()),

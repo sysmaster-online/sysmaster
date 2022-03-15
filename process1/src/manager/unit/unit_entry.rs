@@ -11,6 +11,7 @@ use std::hash::Hasher;
 use std::hash::Hash;
 use utils:: {time_util, unit_config_parser};
 use super::unit_manager::*;
+use super::unit_interface::UnitAction;
 
 use std::collections::{HashMap, HashSet};
 use std::cell::RefCell;
@@ -21,19 +22,7 @@ use std::ops::Deref;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use log;
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum UnitType {
-    UnitService = 0,
-    UnitTarget,
-    UnitTypeMax,
-    UnitTypeInvalid,
-    UnitTypeErrnoMax,
-}
-
-impl Default for UnitType {
-    fn default() -> Self { UnitType::UnitService }
-}
+use super::UnitType;
 
 #[derive(Hash, PartialEq, Eq, Debug, Copy, Clone)]
 pub enum UnitRelations {
@@ -157,10 +146,11 @@ pub struct Unit {
     in_load_queue: bool,
     default_dependencies: bool,
     pub conf: Option<Rc<unit_config_parser::Conf>>,
+    unit: Option<Rc<Box<dyn UnitAction>>>,
 }
 
 impl PartialEq for Unit {
-     fn eq(&self, other: &Unit) -> bool {
+     fn eq(&self, other: &Self) -> bool {
          self.unit_type == other.unit_type && self.id == other.id
      }
 }
@@ -284,6 +274,7 @@ impl Unit {
             in_load_queue: false,
             default_dependencies: true,
             conf: None,
+            unit: None,
         }
     }
 
@@ -506,7 +497,7 @@ pub trait ConfigParser {
     fn parse(&mut self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> { Ok(())}
 }
 
-impl ConfigParser for Unit {
+impl  ConfigParser  for Unit  {
     fn parse(&mut self,  m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
 
         // impl ugly
