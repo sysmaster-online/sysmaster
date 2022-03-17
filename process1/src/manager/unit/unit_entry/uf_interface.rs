@@ -1,5 +1,6 @@
 use super::u_entry::Unit;
-use crate::manager::data::{UnitConfig, UnitConfigItem, UnitType, DataManager};
+use super::unit_datastore::UnitDb;
+use crate::manager::data::{DataManager, UnitConfig, UnitConfigItem, UnitType};
 use crate::plugin::Plugin;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
@@ -28,7 +29,9 @@ impl UnitX {
     }
     pub fn release_resources(&self) {}
     pub fn check_snapshot(&self) {}
-    pub fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {todo!()}
+    pub fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {
+        todo!()
+    }
     pub fn reset_failed(&self) {}
     pub fn trigger(&self, _other: Rc<UnitX>) {}
     pub fn in_load_queue(&self) -> bool {
@@ -55,6 +58,7 @@ impl UnitX {
 
     pub(in crate::manager::unit) fn new(
         dm: Rc<DataManager>,
+        unitdb: Rc<UnitDb>,
         unit_type: UnitType,
         name: &str,
     ) -> Result<Rc<UnitX>, Box<dyn Error>> {
@@ -64,6 +68,7 @@ impl UnitX {
         let unit_obj = plugins.borrow().create_unit_obj(unit_type)?;
         Ok(Rc::new(UnitX(Unit::new(
             Rc::clone(&dm),
+            Rc::clone(&unitdb),
             unit_type,
             name,
             unit_obj,

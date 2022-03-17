@@ -1,6 +1,6 @@
 #![warn(unused_imports)]
+use super::unit_dep::UnitDep;
 use super::unit_sets::UnitSets;
-use super::unit_dep::{UnitDep};
 use crate::manager::data::{DataManager, UnitConfig};
 use crate::manager::table::{TableOp, TableSubscribe};
 use std::rc::Rc;
@@ -12,10 +12,10 @@ pub(super) struct UnitConfigs {
 }
 
 impl UnitConfigs {
-    pub(super) fn new(dm:Rc<DataManager>, units:Rc<UnitSets>, dep:Rc<UnitDep>) -> UnitConfigs {
+    pub(super) fn new(dm: Rc<DataManager>, units: Rc<UnitSets>, dep: Rc<UnitDep>) -> UnitConfigs {
         let uc = UnitConfigs {
-            name:String::from("UnitConfigs"),
-            data:Rc::new(UnitConfigsSub::new(units, dep)),
+            name: String::from("UnitConfigs"),
+            data: Rc::new(UnitConfigsSub::new(units, dep)),
         };
         uc.register(&dm);
         uc
@@ -31,7 +31,7 @@ impl UnitConfigs {
 #[derive(Debug)]
 struct UnitConfigsSub {
     units: Rc<UnitSets>,
-    dep:Rc<UnitDep>,
+    dep: Rc<UnitDep>,
 }
 
 impl TableSubscribe<String, UnitConfig> for UnitConfigsSub {
@@ -50,11 +50,8 @@ impl TableSubscribe<String, UnitConfig> for UnitConfigsSub {
 
 // the declaration "pub(self)" is for identification only.
 impl UnitConfigsSub {
-    pub(self) fn new(units:Rc<UnitSets>, dep:Rc<UnitDep>) -> UnitConfigsSub {
-        UnitConfigsSub {
-            units,
-            dep,
-        }    
+    pub(self) fn new(units: Rc<UnitSets>, dep: Rc<UnitDep>) -> UnitConfigsSub {
+        UnitConfigsSub { units, dep }
     }
 
     pub(self) fn insert_config(&self, source: &str, config: &UnitConfig) {
@@ -68,7 +65,12 @@ impl UnitConfigsSub {
 
         // dependency
         for (relation, name) in config.deps.iter() {
-            self.dep.insert(Rc::clone(&unitx), *relation, self.units.get(name).unwrap(), 0);
+            self.dep.insert(
+                Rc::clone(&unitx),
+                *relation,
+                self.units.get(name).unwrap(),
+                0,
+            );
         }
     }
 

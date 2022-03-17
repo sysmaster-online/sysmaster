@@ -1,4 +1,4 @@
-use crate::manager::data::{UnitType};
+use crate::manager::data::UnitType;
 use nix::sys::signal::Signal;
 
 #[derive(PartialEq, Debug, Eq)]

@@ -1,9 +1,10 @@
-use super::unit_configs::{UnitConfigs};
-use super::unit_dep::{UnitDep};
+use super::unit_base::unit_name_to_type;
+use super::unit_configs::UnitConfigs;
+use super::unit_dep::UnitDep;
+use super::unit_entry::UnitDb;
+use super::unit_entry::UnitX;
 use super::unit_sets::UnitSets;
-use super::unit_base::{unit_name_to_type};
-use super::unit_entry::{UnitX};
-use crate::manager::data::{UnitRelations, UnitType, DataManager};
+use crate::manager::data::{DataManager, UnitRelations, UnitType};
 use crate::manager::signals::ProcessExit;
 use nix::sys::signal::Signal;
 use nix::sys::wait::{WaitPidFlag, WaitStatus};
@@ -26,11 +27,11 @@ use nix::unistd::Pid;
 #[derive(Debug)]
 pub struct UnitManager {
     dm: Rc<DataManager>,
-    configs:Rc<UnitConfigs>,
-
+    configs: Rc<UnitConfigs>,
     units: Rc<UnitSets>,
-    dep:Rc<UnitDep>,
+    dep: Rc<UnitDep>,
     unit_id_map: HashMap<String, String>,
+    pub unitdb: Rc<UnitDb>, // ALL UNIT STORE IN UNITDB,AND OTHER USE REF
     unit_name_map: HashMap<String, String>,
     lookup_path: LookupPaths,
     last_updated_timestamp_hash: u64,
@@ -43,11 +44,11 @@ impl UnitManager {
         self.units.insert(name, unit)
     }
 
-    pub fn units_get(&self, name:&str) -> Option<Rc<UnitX>> {
+    pub fn units_get(&self, name: &str) -> Option<Rc<UnitX>> {
         self.units.get(name)
     }
 
-    pub fn dep_get(&self, source:&UnitX, relation:UnitRelations) -> Vec<Rc<UnitX>> {
+    pub fn dep_get(&self, source: &UnitX, relation: UnitRelations) -> Vec<Rc<UnitX>> {
         self.dep.get(source, relation)
     }
 
@@ -66,23 +67,21 @@ impl UnitManager {
                 let entry = entry.unwrap();
                 let filename = entry.file_name().to_str().unwrap().to_string();
                 let file_path = entry.path().to_str().unwrap().to_string();
-                if self.unit_id_map.contains_key(&filename) {
-                    continue;
-                }
-                self.unit_id_map.insert(filename, file_path);
+                self.unitdb
+                    .insert_unit_config_file(filename, Rc::new(file_path));
             }
         }
         self.last_updated_timestamp_hash = timestamp_hash_new;
         return true;
     }
 
-    pub fn get_unit_file_path(&self, unit_name: &str) -> Option<&String> {
-        match self.unit_id_map.get(unit_name) {
+    pub fn get_unit_file_path(&self, unit_name: &str) -> Option<Rc<String>> {
+        match self.unitdb.get_unit_config_file(&unit_name.to_string()) {
             None => {
                 return None;
             }
             Some(v) => {
-                return Some(v);
+                return Some(Rc::clone(&v));
             }
         }
     }
@@ -121,15 +120,13 @@ impl UnitManager {
         loop {
             match self.load_queue.pop_front() {
                 None => break,
-                Some(unit) => {
-                    match unit.load() {
-                        Ok(()) => {continue},
-                        Err(e) => {
-                            log::error!("load unit config failed: {}", e.to_string());
-                            println!("load unit config failed: {}", e.to_string())
-                        }
+                Some(unit) => match unit.load() {
+                    Ok(()) => continue,
+                    Err(e) => {
+                        log::error!("load unit config failed: {}", e.to_string());
+                        println!("load unit config failed: {}", e.to_string())
                     }
-                }
+                },
             }
         }
     }
@@ -141,29 +138,35 @@ impl UnitManager {
         self.load_queue.push_back(unit);
     }
 
-    fn prepare_unit(&mut self, name: &str) -> Option<Rc<UnitX>> { 
+    fn prepare_unit(&mut self, name: &str) -> Option<Rc<UnitX>> {
         let unit_type = unit_name_to_type(name);
         if unit_type == UnitType::UnitTypeInvalid {
             return None;
         }
 
-        match super::unit_new(Rc::clone(&self.dm), unit_type, name) {
+        match super::unit_new(
+            Rc::clone(&self.dm),
+            Rc::clone(&self.unitdb),
+            unit_type,
+            name,
+        ) {
             Ok(unit) => {
-                self.units.insert(name.to_string(), Rc::clone(&unit));
-                return Some(unit)
-            },
+                let rc_unit = Rc::new(unit);
+                self.unitdb
+                    .insert_unit(name.to_string(), Rc::clone(&rc_unit));
+                Some(Rc::clone(&rc_unit))
+            }
             Err(_e) => {
                 log::error!("create unit obj failed {:?}", _e);
                 return None;
             }
-        };
+        }
     }
 
     pub fn load_unit(&mut self, name: &str) -> Option<Rc<UnitX>> {
-        if let Some(unit) = self.units.get(name) {
-            return Some(unit);
+        if let Some(unit) = self.unitdb.get_unit_by_name(&name.to_string()) {
+            return Some(Rc::clone(&unit));
         };
-
         let unit = self.prepare_unit(name);
         let u = if let Some(u) = unit {
             u
@@ -171,9 +174,9 @@ impl UnitManager {
             return None;
         };
         log::info!("push new unit into load queue");
-        self.push_load_queue(u.clone());
+        self.push_load_queue(Rc::clone(&u));
         self.dispatch_load_queue();
-        Some(u.clone())
+        Some(Rc::clone(&u))
     }
     pub fn dispatch_sigchld(&mut self) -> Result<(), Box<dyn Error>> {
         log::debug!("Dispatching sighandler waiting for pid");
@@ -219,25 +222,29 @@ impl UnitManager {
     }
 
     pub fn add_watch_pid(&mut self, pid: Pid, id: &str) {
-        let unit_obj = self.units.get(id).unwrap();
-        self.watch_pids.insert(pid, unit_obj.clone());
+        let unit_obj = self.unitdb.get_unit_by_name(&id.to_string()).unwrap();
+        self.watch_pids.insert(pid, Rc::clone(&unit_obj));
     }
 
     pub fn unwatch_pid(&mut self, pid: Pid) {
         self.watch_pids.remove(&pid);
     }
 
-    pub(in crate::manager) fn new(dm:Rc<DataManager>) -> Self{
+    pub(in crate::manager) fn new(dm: Rc<DataManager>) -> Self {
         let _dm = Rc::clone(&dm);
         let units = Rc::new(UnitSets::new());
         let dep = Rc::new(UnitDep::new());
         UnitManager {
             dm,
-            configs:Rc::new(UnitConfigs::new(Rc::clone(&_dm), Rc::clone(&units), Rc::clone(&dep))),
-
+            configs: Rc::new(UnitConfigs::new(
+                Rc::clone(&_dm),
+                Rc::clone(&units),
+                Rc::clone(&dep),
+            )),
             units,
             dep,
             unit_id_map: HashMap::new(),
+            unitdb: Rc::new(UnitDb::new()),
             unit_name_map: HashMap::new(),
             last_updated_timestamp_hash: 0,
             lookup_path: path_lookup::LookupPaths::new(),
@@ -245,7 +252,6 @@ impl UnitManager {
             watch_pids: HashMap::new(),
         }
     }
-
 }
 
 #[cfg(test)]
@@ -268,7 +274,7 @@ mod tests {
 
         //assert_ne!(unit_manager.units.borrow().len(), 0);
 
-        match unit_manager.units.get(&unit_name) {
+        match unit_manager.unitdb.get_unit_by_name(&unit_name) {
             Some(_unit_obj) => println!("found unit obj {}", unit_name),
             None => println!("not fount unit: {}", unit_name),
         };
@@ -283,7 +289,7 @@ mod tests {
         let unit_name = String::from("config.service");
         unit_manager.load_unit(&unit_name);
 
-        match unit_manager.units.get(&unit_name) {
+        match unit_manager.unitdb.get_unit_on_name(&unit_name) {
             Some(_unit_obj) => println!("found unit obj {}", unit_name),
             None => println!("not fount unit: {}", unit_name),
         };

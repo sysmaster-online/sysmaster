@@ -1,5 +1,5 @@
-pub use data::{UnitType};
-pub use unit::{UnitActiveState, KillOperation, Unit, UnitObj, UnitX, UnitManager};
+pub use data::UnitType;
+pub use unit::{KillOperation, Unit, UnitActiveState, UnitManager, UnitObj, UnitX};
 
 mod job;
 pub mod manager;

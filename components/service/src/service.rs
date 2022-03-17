@@ -1,4 +1,4 @@
-use process1::manager::{KillOperation, Unit, UnitActiveState, UnitObj, UnitManager};
+use process1::manager::{KillOperation, Unit, UnitActiveState, UnitManager, UnitObj};
 use process1::watchdog;
 use std::any::{Any, TypeId};
 use std::collections::hash_map::DefaultHasher;
@@ -841,12 +841,7 @@ impl UnitObj for ServiceUnit {
         todo!()
     }
     fn load(&mut self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
-        self.unit
-            .upgrade()
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .load_unit(m);
+        self.unit.upgrade().as_ref().cloned().unwrap().load_unit(m);
 
         self.parse(m)?;
 
@@ -928,7 +923,15 @@ impl UnitObj for ServiceUnit {
     fn hash(&self) -> u64 {
         let mut h = DefaultHasher::new();
         Hash::hash(&(TypeId::of::<ServiceUnit>()), &mut h);
-        h.write(self.unit.upgrade().as_ref().cloned().unwrap().get_id().as_bytes());
+        h.write(
+            self.unit
+                .upgrade()
+                .as_ref()
+                .cloned()
+                .unwrap()
+                .get_id()
+                .as_bytes(),
+        );
         h.finish()
     }
 
