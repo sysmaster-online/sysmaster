@@ -2,6 +2,7 @@
 const ETC_SYSTEM_PATH: &'static str = "/etc/process1/system";
 const LIB_SYSTEM_PATH: &'static str = "/usr/lib/process1/system";
 
+#[derive(Debug)]
 pub struct LookupPaths {
     pub search_path: Vec<&'static str>,
     pub generator: String,

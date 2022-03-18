@@ -11,9 +11,10 @@ name = "process1"
 path = "src/bin/process1.rs"
 
 [lib]
-#crate_type = ["dylib"]
+# crate_type = ["dylib"]
+crate_type = ["lib"]
 path = "src/lib.rs"
-name = "core"
+name = "process1"
 
 [dependencies]
 dynamic_reload = "0.4.0"
@@ -25,3 +26,4 @@ strum = { version = "0.23", features = ["derive"] }
 nix = "0.23.0"
 log = "0.4"
 libc = "0.2.*"
+signal-hook = "0.3.13"

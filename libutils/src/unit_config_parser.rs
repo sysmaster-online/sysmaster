@@ -24,8 +24,20 @@ pub struct ConfUnit {
 pub struct ConfService {
     #[serde(alias = "Type")]
     pub service_type: Option<String>,
+    #[serde(alias = "ExecCondition")]
+    pub exec_condition: Option<Vec<String>>,
+    #[serde(alias = "ExecStartPre")]
+    pub exec_prestart: Option<Vec<String>>,
     #[serde(alias = "ExecStart")]
-    pub exec_start: Option<String>,
+    pub exec_start: Option<Vec<String>>,
+    #[serde(alias = "ExecStartPost")]
+    pub exec_startpost: Option<Vec<String>>,
+    #[serde(alias = "ExecReload")]
+    pub exec_reload: Option<Vec<String>>,
+    #[serde(alias = "ExecStop")]
+    pub exec_stop: Option<Vec<String>>,
+    #[serde(alias = "ExecStopPost")]
+    pub exec_stoppost: Option<Vec<String>>,
     #[serde(alias = "Sockets")]
     pub sockets: Option<String>,
     #[serde(alias = "Restart")]
@@ -34,8 +46,6 @@ pub struct ConfService {
     pub restrict_realtime: Option<String>,
     #[serde(alias = "RebootArgument")]
     pub reboot_argument: Option<String>,
-    #[serde(alias = "ExecReload")]
-    pub exec_reload: Option<String>,
     #[serde(alias = "OOMScoreAdjust")]
     pub oom_score_adjust: Option<String>,
     #[serde(alias = "RestartSec")]
