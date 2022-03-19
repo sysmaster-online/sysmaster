@@ -5,7 +5,7 @@ Requires="c.service"
 Wants = "b.service"
 
 [Service]
-ExecStart="/usr/bin/reboot"
+ExecStart=["/usr/bin/reboot"]
 
 
 [Install]

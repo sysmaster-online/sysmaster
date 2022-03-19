@@ -3,6 +3,7 @@ extern crate toml;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind};
+use serde::de;
 
 #[derive(Debug, Deserialize)]
 pub struct ConfUnit {
@@ -88,7 +89,7 @@ pub struct Conf {
     pub install: Option<ConfInstall>,
 }
 
-pub fn unit_file_load(file_path: String) -> Result<Conf, Error> {
+pub fn unit_file_load (file_path: String) -> Result<Conf, Error> {
     let mut file = match File::open(file_path) {
         Ok(f) => f,
         Err(_e) => {
