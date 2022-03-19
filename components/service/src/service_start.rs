@@ -19,7 +19,7 @@ pub fn start_service(
     unsafe {
         match nix::unistd::fork() {
             Ok(nix::unistd::ForkResult::Parent { child }) => {
-                manager.add_watch_pid(child, &srvc.unit.id);
+                manager.add_watch_pid(child, &srvc.unit.upgrade().as_ref().cloned().unwrap().id);
                 return Ok(child);
             }
             Ok(nix::unistd::ForkResult::Child) => {
