@@ -1,34 +1,37 @@
 #![warn(unused_imports)]
 use super::unit_sets::UnitSets;
+use super::unit_dep::{UnitDep};
 use crate::manager::data::{DataManager, UnitConfig};
 use crate::manager::table::{TableOp, TableSubscribe};
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub(super) struct UnitConfigs {
     name: String,             // key for table-subscriber
     data: Rc<UnitConfigsSub>, // data for table-subscriber
 }
 
 impl UnitConfigs {
-    pub(super) fn new(units: Rc<UnitSets>) -> UnitConfigs {
-        let ud = UnitConfigs {
-            name: String::from("UnitConfigs"),
-            data: Rc::new(UnitConfigsSub::new(units)),
+    pub(super) fn new(dm:Rc<DataManager>, units:Rc<UnitSets>, dep:Rc<UnitDep>) -> UnitConfigs {
+        let uc = UnitConfigs {
+            name:String::from("UnitConfigs"),
+            data:Rc::new(UnitConfigsSub::new(units, dep)),
         };
-        // ud.register(dm); // managers-manager
-        ud
+        uc.register(&dm);
+        uc
     }
 
-    fn register(&self, dm: &mut DataManager) {
+    fn register(&self, dm: &DataManager) {
         let subscriber = Rc::clone(&self.data);
         dm.register_unit_config(self.name.clone(), subscriber)
-            .expect("job dependency has been registered.");
+            .expect("unit dependency has been registered.");
     }
 }
 
 #[derive(Debug)]
 struct UnitConfigsSub {
     units: Rc<UnitSets>,
+    dep:Rc<UnitDep>,
 }
 
 impl TableSubscribe<String, UnitConfig> for UnitConfigsSub {
@@ -47,22 +50,25 @@ impl TableSubscribe<String, UnitConfig> for UnitConfigsSub {
 
 // the declaration "pub(self)" is for identification only.
 impl UnitConfigsSub {
-    pub(self) fn new(units: Rc<UnitSets>) -> UnitConfigsSub {
-        UnitConfigsSub { units }
+    pub(self) fn new(units:Rc<UnitSets>, dep:Rc<UnitDep>) -> UnitConfigsSub {
+        UnitConfigsSub {
+            units,
+            dep,
+        }    
     }
 
     pub(self) fn insert_config(&self, source: &str, config: &UnitConfig) {
-        let unitx = match self.units.get_unit_on_name(source) {
+        let unitx = match self.units.get(source) {
             Some(u) => u,
             None => todo!(), // load
         };
 
         // config
-        unitx.as_ref().borrow().set_config(config);
+        unitx.set_config(config);
 
         // dependency
         for (relation, name) in config.deps.iter() {
-            unitx.as_ref().borrow().add_dependencies(*relation, name);
+            self.dep.insert(Rc::clone(&unitx), *relation, self.units.get(name).unwrap(), 0);
         }
     }
 

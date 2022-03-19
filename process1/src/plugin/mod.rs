@@ -1,5 +1,4 @@
-use crate::manager::data::*;
-use crate::manager::unit::Unit;
+use super::manager::{UnitType, UnitObj};
 use dynamic_reload as dy_re;
 use log::*;
 use std::ffi::OsStr;
@@ -14,12 +13,11 @@ use std::{
 use std::{env, io};
 use walkdir::{DirEntry, WalkDir};
 
-use super::manager::unit;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 pub struct Plugin {
-    unitobj_lists: Vec<Arc<Box<dyn unit::UnitObj>>>,
+    unitobj_lists: Vec<Arc<Box<dyn UnitObj>>>,
     library_dir: String,
     load_libs: HashMap<UnitType, Arc<dy_re::Lib>>,
     is_loaded: bool,
@@ -116,7 +114,7 @@ impl Plugin {
                     log::debug!("insert unit {:?} dynamic lib into libs", unit_type);
                     self.load_libs.insert(unit_type, lib.clone());
                     let dy_lib = self.load_libs.get(&unit_type).unwrap();
-                    let fun: dynamic_reload::Symbol<fn() -> *mut dyn unit::UnitObj> =
+                    let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitObj> =
                         unsafe { dy_lib.lib.get(b"__unit_obj_create").unwrap() };
                     let boxed_raw = fun();
                     self.unitobj_lists
@@ -160,13 +158,13 @@ impl Plugin {
     pub fn create_unit_obj(
         &self,
         unit_type: UnitType,
-    ) -> Result<Box<dyn unit::UnitObj>, Box<dyn Error>> {
+    ) -> Result<Box<dyn UnitObj>, Box<dyn Error>> {
         let dy_lib = match self.load_libs.get(&unit_type) {
             Some(lib) => lib.clone(),
             None => return Err(format!("the {:?} plugin is not exist", unit_type).into()),
         };
 
-        let fun: dynamic_reload::Symbol<fn() -> *mut dyn unit::UnitObj> =
+        let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitObj> =
             unsafe { dy_lib.lib.get(b"__unit_obj_create").unwrap() };
         let boxed_raw = fun();
 

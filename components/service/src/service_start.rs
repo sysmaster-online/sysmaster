@@ -3,7 +3,7 @@ use std::{collections::HashMap, process::exit};
 use super::exec_child;
 use super::service::{CmdError, CommandLine, ServiceUnit};
 use nix::unistd::Pid;
-use process1::manager::unit::unit_manager::UnitManager;
+use process1::manager::{UnitManager};
 
 pub fn start_service(
     srvc: &mut ServiceUnit,
@@ -19,7 +19,7 @@ pub fn start_service(
     unsafe {
         match nix::unistd::fork() {
             Ok(nix::unistd::ForkResult::Parent { child }) => {
-                manager.add_watch_pid(child, &srvc.unit.upgrade().as_ref().cloned().unwrap().id);
+                manager.add_watch_pid(child, &srvc.unit.upgrade().as_ref().cloned().unwrap().get_id());
                 return Ok(child);
             }
             Ok(nix::unistd::ForkResult::Child) => {

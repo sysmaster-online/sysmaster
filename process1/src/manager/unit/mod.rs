@@ -1,20 +1,19 @@
-use std::error::Error;
-
-use crate::manager::data::*;
-pub use unit_base::*;
-pub use unit_entry::*;
-pub(in crate::manager) use unit_manager::*;
-
-use std::rc::Rc;
-// use services::service::ServiceUnit;
+pub use unit_base::{UnitActiveState, KillOperation};
+pub use unit_entry::{Unit, UnitObj, UnitX};
+pub use unit_manager::{UnitManager};
 
 mod unit_base;
-mod unit_configs;
 mod unit_entry;
-pub mod unit_manager;
 mod unit_sets;
+mod unit_dep;
+mod unit_configs;
+mod unit_manager;
 
 //后续考虑和plugin结合
+use std::error::Error;
+use std::rc::Rc;
+use crate::manager::data::{UnitType, DataManager};
+
 fn unit_new(
     dm: Rc<DataManager>,
     unit_type: UnitType,
