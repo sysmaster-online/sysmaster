@@ -53,7 +53,12 @@ impl<T: ConfFactory> ConfigParse for ConfigParser<T> {
             let mut confs = self.1.product_confs();
             // must be a table not support for other format
             for key in v_table.keys() {
-                let mut section: Section<Conf> = Section::new(key.to_string());
+                let section;
+                if let Some(sect)= confs.get_section(key){
+                    section = sect;
+                }else{
+                    return Err(IOError::new(ErrorKind::Other, format!("get section [{}] from erro{}",key,error_info.to_string())));
+                }
                 if let Some(v_t_v_table) =
                     v_table.get(key).unwrap_or_else(|| &error_info).as_table()
                 {
@@ -78,7 +83,6 @@ impl<T: ConfFactory> ConfigParse for ConfigParser<T> {
                 } else {
                     return Err(IOError::new(ErrorKind::Other, error_info.to_string()));
                 }
-                confs.add_section(section);
             }
             return Ok(confs);
         } else {
@@ -97,9 +101,9 @@ mod tests {
     impl ConfFactory for ServiceFactory {
         fn product_confs(&self) -> crate::unit_conf::Confs {
             let mut confs = Confs::new("service".to_string());
-            let unit_section = Section::new("unit".to_string());
-            let service_section = Section::new("service".to_string());
-            let install_section = Section::new("install".to_string());
+            let unit_section = Section::new("Unit".to_string());
+            let service_section = Section::new("Service".to_string());
+            let install_section = Section::new("Install".to_string());
             confs.add_section(unit_section);
             confs.add_section(service_section);
             confs.add_section(install_section);

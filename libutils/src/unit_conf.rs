@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 pub struct Conf(String, ConfValue);
 
 pub enum ConfValue {
@@ -90,11 +92,20 @@ impl Confs {
         self.sections.push(section);
     }
 
+    pub fn get_section(&mut self, name: &str) -> Option<&mut Section<Conf>> {
+        for section in self.sections.iter_mut() {
+            if section.get_section_name() == name {
+                return Some(section);
+            }
+        }
+        None
+    }
+
     pub fn get_sections(&self) -> &Vec<Section<Conf>> {
         &self.sections
     }
 }
 
-pub trait  ConfFactory {
-    fn product_confs(&self)->Confs;
+pub trait ConfFactory {
+    fn product_confs(&self) -> Confs;
 }
