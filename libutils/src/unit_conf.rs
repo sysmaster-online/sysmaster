@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 
 pub struct Conf(String, ConfValue);
 
@@ -70,6 +69,7 @@ impl Section<Conf> {
         self.1.push(conf);
     }
 }
+
 pub struct Confs {
     ctype: String,
     sections: Vec<Section<Conf>>,

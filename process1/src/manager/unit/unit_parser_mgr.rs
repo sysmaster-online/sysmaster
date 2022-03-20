@@ -99,7 +99,7 @@ mod tests {
     }
     #[test]
     fn test_unit_parser_mgr_unit_file_load() -> Result<(), Error> {
-        let file_path = "config.service";
+        let file_path = "examples/config.service";
         let mut config_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         config_path.push("../libutils");
         config_path.push(file_path);

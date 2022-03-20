@@ -1,4 +1,4 @@
-use crate::unit_conf::{Conf, ConfFactory, ConfValue, Section};
+use crate::unit_conf::{Conf, ConfFactory, ConfValue};
 use std::io::{Error as IOError, ErrorKind};
 use toml::Value;
 
@@ -114,7 +114,7 @@ mod tests {
     }
     #[test]
     fn test_config_unit_file_load() -> Result<(), Error> {
-        let file_path = "config.service";
+        let file_path = "examples/config.service";
         let mut file = File::open(file_path).unwrap();
         let mut buf = String::new();
         match file.read_to_string(&mut buf) {

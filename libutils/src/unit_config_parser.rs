@@ -1,6 +1,5 @@
 extern crate toml;
 
-use serde::de;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind};
