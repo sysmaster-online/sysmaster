@@ -76,16 +76,14 @@ where
     }
 }
 
-
-
 mod tests {
 
     use super::UnitParserMgr;
     use std::fs::File;
     use std::io::{Error, ErrorKind, Read};
-    use utils::unit_conf::{ConfFactory, ConfValue, Confs, Section};
-    use utils::config_parser::ConfigParser;
     use std::path::PathBuf;
+    use utils::config_parser::ConfigParser;
+    use utils::unit_conf::{ConfFactory, ConfValue, Confs, Section};
     struct ServiceFactory;
     impl ConfFactory for ServiceFactory {
         fn product_confs(&self) -> Confs {
@@ -110,7 +108,7 @@ mod tests {
         //let mut buf = String::new();
         let service_factory = ServiceFactory;
         let ump = UnitParserMgr::default();
-        let config_parse = ConfigParser::new("service".to_string(),service_factory);
+        let config_parse = ConfigParser::new("service".to_string(), service_factory);
         ump.register_parser("service".to_string(), config_parse);
         let conf = ump.unit_file_parser("service", config_path.to_str().unwrap());
         match conf {

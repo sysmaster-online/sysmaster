@@ -36,7 +36,6 @@ fn convert_value_to_confvalue(value: &Value) -> Option<ConfValue> {
     }
 }
 
-
 impl<T: ConfFactory> ConfigParse for ConfigParser<T> {
     fn unit_file_parse(&self, file_content: &str) -> Result<Confs, IOError> {
         let conf: Value = match toml::from_str(file_content) {
@@ -54,10 +53,13 @@ impl<T: ConfFactory> ConfigParse for ConfigParser<T> {
             // must be a table not support for other format
             for key in v_table.keys() {
                 let section;
-                if let Some(sect)= confs.get_section(key){
+                if let Some(sect) = confs.get_section(key) {
                     section = sect;
-                }else{
-                    return Err(IOError::new(ErrorKind::Other, format!("get section [{}] from erro{}",key,error_info.to_string())));
+                } else {
+                    return Err(IOError::new(
+                        ErrorKind::Other,
+                        format!("get section [{}] from erro{}", key, error_info.to_string()),
+                    ));
                 }
                 if let Some(v_t_v_table) =
                     v_table.get(key).unwrap_or_else(|| &error_info).as_table()
