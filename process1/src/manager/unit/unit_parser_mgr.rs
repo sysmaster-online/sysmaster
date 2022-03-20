@@ -1,23 +1,30 @@
+use std::default::Default;
 use std::error::Error;
 use std::io::{Error as IoError, ErrorKind};
 use std::{cell::RefCell, collections::HashMap, fs::File, io::Read};
 use utils::config_parser::ConfigParser;
-use utils::{config_parser::ConfigParse, u_config::Confs};
-struct UnitParserMgr {
-    config_parsers: RefCell<HashMap<String, ConfigParser>>,
+use utils::unit_conf::ConfFactory;
+use utils::{config_parser::ConfigParse, unit_conf::Confs};
+pub struct UnitParserMgr<T> {
+    config_parsers: RefCell<HashMap<String, T>>,
 }
 
-impl UnitParserMgr {
+impl<T> UnitParserMgr<T>
+where
+    T: ConfigParse,
+{
     pub(super) fn new() -> Self {
         Self {
             config_parsers: RefCell::new(HashMap::new()),
         }
     }
-    pub(super) fn register_parser(&self, unit_type: String) {
-        let config_par = ConfigParser::new((&unit_type).to_string());
+    /*
+     *Different unit have different conf format,so need default parser
+     */
+    pub(super) fn register_parser(&self, unit_type: String, config_parse: T) {
         self.config_parsers
             .borrow_mut()
-            .insert(unit_type, config_par);
+            .insert(unit_type, config_parse);
     }
 
     pub(super) fn unit_file_parser(
@@ -59,27 +66,53 @@ impl UnitParserMgr {
     }
 }
 
-impl Default for UnitParserMgr {
+impl<T> Default for UnitParserMgr<ConfigParser<T>>
+where
+    T: ConfFactory,
+{
     fn default() -> Self {
-        Self::new()
+        let _self = Self::new();
+        _self
     }
 }
+
+
 
 mod tests {
 
     use super::UnitParserMgr;
     use std::fs::File;
     use std::io::{Error, ErrorKind, Read};
-    use utils::u_config::ConfValue;
-
+    use utils::unit_conf::{ConfFactory, ConfValue, Confs, Section};
+    use utils::config_parser::ConfigParser;
+    use std::path::PathBuf;
+    struct ServiceFactory;
+    impl ConfFactory for ServiceFactory {
+        fn product_confs(&self) -> Confs {
+            let mut confs = Confs::new("service".to_string());
+            let unit_section = Section::new("unit".to_string());
+            let service_section = Section::new("service".to_string());
+            let install_section = Section::new("install".to_string());
+            confs.add_section(unit_section);
+            confs.add_section(service_section);
+            confs.add_section(install_section);
+            confs
+        }
+    }
     #[test]
     fn test_unit_parser_mgr_unit_file_load() -> Result<(), Error> {
         let file_path = "config.service";
+        let mut config_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        config_path.push("../libutils");
+        config_path.push(file_path);
+        println!("{:?}", config_path);
         //let mut file = File::open(file_path).unwrap();
         //let mut buf = String::new();
-        let ump = UnitParserMgr::new();
-        ump.register_parser("service".to_string());
-        let conf = ump.unit_file_parser("service", file_path);
+        let service_factory = ServiceFactory;
+        let ump = UnitParserMgr::default();
+        let config_parse = ConfigParser::new("service".to_string(),service_factory);
+        ump.register_parser("service".to_string(), config_parse);
+        let conf = ump.unit_file_parser("service", config_path.to_str().unwrap());
         match conf {
             Ok(conf) => {
                 let v = conf.get_sections();

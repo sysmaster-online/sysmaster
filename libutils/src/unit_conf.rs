@@ -94,3 +94,7 @@ impl Confs {
         &self.sections
     }
 }
+
+pub trait  ConfFactory {
+    fn product_confs(&self)->Confs;
+}
