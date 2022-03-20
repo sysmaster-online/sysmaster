@@ -1,7 +1,7 @@
 use super::unit_base::unit_name_to_type;
 use super::unit_configs::UnitConfigs;
+use super::unit_datastore::UnitDb;
 use super::unit_dep::UnitDep;
-use super::unit_entry::UnitDb;
 use super::unit_entry::UnitX;
 use super::unit_sets::UnitSets;
 use crate::manager::data::{DataManager, UnitRelations, UnitType};
@@ -49,7 +49,7 @@ impl UnitManager {
     }
 
     pub fn dep_get(&self, source: &UnitX, relation: UnitRelations) -> Vec<Rc<UnitX>> {
-        self.dep.get(source, relation)
+        self.dep.gets(source, relation)
     }
 
     pub fn build_name_map(&mut self) -> bool {
@@ -289,7 +289,7 @@ mod tests {
         let unit_name = String::from("config.service");
         unit_manager.load_unit(&unit_name);
 
-        match unit_manager.unitdb.get_unit_on_name(&unit_name) {
+        match unit_manager.unitdb.get_unit_by_name(&unit_name) {
             Some(_unit_obj) => println!("found unit obj {}", unit_name),
             None => println!("not fount unit: {}", unit_name),
         };

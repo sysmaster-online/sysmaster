@@ -14,11 +14,11 @@ impl UeChild {
         }
     }
 
-    pub(super) fn addPids(&mut self, pid: u64) -> bool {
+    pub(super) fn add_pids(&mut self, pid: u64) -> bool {
         self.pids.insert(pid)
     }
 
-    pub(super) fn removePids(&mut self, pid: u64) -> bool {
+    pub(super) fn remove_pids(&mut self, pid: u64) -> bool {
         self.pids.remove(&pid)
     }
 }

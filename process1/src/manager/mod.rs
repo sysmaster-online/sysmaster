@@ -1,7 +1,8 @@
-pub use data::UnitType;
-pub use unit::{KillOperation, Unit, UnitActiveState, UnitManager, UnitObj, UnitX};
+pub use data::{UnitRelations, UnitType};
+pub use unit::{JobAffect, JobConf, JobInfo, JobKind, JobManager, JobResult, JobStage};
+pub use unit::{KillOperation, Unit, UnitActiveState, UnitDb, UnitManager, UnitObj, UnitX};
 
-mod job;
+#[allow(dead_code)]
 pub mod manager;
 pub mod signals;
 #[allow(dead_code)]

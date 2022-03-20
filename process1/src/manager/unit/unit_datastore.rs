@@ -1,7 +1,5 @@
-use super::uf_interface::UnitX;
+use super::unit_entry::UnitX;
 use std::cell::RefCell;
-use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use crate::manager::table::Table;

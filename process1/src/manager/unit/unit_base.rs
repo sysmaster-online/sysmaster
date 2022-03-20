@@ -13,17 +13,6 @@ pub enum UnitLoadState {
     UnitLoadStateInvalid = -1,
 }
 
-pub enum UnitState {
-    UnitActive = 0,
-    UnitReloading = 1,
-    UnitInActive = 2,
-    UnitFailed = 3,
-    UnitActiving = 4,
-    UnitDeactiving = 5,
-    UnitStateMax = 6,
-    UnitStateInvalid = -1,
-}
-
 enum UnitNameFlags {
     UnitNamePlain = 1,
     UnitNameInstance = 2,
@@ -49,15 +38,35 @@ enum UnitFileState {
     UnitFileStateInvalid,
 }
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
+pub enum UnitActionError {
+    UnitActionEAgain,
+    UnitActionEAlready,
+    UnitActionEComm,
+    UnitActionEBadR,
+    UnitActionENoExec,
+    UnitActionEProto,
+    UnitActionEOpNotSupp,
+    UnitActionENolink,
+    UnitActionEStale,
+    UnitActionEFailed,
+}
+
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum UnitActiveState {
     UnitActive,
     UnitReloading,
-    UnitInactive,
+    UnitInActive,
     UnitFailed,
     UnitActivating,
-    UnitDeactiviting,
+    UnitDeActivating,
     UnitMaintenance,
+}
+
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
+pub enum UnitNotifyFlags {
+    UnitNotifyReloadFailure = 1 << 0,
+    UnitNotifyWillAutoRestart = 1 << 1,
 }
 
 pub enum KillOperation {

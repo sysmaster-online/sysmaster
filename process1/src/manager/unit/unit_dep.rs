@@ -1,4 +1,7 @@
 use super::unit_entry::UnitX;
+use super::unit_relation::{self};
+use super::unit_relation_atom::{self, UnitRelationAtom};
+use super::UnitErrno;
 use crate::manager::data::UnitRelations;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -21,11 +24,14 @@ impl UnitDep {
         source: Rc<UnitX>,
         relation: UnitRelations,
         dest: Rc<UnitX>,
+        reference: bool,
         source_mask: u16,
-    ) {
+    ) -> Result<(), UnitErrno> {
+        source.dep_check(relation, &dest)?;
         self.data
             .borrow_mut()
-            .insert(source, relation, dest, source_mask)
+            .insert(source, relation, dest, reference, source_mask);
+        Ok(())
     }
 
     pub(super) fn remove(&self, source: &UnitX, relation: UnitRelations, dest: &UnitX) {
@@ -36,8 +42,16 @@ impl UnitDep {
         self.data.borrow_mut().remove_unit(source)
     }
 
-    pub(super) fn get(&self, source: &UnitX, relation: UnitRelations) -> Vec<Rc<UnitX>> {
-        self.data.borrow().get(source, relation)
+    pub(super) fn gets(&self, source: &UnitX, relation: UnitRelations) -> Vec<Rc<UnitX>> {
+        self.data.borrow().gets(source, relation)
+    }
+
+    pub(super) fn gets_atom(&self, source: &UnitX, atom: UnitRelationAtom) -> Vec<Rc<UnitX>> {
+        let mut dests = Vec::new();
+        for relation in unit_relation_atom::unit_relation_from_unique_atom(atom).iter() {
+            dests.append(&mut self.gets(source, *relation));
+        }
+        dests
     }
 
     pub(super) fn is_dep_with(
@@ -47,6 +61,21 @@ impl UnitDep {
         dest: &UnitX,
     ) -> bool {
         self.data.borrow().is_dep_with(source, relation, dest)
+    }
+
+    pub(super) fn is_dep_atom_with(
+        &self,
+        source: &UnitX,
+        atom: UnitRelationAtom,
+        dest: &UnitX,
+    ) -> bool {
+        for relation in unit_relation_atom::unit_relation_from_unique_atom(atom).iter() {
+            if self.is_dep_with(source, *relation, dest) {
+                // something hits
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -73,40 +102,52 @@ impl UnitDepData {
         source: Rc<UnitX>,
         relation: UnitRelations,
         dest: Rc<UnitX>,
+        reference: bool,
         source_mask: u16,
     ) {
         // check input
         if source.as_ref() == dest.as_ref() {
             // ptr_eq?
-            // Err(JobError::JobErrInternal)
+            // Err(UnitErrno::UnitErrInternal)
             return;
         }
 
+        let mask = UnitDepMask {
+            source: source_mask,
+            dest: 0,
+        };
+        let mask_inverse = UnitDepMask {
+            source: 0,
+            dest: source_mask,
+        };
+        let relation_inverse = unit_relation::unit_relation_to_inverse(relation);
+
         // insert in two-directions way
-        let relation_inverse = relation.clone(); // relation_inverse = inverse(relation)
+        self.insert_one_way(Rc::clone(&source), relation, Rc::clone(&dest), mask);
         self.insert_one_way(
-            Rc::clone(&source),
-            relation,
             Rc::clone(&dest),
-            UnitDepMask {
-                source: source_mask,
-                dest: 0,
-            },
-        );
-        self.insert_one_way(
-            dest,
             relation_inverse,
-            source,
-            UnitDepMask {
-                source: 0,
-                dest: source_mask,
-            },
+            Rc::clone(&source),
+            mask_inverse,
         );
+
+        // process reference in two-directions way
+        if reference {
+            let ref_relation = UnitRelations::UnitReferences;
+            let ref_relation_inverse = unit_relation::unit_relation_to_inverse(ref_relation);
+            self.insert_one_way(Rc::clone(&source), ref_relation, Rc::clone(&dest), mask);
+            self.insert_one_way(
+                Rc::clone(&dest),
+                ref_relation_inverse,
+                Rc::clone(&source),
+                mask_inverse,
+            );
+        }
     }
 
     pub(self) fn remove(&mut self, source: &UnitX, relation: UnitRelations, dest: &UnitX) {
         // remove in two-directions way
-        let relation_inverse = relation.clone(); // relation_inverse = inverse(relation)
+        let relation_inverse = unit_relation::unit_relation_to_inverse(relation);
         self.remove_one_way(source, relation, dest);
         self.remove_one_way(dest, relation_inverse, source);
     }
@@ -126,7 +167,7 @@ impl UnitDepData {
         }
     }
 
-    pub(self) fn get(&self, source: &UnitX, relation: UnitRelations) -> Vec<Rc<UnitX>> {
+    pub(self) fn gets(&self, source: &UnitX, relation: UnitRelations) -> Vec<Rc<UnitX>> {
         let mut dests = Vec::new();
 
         if let Some(sv) = self.t.get(source) {
