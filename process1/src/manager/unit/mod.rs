@@ -20,6 +20,7 @@ mod unit_datastore;
 mod unit_dep;
 mod unit_entry;
 mod unit_manager;
+mod unit_parser_mgr;
 mod unit_relation;
 mod unit_relation_atom;
 mod unit_sets;
