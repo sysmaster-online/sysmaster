@@ -1,10 +1,7 @@
-use std::cell::RefCell;
 use std::io::Error;
-use std::rc::Rc;
+use std::error::Error as Err;
 
-use event::Events;
-use event::EventType;
-use event::Source;
+use super::unit::UnitManager;
 
 pub enum Mode {
     SYSTEM,
@@ -30,67 +27,13 @@ pub enum Stats {
     SWITCHROOT,
 }
 
-pub struct Signals {
-    manager: Rc<RefCell<Manager>>,
-}
-impl Signals {
-    pub fn new(m: Rc<RefCell<Manager>>) -> Signals {
-        Signals { manager: m.clone() }
-    }
-}
 
-impl Source for Signals {
-    fn event_type(&self) -> EventType {
-        EventType::Signal
-    }
-
-    fn signals(&self) -> Vec<libc::c_int> {
-        vec![libc::SIGCHLD, libc::SIGTERM, libc::SIGINT]
-    }
-
-    fn epoll_event(&self) -> u32 {
-        (libc::EPOLLIN) as u32
-    }
-
-    fn priority(&self) -> i8 {
-        0i8
-    }
-
-    fn dispatch(&self, e: &mut Events) {
-        println!("Dispatching signal!");
-        loop {
-            match e.read_signals() {
-                Ok(Some(info)) => {
-                    println!("read signo: {:?}", info.si_signo);
-                    break;
-                }
-                Ok(None) => break,
-                Err(e) => {
-                    println!("{:?}", e);
-                    break;
-                }
-            }
-        }
-    }
-
-    fn token(&self) -> u64 {
-        let data: u64 = unsafe { std::mem::transmute(self) };
-        data
-    }
-
-    fn fd(&self) -> std::os::unix::prelude::RawFd {
-        todo!()
-    }
-
-    fn pid(&self) -> libc::pid_t {
-        0
-    }
-}
 
 pub struct Manager {
     mode: Mode,
     action: Action,
     stat: Stats,
+    um: UnitManager,
 }
 
 type JobId = i32;
@@ -103,6 +46,7 @@ impl Manager {
             mode,
             action,
             stat: Stats::INIT,
+            um: UnitManager::new(),
         }
     }
 
@@ -164,6 +108,10 @@ impl Manager {
 
     pub fn state(&self) -> Result<Stats, Error> {
         Ok(Stats::REEXECUTE)
+    }
+
+    pub fn dispatch_sigchld(&mut self) -> Result<(), Box<dyn Err>> {
+        self.um.dispatch_sigchld()
     }
 }
 

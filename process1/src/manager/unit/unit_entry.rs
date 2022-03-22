@@ -22,7 +22,7 @@ use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum UnitType {
     UnitService = 0,
     UnitTarget,

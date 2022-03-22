@@ -1,9 +1,9 @@
 use std::{collections::HashMap, process::exit};
 
-use nix::unistd::Pid;
-use super::service::{ServiceUnit, CmdError, CommandLine};
-use process1::manager::unit::unit_manager::UnitManager;
 use super::exec_child;
+use super::service::{CmdError, CommandLine, ServiceUnit};
+use nix::unistd::Pid;
+use process1::manager::unit::unit_manager::UnitManager;
 
 pub fn start_service(
     srvc: &mut ServiceUnit,
@@ -18,7 +18,7 @@ pub fn start_service(
 
     unsafe {
         match nix::unistd::fork() {
-            Ok(nix::unistd::ForkResult::Parent {child}) => {
+            Ok(nix::unistd::ForkResult::Parent { child }) => {
                 manager.add_watch_pid(child, &srvc.unit.id);
                 return Ok(child);
             }
