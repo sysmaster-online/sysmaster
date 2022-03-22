@@ -1,7 +1,8 @@
 use std::{collections::HashMap, process::exit};
 
 use super::exec_child;
-use super::service::{CmdError, CommandLine, ServiceUnit};
+use super::service::ServiceUnit;
+use super::service_base::{CmdError, CommandLine};
 use nix::unistd::Pid;
 
 pub fn start_service(srvc: &mut ServiceUnit, cmdline: &CommandLine) -> Result<Pid, CmdError> {

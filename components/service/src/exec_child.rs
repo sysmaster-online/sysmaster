@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use super::service::{CommandLine, ServiceUnit};
+use super::service::ServiceUnit;
+use super::service_base::CommandLine;
 use log;
 use regex::Regex;
 
