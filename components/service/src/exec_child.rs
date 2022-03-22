@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
-use super::service::{ServiceUnit, CommandLine};
+use super::service::{CommandLine, ServiceUnit};
 use log;
 use regex::Regex;
 
-
-fn build_exec_environment(service: &ServiceUnit, cmdline: &CommandLine, env: &HashMap<&str, String>) -> (std::ffi::CString, Vec<std::ffi::CString>) {
+fn build_exec_environment(
+    service: &ServiceUnit,
+    cmdline: &CommandLine,
+    env: &HashMap<&str, String>,
+) -> (std::ffi::CString, Vec<std::ffi::CString>) {
     // let command = cmdline.borrow();
     let cmd = std::ffi::CString::new(cmdline.cmd.clone()).unwrap();
 
@@ -15,7 +18,6 @@ fn build_exec_environment(service: &ServiceUnit, cmdline: &CommandLine, env: &Ha
 
     let mut args = Vec::new();
     args.push(exec_name);
-
 
     let var_regex = Regex::new(r"(\$[A-Z_]+)|(\$\{[A-Z_]+\})").unwrap();
     for arg in &cmdline.args {
@@ -34,7 +36,9 @@ fn build_exec_environment(service: &ServiceUnit, cmdline: &CommandLine, env: &Ha
             if let Some(val) = match_result {
                 let v = val.trim_matches('$').trim_matches('{').trim_matches('}');
                 if let Some(target) = env.get(v) {
-                    args.push(std::ffi::CString::new(var_regex.replace(arg, target).to_string()).unwrap());
+                    args.push(
+                        std::ffi::CString::new(var_regex.replace(arg, target).to_string()).unwrap(),
+                    );
                 };
             }
             continue;
@@ -46,11 +50,7 @@ fn build_exec_environment(service: &ServiceUnit, cmdline: &CommandLine, env: &Ha
     (cmd, args)
 }
 
-pub fn exec_child(
-    service: &ServiceUnit,
-    cmdline: &CommandLine,
-    env: &HashMap<&str, String>
-) {
+pub fn exec_child(service: &ServiceUnit, cmdline: &CommandLine, env: &HashMap<&str, String>) {
     let (cmd, args) = build_exec_environment(service, cmdline, env);
     let cstr_args = args
         .iter()
