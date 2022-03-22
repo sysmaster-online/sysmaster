@@ -136,7 +136,10 @@ mod tests {
         //let mut buf = String::new();
         //let service_factory = DefalutFactory("Service".to_string());
         let ump = UnitParserMgr::default();
-        ump.register_parser_by_private_section_name(UnitType::UnitService.to_string(), "Service".to_string());
+        ump.register_parser_by_private_section_name(
+            UnitType::UnitService.to_string(),
+            "Service".to_string(),
+        );
         let conf = ump.unit_file_parser("service", config_path.to_str().unwrap());
         match conf {
             Ok(conf) => {

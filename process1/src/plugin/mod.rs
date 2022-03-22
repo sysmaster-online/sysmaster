@@ -2,13 +2,8 @@ use super::manager::{UnitObj, UnitType};
 use dynamic_reload as dy_re;
 use log::*;
 use std::ffi::OsStr;
-use std::{
-    collections::HashMap,
-    error::Error,
-    path::PathBuf,
-    sync::{Arc},
-};
-use std::{io};
+use std::io;
+use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
 use walkdir::{DirEntry, WalkDir};
 
 use std::cell::RefCell;
@@ -93,8 +88,12 @@ impl Plugin {
                 let result = Self::load_plugin(self, file_name.unwrap(), &mut reload_handler);
                 if let Ok(_r) = result {
                     log::info!("Plugin load unit plugin[{:?}] sucessfull", file_name);
-                }else if let Err(_e) = result {
-                    log::error!("Plugin load unit plugin[{:?}] failed,deatil is {}", file_name,_e.to_string());
+                } else if let Err(_e) = result {
+                    log::error!(
+                        "Plugin load unit plugin[{:?}] failed,deatil is {}",
+                        file_name,
+                        _e.to_string()
+                    );
                 }
             }
         }

@@ -165,7 +165,7 @@ impl UnitConfigsSub {
             Some(u) => u,
             None => {
                 log::error!("create unit obj error in unit manger");
-                return
+                return;
             } // load
         };
         //log::debug!("");
@@ -201,7 +201,7 @@ impl UnitConfigsSub {
         if let Some(unit) = self.um.db.units_get(name) {
             return Some(unit);
         }
-        log::info!("begin create {} obj by plugin",name);
+        log::info!("begin create {} obj by plugin", name);
         let plugins = Rc::clone(&Plugin::get_instance());
         plugins.borrow_mut().set_library_dir("../target/debug");
         plugins.borrow_mut().load_lib();

@@ -4,7 +4,6 @@ pub use unit_datastore::UnitDb;
 pub use unit_entry::{Unit, UnitObj, UnitX};
 pub use unit_manager::{UnitManager, UnitManagerX, UnitMngUtil, UnitSubClass};
 
-
 #[derive(Debug)]
 pub enum UnitErrno {
     UnitErrInput,

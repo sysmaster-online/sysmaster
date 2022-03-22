@@ -149,13 +149,15 @@ impl Unit {
                     if let Some(p_s_name) = private_section_name {
                         let _section = confs.get_section_by_name(&p_s_name);
                         let _result = _section.map(|s| self.sub.borrow_mut().load(s));
-                        if let Some(r) = _result{
-                            _ret = r.map(|_s|self.load.set_load_state(UnitLoadState::UnitLoaded));
-                        }else{
-                            _ret = Err(format!("load Unit {} failed",self.id).into());
+                        if let Some(r) = _result {
+                            _ret = r.map(|_s| self.load.set_load_state(UnitLoadState::UnitLoaded));
+                        } else {
+                            _ret = Err(format!("load Unit {} failed", self.id).into());
                         }
-                    }else{
-                        _ret = Err(format!("Cann't found private section conf for {}",self.id).into());
+                    } else {
+                        _ret = Err(
+                            format!("Cann't found private section conf for {}", self.id).into()
+                        );
                     }
                     self.load.set_load_state(UnitLoadState::UnitLoaded);
                     _ret

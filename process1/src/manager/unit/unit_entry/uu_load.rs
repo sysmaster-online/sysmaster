@@ -1,7 +1,7 @@
-use super::uu_config::{UnitConfOption};
+use super::uu_config::UnitConfOption;
 use crate::manager::data::{DataManager, JobMode, UnitConfig, UnitRelations, UnitType};
 use crate::manager::unit::unit_base::{self, UnitLoadState};
-use crate::manager::unit::unit_parser_mgr::{SECTION_UNIT};
+use crate::manager::unit::unit_parser_mgr::SECTION_UNIT;
 use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
