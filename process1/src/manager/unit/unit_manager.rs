@@ -4,6 +4,7 @@ use super::unit_datastore::UnitDb;
 use super::unit_entry::{UnitObj, UnitX};
 use super::unit_file::UnitFile;
 use super::unit_load::UnitLoad;
+use super::unit_parser_mgr::{UnitParserMgr, UnitConfigParser};
 use super::unit_relation_atom::UnitRelationAtom;
 use super::unit_runtime::UnitRT;
 use crate::manager::data::{DataManager, UnitConfig, UnitState, UnitType};
@@ -71,6 +72,7 @@ pub struct UnitManager {
     db: Rc<UnitDb>, // ALL UNIT STORE IN UNITDB,AND OTHER USE REF
     rt: Rc<UnitRT>,
     jm: Rc<JobManager>,
+    unit_conf_parser_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
 }
 
 impl UnitManager {
@@ -87,11 +89,13 @@ impl UnitManager {
         let _file = Rc::new(UnitFile::new());
         let _db = Rc::new(UnitDb::new());
         let rt = Rc::new(UnitRT::new());
+        let unit_conf_parser_mgr =  Rc::new(UnitParserMgr::default());
         let _load = Rc::new(UnitLoad::new(
             Rc::clone(&_dm),
             Rc::clone(&_file),
             Rc::clone(&_db),
             Rc::clone(&rt),
+            Rc::clone(&unit_conf_parser_mgr),
         ));
         UnitManager {
             file: Rc::clone(&_file),
@@ -99,6 +103,7 @@ impl UnitManager {
             db: Rc::clone(&_db),
             rt,
             jm: Rc::new(JobManager::new(Rc::clone(&_db))),
+            unit_conf_parser_mgr: Rc::clone(&unit_conf_parser_mgr),
         }
     }
 }
@@ -154,7 +159,7 @@ impl UnitConfigsSub {
         UnitConfigsSub { dm, um }
     }
 
-    pub(self) fn insert_config(&self, name: &str, config: &UnitConfig) {
+    pub(self) fn insert_config(&self, name: &str, config: &UnitConfig) {//hash map insert return is old value,need reconstruct
         let unit = match self.try_new_unit(name) {
             Some(u) => u,
             None => todo!(), // load
@@ -199,10 +204,11 @@ impl UnitConfigsSub {
             Ok(sub) => sub,
             Err(_e) => return None,
         };
-
+        subclass.get_private_conf_section_name().map(|s|self.um.unit_conf_parser_mgr.register_parser_by_private_section_name(unit_type.to_string(),s));
         Some(Rc::new(UnitX::new(
             Rc::clone(&self.dm),
             Rc::clone(&self.um.file),
+            Rc::clone(&self.um.unit_conf_parser_mgr),
             unit_type,
             name,
             subclass,

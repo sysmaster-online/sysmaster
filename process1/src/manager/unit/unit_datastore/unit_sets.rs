@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Debug)]
+
 pub(super) struct UnitSets {
     data: RefCell<UnitSetsData>,
 }
@@ -32,7 +32,7 @@ impl UnitSets {
     }
 }
 
-#[derive(Debug)]
+
 struct UnitSetsData {
     t: HashMap<String, Rc<UnitX>>, // key: string, value: unit
 }

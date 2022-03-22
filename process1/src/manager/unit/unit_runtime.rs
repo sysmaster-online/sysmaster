@@ -58,6 +58,7 @@ impl UnitRTData {
         if unit.in_load_queue() {
             return;
         }
+        unit.set_in_load_queue(true);
         self.load_queue.push_back(unit);
     }
 }

@@ -4,10 +4,13 @@ use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use super::uu_state::UeState;
 use crate::manager::data::{DataManager, UnitActiveState, UnitType};
+use crate::manager::unit::unit_base::{self, UnitLoadState};
 use crate::manager::unit::unit_file::UnitFile;
+use crate::manager::unit::unit_parser_mgr::{UnitParserMgr, UnitConfigParser};
 use log;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
+use utils::unit_conf::{Section,Conf};
 use std::any::Any;
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -16,11 +19,10 @@ use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use utils::unit_config_parser;
 
-#[derive(Debug)]
 pub struct Unit {
     // associated objects
     file: Rc<UnitFile>,
-
+    unit_conf_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
     unit_type: UnitType,
     id: String,
     config: UeConfig,
@@ -56,10 +58,10 @@ impl Hash for Unit {
     }
 }
 
-pub trait UnitObj: std::fmt::Debug {
+pub trait UnitObj{     //: std::fmt::Debug {
     fn init(&self) {}
     fn done(&self) {}
-    fn load(&mut self) -> Result<(), Box<dyn Error>> {
+    fn load(&mut self, section: &Section<Conf>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     fn coldplug(&self) {}
@@ -80,25 +82,67 @@ pub trait UnitObj: std::fmt::Debug {
     fn eq(&self, other: &dyn UnitObj) -> bool;
     fn hash(&self) -> u64;
     fn as_any(&self) -> &dyn Any;
+
+    fn get_private_conf_section_name(&self)->Option<&str>;
 }
 
 impl Unit {
-    pub fn load_unit(&self) -> Result<(), Box<dyn Error>> {
-        self.load.unit_load(&self.file)
-    }
 
-    pub fn load_in_queue(&self) -> bool {
+
+    
+    pub fn in_load_queue(&self) -> bool {
         self.load.in_load_queue()
     }
 
-    pub fn load_parse(&self) -> Result<(), Box<dyn Error>> {
-        self.load.parse()
+    pub fn set_in_load_queue(&self, t: bool) {
+        self.load.set_in_load_queue(t);
     }
 
-    pub fn load_get_conf(&self) -> Option<Rc<unit_config_parser::Conf>> {
-        self.load.get_conf()
+    fn build_name_map(&self) {
+        self.file.build_name_map();
     }
 
+    fn get_unit_file_path(&self) -> Option<String> {
+        match self.file.get_unit_file_path(&self.id) {
+            Some(v) => return Some(v.to_string()),
+            None => {
+                log::error!("not find unit file {}", &self.id);
+                None
+            }
+        }
+    }
+
+    pub fn load_unit(&self) -> Result<(), Box<dyn Error>> {
+        self.set_in_load_queue(false);
+        self.build_name_map();
+        if let Some(p) = self.get_unit_file_path() {
+            self.load.set_config_file_path(&p);
+            let unit_type=unit_base::unit_name_to_type(&self.id);//best use of owner not name,need reconstruct
+            let confs = self.unit_conf_mgr.unit_file_parser(unit_type,&p);
+            match confs{
+                Ok(confs) =>{
+                    let result = self.load.unit_load(&confs);
+                    if let Err(s) = result{
+                        self.load.set_load_state(UnitLoadState::UnitError);
+                        return result;
+                    }
+                    let private_section_name = self.get_private_conf_section_name();
+                    if let Some(p_s_name) = private_section_name{
+                        let section = confs.get_section_by_name(p_s_name);
+                        let result = section.map(|s|self.sub.load(s));
+                    }
+                    self.load.set_load_state(UnitLoadState::UnitLoaded);
+                    result
+                }
+                Err(e) => {
+                    self.load.set_load_state(UnitLoadState::UnitNotFound);
+                    return Err(format!("{}",e.to_string()).into());
+                }
+            }
+        }
+    }
+
+    
     pub fn notify(&self, original_state: UnitActiveState, new_state: UnitActiveState) {
         if original_state != new_state {
             log::debug!(
@@ -107,7 +151,6 @@ impl Unit {
                 new_state
             );
         }
-
         self.state.update(&self.id, original_state, new_state, 0);
     }
 
@@ -119,9 +162,14 @@ impl Unit {
         self.unit_type
     }
 
+    pub fn get_private_conf_section_name(&self)->Option<&str>{
+        self.sub.get_private_conf_section_name()
+    }
+    
     pub(super) fn new(
         dm: Rc<DataManager>,
         file: Rc<UnitFile>,
+        unit_conf_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
         unit_type: UnitType,
         name: &str,
         sub: Box<dyn UnitObj>,
@@ -129,6 +177,7 @@ impl Unit {
         Unit {
             unit_type,
             file,
+            unit_conf_mgr,
             id: String::from(name),
             config: UeConfig::new(),
             state: UeState::new(Rc::clone(&dm)),

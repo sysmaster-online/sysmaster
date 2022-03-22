@@ -111,7 +111,7 @@ impl Plugin {
                         log::error!("invalid service type os lib {}", v);
                         return Ok(());
                     }
-                    log::debug!("insert unit {:?} dynamic lib into libs", unit_type);
+                    log::debug!("insert unit {} dynamic lib into libs", unit_type.to_string());
                     self.load_libs.insert(unit_type, lib.clone());
                     let dy_lib = self.load_libs.get(&unit_type).unwrap();
                     let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitObj> =
@@ -158,7 +158,7 @@ impl Plugin {
     pub fn create_unit_obj(&self, unit_type: UnitType) -> Result<Box<dyn UnitObj>, Box<dyn Error>> {
         let dy_lib = match self.load_libs.get(&unit_type) {
             Some(lib) => lib.clone(),
-            None => return Err(format!("the {:?} plugin is not exist", unit_type).into()),
+            None => return Err(format!("the {:?} plugin is not exist", unit_type.to_string()).into()),
         };
 
         let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitObj> =

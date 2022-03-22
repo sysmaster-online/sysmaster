@@ -4,7 +4,6 @@ use crate::manager::table::{Table, TableSubscribe};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-#[derive(Debug)]
 pub(in crate::manager) struct DataManager {
     tables: (
         RefCell<Table<String, UnitConfig>>, // unit-config

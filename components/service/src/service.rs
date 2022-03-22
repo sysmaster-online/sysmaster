@@ -6,8 +6,9 @@ use std::collections::LinkedList;
 use std::error::Error;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::io::{Error as IOError, ErrorKind};
 use std::str::FromStr;
+use utils::unit_conf::{ConfValue, Section, Conf};
+use core::fmt::{Display, Result as FmtResult, Formatter};
 
 use super::service_start;
 use nix::errno::Errno;
@@ -212,12 +213,12 @@ impl CommandLine {
 }
 
 impl fmt::Display for CommandLine {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> FmtResult {
         write!(f, "Display: {}", self.cmd)
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct ServiceUnit {
     pub unit: Option<Weak<Unit>>,
     pub um: Option<Weak<UnitManager>>,
@@ -918,18 +919,8 @@ impl UnitObj for ServiceUnit {
     fn done(&self) {
         todo!()
     }
-    fn load(&mut self) -> Result<(), Box<dyn Error>> {
-        self.unit
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .upgrade()
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .load_unit();
-
-        self.parse()?;
+    fn load(&mut self, section: &Section<Conf>) -> Result<(), Box<dyn Error>> {
+        self.parse(section)?;
 
         self.service_add_extras();
 
@@ -1054,6 +1045,10 @@ impl UnitObj for ServiceUnit {
             .unwrap()
             .load_in_queue()
     }
+
+    fn get_private_conf_section_name(&self)->Option<&str> {
+        Some("Service")
+    }
 }
 
 impl UnitMngUtil for ServiceUnit {
@@ -1065,186 +1060,205 @@ impl UnitMngUtil for ServiceUnit {
 use process1::declure_unitobj_plugin;
 declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default);
 
+enum ServiceConf {
+    Type,
+    ExecCondition,
+    ExecStart,
+    ExecReload,
+}
+
+
+impl Display for ServiceConf {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self{
+            ServiceConf::Type => write!(f,"Type"),
+            ServiceConf::ExecCondition => write!(f,"ExecCondition"),
+            ServiceConf::ExecStart => write!(f,"ExecStart"),
+            ServiceConf::ExecReload => write!(f,"ExecReload"),
+        }
+    }
+}
+
+impl From<ServiceConf> for String {
+    fn from(service_conf: ServiceConf) -> Self {
+        match service_conf {
+            ServiceConf::Type => "Type".into(),
+            ServiceConf::ExecCondition => "ExecCondition".into(),
+            ServiceConf::ExecStart => "ExecStart".into(),
+            ServiceConf::ExecReload => "ExecReload".into(),
+        }
+    }
+}
 impl ServiceUnit {
-    fn parse(&mut self) -> Result<(), Box<dyn Error>> {
-        self.unit
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .upgrade()
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .load_parse()?;
-        let conf = self
-            .unit
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .upgrade()
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .load_get_conf()
-            .as_ref()
-            .ok_or_else(|| IOError::new(ErrorKind::Other, "config file not loaded"))?
-            .clone();
-
-        let service = conf.service.as_ref().unwrap();
-
-        match &service.exec_condition {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceCondition as usize] = LinkedList::new();
+    fn parse(&mut self, section: &Section<Conf>) -> Result<(), Box<dyn Error>> {
+        //self.unit.upgrade().as_ref().cloned().unwrap().get_id();
+        let confs = section.get_confs();
+        for conf in confs.iter() {
+            let key = conf.get_key();
+            match key.to_string() {
+                _ if key == ServiceConf::ExecCondition.to_string() => {
+                    let values = conf.get_values();
+                    self.exec_commands[ServiceCommand::ServiceCondition as usize] =
+                        LinkedList::new();
+                    prepare_command(
+                        &values,
+                        &mut self.exec_commands[ServiceCommand::ServiceCondition as usize],
+                    );
+                }
+                _ if key == ServiceConf::ExecStart.to_string() => {
+                    let values = conf.get_values();
+                    self.exec_commands[ServiceCommand::ServiceStart as usize] = LinkedList::new();
+                    prepare_command(
+                        &values,
+                        &mut self.exec_commands[ServiceCommand::ServiceStart as usize],
+                    );
+                }
+                _ if key == ServiceConf::ExecReload.to_string() => {
+                    let values = conf.get_values();
+                    self.exec_commands[ServiceCommand::ServiceReload as usize] = LinkedList::new();
+                    prepare_command(
+                        &values,
+                        &mut self.exec_commands[ServiceCommand::ServiceReload as usize],
+                    );
+                }
+                _ if key == ServiceConf::Type.to_string() => {
+                    let values = conf.get_values();
+                    for value in values.iter() {
+                        if let ConfValue::String(v) = value{
+                            self.service_type = ServiceType::from_str(v)?;
+                            break;
+                        }
+                    }
+                }
+                _ => {}
             }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceCondition as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
+
+            /*match &service.exec_prestart {
+                None => {
+                    self.exec_commands[ServiceCommand::ServiceStartPre as usize] =
+                        LinkedList::new();
+                }
+                Some(commands) => {
+                    match prepare_command(
+                        commands,
+                        &mut self.exec_commands[ServiceCommand::ServiceStartPre as usize],
+                    ) {
+                        Ok(_) => {}
+                        Err(e) => return Err(e),
+                    }
+                }
+            }*/
+
+            /*match &service.exec_startpost {
+                None => {
+                    self.exec_commands[ServiceCommand::ServiceStartPost as usize] =
+                        LinkedList::new();
+                }
+                Some(commands) => {
+                    match prepare_command(
+                        commands,
+                        &mut self.exec_commands[ServiceCommand::ServiceStartPost as usize],
+                    ) {
+                        Ok(_) => {}
+                        Err(e) => return Err(e),
+                    }
+                }
+            }*/
+
+            /*match &service.exec_reload {
+                None => {
+                    self.exec_commands[ServiceCommand::ServiceReload as usize] = LinkedList::new();
+                }
+                Some(commands) => {
+                    match prepare_command(
+                        commands,
+                        &mut self.exec_commands[ServiceCommand::ServiceReload as usize],
+                    ) {
+                        Ok(_) => {}
+                        Err(e) => return Err(e),
+                    }
+                }
+            }*/
+
+            /*match &service.exec_stop {
+                None => {
+                    self.exec_commands[ServiceCommand::ServiceStop as usize] = LinkedList::new();
+                }
+                Some(commands) => {
+                    match prepare_command(
+                        commands,
+                        &mut self.exec_commands[ServiceCommand::ServiceStop as usize],
+                    ) {
+                        Ok(_) => {}
+                        Err(e) => return Err(e),
+                    }
                 }
             }
-        }
-
-        match &service.exec_prestart {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceStartPre as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceStartPre as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
+            match &service.exec_stoppost {
+                None => {
+                    self.exec_commands[ServiceCommand::ServiceStopPost as usize] =
+                        LinkedList::new();
+                }
+                Some(commands) => {
+                    match prepare_command(
+                        commands,
+                        &mut self.exec_commands[ServiceCommand::ServiceStopPost as usize],
+                    ) {
+                        Ok(_) => {}
+                        Err(e) => return Err(e),
+                    }
                 }
             }
-        }
 
-        match &service.exec_start {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceStart as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceStart as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
+            match &service.restart {
+                None => {
+                    self.restart = ServiceRestart::ServiceRestartNo;
                 }
-            }
-        }
-
-        match &service.exec_startpost {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceStartPost as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceStartPost as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
+                Some(restart) => {
+                    self.restart = ServiceRestart::from_str(restart)?;
                 }
-            }
+            } */
         }
-
-        match &service.exec_reload {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceReload as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceReload as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-        }
-
-        match &service.exec_stop {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceStop as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceStop as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-        }
-        match &service.exec_stoppost {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceStopPost as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceStopPost as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-        }
-
-        match &service.restart {
-            None => {
-                self.restart = ServiceRestart::ServiceRestartNo;
-            }
-            Some(restart) => {
-                self.restart = ServiceRestart::from_str(restart)?;
-            }
-        }
-
-        match &service.service_type {
-            None => {
-                self.service_type = ServiceType::ServiceTypeInvalid;
-            }
-            Some(service_type) => {
-                self.service_type = ServiceType::from_str(service_type)?;
-            }
-        }
-
         Ok(())
     }
 }
 
 fn prepare_command(
-    commands: &Vec<String>,
+    commands: &Vec<ConfValue>,
     command_list: &mut LinkedList<Rc<RefCell<CommandLine>>>,
 ) -> Result<(), Box<dyn Error>> {
     if commands.len() == 0 {
         return Ok(());
     }
-
+    let mut i = 0;
     for exec in commands.iter() {
-        let mut cmd: Vec<String> = exec
-            .trim_end()
-            .split_whitespace()
-            .map(|s| s.to_string())
-            .collect();
+        let mut cmd = "";
+        let mut t_args:Vec<String> = Vec::new();
+        if let ConfValue::String(t_cmd) = exec {
+            if i == 0 {
+                cmd = t_cmd;
+                i = i + 1;
+            }else {
+                t_args.push(t_cmd.to_string());
+            }
+        } else {
+            return Err(format!(
+                "service config  format is error, command {:?} is error",exec
+            )
+            .into());
+        }
+
         if cmd.is_empty() {
             return Ok(());
         }
-
-        let exec_cmd = cmd.remove(0);
-        let path = Path::new(&exec_cmd);
+        let path = Path::new(&cmd);
         if !path.exists() || !path.is_file() {
             return Err(format!("{:?} is not exist or commad is not a file", path).into());
         }
 
         let new_command = Rc::new(RefCell::new(CommandLine {
             cmd: path.to_str().unwrap().to_string(),
-            args: cmd,
+            args: t_args,
             next: None,
         }));
         match command_list.back() {

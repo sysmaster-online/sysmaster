@@ -1,5 +1,6 @@
 pub struct Conf(String, ConfValue);
 
+#[derive(Debug)]
 pub enum ConfValue {
     String(String),
     Interger(i64),
@@ -8,6 +9,10 @@ pub enum ConfValue {
     Array(Vec<ConfValue>),
 }
 
+pub enum SectionType {
+    PRIVATE,
+    PUB,
+}
 impl Conf {
     pub fn new(key: String, value: ConfValue) -> Self {
         Self(key, value)
@@ -51,21 +56,21 @@ impl Conf {
     }
 }
 
-pub struct Section<Conf>(String, Vec<Conf>);
+pub struct Section<Conf>(String, SectionType, Vec<Conf>);
 
 impl Section<Conf> {
-    pub fn new(name: String) -> Self {
-        Section(name, Vec::new())
+    pub fn new(name: String, section_type: SectionType) -> Self {
+        Section(name, section_type, Vec::new())
     }
 
     pub fn get_section_name(&self) -> &str {
         &self.0
     }
     pub fn get_confs(&self) -> &Vec<Conf> {
-        &self.1
+        &self.2
     }
     pub fn add_conf(&mut self, conf: Conf) {
-        self.1.push(conf);
+        self.2.push(conf);
     }
 }
 
@@ -93,6 +98,15 @@ impl Confs {
 
     pub fn get_section(&mut self, name: &str) -> Option<&mut Section<Conf>> {
         for section in self.sections.iter_mut() {
+            if section.get_section_name() == name {
+                return Some(section);
+            }
+        }
+        None
+    }
+
+    pub fn get_section_by_name(&self, name: &str) -> Option <&Section<Conf>>{
+        for section in self.sections.iter() {
             if section.get_section_name() == name {
                 return Some(section);
             }
