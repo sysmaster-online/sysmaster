@@ -92,10 +92,10 @@ impl<T: ConfFactory> ConfigParse for ConfigParser<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConfigParse,ConfigParser};
-    use crate::unit_conf::{ConfFactory, Confs, Section, SectionType, ConfValue};
-    use std::io::{Error, ErrorKind, Read};
+    use super::{ConfigParse, ConfigParser};
+    use crate::unit_conf::{ConfFactory, ConfValue, Confs, Section, SectionType};
     use std::fs::File;
+    use std::io::{Error, ErrorKind, Read};
     struct ServiceFactory;
     impl ConfFactory for ServiceFactory {
         fn product_confs(&self) -> crate::unit_conf::Confs {

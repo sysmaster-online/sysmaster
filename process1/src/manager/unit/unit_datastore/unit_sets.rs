@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-
 pub(super) struct UnitSets {
     data: RefCell<UnitSetsData>,
 }
@@ -31,7 +30,6 @@ impl UnitSets {
         self.data.borrow().get_all()
     }
 }
-
 
 struct UnitSetsData {
     t: HashMap<String, Rc<UnitX>>, // key: string, value: unit

@@ -1,4 +1,4 @@
-use core::fmt::{Display, Result, Formatter};
+use core::fmt::{Display, Formatter, Result};
 
 use crate::null_str;
 
@@ -11,26 +11,25 @@ pub enum UnitType {
     UnitTypeErrnoMax,
 }
 
-
-impl From<UnitType> for String{
+impl From<UnitType> for String {
     fn from(u_t: UnitType) -> Self {
         match u_t {
             UnitType::UnitService => "Service".into(),
             UnitType::UnitTarget => "Target".into(),
             UnitType::UnitTypeMax => "Max".into(),
-            UnitType::UnitTypeInvalid =>  null_str!("").into(),
+            UnitType::UnitTypeInvalid => null_str!("").into(),
             UnitType::UnitTypeErrnoMax => null_str!("").into(),
         }
     }
 }
-impl Display for UnitType{
+impl Display for UnitType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            UnitType::UnitService => write!(f,"Service"),
-            UnitType::UnitTarget => write!(f,"Target"),
-            UnitType::UnitTypeMax => write!(f,"Max"),
-            UnitType::UnitTypeInvalid => write!(f,""),
-            UnitType::UnitTypeErrnoMax => write!(f,""),
+            UnitType::UnitService => write!(f, "Service"),
+            UnitType::UnitTarget => write!(f, "Target"),
+            UnitType::UnitTypeMax => write!(f, "Max"),
+            UnitType::UnitTypeInvalid => write!(f, ""),
+            UnitType::UnitTypeErrnoMax => write!(f, ""),
         }
     }
 }
@@ -79,16 +78,15 @@ pub enum UnitRelations {
     UnitSliceOf,
 }
 
-
-impl Display for UnitRelations{
+impl Display for UnitRelations {
     fn fmt(&self, f: &mut Formatter) -> Result {
-        match self{
-            UnitRelations::UnitRequires => write!(f,"Requires"),
-            UnitRelations::UnitRequisite => write!(f,"Requisite"),
-            UnitRelations::UnitWants => write!(f,"Wants"),
-            UnitRelations::UnitBindsTo => write!(f,"BindsTo"),
-            UnitRelations::UnitPartOf =>  write!(f,"PartOf"),
-            UnitRelations::UnitUpHolds => write!(f,"UpHolds"),
+        match self {
+            UnitRelations::UnitRequires => write!(f, "Requires"),
+            UnitRelations::UnitRequisite => write!(f, "Requisite"),
+            UnitRelations::UnitWants => write!(f, "Wants"),
+            UnitRelations::UnitBindsTo => write!(f, "BindsTo"),
+            UnitRelations::UnitPartOf => write!(f, "PartOf"),
+            UnitRelations::UnitUpHolds => write!(f, "UpHolds"),
             UnitRelations::UnitRequiresBy => todo!(),
             UnitRelations::UnitRequisiteOf => todo!(),
             UnitRelations::UnitWantsBy => todo!(),
@@ -98,7 +96,7 @@ impl Display for UnitRelations{
             UnitRelations::UnitConflicts => todo!(),
             UnitRelations::UnitConflictedBy => todo!(),
             UnitRelations::UnitBefore => todo!(),
-            UnitRelations::UnitAfter => write!(f,"After"),
+            UnitRelations::UnitAfter => write!(f, "After"),
             UnitRelations::UnitOnSuccess => todo!(),
             UnitRelations::UnitOnSuccessOf => todo!(),
             UnitRelations::UnitOnFailure => todo!(),
@@ -120,7 +118,7 @@ impl Display for UnitRelations{
 
 impl From<UnitRelations> for String {
     fn from(unit_relations: UnitRelations) -> Self {
-        match unit_relations{
+        match unit_relations {
             UnitRelations::UnitAfter => "After".into(),
             UnitRelations::UnitRequires => "Requires".into(),
             UnitRelations::UnitRequisite => "Requisite".into(),
@@ -156,7 +154,7 @@ impl From<UnitRelations> for String {
     }
 }
 
-#[derive(Clone, Debug,Copy, PartialEq, Eq)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum JobMode {
     JobFail,
     JobReplace,

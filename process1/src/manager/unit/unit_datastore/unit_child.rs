@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::rc::Rc;
 
-#[derive(Debug)]
 pub(super) struct UnitChild {
     data: RefCell<UnitChildData>,
 }
@@ -34,7 +33,6 @@ impl UnitChild {
     }
 }
 
-#[derive(Debug)]
 struct UnitChildData {
     units: Rc<UnitSets>,
     watch_pids: HashMap<Pid, Rc<UnitX>>, // key: pid, value: unit

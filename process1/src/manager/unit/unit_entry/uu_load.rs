@@ -1,21 +1,13 @@
-use super::uu_config::{InstallConfOption,UnitConfOption};
-use crate::manager::data::{DataManager, UnitConfig, UnitRelations, UnitType, JobMode};
-use crate::manager::unit::unit_file::{UnitFile};
+use super::uu_config::{UnitConfOption};
+use crate::manager::data::{DataManager, JobMode, UnitConfig, UnitRelations, UnitType};
 use crate::manager::unit::unit_base::{self, UnitLoadState};
-use crate::manager::unit::unit_datastore::UnitDb;
-use crate::manager::unit::unit_manager::UnitManager;
-use crate::manager::unit::unit_parser_mgr::{UnitParserMgr, SECTION_UNIT,SECTION_INSTALL};
+use crate::manager::unit::unit_parser_mgr::{SECTION_UNIT};
 use std::cell::RefCell;
 use std::error::Error;
-use std::fs::File;
-use std::os::unix::fs::FileTypeExt;
 use std::rc::Rc;
-use utils::unit_conf::{Confs, ConfValue};
-use utils::{time_util, unit_config_parser};
+use utils::unit_conf::{ConfValue, Confs};
 
 use crate::null_str;
-
-use super::Unit;
 
 //#[derive(Debug)]
 pub(super) struct UeLoad {
@@ -34,7 +26,7 @@ pub(super) struct UeLoad {
 }
 
 impl UeLoad {
-    pub(super) fn new(dm: Rc<DataManager>,id: String) -> UeLoad {
+    pub(super) fn new(dm: Rc<DataManager>, id: String) -> UeLoad {
         UeLoad {
             dm,
             id,
@@ -46,8 +38,8 @@ impl UeLoad {
             conf: Rc::new(RefCell::new(None)),
         }
     }
-    
-    pub(super) fn set_load_state(&mut self, load_state: UnitLoadState) {
+
+    pub(super) fn set_load_state(&self, load_state: UnitLoadState) {
         *self.load_state.borrow_mut() = load_state;
     }
 
@@ -83,12 +75,16 @@ impl UeLoad {
         u_config.deps.push((relation, String::from(unit_name)));
         Ok(())
     }
-    
-    pub(super) fn parse(&self,confs: &Confs) -> Result<(), Box<dyn Error>> {
-        let mut u_config = UnitConfig::new();// need get config from config database,and update depends here
+
+    pub(super) fn parse(&self, confs: &Confs) -> Result<(), Box<dyn Error>> {
+        let mut u_config = UnitConfig::new(); // need get config from config database,and update depends here
         let unit_section = confs.get_section_by_name(SECTION_UNIT);
         if unit_section.is_none() {
-            return Err(format!("config file format is error,section [{}]  not found",SECTION_UNIT).into());
+            return Err(format!(
+                "config file format is error,section [{}]  not found",
+                SECTION_UNIT
+            )
+            .into());
         }
 
         let confs = unit_section.unwrap().get_confs();
@@ -98,34 +94,64 @@ impl UeLoad {
                 _ if key == UnitConfOption::Relation(UnitRelations::UnitWants).to_string() => {
                     let confvalue = conf.get_values();
                     for value in confvalue.iter() {
-                        if let ConfValue::String(val) = value {// zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
-                            self.parse_unit_relation( val, UnitRelations::UnitWants, &mut u_config);
+                        if let ConfValue::String(val) = value {
+                            // zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
+                            let result = self.parse_unit_relation(
+                                val,
+                                UnitRelations::UnitWants,
+                                &mut u_config,
+                            );
+                            if let Err(r) = result {
+                                return Err(r);
+                            }
                         }
                     }
                 }
                 _ if key == UnitConfOption::Relation(UnitRelations::UnitBefore).to_string() => {
                     let confvalue = conf.get_values();
                     for value in confvalue.iter() {
-                        if let ConfValue::String(unit) = value {// zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
-                            self.parse_unit_relation(&unit, UnitRelations::UnitBefore, &mut u_config);
-                        }
-                    }
-                    
-                }
-                _ if key == UnitConfOption::Relation(UnitRelations::UnitAfter).to_string() =>{
-                    let confvalue = conf.get_values();
-                    let units = String::from("");
-                    for value in confvalue.iter() {
-                        if let ConfValue::String(unit) = value {// zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
-                            self.parse_unit_relation(&unit, UnitRelations::UnitAfter, &mut u_config);
+                        if let ConfValue::String(unit) = value {
+                            // zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
+                            let result = self.parse_unit_relation(
+                                &unit,
+                                UnitRelations::UnitBefore,
+                                &mut u_config,
+                            );
+                            if let Err(r) = result {
+                                return Err(r);
+                            }
                         }
                     }
                 }
-                _ if key == UnitConfOption::Relation(UnitRelations::UnitRequires).to_string() =>{
+                _ if key == UnitConfOption::Relation(UnitRelations::UnitAfter).to_string() => {
                     let confvalue = conf.get_values();
                     for value in confvalue.iter() {
-                        if let ConfValue::String(unit) = value {// zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
-                            self.parse_unit_relation(&unit, UnitRelations::UnitRequires, &mut u_config);
+                        if let ConfValue::String(unit) = value {
+                            // zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
+                            let result = self.parse_unit_relation(
+                                &unit,
+                                UnitRelations::UnitAfter,
+                                &mut u_config,
+                            );
+                            if let Err(r) = result {
+                                return Err(r);
+                            }
+                        }
+                    }
+                }
+                _ if key == UnitConfOption::Relation(UnitRelations::UnitRequires).to_string() => {
+                    let confvalue = conf.get_values();
+                    for value in confvalue.iter() {
+                        if let ConfValue::String(unit) = value {
+                            // zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
+                            let result = self.parse_unit_relation(
+                                &unit,
+                                UnitRelations::UnitRequires,
+                                &mut u_config,
+                            );
+                            if let Err(r) = result {
+                                return Err(r);
+                            }
                         }
                     }
                 }
@@ -148,7 +174,7 @@ impl UeLoad {
                         }
                     }
                 }
-                _ if key == UnitConfOption::AllowIsolate.to_string() =>{
+                _ if key == UnitConfOption::AllowIsolate.to_string() => {
                     for value in conf.get_values().iter() {
                         if let ConfValue::Boolean(v) = value {
                             u_config.allow_isolate = *v;
@@ -156,37 +182,40 @@ impl UeLoad {
                             break;
                         }
                     }
-                   
                 }
-                _ if key == UnitConfOption::IgnoreOnIolate.to_string() =>{
+                _ if key == UnitConfOption::IgnoreOnIolate.to_string() => {
                     for value in conf.get_values().iter() {
-                        if let ConfValue::Boolean(v) = value {
-                            u_config.ignore_on_isolate = *v;
+                        if let ConfValue::Boolean(_v) = value {
+                            u_config.ignore_on_isolate = *_v;
                         } else {
                             break;
                         }
                     }
                 }
-                _ if key == UnitConfOption::OnSucessJobMode.to_string() =>{
+                _ if key == UnitConfOption::OnSucessJobMode.to_string() => {
                     for value in conf.get_values().iter() {
-                        if let ConfValue::Boolean(v) = value {
-                            u_config.on_success_job_mode = JobMode::JobFail;
+                        if let ConfValue::String(_v) = value {
+                            u_config.on_success_job_mode = JobMode::JobReplace; // default is replace need impl from string
                         } else {
                             break;
                         }
                     }
                 }
-                _ if key == UnitConfOption::OnFailureJobMode.to_string() =>{
+                _ if key == UnitConfOption::OnFailureJobMode.to_string() => {
                     for value in conf.get_values().iter() {
-                        if let ConfValue::Boolean(v) = value {
-                            u_config.on_failure_job_mode = JobMode::JobFail;
+                        if let ConfValue::String(_v) = value {
+                            u_config.on_failure_job_mode = JobMode::JobReplace;
                         } else {
                             break;
                         }
                     }
                 }
-                _=>{
-                    return Err(format!("config file of {}  section format is error",SECTION_UNIT).into());
+                _ => {
+                    return Err(format!(
+                        "config file of {}  section format is error",
+                        SECTION_UNIT
+                    )
+                    .into());
                 }
             }
         }
@@ -194,20 +223,15 @@ impl UeLoad {
         Ok(())
     }
 
-    pub(super) fn set_load_state(&mut self, load_state: UnitLoadState) {
-        *self.load_state.borrow_mut() = load_state;
-    }
-
-    pub(super) fn unit_load(&self,confs:&Confs) -> Result<(), Box<dyn Error>> {
+    pub(super) fn unit_load(&self, confs: &Confs) -> Result<(), Box<dyn Error>> {
         *self.in_load_queue.borrow_mut() = false;
-        match self.parse(confs){
+        match self.parse(confs) {
             Ok(_conf) => {
                 return Ok(());
             }
             Err(e) => {
-                return Err(format!("{}",e.to_string()).into());
+                return Err(format!("{}", e.to_string()).into());
             }
         }
-       
     }
 }

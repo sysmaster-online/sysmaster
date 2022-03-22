@@ -105,7 +105,7 @@ impl Confs {
         None
     }
 
-    pub fn get_section_by_name(&self, name: &str) -> Option <&Section<Conf>>{
+    pub fn get_section_by_name(&self, name: &str) -> Option<&Section<Conf>> {
         for section in self.sections.iter() {
             if section.get_section_name() == name {
                 return Some(section);

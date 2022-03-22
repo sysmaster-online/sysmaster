@@ -1,11 +1,9 @@
-use core::fmt::{Display, Result, Formatter};
-use siphasher::reexports::serde::de::IntoDeserializer;
+use core::fmt::{Display, Formatter, Result};
 
-use crate::manager::data::{JobMode,UnitConfigItem, UnitRelations};
+use crate::manager::data::{JobMode, UnitConfigItem, UnitRelations};
 use crate::null_str;
 
-
-pub (in crate::manager) enum UnitConfOption{
+pub(in crate::manager) enum UnitConfOption {
     Desc,
     Documentation,
     Relation(UnitRelations),
@@ -15,42 +13,41 @@ pub (in crate::manager) enum UnitConfOption{
     OnFailureJobMode,
 }
 
-impl Display for UnitConfOption{
+impl Display for UnitConfOption {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self{
-            UnitConfOption::Desc => write!(f,"Desc"),
-            UnitConfOption::Documentation =>  write!(f,"Desc"),
-            UnitConfOption::Relation(relation) => write!(f,"{}",relation),
-            UnitConfOption::AllowIsolate =>  write!(f,"AllowIsolate"),
-            UnitConfOption::IgnoreOnIolate =>  write!(f,"IgnoreOnIolate"),
-            UnitConfOption::OnSucessJobMode =>  write!(f,"OnSucessJobMode"),
-            UnitConfOption::OnFailureJobMode =>  write!(f,"OnFailureJobMode"),
+        match self {
+            UnitConfOption::Desc => write!(f, "Desc"),
+            UnitConfOption::Documentation => write!(f, "Desc"),
+            UnitConfOption::Relation(relation) => write!(f, "{}", relation),
+            UnitConfOption::AllowIsolate => write!(f, "AllowIsolate"),
+            UnitConfOption::IgnoreOnIolate => write!(f, "IgnoreOnIolate"),
+            UnitConfOption::OnSucessJobMode => write!(f, "OnSucessJobMode"),
+            UnitConfOption::OnFailureJobMode => write!(f, "OnFailureJobMode"),
         }
     }
 }
 
-impl From<UnitConfOption> for String{
+impl From<UnitConfOption> for String {
     fn from(unit_conf_opt: UnitConfOption) -> Self {
-       match unit_conf_opt{
-        UnitConfOption::Desc => "Desc".into(),
-        UnitConfOption::Documentation => "Documentation".into(),
-        UnitConfOption::Relation(relation) => relation.into(),
-        UnitConfOption::AllowIsolate => "AllowIsolate".into(),
-        UnitConfOption::IgnoreOnIolate => "IgnoreOnIolate".into(),
-        UnitConfOption::OnSucessJobMode => "OnSucessJobMode".into(),
-        UnitConfOption::OnFailureJobMode => "OnFailureJobMode".into(),
-    }
+        match unit_conf_opt {
+            UnitConfOption::Desc => "Desc".into(),
+            UnitConfOption::Documentation => "Documentation".into(),
+            UnitConfOption::Relation(relation) => relation.into(),
+            UnitConfOption::AllowIsolate => "AllowIsolate".into(),
+            UnitConfOption::IgnoreOnIolate => "IgnoreOnIolate".into(),
+            UnitConfOption::OnSucessJobMode => "OnSucessJobMode".into(),
+            UnitConfOption::OnFailureJobMode => "OnFailureJobMode".into(),
+        }
     }
 }
 
-pub  (in crate::manager)  enum InstallConfOption{
+pub(in crate::manager) enum InstallConfOption {
     Alias,
     WantedBy,
     RequiredBy,
     Also,
     DefaultInstance,
 }
-
 
 impl From<InstallConfOption> for String {
     fn from(install_conf_opt: InstallConfOption) -> Self {
@@ -63,7 +60,6 @@ impl From<InstallConfOption> for String {
         }
     }
 }
-
 
 pub(super) struct UeConfig {
     name: String,

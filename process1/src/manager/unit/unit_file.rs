@@ -7,9 +7,6 @@ use utils::path_lookup::LookupPaths;
 use utils::{path_lookup, time_util};
 use walkdir::WalkDir;
 
-use super::unit_parser_mgr::UnitParserMgr;
-
-#[derive(Debug)]
 pub(super) struct UnitFile {
     data: RefCell<UnitFileData>,
 }
@@ -50,7 +47,6 @@ impl UnitFileData {
             unit_name_map: HashMap::new(),
             last_updated_timestamp_hash: 0,
             lookup_path: path_lookup::LookupPaths::new(),
-            
         }
     }
 

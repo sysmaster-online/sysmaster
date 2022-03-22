@@ -7,7 +7,7 @@ use crate::manager::data::{DataManager, UnitConfig};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub(super) struct UnitLoad {
     data: RefCell<UnitLoadData>,
 }
@@ -40,7 +40,7 @@ impl UnitLoad {
     }
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 struct UnitLoadData {
     // associated objects
     dm: Rc<DataManager>,

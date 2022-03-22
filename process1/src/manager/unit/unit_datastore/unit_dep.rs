@@ -84,7 +84,6 @@ struct UnitDepMask {
     dest: u16,
 }
 
-
 struct UnitDepData {
     // key: unit-source + UnitRelations, value: (unit-destination : mask)-list
     t: HashMap<Rc<UnitX>, HashMap<UnitRelations, HashMap<Rc<UnitX>, UnitDepMask>>>,

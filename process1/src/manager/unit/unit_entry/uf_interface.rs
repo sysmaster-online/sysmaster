@@ -4,8 +4,8 @@ use crate::manager::data::{
 };
 use crate::manager::unit::unit_base::UnitActionError;
 use crate::manager::unit::unit_file::UnitFile;
-use crate::manager::unit::UnitErrno;
 use crate::manager::unit::unit_parser_mgr::{UnitConfigParser, UnitParserMgr};
+use crate::manager::unit::UnitErrno;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::any::Any;
@@ -49,10 +49,10 @@ impl UnitX {
     pub fn reset_failed(&self) {}
     pub fn trigger(&self, _other: &Self) {}
     pub fn in_load_queue(&self) -> bool {
-        self.0.in_load_queue()        
+        self.0.in_load_queue()
     }
 
-    pub fn set_in_load_queue(&self,t : bool){
+    pub fn set_in_load_queue(&self, t: bool) {
         self.0.set_in_load_queue(t);
     }
     pub fn dep_check(&self, _relation: UnitRelations, _other: &UnitX) -> Result<(), UnitErrno> {
@@ -99,7 +99,7 @@ impl UnitX {
         todo!();
     }
 
-    pub fn get_private_conf_section_name(&self) -> Option<&str> {
+    pub fn get_private_conf_section_name(&self) -> Option<String> {
         self.0.get_private_conf_section_name()
     }
     pub(in crate::manager::unit) fn new(
@@ -110,6 +110,13 @@ impl UnitX {
         name: &str,
         subclass: Box<dyn UnitObj>,
     ) -> UnitX {
-        UnitX(Unit::new(Rc::clone(&dm), file, unit_conf_mgr,unit_type, name, subclass))
+        UnitX(Unit::new(
+            Rc::clone(&dm),
+            file,
+            unit_conf_mgr,
+            unit_type,
+            name,
+            subclass,
+        ))
     }
 }

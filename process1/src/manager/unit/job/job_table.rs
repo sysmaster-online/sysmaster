@@ -11,7 +11,6 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
-#[derive(Debug)]
 pub(super) struct JobTable {
     // key: job-id | unit, value: job
     // data
@@ -269,7 +268,7 @@ impl JobTable {
     }
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 struct JobUnitTable {
     // key: unit, value: jobs with order
     // data

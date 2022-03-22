@@ -1,3 +1,4 @@
+use core::fmt::{Display, Formatter, Result as FmtResult};
 use process1::manager::{KillOperation, Unit, UnitActiveState, UnitManager, UnitMngUtil, UnitObj};
 use process1::watchdog;
 use std::any::{Any, TypeId};
@@ -7,8 +8,7 @@ use std::error::Error;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
-use utils::unit_conf::{ConfValue, Section, Conf};
-use core::fmt::{Display, Result as FmtResult, Formatter};
+use utils::unit_conf::{Conf, ConfValue, Section};
 
 use super::service_start;
 use nix::errno::Errno;
@@ -1043,10 +1043,10 @@ impl UnitObj for ServiceUnit {
             .as_ref()
             .cloned()
             .unwrap()
-            .load_in_queue()
+            .in_load_queue()
     }
 
-    fn get_private_conf_section_name(&self)->Option<&str> {
+    fn get_private_conf_section_name(&self) -> Option<&str> {
         Some("Service")
     }
 }
@@ -1067,14 +1067,13 @@ enum ServiceConf {
     ExecReload,
 }
 
-
 impl Display for ServiceConf {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self{
-            ServiceConf::Type => write!(f,"Type"),
-            ServiceConf::ExecCondition => write!(f,"ExecCondition"),
-            ServiceConf::ExecStart => write!(f,"ExecStart"),
-            ServiceConf::ExecReload => write!(f,"ExecReload"),
+        match self {
+            ServiceConf::Type => write!(f, "Type"),
+            ServiceConf::ExecCondition => write!(f, "ExecCondition"),
+            ServiceConf::ExecStart => write!(f, "ExecStart"),
+            ServiceConf::ExecReload => write!(f, "ExecReload"),
         }
     }
 }
@@ -1124,7 +1123,7 @@ impl ServiceUnit {
                 _ if key == ServiceConf::Type.to_string() => {
                     let values = conf.get_values();
                     for value in values.iter() {
-                        if let ConfValue::String(v) = value{
+                        if let ConfValue::String(v) = value {
                             self.service_type = ServiceType::from_str(v)?;
                             break;
                         }
@@ -1233,17 +1232,18 @@ fn prepare_command(
     let mut i = 0;
     for exec in commands.iter() {
         let mut cmd = "";
-        let mut t_args:Vec<String> = Vec::new();
+        let mut t_args: Vec<String> = Vec::new();
         if let ConfValue::String(t_cmd) = exec {
             if i == 0 {
                 cmd = t_cmd;
                 i = i + 1;
-            }else {
+            } else {
                 t_args.push(t_cmd.to_string());
             }
         } else {
             return Err(format!(
-                "service config  format is error, command {:?} is error",exec
+                "service config  format is error, command {:?} is error",
+                exec
             )
             .into());
         }
