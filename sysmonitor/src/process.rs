@@ -80,8 +80,10 @@ impl ProcessMonitor {
         loop {
             self.reload_tasks();
             if self.check_service_exist() {
-                self.process_recover(timeout);
-                self.process_alarm();
+                let _ = self.process_recover(timeout);
+                let _ = self.process_alarm_recover();
+            } else {
+                let _ = self.process_alarm();
             }
             sleep(Duration::from_secs(self.monitor_period))
         }
@@ -107,7 +109,7 @@ impl ProcessMonitor {
     }
 
     fn check_process_exist(&mut self) -> io::Result<bool> {
-        command_wait(self.monitor_command.clone(), self.stop_command.clone(), self.uid, self.timeout)
+        command_wait(self.monitor_command.clone(), self.stop_command.clone(), self.uid, self.get_process_check_timeout())
     }
 
     fn process_recover(&self, timeout: u64) -> io::Result<bool> {
@@ -118,8 +120,8 @@ impl ProcessMonitor {
         command_wait(self.alarm_command.clone(), "".to_string(), self.uid, self.timeout)
     }
 
-    fn process_alarm_recover(self) -> io::Result<bool> {
-        command_wait(self.alarm_recover_command, "".to_string(), self.uid, self.timeout)
+    fn process_alarm_recover(&mut self) -> io::Result<bool> {
+        command_wait(self.alarm_recover_command.clone(), "".to_string(), self.uid, self.timeout)
     }
 }
 
@@ -127,10 +129,10 @@ fn command_wait(command: String, stop_command: String, uid: u32, timeout: u64) -
     let mut child = Command::new(command).uid(uid).spawn()?;
 
     if timeout > 0 {
-        wait_child(&mut child, timeout, 100);
+        wait_child(&mut child, timeout, 100)?;
         if stop_command != "" {
             let _stop = Command::new(stop_command).uid(uid).output();
-            process_exit(&mut child);
+            process_exit(&mut child)?;
         }
     } else {
         return match child.wait() {
@@ -143,10 +145,10 @@ fn command_wait(command: String, stop_command: String, uid: u32, timeout: u64) -
 }
 
 fn process_exit(child: &mut Child) -> io::Result<ExitStatus> {
-    kill(Pid::from_raw(child.id() as pid_t), Signal::SIGTERM);
+    kill(Pid::from_raw(child.id() as pid_t), Signal::SIGTERM)?;
     sleep(Duration::from_secs(1));
-    wait_child(child, PROCESS_EXIT_TIMEOUT, 1000);
-    child.kill();
+    wait_child(child, PROCESS_EXIT_TIMEOUT, 1000)?;
+    child.kill()?;
     child.wait()
 }
 
