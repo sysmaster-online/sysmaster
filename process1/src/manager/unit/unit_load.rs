@@ -30,11 +30,7 @@ impl UnitLoad {
             )),
         }
     }
-
-    pub(super) fn prepare_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-        self.data.borrow_mut().prepare_unit(name)
-    }
-
+    
     pub(super) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
         self.data.borrow_mut().load_unit(name)
     }

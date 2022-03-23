@@ -176,10 +176,25 @@ impl UnitConfigsSub {
 
         // dependency
         for (relation, name) in config.deps.iter() {
+            let tmp_unit:Rc<UnitX>;
+            if let Some(unit) = self.um.db.units_get(name){
+                tmp_unit = Rc::clone(&unit);
+            }else{
+                tmp_unit = match self.try_new_unit(name){
+                    Some(u) =>u,
+                    None =>{
+                        log::error!("create unit obj error in unit manger");
+                        return;
+                    }
+                };
+                self.um.db.units_insert(name.to_string(),Rc::clone(&tmp_unit));
+                self.um.rt.push_load_queue(Rc::clone(&tmp_unit));
+            }
+
             if let Err(_e) = self.um.db.dep_insert(
                 Rc::clone(&unit),
                 *relation,
-                self.um.db.units_get(name).unwrap(),
+                tmp_unit,
                 true,
                 0,
             ) {

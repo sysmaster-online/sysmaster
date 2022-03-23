@@ -6,10 +6,10 @@ use std::collections::LinkedList;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
-use utils::unit_conf::{Conf, ConfValue, Section};
+use utils::unit_conf::{Conf, Section};
 
 use super::service_base::{
-    CommandLine, DualTimestamp, ExitStatusSet, ServiceCommand, ServiceConf, ServiceRestart,
+    CommandLine, DualTimestamp, ExitStatusSet, ServiceCommand, ServiceRestart,
     ServiceResult, ServiceState, ServiceTimeoutFailureMode, ServiceType,
 };
 use super::service_start;

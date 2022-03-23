@@ -1,8 +1,7 @@
 use core::fmt::{Display, Formatter, Result as FmtResult};
 use std::cell::RefCell;
 use std::fmt;
-use std::rc::{Rc, Weak};
-use std::str::FromStr;
+use std::rc::{Rc};
 
 use process1::manager::{KillOperation, UnitActiveState};
 
