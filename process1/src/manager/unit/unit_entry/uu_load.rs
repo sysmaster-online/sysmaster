@@ -219,7 +219,8 @@ impl UeLoad {
                 }
             }
         }
-        self.dm.insert_unit_config(self.id.clone(), Rc::new(u_config));
+        self.dm
+            .insert_unit_config(self.id.clone(), Rc::new(u_config));
         Ok(())
     }
 

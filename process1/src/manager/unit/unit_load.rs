@@ -67,7 +67,8 @@ impl UnitLoadData {
 
     pub(self) fn prepare_unit(&self, name: &str) -> Option<Rc<UnitX>> {
         let u_config = UnitConfig::new();
-        self.dm.insert_unit_config(name.to_string(), Rc::new(u_config));
+        self.dm
+            .insert_unit_config(name.to_string(), Rc::new(u_config));
         match self.db.units_get(name) {
             Some(unit) => {
                 let rc_unit = Rc::new(unit);
@@ -95,10 +96,10 @@ impl UnitLoadData {
         log::info!("push new unit into load queue");
         self.rt.dispatch_load_queue();
         let config = self.dm.get_unit_config(name.to_string());
-        if let Some(_config) = config{
-            for (_relation, name) in _config.deps.iter(){
+        if let Some(_config) = config {
+            for (_relation, name) in _config.deps.iter() {
                 let unit = self.db.units_get(name);
-                unit.map(|u|self.rt.push_load_queue(Rc::clone(&u)));
+                unit.map(|u| self.rt.push_load_queue(Rc::clone(&u)));
             }
         }
         Some(Rc::clone(&u))
@@ -182,17 +183,17 @@ impl UnitConfigsSub {
                 tmp_unit = Rc::clone(&unit);
             } else {
                 tmp_unit = match self.try_new_unit(name) {
-                    Some(u) =>Rc::clone(&u),
+                    Some(u) => Rc::clone(&u),
                     None => {
                         log::error!("create unit obj error in unit manger");
                         return;
                     }
                 };
-                
+
                 self.unit_load_data
                     .db
                     .units_insert(name.to_string(), Rc::clone(&tmp_unit));
-                    //self.unit_load_data.rt.push_load_queue(Rc::clone(&tmp_unit));  //cannot be invok embended,because cannot be  borrow two reference
+                //self.unit_load_data.rt.push_load_queue(Rc::clone(&tmp_unit));  //cannot be invok embended,because cannot be  borrow two reference
             }
 
             if let Err(_e) =
@@ -252,8 +253,8 @@ mod tests {
 
     use utils::logger;
 
-    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
     use super::*;
+    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
 
     #[test]
     fn test_unit_load() {
@@ -271,7 +272,7 @@ mod tests {
         load.load_unit(&unit_name);
 
         match load.data.db.units_get(&unit_name) {
-            Some(_unit_obj) =>assert_eq!(_unit_obj.get_id(),unit_name.as_str()),
+            Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), unit_name.as_str()),
             None => println!("not fount unit: {}", unit_name),
         };
     }

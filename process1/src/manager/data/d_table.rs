@@ -7,7 +7,7 @@ use std::rc::Rc;
 pub(in crate::manager) struct DataManager {
     tables: (
         RefCell<Table<String, Rc<UnitConfig>>>, // unit-config
-        RefCell<Table<String, UnitState>>,  // unit-state
+        RefCell<Table<String, UnitState>>,      // unit-state
     ),
 }
 
@@ -27,8 +27,8 @@ impl DataManager {
         table.insert(u_name, u_config)
     }
 
-    pub (in crate::manager) fn get_unit_config(&self,u_name:String)-> Option<Rc<UnitConfig>>{
-        self.tables.0.borrow().get(&u_name).map(|v|Rc::clone(v))
+    pub(in crate::manager) fn get_unit_config(&self, u_name: String) -> Option<Rc<UnitConfig>> {
+        self.tables.0.borrow().get(&u_name).map(|v| Rc::clone(v))
     }
     pub(in crate::manager) fn remove_unit_config(&self, u_name: &String) -> Option<Rc<UnitConfig>> {
         let mut table = self.tables.0.borrow_mut();
