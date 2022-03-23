@@ -59,7 +59,12 @@ where
         name: String,
         subscriber: Rc<dyn TableSubscribe<K, V>>,
     ) -> Option<Rc<dyn TableSubscribe<K, V>>> {
-        self.subscribers.insert(name, subscriber)
+        let t_s = self.subscribers.get(&name);
+        if t_s.is_none() {
+            self.subscribers.insert(name, subscriber)
+        } else {
+            Some(Rc::clone(t_s.unwrap()))
+        }
     }
 
     pub(super) fn unsubscribe(&mut self, name: &str) -> Option<Rc<dyn TableSubscribe<K, V>>> {

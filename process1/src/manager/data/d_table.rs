@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 pub(in crate::manager) struct DataManager {
     tables: (
-        RefCell<Table<String, UnitConfig>>, // unit-config
+        RefCell<Table<String, Rc<UnitConfig>>>, // unit-config
         RefCell<Table<String, UnitState>>,  // unit-state
     ),
 }
@@ -21,13 +21,16 @@ impl DataManager {
     pub(in crate::manager) fn insert_unit_config(
         &self,
         u_name: String,
-        u_config: UnitConfig,
-    ) -> Option<UnitConfig> {
+        u_config: Rc<UnitConfig>,
+    ) -> Option<Rc<UnitConfig>> {
         let mut table = self.tables.0.borrow_mut();
         table.insert(u_name, u_config)
     }
 
-    pub(in crate::manager) fn remove_unit_config(&self, u_name: &String) -> Option<UnitConfig> {
+    pub (in crate::manager) fn get_unit_config(&self,u_name:String)-> Option<Rc<UnitConfig>>{
+        self.tables.0.borrow().get(&u_name).map(|v|Rc::clone(v))
+    }
+    pub(in crate::manager) fn remove_unit_config(&self, u_name: &String) -> Option<Rc<UnitConfig>> {
         let mut table = self.tables.0.borrow_mut();
         table.remove(u_name)
     }
@@ -35,8 +38,8 @@ impl DataManager {
     pub(in crate::manager) fn register_unit_config(
         &self,
         name: String,
-        subscriber: Rc<dyn TableSubscribe<String, UnitConfig>>,
-    ) -> Option<Rc<dyn TableSubscribe<String, UnitConfig>>> {
+        subscriber: Rc<dyn TableSubscribe<String, Rc<UnitConfig>>>,
+    ) -> Option<Rc<dyn TableSubscribe<String, Rc<UnitConfig>>>> {
         let mut table = self.tables.0.borrow_mut();
         table.subscribe(name, subscriber)
     }

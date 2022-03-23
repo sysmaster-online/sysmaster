@@ -95,7 +95,7 @@ impl Display for UnitRelations {
             UnitRelations::UnitUpHeldBy => todo!(),
             UnitRelations::UnitConflicts => todo!(),
             UnitRelations::UnitConflictedBy => todo!(),
-            UnitRelations::UnitBefore => todo!(),
+            UnitRelations::UnitBefore => write!(f, "Before"),
             UnitRelations::UnitAfter => write!(f, "After"),
             UnitRelations::UnitOnSuccess => todo!(),
             UnitRelations::UnitOnSuccessOf => todo!(),
@@ -199,5 +199,9 @@ impl UnitConfig {
             on_success_job_mode: JobMode::JobFail,
             on_failure_job_mode: JobMode::JobFail,
         }
+    }
+
+    pub fn get_name(&self) -> &str {
+        &self.name
     }
 }

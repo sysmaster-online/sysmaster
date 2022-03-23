@@ -24,7 +24,7 @@ pub struct Unit {
     unit_conf_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
     unit_type: UnitType,
     id: String,
-    config: UeConfig,
+    config: RefCell<Rc<UeConfig>>,
     state: UeState,
     load: UeLoad,
     child: UeChild,
@@ -98,7 +98,7 @@ impl Unit {
             file,
             unit_conf_mgr,
             id: String::from(name),
-            config: UeConfig::new(),
+            config: RefCell::new(Rc::new(UeConfig::new())),
             state: UeState::new(Rc::clone(&dm)),
             load: UeLoad::new(Rc::clone(&dm), String::from(name)),
             child: UeChild::new(),
@@ -114,6 +114,14 @@ impl Unit {
         self.load.set_in_load_queue(t);
     }
 
+    pub(super) fn set_config(&self, config: UeConfig) {
+        self.config.replace(Rc::new(config));
+    }
+
+    pub(super) fn get_config(&self) -> Option<Rc<UeConfig>> {
+        let ret = Rc::clone(&self.config.borrow());
+        return Some(Rc::clone(&ret));
+    }
     fn build_name_map(&self) {
         self.file.build_name_map();
     }
