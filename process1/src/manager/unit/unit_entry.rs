@@ -11,6 +11,7 @@ use std::hash::Hasher;
 use std::hash::Hash;
 use utils:: {time_util, unit_config_parser};
 use super::unit_manager::*;
+use super::unit_interface::UnitAction;
 
 use std::collections::{HashMap, HashSet};
 use std::cell::RefCell;
@@ -20,20 +21,8 @@ use std::cell::RefCell;
 use std::ops::Deref;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
-
-
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum UnitType {
-    UnitService = 0,
-    UnitTarget,
-    UnitTypeMax,
-    UnitTypeInvalid,
-    UnitTypeErrnoMax,
-}
-
-impl Default for UnitType {
-    fn default() -> Self { UnitType::UnitService }
-}
+use log;
+use super::UnitType;
 
 #[derive(Hash, PartialEq, Eq, Debug, Copy, Clone)]
 pub enum UnitRelations {
@@ -157,10 +146,11 @@ pub struct Unit {
     in_load_queue: bool,
     default_dependencies: bool,
     pub conf: Option<Rc<unit_config_parser::Conf>>,
+    unit: Option<Rc<Box<dyn UnitAction>>>,
 }
 
 impl PartialEq for Unit {
-     fn eq(&self, other: &Unit) -> bool {
+     fn eq(&self, other: &Self) -> bool {
          self.unit_type == other.unit_type && self.id == other.id
      }
 }
@@ -187,6 +177,7 @@ pub trait UnitObj: std::fmt::Debug {
     fn eq(&self, other: &dyn UnitObj) -> bool;
     fn hash(&self) -> u64;
     fn as_any(&self) -> &dyn Any;
+    fn getDependencies(&self) -> Vec<(UnitRelations,Rc<RefCell<Box<dyn UnitObj>>>)>  { let v: Vec<(UnitRelations,Rc<RefCell<Box<dyn UnitObj>>>)> = Vec::new(); v}
 }
 
 
@@ -283,6 +274,7 @@ impl Unit {
             in_load_queue: false,
             default_dependencies: true,
             conf: None,
+            unit: None,
         }
     }
 
@@ -331,6 +323,16 @@ impl Unit {
         let mut depends = self.dependencies.get(&relation).unwrap().borrow_mut();
         depends.insert(UnitObjWrapper(unit.clone()));//todo!() is need clone ?
         Ok(())
+    }
+
+    fn getDependencies(&self) -> Vec<(UnitRelations,Rc<RefCell<Box<dyn UnitObj>>>)> {
+        let mut v_dependencies: Vec<(UnitRelations,Rc<RefCell<Box<dyn UnitObj>>>)>  = Vec::new();
+        for (k_r,v_set) in self.dependencies.iter(){
+            for v_u in v_set.borrow().iter() {
+                v_dependencies.push((*k_r,Rc::clone(&v_u.0)));
+            }
+        }
+        v_dependencies
     }
 
     fn unit_config_load(&mut self) -> Result<(), Box<dyn Error>> {
@@ -448,6 +450,7 @@ impl Unit {
         }
     }
 
+
  }
 
 impl UnitObj for Unit{
@@ -479,6 +482,10 @@ impl UnitObj for Unit{
     fn in_load_queue(&self) -> bool {
         self.in_load_queue()
     }
+
+    fn getDependencies(&self) -> Vec<(UnitRelations,Rc<RefCell<Box<dyn UnitObj>>>)>  {
+        self.getDependencies()
+    }
 }
 
 
@@ -490,7 +497,7 @@ pub trait ConfigParser {
     fn parse(&mut self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> { Ok(())}
 }
 
-impl ConfigParser for Unit {
+impl  ConfigParser  for Unit  {
     fn parse(&mut self,  m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
 
         // impl ugly

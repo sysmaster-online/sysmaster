@@ -1,10 +1,7 @@
-use crate::manager::signals::ProcessExit;
+use crate::manager::sigchld::ProcessExit;
 use std::cell::RefCell;
-use std::error::Error;
 use std::rc::Rc;
 use std::collections::{HashMap, VecDeque};
-use nix::sys::signal::Signal;
-use nix::sys::wait::{WaitPidFlag, WaitStatus};
 use utils::path_lookup::LookupPaths;
 use super::{UnitType,UnitObj, unit_name_to_type};
 use super::unit_new;
@@ -14,6 +11,7 @@ use utils:: {time_util, path_lookup};
 use siphasher::sip::SipHasher24;
 use walkdir::{WalkDir};
 use std::hash::Hasher;
+
 use nix::unistd::Pid;
 
 // #[macro_use]
@@ -122,7 +120,7 @@ impl UnitManager{
 
     pub fn dispatch_load_queue(&mut self) {
         log::debug!("dispatch load queue");
-    
+
         loop {
             match self.load_queue.pop_front() {
                 None => {break},
@@ -160,11 +158,15 @@ impl UnitManager{
                 self.insert_unit(name.to_string(), u.clone());
                 return Some(u.clone())
             },
-            Err(_e) => return None,
+            Err(_e) => {
+                log::error!("create unit obj failed {:?}",_e);
+                return None
+            }
         };
     }
 
     pub fn load_unit(&mut self, name: &str) -> Option<Rc<RefCell<Box<dyn UnitObj>>>> {
+        
         if let Some(unit) = self.get_unit_on_name(name) {
              return Some(unit);
         }; 
@@ -175,12 +177,11 @@ impl UnitManager{
         } else {
             return None;
         };
-
+        log::info!("push new unit into load queue");
         self.push_load_queue(u.clone());
         self.dispatch_load_queue();
         Some(u.clone())
     }
-
     pub fn dispatch_sigchld(&mut self) ->  Result<(), Box<dyn Error>> {
         log::debug!("Dispatching sighandler waiting for pid");
         let wait_pid = Pid::from_raw(-1);
@@ -242,10 +243,12 @@ mod tests {
     // use services::service::ServiceUnit;
 
     use super::*;
-
+    use utils::{logger};
 
     #[test]
     fn  test_unit_load(){
+        logger::init_log_with_console("test",4);
+        log::info!("test");
         let mut unit_manager = UnitManager::new();
         unit_manager.init_lookup_path();
 
