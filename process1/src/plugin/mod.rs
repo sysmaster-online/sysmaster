@@ -92,7 +92,7 @@ impl Plugin  {
                     }
                     log::debug!("insert unit {:?} dynamic lib into libs",unit_type);
                     self.load_libs.insert(unit_type, lib.clone());
-                    let dy_lib = self.load_libs.get(&UnitType::UnitService).unwrap();
+                    let dy_lib = self.load_libs.get(&unit_type).unwrap();
                     let fun: dynamic_reload::Symbol< fn()-> *mut dyn unit::UnitObj> = unsafe{dy_lib.lib.get(b"__unit_obj_create").unwrap()};
                     let boxed_raw = fun();
                     self.unitobj_lists.push(Arc::new(unsafe{Box::from_raw(boxed_raw)}));

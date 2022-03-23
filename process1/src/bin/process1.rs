@@ -1,6 +1,7 @@
 use event::{Events, Source};
 use log::info;
-use process1::manager::manager::{Mode, Action, Manager, Stats, Signals};
+use process1::manager::manager::{Mode, Action, Manager, Stats};
+use process1::manager::signals::Signals;
 use std::{io::Error, cell::RefCell, rc::Rc};
 use utils::logger;
 

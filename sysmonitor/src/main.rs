@@ -112,12 +112,12 @@ fn main() -> io::Result<()> {
     let toml_str = fs::read_to_string(CONFIG_FILE_PATH)?;
     let sysmonitor: SysMonitor = toml::from_str(&toml_str).unwrap();
 
-    let monitors: [&mut dyn Monitor; 4] = [&mut ProcessCount::default(),&mut ZombieCount::default(),&mut ProcessFd::default(), &mut ProcessMonitor::default()];
+    let monitors: [&mut dyn Monitor; 4] = [&mut ProcessCount::default(), &mut ZombieCount::default(), &mut ProcessFd::default(), &mut ProcessMonitor::default()];
     for monitor in monitors {
         let contents = fs::read_to_string(monitor.config_path())?;
         monitor.load(contents, sysmonitor.clone());
         monitor.is_valid();
-        monitor.check_status();
+        let _ = monitor.check_status();
     }
     Ok(())
 }

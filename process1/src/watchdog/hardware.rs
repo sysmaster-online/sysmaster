@@ -183,5 +183,11 @@ mod tests {
         let mut watchdog = HardwareWatchdog::default();
         let _ = watchdog.config(Some(Duration::from_secs(10)));
     }
+
+    #[test]
+    fn test_set_device() {
+        let mut watchdog = HardwareWatchdog::default();
+        let _ = watchdog.set_device("/dev/watchdog0".to_string());
+    }
 }
 
