@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_unit_load() {
-        // logger::init_log_with_console("test", 4);
+        //logger::init_log_with_console("test", 4);
         // log::info!("test");
         let dm_manager = Rc::new(DataManager::new());
         let file = Rc::new(UnitFile::new());

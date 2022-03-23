@@ -61,7 +61,15 @@ impl UnitFileData {
                 log::warn!("dir {} is not exist", dir);
                 continue;
             }
-            for entry in WalkDir::new(&dir).min_depth(1).max_depth(1).into_iter() {
+            let mut tmp_dir = dir.to_string();
+            if tmp_dir.ends_with("libutils") {
+                tmp_dir.push_str("/examples/");
+            }
+            for entry in WalkDir::new(&tmp_dir.as_str())
+                .min_depth(1)
+                .max_depth(1)
+                .into_iter()
+            {
                 let entry = entry.unwrap();
                 let filename = entry.file_name().to_str().unwrap().to_string();
                 let file_path = entry.path().to_str().unwrap().to_string();
