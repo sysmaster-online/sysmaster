@@ -87,9 +87,9 @@ impl Display for UnitRelations {
             UnitRelations::UnitBindsTo => write!(f, "BindsTo"),
             UnitRelations::UnitPartOf => write!(f, "PartOf"),
             UnitRelations::UnitUpHolds => write!(f, "UpHolds"),
-            UnitRelations::UnitRequiresBy => todo!(),
+            UnitRelations::UnitRequiresBy => write!(f, "RequiresBy"),
             UnitRelations::UnitRequisiteOf => todo!(),
-            UnitRelations::UnitWantsBy => todo!(),
+            UnitRelations::UnitWantsBy => write!(f, "WantsBy"),
             UnitRelations::UnitBoundBy => todo!(),
             UnitRelations::UnitConsistsOf => todo!(),
             UnitRelations::UnitUpHeldBy => todo!(),
@@ -181,6 +181,9 @@ pub struct UnitConfig {
     pub deps: Vec<(UnitRelations, String)>,
     pub desc: String,
     pub documentation: String,
+    pub install_alias: String,
+    pub install_also: String,
+    pub install_default_install: String,
     pub allow_isolate: bool,
     pub ignore_on_isolate: bool,
     pub on_success_job_mode: JobMode,
@@ -194,6 +197,9 @@ impl UnitConfig {
             deps: Vec::new(),
             desc: String::from(""),
             documentation: null_str!(""),
+            install_alias: null_str!(""),
+            install_also: null_str!(""),
+            install_default_install: null_str!(""),
             allow_isolate: false,
             ignore_on_isolate: false,
             on_success_job_mode: JobMode::JobFail,
@@ -201,7 +207,49 @@ impl UnitConfig {
         }
     }
 
+    pub fn set_name(&mut self, _name: String) {
+        self.name = _name;
+    }
+
     pub fn get_name(&self) -> &str {
         &self.name
+    }
+
+    pub fn add_deps(&mut self, item: (UnitRelations, String)) {
+        self.deps.push(item);
+    }
+
+    pub fn set_desc(&mut self, _desc: String) {
+        self.desc = _desc;
+    }
+
+    pub fn set_documentation(&mut self, _doc: String) {
+        self.documentation = _doc;
+    }
+    pub fn set_install_alias(&mut self, _install_alias: String) {
+        self.install_alias = _install_alias;
+    }
+
+    pub fn set_allow_isolate(&mut self, _isolate: bool) {
+        self.allow_isolate = _isolate;
+    }
+
+    pub fn set_install_also(&mut self, _install_also: String) {
+        self.install_also = _install_also;
+    }
+
+    pub fn set_ignore_on_isolate(&mut self, _ignore_on_isolate: bool) {
+        self.ignore_on_isolate = _ignore_on_isolate;
+    }
+
+    pub fn set_on_success_job_mode(&mut self, _job_mode: JobMode) {
+        self.on_success_job_mode = _job_mode;
+    }
+
+    pub fn set_on_failure_job_mode(&mut self, _jobmode: JobMode) {
+        self.on_failure_job_mode = _jobmode;
+    }
+    pub fn set_install_default_install(&mut self, _install_default_install: String) {
+        self.install_default_install = _install_default_install;
     }
 }

@@ -49,6 +49,18 @@ pub(in crate::manager) enum InstallConfOption {
     DefaultInstance,
 }
 
+impl Display for InstallConfOption {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result {
+        match self {
+            InstallConfOption::Alias => write!(fmt, "Alias"),
+            InstallConfOption::WantedBy => write!(fmt, "WantedBy"),
+            InstallConfOption::RequiredBy => write!(fmt, "RequiredBy"),
+            InstallConfOption::Also => write!(fmt, "Also"),
+            InstallConfOption::DefaultInstance => write!(fmt, "DefaultInstance"),
+        }
+    }
+}
+
 impl From<InstallConfOption> for String {
     fn from(install_conf_opt: InstallConfOption) -> Self {
         match install_conf_opt {
