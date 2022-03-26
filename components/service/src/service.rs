@@ -1,5 +1,5 @@
-use process1::manager::unit::unit_entry::{
-    ConfigParser, KillOperation, Unit, UnitActiveState, UnitObj,
+use process1::manager::unit::{
+    KillOperation, Unit, UnitActiveState, UnitObj,
 };
 use process1::manager::unit::unit_manager::UnitManager;
 use process1::watchdog;
@@ -18,7 +18,7 @@ use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::path::Path;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 #[derive(PartialEq, Default, Debug)]
 struct ExitStatusSet {}
@@ -220,9 +220,9 @@ impl fmt::Display for CommandLine {
     }
 }
 
-#[derive(PartialEq, Default, Debug)]
+#[derive(Default, Debug)]
 pub struct ServiceUnit {
-    pub unit: Unit,
+    pub unit: Weak<Unit>,
     service_type: ServiceType,
     state: ServiceState,
     restart: ServiceRestart,
@@ -256,7 +256,7 @@ pub struct ServiceUnit {
 }
 
 impl ServiceUnit {
-    pub fn new(unit: Unit) -> Self {
+    pub fn new(unit: Weak<Unit>) -> Self {
         Self {
             unit,
             service_type: ServiceType::ServiceTypeInvalid,
@@ -291,9 +291,9 @@ impl ServiceUnit {
         }
     }
 
-    pub fn unit_service_load(&mut self, manager: &mut UnitManager) -> Result<(), Box<dyn Error>> {
+    /*pub fn unit_service_load(&mut self, manager: &mut UnitManager) -> Result<(), Box<dyn Error>> {
         return self.unit.load(manager);
-    }
+    }*/
 
     pub fn service_add_extras(&mut self) -> bool {
         if self.service_type == ServiceType::ServiceTypeInvalid {
@@ -308,9 +308,9 @@ impl ServiceUnit {
         Ok(())
     }
 
-    pub fn get_unit_name(&self) -> String {
+    /*pub fn get_unit_name(&self) -> String {
         self.unit.id.to_string()
-    }
+    }*/
 
     pub fn start(&mut self, m: &mut UnitManager) {
         let cmds = self.exec_commands[ServiceCommand::ServiceCondition as usize].clone();
@@ -378,7 +378,7 @@ impl ServiceUnit {
                         self.control_pid = Some(pid);
                     }
                     Err(_e) => {
-                        log::error!("failed to start service: {}", self.unit.id.clone());
+                        log::error!("failed to start service: {}", self.unit.upgrade().as_ref().cloned().unwrap().id.clone());
                     }
                 }
             }
@@ -394,7 +394,7 @@ impl ServiceUnit {
                         self.main_pid = Some(pid);
                     }
                     Err(_e) => {
-                        log::error!("failed to run main command: {}", self.unit.id.clone());
+                        log::error!("failed to run main command: {}", self.unit.upgrade().as_ref().cloned().unwrap().id.clone());
                     }
                 }
             }
@@ -413,7 +413,7 @@ impl ServiceUnit {
         // todo!()
         // trigger the unit the dependency trigger_by
 
-        self.unit.notify(
+        self.unit.upgrade().as_ref().cloned().unwrap().notify(
             m,
             original_state.to_unit_active_state(),
             state.to_unit_active_state(),
@@ -435,7 +435,7 @@ impl ServiceUnit {
                 match service_start::start_service(self, m, &*cmd.borrow()) {
                     Ok(pid) => self.main_pid = Some(pid),
                     Err(_e) => {
-                        log::error!("failed to start service: {}", self.unit.id.clone());
+                        log::error!("failed to start service: {}", self.unit.upgrade().as_ref().cloned().unwrap().id.clone());
                         self.send_signal(
                             m,
                             ServiceState::ServiceStopSigterm,
@@ -464,7 +464,7 @@ impl ServiceUnit {
                 match service_start::start_service(self, m, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
-                        log::error!("Failed to run start post service: {}", self.unit.id.clone());
+                        log::error!("Failed to run start post service: {}", self.unit.upgrade().as_ref().cloned().unwrap().id.clone());
                     }
                 }
                 self.set_state(m, ServiceState::ServiceStartPost);
@@ -548,7 +548,7 @@ impl ServiceUnit {
                 match service_start::start_service(self, m, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
-                        log::error!("Failed to run stop service: {}", self.unit.id.clone());
+                        log::error!("Failed to run stop service: {}", self.unit.upgrade().as_ref().cloned().unwrap().id.clone());
                     }
                 }
                 self.set_state(m, ServiceState::ServiceStop);
@@ -584,7 +584,7 @@ impl ServiceUnit {
                             ServiceState::ServiceFinalSigterm,
                             ServiceResult::ServiceFailureResources,
                         );
-                        log::error!("Failed to run stop service: {}", self.unit.id.clone());
+                        log::error!("Failed to run stop service: {}", self.unit.upgrade().as_ref().cloned().unwrap().id.clone());
                     }
                 }
                 self.set_state(m, ServiceState::ServiceStopPost);
@@ -628,7 +628,7 @@ impl ServiceUnit {
                 match service_start::start_service(self, m, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
-                        log::error!("failed to start service: {}", self.unit.id.clone());
+                        log::error!("failed to start service: {}", self.unit.upgrade().as_ref().cloned().unwrap().id.clone());
                         self.enter_running(m, ServiceResult::ServiceSuccess);
                     }
                 }
@@ -823,7 +823,7 @@ impl UnitObj for ServiceUnit {
         todo!()
     }
     fn load(&mut self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
-        self.unit_service_load(m)?;
+        self.unit.upgrade().as_ref().cloned().unwrap().load.unit_load(m);
 
         self.parse(m)?;
 
@@ -896,7 +896,7 @@ impl UnitObj for ServiceUnit {
 
     fn eq(&self, other: &dyn UnitObj) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<ServiceUnit>() {
-            return self == other;
+            return self.unit.upgrade().as_ref().cloned().unwrap() == other.unit.upgrade().as_ref().cloned().unwrap();
         }
         false
     }
@@ -904,7 +904,7 @@ impl UnitObj for ServiceUnit {
     fn hash(&self) -> u64 {
         let mut h = DefaultHasher::new();
         Hash::hash(&(TypeId::of::<ServiceUnit>()), &mut h);
-        h.write(self.unit.id.as_bytes());
+        h.write(self.unit.upgrade().as_ref().cloned().unwrap().id.as_bytes());
         h.finish()
     }
 
@@ -913,21 +913,22 @@ impl UnitObj for ServiceUnit {
     }
 
     fn in_load_queue(&self) -> bool {
-        self.unit.in_load_queue()
+        self.unit.upgrade().as_ref().cloned().unwrap().load.in_load_queue()
     }
 }
 
 use process1::declure_unitobj_plugin;
 declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default);
 
-impl ConfigParser for ServiceUnit {
+
+impl ServiceUnit {
     fn parse(&mut self, manager: &mut UnitManager) -> Result<(), Box<dyn Error>> {
-        self.unit.parse(manager)?;
+        self.unit.upgrade().as_ref().cloned().unwrap().load.parse(manager)?;
         let conf = self
-            .unit
-            .conf
+            .unit.upgrade().as_ref().cloned().unwrap()
+            .load.get_conf()
             .as_ref()
-            .ok_or_else(|| IOError::new(ErrorKind::Other, "config file not loaded"))?;
+            .ok_or_else(|| IOError::new(ErrorKind::Other, "config file not loaded"))?.clone();
 
         let service = conf.service.as_ref().unwrap();
 
@@ -1056,6 +1057,7 @@ impl ConfigParser for ServiceUnit {
         Ok(())
     }
 }
+
 
 fn prepare_command(
     commands: &Vec<String>,

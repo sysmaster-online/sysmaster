@@ -1,6 +1,8 @@
+use std::rc::Rc;
 use std::io::Error;
 use std::error::Error as Err;
 
+use super::data::DataManager;
 use super::unit::UnitManager;
 
 pub enum Mode {
@@ -34,6 +36,7 @@ pub struct Manager {
     action: Action,
     stat: Stats,
     um: UnitManager,
+    dm: Rc<DataManager>,
 }
 
 type JobId = i32;
@@ -42,11 +45,13 @@ type JobId = i32;
 
 impl Manager {
     pub fn new(mode: Mode, action: Action) -> Manager {
+        let _dm = Rc::new(DataManager::new());
         Manager {
+            dm: Rc::clone(&_dm),
             mode,
             action,
             stat: Stats::INIT,
-            um: UnitManager::new(),
+            um: UnitManager::new(Rc::clone(&_dm)),
         }
     }
 

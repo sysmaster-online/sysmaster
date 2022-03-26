@@ -1,25 +1,21 @@
-pub mod unit_entry;
-pub mod unit_manager;
-pub mod unit_interface;
-
 use std::error::Error;
 
+use crate::manager::data::*;
+pub use unit_base::*;
+pub use unit_entry::*;
 pub (in crate::manager) use unit_manager::*;
 
-use crate::plugin::Plugin;
 use std::rc::Rc;
 // use services::service::ServiceUnit;
 
+mod unit_base;
+mod unit_entry;
+mod unit_sets;
+mod unit_configs;
+pub mod unit_manager;
 
-pub use unit_entry::*;
-pub use unit_interface::*;
 
 //后续考虑和plugin结合
-fn unit_new(unit_type: UnitType, name: &str) -> Result<Box<dyn UnitObj>, Box<dyn Error>> {
-    let unit = Unit::new(name);
-    let plugins = Rc::clone(&Plugin::get_instance());
-    plugins.borrow_mut().set_library_dir("../target/debug");
-    plugins.borrow_mut().load_lib();
-    let u = plugins.borrow().create_unit_obj(unit_type);
-    u
+fn unit_new(dm:Rc<DataManager>, unit_type: UnitType, name: &str) -> Result<Rc<UnitX>, Box<dyn Error>> {
+    UnitX::new(dm, unit_type, name)
 }
