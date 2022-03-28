@@ -1,11 +1,11 @@
 use event::{Events, Source};
 use log::info;
-use process1::manager::manager::{Mode, Action, Manager, Stats};
+use process1::manager::manager::{Action, Manager, Mode, Stats};
 use process1::manager::signals::Signals;
-use std::{io::Error, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, io::Error, rc::Rc};
 use utils::logger;
 
-fn main() -> Result<(), Error>{
+fn main() -> Result<(), Error> {
     logger::init_log_with_console("process1", 4);
     info!("process1 running in system mode.");
 
@@ -30,7 +30,7 @@ fn main() -> Result<(), Error>{
             Ok(_) => todo!(),
             Err(_) => todo!(),
         };
-    };
+    }
 
     info!("process1 shutdown.");
     Ok(())

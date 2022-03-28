@@ -13,10 +13,10 @@ use crate::process_count::ProcessCount;
 use crate::process_fd::ProcessFd;
 use crate::zombie::ZombieCount;
 
-mod process_count;
-mod zombie;
-mod process_fd;
 mod process;
+mod process_count;
+mod process_fd;
+mod zombie;
 
 #[derive(Debug)]
 pub enum SysMonitorError {
@@ -98,21 +98,36 @@ pub fn config_file_load(file_path: &str) -> io::Result<String> {
     Ok(buf)
 }
 
-fn on() -> bool { true }
+fn on() -> bool {
+    true
+}
 
-pub fn process_monitor_period_default() -> u64 { 3 }
+pub fn process_monitor_period_default() -> u64 {
+    3
+}
 
-fn process_recall_default_period() -> u32 { 1 }
+fn process_recall_default_period() -> u32 {
+    1
+}
 
-fn process_restart_default_timeout() -> u32 { 90 }
+fn process_restart_default_timeout() -> u32 {
+    90
+}
 
-fn process_alarm_suppress_num_default() -> u32 { 5 }
+fn process_alarm_suppress_num_default() -> u32 {
+    5
+}
 
 fn main() -> io::Result<()> {
     let toml_str = fs::read_to_string(CONFIG_FILE_PATH)?;
     let sysmonitor: SysMonitor = toml::from_str(&toml_str).unwrap();
 
-    let monitors: [&mut dyn Monitor; 4] = [&mut ProcessCount::default(), &mut ZombieCount::default(), &mut ProcessFd::default(), &mut ProcessMonitor::default()];
+    let monitors: [&mut dyn Monitor; 4] = [
+        &mut ProcessCount::default(),
+        &mut ZombieCount::default(),
+        &mut ProcessFd::default(),
+        &mut ProcessMonitor::default(),
+    ];
     for monitor in monitors {
         let contents = fs::read_to_string(monitor.config_path())?;
         monitor.load(contents, sysmonitor.clone());

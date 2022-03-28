@@ -19,11 +19,17 @@ pub struct ZombieCount {
     pub status: bool,
 }
 
-fn alarm_default() -> u32 { 500 }
+fn alarm_default() -> u32 {
+    500
+}
 
-fn resume_default() -> u32 { 400 }
+fn resume_default() -> u32 {
+    400
+}
 
-fn period_default() -> u32 { 60 }
+fn period_default() -> u32 {
+    60
+}
 
 impl Monitor for ZombieCount {
     fn config_path(&self) -> &str {
@@ -41,7 +47,6 @@ impl Monitor for ZombieCount {
         };
     }
 
-
     fn is_valid(&self) -> bool {
         self.alarm > self.resume
     }
@@ -56,7 +61,8 @@ impl Monitor for ZombieCount {
 
         if count >= self.alarm && !self.status {
             let _ = Command::new("/usr/libexec/sysmonitor/getzombieparent.py").output()?;
-        } else if count <= self.resume && self.status {}
+        } else if count <= self.resume && self.status {
+        }
 
         return Ok(());
     }
@@ -66,15 +72,17 @@ impl Monitor for ZombieCount {
 
 #[cfg(test)]
 mod tests {
-    use crate::Monitor;
     use crate::zombie::ZombieCount;
+    use crate::Monitor;
 
     #[test]
     fn test_check_status() {
         let mut z = ZombieCount::default();
         match z.check_status() {
             Ok(_) => {}
-            Err(e) => { println!("error: {:?}", e); }
+            Err(e) => {
+                println!("error: {:?}", e);
+            }
         }
     }
 }

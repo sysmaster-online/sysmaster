@@ -17,7 +17,9 @@ pub struct ProcessFd {
     pub alarm: u32,
 }
 
-fn alarm_default() -> u32 { 80 }
+fn alarm_default() -> u32 {
+    80
+}
 
 impl Monitor for ProcessFd {
     fn config_path(&self) -> &str {
@@ -34,7 +36,6 @@ impl Monitor for ProcessFd {
             ..monitor
         };
     }
-
 
     fn is_valid(&self) -> bool {
         self.alarm > 0 && self.alarm < 100

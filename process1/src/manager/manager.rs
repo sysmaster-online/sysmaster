@@ -1,6 +1,6 @@
-use std::rc::Rc;
-use std::io::Error;
 use std::error::Error as Err;
+use std::io::Error;
+use std::rc::Rc;
 
 use super::data::DataManager;
 use super::unit::UnitManager;
@@ -29,8 +29,6 @@ pub enum Stats {
     SWITCHROOT,
 }
 
-
-
 pub struct Manager {
     mode: Mode,
     action: Action,
@@ -40,8 +38,6 @@ pub struct Manager {
 }
 
 type JobId = i32;
-
-
 
 impl Manager {
     pub fn new(mode: Mode, action: Action) -> Manager {
@@ -79,7 +75,7 @@ impl Manager {
         todo!()
     }
 
-    pub fn rloop(&mut self) -> Result<Stats, Error>  {
+    pub fn rloop(&mut self) -> Result<Stats, Error> {
         Ok(Stats::REEXECUTE)
     }
 
@@ -108,7 +104,7 @@ impl Manager {
     }
 
     pub fn exit(&mut self) {
-        self.stat =  Stats::EXIT;
+        self.stat = Stats::EXIT;
     }
 
     pub fn state(&self) -> Result<Stats, Error> {
@@ -124,10 +120,8 @@ impl Drop for Manager {
     fn drop(&mut self) {}
 }
 
-pub trait  Mangerobj {
-    fn init(&self){
-
-    }
+pub trait Mangerobj {
+    fn init(&self) {}
 
     fn load(&self);
 
@@ -141,42 +135,41 @@ pub trait  Mangerobj {
     fn event_dispatch(&self) -> Option<i32>;
 }
 
-pub struct MangerLoader  {
-    pub managers: Vec<Box <dyn Mangerobj>>,
+pub struct MangerLoader {
+    pub managers: Vec<Box<dyn Mangerobj>>,
 }
 
-
-impl  MangerLoader{
-    pub fn new() -> Self{
-        MangerLoader{
-            managers: Vec::new()
+impl MangerLoader {
+    pub fn new() -> Self {
+        MangerLoader {
+            managers: Vec::new(),
         }
     }
     pub fn load_plugins(&mut self, d: Box<dyn Mangerobj>) {
-            self.managers.push(d);
-        }
+        self.managers.push(d);
+    }
 
-        pub fn run(&mut self) -> i32{
-            let mut ret:i32 = 0;
-            for m in self.managers.iter(){
-                m.init();
-                m.load();
-                ret =m.dispatch();
-            }
-            ret
+    pub fn run(&mut self) -> i32 {
+        let mut ret: i32 = 0;
+        for m in self.managers.iter() {
+            m.init();
+            m.load();
+            ret = m.dispatch();
         }
+        ret
+    }
 
-        pub fn destroy(&self) {
-            for m in self.managers.iter(){
-                m.destroy();
-            }
+    pub fn destroy(&self) {
+        for m in self.managers.iter() {
+            m.destroy();
         }
+    }
 
-        pub fn reload(&self){
-            for m in self.managers.iter(){
-                m.reload();
-            }
+    pub fn reload(&self) {
+        for m in self.managers.iter() {
+            m.reload();
         }
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -184,8 +177,6 @@ mod tests {
 
     use super::*;
 
-#[test]
-fn  test_mangerplugin(){
-
-}
+    #[test]
+    fn test_mangerplugin() {}
 }

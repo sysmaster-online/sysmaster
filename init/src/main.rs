@@ -3,7 +3,7 @@ use std::io::Error;
 use std::mem::MaybeUninit;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
-use std::process::{Command, exit};
+use std::process::{exit, Command};
 use std::time::{Duration, Instant};
 
 use libc::{siginfo_t, waitid};
@@ -64,8 +64,13 @@ fn execute_mode(s: &String) -> Result<(), Error> {
     loop {
         let mut siginfo = MaybeUninit::<siginfo_t>::zeroed();
         let pid = unsafe {
-            if waitid(libc::P_ALL, 0, siginfo.as_mut_ptr(),
-                      libc::WEXITED | libc::WNOWAIT) < 0 {
+            if waitid(
+                libc::P_ALL,
+                0,
+                siginfo.as_mut_ptr(),
+                libc::WEXITED | libc::WNOWAIT,
+            ) < 0
+            {
                 continue;
             };
             siginfo.assume_init().si_pid()
@@ -113,8 +118,13 @@ fn need_exit(fail_record: &mut VecDeque<Instant>) -> bool {
 fn send_signal(pid: i32, mut siginfo: MaybeUninit<siginfo_t>) {
     unsafe {
         siginfo.assume_init_mut().si_code -= SELF_CODE_OFFSET;
-        if libc::syscall(libc::SYS_rt_sigqueueinfo, pid, libc::SIGRTMIN() + SELF_SIG_OFFSET,
-                         siginfo.as_mut_ptr()) < 0 {
+        if libc::syscall(
+            libc::SYS_rt_sigqueueinfo,
+            pid,
+            libc::SIGRTMIN() + SELF_SIG_OFFSET,
+            siginfo.as_mut_ptr(),
+        ) < 0
+        {
             println!("send signal error:{}", Error::last_os_error())
         }
     }

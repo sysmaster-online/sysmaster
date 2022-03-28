@@ -1,4 +1,3 @@
-
 const ETC_SYSTEM_PATH: &'static str = "/etc/process1/system";
 const LIB_SYSTEM_PATH: &'static str = "/usr/lib/process1/system";
 
@@ -11,7 +10,7 @@ pub struct LookupPaths {
     pub transient: String,
 }
 
-impl LookupPaths{
+impl LookupPaths {
     pub fn new() -> Self {
         LookupPaths {
             generator: String::from(""),
@@ -26,6 +25,4 @@ impl LookupPaths{
         self.search_path.push(ETC_SYSTEM_PATH);
         self.search_path.push(LIB_SYSTEM_PATH);
     }
-
-
 }
