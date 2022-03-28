@@ -3,7 +3,7 @@ extern crate toml;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind};
- 
+
 #[derive(Debug, Deserialize)]
 pub struct ConfUnit {
     #[serde(alias = "Description")]
@@ -91,21 +91,27 @@ pub struct Conf {
 pub fn unit_file_load(file_path: String) -> Result<Conf, Error> {
     let mut file = match File::open(file_path) {
         Ok(f) => f,
-        Err(_e) => { return Err(Error::new(ErrorKind::Other,
-            "Error: Open file failed"));}
+        Err(_e) => {
+            return Err(Error::new(ErrorKind::Other, "Error: Open file failed"));
+        }
     };
 
     let mut buf = String::new();
     match file.read_to_string(&mut buf) {
         Ok(s) => s,
-        Err(_e) => {return Err(Error::new(ErrorKind::Other,
-            "read file content failed"));}
+        Err(_e) => {
+            return Err(Error::new(ErrorKind::Other, "read file content failed"));
+        }
     };
 
     let conf: Conf = match toml::from_str(&buf) {
         Ok(conf) => conf,
-        Err(_e) => {return Err(Error::new(ErrorKind::Other,
-            "translate string to struct failed"));}
+        Err(_e) => {
+            return Err(Error::new(
+                ErrorKind::Other,
+                "translate string to struct failed",
+            ));
+        }
     };
 
     return Ok(conf);
@@ -114,25 +120,22 @@ pub fn unit_file_load(file_path: String) -> Result<Conf, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
-    fn  test_unit_file_load() -> Result<(), Error>{
+    fn test_unit_file_load() -> Result<(), Error> {
         let file: String = String::from("config.service");
         match unit_file_load(file) {
-            Ok(conf) => {
-                match conf.install {
-                    Some(c) => assert_eq!(c.wanted_by, Some("dbus".to_string())),
-                    None => {
-                        return Err(Error::new(ErrorKind::Other,
-                            "no install field"));
-                    }
+            Ok(conf) => match conf.install {
+                Some(c) => assert_eq!(c.wanted_by, Some("dbus".to_string())),
+                None => {
+                    return Err(Error::new(ErrorKind::Other, "no install field"));
                 }
-            }
+            },
             Err(e) => {
-                return Err(Error::new(ErrorKind::Other,
-                e.to_string()));}
+                return Err(Error::new(ErrorKind::Other, e.to_string()));
+            }
         };
-        
+
         Ok(())
     }
 }

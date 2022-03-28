@@ -1,7 +1,7 @@
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::collections::{HashMap};
 use super::unit_entry::*;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct UnitSets {
@@ -16,15 +16,14 @@ impl UnitSets {
     }
 
     pub fn insert_unit(&self, name: String, unit: Rc<RefCell<Rc<UnitX>>>) {
-	    let mut units = self.units.borrow_mut();
-	    units.insert(name, unit);
+        let mut units = self.units.borrow_mut();
+        units.insert(name, unit);
     }
 
     pub fn get_unit_on_name(&self, name: &str) -> Option<Rc<RefCell<Rc<UnitX>>>> {
-        self.units.borrow_mut().get(name).and_then(|u| Some(u.clone()))
+        self.units
+            .borrow_mut()
+            .get(name)
+            .and_then(|u| Some(u.clone()))
     }
 }
-
-
-
-

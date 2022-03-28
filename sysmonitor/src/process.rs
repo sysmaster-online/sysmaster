@@ -10,8 +10,8 @@ use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use serde_derive::Deserialize;
 
-use crate::{Monitor, Switch, SysMonitor, SysMonitorError};
 use crate::process_monitor_period_default;
+use crate::{Monitor, Switch, SysMonitor, SysMonitorError};
 
 const CONFIG_FILE_PATH: &str = "/etc/sysmonitor/process";
 const PROCESS_EXIT_TIMEOUT: u64 = 10;
@@ -45,7 +45,9 @@ pub struct ProcessMonitor {
     timeout: u64,
 }
 
-fn monitor_mode_default() -> String { "serial".to_string() }
+fn monitor_mode_default() -> String {
+    "serial".to_string()
+}
 
 impl Monitor for ProcessMonitor {
     fn config_path(&self) -> &str {
@@ -64,7 +66,8 @@ impl Monitor for ProcessMonitor {
     }
 
     fn is_valid(&self) -> bool {
-        (self.monitor_mode == "serial" || self.monitor_mode == "parallel") && self.monitor_period > 0
+        (self.monitor_mode == "serial" || self.monitor_mode == "parallel")
+            && self.monitor_period > 0
     }
 
     fn check_status(&mut self) -> Result<(), SysMonitorError> {
@@ -109,19 +112,39 @@ impl ProcessMonitor {
     }
 
     fn check_process_exist(&mut self) -> io::Result<bool> {
-        command_wait(self.monitor_command.clone(), self.stop_command.clone(), self.uid, self.get_process_check_timeout())
+        command_wait(
+            self.monitor_command.clone(),
+            self.stop_command.clone(),
+            self.uid,
+            self.get_process_check_timeout(),
+        )
     }
 
     fn process_recover(&self, timeout: u64) -> io::Result<bool> {
-        command_wait(self.recover_command.clone(), self.stop_command.clone(), self.uid, timeout)
+        command_wait(
+            self.recover_command.clone(),
+            self.stop_command.clone(),
+            self.uid,
+            timeout,
+        )
     }
 
     fn process_alarm(&mut self) -> io::Result<bool> {
-        command_wait(self.alarm_command.clone(), "".to_string(), self.uid, self.timeout)
+        command_wait(
+            self.alarm_command.clone(),
+            "".to_string(),
+            self.uid,
+            self.timeout,
+        )
     }
 
     fn process_alarm_recover(&mut self) -> io::Result<bool> {
-        command_wait(self.alarm_recover_command.clone(), "".to_string(), self.uid, self.timeout)
+        command_wait(
+            self.alarm_recover_command.clone(),
+            "".to_string(),
+            self.uid,
+            self.timeout,
+        )
     }
 }
 
@@ -136,8 +159,8 @@ fn command_wait(command: String, stop_command: String, uid: u32, timeout: u64) -
         }
     } else {
         return match child.wait() {
-            Ok(status) => { Ok(status.success()) }
-            Err(e) => { Err(e) }
+            Ok(status) => Ok(status.success()),
+            Err(e) => Err(e),
         };
     }
 

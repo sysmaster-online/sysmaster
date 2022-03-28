@@ -1,7 +1,7 @@
-use std::{cell::RefCell, rc::Rc, convert::TryFrom};
+use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
-use event::{Source, EventType, Events};
-use nix::{unistd::Pid, sys::signal::Signal};
+use event::{EventType, Events, Source};
+use nix::{sys::signal::Signal, unistd::Pid};
 
 use super::manager::Manager;
 
@@ -18,7 +18,6 @@ impl Signals {
         Signals { manager: m.clone() }
     }
 }
-
 
 impl Source for Signals {
     fn event_type(&self) -> EventType {
@@ -47,13 +46,15 @@ impl Source for Signals {
                         Signal::SIGCHLD => {
                             let mut m = self.manager.borrow_mut();
                             match m.dispatch_sigchld() {
-                                Err(e) => { log::error!("dispatch sigchld error: {}", e)},
+                                Err(e) => {
+                                    log::error!("dispatch sigchld error: {}", e)
+                                }
                                 Ok(_) => break,
                             }
-                        },
+                        }
                         Signal::SIGHUP => todo!(),
                         Signal::SIGINT => todo!(),
-                        
+
                         Signal::SIGKILL => todo!(),
                         Signal::SIGUSR1 => todo!(),
                         Signal::SIGUSR2 => todo!(),

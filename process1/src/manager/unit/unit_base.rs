@@ -1,9 +1,5 @@
-use nix::sys::signal::Signal;
 use crate::manager::data::*;
-
-
-
-
+use nix::sys::signal::Signal;
 
 #[derive(PartialEq, Debug, Eq)]
 pub enum UnitLoadState {
@@ -29,10 +25,10 @@ pub enum UnitState {
 }
 
 enum UnitNameFlags {
-    UnitNamePlain =1,
+    UnitNamePlain = 1,
     UnitNameInstance = 2,
     UnitNameTemplate = 4,
-    UnitNameAny = 1|2|4,
+    UnitNameAny = 1 | 2 | 4,
 }
 
 enum UnitFileState {
@@ -76,15 +72,15 @@ pub enum KillOperation {
 impl KillOperation {
     pub fn to_signal(&self) -> Signal {
         match *self {
-            KillOperation::KillTerminate | KillOperation::KillTerminateAndLog |
-                KillOperation::KillRestart => Signal::SIGTERM,
+            KillOperation::KillTerminate
+            | KillOperation::KillTerminateAndLog
+            | KillOperation::KillRestart => Signal::SIGTERM,
             KillOperation::KillKill => Signal::SIGKILL,
             KillOperation::KillWatchdog => Signal::SIGABRT,
             _ => Signal::SIGTERM,
         }
     }
 }
-
 
 // #[macro_export]
 // macro_rules! unit_name_to_type{
@@ -99,7 +95,7 @@ impl KillOperation {
 
 pub fn unit_name_to_type(unit_name: &str) -> UnitType {
     let words: Vec<&str> = unit_name.split(".").collect();
-    match words[words.len()-1] {
+    match words[words.len() - 1] {
         "service" => UnitType::UnitService,
         "target" => UnitType::UnitTarget,
         _ => UnitType::UnitTypeInvalid,
@@ -110,5 +106,5 @@ pub fn unit_name_to_type(unit_name: &str) -> UnitType {
 macro_rules! null_str {
     ($name:expr) => {
         String::from($name)
-    }
+    };
 }

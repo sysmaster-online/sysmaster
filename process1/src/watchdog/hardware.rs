@@ -5,10 +5,10 @@ use std::iter::FromIterator;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::time::{Duration, Instant};
 
-use nix::{ioctl_read, ioctl_readwrite, libc};
 use nix::errno::{errno, Errno};
 use nix::fcntl::open;
 use nix::libc::c_int;
+use nix::{ioctl_read, ioctl_readwrite, libc};
 
 pub trait Watchdog {
     fn config(self, timeout: Option<Duration>) -> io::Result<()>;
@@ -31,14 +31,38 @@ const WATCHDOG_SETTIMEOUT: u8 = 6;
 const WATCHDOG_GETTIMEOUT: u8 = 7;
 const WDIOS_DISABLECARD: i32 = 0x0001;
 const WDIOS_ENABLECARD: i32 = 0x0002;
-ioctl_read!(watchdog_setoptions,WATCHDOG_IOCTL_BASE,WATCHDOG_SETOPTIONS,i32);
-ioctl_read!(watchdog_keepalive,WATCHDOG_IOCTL_BASE,WATCHDOG_KEEPALIVE,i32);
-ioctl_readwrite!(watchdog_settimeout,WATCHDOG_IOCTL_BASE,WATCHDOG_SETTIMEOUT,i32);
-ioctl_read!(watchdog_gettimeout,WATCHDOG_IOCTL_BASE,WATCHDOG_GETTIMEOUT,i32);
+ioctl_read!(
+    watchdog_setoptions,
+    WATCHDOG_IOCTL_BASE,
+    WATCHDOG_SETOPTIONS,
+    i32
+);
+ioctl_read!(
+    watchdog_keepalive,
+    WATCHDOG_IOCTL_BASE,
+    WATCHDOG_KEEPALIVE,
+    i32
+);
+ioctl_readwrite!(
+    watchdog_settimeout,
+    WATCHDOG_IOCTL_BASE,
+    WATCHDOG_SETTIMEOUT,
+    i32
+);
+ioctl_read!(
+    watchdog_gettimeout,
+    WATCHDOG_IOCTL_BASE,
+    WATCHDOG_GETTIMEOUT,
+    i32
+);
 
 impl HardwareWatchdog {
     fn set_options(&mut self, enable: bool) -> io::Result<i32> {
-        let mut flag = if enable { WDIOS_ENABLECARD } else { WDIOS_DISABLECARD };
+        let mut flag = if enable {
+            WDIOS_ENABLECARD
+        } else {
+            WDIOS_DISABLECARD
+        };
         unsafe { watchdog_setoptions(self.fd()?, &mut flag as *mut i32).map_err(Error::from) }
     }
 
@@ -48,7 +72,11 @@ impl HardwareWatchdog {
 
     fn obtain_timeout(&mut self) -> io::Result<i32> {
         let mut sec = 0;
-        unsafe { watchdog_gettimeout(self.fd()?, &mut sec as *mut i32).map(|_| sec).map_err(Error::from) }
+        unsafe {
+            watchdog_gettimeout(self.fd()?, &mut sec as *mut i32)
+                .map(|_| sec)
+                .map_err(Error::from)
+        }
     }
 
     fn keepalive(&mut self) -> io::Result<i32> {
@@ -114,7 +142,7 @@ impl Watchdog for HardwareWatchdog {
         }
         if self.timeout.is_none() {
             match self.obtain_timeout() {
-                Ok(secs) => { self.timeout = Some(Duration::from_secs(secs as u64)) }
+                Ok(secs) => self.timeout = Some(Duration::from_secs(secs as u64)),
                 Err(err) => {
                     self.timeout = Some(Duration::default());
                     return Err(err);
@@ -149,7 +177,8 @@ fn errno_is_not_supported(errno: Errno) -> bool {
         Errno::EAFNOSUPPORT,
         Errno::EPFNOSUPPORT,
         Errno::EPROTONOSUPPORT,
-        Errno::ESOCKTNOSUPPORT] {
+        Errno::ESOCKTNOSUPPORT,
+    ] {
         if e == errno {
             return true;
         }
@@ -190,4 +219,3 @@ mod tests {
         let _ = watchdog.set_device("/dev/watchdog0".to_string());
     }
 }
-

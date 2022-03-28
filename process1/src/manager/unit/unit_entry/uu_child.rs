@@ -1,5 +1,4 @@
-use std::collections::{HashSet};
-
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct UeChild {
@@ -15,11 +14,11 @@ impl UeChild {
         }
     }
 
-    pub fn addPids(&mut self, pid:u64) -> bool{
+    pub fn addPids(&mut self, pid: u64) -> bool {
         self.pids.insert(pid)
     }
 
-    pub fn removePids(&mut self, pid:u64) -> bool{
+    pub fn removePids(&mut self, pid: u64) -> bool {
         self.pids.remove(&pid)
     }
 }

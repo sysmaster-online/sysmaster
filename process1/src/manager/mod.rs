@@ -1,8 +1,8 @@
+mod job;
 pub mod manager;
+pub mod signals;
 #[allow(dead_code)]
 pub mod unit;
-mod job;
-pub mod signals;
 
 #[allow(dead_code)]
 pub mod data;

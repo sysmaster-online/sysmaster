@@ -26,7 +26,6 @@ pub enum UnitRelations {
     UnitTriggeredBy,
 }
 
-
 pub enum UnitConfigItem {
     UcItemName(String),
     UcItemDesc(String),
@@ -43,7 +42,7 @@ pub struct UnitConfig {
 
 impl UnitConfig {
     pub fn new() -> UnitConfig {
-        UnitConfig  {
+        UnitConfig {
             name: String::from(""),
             deps: Vec::new(),
             desc: String::from(""),
@@ -51,4 +50,3 @@ impl UnitConfig {
         }
     }
 }
-

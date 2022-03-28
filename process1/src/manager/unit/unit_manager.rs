@@ -1,20 +1,20 @@
-use crate::manager::signals::ProcessExit;
-use std::cell::RefCell;
-use std::error::Error;
-use std::rc::Rc;
-use std::collections::{HashMap, VecDeque};
-use utils::path_lookup::LookupPaths;
-use crate::manager::data::*;
-use super::{UnitX, unit_name_to_type};
 use super::unit_new;
-use std::fs;
-use utils:: {time_util, path_lookup};
+use super::unit_sets::UnitSets;
+use super::{unit_name_to_type, UnitX};
+use crate::manager::data::*;
+use crate::manager::signals::ProcessExit;
 use nix::sys::signal::Signal;
 use nix::sys::wait::{WaitPidFlag, WaitStatus};
 use siphasher::sip::SipHasher24;
-use walkdir::{WalkDir};
+use std::cell::RefCell;
+use std::collections::{HashMap, VecDeque};
+use std::error::Error;
+use std::fs;
 use std::hash::Hasher;
-use super::unit_sets::{UnitSets};
+use std::rc::Rc;
+use utils::path_lookup::LookupPaths;
+use utils::{path_lookup, time_util};
+use walkdir::WalkDir;
 
 use nix::unistd::Pid;
 
@@ -24,7 +24,7 @@ use nix::unistd::Pid;
 
 #[derive(Debug)]
 pub struct UnitManager {
-    dm:Rc<DataManager>,
+    dm: Rc<DataManager>,
     pub units: UnitSets,
     unit_id_map: HashMap<String, String>,
     unit_name_map: HashMap<String, String>,
@@ -34,9 +34,8 @@ pub struct UnitManager {
     pub watch_pids: HashMap<Pid, Rc<RefCell<Rc<UnitX>>>>,
 }
 
-
-impl UnitManager{
-    pub fn new(dm:Rc<DataManager>) -> Self{
+impl UnitManager {
+    pub fn new(dm: Rc<DataManager>) -> Self {
         UnitManager {
             dm,
             units: UnitSets::new(),
@@ -50,7 +49,7 @@ impl UnitManager{
     }
 
     pub fn build_name_map(&mut self) -> bool {
-	    let mut timestamp_hash_new: u64 = 0;
+        let mut timestamp_hash_new: u64 = 0;
         if !self.lookup_paths_updated(&mut timestamp_hash_new) {
             return false;
         }
@@ -59,11 +58,8 @@ impl UnitManager{
             if !std::path::Path::new(&dir).exists() {
                 log::warn!("dir {} is not exist", dir);
                 continue;
-	        }
-            for entry in WalkDir::new(&dir)
-                .min_depth(1)
-	            .max_depth(1)
-                .into_iter() {
+            }
+            for entry in WalkDir::new(&dir).min_depth(1).max_depth(1).into_iter() {
                 let entry = entry.unwrap();
                 let filename = entry.file_name().to_str().unwrap().to_string();
                 let file_path = entry.path().to_str().unwrap().to_string();
@@ -73,16 +69,18 @@ impl UnitManager{
                 self.unit_id_map.insert(filename, file_path);
             }
         }
-	    self.last_updated_timestamp_hash = timestamp_hash_new;
+        self.last_updated_timestamp_hash = timestamp_hash_new;
         return true;
     }
 
     pub fn get_unit_file_path(&self, unit_name: &str) -> Option<&String> {
         match self.unit_id_map.get(unit_name) {
-            None => { return None; },
+            None => {
+                return None;
+            }
             Some(v) => {
                 return Some(v);
-            },
+            }
         }
     }
 
@@ -90,15 +88,15 @@ impl UnitManager{
         let updated: u64;
         let mut siphash24 = SipHasher24::new_with_keys(0, 0);
         for dir in &self.lookup_path.search_path {
-	        match fs::metadata(&dir) {
+            match fs::metadata(&dir) {
                 Ok(metadata) => match metadata.modified() {
                     Ok(time) => {
                         siphash24.write_u128(time_util::timespec_load(time));
-                    },
+                    }
                     _ => {
                         log::error!("failed to get mtime {}", dir);
-                    },
-                }
+                    }
+                },
                 Err(e) => {
                     log::error!("failed to get metadata of {}, err: {}", dir, e);
                 }
@@ -114,13 +112,12 @@ impl UnitManager{
         self.lookup_path.init_lookup_paths();
     }
 
-
     pub fn dispatch_load_queue(&mut self) {
         log::debug!("dispatch load queue");
 
         loop {
             match self.load_queue.pop_front() {
-                None => {break},
+                None => break,
                 Some(unit) => {
                     /*match unit.borrow_mut().load(self) {
                         Ok(()) => {continue},
@@ -141,9 +138,7 @@ impl UnitManager{
         self.load_queue.push_back(unit);
     }
 
-    
-    
-    fn prepare_unit(&mut self, name: &str) -> Option<Rc<RefCell<Rc<UnitX>>>> { 
+    fn prepare_unit(&mut self, name: &str) -> Option<Rc<RefCell<Rc<UnitX>>>> {
         let unit_type = unit_name_to_type(name);
         if unit_type == UnitType::UnitTypeInvalid {
             return None;
@@ -153,20 +148,19 @@ impl UnitManager{
             Ok(unit) => {
                 let u = Rc::new(RefCell::new(unit));
                 self.units.insert_unit(name.to_string(), u.clone());
-                return Some(u.clone())
-            },
+                return Some(u.clone());
+            }
             Err(_e) => {
-                log::error!("create unit obj failed {:?}",_e);
-                return None
+                log::error!("create unit obj failed {:?}", _e);
+                return None;
             }
         };
     }
 
     pub fn load_unit(&mut self, name: &str) -> Option<Rc<RefCell<Rc<UnitX>>>> {
-        
         if let Some(unit) = self.units.get_unit_on_name(name) {
-             return Some(unit);
-        }; 
+            return Some(unit);
+        };
 
         let unit = self.prepare_unit(name);
         let u = if let Some(u) = unit {
@@ -179,7 +173,7 @@ impl UnitManager{
         self.dispatch_load_queue();
         Some(u.clone())
     }
-    pub fn dispatch_sigchld(&mut self) ->  Result<(), Box<dyn Error>> {
+    pub fn dispatch_sigchld(&mut self) -> Result<(), Box<dyn Error>> {
         log::debug!("Dispatching sighandler waiting for pid");
         let wait_pid = Pid::from_raw(-1);
         let flags = WaitPidFlag::WNOHANG;
@@ -194,12 +188,12 @@ impl UnitManager{
                     }
                     _ => {
                         log::debug!("Ignored child signal: {:?}", wait_status);
-                        return Err(format!("Ignored child signal: {:?}", wait_status).into())
+                        return Err(format!("Ignored child signal: {:?}", wait_status).into());
                     }
                 },
                 Err(e) => {
                     log::error!("Error while waiting pid: {}", e);
-                    return Err(format!("Error while waiting pid: {}", e).into())
+                    return Err(format!("Error while waiting pid: {}", e).into());
                 }
             }
         };
@@ -212,8 +206,8 @@ impl UnitManager{
                     }
                     None => {
                         log::debug!("not found unit obj of pid: {:?}", pid);
-                        return Err(format!("not found unit obj of pid: {:?}", pid).into())
-                    },
+                        return Err(format!("not found unit obj of pid: {:?}", pid).into());
+                    }
                 }
 
                 self.watch_pids.remove(&pid);
@@ -230,21 +224,18 @@ impl UnitManager{
     pub fn unwatch_pid(&mut self, pid: Pid) {
         self.watch_pids.remove(&pid);
     }
-        
 }
-
-
 
 #[cfg(test)]
 mod tests {
     // use services::service::ServiceUnit;
 
     use super::*;
-    use utils::{logger};
+    use utils::logger;
 
     #[test]
-    fn  test_unit_load(){
-        logger::init_log_with_console("test",4);
+    fn test_unit_load() {
+        logger::init_log_with_console("test", 4);
         log::info!("test");
         let dm_manager = Rc::new(DataManager::new());
         let mut unit_manager = UnitManager::new(Rc::clone(&dm_manager));
@@ -259,11 +250,10 @@ mod tests {
             Some(_unit_obj) => println!("found unit obj {}", unit_name),
             None => println!("not fount unit: {}", unit_name),
         };
-
     }
 
     #[test]
-    fn  test_unit_start(){
+    fn test_unit_start() {
         let dm_manager = Rc::new(DataManager::new());
         let mut unit_manager = UnitManager::new(Rc::clone(&dm_manager));
         unit_manager.init_lookup_path();
@@ -276,5 +266,4 @@ mod tests {
             None => println!("not fount unit: {}", unit_name),
         };
     }
-
 }
