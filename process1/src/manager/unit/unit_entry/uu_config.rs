@@ -1,15 +1,15 @@
-use crate::manager::data::*;
+use crate::manager::data::{UnitConfigItem};
 use crate::null_str;
 
 #[derive(Debug)]
-pub struct UeConfig {
+pub(super) struct UeConfig {
     name: String,
     desc: String,
     documnetation: String,
 }
 
 impl UeConfig {
-    pub fn new() -> UeConfig {
+    pub(super) fn new() -> UeConfig {
         UeConfig {
             name: String::from(""),
             desc: String::from(""),
@@ -17,7 +17,7 @@ impl UeConfig {
         }
     }
 
-    pub fn set(&mut self, item: UnitConfigItem) {
+    pub(super) fn set(&mut self, item: UnitConfigItem) {
         match item {
             UnitConfigItem::UcItemName(name) => self.name = name,
             UnitConfigItem::UcItemDesc(desc) => self.desc = desc,
@@ -25,7 +25,7 @@ impl UeConfig {
         }
     }
 
-    pub fn get(&self, item: UnitConfigItem) -> UnitConfigItem {
+    pub(super) fn get(&self, item: UnitConfigItem) -> UnitConfigItem {
         match item {
             UnitConfigItem::UcItemName(_) => UnitConfigItem::UcItemName(self.name.clone()),
             UnitConfigItem::UcItemDesc(_) => UnitConfigItem::UcItemDesc(self.desc.clone()),

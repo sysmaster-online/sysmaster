@@ -1,4 +1,4 @@
-use crate::manager::data::*;
+use crate::manager::data::{UnitRelations, UnitType, UnitConfig, DataManager};
 use crate::manager::unit::unit_base::{self, UnitLoadState};
 use crate::manager::unit::unit_manager::UnitManager;
 use std::cell::RefCell;
@@ -11,7 +11,7 @@ use utils::{time_util, unit_config_parser};
 use crate::null_str;
 
 #[derive(Debug)]
-pub struct UeLoad {
+pub(super) struct UeLoad {
     dm: Rc<DataManager>,
 
     // key
@@ -27,7 +27,7 @@ pub struct UeLoad {
 }
 
 impl UeLoad {
-    pub fn new(dm: Rc<DataManager>, id: String) -> UeLoad {
+    pub(super) fn new(dm: Rc<DataManager>, id: String) -> UeLoad {
         UeLoad {
             dm,
             id,
@@ -40,20 +40,20 @@ impl UeLoad {
         }
     }
 
-    pub fn set_load_state(&mut self, load_state: UnitLoadState) {
+    pub(super) fn set_load_state(&mut self, load_state: UnitLoadState) {
         *self.load_state.borrow_mut() = load_state;
     }
 
-    pub fn set_In_load_queue(&self, t: bool) {
+    pub(super) fn set_In_load_queue(&self, t: bool) {
         *self.in_load_queue.borrow_mut() = t;
     }
 
-    pub fn setConfig_file_path(&self, configFilePath: &str) {
+    pub(super) fn setConfig_file_path(&self, configFilePath: &str) {
         self.config_file_path.borrow_mut().clear();
         self.config_file_path.borrow_mut().push_str(configFilePath);
     }
 
-    pub fn get_conf(&self) -> Option<Rc<unit_config_parser::Conf>> {
+    pub(super) fn get_conf(&self) -> Option<Rc<unit_config_parser::Conf>> {
         self.conf.borrow().as_ref().cloned()
     }
 
@@ -98,7 +98,7 @@ impl UeLoad {
         }
     }
 
-    pub fn unit_load(&self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
+    pub(super) fn unit_load(&self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
         *self.in_load_queue.borrow_mut() = false;
         self.build_name_map(m);
 
@@ -111,7 +111,7 @@ impl UeLoad {
         }
 
         match self.unit_config_load() {
-            Ok(conf) => {
+            Ok(_conf) => {
                 self.parse(m);
             }
             Err(e) => {
@@ -121,7 +121,7 @@ impl UeLoad {
         return Ok(());
     }
 
-    pub fn in_load_queue(&self) -> bool {
+    pub(super) fn in_load_queue(&self) -> bool {
         *self.in_load_queue.borrow_mut() == true
     }
 
@@ -156,7 +156,7 @@ impl UeLoad {
         if unit_type == UnitType::UnitTypeInvalid {
             return Err(format!("invalid unit type of unit {}", unit_name).into());
         }
-        let other = if let Some(_unit) = m.units.get_unit_on_name(unit_name) {
+        let other = if let Some(_unit) = m.units_get(unit_name) {
             return Ok(());
         } else {
             let unit =
@@ -164,17 +164,16 @@ impl UeLoad {
                     Ok(u) => u,
                     Err(e) => return Err(e),
                 };
-            let u = Rc::new(RefCell::new(unit));
-            m.push_load_queue(u.clone());
-            u
+            m.push_load_queue(Rc::clone(&unit));
+            unit
         };
 
-        m.units.insert_unit(unit_name.to_string(), other.clone());
+        m.units_insert(unit_name.to_string(), other.clone());
         u_config.deps.push((relation, String::from(unit_name)));
         Ok(())
     }
 
-    pub fn parse(&self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
+    pub(super) fn parse(&self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
         let mut u_config = UnitConfig::new();
 
         // impl ugly

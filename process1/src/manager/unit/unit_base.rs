@@ -1,4 +1,4 @@
-use crate::manager::data::*;
+use crate::manager::data::{UnitType};
 use nix::sys::signal::Signal;
 
 #[derive(PartialEq, Debug, Eq)]
@@ -93,7 +93,7 @@ impl KillOperation {
 //     };
 // }
 
-pub fn unit_name_to_type(unit_name: &str) -> UnitType {
+pub(super) fn unit_name_to_type(unit_name: &str) -> UnitType {
     let words: Vec<&str> = unit_name.split(".").collect();
     match words[words.len() - 1] {
         "service" => UnitType::UnitService,

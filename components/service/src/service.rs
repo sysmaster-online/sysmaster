@@ -1,5 +1,4 @@
-use process1::manager::unit::unit_manager::UnitManager;
-use process1::manager::unit::{KillOperation, Unit, UnitActiveState, UnitObj};
+use process1::manager::{KillOperation, Unit, UnitActiveState, UnitObj, UnitManager};
 use process1::watchdog;
 use std::any::{Any, TypeId};
 use std::collections::hash_map::DefaultHasher;
@@ -378,7 +377,7 @@ impl ServiceUnit {
                     Err(_e) => {
                         log::error!(
                             "failed to start service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().id.clone()
+                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
                         );
                     }
                 }
@@ -397,7 +396,7 @@ impl ServiceUnit {
                     Err(_e) => {
                         log::error!(
                             "failed to run main command: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().id.clone()
+                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
                         );
                     }
                 }
@@ -441,7 +440,7 @@ impl ServiceUnit {
                     Err(_e) => {
                         log::error!(
                             "failed to start service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().id.clone()
+                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
                         );
                         self.send_signal(
                             m,
@@ -473,7 +472,7 @@ impl ServiceUnit {
                     Err(_e) => {
                         log::error!(
                             "Failed to run start post service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().id.clone()
+                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
                         );
                     }
                 }
@@ -560,7 +559,7 @@ impl ServiceUnit {
                     Err(_e) => {
                         log::error!(
                             "Failed to run stop service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().id.clone()
+                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
                         );
                     }
                 }
@@ -599,7 +598,7 @@ impl ServiceUnit {
                         );
                         log::error!(
                             "Failed to run stop service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().id.clone()
+                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
                         );
                     }
                 }
@@ -646,7 +645,7 @@ impl ServiceUnit {
                     Err(_e) => {
                         log::error!(
                             "failed to start service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().id.clone()
+                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
                         );
                         self.enter_running(m, ServiceResult::ServiceSuccess);
                     }
@@ -847,8 +846,7 @@ impl UnitObj for ServiceUnit {
             .as_ref()
             .cloned()
             .unwrap()
-            .load
-            .unit_load(m);
+            .load_unit(m);
 
         self.parse(m)?;
 
@@ -930,7 +928,7 @@ impl UnitObj for ServiceUnit {
     fn hash(&self) -> u64 {
         let mut h = DefaultHasher::new();
         Hash::hash(&(TypeId::of::<ServiceUnit>()), &mut h);
-        h.write(self.unit.upgrade().as_ref().cloned().unwrap().id.as_bytes());
+        h.write(self.unit.upgrade().as_ref().cloned().unwrap().get_id().as_bytes());
         h.finish()
     }
 
@@ -944,8 +942,7 @@ impl UnitObj for ServiceUnit {
             .as_ref()
             .cloned()
             .unwrap()
-            .load
-            .in_load_queue()
+            .load_in_queue()
     }
 }
 
@@ -959,16 +956,14 @@ impl ServiceUnit {
             .as_ref()
             .cloned()
             .unwrap()
-            .load
-            .parse(manager)?;
+            .load_parse(manager)?;
         let conf = self
             .unit
             .upgrade()
             .as_ref()
             .cloned()
             .unwrap()
-            .load
-            .get_conf()
+            .load_get_conf()
             .as_ref()
             .ok_or_else(|| IOError::new(ErrorKind::Other, "config file not loaded"))?
             .clone();

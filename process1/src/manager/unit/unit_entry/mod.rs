@@ -1,12 +1,11 @@
-pub use u_entry::*;
-pub use uf_interface::*;
+pub use u_entry::{Unit, UnitObj};
+pub use uf_interface::{UnitX};
 
 // util
 mod uu_load;
 
 mod uu_child;
 mod uu_config;
-mod uu_dep;
 
 // entry
 mod u_entry;
