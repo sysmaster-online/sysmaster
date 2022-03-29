@@ -1,4 +1,4 @@
-use crate::manager::data::{UnitRelations, UnitType, UnitConfig, DataManager};
+use crate::manager::data::{DataManager, UnitConfig, UnitRelations, UnitType};
 use crate::manager::unit::unit_base::{self, UnitLoadState};
 use crate::manager::unit::unit_manager::UnitManager;
 use std::cell::RefCell;
@@ -10,10 +10,12 @@ use utils::{time_util, unit_config_parser};
 
 use crate::null_str;
 
+use super::UnitDb;
+
 #[derive(Debug)]
 pub(super) struct UeLoad {
     dm: Rc<DataManager>,
-
+    unitdb: Rc<UnitDb>,
     // key
     id: String,
 
@@ -27,9 +29,10 @@ pub(super) struct UeLoad {
 }
 
 impl UeLoad {
-    pub(super) fn new(dm: Rc<DataManager>, id: String) -> UeLoad {
+    pub(super) fn new(dm: Rc<DataManager>, unitdb: Rc<UnitDb>, id: String) -> UeLoad {
         UeLoad {
             dm,
+            unitdb,
             id,
             load_state: RefCell::new(UnitLoadState::UnitStub),
             config_file_path: RefCell::new(null_str!("")),
@@ -156,24 +159,26 @@ impl UeLoad {
         if unit_type == UnitType::UnitTypeInvalid {
             return Err(format!("invalid unit type of unit {}", unit_name).into());
         }
-        let other = if let Some(_unit) = m.units_get(unit_name) {
+        if let Some(_unit) = m.unitdb.get_unit_by_name(&unit_name.to_string()) {
             return Ok(());
         } else {
-            let unit =
-                match crate::manager::unit::unit_new(Rc::clone(&self.dm), unit_type, unit_name) {
-                    Ok(u) => u,
-                    Err(e) => return Err(e),
-                };
+            let unit = match crate::manager::unit::unit_new(
+                Rc::clone(&self.dm),
+                Rc::clone(&self.unitdb),
+                unit_type,
+                unit_name,
+            ) {
+                Ok(u) => u,
+                Err(e) => return Err(e),
+            };
             m.push_load_queue(Rc::clone(&unit));
-            unit
+            m.unitdb.insert_unit(unit_name.to_string(), unit);
         };
-
-        m.units_insert(unit_name.to_string(), other.clone());
         u_config.deps.push((relation, String::from(unit_name)));
         Ok(())
     }
 
-    pub(super) fn parse(&self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
+    pub fn parse(&self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
         let mut u_config = UnitConfig::new();
 
         // impl ugly

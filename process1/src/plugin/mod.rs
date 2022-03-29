@@ -1,4 +1,4 @@
-use super::manager::{UnitType, UnitObj};
+use super::manager::{UnitObj, UnitType};
 use dynamic_reload as dy_re;
 use log::*;
 use std::ffi::OsStr;
@@ -155,10 +155,7 @@ impl Plugin {
         }
     }
 
-    pub fn create_unit_obj(
-        &self,
-        unit_type: UnitType,
-    ) -> Result<Box<dyn UnitObj>, Box<dyn Error>> {
+    pub fn create_unit_obj(&self, unit_type: UnitType) -> Result<Box<dyn UnitObj>, Box<dyn Error>> {
         let dy_lib = match self.load_libs.get(&unit_type) {
             Some(lib) => lib.clone(),
             None => return Err(format!("the {:?} plugin is not exist", unit_type).into()),

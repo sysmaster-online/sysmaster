@@ -1,4 +1,4 @@
-use crate::manager::data::{UnitConfigItem};
+use crate::manager::data::UnitConfigItem;
 use crate::null_str;
 
 #[derive(Debug)]

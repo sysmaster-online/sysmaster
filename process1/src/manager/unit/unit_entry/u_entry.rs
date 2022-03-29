@@ -1,26 +1,27 @@
 extern crate siphasher;
 
+use super::unit_datastore::UnitDb;
 use super::uu_child::UeChild;
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
-use crate::manager::data::{UnitType, UnitRelations, DataManager};
-use crate::manager::unit::unit_base::{UnitActiveState};
-use crate::manager::unit::unit_manager::{UnitManager};
-use utils:: {unit_config_parser};
+use crate::manager::data::{DataManager, UnitRelations, UnitType};
+use crate::manager::unit::unit_base::UnitActiveState;
+use crate::manager::unit::unit_manager::UnitManager;
+use log;
+use nix::sys::signal::Signal;
+use nix::unistd::Pid;
 use std::any::Any;
 use std::cell::RefCell;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
-
-use log;
-use nix::sys::signal::Signal;
-use nix::unistd::Pid;
+use utils::unit_config_parser;
 
 #[derive(Debug)]
 pub struct Unit {
     unit_type: UnitType,
     id: String,
+    unit_db: Rc<UnitDb>,
     config: UeConfig,
     load: UeLoad,
     child: UeChild,
@@ -128,6 +129,7 @@ impl Unit {
 
     pub(super) fn new(
         dm: Rc<DataManager>,
+        unit_db: Rc<UnitDb>,
         unit_type: UnitType,
         name: &str,
         sub: Box<dyn UnitObj>,
@@ -135,8 +137,9 @@ impl Unit {
         Unit {
             unit_type,
             id: String::from(name),
+            unit_db: Rc::clone(&unit_db),
             config: UeConfig::new(),
-            load: UeLoad::new(Rc::clone(&dm), String::from(name)),
+            load: UeLoad::new(Rc::clone(&dm), Rc::clone(&unit_db), String::from(name)),
             child: UeChild::new(),
             sub,
         }
