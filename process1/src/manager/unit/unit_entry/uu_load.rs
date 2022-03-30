@@ -1,5 +1,6 @@
 use crate::manager::data::{DataManager, UnitConfig, UnitRelations, UnitType};
 use crate::manager::unit::unit_base::{self, UnitLoadState};
+use crate::manager::unit::unit_datastore::UnitDb;
 use crate::manager::unit::unit_manager::UnitManager;
 use std::cell::RefCell;
 use std::error::Error;
@@ -9,8 +10,6 @@ use std::rc::Rc;
 use utils::{time_util, unit_config_parser};
 
 use crate::null_str;
-
-use super::UnitDb;
 
 #[derive(Debug)]
 pub(super) struct UeLoad {
@@ -47,13 +46,13 @@ impl UeLoad {
         *self.load_state.borrow_mut() = load_state;
     }
 
-    pub(super) fn set_In_load_queue(&self, t: bool) {
+    pub(super) fn set_in_load_queue(&self, t: bool) {
         *self.in_load_queue.borrow_mut() = t;
     }
 
-    pub(super) fn setConfig_file_path(&self, configFilePath: &str) {
+    pub(super) fn set_config_file_path(&self, config_filepath: &str) {
         self.config_file_path.borrow_mut().clear();
-        self.config_file_path.borrow_mut().push_str(configFilePath);
+        self.config_file_path.borrow_mut().push_str(config_filepath);
     }
 
     pub(super) fn get_conf(&self) -> Option<Rc<unit_config_parser::Conf>> {
@@ -106,7 +105,7 @@ impl UeLoad {
         self.build_name_map(m);
 
         if let Some(p) = self.get_unit_file_path(m) {
-            self.setConfig_file_path(&p);
+            self.set_config_file_path(&p);
         }
 
         if self.config_file_path.borrow().is_empty() {
@@ -115,7 +114,7 @@ impl UeLoad {
 
         match self.unit_config_load() {
             Ok(_conf) => {
-                self.parse(m);
+                self.parse(m)?;
             }
             Err(e) => {
                 return Err(e);
@@ -178,7 +177,7 @@ impl UeLoad {
         Ok(())
     }
 
-    pub fn parse(&self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
+    pub(super) fn parse(&self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
         let mut u_config = UnitConfig::new();
 
         // impl ugly

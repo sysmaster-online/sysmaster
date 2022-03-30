@@ -145,7 +145,7 @@ impl Default for ServiceState {
 impl ServiceState {
     fn to_unit_active_state(&self) -> UnitActiveState {
         match *self {
-            ServiceState::ServiceDead => UnitActiveState::UnitInactive,
+            ServiceState::ServiceDead => UnitActiveState::UnitInActive,
             ServiceState::ServiceCondition
             | ServiceState::ServiceStartPre
             | ServiceState::ServiceStart
@@ -162,7 +162,7 @@ impl ServiceState {
             | ServiceState::ServiceStateMax
             | ServiceState::ServiceFinalSigterm
             | ServiceState::ServiceFinalSigkill
-            | ServiceState::ServiceFinalWatchdog => UnitActiveState::UnitDeactiviting,
+            | ServiceState::ServiceFinalWatchdog => UnitActiveState::UnitDeActivating,
             ServiceState::ServiceFailed => UnitActiveState::UnitFailed,
         }
     }

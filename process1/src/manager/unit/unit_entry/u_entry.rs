@@ -1,17 +1,18 @@
 extern crate siphasher;
 
-use super::unit_datastore::UnitDb;
 use super::uu_child::UeChild;
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use crate::manager::data::{DataManager, UnitRelations, UnitType};
 use crate::manager::unit::unit_base::UnitActiveState;
+use crate::manager::unit::unit_datastore::UnitDb;
 use crate::manager::unit::unit_manager::UnitManager;
 use log;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::any::Any;
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
@@ -35,6 +36,18 @@ impl PartialEq for Unit {
 }
 
 impl Eq for Unit {}
+
+impl PartialOrd for Unit {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Unit {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id.cmp(&other.id)
+    }
+}
 
 impl Hash for Unit {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -115,7 +128,7 @@ impl Unit {
 
         let unitx = manager.units_get(&self.id).unwrap();
         for other in manager.dep_get(&unitx, UnitRelations::UnitTriggeredBy) {
-            other.trigger(Rc::clone(&unitx));
+            other.trigger(&unitx);
         }
     }
 

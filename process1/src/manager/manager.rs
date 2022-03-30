@@ -55,19 +55,19 @@ impl Manager {
         Ok(())
     }
 
-    pub fn get_job(&self, id: JobId) -> Result<(), Error> {
+    pub fn get_job(&self, _id: JobId) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn get_unit(&self, name: &str) -> Result<(), Error> {
+    pub fn get_unit(&self, _name: &str) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn load_unit(&self, name: &str) -> Result<(), Error> {
+    pub fn load_unit(&self, _name: &str) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn add_job(&mut self, job: JobId) -> Result<(), Error> {
+    pub fn add_job(&mut self, _job: JobId) -> Result<(), Error> {
         Ok(())
     }
 
@@ -175,7 +175,7 @@ impl MangerLoader {
 mod tests {
     // use crate::manager::service::ServiceUnit;
 
-    use super::*;
+    // use super::*;
 
     #[test]
     fn test_mangerplugin() {}

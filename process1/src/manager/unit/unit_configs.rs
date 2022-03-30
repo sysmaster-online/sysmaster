@@ -65,12 +65,15 @@ impl UnitConfigsSub {
 
         // dependency
         for (relation, name) in config.deps.iter() {
-            self.dep.insert(
+            if let Err(_e) = self.dep.insert(
                 Rc::clone(&unitx),
                 *relation,
                 self.units.get(name).unwrap(),
+                true,
                 0,
-            );
+            ) {
+                // debug
+            }
         }
     }
 

@@ -26,6 +26,10 @@ impl UnitSets {
     pub(super) fn get(&self, name: &str) -> Option<Rc<UnitX>> {
         self.data.borrow().get(name)
     }
+
+    pub(super) fn get_all(&self) -> Vec<Rc<UnitX>> {
+        self.data.borrow().get_all()
+    }
 }
 
 #[derive(Debug)]
@@ -49,5 +53,12 @@ impl UnitSetsData {
 
     pub(self) fn get(&self, name: &str) -> Option<Rc<UnitX>> {
         self.t.get(name).cloned()
+    }
+
+    pub(self) fn get_all(&self) -> Vec<Rc<UnitX>> {
+        self.t
+            .iter()
+            .map(|(_, ur)| Rc::clone(ur))
+            .collect::<Vec<_>>()
     }
 }
