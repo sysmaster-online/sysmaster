@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package abi;
+
+// 来自客户端的命令请求
+message CommandRequest {
+  oneof request_data {
+    //unit lifecycle
+    UnitComm ucomm = 1;
+    //unit file commands
+    UnitFile ufile = 2;
+    //job管理
+    JobComm jcomm = 3;
+    //manager commands
+    MngrComm mcomm = 4;
+    //system commands, reboot/shutdown/halt
+    SysComm  syscomm = 5;
+  }
+}
+
+// 服务端的响应
+message CommandResponse {
+  // 状态码；复用 HTTP 2xx/4xx/5xx 状态码
+  uint32 status = 1;
+  // 如果不是 2xx，message 里包含详细的信息
+  string message = 2;
+}
+
+message UnitComm {
+  enum Action {
+    STATUS = 0;
+    START = 1;
+    STOP = 2;
+    RESTART = 3;
+    RELOAD = 4;
+    KILL = 5;
+  }
+  Action action = 1;
+  string unitname = 2;
+}
+
+message UnitFile {
+  enum Action {
+    CAT = 0;
+    ENABLE = 1;
+    DISABLE = 2;
+    MASK = 3;
+    GETDEF = 4;
+    SETDEF = 5;
+  }
+  Action action = 1;
+  string unitname = 2;
+}
+
+message JobComm {
+  enum Action {
+    LIST = 0;
+    CANCEL = 1;
+  }
+  Action action = 1;
+  string JobId = 2;
+}
+
+message MngrComm {
+  enum Action {
+    RELOAD = 0;
+    REEXEC = 1;
+  }
+  Action action = 1;
+}
+
+message SysComm {
+  enum Action {
+    REBOOT = 0;
+    SHUTDOWN = 1;
+    HALT = 2;
+    SUSPEND = 3;
+    POWEROFF = 4;
+    HIBERNATE = 5;
+  }
+  Action action = 1;
+  string unitname = 2;
+}

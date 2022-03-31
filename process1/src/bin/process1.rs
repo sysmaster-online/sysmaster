@@ -1,5 +1,6 @@
 use event::{Events, Source};
 use log::info;
+use process1::manager::commands::Commands;
 use process1::manager::manager::{Action, Manager, Mode, Stats};
 use process1::manager::signals::Signals;
 use std::{cell::RefCell, io::Error, rc::Rc};
@@ -19,19 +20,21 @@ fn main() -> Result<(), Error> {
     m.add_job(0).unwrap();
 
     let mut event = Events::new().unwrap();
-    let source: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Signals::new(manager.clone())));
+    let signal: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Signals::new(manager.clone())));
+    let command: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Commands::new(manager.clone())));
 
-    event.add_source(source.clone());
+    event.add_source(signal.clone());
+    event.add_source(command.clone());
 
     loop {
-        event.run(0);
+        event.run(-1);
         match m.state() {
-            Ok(Stats::REEXECUTE) => m.reexec(),
+            Ok(Stats::REEXECUTE) => m.reexec()?,
             Ok(_) => todo!(),
             Err(_) => todo!(),
         };
     }
 
-    info!("process1 shutdown.");
+    #[allow(unreachable_code)]
     Ok(())
 }

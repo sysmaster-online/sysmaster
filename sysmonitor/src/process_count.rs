@@ -107,9 +107,9 @@ impl Monitor for ProcessCount {
             (pid_max as f32 * self.resume_ratio / 100.0) as u32,
         );
         //  self.count = proc_num;
-        if proc_num >= real_alarm && !self.status {
-        } else if proc_num <= real_resume && self.status {
-        }
+        // if proc_num >= real_alarm && !self.status {
+        // } else if proc_num <= real_resume && self.status {
+        // }
 
         return Ok(());
     }

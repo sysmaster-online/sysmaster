@@ -15,7 +15,7 @@ pub struct Signals {
 
 impl Signals {
     pub fn new(m: Rc<RefCell<Manager>>) -> Signals {
-        Signals { manager: m.clone() }
+        Signals { manager: m }
     }
 }
 
