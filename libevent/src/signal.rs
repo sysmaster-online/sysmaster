@@ -81,7 +81,7 @@ impl Signals {
 
     pub fn restore_sigset(&mut self) {
         unsafe {
-            libc::pthread_sigmask(libc::SIG_SETMASK, &mut self.oldset.sigset, null_mut());
+            libc::pthread_sigmask(libc::SIG_SETMASK, &self.oldset.sigset, null_mut());
             libc::close(self.fd as libc::c_int);
         }
     }

@@ -12,8 +12,8 @@ use nix::sys::wait::waitpid;
 use nix::unistd::{fork, ForkResult, Pid};
 use signal_hook_registry::register_sigaction;
 
-const PROCESS1_PATH: &'static str = "/usr/lib/process1/process1";
-const SYSTEMD_PATH: &'static str = "/usr/lib/systemd/systemd";
+const PROCESS1_PATH: &str = "/usr/lib/process1/process1";
+const SYSTEMD_PATH: &str = "/usr/lib/systemd/systemd";
 const TIME_INTERVAL: Duration = Duration::from_secs(10);
 const FAIL_COUNT: usize = 3;
 const SELF_CODE_OFFSET: i32 = 14;
@@ -58,7 +58,7 @@ fn detect_init() -> String {
     String::new()
 }
 
-fn execute_mode(s: &String) -> Result<(), Error> {
+fn execute_mode(s: &str) -> Result<(), Error> {
     let mut fail_record: VecDeque<Instant> = VecDeque::with_capacity(FAIL_COUNT);
     let mut child = create_init(s);
     loop {
@@ -93,7 +93,7 @@ fn execute_mode(s: &String) -> Result<(), Error> {
     Ok(())
 }
 
-fn create_init(s: &String) -> Pid {
+fn create_init(s: &str) -> Pid {
     println!("Running to execute command : {:?}", s);
     if let Ok(ForkResult::Parent { child, .. }) = unsafe { fork() } {
         child
@@ -107,10 +107,10 @@ fn create_init(s: &String) -> Pid {
 
 fn need_exit(fail_record: &mut VecDeque<Instant>) -> bool {
     fail_record.push_back(Instant::now());
-    if fail_record.len() == FAIL_COUNT {
-        if fail_record.pop_front().unwrap().elapsed() <= TIME_INTERVAL {
-            return true;
-        }
+    if fail_record.len() == FAIL_COUNT
+        && fail_record.pop_front().unwrap().elapsed() <= TIME_INTERVAL
+    {
+        return true;
     }
     false
 }

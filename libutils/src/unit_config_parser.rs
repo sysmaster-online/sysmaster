@@ -114,7 +114,7 @@ pub fn unit_file_load(file_path: String) -> Result<Conf, Error> {
         }
     };
 
-    return Ok(conf);
+    Ok(conf)
 }
 
 #[cfg(test)]

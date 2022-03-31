@@ -123,6 +123,7 @@ impl Events {
     /// And add the corresponding events to the pengding queue
     fn wait(&mut self, timeout: i32) -> bool {
         let events = {
+            #[allow(clippy::never_loop)]
             loop {
                 let result = self.poller.poll(timeout);
 
@@ -136,7 +137,7 @@ impl Events {
         for event in events.iter() {
             #[allow(unaligned_references)]
             let token = &event.u64;
-            let s = self.sources.get(&token).unwrap();
+            let s = self.sources.get(token).unwrap();
             self.pending.push(s.clone());
         }
 
@@ -204,7 +205,7 @@ impl Events {
 
     /// Scheduling once, processing an event
     pub fn run(&mut self, timeout: i32) {
-        if self.exit == true {
+        if self.exit {
             return;
         }
         if self.prepare() {
@@ -216,7 +217,7 @@ impl Events {
     /// Process the event in a loop until exiting actively
     pub fn rloop(&mut self) {
         loop {
-            if self.exit == true {
+            if self.exit {
                 return;
             }
             self.run(-1i32);

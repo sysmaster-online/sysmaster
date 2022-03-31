@@ -41,15 +41,14 @@ pub fn init_log_with_console(app_name: &str, log_level: u32) {
         .build();
     let logging_builder =
         Config::builder().appender(Appender::builder().build("console", Box::new(stdout)));
-    let l_level;
-    match log_level {
-        0 => l_level = LevelFilter::Error,
-        1 => l_level = LevelFilter::Warn,
-        2 => l_level = LevelFilter::Info,
-        3 => l_level = LevelFilter::Debug,
-        4 => l_level = LevelFilter::Trace,
-        _ => l_level = LevelFilter::Info,
-    }
+    let l_level = match log_level {
+        0 => LevelFilter::Error,
+        1 => LevelFilter::Warn,
+        2 => LevelFilter::Info,
+        3 => LevelFilter::Debug,
+        4 => LevelFilter::Trace,
+        _ => LevelFilter::Info,
+    };
 
     let config = match Some(app_name) {
         Some(a_p) => logging_builder
