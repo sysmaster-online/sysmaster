@@ -3,13 +3,8 @@ use std::{collections::HashMap, process::exit};
 use super::exec_child;
 use super::service::{CmdError, CommandLine, ServiceUnit};
 use nix::unistd::Pid;
-use process1::manager::UnitManager;
 
-pub fn start_service(
-    srvc: &mut ServiceUnit,
-    manager: &mut UnitManager,
-    cmdline: &CommandLine,
-) -> Result<Pid, CmdError> {
+pub fn start_service(srvc: &mut ServiceUnit, cmdline: &CommandLine) -> Result<Pid, CmdError> {
     let mut env = HashMap::new();
 
     if let Some(pid) = srvc.main_pid {
@@ -19,10 +14,26 @@ pub fn start_service(
     unsafe {
         match nix::unistd::fork() {
             Ok(nix::unistd::ForkResult::Parent { child }) => {
-                manager.add_watch_pid(
-                    child,
-                    &srvc.unit.upgrade().as_ref().cloned().unwrap().get_id(),
-                );
+                srvc.um
+                    .as_ref()
+                    .cloned()
+                    .unwrap()
+                    .upgrade()
+                    .as_ref()
+                    .cloned()
+                    .unwrap()
+                    .child_watch_pid(
+                        child,
+                        srvc.unit
+                            .as_ref()
+                            .cloned()
+                            .unwrap()
+                            .upgrade()
+                            .as_ref()
+                            .cloned()
+                            .unwrap()
+                            .get_id(),
+                    );
                 return Ok(child);
             }
             Ok(nix::unistd::ForkResult::Child) => {

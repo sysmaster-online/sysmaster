@@ -1,4 +1,4 @@
-use super::unit_entry::UnitX;
+use crate::manager::unit::unit_entry::UnitX;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;

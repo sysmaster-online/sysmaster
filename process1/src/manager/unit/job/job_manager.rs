@@ -6,12 +6,10 @@ use super::job_stat::JobStat;
 use super::job_table::JobTable;
 use super::job_transaction::{self};
 use super::JobErrno;
-use crate::manager::data::{JobMode, UnitConfigItem};
-use crate::manager::unit::unit_base::{UnitActiveState, UnitNotifyFlags};
-use crate::manager::unit::unit_dep::UnitDep;
+use crate::manager::data::{JobMode, UnitActiveState, UnitConfigItem, UnitNotifyFlags};
+use crate::manager::unit::unit_datastore::UnitDb;
 use crate::manager::unit::unit_entry::UnitX;
 use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
-use crate::manager::unit::unit_sets::UnitSets;
 use std::rc::Rc;
 
 pub struct JobAffect {
@@ -45,10 +43,10 @@ impl JobAffect {
     }
 }
 
+#[derive(Debug)]
 pub struct JobManager {
     // associated objects
-    units: Rc<UnitSets>,
-    dep: Rc<UnitDep>,
+    db: Rc<UnitDb>,
 
     // control
     ja: JobAlloc,
@@ -78,15 +76,8 @@ impl JobManager {
         self.stage.clear(); // clear stage first: make rollback simple
 
         // build changes in stage
-        job_transaction::job_trans_expand(&mut self.stage, &mut self.ja, &self.dep, config, mode)?;
-        job_transaction::job_trans_affect(
-            &mut self.stage,
-            &mut self.ja,
-            &self.units,
-            &self.dep,
-            config,
-            mode,
-        )?;
+        job_transaction::job_trans_expand(&mut self.stage, &mut self.ja, &self.db, config, mode)?;
+        job_transaction::job_trans_affect(&mut self.stage, &mut self.ja, &self.db, config, mode)?;
         job_transaction::job_trans_verify(&mut self.stage, &self.jobs, mode)?;
 
         // commit stage to jobs
@@ -122,10 +113,9 @@ impl JobManager {
         Ok(())
     }
 
-    pub(in crate::manager::unit) fn new(units: Rc<UnitSets>, dep: Rc<UnitDep>) -> JobManager {
+    pub(in crate::manager::unit) fn new(db: Rc<UnitDb>) -> JobManager {
         JobManager {
-            units,
-            dep,
+            db,
 
             ja: JobAlloc::new(),
 
@@ -144,7 +134,7 @@ impl JobManager {
             // try to trigger something to run
             self.text = None; // reset every time
             self.running = true;
-            let trigger_ret = self.jobs.try_trigger(&self.dep);
+            let trigger_ret = self.jobs.try_trigger(&self.db);
             self.running = false;
 
             if let Some((trigger_info, merge_trigger)) = trigger_ret {
@@ -284,14 +274,14 @@ impl JobManager {
 
     fn del_trigger(&mut self, job_info: &JobInfo, result: JobResult) {
         // delete itself
-        let del_trigger = self.jobs.finish_trigger(&self.dep, &job_info.unit, result);
+        let del_trigger = self.jobs.finish_trigger(&self.db, &job_info.unit, result);
 
         // remove relational jobs on failure
         let remove_jobs = match result {
             JobResult::JobDone => Vec::new(),
             _ => job_transaction::job_trans_fallback(
                 &mut self.jobs,
-                &self.dep,
+                &self.db,
                 &job_info.unit,
                 job_info.run_kind,
             ),
@@ -312,7 +302,7 @@ impl JobManager {
 
         // delete itself
         del_jobs.append(&mut self.jobs.remove_suspends(
-            &self.dep,
+            &self.db,
             &job_info.unit,
             job_info.kind,
             None,
@@ -323,7 +313,7 @@ impl JobManager {
         if result != JobResult::JobDone {
             del_jobs.append(&mut job_transaction::job_trans_fallback(
                 &mut self.jobs,
-                &self.dep,
+                &self.db,
                 &job_info.unit,
                 job_info.run_kind,
             ));
@@ -363,7 +353,12 @@ impl JobManager {
         }
 
         // trigger-notify
-        // unit.unit_trigger_notify();
+        for other in self
+            .db
+            .dep_gets_atom(unit, UnitRelationAtom::UnitAtomTriggeredBy)
+        {
+            other.trigger(unit);
+        }
     }
 
     fn unit_start_on(
@@ -407,7 +402,7 @@ impl JobManager {
     }
 
     fn exec_on(&mut self, unit: Rc<UnitX>, atom: UnitRelationAtom, mode: JobMode) {
-        let (configs, mode) = job_notify::job_notify_result(&self.dep, unit, atom, mode);
+        let (configs, mode) = job_notify::job_notify_result(&self.db, unit, atom, mode);
         for config in configs.iter() {
             if let Err(_e) = self.exec(config, mode, &mut JobAffect::new(false)) {
                 // debug
@@ -416,7 +411,7 @@ impl JobManager {
     }
 
     fn do_notify(&mut self, config: &JobConf, mode_option: Option<JobMode>) {
-        let targets = job_notify::job_notify_event(&self.dep, config, mode_option);
+        let targets = job_notify::job_notify_event(&self.db, config, mode_option);
         for (config, mode) in targets.iter() {
             if let Err(_e) = self.exec(config, *mode, &mut JobAffect::new(false)) {
                 // debug

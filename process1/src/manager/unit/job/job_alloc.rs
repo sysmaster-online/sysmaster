@@ -5,6 +5,7 @@ use crate::manager::unit::unit_entry::UnitX;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub(super) struct JobAlloc {
     // data
     ids: HashSet<u32>,

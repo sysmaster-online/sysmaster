@@ -1,297 +1,275 @@
-use super::unit_base::unit_name_to_type;
-use super::unit_configs::UnitConfigs;
+use super::job::JobManager;
+use super::unit_base::{self};
 use super::unit_datastore::UnitDb;
-use super::unit_dep::UnitDep;
-use super::unit_entry::UnitX;
-use super::unit_sets::UnitSets;
-use crate::manager::data::{DataManager, UnitRelations, UnitType};
-use crate::manager::signals::ProcessExit;
-use nix::sys::signal::Signal;
-use nix::sys::wait::{WaitPidFlag, WaitStatus};
-use siphasher::sip::SipHasher24;
-use std::collections::{HashMap, VecDeque};
-use std::error::Error;
-use std::fs;
-use std::hash::Hasher;
-use std::rc::Rc;
-use utils::path_lookup::LookupPaths;
-use utils::{path_lookup, time_util};
-use walkdir::WalkDir;
-
+use super::unit_entry::{UnitObj, UnitX};
+use super::unit_file::UnitFile;
+use super::unit_load::UnitLoad;
+use super::unit_relation_atom::UnitRelationAtom;
+use super::unit_runtime::UnitRT;
+use crate::manager::data::{DataManager, UnitConfig, UnitState, UnitType};
+use crate::manager::table::{TableOp, TableSubscribe};
+use crate::plugin::Plugin;
 use nix::unistd::Pid;
+use std::error::Error;
+use std::rc::Rc;
 
 // #[macro_use]
 // use crate::unit_name_to_type;
 //unitManger composition of units with hash map
 
+pub trait UnitMngUtil: std::fmt::Debug {
+    fn attach(&self, um: Rc<UnitManager>);
+}
+
+pub trait UnitSubClass: UnitObj + UnitMngUtil {}
+
+#[macro_export]
+macro_rules! declure_unitobj_plugin {
+    ($unit_type:ty, $constructor:path) => {
+        #[no_mangle]
+        pub fn __unit_obj_create() -> *mut dyn $crate::manager::UnitObj {
+            let construcotr: fn() -> $unit_type = $constructor;
+
+            let obj = construcotr();
+            let boxed: Box<dyn $crate::manager::UnitObj> = Box::new(obj);
+            Box::into_raw(boxed)
+        }
+    };
+}
+
+#[derive(Debug)]
+pub struct UnitManagerX {
+    // associated objects
+    dm: Rc<DataManager>,
+
+    configs: Rc<UnitConfigs>,
+    states: Rc<UnitStates>,
+    data: Rc<UnitManager>,
+}
+
+impl UnitManagerX {
+    pub(in crate::manager) fn new(dm: Rc<DataManager>) -> UnitManagerX {
+        let _dm = Rc::clone(&dm);
+        let _um = Rc::new(UnitManager::new(Rc::clone(&_dm)));
+        UnitManagerX {
+            dm,
+            configs: Rc::new(UnitConfigs::new(Rc::clone(&_dm), Rc::clone(&_um))),
+            states: Rc::new(UnitStates::new(Rc::clone(&_dm), Rc::clone(&_um))),
+            data: _um,
+        }
+    }
+
+    pub fn child_dispatch_sigchld(&self) -> Result<(), Box<dyn Error>> {
+        self.data.db.child_dispatch_sigchld()
+    }
+}
+
 #[derive(Debug)]
 pub struct UnitManager {
-    dm: Rc<DataManager>,
-    configs: Rc<UnitConfigs>,
-    units: Rc<UnitSets>,
-    dep: Rc<UnitDep>,
-    unit_id_map: HashMap<String, String>,
-    pub unitdb: Rc<UnitDb>, // ALL UNIT STORE IN UNITDB,AND OTHER USE REF
-    unit_name_map: HashMap<String, String>,
-    lookup_path: LookupPaths,
-    last_updated_timestamp_hash: u64,
-    load_queue: VecDeque<Rc<UnitX>>,
-    watch_pids: HashMap<Pid, Rc<UnitX>>,
+    file: Rc<UnitFile>,
+    load: Rc<UnitLoad>,
+    db: Rc<UnitDb>, // ALL UNIT STORE IN UNITDB,AND OTHER USE REF
+    rt: Rc<UnitRT>,
+    jm: Rc<JobManager>,
 }
 
 impl UnitManager {
-    pub fn units_insert(&self, name: String, unit: Rc<UnitX>) -> Option<Rc<UnitX>> {
-        self.units.insert(name, unit)
+    pub fn child_watch_pid(&self, pid: Pid, id: &str) {
+        self.db.child_add_watch_pid(pid, id)
     }
 
-    pub fn units_get(&self, name: &str) -> Option<Rc<UnitX>> {
-        self.units.get(name)
+    pub fn child_unwatch_pid(&self, pid: Pid) {
+        self.db.child_unwatch_pid(pid)
     }
 
-    pub fn dep_get(&self, source: &UnitX, relation: UnitRelations) -> Vec<Rc<UnitX>> {
-        self.dep.gets(source, relation)
-    }
-
-    pub fn build_name_map(&mut self) -> bool {
-        let mut timestamp_hash_new: u64 = 0;
-        if !self.lookup_paths_updated(&mut timestamp_hash_new) {
-            return false;
-        }
-
-        for dir in &self.lookup_path.search_path {
-            if !std::path::Path::new(&dir).exists() {
-                log::warn!("dir {} is not exist", dir);
-                continue;
-            }
-            for entry in WalkDir::new(&dir).min_depth(1).max_depth(1).into_iter() {
-                let entry = entry.unwrap();
-                let filename = entry.file_name().to_str().unwrap().to_string();
-                let file_path = entry.path().to_str().unwrap().to_string();
-                self.unitdb
-                    .insert_unit_config_file(filename, Rc::new(file_path));
-            }
-        }
-        self.last_updated_timestamp_hash = timestamp_hash_new;
-        return true;
-    }
-
-    pub fn get_unit_file_path(&self, unit_name: &str) -> Option<Rc<String>> {
-        match self.unitdb.get_unit_config_file(&unit_name.to_string()) {
-            None => {
-                return None;
-            }
-            Some(v) => {
-                return Some(Rc::clone(&v));
-            }
+    pub(in crate::manager) fn new(dm: Rc<DataManager>) -> UnitManager {
+        let _dm = Rc::clone(&dm);
+        let _file = Rc::new(UnitFile::new());
+        let _db = Rc::new(UnitDb::new());
+        let rt = Rc::new(UnitRT::new());
+        let _load = Rc::new(UnitLoad::new(
+            Rc::clone(&_dm),
+            Rc::clone(&_file),
+            Rc::clone(&_db),
+            Rc::clone(&rt),
+        ));
+        UnitManager {
+            file: Rc::clone(&_file),
+            load: Rc::clone(&_load),
+            db: Rc::clone(&_db),
+            rt,
+            jm: Rc::new(JobManager::new(Rc::clone(&_db))),
         }
     }
+}
 
-    fn lookup_paths_updated(&mut self, timestamp_new: &mut u64) -> bool {
-        let updated: u64;
-        let mut siphash24 = SipHasher24::new_with_keys(0, 0);
-        for dir in &self.lookup_path.search_path {
-            match fs::metadata(&dir) {
-                Ok(metadata) => match metadata.modified() {
-                    Ok(time) => {
-                        siphash24.write_u128(time_util::timespec_load(time));
-                    }
-                    _ => {
-                        log::error!("failed to get mtime {}", dir);
-                    }
-                },
-                Err(e) => {
-                    log::error!("failed to get metadata of {}, err: {}", dir, e);
-                }
+#[derive(Debug)]
+struct UnitConfigs {
+    name: String,             // key for table-subscriber
+    data: Rc<UnitConfigsSub>, // data for table-subscriber
+}
+
+// the declaration "pub(self)" is for identification only.
+impl UnitConfigs {
+    pub(self) fn new(dm: Rc<DataManager>, um: Rc<UnitManager>) -> UnitConfigs {
+        let _dm = Rc::clone(&dm);
+        let uc = UnitConfigs {
+            name: String::from("UnitConfigs"),
+            data: Rc::new(UnitConfigsSub::new(dm, um)),
+        };
+        uc.register(&_dm);
+        uc
+    }
+
+    fn register(&self, dm: &DataManager) {
+        let subscriber = Rc::clone(&self.data);
+        dm.register_unit_config(self.name.clone(), subscriber)
+            .expect("unit configs has been registered.");
+    }
+}
+
+#[derive(Debug)]
+struct UnitConfigsSub {
+    dm: Rc<DataManager>,
+    um: Rc<UnitManager>,
+}
+
+impl TableSubscribe<String, UnitConfig> for UnitConfigsSub {
+    fn filter(&self, _op: &TableOp<String, UnitConfig>) -> bool {
+        // everything is allowed
+        true
+    }
+
+    fn notify(&self, op: &TableOp<String, UnitConfig>) {
+        match op {
+            TableOp::TableInsert(name, config) => self.insert_config(name, config),
+            TableOp::TableRemove(_, _) => {} // self.remove_config(name)
+        }
+    }
+}
+
+// the declaration "pub(self)" is for identification only.
+impl UnitConfigsSub {
+    pub(self) fn new(dm: Rc<DataManager>, um: Rc<UnitManager>) -> UnitConfigsSub {
+        UnitConfigsSub { dm, um }
+    }
+
+    pub(self) fn insert_config(&self, name: &str, config: &UnitConfig) {
+        let unit = match self.try_new_unit(name) {
+            Some(u) => u,
+            None => todo!(), // load
+        };
+        self.um.db.units_insert(name.to_string(), Rc::clone(&unit));
+
+        // config
+        unit.set_config(config);
+
+        // dependency
+        for (relation, name) in config.deps.iter() {
+            if let Err(_e) = self.um.db.dep_insert(
+                Rc::clone(&unit),
+                *relation,
+                self.um.db.units_get(name).unwrap(),
+                true,
+                0,
+            ) {
+                // debug
             }
         }
-
-        updated = siphash24.finish();
-        *timestamp_new = updated;
-        return updated != self.last_updated_timestamp_hash;
     }
 
-    pub fn init_lookup_path(&mut self) {
-        self.lookup_path.init_lookup_paths();
+    pub(self) fn remove_config(&self, _source: &str) {
+        todo!();
     }
 
-    pub fn dispatch_load_queue(&mut self) {
-        log::debug!("dispatch load queue");
-
-        loop {
-            match self.load_queue.pop_front() {
-                None => break,
-                Some(unit) => match unit.load() {
-                    Ok(()) => continue,
-                    Err(e) => {
-                        log::error!("load unit config failed: {}", e.to_string());
-                        println!("load unit config failed: {}", e.to_string())
-                    }
-                },
-            }
-        }
-    }
-
-    pub fn push_load_queue(&mut self, unit: Rc<UnitX>) {
-        if unit.in_load_queue() {
-            return;
-        }
-        self.load_queue.push_back(unit);
-    }
-
-    fn prepare_unit(&mut self, name: &str) -> Option<Rc<UnitX>> {
-        let unit_type = unit_name_to_type(name);
+    fn try_new_unit(&self, name: &str) -> Option<Rc<UnitX>> {
+        let unit_type = unit_base::unit_name_to_type(name);
         if unit_type == UnitType::UnitTypeInvalid {
             return None;
         }
 
-        match super::unit_new(
+        if let Some(unit) = self.um.db.units_get(name) {
+            return Some(unit);
+        }
+
+        let plugins = Rc::clone(&Plugin::get_instance());
+        plugins.borrow_mut().set_library_dir("../target/debug");
+        plugins.borrow_mut().load_lib();
+        let subclass = match plugins.borrow().create_unit_obj(unit_type) {
+            Ok(sub) => sub,
+            Err(_e) => return None,
+        };
+
+        Some(Rc::new(UnitX::new(
             Rc::clone(&self.dm),
-            Rc::clone(&self.unitdb),
+            Rc::clone(&self.um.file),
             unit_type,
             name,
-        ) {
-            Ok(unit) => {
-                let rc_unit = Rc::new(unit);
-                self.unitdb
-                    .insert_unit(name.to_string(), Rc::clone(&rc_unit));
-                Some(Rc::clone(&rc_unit))
-            }
-            Err(_e) => {
-                log::error!("create unit obj failed {:?}", _e);
-                return None;
-            }
-        }
+            subclass,
+        )))
     }
+}
 
-    pub fn load_unit(&mut self, name: &str) -> Option<Rc<UnitX>> {
-        if let Some(unit) = self.unitdb.get_unit_by_name(&name.to_string()) {
-            return Some(Rc::clone(&unit));
+#[derive(Debug)]
+struct UnitStates {
+    name: String,            // key for table-subscriber
+    data: Rc<UnitStatesSub>, // data for table-subscriber
+}
+
+impl UnitStates {
+    pub(self) fn new(dm: Rc<DataManager>, um: Rc<UnitManager>) -> UnitStates {
+        let us = UnitStates {
+            name: String::from("UnitStates"),
+            data: Rc::new(UnitStatesSub::new(um)),
         };
-        let unit = self.prepare_unit(name);
-        let u = if let Some(u) = unit {
-            u
-        } else {
-            return None;
-        };
-        log::info!("push new unit into load queue");
-        self.push_load_queue(Rc::clone(&u));
-        self.dispatch_load_queue();
-        Some(Rc::clone(&u))
-    }
-    pub fn dispatch_sigchld(&mut self) -> Result<(), Box<dyn Error>> {
-        log::debug!("Dispatching sighandler waiting for pid");
-        let wait_pid = Pid::from_raw(-1);
-        let flags = WaitPidFlag::WNOHANG;
-        let process_exit = {
-            match nix::sys::wait::waitpid(wait_pid, Some(flags)) {
-                Ok(wait_status) => match wait_status {
-                    WaitStatus::Exited(pid, code) => {
-                        ProcessExit::Status(pid, code, Signal::SIGCHLD)
-                    }
-                    WaitStatus::Signaled(pid, signal, _dumped_core) => {
-                        ProcessExit::Status(pid, -1, signal)
-                    }
-                    _ => {
-                        log::debug!("Ignored child signal: {:?}", wait_status);
-                        return Err(format!("Ignored child signal: {:?}", wait_status).into());
-                    }
-                },
-                Err(e) => {
-                    log::error!("Error while waiting pid: {}", e);
-                    return Err(format!("Error while waiting pid: {}", e).into());
-                }
-            }
-        };
-
-        match process_exit {
-            ProcessExit::Status(pid, code, signal) => {
-                match self.watch_pids.get(&pid) {
-                    Some(unit) => {
-                        unit.sigchld_events(pid, code, signal);
-                    }
-                    None => {
-                        log::debug!("not found unit obj of pid: {:?}", pid);
-                        return Err(format!("not found unit obj of pid: {:?}", pid).into());
-                    }
-                }
-
-                self.watch_pids.remove(&pid);
-                Ok(())
-            }
-        }
+        us.register(&dm);
+        us
     }
 
-    pub fn add_watch_pid(&mut self, pid: Pid, id: &str) {
-        let unit_obj = self.unitdb.get_unit_by_name(&id.to_string()).unwrap();
-        self.watch_pids.insert(pid, Rc::clone(&unit_obj));
+    fn register(&self, dm: &DataManager) {
+        let subscriber = Rc::clone(&self.data);
+        dm.register_unit_state(self.name.clone(), subscriber)
+            .expect("unit dependency has been registered.");
+    }
+}
+
+#[derive(Debug)]
+struct UnitStatesSub {
+    um: Rc<UnitManager>,
+}
+
+impl TableSubscribe<String, UnitState> for UnitStatesSub {
+    fn filter(&self, _op: &TableOp<String, UnitState>) -> bool {
+        // everything is allowed
+        true
     }
 
-    pub fn unwatch_pid(&mut self, pid: Pid) {
-        self.watch_pids.remove(&pid);
-    }
-
-    pub(in crate::manager) fn new(dm: Rc<DataManager>) -> Self {
-        let _dm = Rc::clone(&dm);
-        let units = Rc::new(UnitSets::new());
-        let dep = Rc::new(UnitDep::new());
-        UnitManager {
-            dm,
-            configs: Rc::new(UnitConfigs::new(
-                Rc::clone(&_dm),
-                Rc::clone(&units),
-                Rc::clone(&dep),
-            )),
-            units,
-            dep,
-            unit_id_map: HashMap::new(),
-            unitdb: Rc::new(UnitDb::new()),
-            unit_name_map: HashMap::new(),
-            last_updated_timestamp_hash: 0,
-            lookup_path: path_lookup::LookupPaths::new(),
-            load_queue: VecDeque::new(),
-            watch_pids: HashMap::new(),
+    fn notify(&self, op: &TableOp<String, UnitState>) {
+        match op {
+            TableOp::TableInsert(name, config) => self.insert_config(name, config),
+            TableOp::TableRemove(_, _) => {} // self.remove_config(name)
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    // use services::service::ServiceUnit;
-
-    use super::*;
-    use utils::logger;
-
-    #[test]
-    fn test_unit_load() {
-        logger::init_log_with_console("test", 4);
-        log::info!("test");
-        let dm_manager = Rc::new(DataManager::new());
-        let mut unit_manager = UnitManager::new(Rc::clone(&dm_manager));
-        unit_manager.init_lookup_path();
-
-        let unit_name = String::from("config.service");
-        unit_manager.load_unit(&unit_name);
-
-        //assert_ne!(unit_manager.units.borrow().len(), 0);
-
-        match unit_manager.unitdb.get_unit_by_name(&unit_name) {
-            Some(_unit_obj) => println!("found unit obj {}", unit_name),
-            None => println!("not fount unit: {}", unit_name),
-        };
+// the declaration "pub(self)" is for identification only.
+impl UnitStatesSub {
+    pub(self) fn new(um: Rc<UnitManager>) -> UnitStatesSub {
+        UnitStatesSub { um }
     }
 
-    #[test]
-    fn test_unit_start() {
-        let dm_manager = Rc::new(DataManager::new());
-        let mut unit_manager = UnitManager::new(Rc::clone(&dm_manager));
-        unit_manager.init_lookup_path();
+    pub(self) fn insert_config(&self, source: &str, _state: &UnitState) {
+        let unitx = self.um.db.units_get(source).unwrap();
+        for other in self
+            .um
+            .db
+            .dep_gets_atom(&unitx, UnitRelationAtom::UnitAtomTriggeredBy)
+        {
+            other.trigger(&unitx);
+        }
+    }
 
-        let unit_name = String::from("config.service");
-        unit_manager.load_unit(&unit_name);
-
-        match unit_manager.unitdb.get_unit_by_name(&unit_name) {
-            Some(_unit_obj) => println!("found unit obj {}", unit_name),
-            None => println!("not fount unit: {}", unit_name),
-        };
+    pub(self) fn remove_config(&self, _source: &str) {
+        todo!();
     }
 }

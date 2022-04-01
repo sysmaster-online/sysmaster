@@ -52,23 +52,6 @@ pub enum UnitActionError {
     UnitActionEFailed,
 }
 
-#[derive(Eq, PartialEq, Clone, Copy, Debug)]
-pub enum UnitActiveState {
-    UnitActive,
-    UnitReloading,
-    UnitInActive,
-    UnitFailed,
-    UnitActivating,
-    UnitDeActivating,
-    UnitMaintenance,
-}
-
-#[derive(Eq, PartialEq, Clone, Copy, Debug)]
-pub enum UnitNotifyFlags {
-    UnitNotifyReloadFailure = 1 << 0,
-    UnitNotifyWillAutoRestart = 1 << 1,
-}
-
 pub enum KillOperation {
     KillTerminate,
     KillTerminateAndLog,

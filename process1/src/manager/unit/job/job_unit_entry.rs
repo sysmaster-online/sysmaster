@@ -1,6 +1,6 @@
 #![warn(unused_imports)]
 use super::job_entry::{Job, JobAttrKind, JobInfo, JobKind, JobResult, JobStage};
-use crate::manager::unit::unit_base::UnitActiveState;
+use crate::manager::data::UnitActiveState;
 use crate::manager::unit::unit_entry::UnitX;
 use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
 use std::collections::{HashMap, LinkedList};
@@ -9,6 +9,7 @@ use std::rc::Rc;
 const JOBUNIT_SQ_MUTOP_MAX_NUM: usize = 1; // stop or (restart|start|reload), which can change the unit's stage
 const JOBUNIT_SQ_MAX_NUM: usize = 3; // [stop] | [(restart|start|reload)->verify->nop]
 
+#[derive(Debug)]
 pub(super) struct JobUnit {
     // key
     unit: Rc<UnitX>,

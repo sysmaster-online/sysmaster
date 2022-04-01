@@ -1,9 +1,10 @@
-use super::u_entry::Unit;
-use crate::manager::data::{DataManager, UnitConfig, UnitConfigItem, UnitRelations, UnitType};
-use crate::manager::unit::unit_base::{UnitActionError, UnitActiveState};
-use crate::manager::unit::unit_datastore::UnitDb;
+use super::u_entry::{Unit, UnitObj};
+use crate::manager::data::{
+    DataManager, UnitActiveState, UnitConfig, UnitConfigItem, UnitRelations, UnitType,
+};
+use crate::manager::unit::unit_base::UnitActionError;
+use crate::manager::unit::unit_file::UnitFile;
 use crate::manager::unit::UnitErrno;
-use crate::plugin::Plugin;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::any::Any;
@@ -96,20 +97,11 @@ impl UnitX {
 
     pub(in crate::manager::unit) fn new(
         dm: Rc<DataManager>,
-        unitdb: Rc<UnitDb>,
+        file: Rc<UnitFile>,
         unit_type: UnitType,
         name: &str,
-    ) -> Result<Rc<UnitX>, Box<dyn Error>> {
-        let plugins = Rc::clone(&Plugin::get_instance());
-        plugins.borrow_mut().set_library_dir("../target/debug");
-        plugins.borrow_mut().load_lib();
-        let unit_obj = plugins.borrow().create_unit_obj(unit_type)?;
-        Ok(Rc::new(UnitX(Unit::new(
-            Rc::clone(&dm),
-            Rc::clone(&unitdb),
-            unit_type,
-            name,
-            unit_obj,
-        ))))
+        subclass: Box<dyn UnitObj>,
+    ) -> UnitX {
+        UnitX(Unit::new(Rc::clone(&dm), file, unit_type, name, subclass))
     }
 }

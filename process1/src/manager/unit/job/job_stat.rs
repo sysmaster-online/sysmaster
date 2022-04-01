@@ -2,6 +2,7 @@
 use super::job_entry::{Job, JobKind, JobResult, JobStage};
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub(super) struct JobStat {
     num: JobNum, // snapshot
     cnt: JobCnt, // history
@@ -52,6 +53,7 @@ impl JobStat {
     }
 }
 
+#[derive(Debug)]
 struct JobNum {
     kind: JobKindNum,
     stage: JobStageNum,
@@ -79,6 +81,7 @@ impl JobNum {
     }
 }
 
+#[derive(Debug)]
 struct JobKindNum {
     start: usize,
     stop: usize,
@@ -140,6 +143,7 @@ impl JobKindNum {
     }
 }
 
+#[derive(Debug)]
 struct JobStageNum {
     wait: usize,
     running: usize,
@@ -175,6 +179,7 @@ impl JobStageNum {
     }
 }
 
+#[derive(Debug)]
 struct JobCnt {
     result: JobResultCnt,
     op: JobOpCnt,
@@ -205,6 +210,7 @@ impl JobCnt {
     }
 }
 
+#[derive(Debug)]
 struct JobResultCnt {
     done: usize,
     cancelled: usize,
@@ -303,6 +309,7 @@ impl JobResultCnt {
     }
 }
 
+#[derive(Debug)]
 struct JobOpCnt {
     add: usize,
     update: usize,

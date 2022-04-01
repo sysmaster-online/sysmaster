@@ -3,7 +3,7 @@ use std::io::Error;
 use std::rc::Rc;
 
 use super::data::DataManager;
-// use super::unit::UnitManager;
+// use super::unit::UnitManagerX;
 
 pub enum Mode {
     SYSTEM,
@@ -33,8 +33,8 @@ pub struct Manager {
     mode: Mode,
     action: Action,
     stat: Stats,
+    // um: UnitManagerX,
     // dm: Rc<DataManager>,
-    // um: UnitManager,
 }
 
 type JobId = i32;
@@ -47,7 +47,7 @@ impl Manager {
             action,
             stat: Stats::INIT,
             // dm: Rc::clone(&_dm),
-            // um: UnitManager::new(Rc::clone(&_dm)),
+            // um: UnitManagerX::new(Rc::clone(&_dm)),
         }
     }
 
@@ -112,7 +112,7 @@ impl Manager {
     }
 
     pub fn dispatch_sigchld(&mut self) -> Result<(), Box<dyn Err>> {
-        // self.um.dispatch_sigchld()
+        // self.um.child_dispatch_sigchld()
         Ok(())
     }
 }
