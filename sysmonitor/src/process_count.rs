@@ -1,8 +1,8 @@
 use std::cmp::max;
 use std::io::{Error, ErrorKind};
 
-use procfs::sys::kernel::pid_max;
 use procfs::ProcError;
+use procfs::sys::kernel::pid_max;
 use serde_derive::Deserialize;
 
 use crate::{Monitor, Switch, SysMonitor, SysMonitorError};
@@ -107,11 +107,11 @@ impl Monitor for ProcessCount {
             (pid_max as f32 * self.resume_ratio / 100.0) as u32,
         );
         //  self.count = proc_num;
-        if proc_num >= real_alarm && !self.status {
-        } else if proc_num <= real_resume && self.status {
-        }
+        // if proc_num >= real_alarm && !self.status {
+        // } else if proc_num <= real_resume && self.status {
+        // }
 
-        return Ok(());
+        Ok(())
     }
 
     fn report_alarm(&self) {}
@@ -119,8 +119,8 @@ impl Monitor for ProcessCount {
 
 #[cfg(test)]
 mod tests {
-    use crate::process_count::ProcessCount;
     use crate::Monitor;
+    use crate::process_count::ProcessCount;
 
     #[test]
     fn test_decode_config() {

@@ -1,14 +1,11 @@
 use std::cmp::min;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Error, Result};
-use std::iter::FromIterator;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::time::{Duration, Instant};
 
-use nix::errno::{errno, Errno};
-use nix::fcntl::open;
-use nix::libc::c_int;
-use nix::{ioctl_read, ioctl_readwrite, libc};
+use nix::errno::Errno;
+use nix::{ioctl_read, ioctl_readwrite};
 
 pub trait Watchdog {
     fn config(self, timeout: Option<Duration>) -> io::Result<()>;
