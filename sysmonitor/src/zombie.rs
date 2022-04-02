@@ -64,7 +64,7 @@ impl Monitor for ZombieCount {
         } else if count <= self.resume && self.status {
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn report_alarm(&self) {}

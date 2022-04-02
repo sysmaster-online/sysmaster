@@ -153,7 +153,7 @@ fn command_wait(command: String, stop_command: String, uid: u32, timeout: u64) -
 
     if timeout > 0 {
         wait_child(&mut child, timeout, 100)?;
-        if stop_command != "" {
+        if !stop_command.is_empty() {
             let _stop = Command::new(stop_command).uid(uid).output();
             process_exit(&mut child)?;
         }
