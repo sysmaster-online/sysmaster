@@ -13,6 +13,7 @@ use crate::process_count::ProcessCount;
 use crate::process_fd::ProcessFd;
 use crate::zombie::ZombieCount;
 
+#[allow(dead_code)]
 mod process;
 mod process_count;
 mod process_fd;
@@ -60,6 +61,7 @@ pub trait Monitor {
     fn report_alarm(&self);
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "UPPERCASE")]
 pub struct SysMonitor {
@@ -84,6 +86,7 @@ pub struct SysMonitor {
     zombie_alarm: bool,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Default, Deserialize)]
 pub struct Switch {
     monitor: bool,
