@@ -2,7 +2,7 @@
 name = "process1"
 version = "0.1.0"
 authors = ["overweight <hexiaowen@huawei.com>"]
-edition = "2018"
+edition = "2021"
 default-run = "process1"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
