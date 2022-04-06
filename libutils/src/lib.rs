@@ -2,6 +2,7 @@
 extern crate serde_derive;
 
 pub mod config_parser;
+pub mod error;
 pub mod logger;
 pub mod macros;
 pub mod path_lookup;

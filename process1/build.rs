@@ -2,6 +2,7 @@ fn main() {
     let mut config = prost_build::Config::new();
     config.bytes(&["."]);
     // config.type_attribute(".", "#[derive(PartialOrd)]");
+    config.type_attribute(".", "#[rustfmt::skip]");
     config
         .out_dir("src/proto")
         .compile_protos(&["abi.proto"], &["./src/proto"])

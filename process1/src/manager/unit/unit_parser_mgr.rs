@@ -77,13 +77,18 @@ where
 }
 
 mod tests {
+    use std::{
+        io::{Error, ErrorKind},
+        path::PathBuf,
+    };
 
-    use super::UnitParserMgr;
-    use std::fs::File;
-    use std::io::{Error, ErrorKind, Read};
-    use std::path::PathBuf;
-    use utils::config_parser::ConfigParser;
-    use utils::unit_conf::{ConfFactory, ConfValue, Confs, Section};
+    use utils::{
+        config_parser::ConfigParser,
+        unit_conf::{ConfFactory, ConfValue, Confs, Section},
+    };
+
+    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+
     struct ServiceFactory;
     impl ConfFactory for ServiceFactory {
         fn product_confs(&self) -> Confs {
