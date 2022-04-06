@@ -1,7 +1,6 @@
-use crate::manager::data::{DataManager, UnitConfig, UnitRelations, UnitType};
-use crate::manager::unit::unit_base::{self, UnitLoadState};
-use crate::manager::unit::unit_datastore::UnitDb;
-use crate::manager::unit::unit_manager::UnitManager;
+use crate::manager::data::{DataManager, UnitConfig, UnitRelations};
+use crate::manager::unit::unit_base::UnitLoadState;
+use crate::manager::unit::unit_file::UnitFile;
 use std::cell::RefCell;
 use std::error::Error;
 use std::fs::File;
@@ -13,8 +12,9 @@ use crate::null_str;
 
 #[derive(Debug)]
 pub(super) struct UeLoad {
+    // associated objects
     dm: Rc<DataManager>,
-    unitdb: Rc<UnitDb>,
+
     // key
     id: String,
 
@@ -28,10 +28,9 @@ pub(super) struct UeLoad {
 }
 
 impl UeLoad {
-    pub(super) fn new(dm: Rc<DataManager>, unitdb: Rc<UnitDb>, id: String) -> UeLoad {
+    pub(super) fn new(dm: Rc<DataManager>, id: String) -> UeLoad {
         UeLoad {
             dm,
-            unitdb,
             id,
             load_state: RefCell::new(UnitLoadState::UnitStub),
             config_file_path: RefCell::new(null_str!("")),
@@ -86,12 +85,12 @@ impl UeLoad {
         return Ok(());
     }
 
-    fn build_name_map(&self, manager: &mut UnitManager) {
-        manager.build_name_map();
+    fn build_name_map(&self, file: &UnitFile) {
+        file.build_name_map();
     }
 
-    fn get_unit_file_path(&self, manager: &mut UnitManager) -> Option<String> {
-        match manager.get_unit_file_path(&self.id) {
+    fn get_unit_file_path(&self, file: &UnitFile) -> Option<String> {
+        match file.get_unit_file_path(&self.id) {
             Some(v) => return Some(v.to_string()),
             None => {
                 log::error!("not find unit file {}", &self.id);
@@ -100,11 +99,11 @@ impl UeLoad {
         }
     }
 
-    pub(super) fn unit_load(&self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
+    pub(super) fn unit_load(&self, file: &UnitFile) -> Result<(), Box<dyn Error>> {
         *self.in_load_queue.borrow_mut() = false;
-        self.build_name_map(m);
+        self.build_name_map(&file);
 
-        if let Some(p) = self.get_unit_file_path(m) {
+        if let Some(p) = self.get_unit_file_path(&file) {
             self.set_config_file_path(&p);
         }
 
@@ -114,7 +113,7 @@ impl UeLoad {
 
         match self.unit_config_load() {
             Ok(_conf) => {
-                self.parse(m)?;
+                self.parse()?;
             }
             Err(e) => {
                 return Err(e);
@@ -129,21 +128,19 @@ impl UeLoad {
 
     fn parse_unit_relations(
         &self,
-        manager: &mut UnitManager,
         units: &str,
         relation: UnitRelations,
         u_config: &mut UnitConfig,
     ) -> Result<(), Box<dyn Error>> {
         let units = units.split_whitespace();
         for unit in units {
-            self.parse_unit_relation(manager, unit, relation, u_config)?;
+            self.parse_unit_relation(unit, relation, u_config)?;
         }
         Ok(())
     }
 
     fn parse_unit_relation(
         &self,
-        m: &mut UnitManager,
         unit_name: &str,
         relation: UnitRelations,
         u_config: &mut UnitConfig,
@@ -154,30 +151,11 @@ impl UeLoad {
             relation
         );
 
-        let unit_type = unit_base::unit_name_to_type(unit_name);
-        if unit_type == UnitType::UnitTypeInvalid {
-            return Err(format!("invalid unit type of unit {}", unit_name).into());
-        }
-        if let Some(_unit) = m.unitdb.get_unit_by_name(&unit_name.to_string()) {
-            return Ok(());
-        } else {
-            let unit = match crate::manager::unit::unit_new(
-                Rc::clone(&self.dm),
-                Rc::clone(&self.unitdb),
-                unit_type,
-                unit_name,
-            ) {
-                Ok(u) => u,
-                Err(e) => return Err(e),
-            };
-            m.push_load_queue(Rc::clone(&unit));
-            m.unitdb.insert_unit(unit_name.to_string(), unit);
-        };
         u_config.deps.push((relation, String::from(unit_name)));
         Ok(())
     }
 
-    pub(super) fn parse(&self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
+    pub(super) fn parse(&self) -> Result<(), Box<dyn Error>> {
         let mut u_config = UnitConfig::new();
 
         // impl ugly
@@ -194,28 +172,28 @@ impl UeLoad {
         match &unit.wants {
             None => {}
             Some(w) => {
-                self.parse_unit_relations(m, w, UnitRelations::UnitWants, &mut u_config)?;
+                self.parse_unit_relations(w, UnitRelations::UnitWants, &mut u_config)?;
             }
         }
 
         match &unit.before {
             None => {}
             Some(w) => {
-                self.parse_unit_relations(m, w, UnitRelations::UnitBefore, &mut u_config)?;
+                self.parse_unit_relations(w, UnitRelations::UnitBefore, &mut u_config)?;
             }
         }
 
         match &unit.after {
             None => {}
             Some(w) => {
-                self.parse_unit_relations(m, w, UnitRelations::UnitAfter, &mut u_config)?;
+                self.parse_unit_relations(w, UnitRelations::UnitAfter, &mut u_config)?;
             }
         }
 
         match &unit.requires {
             None => {}
             Some(w) => {
-                self.parse_unit_relations(m, w, UnitRelations::UnitRequires, &mut u_config)?;
+                self.parse_unit_relations(w, UnitRelations::UnitRequires, &mut u_config)?;
             }
         }
 

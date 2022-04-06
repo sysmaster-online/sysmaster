@@ -1,8 +1,8 @@
-use super::unit_entry::UnitX;
-use super::unit_relation::{self};
-use super::unit_relation_atom::{self, UnitRelationAtom};
-use super::UnitErrno;
 use crate::manager::data::UnitRelations;
+use crate::manager::unit::unit_entry::UnitX;
+use crate::manager::unit::unit_relation::{self};
+use crate::manager::unit::unit_relation_atom::{self, UnitRelationAtom};
+use crate::manager::unit::UnitErrno;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;

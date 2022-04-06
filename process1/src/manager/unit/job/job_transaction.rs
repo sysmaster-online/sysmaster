@@ -5,16 +5,15 @@ use super::job_table::JobTable;
 use super::JobErrno;
 use crate::manager::data::{JobMode, UnitConfigItem};
 use crate::manager::unit::unit_base::UnitActionError;
-use crate::manager::unit::unit_dep::UnitDep;
+use crate::manager::unit::unit_datastore::UnitDb;
 use crate::manager::unit::unit_entry::UnitX;
 use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
-use crate::manager::unit::unit_sets::UnitSets;
 use std::rc::Rc;
 
 pub(super) fn job_trans_expand(
     stage: &mut JobTable,
     ja: &mut JobAlloc,
-    dep: &UnitDep,
+    db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
 ) -> Result<(), JobErrno> {
@@ -28,12 +27,12 @@ pub(super) fn job_trans_expand(
     // expand
     if trans_is_expand(&conf, new, mode) {
         match conf.get_kind() {
-            JobKind::JobStart => trans_expand_start(stage, ja, dep, &conf, mode)?,
-            JobKind::JobStop => trans_expand_stop(stage, ja, dep, &conf, mode)?,
-            JobKind::JobReload => trans_expand_reload(stage, ja, dep, &conf, mode)?,
+            JobKind::JobStart => trans_expand_start(stage, ja, db, &conf, mode)?,
+            JobKind::JobStop => trans_expand_stop(stage, ja, db, &conf, mode)?,
+            JobKind::JobReload => trans_expand_reload(stage, ja, db, &conf, mode)?,
             JobKind::JobRestart => {
-                trans_expand_start(stage, ja, dep, &conf, mode)?;
-                trans_expand_stop(stage, ja, dep, &conf, mode)?
+                trans_expand_start(stage, ja, db, &conf, mode)?;
+                trans_expand_stop(stage, ja, db, &conf, mode)?
             }
             _ => unreachable!("Invalid job kind."),
         }
@@ -46,14 +45,13 @@ pub(super) fn job_trans_expand(
 pub(super) fn job_trans_affect(
     stage: &mut JobTable,
     ja: &mut JobAlloc,
-    units: &UnitSets,
-    dep: &UnitDep,
+    db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
 ) -> Result<(), JobErrno> {
     match mode {
-        JobMode::JobIsolate => trans_affect_isolate(stage, ja, units, dep, mode),
-        JobMode::JobTrigger => trans_affect_trigger(stage, ja, dep, config, mode),
+        JobMode::JobIsolate => trans_affect_isolate(stage, ja, db, mode),
+        JobMode::JobTrigger => trans_affect_trigger(stage, ja, db, config, mode),
         _ => Ok(()), // do nothing
     }
 }
@@ -74,14 +72,14 @@ pub(super) fn job_trans_verify(
 
 pub(super) fn job_trans_fallback(
     jobs: &mut JobTable,
-    dep: &UnitDep,
+    db: &UnitDb,
     unit: &UnitX,
     run_kind: JobKind,
 ) -> Vec<Rc<Job>> {
     match run_kind {
-        JobKind::JobStart => trans_fallback_start(jobs, dep, unit),
-        JobKind::JobStop => trans_fallback_stop(jobs, dep, unit),
-        JobKind::JobVerify => trans_fallback_start(jobs, dep, unit),
+        JobKind::JobStart => trans_fallback_start(jobs, db, unit),
+        JobKind::JobStop => trans_fallback_stop(jobs, db, unit),
+        JobKind::JobVerify => trans_fallback_start(jobs, db, unit),
         _ => Vec::new(), // nothing to fallback
     }
 }
@@ -113,20 +111,20 @@ fn trans_expand_check_input(config: &JobConf) -> Result<(), JobErrno> {
 fn trans_expand_start(
     stage: &mut JobTable,
     ja: &mut JobAlloc,
-    dep: &UnitDep,
+    db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
 ) -> Result<(), JobErrno> {
     let unit = config.get_unit();
 
-    for other in dep
-        .gets_atom(unit, UnitRelationAtom::UnitAtomPullInStart)
+    for other in db
+        .dep_gets_atom(unit, UnitRelationAtom::UnitAtomPullInStart)
         .iter()
     {
         if let Err(err) = job_trans_expand(
             stage,
             ja,
-            dep,
+            db,
             &JobConf::new(Rc::clone(other), JobKind::JobStart),
             mode,
         ) {
@@ -136,28 +134,28 @@ fn trans_expand_start(
             }
         }
     }
-    for other in dep
-        .gets_atom(unit, UnitRelationAtom::UnitAtomPullInStartIgnored)
+    for other in db
+        .dep_gets_atom(unit, UnitRelationAtom::UnitAtomPullInStartIgnored)
         .iter()
     {
         if let Err(_err) = job_trans_expand(
             stage,
             ja,
-            dep,
+            db,
             &JobConf::new(Rc::clone(other), JobKind::JobStart),
             mode,
         ) {
             // debug
         }
     }
-    for other in dep
-        .gets_atom(unit, UnitRelationAtom::UnitAtomPullInVerify)
+    for other in db
+        .dep_gets_atom(unit, UnitRelationAtom::UnitAtomPullInVerify)
         .iter()
     {
         if let Err(err) = job_trans_expand(
             stage,
             ja,
-            dep,
+            db,
             &JobConf::new(Rc::clone(other), JobKind::JobVerify),
             mode,
         ) {
@@ -167,14 +165,14 @@ fn trans_expand_start(
             }
         }
     }
-    for other in dep
-        .gets_atom(unit, UnitRelationAtom::UnitAtomPullInStop)
+    for other in db
+        .dep_gets_atom(unit, UnitRelationAtom::UnitAtomPullInStop)
         .iter()
     {
         if let Err(err) = job_trans_expand(
             stage,
             ja,
-            dep,
+            db,
             &JobConf::new(Rc::clone(other), JobKind::JobStop),
             mode,
         ) {
@@ -184,14 +182,14 @@ fn trans_expand_start(
             }
         }
     }
-    for other in dep
-        .gets_atom(unit, UnitRelationAtom::UnitAtomPullInStopIgnored)
+    for other in db
+        .dep_gets_atom(unit, UnitRelationAtom::UnitAtomPullInStopIgnored)
         .iter()
     {
         if let Err(_err) = job_trans_expand(
             stage,
             ja,
-            dep,
+            db,
             &JobConf::new(Rc::clone(other), JobKind::JobStop),
             mode,
         ) {
@@ -205,7 +203,7 @@ fn trans_expand_start(
 fn trans_expand_stop(
     stage: &mut JobTable,
     ja: &mut JobAlloc,
-    dep: &UnitDep,
+    db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
 ) -> Result<(), JobErrno> {
@@ -220,11 +218,11 @@ fn trans_expand_stop(
         _ => unreachable!("invalid configuration."),
     };
 
-    for other in dep.gets_atom(unit, expand_atom).iter() {
+    for other in db.dep_gets_atom(unit, expand_atom).iter() {
         if let Err(err) = job_trans_expand(
             stage,
             ja,
-            dep,
+            db,
             &JobConf::new(Rc::clone(other), expand_kind),
             mode,
         ) {
@@ -241,20 +239,20 @@ fn trans_expand_stop(
 fn trans_expand_reload(
     stage: &mut JobTable,
     ja: &mut JobAlloc,
-    dep: &UnitDep,
+    db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
 ) -> Result<(), JobErrno> {
     let unit = config.get_unit();
 
-    for other in dep
-        .gets_atom(unit, UnitRelationAtom::UnitAtomPropagatesReloadTo)
+    for other in db
+        .dep_gets_atom(unit, UnitRelationAtom::UnitAtomPropagatesReloadTo)
         .iter()
     {
         if let Err(_err) = job_trans_expand(
             stage,
             ja,
-            dep,
+            db,
             &JobConf::new(Rc::clone(other), JobKind::JobTryReload),
             mode,
         ) {
@@ -288,13 +286,12 @@ fn trans_is_expand(config: &JobConf, new: bool, mode: JobMode) -> bool {
 fn trans_affect_isolate(
     stage: &mut JobTable,
     ja: &mut JobAlloc,
-    units: &UnitSets,
-    dep: &UnitDep,
+    db: &UnitDb,
     mode: JobMode,
 ) -> Result<(), JobErrno> {
     assert_eq!(mode, JobMode::JobIsolate);
 
-    for other in units.get_all().iter() {
+    for other in db.units_get_all().iter() {
         // it is allowed not to be affected by isolation
         if let UnitConfigItem::UcItemIgnoreOnIsolate(true) =
             other.get_config(&UnitConfigItem::UcItemIgnoreOnIsolate(false))
@@ -311,7 +308,7 @@ fn trans_affect_isolate(
         if let Err(_err) = job_trans_expand(
             stage,
             ja,
-            dep,
+            db,
             &JobConf::new(Rc::clone(other), JobKind::JobStop),
             mode,
         ) {
@@ -326,7 +323,7 @@ fn trans_affect_isolate(
 fn trans_affect_trigger(
     stage: &mut JobTable,
     ja: &mut JobAlloc,
-    dep: &UnitDep,
+    db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
 ) -> Result<(), JobErrno> {
@@ -334,8 +331,8 @@ fn trans_affect_trigger(
     assert_eq!(mode, JobMode::JobTrigger);
 
     let unit = config.get_unit();
-    for other in dep
-        .gets_atom(unit, UnitRelationAtom::UnitAtomTriggeredBy)
+    for other in db
+        .dep_gets_atom(unit, UnitRelationAtom::UnitAtomTriggeredBy)
         .iter()
     {
         // there is something assigned, not affected
@@ -347,7 +344,7 @@ fn trans_affect_trigger(
         if let Err(_err) = job_trans_expand(
             stage,
             ja,
-            dep,
+            db,
             &JobConf::new(Rc::clone(other), JobKind::JobStop),
             mode,
         ) {
@@ -388,19 +385,19 @@ fn trans_verify_is_destructive(
     Err(JobErrno::JobErrConflict)
 }
 
-fn trans_fallback_start(jobs: &mut JobTable, dep: &UnitDep, unit: &UnitX) -> Vec<Rc<Job>> {
+fn trans_fallback_start(jobs: &mut JobTable, db: &UnitDb, unit: &UnitX) -> Vec<Rc<Job>> {
     trans_fallback(
         jobs,
-        dep,
+        db,
         unit,
         UnitRelationAtom::UnitAtomPropagateStartFailure,
     )
 }
 
-fn trans_fallback_stop(jobs: &mut JobTable, dep: &UnitDep, unit: &UnitX) -> Vec<Rc<Job>> {
+fn trans_fallback_stop(jobs: &mut JobTable, db: &UnitDb, unit: &UnitX) -> Vec<Rc<Job>> {
     trans_fallback(
         jobs,
-        dep,
+        db,
         unit,
         UnitRelationAtom::UnitAtomPropagateStopFailure,
     )
@@ -408,14 +405,14 @@ fn trans_fallback_stop(jobs: &mut JobTable, dep: &UnitDep, unit: &UnitX) -> Vec<
 
 fn trans_fallback(
     jobs: &mut JobTable,
-    dep: &UnitDep,
+    db: &UnitDb,
     unit: &UnitX,
     atom: UnitRelationAtom,
 ) -> Vec<Rc<Job>> {
     let mut del_jobs = Vec::new();
-    for other in dep.gets_atom(unit, atom) {
+    for other in db.dep_gets_atom(unit, atom) {
         del_jobs.append(&mut jobs.remove_suspends(
-            dep,
+            db,
             &other,
             JobKind::JobStart,
             Some(JobKind::JobVerify),

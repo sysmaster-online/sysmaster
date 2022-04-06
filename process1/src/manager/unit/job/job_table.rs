@@ -4,13 +4,14 @@ use super::job_entry::{Job, JobConf, JobInfo, JobKind, JobResult};
 use super::job_unit_entry::JobUnit;
 use super::JobErrno;
 use crate::manager::data::{JobMode, UnitConfigItem};
-use crate::manager::unit::unit_dep::UnitDep;
+use crate::manager::unit::unit_datastore::UnitDb;
 use crate::manager::unit::unit_entry::UnitX;
 use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub(super) struct JobTable {
     // key: job-id | unit, value: job
     // data
@@ -47,14 +48,14 @@ impl JobTable {
 
     pub(super) fn remove_suspends(
         &mut self,
-        dep: &UnitDep,
+        db: &UnitDb,
         unit: &UnitX,
         kind1: JobKind,
         kind2: Option<JobKind>,
         result: JobResult,
     ) -> Vec<Rc<Job>> {
         // table-unit
-        let del_jobs = self.t_unit.remove_suspends(dep, unit, kind1, kind2, result);
+        let del_jobs = self.t_unit.remove_suspends(db, unit, kind1, kind2, result);
 
         // synchronize table-id
         for job in del_jobs.iter() {
@@ -91,10 +92,10 @@ impl JobTable {
 
     pub(super) fn try_trigger(
         &mut self,
-        dep: &UnitDep,
+        db: &UnitDb,
     ) -> Option<(Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>)> {
         // try trigger table-unit
-        let trigger_ret = self.t_unit.try_trigger(dep);
+        let trigger_ret = self.t_unit.try_trigger(db);
 
         // synchronize table-id
         if let Some((_, Some(job))) = &trigger_ret {
@@ -106,12 +107,12 @@ impl JobTable {
 
     pub(super) fn finish_trigger(
         &mut self,
-        dep: &UnitDep,
+        db: &UnitDb,
         unit: &UnitX,
         result: JobResult,
     ) -> Option<Rc<Job>> {
         // finish table-unit
-        let del_trigger = self.t_unit.finish_trigger(dep, unit, result);
+        let del_trigger = self.t_unit.finish_trigger(db, unit, result);
 
         // synchronize table-id
         if let Some(job) = &del_trigger {
@@ -268,6 +269,7 @@ impl JobTable {
     }
 }
 
+#[derive(Debug)]
 struct JobUnitTable {
     // key: unit, value: jobs with order
     // data
@@ -384,7 +386,7 @@ impl JobUnitTable {
 
     pub(self) fn try_trigger(
         &mut self,
-        dep: &UnitDep,
+        db: &UnitDb,
     ) -> Option<(Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>)> {
         assert!(self.sync);
 
@@ -394,7 +396,7 @@ impl JobUnitTable {
         self.readys_fill();
 
         if let Some(uv) = self.readys.pop() {
-            let (trigger_info, merge_trigger) = self.try_trigger_entry(dep, &uv); // status(sync): not changed
+            let (trigger_info, merge_trigger) = self.try_trigger_entry(db, &uv); // status(sync): not changed
             assert!(!uv.borrow().is_empty());
             return Some((trigger_info, merge_trigger));
         }
@@ -404,7 +406,7 @@ impl JobUnitTable {
 
     pub(self) fn finish_trigger(
         &mut self,
-        dep: &UnitDep,
+        db: &UnitDb,
         unit: &UnitX,
         result: JobResult,
     ) -> Option<Rc<Job>> {
@@ -416,7 +418,7 @@ impl JobUnitTable {
             .expect("guaranteed by caller.");
         let (u, uv) = (Rc::clone(ur), Rc::clone(uvr));
         assert!(uv.borrow().get_trigger().is_some(), "guaranteed by caller.");
-        let del_trigger = self.finish_entry(dep, &(&u, &uv), result); // status(sync): not changed
+        let del_trigger = self.finish_entry(db, &(&u, &uv), result); // status(sync): not changed
         self.try_gc_empty_unit(&(&u, &uv));
 
         del_trigger
@@ -424,7 +426,7 @@ impl JobUnitTable {
 
     pub(self) fn remove_suspends(
         &mut self,
-        dep: &UnitDep,
+        db: &UnitDb,
         unit: &UnitX,
         kind1: JobKind,
         kind2: Option<JobKind>,
@@ -435,7 +437,7 @@ impl JobUnitTable {
         let mut del_jobs = Vec::new();
         if let Some((ur, uvr)) = self.t_data.get_key_value(unit) {
             let (u, uv) = (Rc::clone(ur), Rc::clone(uvr));
-            del_jobs.append(&mut self.remove_entry(dep, &(&u, &uv), kind1, kind2, result));
+            del_jobs.append(&mut self.remove_entry(db, &(&u, &uv), kind1, kind2, result));
             self.try_gc_empty_unit(&(&u, &uv));
 
             // status(sync): nothing changed
@@ -566,7 +568,7 @@ impl JobUnitTable {
 
     fn try_trigger_entry(
         &mut self,
-        dep: &UnitDep,
+        db: &UnitDb,
         value: &Rc<RefCell<JobUnit>>,
     ) -> (Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>) {
         let uv = value;
@@ -574,7 +576,7 @@ impl JobUnitTable {
         assert!(!uv.borrow().is_dirty());
 
         // try to trigger unit: trigger (order-allowed)it or pause (order-non-allowed)it
-        let (trigger_info, merge_trigger) = match self.is_uv_runnable(&uv.borrow(), dep) {
+        let (trigger_info, merge_trigger) = match self.is_uv_runnable(&uv.borrow(), db) {
             true => uv.borrow_mut().do_trigger(),
             false => {
                 uv.borrow_mut().pause();
@@ -594,7 +596,7 @@ impl JobUnitTable {
 
     fn finish_entry(
         &mut self,
-        dep: &UnitDep,
+        db: &UnitDb,
         entry: &(&Rc<UnitX>, &Rc<RefCell<JobUnit>>),
         result: JobResult,
     ) -> Option<Rc<Job>> {
@@ -612,10 +614,10 @@ impl JobUnitTable {
         uv.borrow_mut().clear_dirty(); // the 'dirty' entry has been synced, it's not dirty now.
 
         // resume order-related units
-        for other in dep.gets_atom(u, UnitRelationAtom::UnitAtomAfter).iter() {
+        for other in db.dep_gets_atom(u, UnitRelationAtom::UnitAtomAfter).iter() {
             self.resume_unit(other);
         }
-        for other in dep.gets_atom(u, UnitRelationAtom::UnitAtomBefore).iter() {
+        for other in db.dep_gets_atom(u, UnitRelationAtom::UnitAtomBefore).iter() {
             self.resume_unit(other);
         }
 
@@ -624,7 +626,7 @@ impl JobUnitTable {
 
     fn remove_entry(
         &mut self,
-        dep: &UnitDep,
+        db: &UnitDb,
         entry: &(&Rc<UnitX>, &Rc<RefCell<JobUnit>>),
         kind1: JobKind,
         kind2: Option<JobKind>,
@@ -652,10 +654,10 @@ impl JobUnitTable {
         uv.borrow_mut().clear_dirty(); // the 'dirty' entry has been synced, it's not dirty now.
 
         // resume order-related units
-        for other in dep.gets_atom(u, UnitRelationAtom::UnitAtomAfter).iter() {
+        for other in db.dep_gets_atom(u, UnitRelationAtom::UnitAtomAfter).iter() {
             self.resume_unit(other);
         }
-        for other in dep.gets_atom(u, UnitRelationAtom::UnitAtomBefore).iter() {
+        for other in db.dep_gets_atom(u, UnitRelationAtom::UnitAtomBefore).iter() {
             self.resume_unit(other);
         }
 
@@ -766,9 +768,12 @@ impl JobUnitTable {
             .expect("something inserted is not found.")
     }
 
-    fn is_uv_runnable(&self, uv: &JobUnit, dep: &UnitDep) -> bool {
+    fn is_uv_runnable(&self, uv: &JobUnit, db: &UnitDb) -> bool {
         let unit = uv.get_unit();
-        for other in dep.gets_atom(unit, UnitRelationAtom::UnitAtomAfter).iter() {
+        for other in db
+            .dep_gets_atom(unit, UnitRelationAtom::UnitAtomAfter)
+            .iter()
+        {
             if let Some(other_uv) = self.t_data.get(other) {
                 if !uv
                     .is_next_trigger_order_with(&other_uv.borrow(), UnitRelationAtom::UnitAtomAfter)
@@ -777,7 +782,10 @@ impl JobUnitTable {
                 }
             }
         }
-        for other in dep.gets_atom(unit, UnitRelationAtom::UnitAtomBefore).iter() {
+        for other in db
+            .dep_gets_atom(unit, UnitRelationAtom::UnitAtomBefore)
+            .iter()
+        {
             if let Some(other_uv) = self.t_data.get(other) {
                 if !uv.is_next_trigger_order_with(
                     &other_uv.borrow(),

@@ -1,4 +1,4 @@
-use process1::manager::{KillOperation, Unit, UnitActiveState, UnitManager, UnitObj};
+use process1::manager::{KillOperation, Unit, UnitActiveState, UnitManager, UnitMngUtil, UnitObj};
 use process1::watchdog;
 use std::any::{Any, TypeId};
 use std::collections::hash_map::DefaultHasher;
@@ -219,7 +219,8 @@ impl fmt::Display for CommandLine {
 
 #[derive(Default, Debug)]
 pub struct ServiceUnit {
-    pub unit: Weak<Unit>,
+    pub unit: Option<Weak<Unit>>,
+    pub um: Option<Weak<UnitManager>>,
     service_type: ServiceType,
     state: ServiceState,
     restart: ServiceRestart,
@@ -253,9 +254,10 @@ pub struct ServiceUnit {
 }
 
 impl ServiceUnit {
-    pub fn new(unit: Weak<Unit>) -> Self {
+    pub fn new() -> Self {
         Self {
-            unit,
+            unit: None,
+            um: None,
             service_type: ServiceType::ServiceTypeInvalid,
             state: ServiceState::ServiceStateMax,
             restart: ServiceRestart::ServiceRestartInvalid,
@@ -309,75 +311,101 @@ impl ServiceUnit {
         self.unit.id.to_string()
     }*/
 
-    pub fn start(&mut self, m: &mut UnitManager) {
+    pub fn start(&mut self) {
         let cmds = self.exec_commands[ServiceCommand::ServiceCondition as usize].clone();
         let mut cmd = cmds.iter();
 
         match cmd.next() {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
-                match service_start::start_service(self, m, &*cmd.borrow()) {
+                match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
-                        self.run_dead(m, ServiceResult::ServiceFailureResources);
+                        self.run_dead(ServiceResult::ServiceFailureResources);
                     }
                 }
-                self.set_state(m, ServiceState::ServiceCondition);
+                self.set_state(ServiceState::ServiceCondition);
             }
             None => {
-                self.run_prestart(m);
+                self.run_prestart();
             }
         }
     }
 
-    fn run_prestart(&mut self, m: &mut UnitManager) {
+    fn run_prestart(&mut self) {
         let cmds = self.exec_commands[ServiceCommand::ServiceStartPre as usize].clone();
         let mut cmd = cmds.iter();
 
-        self.unwatch_control_pid(m);
+        self.unwatch_control_pid();
         match cmd.next() {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
 
-                match service_start::start_service(self, m, &*cmd.borrow()) {
+                match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
-                        self.run_dead(m, ServiceResult::ServiceFailureResources);
+                        self.run_dead(ServiceResult::ServiceFailureResources);
                     }
                 }
-                self.set_state(m, ServiceState::ServiceStartPre);
+                self.set_state(ServiceState::ServiceStartPre);
             }
-            None => self.run_start(m),
+            None => self.run_start(),
         }
     }
 
-    fn unwatch_control_pid(&mut self, m: &mut UnitManager) {
+    fn unwatch_control_pid(&mut self) {
         match self.control_pid {
-            Some(pid) => m.unwatch_pid(pid),
+            Some(pid) => self
+                .um
+                .as_ref()
+                .cloned()
+                .unwrap()
+                .upgrade()
+                .as_ref()
+                .cloned()
+                .unwrap()
+                .child_unwatch_pid(pid),
             None => {}
         }
     }
 
-    fn unwatch_main_pid(&mut self, m: &mut UnitManager) {
+    fn unwatch_main_pid(&mut self) {
         match self.main_pid {
-            Some(pid) => m.unwatch_pid(pid),
+            Some(pid) => self
+                .um
+                .as_ref()
+                .cloned()
+                .unwrap()
+                .upgrade()
+                .as_ref()
+                .cloned()
+                .unwrap()
+                .child_unwatch_pid(pid),
             None => {}
         }
     }
 
-    fn run_next_control(&mut self, m: &mut UnitManager) {
+    fn run_next_control(&mut self) {
         log::debug!("runing next control command");
         if let Some(control_command) = &self.control_command {
             if let Some(cmd) = &control_command.clone().borrow().next {
                 self.control_command = Some(cmd.clone());
-                match service_start::start_service(self, m, &*cmd.borrow()) {
+                match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => {
                         self.control_pid = Some(pid);
                     }
                     Err(_e) => {
                         log::error!(
                             "failed to start service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
+                            self.unit
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .upgrade()
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .get_id()
                         );
                     }
                 }
@@ -385,18 +413,26 @@ impl ServiceUnit {
         }
     }
 
-    fn run_next_main(&mut self, m: &mut UnitManager) {
+    fn run_next_main(&mut self) {
         if let Some(main_command) = &self.main_command {
             if let Some(cmd) = &main_command.clone().borrow().next {
                 self.main_command = Some(cmd.clone());
-                match service_start::start_service(self, m, &*cmd.borrow()) {
+                match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => {
                         self.main_pid = Some(pid);
                     }
                     Err(_e) => {
                         log::error!(
                             "failed to run main command: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
+                            self.unit
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .upgrade()
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .get_id()
                         );
                     }
                 }
@@ -404,7 +440,7 @@ impl ServiceUnit {
         }
     }
 
-    fn set_state(&mut self, m: &mut UnitManager, state: ServiceState) {
+    fn set_state(&mut self, state: ServiceState) {
         let original_state = self.state;
         self.state = state;
 
@@ -416,84 +452,106 @@ impl ServiceUnit {
         // todo!()
         // trigger the unit the dependency trigger_by
 
-        self.unit.upgrade().as_ref().cloned().unwrap().notify(
-            m,
-            original_state.to_unit_active_state(),
-            state.to_unit_active_state(),
-        );
+        self.unit
+            .as_ref()
+            .cloned()
+            .unwrap()
+            .upgrade()
+            .as_ref()
+            .cloned()
+            .unwrap()
+            .notify(
+                original_state.to_unit_active_state(),
+                state.to_unit_active_state(),
+            );
     }
 
-    fn run_start(&mut self, m: &mut UnitManager) {
+    fn run_start(&mut self) {
         log::debug!("running service start command");
         self.control_command = None;
         let cmds = self.exec_commands[ServiceCommand::ServiceStart as usize].clone();
         let mut cmd = cmds.iter();
 
-        self.unwatch_control_pid(m);
-        self.unwatch_main_pid(m);
+        self.unwatch_control_pid();
+        self.unwatch_main_pid();
         match cmd.next() {
             Some(cmd) => {
                 self.main_command = Some(cmd.clone());
 
-                match service_start::start_service(self, m, &*cmd.borrow()) {
+                match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => self.main_pid = Some(pid),
                     Err(_e) => {
                         log::error!(
                             "failed to start service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
+                            self.unit
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .upgrade()
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .get_id()
                         );
                         self.send_signal(
-                            m,
                             ServiceState::ServiceStopSigterm,
                             ServiceResult::ServiceFailureResources,
                         );
                     }
                 }
-                self.set_state(m, ServiceState::ServiceStart);
+                self.set_state(ServiceState::ServiceStart);
             }
             None => {
-                self.run_start_post(m);
+                self.run_start_post();
             }
         }
     }
 
-    fn run_start_post(&mut self, m: &mut UnitManager) {
+    fn run_start_post(&mut self) {
         log::debug!("running start post command");
         let cmds = self.exec_commands[ServiceCommand::ServiceStartPost as usize].clone();
         let mut cmd = cmds.iter();
 
-        self.unwatch_control_pid(m);
+        self.unwatch_control_pid();
         match cmd.next() {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
 
-                match service_start::start_service(self, m, &*cmd.borrow()) {
+                match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
                         log::error!(
                             "Failed to run start post service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
+                            self.unit
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .upgrade()
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .get_id()
                         );
                     }
                 }
-                self.set_state(m, ServiceState::ServiceStartPost);
+                self.set_state(ServiceState::ServiceStartPost);
             }
-            None => self.enter_running(m, ServiceResult::ServiceSuccess),
+            None => self.enter_running(ServiceResult::ServiceSuccess),
         }
     }
 
-    fn enter_running(&mut self, m: &mut UnitManager, sr: ServiceResult) {
-        self.unwatch_control_pid(m);
+    fn enter_running(&mut self, sr: ServiceResult) {
+        self.unwatch_control_pid();
         if self.result == ServiceResult::ServiceSuccess {
             self.result = sr;
         }
 
         if self.result != ServiceResult::ServiceSuccess {
-            self.send_signal(m, ServiceState::ServiceStopSigterm, sr);
+            self.send_signal(ServiceState::ServiceStopSigterm, sr);
         } else if self.service_alive() {
-            self.set_state(m, ServiceState::ServiceRuning);
+            self.set_state(ServiceState::ServiceRuning);
         } else {
-            self.run_stop(m, sr);
+            self.run_stop(sr);
         }
     }
 
@@ -502,7 +560,7 @@ impl ServiceUnit {
         true
     }
 
-    fn send_signal(&mut self, m: &mut UnitManager, state: ServiceState, res: ServiceResult) {
+    fn send_signal(&mut self, state: ServiceState, res: ServiceResult) {
         log::debug!(
             "Sending signalsend signal of state: {:?}, service result: {:?}",
             state,
@@ -519,7 +577,7 @@ impl ServiceUnit {
         ]
         .contains(&state)
         {
-            self.run_stop_post(m, ServiceResult::ServiceSuccess);
+            self.run_stop_post(ServiceResult::ServiceSuccess);
         } else if vec![
             ServiceState::ServiceFinalWatchdog,
             ServiceState::ServiceFinalSigterm,
@@ -527,12 +585,11 @@ impl ServiceUnit {
         .contains(&state)
         {
             self.send_signal(
-                m,
                 ServiceState::ServiceFinalSigkill,
                 ServiceResult::ServiceSuccess,
             );
         } else {
-            self.run_dead(m, ServiceResult::ServiceSuccess);
+            self.run_dead(ServiceResult::ServiceSuccess);
         }
 
         log::debug!(
@@ -542,7 +599,7 @@ impl ServiceUnit {
         );
     }
 
-    pub fn run_stop(&mut self, m: &mut UnitManager, res: ServiceResult) {
+    pub fn run_stop(&mut self, res: ServiceResult) {
         if self.result == ServiceResult::ServiceSuccess {
             self.result = res;
         }
@@ -554,20 +611,27 @@ impl ServiceUnit {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
 
-                match service_start::start_service(self, m, &*cmd.borrow()) {
+                match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
                         log::error!(
                             "Failed to run stop service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
+                            self.unit
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .upgrade()
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .get_id()
                         );
                     }
                 }
-                self.set_state(m, ServiceState::ServiceStop);
+                self.set_state(ServiceState::ServiceStop);
             }
             None => {
                 self.send_signal(
-                    m,
                     ServiceState::ServiceStopSigterm,
                     ServiceResult::ServiceSuccess,
                 );
@@ -575,7 +639,7 @@ impl ServiceUnit {
         }
     }
 
-    pub fn run_stop_post(&mut self, m: &mut UnitManager, res: ServiceResult) {
+    pub fn run_stop_post(&mut self, res: ServiceResult) {
         log::debug!("runing stop post, service result: {:?}", res);
         if self.result == ServiceResult::ServiceSuccess {
             self.result = res;
@@ -588,25 +652,31 @@ impl ServiceUnit {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
 
-                match service_start::start_service(self, m, &*cmd.borrow()) {
+                match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
                         self.send_signal(
-                            m,
                             ServiceState::ServiceFinalSigterm,
                             ServiceResult::ServiceFailureResources,
                         );
                         log::error!(
                             "Failed to run stop service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
+                            self.unit
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .upgrade()
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .get_id()
                         );
                     }
                 }
-                self.set_state(m, ServiceState::ServiceStopPost);
+                self.set_state(ServiceState::ServiceStopPost);
             }
             None => {
                 self.send_signal(
-                    m,
                     ServiceState::ServiceFinalSigterm,
                     ServiceResult::ServiceSuccess,
                 );
@@ -614,7 +684,7 @@ impl ServiceUnit {
         }
     }
 
-    fn run_dead(&mut self, m: &mut UnitManager, res: ServiceResult) {
+    fn run_dead(&mut self, res: ServiceResult) {
         log::debug!("Running into dead state, res: {:?}", res);
         if self.result == ServiceResult::ServiceSuccess {
             self.result = res;
@@ -626,34 +696,42 @@ impl ServiceUnit {
             ServiceState::ServiceFailed
         };
 
-        self.set_state(m, state);
+        self.set_state(state);
     }
 
-    fn run_reload(&mut self, m: &mut UnitManager) {
+    fn run_reload(&mut self) {
         log::debug!("running service reload command");
         self.control_command = None;
         let cmds = self.exec_commands[ServiceCommand::ServiceReload as usize].clone();
         let mut cmd = cmds.iter();
 
-        self.unwatch_control_pid(m);
+        self.unwatch_control_pid();
         match cmd.next() {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
 
-                match service_start::start_service(self, m, &*cmd.borrow()) {
+                match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
                         log::error!(
                             "failed to start service: {}",
-                            self.unit.upgrade().as_ref().cloned().unwrap().get_id()
+                            self.unit
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .upgrade()
+                                .as_ref()
+                                .cloned()
+                                .unwrap()
+                                .get_id()
                         );
-                        self.enter_running(m, ServiceResult::ServiceSuccess);
+                        self.enter_running(ServiceResult::ServiceSuccess);
                     }
                 }
-                self.set_state(m, ServiceState::ServiceReload);
+                self.set_state(ServiceState::ServiceReload);
             }
             None => {
-                self.enter_running(m, ServiceResult::ServiceSuccess);
+                self.enter_running(ServiceResult::ServiceSuccess);
             }
         }
     }
@@ -691,7 +769,7 @@ impl ServiceUnit {
 }
 
 impl ServiceUnit {
-    fn sigchld_event(&mut self, m: &mut UnitManager, pid: Pid, code: i32, status: Signal) {
+    fn sigchld_event(&mut self, pid: Pid, code: i32, status: Signal) {
         log::debug!(
             "ServiceUnit sigchld exit, pid: {:?} code:{}, status:{}",
             pid,
@@ -699,7 +777,7 @@ impl ServiceUnit {
             status
         );
         log::debug!(
-            "main_pid ：{:?}, control_pid: {:?}, state: {:?}",
+            "main_pid: {:?}, control_pid: {:?}, state: {:?}",
             self.main_pid,
             self.control_pid,
             self.state
@@ -724,28 +802,28 @@ impl ServiceUnit {
                 && self.main_command.as_ref().unwrap().borrow().next.is_some()
                 && res == ServiceResult::ServiceSuccess
             {
-                self.run_next_main(m);
+                self.run_next_main();
             } else {
                 self.main_command = None;
                 match self.state {
                     ServiceState::ServiceDead => todo!(),
                     ServiceState::ServiceStart => {
-                        self.send_signal(m, ServiceState::ServiceStopSigterm, res);
+                        self.send_signal(ServiceState::ServiceStopSigterm, res);
                     }
                     ServiceState::ServiceStartPost | ServiceState::ServiceReload => {
-                        self.run_stop(m, res);
+                        self.run_stop(res);
                     }
                     ServiceState::ServiceRuning => {
-                        self.enter_running(m, res);
+                        self.enter_running(res);
                     }
                     ServiceState::ServiceStop => {}
                     ServiceState::ServiceStopWatchdog
                     | ServiceState::ServiceStopSigkill
                     | ServiceState::ServiceStopSigterm => {
-                        self.run_stop_post(m, res);
+                        self.run_stop_post(res);
                     }
                     ServiceState::ServiceFinalSigterm | ServiceState::ServiceFinalSigkill => {
-                        self.run_dead(m, res);
+                        self.run_dead(res);
                     }
                     _ => {}
                 }
@@ -763,49 +841,49 @@ impl ServiceUnit {
                     .is_some()
                 && res == ServiceResult::ServiceSuccess
             {
-                self.run_next_control(m);
+                self.run_next_control();
             } else {
                 self.control_command = None;
                 match self.state {
                     ServiceState::ServiceCondition => {
                         if res == ServiceResult::ServiceSuccess {
-                            self.run_prestart(m);
+                            self.run_prestart();
                         } else {
-                            self.send_signal(m, ServiceState::ServiceStopSigterm, res);
+                            self.send_signal(ServiceState::ServiceStopSigterm, res);
                         }
                     }
                     ServiceState::ServiceStartPre => {
                         if res == ServiceResult::ServiceSuccess {
-                            self.run_start(m);
+                            self.run_start();
                         } else {
-                            self.send_signal(m, ServiceState::ServiceStopSigterm, res);
+                            self.send_signal(ServiceState::ServiceStopSigterm, res);
                         }
                     }
                     ServiceState::ServiceStart => {
                         if res == ServiceResult::ServiceSuccess {
-                            self.run_start_post(m);
+                            self.run_start_post();
                         }
                     }
                     ServiceState::ServiceStartPost => {
-                        self.enter_running(m, ServiceResult::ServiceSuccess);
+                        self.enter_running(ServiceResult::ServiceSuccess);
                     }
                     ServiceState::ServiceRuning => todo!(),
                     ServiceState::ServiceReload => {
-                        self.enter_running(m, res);
+                        self.enter_running(res);
                     }
                     ServiceState::ServiceStop => {
-                        self.send_signal(m, ServiceState::ServiceStopSigterm, res);
+                        self.send_signal(ServiceState::ServiceStopSigterm, res);
                     }
                     ServiceState::ServiceStopSigterm
                     | ServiceState::ServiceStopSigkill
                     | ServiceState::ServiceStopWatchdog => {
-                        self.run_stop_post(m, res);
+                        self.run_stop_post(res);
                     }
                     ServiceState::ServiceStopPost => {
-                        self.send_signal(m, ServiceState::ServiceFinalSigterm, res);
+                        self.send_signal(ServiceState::ServiceFinalSigterm, res);
                     }
                     ServiceState::ServiceFinalSigterm | ServiceState::ServiceFinalSigkill => {
-                        self.run_dead(m, res);
+                        self.run_dead(res);
                     }
                     _ => {}
                 }
@@ -840,10 +918,18 @@ impl UnitObj for ServiceUnit {
     fn done(&self) {
         todo!()
     }
-    fn load(&mut self, m: &mut UnitManager) -> Result<(), Box<dyn Error>> {
-        self.unit.upgrade().as_ref().cloned().unwrap().load_unit(m);
+    fn load(&mut self) -> Result<(), Box<dyn Error>> {
+        self.unit
+            .as_ref()
+            .cloned()
+            .unwrap()
+            .upgrade()
+            .as_ref()
+            .cloned()
+            .unwrap()
+            .load_unit();
 
-        self.parse(m)?;
+        self.parse()?;
 
         self.service_add_extras();
 
@@ -852,13 +938,13 @@ impl UnitObj for ServiceUnit {
     fn coldplug(&self) {
         todo!()
     }
-    fn start(&mut self, m: &mut UnitManager) {
-        self.start(m);
+    fn start(&mut self) {
+        self.start();
     }
     fn dump(&self) {
         todo!()
     }
-    fn stop(&mut self, m: &mut UnitManager) {
+    fn stop(&mut self) {
         self.forbid_restart = true;
         let stop_state = vec![
             ServiceState::ServiceStop,
@@ -881,17 +967,16 @@ impl UnitObj for ServiceUnit {
         ];
         if starting_state.contains(&self.state) {
             self.send_signal(
-                m,
                 ServiceState::ServiceStopSigterm,
                 ServiceResult::ServiceSuccess,
             );
             return;
         }
 
-        self.run_stop(m, ServiceResult::ServiceSuccess);
+        self.run_stop(ServiceResult::ServiceSuccess);
     }
-    fn reload(&mut self, m: &mut UnitManager) {
-        self.run_reload(m);
+    fn reload(&mut self) {
+        self.run_reload();
     }
     fn kill(&self) {
         todo!()
@@ -905,8 +990,8 @@ impl UnitObj for ServiceUnit {
     fn check_snapshot(&self) {
         todo!()
     }
-    fn sigchld_events(&mut self, m: &mut UnitManager, pid: Pid, code: i32, status: Signal) {
-        self.sigchld_event(m, pid, code, status)
+    fn sigchld_events(&mut self, pid: Pid, code: i32, status: Signal) {
+        self.sigchld_event(pid, code, status)
     }
     fn reset_failed(&self) {
         todo!()
@@ -914,8 +999,24 @@ impl UnitObj for ServiceUnit {
 
     fn eq(&self, other: &dyn UnitObj) -> bool {
         if let Some(other) = other.as_any().downcast_ref::<ServiceUnit>() {
-            return self.unit.upgrade().as_ref().cloned().unwrap()
-                == other.unit.upgrade().as_ref().cloned().unwrap();
+            return self
+                .unit
+                .as_ref()
+                .cloned()
+                .unwrap()
+                .upgrade()
+                .as_ref()
+                .cloned()
+                .unwrap()
+                == other
+                    .unit
+                    .as_ref()
+                    .cloned()
+                    .unwrap()
+                    .upgrade()
+                    .as_ref()
+                    .cloned()
+                    .unwrap();
         }
         false
     }
@@ -925,6 +1026,9 @@ impl UnitObj for ServiceUnit {
         Hash::hash(&(TypeId::of::<ServiceUnit>()), &mut h);
         h.write(
             self.unit
+                .as_ref()
+                .cloned()
+                .unwrap()
                 .upgrade()
                 .as_ref()
                 .cloned()
@@ -941,6 +1045,9 @@ impl UnitObj for ServiceUnit {
 
     fn in_load_queue(&self) -> bool {
         self.unit
+            .as_ref()
+            .cloned()
+            .unwrap()
             .upgrade()
             .as_ref()
             .cloned()
@@ -949,19 +1056,31 @@ impl UnitObj for ServiceUnit {
     }
 }
 
+impl UnitMngUtil for ServiceUnit {
+    fn attach(&self, um: Rc<UnitManager>) {
+        todo!();
+    }
+}
+
 use process1::declure_unitobj_plugin;
 declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default);
 
 impl ServiceUnit {
-    fn parse(&mut self, manager: &mut UnitManager) -> Result<(), Box<dyn Error>> {
+    fn parse(&mut self) -> Result<(), Box<dyn Error>> {
         self.unit
+            .as_ref()
+            .cloned()
+            .unwrap()
             .upgrade()
             .as_ref()
             .cloned()
             .unwrap()
-            .load_parse(manager)?;
+            .load_parse()?;
         let conf = self
             .unit
+            .as_ref()
+            .cloned()
+            .unwrap()
             .upgrade()
             .as_ref()
             .cloned()

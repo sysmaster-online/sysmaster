@@ -1,4 +1,3 @@
-
 pub struct Conf(String, ConfValue);
 
 pub enum ConfValue {

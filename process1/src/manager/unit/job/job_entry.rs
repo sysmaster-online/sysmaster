@@ -1,6 +1,6 @@
 #![warn(unused_imports)]
-use crate::manager::data::JobMode;
-use crate::manager::unit::unit_base::{UnitActionError, UnitActiveState, UnitNotifyFlags};
+use crate::manager::data::{JobMode, UnitActiveState, UnitNotifyFlags};
+use crate::manager::unit::unit_base::UnitActionError;
 use crate::manager::unit::unit_entry::UnitX;
 use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
 use std::cell::RefCell;
