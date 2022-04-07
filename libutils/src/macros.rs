@@ -1,13 +1,12 @@
 #![allow(unused_macros)]
 #[macro_export]
-
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
         let res = unsafe { libc::$fn($($arg, )*) };
-        if res == -1 {
-            Err(std::io::Error::last_os_error())
+        if res < 0 {
+            utils::Result::Err(utils::Error::Syscall { syscall: stringify!($fn), errno: unsafe { *libc::__errno_location() }, ret: res })
         } else {
-            Ok(res)
+            utils::Result::Ok(res)
         }
     }};
 }

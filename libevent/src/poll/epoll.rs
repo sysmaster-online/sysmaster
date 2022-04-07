@@ -1,20 +1,9 @@
 use libc::{epoll_event, EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD};
 use std::os::unix::io::{AsRawFd, RawFd};
+use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
-use std::{io, ptr};
-
-#[allow(unused_macros)]
-#[macro_export]
-macro_rules! syscall {
-    ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
-        let res = unsafe { libc::$fn($($arg, )*) };
-        if res == -1 {
-            Err(std::io::Error::last_os_error())
-        } else {
-            Ok(res)
-        }
-    }};
-}
+use utils::syscall;
+use utils::Result;
 
 const LOWEST_FD: libc::c_int = 3;
 
@@ -25,21 +14,21 @@ pub(crate) struct Epoll {
 }
 
 impl Epoll {
-    pub(crate) fn new() -> io::Result<Epoll> {
+    pub(crate) fn new() -> Result<Epoll> {
         syscall!(epoll_create1(EPOLL_CLOEXEC)).map(|ep| Epoll {
             epoll_fd: ep,
             n_sources: AtomicUsize::new(0),
         })
     }
 
-    pub(crate) fn try_clone(&self) -> io::Result<Epoll> {
+    pub(crate) fn try_clone(&self) -> Result<Epoll> {
         syscall!(fcntl(self.epoll_fd, libc::F_DUPFD_CLOEXEC, LOWEST_FD)).map(|ep| Epoll {
             epoll_fd: ep,
             n_sources: AtomicUsize::new(0),
         })
     }
 
-    pub(crate) fn poll(&self, timeout: i32) -> io::Result<Vec<epoll_event>> {
+    pub(crate) fn poll(&self, timeout: i32) -> Result<Vec<epoll_event>> {
         let mut events = Vec::<epoll_event>::with_capacity(self.n_sources.load(Relaxed));
 
         events.clear();
@@ -55,16 +44,16 @@ impl Epoll {
         Ok(events)
     }
 
-    pub(crate) fn register(&mut self, fd: RawFd, event: &mut epoll_event) -> io::Result<()> {
+    pub(crate) fn register(&mut self, fd: RawFd, event: &mut epoll_event) -> Result<()> {
         self.n_sources.fetch_add(1, Relaxed);
         syscall!(epoll_ctl(self.epoll_fd, EPOLL_CTL_ADD, fd, event)).map(|_| ())
     }
 
-    pub(crate) fn reregister(&mut self, fd: RawFd, event: &mut epoll_event) -> io::Result<()> {
+    pub(crate) fn reregister(&mut self, fd: RawFd, event: &mut epoll_event) -> Result<()> {
         syscall!(epoll_ctl(self.epoll_fd, EPOLL_CTL_MOD, fd, event)).map(|_| ())
     }
 
-    pub(crate) fn unregister(&mut self, fd: RawFd) -> io::Result<()> {
+    pub(crate) fn unregister(&mut self, fd: RawFd) -> Result<()> {
         self.n_sources.fetch_sub(1, Relaxed);
         syscall!(epoll_ctl(self.epoll_fd, EPOLL_CTL_DEL, fd, ptr::null_mut())).map(|_| ())
     }

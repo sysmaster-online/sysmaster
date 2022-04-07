@@ -8,6 +8,7 @@ use std::{
 use event::EventType;
 use event::Events;
 use event::Source;
+use utils::{Error, Result};
 
 use std::thread;
 use std::time::Duration;
@@ -42,8 +43,9 @@ impl Source for Io {
         0i8
     }
 
-    fn dispatch(&self, _: &mut Events) {
+    fn dispatch(&self, _: &mut Events) -> Result<i32, Error> {
         println!("Dispatching IO!");
+        Ok(0)
     }
 
     fn token(&self) -> u64 {
@@ -52,7 +54,8 @@ impl Source for Io {
     }
 }
 
-fn main() {
+#[test]
+fn test_io() {
     thread::spawn(move || {
         let listener = TcpListener::bind("0.0.0.0:9097").unwrap();
         loop {

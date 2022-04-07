@@ -1,3 +1,6 @@
+use utils::Error;
+use utils::Result;
+
 use crate::EventType;
 use crate::Events;
 use std::fmt::Debug;
@@ -9,7 +12,7 @@ pub trait Source {
     }
 
     fn signals(&self) -> Vec<libc::c_int> {
-        vec![libc::SIGABRT]
+        vec![]
     }
 
     fn pid(&self) -> libc::pid_t {
@@ -31,7 +34,7 @@ pub trait Source {
         0i8
     }
 
-    fn dispatch(&self, event: &mut Events);
+    fn dispatch(&self, event: &mut Events) -> Result<i32, Error>;
 }
 
 // for HashSet
