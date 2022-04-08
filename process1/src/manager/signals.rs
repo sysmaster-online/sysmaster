@@ -2,6 +2,7 @@ use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use event::{EventType, Events, Source};
 use nix::{sys::signal::Signal, unistd::Pid};
+use utils::{Error, Result};
 
 use super::manager::Manager;
 
@@ -36,8 +37,9 @@ impl Source for Signals {
         0i8
     }
 
-    fn dispatch(&self, e: &mut Events) {
+    fn dispatch(&self, e: &mut Events) -> Result<i32, Error> {
         println!("Dispatching signal!");
+        #[allow(clippy::never_loop)]
         loop {
             match e.read_signals() {
                 Ok(Some(info)) => {
@@ -70,6 +72,7 @@ impl Source for Signals {
                 }
             }
         }
+        Ok(0)
     }
 
     fn token(&self) -> u64 {

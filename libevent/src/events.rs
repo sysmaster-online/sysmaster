@@ -1,5 +1,7 @@
 use crate::{signal::Signals, EventType, Poll, Source};
 
+use utils::error::*;
+
 use std::{
     cell::RefCell,
     collections::{BinaryHeap, HashMap},
@@ -22,7 +24,7 @@ pub struct Events {
 }
 
 impl Events {
-    pub fn new() -> std::io::Result<Events> {
+    pub fn new() -> Result<Events> {
         Ok(Self {
             poller: Poll::new()?,
             exit: false,
@@ -166,26 +168,26 @@ impl Events {
             let top = first.try_borrow().unwrap();
             match top.event_type() {
                 EventType::Io => {
-                    top.dispatch(self);
+                    top.dispatch(self).unwrap();
                 }
                 EventType::Timer => todo!(),
                 EventType::TimerRelative => todo!(),
                 EventType::Signal => {
-                    top.dispatch(self);
+                    top.dispatch(self).unwrap();
                 }
                 EventType::Child => {
-                    top.dispatch(self);
+                    top.dispatch(self).unwrap();
                 }
                 EventType::Pidfd => {
-                    top.dispatch(self);
+                    top.dispatch(self).unwrap();
                 }
                 EventType::Inotify => todo!(),
                 EventType::Defer => {
-                    top.dispatch(self);
+                    top.dispatch(self).unwrap();
                 }
                 EventType::Post => todo!(),
                 EventType::Exit => {
-                    top.dispatch(self);
+                    top.dispatch(self).unwrap();
                 }
             }
         }

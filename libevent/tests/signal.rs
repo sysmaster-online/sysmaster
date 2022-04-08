@@ -1,5 +1,7 @@
 use libc::getpid;
 use libc::kill;
+use utils::Error;
+use utils::Result;
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -33,8 +35,9 @@ impl Source for Signals {
         0i8
     }
 
-    fn dispatch(&self, _: &mut Events) {
+    fn dispatch(&self, _: &mut Events) -> Result<i32, Error> {
         println!("Dispatching signal!");
+        Ok(0)
     }
 
     fn token(&self) -> u64 {

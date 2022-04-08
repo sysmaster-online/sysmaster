@@ -9,3 +9,7 @@ pub mod path_lookup;
 pub mod time_util;
 pub mod unit_conf;
 pub mod unit_config_parser;
+
+pub use error::Error;
+pub use error::Result;
+pub use anyhow::*;

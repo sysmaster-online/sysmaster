@@ -23,6 +23,8 @@ pub enum EventType {
 
 #[cfg(test)]
 mod test {
+    use utils::Error;
+
     use crate::Events;
     use crate::Source;
 
@@ -54,7 +56,7 @@ mod test {
                 0
             }
 
-            fn dispatch(&self, _: &mut Events) {
+            fn dispatch(&self, _: &mut Events) -> Result<i32, Error> {
                 todo!()
             }
         }
@@ -99,8 +101,9 @@ mod test {
                 0i8
             }
 
-            fn dispatch(&self, _: &mut Events) {
+            fn dispatch(&self, _: &mut Events) -> Result<i32, Error> {
                 println!("Dispatching IO!");
+                Ok(0)
             }
 
             fn token(&self) -> u64 {

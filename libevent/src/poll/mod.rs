@@ -1,6 +1,6 @@
 use libc::epoll_event;
-use std::io;
 use std::os::unix::{io::AsRawFd, io::RawFd};
+use utils::Result;
 
 pub mod epoll;
 #[cfg(unix)]
@@ -12,31 +12,31 @@ pub struct Poll {
 }
 
 impl Poll {
-    pub fn new() -> io::Result<Poll> {
+    pub fn new() -> Result<Poll> {
         Ok(Poll {
             poller: Poller::new()?,
         })
     }
 
-    pub fn try_clone(&self) -> io::Result<Poll> {
+    pub fn try_clone(&self) -> Result<Poll> {
         Ok(Poll {
             poller: self.poller.try_clone().unwrap(),
         })
     }
 
-    pub fn poll(&self, timeout: i32) -> io::Result<Vec<epoll_event>> {
+    pub fn poll(&self, timeout: i32) -> Result<Vec<epoll_event>> {
         self.poller.poll(timeout)
     }
 
-    pub fn register(&mut self, fd: RawFd, event: &mut epoll_event) -> io::Result<()> {
+    pub fn register(&mut self, fd: RawFd, event: &mut epoll_event) -> Result<()> {
         self.poller.register(fd, event)
     }
 
-    pub fn reregister(&mut self, fd: RawFd, event: &mut epoll_event) -> io::Result<()> {
+    pub fn reregister(&mut self, fd: RawFd, event: &mut epoll_event) -> Result<()> {
         self.poller.reregister(fd, event)
     }
 
-    pub fn unregister(&mut self, fd: RawFd) -> io::Result<()> {
+    pub fn unregister(&mut self, fd: RawFd) -> Result<()> {
         self.poller.unregister(fd)
     }
 }

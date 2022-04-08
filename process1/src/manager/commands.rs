@@ -1,6 +1,7 @@
 use std::{cell::RefCell, os::unix::prelude::AsRawFd, rc::Rc};
 
 use event::{EventType, Events, Source};
+use utils::{Error, Result};
 
 use std::os::unix::io::RawFd;
 
@@ -31,7 +32,7 @@ impl Source for Commands {
         (libc::EPOLLIN) as u32
     }
 
-    fn dispatch(&self, _e: &mut Events) {
+    fn dispatch(&self, _e: &mut Events) -> Result<i32, Error> {
         println!("Dispatching Command!");
         for stream in self.fd.incoming() {
             match stream {
@@ -43,6 +44,7 @@ impl Source for Commands {
                 }
             }
         }
+        Ok(0)
     }
 
     fn token(&self) -> u64 {

@@ -1,4 +1,3 @@
-use std::convert::TryInto;
 use std::fmt::Debug;
 use std::mem;
 use std::ptr::null_mut;
@@ -92,7 +91,7 @@ impl Signals {
         let size = mem::size_of_val(&buffer);
         let res = unsafe { libc::read(self.fd, buffer.as_mut_ptr() as *mut libc::c_void, size) };
         match res {
-            x if x == size.try_into().unwrap() => Ok(Some(unsafe { buffer.assume_init() })),
+            x if x == size as isize => Ok(Some(unsafe { buffer.assume_init() })),
             _ => unreachable!("partial read on signalfd"),
         }
     }
