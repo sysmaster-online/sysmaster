@@ -118,7 +118,7 @@ impl ConfFactory for DefalutFactory {
 mod tests {
     use super::UnitParserMgr;
     use crate::manager::UnitType;
-    use std::fs::File;
+
     use std::io::{Error, ErrorKind};
     use std::path::PathBuf;
     use utils::logger;

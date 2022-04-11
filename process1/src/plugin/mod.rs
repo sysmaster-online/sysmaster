@@ -187,7 +187,7 @@ mod tests {
         let t_p = plugins.borrow();
         for uniobj in &t_p.unitobj_lists {
             let u = Arc::clone(&uniobj);
-            let u_box = unsafe { Arc::into_raw(u).as_ref().unwrap() };
+            let _u_box = unsafe { Arc::into_raw(u).as_ref().unwrap() };
             // let service_unit = u_box.as_any().downcast_ref::<ServiceUnit>().unwrap();
             // assert_eq!(service_unit.get_unit_name(),"");
         }

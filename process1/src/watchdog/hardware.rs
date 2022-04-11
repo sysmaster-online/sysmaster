@@ -200,13 +200,13 @@ mod tests {
 
     #[test]
     fn test_close() {
-        let mut watchdog = HardwareWatchdog::default();
+        let watchdog = HardwareWatchdog::default();
         let _ = watchdog.close();
     }
 
     #[test]
     fn test_config() {
-        let mut watchdog = HardwareWatchdog::default();
+        let watchdog = HardwareWatchdog::default();
         let _ = watchdog.config(Some(Duration::from_secs(10)));
     }
 

@@ -6,7 +6,7 @@ use log;
 use regex::Regex;
 
 fn build_exec_environment(
-    service: &ServiceUnit,
+    _service: &ServiceUnit,
     cmdline: &CommandLine,
     env: &HashMap<&str, String>,
 ) -> (std::ffi::CString, Vec<std::ffi::CString>) {

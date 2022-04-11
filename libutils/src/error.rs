@@ -87,7 +87,7 @@ mod test {
 
     #[test]
     fn var_error() {
-        let res = env::var("yoda").map_err(|e| Error::from(e));
+        let res = env::var("yoda").map_err(Error::from);
         assert!(res.is_err());
         let err = res.err().unwrap();
         assert_eq!(

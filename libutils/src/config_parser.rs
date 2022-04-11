@@ -49,18 +49,15 @@ impl<T: ConfFactory> ConfigParse for ConfigParser<T> {
             let mut confs = self.1.product_confs();
             // must be a table not support for other format
             for key in v_table.keys() {
-                let section;
-                if let Some(sect) = confs.get_section(key) {
-                    section = sect;
+                let section = if let Some(sect) = confs.get_section(key) {
+                    sect
                 } else {
                     return Err(IOError::new(
                         ErrorKind::Other,
-                        format!("get section [{}] from erro{}", key, error_info.to_string()),
+                        format!("get section [{}] from erro{}", key, error_info),
                     ));
-                }
-                if let Some(v_t_v_table) =
-                    v_table.get(key).unwrap_or_else(|| &error_info).as_table()
-                {
+                };
+                if let Some(v_t_v_table) = v_table.get(key).unwrap_or(&error_info).as_table() {
                     //must be a table not support for other format
                     for t_key in v_t_v_table.keys() {
                         if let Some(tmp) = v_t_v_table.get(t_key) {
@@ -72,8 +69,7 @@ impl<T: ConfFactory> ConfigParse for ConfigParser<T> {
                                     ErrorKind::Other,
                                     format!(
                                         "parser conf error key[{}] error info{}",
-                                        t_key,
-                                        error_info.to_string()
+                                        t_key, error_info
                                     ),
                                 ));
                             }
@@ -83,9 +79,9 @@ impl<T: ConfFactory> ConfigParse for ConfigParser<T> {
                     return Err(IOError::new(ErrorKind::Other, error_info.to_string()));
                 }
             }
-            return Ok(confs);
+            Ok(confs)
         } else {
-            return Err(IOError::new(ErrorKind::Other, error_info.to_string()));
+            Err(IOError::new(ErrorKind::Other, error_info.to_string()))
         }
     }
 }
@@ -134,7 +130,7 @@ mod tests {
                             if item_c.get_key() == "ExecStart" {
                                 match &item_c.get_values()[0] {
                                     ConfValue::String(str) => {
-                                        println!("{}", str.to_string());
+                                        println!("{}", str);
                                         assert_eq!("/usr/bin/reboot".to_string(), str.to_string())
                                     }
                                     ConfValue::Interger(_) => todo!(),

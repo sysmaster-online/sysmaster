@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn test_init_log_with_console() {
         init_log_with_console("test", 4);
-        assert_eq!((), ());
+        // assert_eq!((), ());
         log::info!("test for logger info");
         log::error!("test for logger error");
         log::warn!("test for logger warn");

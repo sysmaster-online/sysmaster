@@ -5,12 +5,12 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::LinkedList;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
-use std::str::FromStr;
+
 use utils::unit_conf::{Conf, Section};
 
 use super::service_base::{
-    CommandLine, DualTimestamp, ExitStatusSet, ServiceCommand, ServiceRestart,
-    ServiceResult, ServiceState, ServiceTimeoutFailureMode, ServiceType,
+    CommandLine, DualTimestamp, ExitStatusSet, ServiceCommand, ServiceRestart, ServiceResult,
+    ServiceState, ServiceTimeoutFailureMode, ServiceType,
 };
 use super::service_start;
 use nix::errno::Errno;
@@ -853,7 +853,7 @@ impl UnitObj for ServiceUnit {
 }
 
 impl UnitMngUtil for ServiceUnit {
-    fn attach(&self, um: Rc<UnitManager>) {
+    fn attach(&self, _um: Rc<UnitManager>) {
         todo!();
     }
 }
