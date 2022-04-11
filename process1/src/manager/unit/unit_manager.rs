@@ -4,6 +4,7 @@ use super::unit_datastore::UnitDb;
 use super::unit_entry::{UnitObj, UnitX};
 use super::unit_file::UnitFile;
 use super::unit_load::UnitLoad;
+use super::unit_parser_mgr::{UnitConfigParser, UnitParserMgr};
 use super::unit_relation_atom::UnitRelationAtom;
 use super::unit_runtime::UnitRT;
 use crate::manager::data::{DataManager, UnitConfig, UnitState, UnitType};
@@ -17,7 +18,7 @@ use std::rc::Rc;
 // use crate::unit_name_to_type;
 //unitManger composition of units with hash map
 
-pub trait UnitMngUtil: std::fmt::Debug {
+pub trait UnitMngUtil {
     fn attach(&self, um: Rc<UnitManager>);
 }
 
@@ -37,7 +38,7 @@ macro_rules! declure_unitobj_plugin {
     };
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct UnitManagerX {
     // associated objects
     dm: Rc<DataManager>,
@@ -64,13 +65,14 @@ impl UnitManagerX {
     }
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct UnitManager {
     file: Rc<UnitFile>,
     load: Rc<UnitLoad>,
     db: Rc<UnitDb>, // ALL UNIT STORE IN UNITDB,AND OTHER USE REF
     rt: Rc<UnitRT>,
     jm: Rc<JobManager>,
+    unit_conf_parser_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
 }
 
 impl UnitManager {
@@ -87,11 +89,13 @@ impl UnitManager {
         let _file = Rc::new(UnitFile::new());
         let _db = Rc::new(UnitDb::new());
         let rt = Rc::new(UnitRT::new());
+        let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
         let _load = Rc::new(UnitLoad::new(
             Rc::clone(&_dm),
             Rc::clone(&_file),
             Rc::clone(&_db),
             Rc::clone(&rt),
+            Rc::clone(&unit_conf_parser_mgr),
         ));
         UnitManager {
             file: Rc::clone(&_file),
@@ -99,11 +103,12 @@ impl UnitManager {
             db: Rc::clone(&_db),
             rt,
             jm: Rc::new(JobManager::new(Rc::clone(&_db))),
+            unit_conf_parser_mgr: Rc::clone(&unit_conf_parser_mgr),
         }
     }
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 struct UnitConfigs {
     name: String,             // key for table-subscriber
     data: Rc<UnitConfigsSub>, // data for table-subscriber
@@ -128,7 +133,7 @@ impl UnitConfigs {
     }
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 struct UnitConfigsSub {
     dm: Rc<DataManager>,
     um: Rc<UnitManager>,
@@ -155,10 +160,15 @@ impl UnitConfigsSub {
     }
 
     pub(self) fn insert_config(&self, name: &str, config: &UnitConfig) {
+        //hash map insert return is old value,need reconstruct
         let unit = match self.try_new_unit(name) {
             Some(u) => u,
-            None => todo!(), // load
+            None => {
+                log::error!("create unit obj error in unit manger");
+                return;
+            } // load
         };
+        //log::debug!("");
         self.um.db.units_insert(name.to_string(), Rc::clone(&unit));
 
         // config
@@ -166,10 +176,25 @@ impl UnitConfigsSub {
 
         // dependency
         for (relation, name) in config.deps.iter() {
+            let tmp_unit:Rc<UnitX>;
+            if let Some(unit) = self.um.db.units_get(name){
+                tmp_unit = Rc::clone(&unit);
+            }else{
+                tmp_unit = match self.try_new_unit(name){
+                    Some(u) =>u,
+                    None =>{
+                        log::error!("create unit obj error in unit manger");
+                        return;
+                    }
+                };
+                self.um.db.units_insert(name.to_string(),Rc::clone(&tmp_unit));
+                self.um.rt.push_load_queue(Rc::clone(&tmp_unit));
+            }
+
             if let Err(_e) = self.um.db.dep_insert(
                 Rc::clone(&unit),
                 *relation,
-                self.um.db.units_get(name).unwrap(),
+                tmp_unit,
                 true,
                 0,
             ) {
@@ -191,7 +216,7 @@ impl UnitConfigsSub {
         if let Some(unit) = self.um.db.units_get(name) {
             return Some(unit);
         }
-
+        log::info!("begin create {} obj by plugin", name);
         let plugins = Rc::clone(&Plugin::get_instance());
         plugins.borrow_mut().set_library_dir("../target/debug");
         plugins.borrow_mut().load_lib();
@@ -199,10 +224,15 @@ impl UnitConfigsSub {
             Ok(sub) => sub,
             Err(_e) => return None,
         };
-
+        subclass.get_private_conf_section_name().map(|s| {
+            self.um
+                .unit_conf_parser_mgr
+                .register_parser_by_private_section_name(unit_type.to_string(), s.to_string())
+        });
         Some(Rc::new(UnitX::new(
             Rc::clone(&self.dm),
             Rc::clone(&self.um.file),
+            Rc::clone(&self.um.unit_conf_parser_mgr),
             unit_type,
             name,
             subclass,
@@ -210,7 +240,7 @@ impl UnitConfigsSub {
     }
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 struct UnitStates {
     name: String,            // key for table-subscriber
     data: Rc<UnitStatesSub>, // data for table-subscriber
@@ -233,7 +263,7 @@ impl UnitStates {
     }
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 struct UnitStatesSub {
     um: Rc<UnitManager>,
 }

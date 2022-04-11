@@ -7,7 +7,6 @@ use utils::path_lookup::LookupPaths;
 use utils::{path_lookup, time_util};
 use walkdir::WalkDir;
 
-#[derive(Debug)]
 pub(super) struct UnitFile {
     data: RefCell<UnitFileData>,
 }

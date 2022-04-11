@@ -2,15 +2,8 @@ use super::manager::{UnitObj, UnitType};
 use dynamic_reload as dy_re;
 use log::*;
 use std::ffi::OsStr;
-use std::path::Path;
-use std::{
-    collections::HashMap,
-    error::Error,
-    fs,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
-use std::{env, io};
+use std::io;
+use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
 use walkdir::{DirEntry, WalkDir};
 
 use std::cell::RefCell;
@@ -58,7 +51,7 @@ impl Plugin {
             if self.library_dir.is_empty() {
                 return false;
             }
-            let mut libdir_path = PathBuf::from(self.library_dir.as_str());
+            let libdir_path = PathBuf::from(self.library_dir.as_str());
             if !libdir_path.exists() || !libdir_path.is_dir() {
                 log::error!(
                     "library_dir is dir {:?} is not a dir or not exist",
@@ -92,7 +85,16 @@ impl Plugin {
                 continue;
             } else {
                 let file_name = path.file_name();
-                Self::load_plugin(self, file_name.unwrap(), &mut reload_handler);
+                let result = Self::load_plugin(self, file_name.unwrap(), &mut reload_handler);
+                if let Ok(_r) = result {
+                    log::info!("Plugin load unit plugin[{:?}] sucessfull", file_name);
+                } else if let Err(_e) = result {
+                    log::error!(
+                        "Plugin load unit plugin[{:?}] failed,deatil is {}",
+                        file_name,
+                        _e.to_string()
+                    );
+                }
             }
         }
         self.is_loaded = true;
@@ -111,7 +113,10 @@ impl Plugin {
                         log::error!("invalid service type os lib {}", v);
                         return Ok(());
                     }
-                    log::debug!("insert unit {:?} dynamic lib into libs", unit_type);
+                    log::debug!(
+                        "insert unit {} dynamic lib into libs",
+                        unit_type.to_string()
+                    );
                     self.load_libs.insert(unit_type, lib.clone());
                     let dy_lib = self.load_libs.get(&unit_type).unwrap();
                     let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitObj> =
@@ -158,7 +163,9 @@ impl Plugin {
     pub fn create_unit_obj(&self, unit_type: UnitType) -> Result<Box<dyn UnitObj>, Box<dyn Error>> {
         let dy_lib = match self.load_libs.get(&unit_type) {
             Some(lib) => lib.clone(),
-            None => return Err(format!("the {:?} plugin is not exist", unit_type).into()),
+            None => {
+                return Err(format!("the {:?} plugin is not exist", unit_type.to_string()).into())
+            }
         };
 
         let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitObj> =

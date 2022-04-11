@@ -5,7 +5,7 @@ Requires="c.service"
 Wants = "b.service"
 
 [Service]
-ExecStart=["echo 'test' "]
+ExecStart=["echo 'test'"]
 
 
 [Install]

@@ -4,7 +4,7 @@ use toml::Value;
 
 use super::unit_conf::Confs;
 pub trait ConfigParse {
-    fn unit_file_parse(&self, file_content: &str) -> Result<Confs, IOError>;
+    fn toml_file_parse(&self, file_content: &str) -> Result<Confs, IOError>;
 }
 pub struct ConfigParser<T: ConfFactory>(String, T);
 
@@ -15,9 +15,6 @@ where
     pub fn new(unit_type: String, factory: T) -> Self {
         Self(unit_type, factory)
     }
-    pub fn test(&self) {
-        self.1.product_confs();
-    }
 }
 
 fn convert_value_to_confvalue(value: &Value) -> Option<ConfValue> {
@@ -27,7 +24,7 @@ fn convert_value_to_confvalue(value: &Value) -> Option<ConfValue> {
         let mut ve = Vec::new();
         for v in v_array.iter() {
             if let Some(v_str) = v.as_str() {
-                ve.push(ConfValue::String(v_str.to_string()));
+                ve.push(ConfValue::String(v_str.trim().to_string()));
             }
         }
         Some(ConfValue::Array(ve))
@@ -37,7 +34,7 @@ fn convert_value_to_confvalue(value: &Value) -> Option<ConfValue> {
 }
 
 impl<T: ConfFactory> ConfigParse for ConfigParser<T> {
-    fn unit_file_parse(&self, file_content: &str) -> Result<Confs, IOError> {
+    fn toml_file_parse(&self, file_content: &str) -> Result<Confs, IOError> {
         let conf: Value = match toml::from_str(file_content) {
             Ok(conf) => conf,
             Err(why) => {
@@ -93,19 +90,19 @@ impl<T: ConfFactory> ConfigParse for ConfigParser<T> {
     }
 }
 
+#[cfg(test)]
 mod tests {
-
     use super::{ConfigParse, ConfigParser};
-    use crate::unit_conf::{ConfFactory, ConfValue, Confs, Section};
+    use crate::unit_conf::{ConfFactory, ConfValue, Confs, Section, SectionType};
     use std::fs::File;
     use std::io::{Error, ErrorKind, Read};
     struct ServiceFactory;
     impl ConfFactory for ServiceFactory {
         fn product_confs(&self) -> crate::unit_conf::Confs {
             let mut confs = Confs::new("service".to_string());
-            let unit_section = Section::new("Unit".to_string());
-            let service_section = Section::new("Service".to_string());
-            let install_section = Section::new("Install".to_string());
+            let unit_section = Section::new("Unit".to_string(), SectionType::PUB);
+            let service_section = Section::new("Service".to_string(), SectionType::PRIVATE);
+            let install_section = Section::new("Install".to_string(), SectionType::PUB);
             confs.add_section(unit_section);
             confs.add_section(service_section);
             confs.add_section(install_section);
@@ -123,9 +120,10 @@ mod tests {
                 return Err(Error::new(ErrorKind::Other, "Error: Open file failed"));
             }
         };
+        log::info!("test for config unit file load");
         let factory = ServiceFactory;
         let a = ConfigParser("service".to_string(), factory);
-        let conf = a.unit_file_parse(&buf);
+        let conf = a.toml_file_parse(&buf);
         match conf {
             Ok(conf) => {
                 let v = conf.get_sections();
@@ -153,6 +151,7 @@ mod tests {
                 return Err(Error::new(ErrorKind::Other, e.to_string()));
             }
         };
+        println!("confs is now empty");
         Ok(())
     }
 }

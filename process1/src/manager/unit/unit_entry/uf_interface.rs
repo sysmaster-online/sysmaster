@@ -4,6 +4,7 @@ use crate::manager::data::{
 };
 use crate::manager::unit::unit_base::UnitActionError;
 use crate::manager::unit::unit_file::UnitFile;
+use crate::manager::unit::unit_parser_mgr::{UnitConfigParser, UnitParserMgr};
 use crate::manager::unit::UnitErrno;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
@@ -11,14 +12,14 @@ use std::any::Any;
 use std::error::Error;
 use std::rc::Rc;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnitX(Unit);
 
 impl UnitX {
     pub fn init(&self) {}
     pub fn done(&self) {}
     pub fn load(&self) -> Result<(), Box<dyn Error>> {
-        todo!()
+        self.0.load_unit()
     }
     pub fn try_load(&self) -> Result<(), UnitActionError> {
         // transaction_add_job_and_dependencies: bus_unit_validate_load_state + manager_unit_cache_should_retry_load + unit_load + bus_unit_validate_load_state
@@ -48,8 +49,11 @@ impl UnitX {
     pub fn reset_failed(&self) {}
     pub fn trigger(&self, _other: &Self) {}
     pub fn in_load_queue(&self) -> bool {
-        //self.in_load_queue()
-        todo!()
+        self.0.in_load_queue()
+    }
+
+    pub fn set_in_load_queue(&self, t: bool) {
+        self.0.set_in_load_queue(t);
     }
     pub fn dep_check(&self, _relation: UnitRelations, _other: &UnitX) -> Result<(), UnitErrno> {
         // unit_add_dependency: check input
@@ -95,13 +99,24 @@ impl UnitX {
         todo!();
     }
 
+    pub fn get_private_conf_section_name(&self) -> Option<String> {
+        self.0.get_private_conf_section_name()
+    }
     pub(in crate::manager::unit) fn new(
         dm: Rc<DataManager>,
         file: Rc<UnitFile>,
+        unit_conf_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
         unit_type: UnitType,
         name: &str,
         subclass: Box<dyn UnitObj>,
     ) -> UnitX {
-        UnitX(Unit::new(Rc::clone(&dm), file, unit_type, name, subclass))
+        UnitX(Unit::new(
+            Rc::clone(&dm),
+            file,
+            unit_conf_mgr,
+            unit_type,
+            name,
+            subclass,
+        ))
     }
 }

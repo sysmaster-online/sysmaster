@@ -1,7 +1,66 @@
-use crate::manager::data::{JobMode, UnitConfigItem};
+use core::fmt::{Display, Formatter, Result};
+
+use crate::manager::data::{JobMode, UnitConfigItem, UnitRelations};
 use crate::null_str;
 
-#[derive(Debug)]
+pub(in crate::manager) enum UnitConfOption {
+    Desc,
+    Documentation,
+    Relation(UnitRelations),
+    AllowIsolate,
+    IgnoreOnIolate,
+    OnSucessJobMode,
+    OnFailureJobMode,
+}
+
+impl Display for UnitConfOption {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            UnitConfOption::Desc => write!(f, "Desc"),
+            UnitConfOption::Documentation => write!(f, "Desc"),
+            UnitConfOption::Relation(relation) => write!(f, "{}", relation),
+            UnitConfOption::AllowIsolate => write!(f, "AllowIsolate"),
+            UnitConfOption::IgnoreOnIolate => write!(f, "IgnoreOnIolate"),
+            UnitConfOption::OnSucessJobMode => write!(f, "OnSucessJobMode"),
+            UnitConfOption::OnFailureJobMode => write!(f, "OnFailureJobMode"),
+        }
+    }
+}
+
+impl From<UnitConfOption> for String {
+    fn from(unit_conf_opt: UnitConfOption) -> Self {
+        match unit_conf_opt {
+            UnitConfOption::Desc => "Desc".into(),
+            UnitConfOption::Documentation => "Documentation".into(),
+            UnitConfOption::Relation(relation) => relation.into(),
+            UnitConfOption::AllowIsolate => "AllowIsolate".into(),
+            UnitConfOption::IgnoreOnIolate => "IgnoreOnIolate".into(),
+            UnitConfOption::OnSucessJobMode => "OnSucessJobMode".into(),
+            UnitConfOption::OnFailureJobMode => "OnFailureJobMode".into(),
+        }
+    }
+}
+
+pub(in crate::manager) enum InstallConfOption {
+    Alias,
+    WantedBy,
+    RequiredBy,
+    Also,
+    DefaultInstance,
+}
+
+impl From<InstallConfOption> for String {
+    fn from(install_conf_opt: InstallConfOption) -> Self {
+        match install_conf_opt {
+            InstallConfOption::Alias => "Alias".into(),
+            InstallConfOption::WantedBy => "WantedBy".into(),
+            InstallConfOption::RequiredBy => "RequiredBy".into(),
+            InstallConfOption::Also => "Also".into(),
+            InstallConfOption::DefaultInstance => "DefaultInstance".into(),
+        }
+    }
+}
+
 pub(super) struct UeConfig {
     name: String,
     desc: String,

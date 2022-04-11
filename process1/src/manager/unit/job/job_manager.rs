@@ -43,7 +43,7 @@ impl JobAffect {
     }
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct JobManager {
     // associated objects
     db: Rc<UnitDb>,

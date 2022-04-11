@@ -1,7 +1,6 @@
 use crate::manager::data::{DataManager, UnitActiveState, UnitState};
 use std::rc::Rc;
 
-#[derive(Debug)]
 pub(super) struct UeState {
     // associated objects
     dm: Rc<DataManager>,

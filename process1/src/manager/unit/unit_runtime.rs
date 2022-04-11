@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub(super) struct UnitRT {
     data: RefCell<UnitRTData>,
 }
@@ -24,7 +24,7 @@ impl UnitRT {
     }
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 struct UnitRTData {
     load_queue: VecDeque<Rc<UnitX>>,
 }
@@ -58,6 +58,7 @@ impl UnitRTData {
         if unit.in_load_queue() {
             return;
         }
+        unit.set_in_load_queue(true);
         self.load_queue.push_back(unit);
     }
 }

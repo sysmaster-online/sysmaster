@@ -7,7 +7,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Debug)]
 pub(super) struct UnitDep {
     data: RefCell<UnitDepData>,
 }
@@ -85,7 +84,6 @@ struct UnitDepMask {
     dest: u16,
 }
 
-#[derive(Debug)]
 struct UnitDepData {
     // key: unit-source + UnitRelations, value: (unit-destination : mask)-list
     t: HashMap<Rc<UnitX>, HashMap<UnitRelations, HashMap<Rc<UnitX>, UnitDepMask>>>,

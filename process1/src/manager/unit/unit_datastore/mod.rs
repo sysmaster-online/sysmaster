@@ -9,7 +9,7 @@ use unit_child::UnitChild;
 use unit_dep::UnitDep;
 use unit_sets::UnitSets;
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct UnitDb {
     units: Rc<UnitSets>,
     dep: Rc<UnitDep>,

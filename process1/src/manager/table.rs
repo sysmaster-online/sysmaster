@@ -7,12 +7,12 @@ pub(super) enum TableOp<'a, K, V> {
     TableRemove(&'a K, &'a V),
 }
 
-pub(super) trait TableSubscribe<K, V>: std::fmt::Debug {
+pub(super) trait TableSubscribe<K, V> {
     fn filter(&self, op: &TableOp<K, V>) -> bool;
     fn notify(&self, op: &TableOp<K, V>);
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub(super) struct Table<K, V> {
     data: HashMap<K, V>,                                        // key + value
     subscribers: HashMap<String, Rc<dyn TableSubscribe<K, V>>>, // key: name, value: subscriber

@@ -1,227 +1,29 @@
-use process1::manager::{KillOperation, Unit, UnitActiveState, UnitManager, UnitMngUtil, UnitObj};
+use process1::manager::{KillOperation, Unit, UnitManager, UnitMngUtil, UnitObj};
 use process1::watchdog;
 use std::any::{Any, TypeId};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::LinkedList;
 use std::error::Error;
-use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::io::{Error as IOError, ErrorKind};
 use std::str::FromStr;
+use utils::unit_conf::{Conf, Section};
 
+use super::service_base::{
+    CommandLine, DualTimestamp, ExitStatusSet, ServiceCommand, ServiceRestart,
+    ServiceResult, ServiceState, ServiceTimeoutFailureMode, ServiceType,
+};
 use super::service_start;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::cell::RefCell;
-use std::path::Path;
 use std::rc::{Rc, Weak};
 
-#[derive(PartialEq, Default, Debug)]
-struct ExitStatusSet {}
-
-#[derive(PartialEq, EnumString, Display, Debug)]
-enum ServiceTimeoutFailureMode {
-    #[strum(serialize = "terminate")]
-    ServiceTimeoutTerminate,
-    #[strum(serialize = "abort")]
-    ServiceTimeoutAbort,
-    #[strum(serialize = "kill")]
-    ServiceTimeoutKill,
-    ServiceTimeoutFailureModeMax,
-    ServiceTimeoutFailureModeInvalid = -1,
-}
-
-impl Default for ServiceTimeoutFailureMode {
-    fn default() -> Self {
-        ServiceTimeoutFailureMode::ServiceTimeoutTerminate
-    }
-}
-
-#[derive(PartialEq, EnumString, Display, Debug)]
-enum ServiceRestart {
-    #[strum(serialize = "no")]
-    ServiceRestartNo,
-    #[strum(serialize = "on-success")]
-    ServiceRestartOnSuccess,
-    #[strum(serialize = "on-failure")]
-    ServiceRestartOnFailure,
-    #[strum(serialize = "on-abnormal")]
-    ServiceRestartOnAbnormal,
-    #[strum(serialize = "on-abort")]
-    ServiceRestartOnAbort,
-    #[strum(serialize = "always")]
-    ServiceRestartAlways,
-    ServiceRestartMax,
-    ServiceRestartInvalid = -1,
-}
-
-impl Default for ServiceRestart {
-    fn default() -> Self {
-        ServiceRestart::ServiceRestartNo
-    }
-}
-
-#[derive(PartialEq, Eq, EnumString, Display, Debug)]
-pub(crate) enum ServiceType {
-    #[strum(serialize = "simple")]
-    ServiceSimple,
-    #[strum(serialize = "forking")]
-    SserviceForking,
-    #[strum(serialize = "oneshot")]
-    ServiceOneshot,
-    #[strum(serialize = "dbus")]
-    ServiceDbus,
-    #[strum(serialize = "notify")]
-    ServiceNotify,
-    #[strum(serialize = "idle")]
-    SserviceIdle,
-    #[strum(serialize = "exec")]
-    ServiceExec,
-    ServiceTypeMax,
-    ServiceTypeInvalid = -1,
-}
-
-impl Default for ServiceType {
-    fn default() -> Self {
-        ServiceType::ServiceSimple
-    }
-}
-pub enum ServiceCommand {
-    ServiceCondition,
-    ServiceStartPre,
-    ServiceStart,
-    ServiceStartPost,
-    ServiceReload,
-    ServiceStop,
-    ServiceStopPost,
-    ServiceCommandMax,
-}
-
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub enum ServiceResult {
-    ServiceSuccess,
-    ServiceFailureResources,
-    ServiceFailureTimeout,
-    ServiceFailureSignal,
-    ServiceFailureKill,
-    ServiceResultInvalid,
-}
-
-impl Default for ServiceResult {
-    fn default() -> Self {
-        ServiceResult::ServiceResultInvalid
-    }
-}
-
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub enum ServiceState {
-    ServiceDead,
-    ServiceCondition,
-    ServiceStartPre,
-    ServiceStart,
-    ServiceStartPost,
-    ServiceRuning,
-    ServiceExited,
-    ServiceReload,
-    ServiceStop,
-    ServiceStopWatchdog,
-    ServiceStopPost,
-    ServiceStopSigterm,
-    ServiceStopSigkill,
-    ServiceFinalWatchdog,
-    ServiceFinalSigterm,
-    ServiceFinalSigkill,
-    ServiceFailed,
-    ServiceStateMax,
-}
-
-impl Default for ServiceState {
-    fn default() -> Self {
-        ServiceState::ServiceStateMax
-    }
-}
-
-impl ServiceState {
-    fn to_unit_active_state(&self) -> UnitActiveState {
-        match *self {
-            ServiceState::ServiceDead => UnitActiveState::UnitInActive,
-            ServiceState::ServiceCondition
-            | ServiceState::ServiceStartPre
-            | ServiceState::ServiceStart
-            | ServiceState::ServiceStartPost => UnitActiveState::UnitActivating,
-            ServiceState::ServiceRuning | ServiceState::ServiceExited => {
-                UnitActiveState::UnitActive
-            }
-            ServiceState::ServiceReload => UnitActiveState::UnitReloading,
-            ServiceState::ServiceStop
-            | ServiceState::ServiceStopWatchdog
-            | ServiceState::ServiceStopPost
-            | ServiceState::ServiceStopSigterm
-            | ServiceState::ServiceStopSigkill
-            | ServiceState::ServiceStateMax
-            | ServiceState::ServiceFinalSigterm
-            | ServiceState::ServiceFinalSigkill
-            | ServiceState::ServiceFinalWatchdog => UnitActiveState::UnitDeActivating,
-            ServiceState::ServiceFailed => UnitActiveState::UnitFailed,
-        }
-    }
-
-    fn to_kill_operation(&self) -> KillOperation {
-        match self {
-            ServiceState::ServiceStopWatchdog => KillOperation::KillWatchdog,
-            ServiceState::ServiceStopSigterm | ServiceState::ServiceFinalSigterm => {
-                KillOperation::KillTerminate
-            }
-            ServiceState::ServiceStopSigkill | ServiceState::ServiceFinalSigkill => {
-                KillOperation::KillKill
-            }
-            _ => KillOperation::KillInvalid,
-        }
-    }
-}
-
-pub enum CmdError {
-    Timeout,
-    NoCmdFound,
-    SpawnError,
-}
-
-pub enum ErrorService {
-    ServiceAlreadyStarted(nix::unistd::Pid),
-    ServicePreStartFailed(String),
-    ServiceStartFailed(String),
-    ServicePostStartFailed(String),
-    ServiceCommandNotFound,
-}
-
-#[derive(PartialEq, Default, Debug)]
-struct DualTimestamp {}
-
-#[derive(PartialEq, Clone, Eq, Debug)]
-pub struct CommandLine {
-    pub cmd: String,
-    pub args: Vec<String>,
-    pub next: Option<Rc<RefCell<CommandLine>>>,
-}
-
-impl CommandLine {
-    pub fn update_next(&mut self, next: Rc<RefCell<CommandLine>>) {
-        self.next = Some(next)
-    }
-}
-
-impl fmt::Display for CommandLine {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Display: {}", self.cmd)
-    }
-}
-
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct ServiceUnit {
     pub unit: Option<Weak<Unit>>,
     pub um: Option<Weak<UnitManager>>,
-    service_type: ServiceType,
+    pub(crate) service_type: ServiceType,
     state: ServiceState,
     restart: ServiceRestart,
     restart_prevent_status: ExitStatusSet,
@@ -918,18 +720,8 @@ impl UnitObj for ServiceUnit {
     fn done(&self) {
         todo!()
     }
-    fn load(&mut self) -> Result<(), Box<dyn Error>> {
-        self.unit
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .upgrade()
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .load_unit();
-
-        self.parse()?;
+    fn load(&mut self, section: &Section<Conf>) -> Result<(), Box<dyn Error>> {
+        self.parse(section)?;
 
         self.service_add_extras();
 
@@ -1052,7 +844,11 @@ impl UnitObj for ServiceUnit {
             .as_ref()
             .cloned()
             .unwrap()
-            .load_in_queue()
+            .in_load_queue()
+    }
+
+    fn get_private_conf_section_name(&self) -> Option<&str> {
+        Some("Service")
     }
 }
 
@@ -1064,198 +860,3 @@ impl UnitMngUtil for ServiceUnit {
 
 use process1::declure_unitobj_plugin;
 declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default);
-
-impl ServiceUnit {
-    fn parse(&mut self) -> Result<(), Box<dyn Error>> {
-        self.unit
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .upgrade()
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .load_parse()?;
-        let conf = self
-            .unit
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .upgrade()
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .load_get_conf()
-            .as_ref()
-            .ok_or_else(|| IOError::new(ErrorKind::Other, "config file not loaded"))?
-            .clone();
-
-        let service = conf.service.as_ref().unwrap();
-
-        match &service.exec_condition {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceCondition as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceCondition as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-        }
-
-        match &service.exec_prestart {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceStartPre as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceStartPre as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-        }
-
-        match &service.exec_start {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceStart as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceStart as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-        }
-
-        match &service.exec_startpost {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceStartPost as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceStartPost as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-        }
-
-        match &service.exec_reload {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceReload as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceReload as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-        }
-
-        match &service.exec_stop {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceStop as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceStop as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-        }
-        match &service.exec_stoppost {
-            None => {
-                self.exec_commands[ServiceCommand::ServiceStopPost as usize] = LinkedList::new();
-            }
-            Some(commands) => {
-                match prepare_command(
-                    commands,
-                    &mut self.exec_commands[ServiceCommand::ServiceStopPost as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-        }
-
-        match &service.restart {
-            None => {
-                self.restart = ServiceRestart::ServiceRestartNo;
-            }
-            Some(restart) => {
-                self.restart = ServiceRestart::from_str(restart)?;
-            }
-        }
-
-        match &service.service_type {
-            None => {
-                self.service_type = ServiceType::ServiceTypeInvalid;
-            }
-            Some(service_type) => {
-                self.service_type = ServiceType::from_str(service_type)?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-fn prepare_command(
-    commands: &Vec<String>,
-    command_list: &mut LinkedList<Rc<RefCell<CommandLine>>>,
-) -> Result<(), Box<dyn Error>> {
-    if commands.len() == 0 {
-        return Ok(());
-    }
-
-    for exec in commands.iter() {
-        let mut cmd: Vec<String> = exec
-            .trim_end()
-            .split_whitespace()
-            .map(|s| s.to_string())
-            .collect();
-        if cmd.is_empty() {
-            return Ok(());
-        }
-
-        let exec_cmd = cmd.remove(0);
-        let path = Path::new(&exec_cmd);
-        if !path.exists() || !path.is_file() {
-            return Err(format!("{:?} is not exist or commad is not a file", path).into());
-        }
-
-        let new_command = Rc::new(RefCell::new(CommandLine {
-            cmd: path.to_str().unwrap().to_string(),
-            args: cmd,
-            next: None,
-        }));
-        match command_list.back() {
-            Some(command) => {
-                command.borrow_mut().next = Some(new_command.clone());
-            }
-            None => {}
-        }
-
-        command_list.push_back(new_command.clone());
-    }
-
-    Ok(())
-}

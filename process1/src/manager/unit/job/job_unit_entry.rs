@@ -9,7 +9,7 @@ use std::rc::Rc;
 const JOBUNIT_SQ_MUTOP_MAX_NUM: usize = 1; // stop or (restart|start|reload), which can change the unit's stage
 const JOBUNIT_SQ_MAX_NUM: usize = 3; // [stop] | [(restart|start|reload)->verify->nop]
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub(super) struct JobUnit {
     // key
     unit: Rc<UnitX>,
