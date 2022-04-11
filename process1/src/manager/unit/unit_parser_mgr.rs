@@ -140,7 +140,7 @@ mod tests {
             UnitType::UnitService.to_string(),
             "Service".to_string(),
         );
-        let conf = ump.unit_file_parser("service", config_path.to_str().unwrap());
+        let conf = ump.unit_file_parser("Service", config_path.to_str().unwrap());
         match conf {
             Ok(conf) => {
                 let v = conf.get_sections();
