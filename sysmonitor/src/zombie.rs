@@ -55,7 +55,7 @@ impl Monitor for ZombieCount {
         let cmd = "ps -A -o stat,ppid,pid,cmd | grep -e '^[Zz]' | awk '{print $0}' | wc -l";
         let output = Command::new("bash").arg("-c").arg(cmd).output()?;
         let out = String::from_utf8(output.stdout)?;
-        let count: u32 = out.replace("\n", "").parse()?;
+        let count: u32 = out.replace('\n', "").parse()?;
 
         println!("zombie count: {}", count);
 
