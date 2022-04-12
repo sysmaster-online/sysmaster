@@ -1,23 +1,32 @@
-use process1::manager::{KillOperation, Unit, UnitManager, UnitMngUtil, UnitObj};
+use process1::manager::{
+    KillOperation, Unit, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
+};
 use process1::watchdog;
 use std::any::{Any, TypeId};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::LinkedList;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
-
 use utils::unit_conf::{Conf, Section};
 
 use super::service_base::{
-    CommandLine, DualTimestamp, ExitStatusSet, ServiceCommand, ServiceRestart, ServiceResult,
-    ServiceState, ServiceTimeoutFailureMode, ServiceType,
+    CommandLine, ExitStatusSet, ServiceCommand, ServiceRestart, ServiceResult, ServiceState,
+    ServiceType,
 };
 use super::service_start;
+use log;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
+use utils::logger;
+use utils::IN_SET;
+
+use process1::manager::UnitActionError;
+
+const LOG_LEVEL: u32 = 4;
+const PLUGIN_NAME: &str = "ServiceUnit";
 
 #[derive(Default)]
 pub struct ServiceUnit {
@@ -31,19 +40,10 @@ pub struct ServiceUnit {
     success_status: ExitStatusSet,
     pid_file: String,
     restart_usec: u64,
-    timeout_start_usec: u64,
-    timeout_stop_usec: u64,
-    timeout_abort_usec: u64,
-    timeout_abort_set: bool,
-    runtime_max_usec: u64,
-    timeout_start_failure_mode: ServiceTimeoutFailureMode,
-    timeout_stop_failure_mode: ServiceTimeoutFailureMode,
-    watchdog_timestamp: DualTimestamp,
     watchdog_usec: u64,
     watchdog_original_usec: u64,
     watchdog_override_usec: u64,
     watchdog_override_enable: bool,
-    socket_fd: isize,
     bus_name: String,
     forbid_restart: bool,
     result: ServiceResult,
@@ -68,19 +68,10 @@ impl ServiceUnit {
             success_status: ExitStatusSet {},
             pid_file: String::from(""),
             restart_usec: 0,
-            timeout_start_usec: 0,
-            timeout_stop_usec: 0,
-            timeout_abort_usec: 0,
-            timeout_abort_set: false,
-            runtime_max_usec: u64::MAX,
-            timeout_start_failure_mode: ServiceTimeoutFailureMode::ServiceTimeoutFailureModeInvalid,
-            timeout_stop_failure_mode: ServiceTimeoutFailureMode::ServiceTimeoutFailureModeInvalid,
-            watchdog_timestamp: DualTimestamp {},
             watchdog_usec: 0,
             watchdog_original_usec: u64::MAX,
             watchdog_override_usec: 0,
             watchdog_override_enable: false,
-            socket_fd: -1,
             bus_name: String::from(""),
             exec_commands: Default::default(),
             main_command: None,
@@ -157,32 +148,36 @@ impl ServiceUnit {
 
     fn unwatch_control_pid(&mut self) {
         match self.control_pid {
-            Some(pid) => self
-                .um
-                .as_ref()
-                .cloned()
-                .unwrap()
-                .upgrade()
-                .as_ref()
-                .cloned()
-                .unwrap()
-                .child_unwatch_pid(pid),
+            Some(pid) => {
+                self.um
+                    .as_ref()
+                    .cloned()
+                    .unwrap()
+                    .upgrade()
+                    .as_ref()
+                    .cloned()
+                    .unwrap()
+                    .child_unwatch_pid(pid);
+                self.control_pid = None;
+            }
             None => {}
         }
     }
 
     fn unwatch_main_pid(&mut self) {
         match self.main_pid {
-            Some(pid) => self
-                .um
-                .as_ref()
-                .cloned()
-                .unwrap()
-                .upgrade()
-                .as_ref()
-                .cloned()
-                .unwrap()
-                .child_unwatch_pid(pid),
+            Some(pid) => {
+                self.um
+                    .as_ref()
+                    .cloned()
+                    .unwrap()
+                    .upgrade()
+                    .as_ref()
+                    .cloned()
+                    .unwrap()
+                    .child_unwatch_pid(pid);
+                self.main_pid = None;
+            }
             None => {}
         }
     }
@@ -246,6 +241,50 @@ impl ServiceUnit {
         let original_state = self.state;
         self.state = state;
 
+        // TODO
+        // check the new state
+        if !vec![
+            ServiceState::ServiceStart,
+            ServiceState::ServiceStartPost,
+            ServiceState::ServiceRuning,
+            ServiceState::ServiceReload,
+            ServiceState::ServiceStop,
+            ServiceState::ServiceStopWatchdog,
+            ServiceState::ServiceStopSigterm,
+            ServiceState::ServiceStopSigkill,
+            ServiceState::ServiceStopPost,
+            ServiceState::ServiceFinalWatchdog,
+            ServiceState::ServiceFinalSigterm,
+            ServiceState::ServiceFinalSigkill,
+        ]
+        .contains(&state)
+        {
+            self.unwatch_main_pid();
+            self.main_command = None;
+        }
+
+        if !vec![
+            ServiceState::ServiceCondition,
+            ServiceState::ServiceStartPre,
+            ServiceState::ServiceStart,
+            ServiceState::ServiceStartPost,
+            ServiceState::ServiceReload,
+            ServiceState::ServiceStop,
+            ServiceState::ServiceStopWatchdog,
+            ServiceState::ServiceStopSigterm,
+            ServiceState::ServiceStopSigkill,
+            ServiceState::ServiceStopPost,
+            ServiceState::ServiceFinalWatchdog,
+            ServiceState::ServiceFinalSigterm,
+            ServiceState::ServiceFinalSigkill,
+            ServiceState::ServiceCleaning,
+        ]
+        .contains(&state)
+        {
+            self.unwatch_control_pid();
+            self.control_command = None;
+        }
+
         log::debug!(
             "original state: {:?}, change to: {:?}",
             original_state,
@@ -263,8 +302,9 @@ impl ServiceUnit {
             .cloned()
             .unwrap()
             .notify(
-                original_state.to_unit_active_state(),
-                state.to_unit_active_state(),
+                self.trans_to_active_state(original_state),
+                self.trans_to_active_state(state),
+                0,
             );
     }
 
@@ -544,7 +584,12 @@ impl ServiceUnit {
             match nix::sys::signal::kill(self.main_pid.unwrap(), sig) {
                 Ok(_) => {
                     if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
-                        nix::sys::signal::kill(self.main_pid.unwrap(), Signal::SIGCONT);
+                        match nix::sys::signal::kill(self.main_pid.unwrap(), Signal::SIGCONT) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::debug!("kill pid {} errno: {}", self.main_pid.unwrap(), e)
+                            }
+                        }
                     }
                 }
                 Err(e) => {
@@ -557,7 +602,12 @@ impl ServiceUnit {
             match nix::sys::signal::kill(self.control_pid.unwrap(), sig) {
                 Ok(_) => {
                     if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
-                        nix::sys::signal::kill(self.control_pid.unwrap(), Signal::SIGCONT);
+                        match nix::sys::signal::kill(self.control_pid.unwrap(), Signal::SIGCONT) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::debug!("kill pid {} errno: {}", self.control_pid.unwrap(), e)
+                            }
+                        }
                     }
                 }
                 Err(e) => {
@@ -567,6 +617,22 @@ impl ServiceUnit {
         }
 
         Ok(())
+    }
+
+    fn current_active_state(&self) -> UnitActiveState {
+        if self.service_type == ServiceType::ServiceIdle {
+            return self.state.to_unit_active_state_idle();
+        }
+
+        self.state.to_unit_active_state()
+    }
+
+    fn trans_to_active_state(&self, state: ServiceState) -> UnitActiveState {
+        if self.service_type == ServiceType::ServiceIdle {
+            return state.to_unit_active_state_idle();
+        }
+
+        state.to_unit_active_state()
     }
 }
 
@@ -612,6 +678,7 @@ impl ServiceUnit {
                     ServiceState::ServiceStart => {
                         self.send_signal(ServiceState::ServiceStopSigterm, res);
                     }
+
                     ServiceState::ServiceStartPost | ServiceState::ServiceReload => {
                         self.run_stop(res);
                     }
@@ -730,13 +797,38 @@ impl UnitObj for ServiceUnit {
     fn coldplug(&self) {
         todo!()
     }
-    fn start(&mut self) {
+    fn start(&mut self) -> Result<(), UnitActionError> {
+        log::debug!("begin to start the service unit");
+        if IN_SET!(
+            self.state,
+            ServiceState::ServiceStop,
+            ServiceState::ServiceStopWatchdog,
+            ServiceState::ServiceStopSigterm,
+            ServiceState::ServiceStopSigkill,
+            ServiceState::ServiceStopPost,
+            ServiceState::ServiceFinalWatchdog,
+            ServiceState::ServiceFinalSigterm,
+            ServiceState::ServiceFinalSigkill,
+            ServiceState::ServiceCleaning
+        ) {
+            return Err(UnitActionError::UnitActionEAgain);
+        }
+
+        self.result = ServiceResult::ServiceSuccess;
+        self.forbid_restart = false;
+
+        self.watchdog_original_usec = self.watchdog_usec;
+        self.watchdog_override_enable = false;
+        self.watchdog_override_usec = u64::MAX;
+
         self.start();
+
+        Ok(())
     }
     fn dump(&self) {
         todo!()
     }
-    fn stop(&mut self) {
+    fn stop(&mut self) -> Result<(), UnitActionError> {
         self.forbid_restart = true;
         let stop_state = vec![
             ServiceState::ServiceStop,
@@ -746,7 +838,7 @@ impl UnitObj for ServiceUnit {
         ];
 
         if stop_state.contains(&self.state) {
-            return;
+            return Ok(());
         }
 
         let starting_state = vec![
@@ -762,10 +854,12 @@ impl UnitObj for ServiceUnit {
                 ServiceState::ServiceStopSigterm,
                 ServiceResult::ServiceSuccess,
             );
-            return;
+            return Ok(());
         }
 
         self.run_stop(ServiceResult::ServiceSuccess);
+
+        Ok(())
     }
     fn reload(&mut self) {
         self.run_reload();
@@ -835,28 +929,30 @@ impl UnitObj for ServiceUnit {
         self
     }
 
-    fn in_load_queue(&self) -> bool {
-        self.unit
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .upgrade()
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .in_load_queue()
-    }
-
     fn get_private_conf_section_name(&self) -> Option<&str> {
         Some("Service")
+    }
+
+    fn current_active_state(&self) -> UnitActiveState {
+        self.current_active_state()
+    }
+
+    fn attach_unit(&mut self, unit: Rc<Unit>) {
+        self.unit = Some(Rc::downgrade(&unit));
     }
 }
 
 impl UnitMngUtil for ServiceUnit {
-    fn attach(&self, _um: Rc<UnitManager>) {
-        todo!();
+    fn attach(&mut self, um: Rc<UnitManager>) {
+        self.um = Some(Rc::downgrade(&um));
+    }
+}
+
+impl UnitSubClass for ServiceUnit {
+    fn into_unitobj(self: Box<Self>) -> Box<dyn UnitObj> {
+        Box::new(*self)
     }
 }
 
 use process1::declure_unitobj_plugin;
-declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default);
+declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default, PLUGIN_NAME, LOG_LEVEL);

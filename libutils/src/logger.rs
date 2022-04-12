@@ -1,10 +1,38 @@
-use log::LevelFilter;
+use log::{LevelFilter, Log};
 use log4rs::{
     append::console::{ConsoleAppender, Target},
     config::{Appender, Config, Logger, Root},
     encode::pattern::PatternEncoder,
 };
 use std::path::Path;
+
+struct LoggerPlugin(log4rs::Logger);
+
+impl log::Log for LoggerPlugin {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        self.0.enabled(metadata)
+    }
+
+    fn log(&self, record: &log::Record) {
+        self.0.log(record);
+    }
+
+    fn flush(&self) {
+        self.0.flush();
+    }
+}
+
+fn set_logger(logger: log4rs::Logger) {
+    log::set_max_level(logger.max_log_level());
+    let _ = log::set_boxed_logger(Box::new(LoggerPlugin(logger)));
+}
+
+pub fn init_log_with_default(app_name: &str, log_level: u32) {
+    let config = build_log_config(app_name, log_level);
+    let logger = log4rs::Logger::new(config);
+    set_logger(logger);
+}
+
 /// Init logger whith config yaml file.
 ///
 /// [`path`] the config file path
@@ -31,6 +59,14 @@ where
 /// [others] Info
 ///
 pub fn init_log_with_console(app_name: &str, log_level: u32) {
+    let config = build_log_config(app_name, log_level);
+    let log_init_result = log4rs::init_config(config);
+    if let Err(_r) = log_init_result {
+        println!("{}", _r.to_string());
+    }
+}
+
+fn build_log_config(app_name: &str, log_level: u32) -> Config {
     let mut pattern = String::new();
     pattern += "{d(%Y-%m-%d %H:%M:%S)} ";
     pattern += "{h({l}):<5} ";
@@ -57,10 +93,8 @@ pub fn init_log_with_console(app_name: &str, log_level: u32) {
         _ => logging_builder.build(Root::builder().appender("console").build(l_level)),
     }
     .unwrap();
-    let log_init_result = log4rs::init_config(config);
-    if let Err(_r) = log_init_result {
-        println!("{}", _r.to_string());
-    }
+
+    config
 }
 
 #[cfg(test)]

@@ -63,7 +63,7 @@ pub(crate) enum ServiceType {
     #[strum(serialize = "notify")]
     ServiceNotify,
     #[strum(serialize = "idle")]
-    SserviceIdle,
+    ServiceIdle,
     #[strum(serialize = "exec")]
     ServiceExec,
     ServiceTypeMax,
@@ -121,6 +121,8 @@ pub enum ServiceState {
     ServiceFinalSigterm,
     ServiceFinalSigkill,
     ServiceFailed,
+    ServiceAutoRestart,
+    ServiceCleaning,
     ServiceStateMax,
 }
 
@@ -152,6 +154,33 @@ impl ServiceState {
             | ServiceState::ServiceFinalSigkill
             | ServiceState::ServiceFinalWatchdog => UnitActiveState::UnitDeActivating,
             ServiceState::ServiceFailed => UnitActiveState::UnitFailed,
+            ServiceState::ServiceAutoRestart => UnitActiveState::UnitActivating,
+            ServiceState::ServiceCleaning => UnitActiveState::UnitMaintenance,
+        }
+    }
+
+    pub fn to_unit_active_state_idle(&self) -> UnitActiveState {
+        match *self {
+            ServiceState::ServiceDead => UnitActiveState::UnitInActive,
+            ServiceState::ServiceCondition
+            | ServiceState::ServiceStartPre
+            | ServiceState::ServiceStart
+            | ServiceState::ServiceStartPost
+            | ServiceState::ServiceRuning
+            | ServiceState::ServiceExited => UnitActiveState::UnitActive,
+            ServiceState::ServiceReload => UnitActiveState::UnitReloading,
+            ServiceState::ServiceStop
+            | ServiceState::ServiceStopWatchdog
+            | ServiceState::ServiceStopPost
+            | ServiceState::ServiceStopSigterm
+            | ServiceState::ServiceStopSigkill
+            | ServiceState::ServiceStateMax
+            | ServiceState::ServiceFinalSigterm
+            | ServiceState::ServiceFinalSigkill
+            | ServiceState::ServiceFinalWatchdog => UnitActiveState::UnitDeActivating,
+            ServiceState::ServiceFailed => UnitActiveState::UnitFailed,
+            ServiceState::ServiceAutoRestart => UnitActiveState::UnitActivating,
+            ServiceState::ServiceCleaning => UnitActiveState::UnitMaintenance,
         }
     }
 
@@ -173,14 +202,6 @@ pub enum CmdError {
     Timeout,
     NoCmdFound,
     SpawnError,
-}
-
-pub enum ErrorService {
-    ServiceAlreadyStarted(nix::unistd::Pid),
-    ServicePreStartFailed(String),
-    ServiceStartFailed(String),
-    ServicePostStartFailed(String),
-    ServiceCommandNotFound,
 }
 
 #[derive(PartialEq, Default, Debug)]

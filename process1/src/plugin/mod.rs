@@ -1,3 +1,5 @@
+use crate::manager::UnitSubClass;
+
 use super::manager::{UnitObj, UnitType};
 use dynamic_reload as dy_re;
 use log::*;
@@ -159,7 +161,10 @@ impl Plugin {
         }
     }
 
-    pub fn create_unit_obj(&self, unit_type: UnitType) -> Result<Box<dyn UnitObj>, Box<dyn Error>> {
+    pub fn create_unit_obj(
+        &self,
+        unit_type: UnitType,
+    ) -> Result<Box<dyn UnitSubClass>, Box<dyn Error>> {
         let dy_lib = match self.load_libs.get(&unit_type) {
             Some(lib) => lib.clone(),
             None => {
@@ -167,7 +172,7 @@ impl Plugin {
             }
         };
 
-        let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitObj> =
+        let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitSubClass> =
             unsafe { dy_lib.lib.get(b"__unit_obj_create").unwrap() };
         let boxed_raw = fun();
 

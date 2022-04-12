@@ -10,3 +10,19 @@ macro_rules! syscall {
         }
     }};
 }
+
+#[macro_export]
+macro_rules! IN_SET {
+    ($ov:expr, $($nv:expr),+) => {
+        {
+            let mut found = false;
+            $(
+                if $ov == $nv {
+                    found = true;
+                }
+            )+
+
+            found
+        }
+    };
+}

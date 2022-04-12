@@ -10,6 +10,7 @@ use crate::manager::data::{DataManager, UnitState};
 use crate::manager::table::{TableOp, TableSubscribe};
 
 use nix::unistd::Pid;
+use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
 
@@ -18,20 +19,23 @@ use std::rc::Rc;
 //unitManger composition of units with hash map
 
 pub trait UnitMngUtil {
-    fn attach(&self, um: Rc<UnitManager>);
+    fn attach(&mut self, um: Rc<UnitManager>);
 }
 
-pub trait UnitSubClass: UnitObj + UnitMngUtil {}
+pub trait UnitSubClass: UnitObj + UnitMngUtil {
+    fn into_unitobj(self: Box<Self>) -> Box<dyn UnitObj>;
+}
 
 #[macro_export]
 macro_rules! declure_unitobj_plugin {
-    ($unit_type:ty, $constructor:path) => {
+    ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {
         #[no_mangle]
-        pub fn __unit_obj_create() -> *mut dyn $crate::manager::UnitObj {
+        pub fn __unit_obj_create() -> *mut dyn $crate::manager::UnitSubClass {
+            logger::init_log_with_default($name, $level);
             let construcotr: fn() -> $unit_type = $constructor;
 
             let obj = construcotr();
-            let boxed: Box<dyn $crate::manager::UnitObj> = Box::new(obj);
+            let boxed: Box<dyn $crate::manager::UnitSubClass> = Box::new(obj);
             Box::into_raw(boxed)
         }
     };
@@ -49,7 +53,7 @@ pub struct UnitManagerX {
 impl UnitManagerX {
     pub(in crate::manager) fn new(dm: Rc<DataManager>) -> UnitManagerX {
         let _dm = Rc::clone(&dm);
-        let _um = Rc::new(UnitManager::new(Rc::clone(&_dm)));
+        let _um = UnitManager::new(Rc::clone(&_dm));
         UnitManagerX {
             dm,
             states: Rc::new(UnitStates::new(Rc::clone(&_dm), Rc::clone(&_um))),
@@ -81,12 +85,13 @@ impl UnitManager {
         self.db.child_unwatch_pid(pid)
     }
 
-    pub(in crate::manager) fn new(dm: Rc<DataManager>) -> UnitManager {
+    pub(in crate::manager) fn new(dm: Rc<DataManager>) -> Rc<UnitManager> {
         let _dm = Rc::clone(&dm);
         let _file = Rc::new(UnitFile::new());
         let _db = Rc::new(UnitDb::new());
         let rt = Rc::new(UnitRT::new());
         let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
+
         let _load = Rc::new(UnitLoad::new(
             Rc::clone(&_dm),
             Rc::clone(&_file),
@@ -94,14 +99,18 @@ impl UnitManager {
             Rc::clone(&rt),
             Rc::clone(&unit_conf_parser_mgr),
         ));
-        UnitManager {
+
+        let um = Rc::new(UnitManager {
             file: Rc::clone(&_file),
             load: Rc::clone(&_load),
             db: Rc::clone(&_db),
-            rt,
+            rt: Rc::clone(&rt),
             jm: Rc::new(JobManager::new(Rc::clone(&_db))),
             unit_conf_parser_mgr: Rc::clone(&unit_conf_parser_mgr),
-        }
+        });
+
+        _load.set_um(um.clone());
+        um
     }
 }
 
@@ -141,8 +150,8 @@ impl TableSubscribe<String, UnitState> for UnitStatesSub {
 
     fn notify(&self, op: &TableOp<String, UnitState>) {
         match op {
-            TableOp::TableInsert(name, config) => self.insert_config(name, config),
-            TableOp::TableRemove(_, _) => {} // self.remove_config(name)
+            TableOp::TableInsert(name, config) => self.insert_states(name, config),
+            TableOp::TableRemove(name, _) => self.remove_states(name),
         }
     }
 }
@@ -153,8 +162,15 @@ impl UnitStatesSub {
         UnitStatesSub { um }
     }
 
-    pub(self) fn insert_config(&self, source: &str, _state: &UnitState) {
-        let unitx = self.um.db.units_get(source).unwrap();
+    pub(self) fn insert_states(&self, source: &str, _state: &UnitState) {
+        let unitx = if let Some(u) = self.um.db.units_get(source) {
+            u
+        } else {
+            return;
+        };
+
+        // self.um.jm.clone().try_finish(&unitx, state.get_os(), state.get_ns(), state.get_flags());
+
         for other in self
             .um
             .db
@@ -164,7 +180,7 @@ impl UnitStatesSub {
         }
     }
 
-    pub(self) fn remove_config(&self, _source: &str) {
+    pub(self) fn remove_states(&self, _source: &str) {
         todo!();
     }
 }

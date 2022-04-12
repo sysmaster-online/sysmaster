@@ -3,11 +3,13 @@ use super::unit_entry::UnitX;
 use super::unit_file::UnitFile;
 use super::unit_parser_mgr::{UnitConfigParser, UnitParserMgr};
 use super::unit_runtime::UnitRT;
+use super::UnitManager;
 use crate::manager::data::{DataManager, UnitConfig};
 use crate::manager::table::{TableOp, TableSubscribe};
 use crate::manager::unit::unit_base;
 use crate::manager::UnitType;
 use crate::plugin::Plugin;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 //#[derive(Debug)]
@@ -27,11 +29,14 @@ impl UnitLoad {
         let unit_load_data = UnitLoadData::new(dm, file, unitdb, rt, unit_conf_parser_mgr);
         let rc_unit_load_data = Rc::new(unit_load_data);
         UnitLoad {
-            data: Rc::clone(&rc_unit_load_data),
-            uconf_register: UnitConfigs::new(Rc::clone(&rc_unit_load_data)),
+            data: rc_unit_load_data.clone(),
+            uconf_register: UnitConfigs::new(rc_unit_load_data.clone()),
         }
     }
 
+    pub fn set_um(&self, um: Rc<UnitManager>) {
+        self.data.set_um(um);
+    }
     pub(super) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
         self.data.load_unit(name)
     }
@@ -39,12 +44,13 @@ impl UnitLoad {
 
 //#[derive(Debug)]
 struct UnitLoadData {
-    // associated objects
+    // associated objectsd
     dm: Rc<DataManager>,
     db: Rc<UnitDb>,
     file: Rc<UnitFile>,
     rt: Rc<UnitRT>,
     unit_conf_parser_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
+    um: RefCell<Option<Rc<UnitManager>>>,
 }
 
 // the declaration "pub(self)" is for identification only.
@@ -62,7 +68,12 @@ impl UnitLoadData {
             file,
             rt,
             unit_conf_parser_mgr,
+            um: RefCell::new(None),
         }
+    }
+
+    pub fn set_um(&self, um: Rc<UnitManager>) {
+        self.um.replace(Some(um));
     }
 
     pub(self) fn prepare_unit(&self, name: &str) -> Option<Rc<UnitX>> {
@@ -219,7 +230,7 @@ impl UnitConfigsSub {
         let plugins = Rc::clone(&Plugin::get_instance());
         plugins.borrow_mut().set_library_dir("../target/debug");
         plugins.borrow_mut().load_lib();
-        let subclass = match plugins.borrow().create_unit_obj(unit_type) {
+        let mut subclass = match plugins.borrow().create_unit_obj(unit_type) {
             Ok(sub) => sub,
             Err(_e) => return None,
         };
@@ -228,13 +239,16 @@ impl UnitConfigsSub {
                 .unit_conf_parser_mgr
                 .register_parser_by_private_section_name(unit_type.to_string(), s.to_string())
         });
+
+        subclass.attach(self.unit_load_data.um.borrow().as_ref().cloned().unwrap());
+
         Some(Rc::new(UnitX::new(
             Rc::clone(&self.unit_load_data.dm),
             Rc::clone(&self.unit_load_data.file),
             Rc::clone(&self.unit_load_data.unit_conf_parser_mgr),
             unit_type,
             name,
-            subclass,
+            subclass.into_unitobj(),
         )))
     }
 }
@@ -253,12 +267,14 @@ mod tests {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
         let dm_manager = Rc::new(DataManager::new());
+        let um = UnitManager::new(dm_manager.clone());
         let file = Rc::new(UnitFile::new());
         let db = Rc::new(UnitDb::new());
         let rt = Rc::new(UnitRT::new());
         let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
         let load = UnitLoad::new(dm_manager, file, db, rt, unit_conf_parser_mgr);
         load.data.file.init_lookup_path();
+        load.set_um(um);
 
         let unit_name = String::from("config.service");
         let loaded_unit = load.load_unit(&unit_name);
@@ -272,12 +288,14 @@ mod tests {
     #[test]
     fn test_unit_start() {
         let dm_manager = Rc::new(DataManager::new());
+        let um = UnitManager::new(dm_manager.clone());
         let file = Rc::new(UnitFile::new());
         let db = Rc::new(UnitDb::new());
         let rt = Rc::new(UnitRT::new());
         let unit_parser_mgr = Rc::new(UnitParserMgr::default());
         let load = UnitLoad::new(dm_manager, file, db, rt, unit_parser_mgr);
         load.data.file.init_lookup_path();
+        load.set_um(um);
 
         let unit_name = String::from("config.service");
         load.load_unit(&unit_name);

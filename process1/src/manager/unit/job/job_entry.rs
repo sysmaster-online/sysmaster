@@ -394,6 +394,7 @@ fn job_trigger_err_to_result(err: UnitActionError) -> Option<JobResult> {
         UnitActionError::UnitActionENolink => Some(JobResult::JobDependency),
         UnitActionError::UnitActionEStale => Some(JobResult::JobOnce),
         UnitActionError::UnitActionEFailed => Some(JobResult::JobFailed),
+        UnitActionError::UnitActionEInval => Some(JobResult::JobFailed),
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::manager::data::UnitType;
 use nix::sys::signal::Signal;
 
-#[derive(PartialEq, Debug, Eq)]
+#[derive(PartialEq, Debug, Eq, Copy, Clone)]
 pub enum UnitLoadState {
     UnitStub = 0,
     UnitLoaded,
@@ -50,6 +50,7 @@ pub enum UnitActionError {
     UnitActionENolink,
     UnitActionEStale,
     UnitActionEFailed,
+    UnitActionEInval,
 }
 
 pub enum KillOperation {
