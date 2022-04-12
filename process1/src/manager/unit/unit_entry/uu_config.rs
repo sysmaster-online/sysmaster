@@ -16,8 +16,8 @@ pub(in crate::manager) enum UnitConfOption {
 impl Display for UnitConfOption {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            UnitConfOption::Desc => write!(f, "Desc"),
-            UnitConfOption::Documentation => write!(f, "Desc"),
+            UnitConfOption::Desc => write!(f, "Description"),
+            UnitConfOption::Documentation => write!(f, "Documentation"),
             UnitConfOption::Relation(relation) => write!(f, "{}", relation),
             UnitConfOption::AllowIsolate => write!(f, "AllowIsolate"),
             UnitConfOption::IgnoreOnIolate => write!(f, "IgnoreOnIolate"),

@@ -1,4 +1,5 @@
 use super::u_entry::{Unit, UnitObj};
+use super::uu_config::UeConfig;
 use crate::manager::data::{
     DataManager, UnitActiveState, UnitConfig, UnitConfigItem, UnitRelations, UnitType,
 };
@@ -57,7 +58,8 @@ impl UnitX {
     }
     pub fn dep_check(&self, _relation: UnitRelations, _other: &UnitX) -> Result<(), UnitErrno> {
         // unit_add_dependency: check input
-        todo!()
+
+        Ok(())
     }
     pub fn eq(&self, _other: &UnitX) -> bool {
         todo!();
@@ -70,12 +72,32 @@ impl UnitX {
     }
 
     pub fn get_id(&self) -> &str {
-        todo!();
+        self.0.get_id()
     }
     pub fn set_config(&self, _config: &UnitConfig) {
-        // get and compare each item, only the changed item needs to be set
-        todo!()
+        let name = _config.get_name();
+        if !name.is_empty() {
+            let mut ue_config = UeConfig::new();
+            ue_config.set(UnitConfigItem::UcItemName(name.to_string()));
+            ue_config.set(UnitConfigItem::UcItemDesc((&_config.desc).to_string()));
+            ue_config.set(UnitConfigItem::UcItemDoc(
+                (&_config.documentation).to_string(),
+            ));
+            ue_config.set(UnitConfigItem::UcItemAllowIsolate(_config.allow_isolate));
+            ue_config.set(UnitConfigItem::UcItemAllowIsolate(_config.allow_isolate));
+            ue_config.set(UnitConfigItem::UcItemIgnoreOnIsolate(
+                _config.ignore_on_isolate,
+            ));
+            ue_config.set(UnitConfigItem::UcItemOnSucJobMode(
+                _config.on_success_job_mode,
+            ));
+            ue_config.set(UnitConfigItem::UcItemOnFailJobMode(
+                _config.on_failure_job_mode,
+            ));
+            self.0.set_config(ue_config);
+        }
     }
+
     pub fn get_config(&self, _item: &UnitConfigItem) -> UnitConfigItem {
         todo!();
     }

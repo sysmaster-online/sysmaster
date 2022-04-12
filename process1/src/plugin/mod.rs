@@ -53,15 +53,13 @@ impl Plugin {
             }
             let libdir_path = PathBuf::from(self.library_dir.as_str());
             if !libdir_path.exists() || !libdir_path.is_dir() {
-                log::error!(
-                    "library_dir is dir {:?} is not a dir or not exist",
-                    libdir_path
-                );
+                log::error!("library_dir {:?} is not a dir or not exist", libdir_path);
                 return false;
             }
             true
         };
-        if !file_exist() {
+        let a = file_exist();
+        if !a {
             return;
         }
         log::debug!(
@@ -143,6 +141,7 @@ impl Plugin {
     pub fn set_library_dir(&mut self, library_dir: &str) {
         self.library_dir.clear();
         self.library_dir.push_str(library_dir);
+        log::debug!("set libray dir {}", library_dir);
     }
 
     pub fn is_dynamic_lib(entry: &DirEntry) -> bool {

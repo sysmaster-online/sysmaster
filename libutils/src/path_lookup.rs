@@ -24,6 +24,7 @@ impl LookupPaths {
     pub fn init_lookup_paths(&mut self) {
         self.search_path.push(ETC_SYSTEM_PATH);
         self.search_path.push(LIB_SYSTEM_PATH);
+        self.search_path.push(env!("CARGO_MANIFEST_DIR"));
     }
 }
 
