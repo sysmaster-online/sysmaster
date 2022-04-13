@@ -57,7 +57,10 @@ pub fn init_log_with_console(app_name: &str, log_level: u32) {
         _ => logging_builder.build(Root::builder().appender("console").build(l_level)),
     }
     .unwrap();
-    log4rs::init_config(config).unwrap();
+    let log_init_result = log4rs::init_config(config);
+    if let Err(_r) = log_init_result {
+        println!("{}", _r.to_string());
+    }
 }
 
 #[cfg(test)]

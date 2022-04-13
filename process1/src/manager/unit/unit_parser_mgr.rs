@@ -164,6 +164,7 @@ mod tests {
                                     ConfValue::Float(_) => todo!(),
                                     ConfValue::Boolean(_) => todo!(),
                                     ConfValue::Array(_) => todo!(),
+                                    ConfValue::Error(_) => todo!(),
                                 }
                             }
                         }

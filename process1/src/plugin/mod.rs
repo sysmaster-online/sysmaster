@@ -181,6 +181,7 @@ mod tests {
     // use services::service::ServiceUnit;
 
     #[test]
+    #[ignore]
     fn test_plugin_load_library() {
         let plugins = Rc::clone(&Plugin::get_instance());
         let t_p = plugins.borrow();

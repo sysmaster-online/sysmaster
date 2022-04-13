@@ -1,7 +1,7 @@
-use super::uu_config::UnitConfOption;
+use super::uu_config::{InstallConfOption, UnitConfOption};
 use crate::manager::data::{DataManager, JobMode, UnitConfig, UnitRelations, UnitType};
 use crate::manager::unit::unit_base::{self, UnitLoadState};
-use crate::manager::unit::unit_parser_mgr::SECTION_UNIT;
+use crate::manager::unit::unit_parser_mgr::{SECTION_INSTALL, SECTION_UNIT};
 use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
@@ -72,10 +72,27 @@ impl UeLoad {
         if unit_type == UnitType::UnitTypeInvalid {
             return Err(format!("invalid unit type of unit {}", unit_name).into());
         }
-        u_config.deps.push((relation, String::from(unit_name)));
+        u_config.add_deps((relation, String::from(unit_name)));
         Ok(())
     }
 
+    fn parse_unit_relations(
+        &self,
+        confvalue: Vec<ConfValue>,
+        relation: UnitRelations,
+        u_config: &mut UnitConfig,
+    ) -> Result<(), Box<dyn Error>> {
+        for value in confvalue.iter() {
+            if let ConfValue::String(val) = value {
+                // zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
+                let result = self.parse_unit_relation(val, relation, u_config);
+                if let Err(r) = result {
+                    return Err(r);
+                }
+            }
+        }
+        Ok(())
+    }
     pub(super) fn parse(&self, confs: &Confs) -> Result<(), Box<dyn Error>> {
         let mut u_config = UnitConfig::new(); // need get config from config database,and update depends here
         let unit_section = confs.get_section_by_name(SECTION_UNIT);
@@ -86,127 +103,242 @@ impl UeLoad {
             )
             .into());
         }
+        let unit_install = confs.get_section_by_name(SECTION_INSTALL);
+        if unit_install.is_none() {
+            return Err(format!(
+                "Config file format is error,Section [{}] not found",
+                SECTION_INSTALL
+            )
+            .into());
+        }
+        //let parse_unit_relations = |relation| {};
+        let set_base_config = |mut conf_values: Vec<ConfValue>| {
+            let conf_value = conf_values.pop();
+            let err_str = "Config file format is error";
+            let result = conf_value.map_or_else(
+                || ConfValue::Error(err_str.to_string()),
+                |v| {
+                    if let ConfValue::String(str) = v {
+                        ConfValue::String(str)
+                    } else if let ConfValue::Boolean(v) = v {
+                        ConfValue::Boolean(v)
+                    } else {
+                        ConfValue::Error(err_str.to_string())
+                    }
+                },
+            );
+            return result;
+        };
 
+        let confs = unit_install.unwrap().get_confs();
+        for conf in confs.iter() {
+            let key = conf.get_key();
+            let conf_values = conf.get_values();
+            match key {
+                _ if key == InstallConfOption::WantedBy.to_string() => {
+                    let result = self.parse_unit_relations(
+                        conf_values,
+                        UnitRelations::UnitWantsBy,
+                        &mut u_config,
+                    );
+                    if let Err(r) = result {
+                        return Err(r);
+                    }
+                }
+                _ if key == InstallConfOption::RequiredBy.to_string() => {
+                    let result = self.parse_unit_relations(
+                        conf_values,
+                        UnitRelations::UnitRequiresBy,
+                        &mut u_config,
+                    );
+                    if let Err(r) = result {
+                        return Err(r);
+                    }
+                }
+                _ if key == InstallConfOption::Alias.to_string() => {
+                    let result = set_base_config(conf_values);
+
+                    if let ConfValue::String(_s) = result {
+                        u_config.set_install_alias(_s);
+                    } else {
+                        if let ConfValue::Error(_s) = result {
+                            return Err(format!(
+                                "{},Section [{}] Conf[{}] value is not supported",
+                                _s,
+                                SECTION_INSTALL,
+                                InstallConfOption::Alias
+                            )
+                            .into());
+                        }
+                    }
+                }
+                _ if key == InstallConfOption::Also.to_string() => {
+                    let result = set_base_config(conf_values);
+                    if let ConfValue::String(_s) = result {
+                        u_config.set_install_also(_s);
+                    } else {
+                        if let ConfValue::Error(_s) = result {
+                            return Err(format!(
+                                "{},Section [{}] Conf[{}] value is not supported",
+                                _s,
+                                SECTION_INSTALL,
+                                InstallConfOption::Alias
+                            )
+                            .into());
+                        }
+                    }
+                }
+                _ => {
+                    return Err(format!(
+                        "config file of {}  section format is error",
+                        SECTION_INSTALL
+                    )
+                    .into());
+                }
+            }
+        }
         let confs = unit_section.unwrap().get_confs();
         for conf in confs.iter() {
             let key = conf.get_key();
-            match key.to_string() {
+            match key {
                 _ if key == UnitConfOption::Relation(UnitRelations::UnitWants).to_string() => {
                     let confvalue = conf.get_values();
-                    for value in confvalue.iter() {
-                        if let ConfValue::String(val) = value {
-                            // zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
-                            let result = self.parse_unit_relation(
-                                val,
-                                UnitRelations::UnitWants,
-                                &mut u_config,
-                            );
-                            if let Err(r) = result {
-                                return Err(r);
-                            }
-                        }
+                    let result = self.parse_unit_relations(
+                        confvalue,
+                        UnitRelations::UnitWants,
+                        &mut u_config,
+                    );
+                    if let Err(r) = result {
+                        return Err(r);
                     }
                 }
                 _ if key == UnitConfOption::Relation(UnitRelations::UnitBefore).to_string() => {
                     let confvalue = conf.get_values();
-                    for value in confvalue.iter() {
-                        if let ConfValue::String(unit) = value {
-                            // zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
-                            let result = self.parse_unit_relation(
-                                &unit,
-                                UnitRelations::UnitBefore,
-                                &mut u_config,
-                            );
-                            if let Err(r) = result {
-                                return Err(r);
-                            }
-                        }
+                    let result = self.parse_unit_relations(
+                        confvalue,
+                        UnitRelations::UnitBefore,
+                        &mut u_config,
+                    );
+                    if let Err(r) = result {
+                        return Err(r);
                     }
                 }
                 _ if key == UnitConfOption::Relation(UnitRelations::UnitAfter).to_string() => {
                     let confvalue = conf.get_values();
-                    for value in confvalue.iter() {
-                        if let ConfValue::String(unit) = value {
-                            // zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
-                            let result = self.parse_unit_relation(
-                                &unit,
-                                UnitRelations::UnitAfter,
-                                &mut u_config,
-                            );
-                            if let Err(r) = result {
-                                return Err(r);
-                            }
-                        }
+                    let result = self.parse_unit_relations(
+                        confvalue,
+                        UnitRelations::UnitBefore,
+                        &mut u_config,
+                    );
+                    if let Err(r) = result {
+                        return Err(r);
                     }
                 }
                 _ if key == UnitConfOption::Relation(UnitRelations::UnitRequires).to_string() => {
                     let confvalue = conf.get_values();
-                    for value in confvalue.iter() {
-                        if let ConfValue::String(unit) = value {
-                            // zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
-                            let result = self.parse_unit_relation(
-                                &unit,
-                                UnitRelations::UnitRequires,
-                                &mut u_config,
-                            );
-                            if let Err(r) = result {
-                                return Err(r);
-                            }
-                        }
+                    let result = self.parse_unit_relations(
+                        confvalue,
+                        UnitRelations::UnitRequires,
+                        &mut u_config,
+                    );
+                    if let Err(r) = result {
+                        return Err(r);
                     }
                 }
 
                 _ if key == UnitConfOption::Desc.to_string() => {
-                    for value in conf.get_values().iter() {
-                        if let ConfValue::String(str) = value {
-                            u_config.desc = str.to_string();
-                        } else {
-                            todo!()
+                    let confvalue = set_base_config(conf.get_values());
+                    if let ConfValue::String(str) = confvalue {
+                        u_config.set_desc(str);
+                    } else {
+                        if let ConfValue::Error(_s) = confvalue {
+                            return Err(format!(
+                                "{},Section [{}] Conf[{}] value is not supported",
+                                _s,
+                                SECTION_INSTALL,
+                                UnitConfOption::Desc
+                            )
+                            .into());
                         }
                     }
                 }
                 _ if key == UnitConfOption::Documentation.to_string() => {
-                    for value in conf.get_values().iter() {
-                        if let ConfValue::String(str) = value {
-                            u_config.documentation = str.to_string();
-                        } else {
-                            todo!()
+                    let confvalue = set_base_config(conf.get_values());
+                    if let ConfValue::String(str) = confvalue {
+                        u_config.set_documentation(str.to_string())
+                    } else {
+                        if let ConfValue::Error(_s) = confvalue {
+                            return Err(format!(
+                                "{},Section [{}] Conf[{}] value is not supported",
+                                _s,
+                                SECTION_UNIT,
+                                UnitConfOption::Documentation
+                            )
+                            .into());
                         }
                     }
                 }
                 _ if key == UnitConfOption::AllowIsolate.to_string() => {
-                    for value in conf.get_values().iter() {
-                        if let ConfValue::Boolean(v) = value {
-                            u_config.allow_isolate = *v;
-                        } else {
-                            break;
+                    let confvalue = set_base_config(conf.get_values());
+                    if let ConfValue::Boolean(v) = confvalue {
+                        u_config.set_allow_isolate(v);
+                    } else {
+                        if let ConfValue::Error(_s) = confvalue {
+                            return Err(format!(
+                                "{},Section [{}] Conf[{}] value is not supported",
+                                _s,
+                                SECTION_UNIT,
+                                UnitConfOption::AllowIsolate
+                            )
+                            .into());
                         }
                     }
                 }
                 _ if key == UnitConfOption::IgnoreOnIolate.to_string() => {
-                    for value in conf.get_values().iter() {
-                        if let ConfValue::Boolean(_v) = value {
-                            u_config.ignore_on_isolate = *_v;
-                        } else {
-                            break;
+                    let confvalue = set_base_config(conf.get_values());
+                    if let ConfValue::Boolean(v) = confvalue {
+                        u_config.set_ignore_on_isolate(v);
+                    } else {
+                        if let ConfValue::Error(_s) = confvalue {
+                            return Err(format!(
+                                "{},Section [{}] Conf[{}] value is not supported",
+                                _s,
+                                SECTION_UNIT,
+                                UnitConfOption::IgnoreOnIolate
+                            )
+                            .into());
                         }
                     }
                 }
                 _ if key == UnitConfOption::OnSucessJobMode.to_string() => {
-                    for value in conf.get_values().iter() {
-                        if let ConfValue::String(_v) = value {
-                            u_config.on_success_job_mode = JobMode::JobReplace; // default is replace need impl from string
-                        } else {
-                            break;
+                    let confvalue = set_base_config(conf.get_values());
+                    if let ConfValue::String(_str) = confvalue {
+                        u_config.set_on_success_job_mode(JobMode::JobReplace);
+                    } else {
+                        if let ConfValue::Error(_s) = confvalue {
+                            return Err(format!(
+                                "{},Section [{}] Conf[{}] value is not supported",
+                                _s,
+                                SECTION_UNIT,
+                                UnitConfOption::OnSucessJobMode
+                            )
+                            .into());
                         }
                     }
                 }
                 _ if key == UnitConfOption::OnFailureJobMode.to_string() => {
-                    for value in conf.get_values().iter() {
-                        if let ConfValue::String(_v) = value {
-                            u_config.on_failure_job_mode = JobMode::JobReplace;
-                        } else {
-                            break;
+                    let confvalue = set_base_config(conf.get_values());
+                    if let ConfValue::Boolean(_str) = confvalue {
+                        u_config.set_on_failure_job_mode(JobMode::JobReplace);
+                    } else {
+                        if let ConfValue::Error(_s) = confvalue {
+                            return Err(format!(
+                                "{},Section [{}] Conf[{}] value is not supported",
+                                _s,
+                                SECTION_UNIT,
+                                UnitConfOption::OnFailureJobMode
+                            )
+                            .into());
                         }
                     }
                 }
@@ -219,6 +351,7 @@ impl UeLoad {
                 }
             }
         }
+
         self.dm
             .insert_unit_config(self.id.clone(), Rc::new(u_config));
         Ok(())

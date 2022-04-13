@@ -7,6 +7,7 @@ pub enum ConfValue {
     Float(f64),
     Boolean(bool),
     Array(Vec<ConfValue>),
+    Error(String),
 }
 
 pub enum SectionType {
@@ -48,8 +49,12 @@ impl Conf {
                             ve.push(ConfValue::Boolean(*item_b));
                         }
                         ConfValue::Array(_) => continue, // not support nested
+                        ConfValue::Error(_) => continue,
                     }
                 }
+            }
+            ConfValue::Error(err) => {
+                ve.push(ConfValue::String(err.to_string()));
             }
         }
         ve

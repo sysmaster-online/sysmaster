@@ -72,7 +72,6 @@ impl UnitLoadData {
         match self.db.units_get(name) {
             Some(unit) => {
                 let rc_unit = Rc::new(unit);
-                //self.db.units_insert(name.to_string(), Rc::clone(&rc_unit));
                 self.rt.push_load_queue(Rc::clone(&rc_unit));
                 Some(Rc::clone(&rc_unit))
             }
@@ -95,13 +94,6 @@ impl UnitLoadData {
         };
         log::info!("push new unit into load queue");
         self.rt.dispatch_load_queue();
-        let config = self.dm.get_unit_config(name.to_string());
-        if let Some(_config) = config {
-            for (_relation, name) in _config.deps.iter() {
-                let unit = self.db.units_get(name);
-                unit.map(|u| self.rt.push_load_queue(Rc::clone(&u)));
-            }
-        }
         Some(Rc::clone(&u))
     }
 }
@@ -193,7 +185,7 @@ impl UnitConfigsSub {
                 self.unit_load_data
                     .db
                     .units_insert(name.to_string(), Rc::clone(&tmp_unit));
-                //self.unit_load_data.rt.push_load_queue(Rc::clone(&tmp_unit));  //cannot be invok embended,because cannot be  borrow two reference
+                self.unit_load_data.rt.push_load_queue(Rc::clone(&tmp_unit)); //cannot be invok embended,because cannot be  borrow two reference
             }
 
             if let Err(_e) =
@@ -258,8 +250,8 @@ mod tests {
 
     #[test]
     fn test_unit_load() {
-        //logger::init_log_with_console("test", 4);
-        // log::info!("test");
+        logger::init_log_with_console("test_unit_load", 4);
+        log::info!("test");
         let dm_manager = Rc::new(DataManager::new());
         let file = Rc::new(UnitFile::new());
         let db = Rc::new(UnitDb::new());
@@ -269,10 +261,10 @@ mod tests {
         load.data.file.init_lookup_path();
 
         let unit_name = String::from("config.service");
-        load.load_unit(&unit_name);
+        let loaded_unit = load.load_unit(&unit_name);
 
         match load.data.db.units_get(&unit_name) {
-            Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), unit_name.as_str()),
+            Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), loaded_unit.unwrap().get_id()),
             None => println!("not fount unit: {}", unit_name),
         };
     }
