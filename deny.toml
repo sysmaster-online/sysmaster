@@ -34,7 +34,7 @@ targets = [
 # The path where the advisory database is cloned/fetched into
 db-path = "~/.cargo/advisory-db"
 # The url(s) of the advisory databases to use
-db-urls = ["https://hub.fastgit.org/rustsec/advisory-db.git"]
+db-urls = ["https://github.com/rustsec/advisory-db.git"]
 # The lint level for security vulnerabilities
 vulnerability = "deny"
 # The lint level for unmaintained crates
