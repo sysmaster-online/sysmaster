@@ -20,7 +20,7 @@ repos:
       - id: cargo-clippy
         name: cargo clippy
         description: Lint rust sources
-        entry: bash -c 'cargo clippy --all-targets --all-features --tests --benches -- -D warnings'
+        entry: bash -c 'cargo clippy --all-targets --all-features --tests --benches'
         language: rust
         files: \.rs$
         pass_filenames: false
