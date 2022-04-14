@@ -34,6 +34,7 @@ libc = "0.2.*"
 signal-hook = "0.3.13"
 prost = "0.9" # 处理 protobuf 的代码
 http = "0.2" # 我们使用 HTTP status code 所以引入这个类型库
+clap = { version = "3.1.8", features = ["derive"] }
 
 [build-dependencies]
 prost-build = "0.9" # 编译 protobuf
