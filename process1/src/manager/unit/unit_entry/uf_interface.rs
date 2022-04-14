@@ -3,18 +3,20 @@ use super::uu_config::UeConfig;
 use crate::manager::data::{
     DataManager, UnitActiveState, UnitConfig, UnitConfigItem, UnitRelations, UnitType,
 };
-use crate::manager::unit::unit_base::UnitActionError;
+use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState};
 use crate::manager::unit::unit_file::UnitFile;
 use crate::manager::unit::unit_parser_mgr::{UnitConfigParser, UnitParserMgr};
 use crate::manager::unit::UnitErrno;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::any::Any;
+use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
+use utils::IN_SET;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UnitX(Unit);
+pub struct UnitX(Rc<Unit>);
 
 impl UnitX {
     pub fn init(&self) {}
@@ -29,10 +31,30 @@ impl UnitX {
     pub fn coldplug(&self) {}
     pub fn dump(&self) {}
     pub fn start(&self) -> Result<(), UnitActionError> {
-        todo!();
+        let state = self.0.current_active_state();
+
+        if state == UnitActiveState::UnitMaintenance {
+            return Err(UnitActionError::UnitActionEAgain);
+        }
+
+        if self.0.get_load_state() != UnitLoadState::UnitLoaded {
+            return Err(UnitActionError::UnitActionEInval);
+        }
+
+        self.0.start()
     }
     pub fn stop(&self) -> Result<(), UnitActionError> {
-        todo!();
+        let state = self.0.current_active_state();
+
+        if IN_SET!(
+            state,
+            UnitActiveState::UnitInActive,
+            UnitActiveState::UnitFailed
+        ) {
+            return Err(UnitActionError::UnitActionEAlready);
+        }
+
+        self.0.stop()
     }
     pub fn reload(&self) -> Result<(), UnitActionError> {
         todo!();
@@ -132,13 +154,18 @@ impl UnitX {
         name: &str,
         subclass: Box<dyn UnitObj>,
     ) -> UnitX {
-        UnitX(Unit::new(
+        let sub_obj = Rc::new(RefCell::new(subclass));
+        let unit = Rc::new(Unit::new(
             Rc::clone(&dm),
             file,
             unit_conf_mgr,
             unit_type,
             name,
-            subclass,
-        ))
+            sub_obj.clone(),
+        ));
+
+        sub_obj.borrow_mut().attach_unit(unit.clone());
+
+        UnitX(unit)
     }
 }

@@ -1,5 +1,5 @@
 pub use job::{JobAffect, JobConf, JobInfo, JobKind, JobManager, JobResult, JobStage};
-pub use unit_base::KillOperation;
+pub use unit_base::{KillOperation, UnitActionError};
 pub use unit_datastore::UnitDb;
 pub use unit_entry::{Unit, UnitObj, UnitX};
 pub use unit_manager::{UnitManager, UnitManagerX, UnitMngUtil, UnitSubClass};

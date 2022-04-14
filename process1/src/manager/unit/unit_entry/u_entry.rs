@@ -4,7 +4,7 @@ use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use super::uu_state::UeState;
 use crate::manager::data::{DataManager, UnitActiveState, UnitType};
-use crate::manager::unit::unit_base::{self, UnitLoadState};
+use crate::manager::unit::unit_base::{self, UnitActionError, UnitLoadState};
 use crate::manager::unit::unit_file::UnitFile;
 use crate::manager::unit::unit_parser_mgr::{UnitConfigParser, UnitParserMgr};
 use log;
@@ -58,14 +58,17 @@ impl Hash for Unit {
 }
 
 pub trait UnitObj {
-    //: std::fmt::Debug {
     fn init(&self) {}
     fn done(&self) {}
     fn load(&mut self, section: &Section<Conf>) -> Result<(), Box<dyn Error>>;
     fn coldplug(&self) {}
     fn dump(&self) {}
-    fn start(&mut self) {}
-    fn stop(&mut self) {}
+    fn start(&mut self) -> Result<(), UnitActionError> {
+        Ok(())
+    }
+    fn stop(&mut self) -> Result<(), UnitActionError> {
+        Ok(())
+    }
     fn reload(&mut self) {}
 
     fn kill(&self) {}
@@ -75,13 +78,14 @@ pub trait UnitObj {
     fn sigchld_events(&mut self, _pid: Pid, _code: i32, _status: Signal) {}
     fn reset_failed(&self) {}
     fn trigger(&mut self, _other: Rc<RefCell<Box<dyn UnitObj>>>) {}
-    fn in_load_queue(&self) -> bool;
 
     fn eq(&self, other: &dyn UnitObj) -> bool;
     fn hash(&self) -> u64;
     fn as_any(&self) -> &dyn Any;
 
     fn get_private_conf_section_name(&self) -> Option<&str>;
+    fn current_active_state(&self) -> UnitActiveState;
+    fn attach_unit(&mut self, unit: Rc<Unit>);
 }
 
 impl Unit {
@@ -91,7 +95,7 @@ impl Unit {
         unit_conf_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
         unit_type: UnitType,
         name: &str,
-        sub: Box<dyn UnitObj>,
+        sub: Rc<RefCell<Box<dyn UnitObj>>>,
     ) -> Self {
         Unit {
             unit_type,
@@ -102,7 +106,7 @@ impl Unit {
             state: UeState::new(Rc::clone(&dm)),
             load: UeLoad::new(Rc::clone(&dm), String::from(name)),
             child: UeChild::new(),
-            sub: Rc::new(RefCell::new(sub)),
+            sub,
         }
     }
 
@@ -181,7 +185,12 @@ impl Unit {
         }
     }
 
-    pub fn notify(&self, original_state: UnitActiveState, new_state: UnitActiveState) {
+    pub fn notify(
+        &self,
+        original_state: UnitActiveState,
+        new_state: UnitActiveState,
+        flags: isize,
+    ) {
         if original_state != new_state {
             log::debug!(
                 "unit active state change from: {:?} to {:?}",
@@ -189,7 +198,8 @@ impl Unit {
                 new_state
             );
         }
-        self.state.update(&self.id, original_state, new_state, 0);
+        self.state
+            .update(&self.id, original_state, new_state, flags);
     }
 
     pub fn get_id(&self) -> &str {
@@ -207,5 +217,21 @@ impl Unit {
             .get_private_conf_section_name()
             .map(|s| s.to_string());
         str
+    }
+
+    pub fn current_active_state(&self) -> UnitActiveState {
+        self.sub.borrow().current_active_state()
+    }
+
+    pub fn start(&self) -> Result<(), UnitActionError> {
+        self.sub.borrow_mut().start()
+    }
+
+    pub fn stop(&self) -> Result<(), UnitActionError> {
+        self.sub.borrow_mut().stop()
+    }
+
+    pub fn get_load_state(&self) -> UnitLoadState {
+        self.load.get_load_state()
     }
 }
