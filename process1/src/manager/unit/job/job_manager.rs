@@ -15,6 +15,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use utils::{Error, Result};
 
+#[derive(Debug)]
 pub struct JobAffect {
     // data
     pub adds: Vec<JobInfo>,
@@ -102,7 +103,7 @@ impl JobManager {
 
     fn register(&self, event: Rc<RefCell<Events>>) {
         let source = Rc::clone(&self.sub);
-        event.borrow_mut().add_source(source);
+        event.borrow_mut().add_source(source).unwrap();
     }
 }
 
@@ -524,10 +525,6 @@ fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno
     let kind = config.get_kind();
     let unit = config.get_unit();
 
-    if kind == JobKind::JobNop {
-        return Err(JobErrno::JobErrInput);
-    }
-
     if mode == JobMode::JobIsolate {
         if kind != JobKind::JobStart {
             return Err(JobErrno::JobErrInput);
@@ -547,4 +544,183 @@ fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::manager::data::{DataManager, UnitRelations, UnitType};
+    use crate::manager::unit::job::JobStage;
+    use crate::manager::unit::unit_file::UnitFile;
+    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+    use crate::plugin::Plugin;
+    use std::path::PathBuf;
+    use utils::logger;
+
+    #[test]
+    fn job_exec_single() {
+        let event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let db = Rc::new(UnitDb::new());
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let name_test2 = String::from("test2.service");
+        let unit_test2 = create_unit(&name_test2);
+        db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
+        db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
+        let jm = JobManager::new(db, event);
+
+        let mut affect = JobAffect::new(true);
+        let ret = jm.exec(
+            &JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart),
+            JobMode::JobReplace,
+            &mut affect,
+        );
+        assert!(ret.is_ok());
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 1);
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 1);
+
+        assert_eq!(affect.adds.len(), 1);
+        let job_info = affect.adds.pop().unwrap();
+        assert!(Rc::ptr_eq(&job_info.unit, &unit_test1));
+        assert_eq!(job_info.kind, JobKind::JobStart);
+        assert_eq!(job_info.run_kind, JobKind::JobStart);
+        assert_eq!(job_info.stage, JobStage::JobWait);
+    }
+
+    #[test]
+    fn job_exec_multi() {
+        let event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let db = Rc::new(UnitDb::new());
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let name_test2 = String::from("test2.service");
+        let unit_test2 = create_unit(&name_test2);
+        let relation = UnitRelations::UnitRequires;
+        db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
+        db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
+        db.dep_insert(
+            Rc::clone(&unit_test1),
+            relation,
+            Rc::clone(&unit_test2),
+            true,
+            0,
+        )
+        .unwrap();
+        let jm = JobManager::new(db, event);
+
+        let mut affect = JobAffect::new(true);
+        let ret = jm.exec(
+            &JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart),
+            JobMode::JobReplace,
+            &mut affect,
+        );
+        assert!(ret.is_ok());
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 2);
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 2);
+        assert_eq!(affect.adds.len(), 2);
+        let job_info1 = affect.adds.pop().unwrap();
+        assert!(
+            Rc::ptr_eq(&job_info1.unit, &unit_test1) || Rc::ptr_eq(&job_info1.unit, &unit_test2)
+        );
+        assert_eq!(job_info1.kind, JobKind::JobStart);
+        assert_eq!(job_info1.run_kind, JobKind::JobStart);
+        assert_eq!(job_info1.stage, JobStage::JobWait);
+        let job_info2 = affect.adds.pop().unwrap();
+        assert!(!Rc::ptr_eq(&job_info1.unit, &job_info2.unit));
+        assert!(
+            Rc::ptr_eq(&job_info2.unit, &unit_test1) || Rc::ptr_eq(&job_info2.unit, &unit_test2)
+        );
+        assert_eq!(job_info2.kind, JobKind::JobStart);
+        assert_eq!(job_info2.run_kind, JobKind::JobStart);
+        assert_eq!(job_info2.stage, JobStage::JobWait);
+    }
+
+    #[test]
+    fn job_run_finish_single() {
+        let event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let db = Rc::new(UnitDb::new());
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let name_test2 = String::from("test2.service");
+        let unit_test2 = create_unit(&name_test2);
+        db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
+        db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
+        let jm = JobManager::new(db, event);
+
+        jm.exec(
+            &JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop),
+            JobMode::JobReplace,
+            &mut JobAffect::new(false),
+        )
+        .unwrap();
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 1);
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 1);
+
+        jm.sub.borrow().data.borrow_mut().run();
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 0);
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 0);
+    }
+
+    #[test]
+    fn job_run_finish_multi() {
+        let event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let db = Rc::new(UnitDb::new());
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let name_test2 = String::from("test2.service");
+        let unit_test2 = create_unit(&name_test2);
+        db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
+        db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
+        let jm = JobManager::new(db, event);
+
+        jm.exec(
+            &JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop),
+            JobMode::JobReplace,
+            &mut JobAffect::new(false),
+        )
+        .unwrap();
+        jm.exec(
+            &JobConf::new(Rc::clone(&unit_test2), JobKind::JobNop),
+            JobMode::JobReplace,
+            &mut JobAffect::new(false),
+        )
+        .unwrap();
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 2);
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 2);
+
+        jm.sub.borrow().data.borrow_mut().run();
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 0);
+        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 0);
+    }
+
+    fn create_unit(name: &str) -> Rc<UnitX> {
+        logger::init_log_with_console("test_unit_load", 4);
+        log::info!("test");
+        let dm = Rc::new(DataManager::new());
+        let file = Rc::new(UnitFile::new());
+        let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
+        let unit_type = UnitType::UnitService;
+        let plugins = Rc::clone(&Plugin::get_instance());
+        let mut config_path1 = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        config_path1.push("../target/debug");
+        plugins
+            .borrow_mut()
+            .set_library_dir(&config_path1.to_str().unwrap());
+        plugins.borrow_mut().load_lib();
+        let mut config_path2 = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        config_path2.push("../target/release");
+        plugins
+            .borrow_mut()
+            .set_library_dir(&config_path2.to_str().unwrap());
+        plugins.borrow_mut().load_lib();
+        let subclass = plugins.borrow().create_unit_obj(unit_type).unwrap();
+        Rc::new(UnitX::new(
+            dm,
+            file,
+            unit_conf_parser_mgr,
+            unit_type,
+            name,
+            subclass.into_unitobj(),
+        ))
+    }
 }

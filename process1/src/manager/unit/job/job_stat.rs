@@ -369,7 +369,7 @@ fn change_to_changes(job: &Option<Rc<Job>>) -> Vec<Rc<Job>> {
 
 fn value_try_add(value: &mut usize, add: usize) -> bool {
     let (v, o) = value.overflowing_add(add);
-    if o {
+    if !o {
         *value = v;
     }
     o
@@ -377,7 +377,7 @@ fn value_try_add(value: &mut usize, add: usize) -> bool {
 
 fn value_try_sub(value: &mut usize, sub: usize) -> bool {
     let (v, o) = value.overflowing_sub(sub);
-    if o {
+    if !o {
         *value = v;
     }
     o

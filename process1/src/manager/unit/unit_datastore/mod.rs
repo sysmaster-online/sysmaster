@@ -66,15 +66,6 @@ impl UnitDb {
         self.dep.gets_atom(source, atom)
     }
 
-    pub(super) fn dep_is_dep_with(
-        &self,
-        source: &UnitX,
-        relation: UnitRelations,
-        dest: &UnitX,
-    ) -> bool {
-        self.dep.is_dep_with(source, relation, dest)
-    }
-
     pub(super) fn dep_is_dep_atom_with(
         &self,
         source: &UnitX,
