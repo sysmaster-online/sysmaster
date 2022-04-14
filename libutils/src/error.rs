@@ -3,6 +3,8 @@ enum ErrKind {
     Env,
     Unit,
     Syscall,
+    Http,
+    Other,
 }
 
 impl std::fmt::Display for ErrKind {
@@ -12,6 +14,8 @@ impl std::fmt::Display for ErrKind {
             ErrKind::Env => "env",
             ErrKind::Unit => "unit",
             ErrKind::Syscall => "syscall",
+            ErrKind::Http => "http",
+            ErrKind::Other => "other",
         };
         write!(f, "{}", err_kind)
     }
@@ -49,12 +53,24 @@ pub enum Error {
     )]
     Pid { msg: &'static str },
 
+    /// An error writing the cargo instructions to stdout
+    #[error("{}: There was an error writing the cargo instructions to stdout: {}", ErrKind::Http, .0)]
+    Http(#[from] http::Error),
+
     /// An error getting the current pid
     #[error("{}: Got an error: {} for unit: {}", ErrKind::Unit, msg, unit)]
     Unit {
         msg: &'static str,
         unit: &'static str,
     },
+
+    /// An error getting the current pid
+    #[error(
+        "{}: Unable to determine the current process pid: {}",
+        ErrKind::Other,
+        msg
+    )]
+    Other { msg: &'static str },
 }
 
 pub type Result<T, E = Error> = anyhow::Result<T, E>;
