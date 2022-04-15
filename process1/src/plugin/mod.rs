@@ -174,7 +174,7 @@ impl Plugin {
             unsafe { dy_lib.lib.get(b"__unit_obj_create").unwrap() };
         let boxed_raw = fun();
 
-        return Ok(unsafe { Box::from_raw(boxed_raw) });
+        Ok(unsafe { Box::from_raw(boxed_raw) })
     }
 }
 
