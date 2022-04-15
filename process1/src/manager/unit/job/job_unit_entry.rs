@@ -3,14 +3,162 @@ use super::job_entry::{Job, JobAttrKind, JobInfo, JobKind, JobResult, JobStage};
 use crate::manager::data::UnitActiveState;
 use crate::manager::unit::unit_entry::UnitX;
 use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
+use std::cell::RefCell;
 use std::collections::{HashMap, LinkedList};
 use std::rc::Rc;
 
 const JOBUNIT_SQ_MUTOP_MAX_NUM: usize = 1; // stop or (restart|start|reload), which can change the unit's stage
 const JOBUNIT_SQ_MAX_NUM: usize = 3; // [stop] | [(restart|start|reload)->verify->nop]
 
-//#[derive(Debug)]
 pub(super) struct JobUnit {
+    data: RefCell<JobUnitData>,
+}
+
+impl JobUnit {
+    pub(super) fn new(unit: Rc<UnitX>) -> JobUnit {
+        JobUnit {
+            data: RefCell::new(JobUnitData::new(unit)),
+        }
+    }
+
+    pub(super) fn insert_suspend(&self, job: Rc<Job>, operate: bool) {
+        self.data.borrow_mut().insert_suspend(job, operate)
+    }
+
+    pub(super) fn remove_suspend(&self, kind: JobKind, result: JobResult) -> Option<Rc<Job>> {
+        self.data.borrow_mut().remove_suspend(kind, result)
+    }
+
+    pub(super) fn flush_suspends(&self) -> Vec<Rc<Job>> {
+        self.data.borrow_mut().flush_suspends()
+    }
+
+    pub(super) fn merge_suspends(
+        &self,
+        other: &Self,
+    ) -> (Vec<Rc<Job>>, Vec<Rc<Job>>, Vec<Rc<Job>>) {
+        self.data.borrow_mut().merge_suspends(&other.data.borrow())
+    }
+
+    pub(super) fn reshuffle(&self) -> Vec<Rc<Job>> {
+        self.data.borrow_mut().reshuffle()
+    }
+
+    pub(super) fn pause(&self) {
+        self.data.borrow_mut().pause()
+    }
+
+    pub(super) fn resume(&self) {
+        self.data.borrow_mut().resume()
+    }
+
+    pub(super) fn do_trigger(&self) -> (Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>) {
+        let (cur_trigger, merge_trigger) = self.data.borrow_mut().do_next_trigger();
+
+        // record current infomation of the trigger first, which(run_kind + stage) could be changed after running.
+        let t_jinfo = JobInfo::map(&cur_trigger);
+
+        // operate job
+        let tfinish_result = match cur_trigger.run() {
+            // run the trigger
+            Ok(_) => None, // trigger successful
+            Err(None) => {
+                self.data.borrow_mut().pause();
+                self.data.borrow_mut().retrigger_trigger();
+                None
+            } // trigger failed, but need to be retriggered again
+            Err(Some(tfinish_r)) => Some(tfinish_r), // trigger failed, and need to be finished
+        };
+
+        if let Some(job) = &merge_trigger {
+            // finish merged job
+            job.finish(JobResult::JobMerged);
+        }
+
+        (Some((t_jinfo, tfinish_result)), merge_trigger)
+    }
+
+    pub(super) fn finish_trigger(&self, result: JobResult) -> Option<Rc<Job>> {
+        self.data.borrow_mut().finish_trigger(result)
+    }
+
+    pub(super) fn clear_dirty(&self) {
+        self.data.borrow_mut().clear_dirty()
+    }
+
+    pub(super) fn set_up_ready(&self) {
+        self.data.borrow_mut().set_up_ready()
+    }
+
+    pub(super) fn clear_up_ready(&self) {
+        self.data.borrow_mut().clear_up_ready()
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.data.borrow().len()
+    }
+
+    pub(super) fn get_suspend(&self, kind: JobKind) -> Option<Rc<Job>> {
+        self.data.borrow().get_suspend(kind)
+    }
+
+    pub(super) fn get_suspends(&self) -> Vec<Rc<Job>> {
+        self.data.borrow().get_suspends()
+    }
+
+    pub(super) fn get_trigger(&self) -> Option<Rc<Job>> {
+        self.data.borrow().get_trigger()
+    }
+
+    pub(super) fn get_unit(&self) -> Rc<UnitX> {
+        self.data.borrow().get_unit()
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.data.borrow().is_empty()
+    }
+
+    pub(super) fn is_ready(&self) -> bool {
+        self.data.borrow().is_ready()
+    }
+
+    pub(super) fn is_up_ready(&self) -> bool {
+        self.data.borrow().is_up_ready()
+    }
+
+    pub(super) fn is_dirty(&self) -> bool {
+        self.data.borrow().is_dirty()
+    }
+
+    pub(super) fn is_pause(&self) -> bool {
+        self.data.borrow().is_pause()
+    }
+
+    pub(super) fn is_suspends_conflict(&self) -> bool {
+        self.data.borrow().is_suspends_conflict()
+    }
+
+    pub(super) fn is_suspends_conflict_with(&self, other: &Self) -> bool {
+        self.data
+            .borrow()
+            .is_suspends_conflict_with(&other.data.borrow())
+    }
+
+    pub(super) fn is_suspends_replace_with(&self, other: &Self) -> bool {
+        self.data
+            .borrow()
+            .is_suspends_replace_with(&other.data.borrow())
+    }
+
+    pub(super) fn is_next_trigger_order_with(&self, other: &Self, atom: UnitRelationAtom) -> bool {
+        self.data
+            .borrow()
+            .is_next_trigger_order_with(&other.data.borrow(), atom)
+    }
+}
+
+//#[derive(Debug)]
+struct JobUnitData {
     // key
     unit: Rc<UnitX>,
 
@@ -33,9 +181,10 @@ pub(super) struct JobUnit {
     up_ready: bool, // 'ready' status in up-level
 }
 
-impl JobUnit {
-    pub(super) fn new(unit: Rc<UnitX>) -> JobUnit {
-        JobUnit {
+// the declaration "pub(self)" is for identification only.
+impl JobUnitData {
+    pub(self) fn new(unit: Rc<UnitX>) -> JobUnitData {
+        JobUnitData {
             unit,
 
             suspends: HashMap::new(),
@@ -52,7 +201,7 @@ impl JobUnit {
         }
     }
 
-    pub(super) fn insert_suspend(&mut self, job: Rc<Job>, operate: bool) {
+    pub(self) fn insert_suspend(&mut self, job: Rc<Job>, operate: bool) {
         assert!(job.is_basic_op());
         assert_eq!(job.get_stage(), JobStage::JobInit);
         assert!(!self.is_trigger(&job));
@@ -75,7 +224,7 @@ impl JobUnit {
         }
     }
 
-    pub(super) fn remove_suspend(&mut self, kind: JobKind, result: JobResult) -> Option<Rc<Job>> {
+    pub(self) fn remove_suspend(&mut self, kind: JobKind, result: JobResult) -> Option<Rc<Job>> {
         // suspends
         /* data */
         let del_job = self.suspends.remove(&kind);
@@ -96,7 +245,7 @@ impl JobUnit {
         del_job
     }
 
-    pub(super) fn flush_suspends(&mut self) -> Vec<Rc<Job>> {
+    pub(self) fn flush_suspends(&mut self) -> Vec<Rc<Job>> {
         // suspends
         /* data */
         let del_jobs = self
@@ -122,7 +271,7 @@ impl JobUnit {
         del_jobs
     }
 
-    pub(super) fn merge_suspends(
+    pub(self) fn merge_suspends(
         &mut self,
         other: &Self,
     ) -> (Vec<Rc<Job>>, Vec<Rc<Job>>, Vec<Rc<Job>>) {
@@ -152,7 +301,7 @@ impl JobUnit {
         (add_jobs, del_jobs, update_jobs)
     }
 
-    pub(super) fn reshuffle(&mut self) -> Vec<Rc<Job>> {
+    pub(self) fn reshuffle(&mut self) -> Vec<Rc<Job>> {
         assert!(!self.is_suspends_conflict()); // only the non-suspends-conflicting unit can be reshuffled
 
         let mut merge_jobs = Vec::new();
@@ -182,7 +331,7 @@ impl JobUnit {
         merge_jobs
     }
 
-    pub(super) fn pause(&mut self) {
+    pub(self) fn pause(&mut self) {
         // suspends: do nothing
         assert!(self.order);
         // trigger: do nothing
@@ -192,7 +341,7 @@ impl JobUnit {
         self.update_ready();
     }
 
-    pub(super) fn resume(&mut self) {
+    pub(self) fn resume(&mut self) {
         // suspends: do nothing
         assert!(self.order);
         // trigger: do nothing
@@ -202,38 +351,30 @@ impl JobUnit {
         self.update_ready();
     }
 
-    pub(super) fn do_trigger(&mut self) -> (Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>) {
+    pub(self) fn do_next_trigger(&mut self) -> (Rc<Job>, Option<Rc<Job>>) {
         // trigger the next
-        let (cur_trigger, merge_trigger) = match self.calc_ready() {
+        match self.calc_ready() {
             Some(s) if s => self.do_next_trigger_suspend(),
             Some(s) if !s => self.do_next_trigger_retrigger(),
             _ => unreachable!("the non-ready entry is triggered."),
-        };
-
-        // record current infomation of the trigger first, which(run_kind + stage) could be changed after running.
-        let t_jinfo = JobInfo::map(&cur_trigger);
-
-        // operate job
-        let tfinish_result = match cur_trigger.run() {
-            // run the trigger
-            Ok(_) => None, // trigger successful
-            Err(None) => {
-                self.pause();
-                self.retrigger_trigger();
-                None
-            } // trigger failed, but need to be retriggered again
-            Err(Some(tfinish_r)) => Some(tfinish_r), // trigger failed, and need to be finished
-        };
-
-        if let Some(job) = &merge_trigger {
-            // finish merged job
-            job.finish(JobResult::JobMerged);
         }
-
-        (Some((t_jinfo, tfinish_result)), merge_trigger)
     }
 
-    pub(super) fn finish_trigger(&mut self, result: JobResult) -> Option<Rc<Job>> {
+    pub(self) fn retrigger_trigger(&mut self) {
+        assert!(self.trigger.is_some());
+
+        // trigger: status-only
+        self.retrigger = true;
+
+        // the entire entry: status-only
+        self.dirty = true;
+        self.update_ready();
+
+        // suspends: do nothing
+        assert!(self.order);
+    }
+
+    pub(self) fn finish_trigger(&mut self, result: JobResult) -> Option<Rc<Job>> {
         assert!(self.trigger.is_some());
 
         // trigger: data + status
@@ -259,64 +400,64 @@ impl JobUnit {
         del_trigger
     }
 
-    pub(super) fn clear_dirty(&mut self) {
+    pub(self) fn clear_dirty(&mut self) {
         self.dirty = false;
     }
 
-    pub(super) fn set_up_ready(&mut self) {
+    pub(self) fn set_up_ready(&mut self) {
         self.up_ready = true;
     }
 
-    pub(super) fn clear_up_ready(&mut self) {
+    pub(self) fn clear_up_ready(&mut self) {
         self.up_ready = false;
     }
 
-    pub(super) fn len(&self) -> usize {
+    pub(self) fn len(&self) -> usize {
         let num_trigger: usize = self.trigger.is_some().into();
         let num_suspend = self.suspends.len();
         num_trigger + num_suspend
     }
 
-    pub(super) fn get_suspend(&self, kind: JobKind) -> Option<Rc<Job>> {
+    pub(self) fn get_suspend(&self, kind: JobKind) -> Option<Rc<Job>> {
         self.suspends.get(&kind).cloned()
     }
 
-    pub(super) fn get_suspends(&self) -> Vec<Rc<Job>> {
+    pub(self) fn get_suspends(&self) -> Vec<Rc<Job>> {
         self.suspends
             .iter()
             .map(|(_, jr)| Rc::clone(jr))
             .collect::<Vec<_>>()
     }
 
-    pub(super) fn get_trigger(&self) -> Option<Rc<Job>> {
+    pub(self) fn get_trigger(&self) -> Option<Rc<Job>> {
         self.trigger.as_ref().cloned()
     }
 
-    pub(super) fn get_unit(&self) -> Rc<UnitX> {
+    pub(self) fn get_unit(&self) -> Rc<UnitX> {
         Rc::clone(&self.unit)
     }
 
-    pub(super) fn is_empty(&self) -> bool {
+    pub(self) fn is_empty(&self) -> bool {
         self.trigger.is_none() && self.suspends.is_empty()
     }
 
-    pub(super) fn is_ready(&self) -> bool {
+    pub(self) fn is_ready(&self) -> bool {
         self.ready
     }
 
-    pub(super) fn is_up_ready(&self) -> bool {
+    pub(self) fn is_up_ready(&self) -> bool {
         self.up_ready
     }
 
-    pub(super) fn is_dirty(&self) -> bool {
+    pub(self) fn is_dirty(&self) -> bool {
         self.dirty
     }
 
-    pub(super) fn is_pause(&self) -> bool {
+    pub(self) fn is_pause(&self) -> bool {
         self.pause
     }
 
-    pub(super) fn is_suspends_conflict(&self) -> bool {
+    pub(self) fn is_suspends_conflict(&self) -> bool {
         // 'stop' can be not conflicting with 'nop' only
         let num_stop = self.suspends_kind_len(JobKind::JobStop);
         let num_others = self.suspends.len() - num_stop - self.suspends_kind_len(JobKind::JobNop);
@@ -326,7 +467,7 @@ impl JobUnit {
         }
     }
 
-    pub(super) fn is_suspends_conflict_with(&self, other: &Self) -> bool {
+    pub(self) fn is_suspends_conflict_with(&self, other: &Self) -> bool {
         // 'stop' can be not conflicting with 'nop' only
         let stop_s = self.suspends_kind_len(JobKind::JobStop);
         let others_s = self.suspends.len() - stop_s - self.suspends_kind_len(JobKind::JobNop);
@@ -338,7 +479,7 @@ impl JobUnit {
         }
     }
 
-    pub(super) fn is_suspends_replace_with(&self, other: &Self) -> bool {
+    pub(self) fn is_suspends_replace_with(&self, other: &Self) -> bool {
         assert!(!self.is_suspends_conflict() && !other.is_suspends_conflict()); // both sides are not conflicting
 
         // can 'other' replace 'self'?
@@ -353,7 +494,7 @@ impl JobUnit {
         }
     }
 
-    pub(super) fn is_next_trigger_order_with(&self, other: &Self, atom: UnitRelationAtom) -> bool {
+    pub(self) fn is_next_trigger_order_with(&self, other: &Self, atom: UnitRelationAtom) -> bool {
         assert!(self.ready && other.order);
 
         let job = self.get_next_trigger();
@@ -432,20 +573,6 @@ impl JobUnit {
     fn get_next_trigger_suspend(&self) -> Rc<Job> {
         assert!(!self.sq.is_empty());
         self.sq.front().cloned().unwrap()
-    }
-
-    fn retrigger_trigger(&mut self) {
-        assert!(self.trigger.is_some());
-
-        // trigger: status-only
-        self.retrigger = true;
-
-        // the entire entry: status-only
-        self.dirty = true;
-        self.update_ready();
-
-        // suspends: do nothing
-        assert!(self.order);
     }
 
     fn jobs_merge_suspend(&mut self, del_jobs: &mut Vec<Rc<Job>>) {

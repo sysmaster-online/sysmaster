@@ -11,8 +11,8 @@ use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
 use std::rc::Rc;
 
 pub(super) fn job_trans_expand(
-    stage: &mut JobTable,
-    ja: &mut JobAlloc,
+    stage: &JobTable,
+    ja: &JobAlloc,
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
@@ -44,8 +44,8 @@ pub(super) fn job_trans_expand(
 }
 
 pub(super) fn job_trans_affect(
-    stage: &mut JobTable,
-    ja: &mut JobAlloc,
+    stage: &JobTable,
+    ja: &JobAlloc,
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
@@ -58,7 +58,7 @@ pub(super) fn job_trans_affect(
 }
 
 pub(super) fn job_trans_verify(
-    stage: &mut JobTable,
+    stage: &JobTable,
     jobs: &JobTable,
     mode: JobMode,
 ) -> Result<(), JobErrno> {
@@ -72,7 +72,7 @@ pub(super) fn job_trans_verify(
 }
 
 pub(super) fn job_trans_fallback(
-    jobs: &mut JobTable,
+    jobs: &JobTable,
     db: &UnitDb,
     unit: &UnitX,
     run_kind: JobKind,
@@ -110,8 +110,8 @@ fn trans_expand_check_input(config: &JobConf) -> Result<(), JobErrno> {
 }
 
 fn trans_expand_start(
-    stage: &mut JobTable,
-    ja: &mut JobAlloc,
+    stage: &JobTable,
+    ja: &JobAlloc,
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
@@ -202,8 +202,8 @@ fn trans_expand_start(
 }
 
 fn trans_expand_stop(
-    stage: &mut JobTable,
-    ja: &mut JobAlloc,
+    stage: &JobTable,
+    ja: &JobAlloc,
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
@@ -238,8 +238,8 @@ fn trans_expand_stop(
 }
 
 fn trans_expand_reload(
-    stage: &mut JobTable,
-    ja: &mut JobAlloc,
+    stage: &JobTable,
+    ja: &JobAlloc,
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
@@ -285,8 +285,8 @@ fn trans_is_expand(config: &JobConf, new: bool, mode: JobMode) -> bool {
 }
 
 fn trans_affect_isolate(
-    stage: &mut JobTable,
-    ja: &mut JobAlloc,
+    stage: &JobTable,
+    ja: &JobAlloc,
     db: &UnitDb,
     mode: JobMode,
 ) -> Result<(), JobErrno> {
@@ -322,8 +322,8 @@ fn trans_affect_isolate(
 }
 
 fn trans_affect_trigger(
-    stage: &mut JobTable,
-    ja: &mut JobAlloc,
+    stage: &JobTable,
+    ja: &JobAlloc,
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
@@ -386,7 +386,7 @@ fn trans_verify_is_destructive(
     Err(JobErrno::JobErrConflict)
 }
 
-fn trans_fallback_start(jobs: &mut JobTable, db: &UnitDb, unit: &UnitX) -> Vec<Rc<Job>> {
+fn trans_fallback_start(jobs: &JobTable, db: &UnitDb, unit: &UnitX) -> Vec<Rc<Job>> {
     trans_fallback(
         jobs,
         db,
@@ -395,7 +395,7 @@ fn trans_fallback_start(jobs: &mut JobTable, db: &UnitDb, unit: &UnitX) -> Vec<R
     )
 }
 
-fn trans_fallback_stop(jobs: &mut JobTable, db: &UnitDb, unit: &UnitX) -> Vec<Rc<Job>> {
+fn trans_fallback_stop(jobs: &JobTable, db: &UnitDb, unit: &UnitX) -> Vec<Rc<Job>> {
     trans_fallback(
         jobs,
         db,
@@ -405,7 +405,7 @@ fn trans_fallback_stop(jobs: &mut JobTable, db: &UnitDb, unit: &UnitX) -> Vec<Rc
 }
 
 fn trans_fallback(
-    jobs: &mut JobTable,
+    jobs: &JobTable,
     db: &UnitDb,
     unit: &UnitX,
     atom: UnitRelationAtom,

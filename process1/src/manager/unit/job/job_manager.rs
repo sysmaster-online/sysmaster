@@ -49,7 +49,7 @@ impl JobAffect {
 
 pub struct JobManager {
     event: Rc<RefCell<Events>>,
-    sub: Rc<RefCell<JobManagerSub>>,
+    data: Rc<RefCell<JobManagerData>>,
 }
 
 impl JobManager {
@@ -59,21 +59,17 @@ impl JobManager {
         mode: JobMode,
         affect: &mut JobAffect,
     ) -> Result<(), JobErrno> {
-        self.sub
-            .borrow()
-            .data
-            .borrow_mut()
-            .exec(config, mode, affect)
+        self.data.borrow().exec(config, mode, affect)
     }
 
     pub fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
-        self.sub.borrow().data.borrow_mut().notify(config, mode)
+        self.data.borrow().notify(config, mode)
     }
 
     pub(in crate::manager::unit) fn new(db: Rc<UnitDb>, event: Rc<RefCell<Events>>) -> JobManager {
         let jm = JobManager {
             event,
-            sub: Rc::new(RefCell::new(JobManagerSub::new(db))),
+            data: Rc::new(RefCell::new(JobManagerData::new(db))),
         };
         jm.register(Rc::clone(&jm.event));
         jm
@@ -86,40 +82,24 @@ impl JobManager {
         ns: UnitActiveState,
         flags: isize,
     ) -> Result<(), JobErrno> {
-        self.sub
-            .borrow()
-            .data
-            .borrow_mut()
-            .try_finish(unit, os, ns, flags)
+        self.data.borrow().try_finish(unit, os, ns, flags)
     }
 
     pub(in crate::manager::unit) fn remove(&self, id: u32) -> Result<(), JobErrno> {
-        self.sub.borrow().data.borrow_mut().remove(id)
+        self.data.borrow().remove(id)
     }
 
     pub(in crate::manager::unit) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
-        self.sub.borrow().data.borrow().get_jobinfo(id)
+        self.data.borrow().get_jobinfo(id)
     }
 
     fn register(&self, event: Rc<RefCell<Events>>) {
-        let source = Rc::clone(&self.sub);
+        let source = Rc::clone(&self.data);
         event.borrow_mut().add_source(source).unwrap();
     }
 }
 
-struct JobManagerSub {
-    data: RefCell<JobManagerData>, // make 'Events' happy
-}
-
-impl JobManagerSub {
-    pub(self) fn new(db: Rc<UnitDb>) -> JobManagerSub {
-        JobManagerSub {
-            data: RefCell::new(JobManagerData::new(db)),
-        }
-    }
-}
-
-impl Source for JobManagerSub {
+impl Source for JobManagerData {
     fn event_type(&self) -> EventType {
         EventType::Defer
     }
@@ -134,7 +114,7 @@ impl Source for JobManagerSub {
     }
 
     fn dispatch(&self, _event: &mut Events) -> Result<i32, Error> {
-        self.data.borrow_mut().run();
+        self.run();
         Ok(0)
     }
 }
@@ -153,8 +133,8 @@ struct JobManagerData {
     stage: JobTable, // temporary
 
     // status
-    running: bool,
-    text: Option<(Rc<UnitX>, UnitActiveState, UnitActiveState, isize)>, // (unit, os, ns, flags) for synchronous finish
+    running: RefCell<bool>,
+    text: RefCell<Option<(Rc<UnitX>, UnitActiveState, UnitActiveState, isize)>>, // (unit, os, ns, flags) for synchronous finish
 
     // statistics
     stat: JobStat,
@@ -163,7 +143,7 @@ struct JobManagerData {
 // the declaration "pub(self)" is for identification only.
 impl JobManagerData {
     pub(self) fn exec(
-        &mut self,
+        &self,
         config: &JobConf,
         mode: JobMode,
         affect: &mut JobAffect,
@@ -173,9 +153,9 @@ impl JobManagerData {
         self.stage.clear(); // clear stage first: make rollback simple
 
         // build changes in stage
-        job_transaction::job_trans_expand(&mut self.stage, &mut self.ja, &self.db, config, mode)?;
-        job_transaction::job_trans_affect(&mut self.stage, &mut self.ja, &self.db, config, mode)?;
-        job_transaction::job_trans_verify(&mut self.stage, &self.jobs, mode)?;
+        job_transaction::job_trans_expand(&self.stage, &self.ja, &self.db, config, mode)?;
+        job_transaction::job_trans_affect(&self.stage, &self.ja, &self.db, config, mode)?;
+        job_transaction::job_trans_verify(&self.stage, &self.jobs, mode)?;
 
         // commit stage to jobs
         let (add_jobs, del_jobs, update_jobs) = self.jobs.commit(&self.stage, mode)?;
@@ -201,7 +181,7 @@ impl JobManagerData {
         // if it's successful, all jobs expanded would be inserted in 'self.jobs', otherwise(failed) they would be cleared next time.
     }
 
-    pub(self) fn notify(&mut self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
+    pub(self) fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
         if config.get_kind() != JobKind::JobReload {
             return Err(JobErrno::JobErrInput);
         }
@@ -219,20 +199,20 @@ impl JobManagerData {
             jobs: JobTable::new(),
             stage: JobTable::new(),
 
-            running: false,
-            text: None,
+            running: RefCell::new(false),
+            text: RefCell::new(None),
 
             stat: JobStat::new(),
         }
     }
 
-    pub(self) fn run(&mut self) {
+    pub(self) fn run(&self) {
         loop {
             // try to trigger something to run
-            self.text = None; // reset every time
-            self.running = true;
+            *self.text.borrow_mut() = None; // reset every time
+            *self.running.borrow_mut() = true;
             let trigger_ret = self.jobs.try_trigger(&self.db);
-            self.running = false;
+            *self.running.borrow_mut() = false;
 
             if let Some((trigger_info, merge_trigger)) = trigger_ret {
                 // something is triggered in this round
@@ -249,7 +229,7 @@ impl JobManagerData {
                 if let Some((unit, os, ns, flags)) = self.text.take() {
                     // case 1
                     self.do_try_finish(&unit, os, ns, flags);
-                    self.text = None;
+                    *self.text.borrow_mut() = None;
                 }
 
                 if let Some((t_jinfo, Some(tfinish_r))) = trigger_info {
@@ -269,21 +249,22 @@ impl JobManagerData {
     }
 
     pub(self) fn try_finish(
-        &mut self,
+        &self,
         unit: &Rc<UnitX>,
         os: UnitActiveState,
         ns: UnitActiveState,
         flags: isize,
     ) -> Result<(), JobErrno> {
         // in order to simplify the mechanism, the running(trigger) and ending(finish) processes need to be isolated.
-        if self.running {
+        if *self.running.borrow() {
             // (synchronous)finish in context
-            if self.text.is_some() {
+            if self.text.borrow().is_some() {
                 // the unit has been finished already
                 return Err(JobErrno::JobErrInput);
             }
 
-            self.text = Some((Rc::clone(unit), os.clone(), ns.clone(), flags.clone()));
+            *self.text.borrow_mut() =
+                Some((Rc::clone(unit), os.clone(), ns.clone(), flags.clone()));
         // update and record it.
         } else {
             // (asynchronous)finish not in context
@@ -298,8 +279,8 @@ impl JobManagerData {
         Ok(())
     }
 
-    pub(self) fn remove(&mut self, id: u32) -> Result<(), JobErrno> {
-        assert!(!self.running);
+    pub(self) fn remove(&self, id: u32) -> Result<(), JobErrno> {
+        assert!(!*self.running.borrow());
 
         let job_info = self.jobs.get(id);
         if job_info.is_none() {
@@ -323,7 +304,7 @@ impl JobManagerData {
     }
 
     fn do_try_finish(
-        &mut self,
+        &self,
         unit: &Rc<UnitX>,
         os: UnitActiveState,
         ns: UnitActiveState,
@@ -357,7 +338,7 @@ impl JobManagerData {
         self.unit_start_on(unit, os, ns, flags);
     }
 
-    fn do_remove(&mut self, job_info: &JobInfo, result: JobResult, force: bool) {
+    fn do_remove(&self, job_info: &JobInfo, result: JobResult, force: bool) {
         // delete itself
         if self.jobs.is_trigger(job_info.id) {
             self.del_trigger(job_info, result);
@@ -369,7 +350,7 @@ impl JobManagerData {
         self.simulate_unit_notify(&job_info.unit, result, force);
     }
 
-    fn del_trigger(&mut self, job_info: &JobInfo, result: JobResult) {
+    fn del_trigger(&self, job_info: &JobInfo, result: JobResult) {
         // delete itself
         let del_trigger = self.jobs.finish_trigger(&self.db, &job_info.unit, result);
 
@@ -377,7 +358,7 @@ impl JobManagerData {
         let remove_jobs = match result {
             JobResult::JobDone => Vec::new(),
             _ => job_transaction::job_trans_fallback(
-                &mut self.jobs,
+                &self.jobs,
                 &self.db,
                 &job_info.unit,
                 job_info.run_kind,
@@ -394,7 +375,7 @@ impl JobManagerData {
         self.stat.update_stage_run(1, false); // finish-someone[run->wait|end]: decrease 'run'
     }
 
-    fn del_suspends(&mut self, job_info: &JobInfo, result: JobResult) {
+    fn del_suspends(&self, job_info: &JobInfo, result: JobResult) {
         let mut del_jobs = Vec::new();
 
         // delete itself
@@ -409,7 +390,7 @@ impl JobManagerData {
         // remove relational jobs on failure
         if result != JobResult::JobDone {
             del_jobs.append(&mut job_transaction::job_trans_fallback(
-                &mut self.jobs,
+                &self.jobs,
                 &self.db,
                 &job_info.unit,
                 job_info.run_kind,
@@ -422,7 +403,7 @@ impl JobManagerData {
         self.stat.update_stage_wait(del_jobs.len(), false); // remove-del[wait->end]: decrease 'wait'
     }
 
-    fn simulate_job_notify(&mut self, unit: &Rc<UnitX>, os: UnitActiveState, ns: UnitActiveState) {
+    fn simulate_job_notify(&self, unit: &Rc<UnitX>, os: UnitActiveState, ns: UnitActiveState) {
         match (os, ns) {
             (
                 UnitActiveState::UnitInActive | UnitActiveState::UnitFailed,
@@ -436,7 +417,7 @@ impl JobManagerData {
         }
     }
 
-    fn simulate_unit_notify(&mut self, unit: &Rc<UnitX>, result: JobResult, force: bool) {
+    fn simulate_unit_notify(&self, unit: &Rc<UnitX>, result: JobResult, force: bool) {
         // OnFailure=
         if !force {
             // is forced removement a failure?
@@ -459,7 +440,7 @@ impl JobManagerData {
     }
 
     fn unit_start_on(
-        &mut self,
+        &self,
         unit: &Rc<UnitX>,
         os: UnitActiveState,
         ns: UnitActiveState,
@@ -498,7 +479,7 @@ impl JobManagerData {
         }
     }
 
-    fn exec_on(&mut self, unit: Rc<UnitX>, atom: UnitRelationAtom, mode: JobMode) {
+    fn exec_on(&self, unit: Rc<UnitX>, atom: UnitRelationAtom, mode: JobMode) {
         let (configs, mode) = job_notify::job_notify_result(&self.db, unit, atom, mode);
         for config in configs.iter() {
             if let Err(_e) = self.exec(config, mode, &mut JobAffect::new(false)) {
@@ -507,7 +488,7 @@ impl JobManagerData {
         }
     }
 
-    fn do_notify(&mut self, config: &JobConf, mode_option: Option<JobMode>) {
+    fn do_notify(&self, config: &JobConf, mode_option: Option<JobMode>) {
         let targets = job_notify::job_notify_event(&self.db, config, mode_option);
         for (config, mode) in targets.iter() {
             if let Err(_e) = self.exec(config, *mode, &mut JobAffect::new(false)) {
@@ -576,8 +557,8 @@ mod tests {
             &mut affect,
         );
         assert!(ret.is_ok());
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 1);
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 1);
+        assert_eq!(jm.data.borrow().jobs.len(), 1);
+        assert_eq!(jm.data.borrow().jobs.ready_len(), 1);
 
         assert_eq!(affect.adds.len(), 1);
         let job_info = affect.adds.pop().unwrap();
@@ -615,8 +596,8 @@ mod tests {
             &mut affect,
         );
         assert!(ret.is_ok());
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 2);
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 2);
+        assert_eq!(jm.data.borrow().jobs.len(), 2);
+        assert_eq!(jm.data.borrow().jobs.ready_len(), 2);
         assert_eq!(affect.adds.len(), 2);
         let job_info1 = affect.adds.pop().unwrap();
         assert!(
@@ -653,12 +634,12 @@ mod tests {
             &mut JobAffect::new(false),
         )
         .unwrap();
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 1);
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 1);
+        assert_eq!(jm.data.borrow().jobs.len(), 1);
+        assert_eq!(jm.data.borrow().jobs.ready_len(), 1);
 
-        jm.sub.borrow().data.borrow_mut().run();
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 0);
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 0);
+        jm.data.borrow_mut().run();
+        assert_eq!(jm.data.borrow().jobs.len(), 0);
+        assert_eq!(jm.data.borrow().jobs.ready_len(), 0);
     }
 
     #[test]
@@ -685,12 +666,12 @@ mod tests {
             &mut JobAffect::new(false),
         )
         .unwrap();
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 2);
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 2);
+        assert_eq!(jm.data.borrow().jobs.len(), 2);
+        assert_eq!(jm.data.borrow().jobs.ready_len(), 2);
 
-        jm.sub.borrow().data.borrow_mut().run();
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.len(), 0);
-        assert_eq!(jm.sub.borrow().data.borrow().jobs.ready_len(), 0);
+        jm.data.borrow_mut().run();
+        assert_eq!(jm.data.borrow().jobs.len(), 0);
+        assert_eq!(jm.data.borrow().jobs.ready_len(), 0);
     }
 
     fn create_unit(name: &str) -> Rc<UnitX> {
