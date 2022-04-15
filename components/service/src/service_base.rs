@@ -101,7 +101,7 @@ impl Default for ServiceResult {
         ServiceResult::ServiceResultInvalid
     }
 }
-
+#[allow(dead_code)]
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum ServiceState {
     ServiceDead,
@@ -198,6 +198,7 @@ impl ServiceState {
     }
 }
 
+#[allow(dead_code)]
 pub enum CmdError {
     Timeout,
     NoCmdFound,
