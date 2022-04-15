@@ -1,9 +1,13 @@
+use super::commands::Commands;
+use super::data::DataManager;
+use super::signals::Signals;
+use super::unit::UnitManagerX;
+use super::MngErrno;
+use event::Events;
+use std::cell::RefCell;
 use std::error::Error as Err;
 use std::io::Error;
 use std::rc::Rc;
-
-use super::data::DataManager;
-use super::unit::UnitManagerX;
 
 pub enum Mode {
     SYSTEM,
@@ -29,29 +33,77 @@ pub enum Stats {
     SWITCHROOT,
 }
 
+pub struct ManagerX {
+    event: Rc<RefCell<Events>>,
+    commands: Rc<RefCell<Commands>>,
+    data: Rc<Manager>,
+}
+
+impl ManagerX {
+    pub fn new(mode: Mode, action: Action) -> ManagerX {
+        let _event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let _data = Rc::new(Manager::new(mode, action, Rc::clone(&_event)));
+        let m = ManagerX {
+            event: Rc::clone(&_event),
+            commands: Rc::new(RefCell::new(Commands::new(Rc::clone(&_data)))),
+            data: Rc::clone(&_data),
+        };
+        m.register(Rc::clone(&m.event));
+        m
+    }
+
+    pub fn startup(&self) -> Result<(), Error> {
+        self.data.startup()
+    }
+
+    pub fn add_job(&self, job: JobId) -> Result<(), Error> {
+        self.data.add_job(job)
+    }
+
+    pub fn rloop(&self) -> Result<Stats, Error> {
+        self.data.rloop()
+    }
+
+    pub fn reexec(&self) -> Result<(), Error> {
+        self.data.reexec()
+    }
+
+    fn register(&self, event: Rc<RefCell<Events>>) {
+        let source = Rc::clone(&self.commands);
+        event.borrow_mut().add_source(source);
+    }
+}
+
 pub struct Manager {
     mode: Mode,
     action: Action,
     stat: Stats,
-    um: UnitManagerX,
-    // dm: Rc<DataManager>,
+    dm: Rc<DataManager>,
+    um: Rc<UnitManagerX>,
+    event: Rc<RefCell<Events>>,
+    signal: Rc<RefCell<Signals>>,
 }
 
 type JobId = i32;
 
 impl Manager {
-    pub fn new(mode: Mode, action: Action) -> Manager {
-        let dm = Rc::new(DataManager::new());
+    pub fn new(mode: Mode, action: Action, event: Rc<RefCell<Events>>) -> Manager {
+        let _dm = Rc::new(DataManager::new());
+        let _um = Rc::new(UnitManagerX::new(Rc::clone(&_dm), Rc::clone(&event)));
         Manager {
             mode,
             action,
             stat: Stats::INIT,
-            // dm: Rc::clone(&_dm),
-            um: UnitManagerX::new(Rc::clone(&dm)),
+            dm: Rc::clone(&_dm),
+            um: Rc::clone(&_um),
+            event,
+            signal: Rc::new(RefCell::new(Signals::new(Rc::clone(&_um)))),
         }
     }
 
-    pub fn startup(&mut self) -> Result<(), Error> {
+    pub fn startup(&self) -> Result<(), Error> {
+        let source = Rc::clone(&self.signal);
+        self.event.borrow_mut().add_source(source);
         Ok(())
     }
 
@@ -67,16 +119,29 @@ impl Manager {
         todo!()
     }
 
-    pub fn add_job(&mut self, _job: JobId) -> Result<(), Error> {
+    pub fn add_job(&self, _job: JobId) -> Result<(), Error> {
         Ok(())
+    }
+
+    pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+        self.um.start_unit(name)
+    }
+
+    pub fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
+        self.um.stop_unit(name)
     }
 
     pub fn clear_jobs(&self) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn rloop(&mut self) -> Result<Stats, Error> {
-        Ok(Stats::REEXECUTE)
+    pub fn rloop(&self) -> Result<Stats, Error> {
+        loop {
+            self.um.dispatch_load_queue();
+            self.event.borrow_mut().run(-1);
+        }
+        #[allow(unreachable_code)]
+        Ok(Stats::OK)
     }
 
     pub fn reload(&mut self) -> Result<(), Error> {
@@ -87,8 +152,8 @@ impl Manager {
         todo!()
     }
 
-    pub fn reexec(&mut self) -> Result<(), Error> {
-        Ok(())
+    pub fn reexec(&self) -> Result<(), Error> {
+        todo!()
     }
 
     pub fn switch_root(&mut self) -> Result<(), Error> {
@@ -108,7 +173,7 @@ impl Manager {
     }
 
     pub fn state(&self) -> Result<Stats, Error> {
-        Ok(Stats::REEXECUTE)
+        todo!()
     }
 
     pub fn dispatch_sigchld(&mut self) -> Result<(), Box<dyn Err>> {

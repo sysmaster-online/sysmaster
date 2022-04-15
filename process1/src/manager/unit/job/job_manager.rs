@@ -10,7 +10,10 @@ use crate::manager::data::{JobMode, UnitActiveState, UnitConfigItem, UnitNotifyF
 use crate::manager::unit::unit_datastore::UnitDb;
 use crate::manager::unit::unit_entry::UnitX;
 use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
+use event::{EventType, Events, Source};
+use std::cell::RefCell;
 use std::rc::Rc;
+use utils::{Error, Result};
 
 pub struct JobAffect {
     // data
@@ -43,8 +46,100 @@ impl JobAffect {
     }
 }
 
-//#[derive(Debug)]
 pub struct JobManager {
+    event: Rc<RefCell<Events>>,
+    sub: Rc<RefCell<JobManagerSub>>,
+}
+
+impl JobManager {
+    pub fn exec(
+        &self,
+        config: &JobConf,
+        mode: JobMode,
+        affect: &mut JobAffect,
+    ) -> Result<(), JobErrno> {
+        self.sub
+            .borrow()
+            .data
+            .borrow_mut()
+            .exec(config, mode, affect)
+    }
+
+    pub fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
+        self.sub.borrow().data.borrow_mut().notify(config, mode)
+    }
+
+    pub(in crate::manager::unit) fn new(db: Rc<UnitDb>, event: Rc<RefCell<Events>>) -> JobManager {
+        let jm = JobManager {
+            event,
+            sub: Rc::new(RefCell::new(JobManagerSub::new(db))),
+        };
+        jm.register(Rc::clone(&jm.event));
+        jm
+    }
+
+    pub(in crate::manager::unit) fn try_finish(
+        &self,
+        unit: &Rc<UnitX>,
+        os: UnitActiveState,
+        ns: UnitActiveState,
+        flags: isize,
+    ) -> Result<(), JobErrno> {
+        self.sub
+            .borrow()
+            .data
+            .borrow_mut()
+            .try_finish(unit, os, ns, flags)
+    }
+
+    pub(in crate::manager::unit) fn remove(&self, id: u32) -> Result<(), JobErrno> {
+        self.sub.borrow().data.borrow_mut().remove(id)
+    }
+
+    pub(in crate::manager::unit) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
+        self.sub.borrow().data.borrow().get_jobinfo(id)
+    }
+
+    fn register(&self, event: Rc<RefCell<Events>>) {
+        let source = Rc::clone(&self.sub);
+        event.borrow_mut().add_source(source);
+    }
+}
+
+struct JobManagerSub {
+    data: RefCell<JobManagerData>, // make 'Events' happy
+}
+
+impl JobManagerSub {
+    pub(self) fn new(db: Rc<UnitDb>) -> JobManagerSub {
+        JobManagerSub {
+            data: RefCell::new(JobManagerData::new(db)),
+        }
+    }
+}
+
+impl Source for JobManagerSub {
+    fn event_type(&self) -> EventType {
+        EventType::Defer
+    }
+
+    fn epoll_event(&self) -> u32 {
+        0
+    }
+
+    fn token(&self) -> u64 {
+        let data: u64 = unsafe { std::mem::transmute(self) };
+        data
+    }
+
+    fn dispatch(&self, _event: &mut Events) -> Result<i32, Error> {
+        self.data.borrow_mut().run();
+        Ok(0)
+    }
+}
+
+//#[derive(Debug)]
+struct JobManagerData {
     // associated objects
     db: Rc<UnitDb>,
 
@@ -64,8 +159,9 @@ pub struct JobManager {
     stat: JobStat,
 }
 
-impl JobManager {
-    pub fn exec(
+// the declaration "pub(self)" is for identification only.
+impl JobManagerData {
+    pub(self) fn exec(
         &mut self,
         config: &JobConf,
         mode: JobMode,
@@ -104,7 +200,7 @@ impl JobManager {
         // if it's successful, all jobs expanded would be inserted in 'self.jobs', otherwise(failed) they would be cleared next time.
     }
 
-    pub fn notify(&mut self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
+    pub(self) fn notify(&mut self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
         if config.get_kind() != JobKind::JobReload {
             return Err(JobErrno::JobErrInput);
         }
@@ -113,8 +209,8 @@ impl JobManager {
         Ok(())
     }
 
-    pub(in crate::manager::unit) fn new(db: Rc<UnitDb>) -> JobManager {
-        JobManager {
+    pub(self) fn new(db: Rc<UnitDb>) -> JobManagerData {
+        JobManagerData {
             db,
 
             ja: JobAlloc::new(),
@@ -129,7 +225,7 @@ impl JobManager {
         }
     }
 
-    pub(in crate::manager::unit) fn run(&mut self) {
+    pub(self) fn run(&mut self) {
         loop {
             // try to trigger something to run
             self.text = None; // reset every time
@@ -171,7 +267,7 @@ impl JobManager {
         }
     }
 
-    pub(in crate::manager::unit) fn try_finish(
+    pub(self) fn try_finish(
         &mut self,
         unit: &Rc<UnitX>,
         os: UnitActiveState,
@@ -201,7 +297,7 @@ impl JobManager {
         Ok(())
     }
 
-    pub(in crate::manager::unit) fn remove(&mut self, id: u32) -> Result<(), JobErrno> {
+    pub(self) fn remove(&mut self, id: u32) -> Result<(), JobErrno> {
         assert!(!self.running);
 
         let job_info = self.jobs.get(id);
@@ -221,7 +317,7 @@ impl JobManager {
         Ok(())
     }
 
-    pub(in crate::manager::unit) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
+    pub(self) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
         self.jobs.get(id)
     }
 

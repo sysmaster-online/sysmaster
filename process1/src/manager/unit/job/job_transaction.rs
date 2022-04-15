@@ -39,7 +39,7 @@ pub(super) fn job_trans_expand(
     }
 
     Ok(())
-    // the jobs expanded do not need to be reverted separately, which are reverted in the up-level caller 'JobManager->exec()' uniformly.
+    // the jobs expanded do not need to be reverted separately, which are reverted in the up-level caller 'JobManagerData->exec()' uniformly.
 }
 
 pub(super) fn job_trans_affect(
@@ -317,7 +317,7 @@ fn trans_affect_isolate(
     }
 
     Ok(())
-    // the jobs expanded do not need to be reverted separately, which are reverted in the up-level caller 'JobManager->exec()' uniformly.
+    // the jobs expanded do not need to be reverted separately, which are reverted in the up-level caller 'JobManagerData->exec()' uniformly.
 }
 
 fn trans_affect_trigger(
@@ -353,7 +353,7 @@ fn trans_affect_trigger(
     }
 
     Ok(())
-    // the jobs expanded do not need to be reverted separately, which are reverted in the up-level caller 'JobManager->exec()' uniformly.
+    // the jobs expanded do not need to be reverted separately, which are reverted in the up-level caller 'JobManagerData->exec()' uniformly.
 }
 
 fn trans_verify_is_conflict(stage: &JobTable) -> Result<(), JobErrno> {

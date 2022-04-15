@@ -1,7 +1,6 @@
 use prost::bytes::{BufMut, BytesMut};
 use prost::Message;
 use std::{
-    cell::RefCell,
     io::{Error, Read, Write},
     rc::Rc,
 };
@@ -51,7 +50,7 @@ where
 /// 处理服务器端 socket 的读写
 pub struct ProstServerStream<S> {
     inner: S,
-    manager: Rc<RefCell<Manager>>,
+    manager: Rc<Manager>,
 }
 
 /// 处理客户端 socket 的读写
@@ -63,7 +62,7 @@ impl<S> ProstServerStream<S>
 where
     S: Read + Write + Unpin + Send,
 {
-    pub fn new(stream: S, manager: Rc<RefCell<Manager>>) -> Self {
+    pub fn new(stream: S, manager: Rc<Manager>) -> Self {
         Self {
             inner: stream,
             manager,
@@ -127,10 +126,12 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
     use std::net::TcpStream;
     use std::thread;
 
     use crate::manager::manager::{Action, Mode};
+    use event::Events;
 
     use super::super::abi::unit_comm::Action as UnitAction;
     use super::*;
@@ -149,7 +150,8 @@ mod tests {
         let fd = std::net::TcpListener::bind("127.0.0.1:9527").unwrap();
         const MODE: Mode = Mode::SYSTEM;
         const ACTION: Action = Action::RUN;
-        let manager = Rc::new(RefCell::new(Manager::new(MODE, ACTION)));
+        let _event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let manager = Rc::new(Manager::new(MODE, ACTION, Rc::clone(&_event)));
         loop {
             for stream in fd.incoming() {
                 match stream {

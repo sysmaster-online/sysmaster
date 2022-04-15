@@ -1,4 +1,4 @@
-use std::{cell::RefCell, os::unix::prelude::AsRawFd, rc::Rc};
+use std::{os::unix::prelude::AsRawFd, rc::Rc};
 
 use event::{EventType, Events, Source};
 use utils::{Error, Result};
@@ -10,12 +10,12 @@ use crate::proto::ProstServerStream;
 use super::manager::Manager;
 
 pub struct Commands {
-    manager: Rc<RefCell<Manager>>,
+    manager: Rc<Manager>,
     fd: std::net::TcpListener,
 }
 
 impl Commands {
-    pub fn new(m: Rc<RefCell<Manager>>) -> Commands {
+    pub fn new(m: Rc<Manager>) -> Commands {
         let fd = std::net::TcpListener::bind("127.0.0.1:9527").unwrap();
         Commands { manager: m, fd }
     }

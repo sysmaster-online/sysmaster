@@ -257,17 +257,18 @@ impl UnitConfigsSub {
 mod tests {
     // use services::service::ServiceUnit;
 
-    use utils::logger;
-
     use super::*;
     use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+    use event::Events;
+    use utils::logger;
 
     #[test]
     fn test_unit_load() {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
         let dm_manager = Rc::new(DataManager::new());
-        let um = UnitManager::new(dm_manager.clone());
+        let _event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let um = UnitManager::new(dm_manager.clone(), Rc::clone(&_event));
         let file = Rc::new(UnitFile::new());
         let db = Rc::new(UnitDb::new());
         let rt = Rc::new(UnitRT::new());
@@ -288,7 +289,8 @@ mod tests {
     #[test]
     fn test_unit_start() {
         let dm_manager = Rc::new(DataManager::new());
-        let um = UnitManager::new(dm_manager.clone());
+        let _event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let um = UnitManager::new(dm_manager.clone(), Rc::clone(&_event));
         let file = Rc::new(UnitFile::new());
         let db = Rc::new(UnitDb::new());
         let rt = Rc::new(UnitRT::new());
