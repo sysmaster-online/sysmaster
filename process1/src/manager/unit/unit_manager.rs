@@ -208,14 +208,18 @@ impl UnitStatesSub {
         UnitStatesSub { um }
     }
 
-    pub(self) fn insert_states(&self, source: &str, _state: &UnitState) {
+    pub(self) fn insert_states(&self, source: &str, state: &UnitState) {
         let unitx = if let Some(u) = self.um.db.units_get(source) {
             u
         } else {
             return;
         };
 
-        // self.um.jm.clone().try_finish(&unitx, state.get_os(), state.get_ns(), state.get_flags());
+        self.um
+            .jm
+            .clone()
+            .try_finish(&unitx, state.get_os(), state.get_ns(), state.get_flags())
+            .unwrap();
 
         for other in self
             .um
