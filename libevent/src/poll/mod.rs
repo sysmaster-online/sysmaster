@@ -49,9 +49,9 @@ impl AsRawFd for Poll {
 
 #[cfg(test)]
 mod test {
-    use std::{net::TcpListener, os::unix::io::AsRawFd};
     use super::Poll;
     use libc::EPOLLIN;
+    use std::{net::TcpListener, os::unix::io::AsRawFd};
 
     #[test]
     fn epoll_new() {
@@ -61,7 +61,7 @@ mod test {
     #[test]
     fn epoll_add() {
         let mut poll = Poll::new().unwrap();
-        let listener = TcpListener::bind("0.0.0.0:9097").unwrap();
+        let listener = TcpListener::bind("0.0.0.0:9098").unwrap();
         let mut events = libc::epoll_event {
             events: EPOLLIN as u32,
             u64: 0,

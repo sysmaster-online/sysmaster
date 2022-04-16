@@ -49,9 +49,9 @@ impl Source for Signals {
 fn main() {
     let mut e = Events::new().unwrap();
     let s: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Signals::new()));
-    e.add_source(s.clone());
+    e.add_source(s.clone()).unwrap();
     unsafe {
         kill(getpid(), libc::SIGTERM);
     }
-    e.rloop();
+    e.rloop().unwrap();
 }

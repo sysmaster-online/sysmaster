@@ -91,7 +91,8 @@ fn build_log_config(app_name: &str, log_level: u32) -> Config {
             .logger(Logger::builder().build(a_p, l_level))
             .build(Root::builder().appender("console").build(l_level)),
         _ => logging_builder.build(Root::builder().appender("console").build(l_level)),
-    }.unwrap()
+    }
+    .unwrap()
 }
 
 #[cfg(test)]
