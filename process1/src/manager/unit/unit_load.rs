@@ -228,7 +228,9 @@ impl UnitConfigsSub {
             name
         );
         let plugins = Rc::clone(&Plugin::get_instance());
-        plugins.borrow_mut().set_library_dir("../target/debug");
+        let mut lib_path = env!("CARGO_MANIFEST_DIR").to_string();
+        lib_path.push_str("/../target/debug");
+        plugins.borrow_mut().set_library_dir(&lib_path);
         plugins.borrow_mut().load_lib();
         let mut subclass = match plugins.borrow().create_unit_obj(unit_type) {
             Ok(sub) => sub,
