@@ -244,13 +244,14 @@ mod tests {
 
     use super::*;
     use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+    use event::Events;
 
     #[test]
     fn test_unit_load() {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
         let dm_manager = Rc::new(DataManager::new());
-        let um = UnitManager::new(dm_manager.clone());
+        let um = UnitManager::new(dm_manager.clone(),Rc::new(RefCell::new(Events::new().unwrap())));
         um.file.init_lookup_path();
         let load = Rc::clone(&um.load);
         let unit_name = String::from("config.service");
