@@ -144,6 +144,7 @@ impl Plugin {
         self.library_dir.clear();
         self.library_dir.push_str(library_dir);
         log::debug!("set libray dir {}", library_dir);
+        self.is_loaded = false;
     }
 
     pub fn is_dynamic_lib(entry: &DirEntry) -> bool {

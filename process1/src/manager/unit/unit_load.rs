@@ -232,6 +232,11 @@ impl UnitConfigsSub {
         lib_path.push_str("/../target/debug");
         plugins.borrow_mut().set_library_dir(&lib_path);
         plugins.borrow_mut().load_lib();
+        lib_path.clear();
+        lib_path.push_str(env!("CARGO_MANIFEST_DIR"));
+        lib_path.push_str("/../target/release");
+        plugins.borrow_mut().set_library_dir(&lib_path);
+        plugins.borrow_mut().load_lib();
         let mut subclass = match plugins.borrow().create_unit_obj(unit_type) {
             Ok(sub) => sub,
             Err(_e) => return None,
@@ -252,59 +257,5 @@ impl UnitConfigsSub {
             name,
             subclass.into_unitobj(),
         )))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    // use services::service::ServiceUnit;
-
-    use utils::logger;
-
-    use super::*;
-    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
-
-    #[test]
-    fn test_unit_load() {
-        logger::init_log_with_console("test_unit_load", 4);
-        log::info!("test");
-        let dm_manager = Rc::new(DataManager::new());
-        let um = UnitManager::new(dm_manager.clone());
-        let file = Rc::new(UnitFile::new());
-        let db = Rc::new(UnitDb::new());
-        let rt = Rc::new(UnitRT::new());
-        let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
-        let load = UnitLoad::new(dm_manager, file, db, rt, unit_conf_parser_mgr);
-        load.data.file.init_lookup_path();
-        load.set_um(um);
-
-        let unit_name = String::from("config.service");
-        let loaded_unit = load.load_unit(&unit_name);
-
-        match load.data.db.units_get(&unit_name) {
-            Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), loaded_unit.unwrap().get_id()),
-            None => println!("not fount unit: {}", unit_name),
-        };
-    }
-
-    #[test]
-    fn test_unit_start() {
-        let dm_manager = Rc::new(DataManager::new());
-        let um = UnitManager::new(dm_manager.clone());
-        let file = Rc::new(UnitFile::new());
-        let db = Rc::new(UnitDb::new());
-        let rt = Rc::new(UnitRT::new());
-        let unit_parser_mgr = Rc::new(UnitParserMgr::default());
-        let load = UnitLoad::new(dm_manager, file, db, rt, unit_parser_mgr);
-        load.data.file.init_lookup_path();
-        load.set_um(um);
-
-        let unit_name = String::from("config.service");
-        load.load_unit(&unit_name);
-
-        match load.data.db.units_get(&unit_name) {
-            Some(_unit_obj) => println!("found unit obj {}", unit_name),
-            None => println!("not fount unit: {}", unit_name),
-        };
     }
 }

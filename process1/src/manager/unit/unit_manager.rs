@@ -184,3 +184,46 @@ impl UnitStatesSub {
         todo!();
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    // use services::service::ServiceUnit;
+
+    use utils::logger;
+
+    use super::*;
+    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+
+    #[test]
+    fn test_unit_load() {
+        logger::init_log_with_console("test_unit_load", 4);
+        log::info!("test");
+        let dm_manager = Rc::new(DataManager::new());
+        let um = UnitManager::new(dm_manager.clone());
+        um.file.init_lookup_path();
+        let load = Rc::clone(&um.load);
+        let unit_name = String::from("config.service");
+        let loaded_unit = load.load_unit(&unit_name);
+
+        match um.db.units_get(&unit_name) {
+            Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), loaded_unit.unwrap().get_id()),
+            None => assert!(false,"not fount unit: {}", unit_name),
+        };
+    }
+
+    #[test]
+    fn test_unit_start() {
+        let dm_manager = Rc::new(DataManager::new());
+        let um = UnitManager::new(dm_manager.clone());
+        um.file.init_lookup_path();
+        let load = Rc::clone(&um.load);
+        let unit_name = String::from("config.service");
+        load.load_unit(&unit_name);
+
+        match um.db.units_get(&unit_name) {
+            Some(_unit_obj) => println!("found unit obj {}", unit_name),
+            None => assert!(false,"not fount unit: {}", unit_name),
+        };
+    }
+}
