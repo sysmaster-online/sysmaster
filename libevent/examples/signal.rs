@@ -6,7 +6,7 @@ use nix::unistd::ForkResult;
 use utils::Error;
 use utils::Result;
 
-use std::{cell::RefCell, rc::Rc};
+use std::rc::Rc;
 
 use event::EventType;
 use event::Events;
@@ -38,7 +38,7 @@ impl Source for Signals {
         0i8
     }
 
-    fn dispatch(&self, e: &mut Events) -> Result<i32, Error> {
+    fn dispatch(&self, e: &Events) -> Result<i32, Error> {
         println!("Dispatching signal!");
         match e.read_signals() {
             Ok(Some(info)) => {
@@ -59,8 +59,8 @@ impl Source for Signals {
 }
 
 fn main() {
-    let mut e = Events::new().unwrap();
-    let s: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Signals::new()));
+    let e = Events::new().unwrap();
+    let s: Rc<dyn Source> = Rc::new(Signals::new());
     e.add_source(s.clone()).unwrap();
     e.set_enabled(s.clone(), EventState::OneShot).unwrap();
 

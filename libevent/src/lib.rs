@@ -22,7 +22,7 @@ pub enum EventType {
     Exit,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum EventState {
     On,
     Off,

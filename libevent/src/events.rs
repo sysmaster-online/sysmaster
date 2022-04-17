@@ -12,23 +12,110 @@ use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct Events {
+    data: RefCell<EventsData>,
+}
+
+impl Events {
+    pub fn new() -> Result<Events> {
+        Ok(Events {
+            data: RefCell::new(EventsData::new()),
+        })
+    }
+
+    pub fn add_source(&self, source: Rc<dyn Source>) -> Result<i32> {
+        self.data.borrow_mut().add_source(source)
+    }
+
+    pub fn del_source(&self, source: Rc<dyn Source>) -> Result<i32> {
+        self.data.borrow_mut().del_source(source)
+    }
+
+    pub fn set_enabled(&self, source: Rc<dyn Source>, state: EventState) -> Result<i32> {
+        self.data.borrow_mut().set_enabled(source, state)
+    }
+
+    pub fn read_signals(&self) -> std::io::Result<Option<libc::siginfo_t>> {
+        self.data.borrow_mut().read_signals()
+    }
+
+    pub fn set_exit(&self) {
+        self.data.borrow_mut().set_exit()
+    }
+
+    pub fn now() {
+        todo!();
+    }
+
+    /// Scheduling once, processing an event
+    pub fn run(&self, timeout: i32) -> Result<i32> {
+        if self.data.borrow().exit() {
+            return Ok(0);
+        }
+        if !self.data.borrow_mut().prepare() {
+            self.data.borrow_mut().wait(timeout);
+        }
+        self.dispatch()?;
+        Ok(0)
+    }
+
+    /// Process the event in a loop until exiting actively
+    pub fn rloop(&self) -> Result<i32> {
+        loop {
+            self.run(-1i32)?;
+        }
+    }
+
+    /// Fetch the highest priority event processing on the pending queue
+    fn dispatch(&self) -> Result<i32> {
+        let first = self.data.borrow_mut().pending_pop();
+        if first.is_none() {
+            return Ok(0);
+        }
+
+        let top = first.unwrap();
+        let state = self.data.borrow().source_state(&top).unwrap();
+        match state {
+            EventState::Off => {
+                println!("set_enabled Off: {:?}", top);
+            }
+            EventState::On => {
+                top.dispatch(self)?;
+                if top.event_type() == EventType::Defer {
+                    self.data.borrow_mut().pending_push(top.clone());
+                }
+            }
+            EventState::OneShot => {
+                top.dispatch(self)?;
+                self.data
+                    .borrow_mut()
+                    .set_enabled(top.clone(), EventState::Off)?;
+            }
+        }
+
+        Ok(0)
+    }
+}
+
+#[derive(Debug)]
+pub struct EventsData {
     poller: Poll,
     exit: bool,
-    sources: HashMap<u64, Rc<RefCell<dyn Source>>>,
-    defer_sources: HashMap<u64, Rc<RefCell<dyn Source>>>,
-    post_sources: HashMap<u64, Rc<RefCell<dyn Source>>>,
-    exit_sources: HashMap<u64, Rc<RefCell<dyn Source>>>,
-    pending: BinaryHeap<Rc<RefCell<dyn Source>>>,
+    sources: HashMap<u64, Rc<dyn Source>>,
+    defer_sources: HashMap<u64, Rc<dyn Source>>,
+    post_sources: HashMap<u64, Rc<dyn Source>>,
+    exit_sources: HashMap<u64, Rc<dyn Source>>,
+    pending: BinaryHeap<Rc<dyn Source>>,
     state: HashMap<u64, EventState>,
     children: HashMap<i64, i64>,
     pidfd: RawFd,
     signal: Signals,
 }
 
-impl Events {
-    pub fn new() -> Result<Events> {
-        Ok(Self {
-            poller: Poll::new()?,
+// the declaration "pub(self)" is for identification only.
+impl EventsData {
+    pub(self) fn new() -> EventsData {
+        Self {
+            poller: Poll::new().unwrap(),
             exit: false,
             sources: HashMap::new(),
             defer_sources: HashMap::new(),
@@ -39,17 +126,12 @@ impl Events {
             children: HashMap::new(),
             pidfd: 0,
             signal: Signals::new(),
-        })
+        }
     }
 
-    pub fn add_source(&mut self, source: Rc<RefCell<dyn Source>>) -> Result<i32> {
-        if source.try_borrow().is_err() {
-            return Ok(0);
-        }
-
-        let t = source.try_borrow().unwrap().event_type();
-        let s = source.try_borrow().unwrap();
-        let token = s.token();
+    pub(self) fn add_source(&mut self, source: Rc<dyn Source>) -> Result<i32> {
+        let t = source.event_type();
+        let token = source.token();
         match t {
             EventType::Io | EventType::Pidfd | EventType::Signal | EventType::Child => {
                 self.sources.insert(token, source.clone());
@@ -73,15 +155,11 @@ impl Events {
         Ok(0)
     }
 
-    pub fn del_source(&mut self, source: Rc<RefCell<dyn Source>>) -> Result<i32> {
-        if source.try_borrow().is_err() {
-            return Ok(0);
-        }
-
+    pub(self) fn del_source(&mut self, source: Rc<dyn Source>) -> Result<i32> {
         self.source_offline(&source)?;
 
-        let t = source.try_borrow().unwrap().event_type();
-        let s = source.try_borrow().unwrap();
+        let t = source.event_type();
+        let s = source;
         let token = s.token();
         match t {
             EventType::Io | EventType::Pidfd | EventType::Signal | EventType::Child => {
@@ -112,16 +190,8 @@ impl Events {
         Ok(0)
     }
 
-    pub fn set_enabled(
-        &mut self,
-        source: Rc<RefCell<dyn Source>>,
-        state: EventState,
-    ) -> Result<i32> {
-        if source.try_borrow().is_err() {
-            return Ok(0);
-        }
-
-        let token = source.try_borrow().unwrap().token();
+    pub(self) fn set_enabled(&mut self, source: Rc<dyn Source>, state: EventState) -> Result<i32> {
+        let token = source.token();
         match state {
             EventState::On | EventState::OneShot => {
                 self.source_online(&source)?;
@@ -137,9 +207,9 @@ impl Events {
         Ok(0)
     }
 
-    fn source_online(&mut self, source: &Rc<RefCell<dyn Source>>) -> Result<i32> {
-        let t = source.try_borrow().unwrap().event_type();
-        let s = source.try_borrow().unwrap();
+    fn source_online(&mut self, source: &Rc<dyn Source>) -> Result<i32> {
+        let t = source.event_type();
+        let s = source;
         let token = s.token();
         let mut event = libc::epoll_event {
             events: s.epoll_event(),
@@ -170,8 +240,7 @@ impl Events {
         Ok(0)
     }
 
-    fn source_offline(&mut self, source: &Rc<RefCell<dyn Source>>) -> Result<i32> {
-        let source = source.try_borrow().unwrap();
+    fn source_offline(&mut self, source: &Rc<dyn Source>) -> Result<i32> {
         // unneed unregister when source is allready Offline
         if *self.state.get(&source.token()).unwrap() == EventState::Off {
             return Ok(0);
@@ -206,13 +275,13 @@ impl Events {
         self.children.insert(pid.into(), pidfd);
     }
 
-    pub fn read_signals(&mut self) -> std::io::Result<Option<libc::siginfo_t>> {
+    pub(self) fn read_signals(&mut self) -> std::io::Result<Option<libc::siginfo_t>> {
         self.signal.read_signals()
     }
 
     /// Wait for the event event through poller
     /// And add the corresponding events to the pengding queue
-    fn wait(&mut self, timeout: i32) -> bool {
+    pub(self) fn wait(&mut self, timeout: i32) -> bool {
         let events = {
             #[allow(clippy::never_loop)]
             loop {
@@ -232,76 +301,44 @@ impl Events {
             self.pending.push(s.clone());
         }
 
-        true
+        if !self.pending_is_empty() || !events.is_empty() {
+            true
+        } else {
+            false
+        }
     }
 
     /// Wait for the event event through poller
     /// And add the corresponding events to the pengding queue
-    fn prepare(&mut self) -> bool {
-        true
-    }
-
-    fn pending_top(&self) -> Rc<RefCell<dyn Source>> {
-        self.pending.peek().unwrap().clone()
-    }
-
-    /// Fetch the highest priority event processing on the pending queue
-    fn dispatch(&mut self) -> Result<i32> {
-        if self.pending.peek().is_none() {
-            return Ok(0);
+    pub(self) fn prepare(&mut self) -> bool {
+        if !self.pending_is_empty() {
+            return self.wait(0);
         }
 
-        let first = self.pending_top();
-        let top = first.try_borrow().unwrap();
-        let state = self.state.get(&top.token()).unwrap();
-        match state {
-            EventState::Off => {
-                println!("set_enabled Off: {:?}", top);
-            }
-            EventState::On => {
-                top.dispatch(self)?;
-                if top.event_type() == EventType::Defer {
-                    self.pending.push(first.clone());
-                }
-            }
-            EventState::OneShot => {
-                top.dispatch(self)?;
-                self.set_enabled(first.clone(), EventState::Off)?;
-            }
-        }
-
-        self.pending.pop();
-
-        Ok(0)
+        false
     }
 
-    /// Scheduling once, processing an event
-    pub fn run(&mut self, timeout: i32) -> Result<i32> {
-        if self.exit {
-            return Ok(0);
-        }
-        if self.prepare() {
-            self.wait(timeout);
-        }
-        self.dispatch()?;
-        Ok(0)
+    pub(self) fn pending_pop(&mut self) -> Option<Rc<dyn Source>> {
+        self.pending.pop()
     }
 
-    /// Process the event in a loop until exiting actively
-    pub fn rloop(&mut self) -> Result<i32> {
-        loop {
-            if self.exit {
-                return Ok(0);
-            }
-            self.run(-1i32)?;
-        }
+    pub(self) fn pending_push(&mut self, source: Rc<dyn Source>) {
+        self.pending.push(source)
     }
 
-    pub fn exit(&mut self) {
+    pub(self) fn source_state(&self, source: &Rc<dyn Source>) -> Option<EventState> {
+        self.state.get(&source.token()).cloned()
+    }
+
+    pub(self) fn set_exit(&mut self) {
         self.exit = true;
     }
 
-    pub fn now() {
-        todo!();
+    pub(self) fn exit(&self) -> bool {
+        self.exit
+    }
+
+    fn pending_is_empty(&self) -> bool {
+        self.pending.is_empty()
     }
 }

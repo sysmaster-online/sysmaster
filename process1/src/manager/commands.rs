@@ -32,7 +32,7 @@ impl Source for Commands {
         (libc::EPOLLIN) as u32
     }
 
-    fn dispatch(&self, _e: &mut Events) -> Result<i32, Error> {
+    fn dispatch(&self, _e: &Events) -> Result<i32, Error> {
         println!("Dispatching Command!");
         match self.fd.incoming().nth(0) {
             None => println!("None CommandRequest!"),
