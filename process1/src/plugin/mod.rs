@@ -1,7 +1,7 @@
 use super::manager::{UnitSubClass, UnitType};
 use dynamic_reload as dy_re;
 use log::*;
-use std::cell::RefCell;
+use once_cell::sync::Lazy;
 use std::ffi::OsStr;
 use std::sync::RwLock;
 use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
@@ -9,11 +9,19 @@ use std::{env, io};
 use walkdir::{DirEntry, WalkDir};
 
 const LIB_PLUGIN_PATH: &str = "/usr/lib/process1/plugin/";
+
+static INSTANCE: Lazy<Arc<Plugin>> = Lazy::new(||{
+    let plugin = Plugin::new();
+    let default_lib_path = Plugin::get_default_libpath();
+    plugin.update_library_dir(&default_lib_path);
+    Arc::new(plugin)
+});
+
 pub struct Plugin {
     /*unitobj_lists: RefCell<Vec<Arc<Box<dyn UnitSubClass>>>>,//hide unit obj mut use refcell*/
     library_dir: RwLock<Vec<String>>,
     load_libs: RwLock<HashMap<UnitType, Arc<dy_re::Lib>>>,
-    _loaded: RefCell<bool>,
+    _loaded: RwLock<bool>,
 }
 
 #[allow(dead_code)]
@@ -23,7 +31,7 @@ impl Plugin {
             //unitobj_lists: RefCell::new(Vec::new()),
             library_dir: RwLock::new(Vec::new()),
             load_libs: RwLock::new(HashMap::new()),
-            _loaded: RefCell::new(false),
+            _loaded: RwLock::new(false),
         }
     }
 
@@ -55,37 +63,28 @@ impl Plugin {
         ret
     }
 
+
     pub fn get_instance() -> Arc<Plugin> {
-        static mut PLUGIN: Option<Arc<Plugin>> = None;
-        unsafe {
-            PLUGIN
-                .get_or_insert_with(|| {
-                    let plugin = Plugin::new();
-                    let default_lib_path = Plugin::get_default_libpath();
-                    plugin.update_library_dir(&default_lib_path);
-                    plugin.load_lib();
-                    Arc::new(plugin)
-                })
-                .clone()
-        }
+        INSTANCE.clone()
     }
 
     fn load_lib(&self) {
         let file_exist = |file_name: &str| {
-            if *(self._loaded.borrow()) {
-                log::info!("plugin is already loaded");
-                return false;
-            }
             if file_name.is_empty() {
                 return false;
             }
             let libdir_path = PathBuf::from(file_name);
             if !libdir_path.exists() || !libdir_path.is_dir() {
-                log::error!("library_dir {:?} is not a dir or not exist", libdir_path);
+                log::error!("load_lib library path [{:?}] is not a dir or not exist", libdir_path);
                 return false;
             }
             true
         };
+
+        if *(self._loaded.read().unwrap()) {
+            log::info!("load_lib plugin is already loaded");
+            return;
+        }
 
         let lib_path = self.library_dir.read().unwrap();
         let search_path: Vec<&str> = (*lib_path)
@@ -107,9 +106,8 @@ impl Plugin {
             Some(shadow_dir),
             dynamic_reload::Search::Default,
         );
-
         for file_item in lib_path.iter() {
-            log::debug!("begin loading library in library dir {:?}", file_item);
+            log::debug!("begin loading  plugin library in libraray path [{:?}]", file_item);
             for entry in WalkDir::new(file_item)
                 .min_depth(1)
                 .follow_links(true)
@@ -135,7 +133,9 @@ impl Plugin {
                 }
             }
         }
-        self._loaded.replace(true);
+
+        let mut _load = self._loaded.write().unwrap();
+        (*_load) = true;
     }
 
     fn load_plugin(
@@ -189,7 +189,6 @@ impl Plugin {
     /// add lib will reload
     pub fn update_library_dir(&self, library_dir: &str) {
         let update_dir = || {
-            log::debug!("update_library_dir {}", library_dir);
             let _tmp_str: Vec<_> = library_dir.split(";").collect();
             let mut _new_dir: Vec<PathBuf> = Vec::new();
             let mut set_flag = false;
@@ -200,7 +199,7 @@ impl Plugin {
                 }
                 let new_libdir = PathBuf::from(new_item);
                 if !new_libdir.is_dir() || !new_libdir.is_dir() {
-                    log::error!("library_dir {} is not a dir or not exist", new_item);
+                    log::error!( " the path [{}] is not a dir/not exist", new_item);
                     continue;
                 } else {
                     let mut _tmp_flag = false;
@@ -209,14 +208,14 @@ impl Plugin {
                             for item in (*pathdir).iter() {
                                 let old_libdir = PathBuf::from(item);
                                 if old_libdir == new_libdir {
-                                    log::info!("library dir is already set {}", item);
+                                    log::info!("update_library_path [{}] is already  in  the variable of libaray load path ", item);
                                     _tmp_flag = true;
                                     break;
                                 }
                             }
                         }
                         Err(e) => {
-                            log::error!("set library dir failed {}", e.to_string());
+                            log::error!("update_library_path set [{}] into load path variable  failed,reason: {}", new_item, e.to_string());
                             return false;
                         }
                     }
@@ -224,17 +223,18 @@ impl Plugin {
                         let dir_str = new_libdir.to_str().unwrap();
                         let mut w = self.library_dir.write().unwrap();
                         (*w).push(dir_str.to_string());
-                        log::debug!("set libray dir {}", dir_str);
+                        log::debug!("update_library_path set [{}] into library load path variable sucessful", dir_str);
                         set_flag = true;
                     }
                 }
             }
             if set_flag {
-                self._loaded.replace(false);
+                let mut _load = self._loaded.write().unwrap();
+                (*_load) = false;
             }
             return set_flag;
         };
-
+        log::debug!("begine update library load path [{}]", library_dir);
         if update_dir() {
             Self::load_lib(self);
         }
@@ -259,7 +259,7 @@ impl Plugin {
         &self,
         unit_type: UnitType,
     ) -> Result<Box<dyn UnitSubClass>, Box<dyn Error>> {
-        if !(*(self._loaded.borrow())) {
+        if !(*(self._loaded.read().unwrap())) {
             log::info!("plugin is not loaded");
             return Err(format!("plugin is not loaded").into());
         }

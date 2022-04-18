@@ -22,6 +22,7 @@ impl log::Log for LoggerPlugin {
     }
 }
 
+
 fn set_logger(logger: log4rs::Logger) {
     log::set_max_level(logger.max_log_level());
     let _ = log::set_boxed_logger(Box::new(LoggerPlugin(logger)));
