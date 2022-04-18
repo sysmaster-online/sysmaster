@@ -110,7 +110,6 @@ mod tests {
     use crate::manager::unit::unit_file::UnitFile;
     use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
     use crate::plugin::Plugin;
-    use std::path::PathBuf;
     use std::sync::Arc;
     use utils::logger;
 
@@ -181,14 +180,6 @@ mod tests {
         let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
         let unit_type = UnitType::UnitService;
         let plugins = Arc::clone(&Plugin::get_instance());
-        let mut config_path1 = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        config_path1.push("../target/debug");
-        plugins.set_library_dir(&config_path1.to_str().unwrap());
-        plugins.load_lib();
-        let mut config_path2 = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        config_path2.push("../target/release");
-        plugins.set_library_dir(&config_path2.to_str().unwrap());
-        plugins.load_lib();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();
         Rc::new(UnitX::new(
             dm,

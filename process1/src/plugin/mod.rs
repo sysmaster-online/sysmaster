@@ -3,14 +3,15 @@ use dynamic_reload as dy_re;
 use log::*;
 use std::cell::RefCell;
 use std::ffi::OsStr;
-use std::io;
 use std::sync::RwLock;
 use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
+use std::{env, io};
 use walkdir::{DirEntry, WalkDir};
 
+const LIB_PLUGIN_PATH: &str = "/usr/lib/process1/plugin/";
 pub struct Plugin {
     /*unitobj_lists: RefCell<Vec<Arc<Box<dyn UnitSubClass>>>>,//hide unit obj mut use refcell*/
-    library_dir: RwLock<String>,
+    library_dir: RwLock<Vec<String>>,
     load_libs: RwLock<HashMap<UnitType, Arc<dy_re::Lib>>>,
     _loaded: RefCell<bool>,
 }
@@ -20,20 +21,48 @@ impl Plugin {
     fn new() -> Self {
         Self {
             //unitobj_lists: RefCell::new(Vec::new()),
-            library_dir: RwLock::new(String::new()),
+            library_dir: RwLock::new(Vec::new()),
             load_libs: RwLock::new(HashMap::new()),
             _loaded: RefCell::new(false),
         }
     }
 
+    fn get_default_libpath() -> String {
+        let mut ret: String = String::with_capacity(256);
+        let devel_path = || {
+            let out_dir = env::var("OUT_DIR");
+            out_dir
+        };
+        let lib_path = env::var("PROCESS_LIB_LOAD_PATH");
+        match lib_path {
+            Ok(lib_path_str) => {
+                let _tmp: Vec<_> = lib_path_str.split("target").collect();
+                ret.push_str(format!("{}/target/debug;", _tmp[0]).as_str());
+                ret.push_str(format!("{}/target/release;", _tmp[0]).as_str());
+            }
+            Err(_) => {
+                let _tmp_lib_path = devel_path();
+                let lib_path_str = _tmp_lib_path.unwrap_or(LIB_PLUGIN_PATH.to_string());
+                let _tmp: Vec<_> = lib_path_str.split("target").collect();
+                if _tmp.is_empty() {
+                    ret.push_str(lib_path_str.as_str());
+                } else {
+                    ret.push_str(format!("{}target/debug;", _tmp[0]).as_str());
+                    ret.push_str(format!("{}target/release;", _tmp[0]).as_str());
+                }
+            }
+        }
+        ret
+    }
+
     pub fn get_instance() -> Arc<Plugin> {
-        log::info!("get_instance");
         static mut PLUGIN: Option<Arc<Plugin>> = None;
         unsafe {
             PLUGIN
                 .get_or_insert_with(|| {
                     let plugin = Plugin::new();
-                    plugin.set_library_dir("target/debug");
+                    let default_lib_path = Plugin::get_default_libpath();
+                    plugin.update_library_dir(&default_lib_path);
                     plugin.load_lib();
                     Arc::new(plugin)
                 })
@@ -41,61 +70,75 @@ impl Plugin {
         }
     }
 
-    pub fn load_lib(&self) {
-        let lib_path = self.library_dir.read().unwrap();
-        let file_exist = || {
+    fn load_lib(&self) {
+        let file_exist = |file_name: &str| {
             if *(self._loaded.borrow()) {
                 log::info!("plugin is already loaded");
                 return false;
             }
-            if (*lib_path).is_empty() {
+            if file_name.is_empty() {
                 return false;
             }
-            let libdir_path = PathBuf::from((*lib_path).as_str());
+            let libdir_path = PathBuf::from(file_name);
             if !libdir_path.exists() || !libdir_path.is_dir() {
                 log::error!("library_dir {:?} is not a dir or not exist", libdir_path);
                 return false;
             }
             true
         };
-        let a = file_exist();
-        if !a {
-            return;
-        }
-        log::debug!("begin loading library in library dir {:?}", lib_path);
+
+        let lib_path = self.library_dir.read().unwrap();
+        let search_path: Vec<&str> = (*lib_path)
+            .iter()
+            .map(|x| {
+                let a = file_exist(x);
+                if a {
+                    x
+                } else {
+                    ""
+                }
+            })
+            .collect();
+
+        let shadow_dir = search_path[0];
+
         let mut reload_handler = dynamic_reload::DynamicReload::new(
-            Some(vec![(*lib_path).as_str()]),
-            Some((*lib_path).as_str()),
+            Some(search_path),
+            Some(shadow_dir),
             dynamic_reload::Search::Default,
         );
-        for entry in WalkDir::new((*lib_path).as_str())
-            .min_depth(1)
-            .follow_links(true)
-            .into_iter()
-            .filter_entry(|e| Self::is_dynamic_lib(e))
-        {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            if path.is_dir() {
-                continue;
-            } else {
-                let file_name = path.file_name();
-                let result = Self::load_plugin(self, file_name.unwrap(), &mut reload_handler);
-                if let Ok(_r) = result {
-                    log::info!("Plugin load unit plugin[{:?}] sucessfull", file_name);
-                } else if let Err(_e) = result {
-                    log::error!(
-                        "Plugin load unit plugin[{:?}] failed,deatil is {}",
-                        file_name,
-                        _e.to_string()
-                    );
+
+        for file_item in lib_path.iter() {
+            log::debug!("begin loading library in library dir {:?}", file_item);
+            for entry in WalkDir::new(file_item)
+                .min_depth(1)
+                .follow_links(true)
+                .into_iter()
+                .filter_entry(|e| Self::is_dynamic_lib(e))
+            {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                if path.is_dir() {
+                    continue;
+                } else {
+                    let file_name = path.file_name();
+                    let result = Self::load_plugin(self, file_name.unwrap(), &mut reload_handler);
+                    if let Ok(_r) = result {
+                        log::info!("Plugin load unit plugin[{:?}] sucessfull", file_name);
+                    } else if let Err(_e) = result {
+                        log::error!(
+                            "Plugin load unit plugin[{:?}] failed,deatil is {}",
+                            file_name,
+                            _e.to_string()
+                        );
+                    }
                 }
             }
         }
         self._loaded.replace(true);
     }
 
-    pub fn load_plugin(
+    fn load_plugin(
         &self,
         filename: &OsStr,
         reload_handler: &mut dynamic_reload::DynamicReload,
@@ -139,37 +182,65 @@ impl Plugin {
 
         UnitType::UnitTypeInvalid
     }
-
-    pub fn set_library_dir(&self, library_dir: &str) {
+    ///
+    /// default plugin library path is /usr/lib/process1/plugin/
+    /// if you want respecfic yourself path invoke this interface
+    /// if the path is not different than last one the path will update
+    /// add lib will reload
+    pub fn update_library_dir(&self, library_dir: &str) {
         let update_dir = || {
-            let new_libdir = PathBuf::from(library_dir);
-            if !new_libdir.is_dir() || !new_libdir.is_dir() {
-                log::error!("library_dir {:?} is not a dir or not exist", library_dir);
-                return;
-            }
-            match self.library_dir.try_read() {
-                Ok(pathdir) => {
-                    let old_libdir = PathBuf::from((*pathdir).as_str());
-                    if old_libdir == new_libdir {
-                        log::info!("library dir is already set {}", library_dir);
-                        return;
+            log::debug!("update_library_dir {}", library_dir);
+            let _tmp_str: Vec<_> = library_dir.split(";").collect();
+            let mut _new_dir: Vec<PathBuf> = Vec::new();
+            let mut set_flag = false;
+
+            for new_item in _tmp_str {
+                if new_item.is_empty() {
+                    continue;
+                }
+                let new_libdir = PathBuf::from(new_item);
+                if !new_libdir.is_dir() || !new_libdir.is_dir() {
+                    log::error!("library_dir {} is not a dir or not exist", new_item);
+                    continue;
+                } else {
+                    let mut _tmp_flag = false;
+                    match self.library_dir.try_read() {
+                        Ok(pathdir) => {
+                            for item in (*pathdir).iter() {
+                                let old_libdir = PathBuf::from(item);
+                                if old_libdir == new_libdir {
+                                    log::info!("library dir is already set {}", item);
+                                    _tmp_flag = true;
+                                    break;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("set library dir failed {}", e.to_string());
+                            return false;
+                        }
+                    }
+                    if !_tmp_flag {
+                        let dir_str = new_libdir.to_str().unwrap();
+                        let mut w = self.library_dir.write().unwrap();
+                        (*w).push(dir_str.to_string());
+                        log::debug!("set libray dir {}", dir_str);
+                        set_flag = true;
                     }
                 }
-                Err(e) => {
-                    log::error!("set library dir failed {}", e.to_string());
-                    return;
-                }
             }
-            let mut w = self.library_dir.write().unwrap();
-            (*w).clear();
-            (*w).push_str(library_dir);
-            log::debug!("set libray dir {}", library_dir);
-            self._loaded.replace(false);
+            if set_flag {
+                self._loaded.replace(false);
+            }
+            return set_flag;
         };
-        update_dir();
+
+        if update_dir() {
+            Self::load_lib(self);
+        }
     }
 
-    pub fn is_dynamic_lib(entry: &DirEntry) -> bool {
+    fn is_dynamic_lib(entry: &DirEntry) -> bool {
         let file_type = entry.file_type();
         let file_name = entry.file_name();
         if file_type.is_file()
@@ -188,6 +259,10 @@ impl Plugin {
         &self,
         unit_type: UnitType,
     ) -> Result<Box<dyn UnitSubClass>, Box<dyn Error>> {
+        if !(*(self._loaded.borrow())) {
+            log::info!("plugin is not loaded");
+            return Err(format!("plugin is not loaded").into());
+        }
         let dy_lib = match (*self.load_libs.read().unwrap()).get(&unit_type) {
             Some(lib) => lib.clone(),
             None => {
@@ -205,13 +280,19 @@ impl Plugin {
 
 #[cfg(test)]
 mod tests {
+    use utils::logger;
+
     use super::*;
     // use services::service::ServiceUnit;
 
     #[test]
     fn test_plugin_load_library() {
+        logger::init_log_with_console("test_unit_load", 4);
         let plugins = Arc::clone(&Plugin::get_instance());
         let t_p = plugins;
+        let mf = env!("CARGO_MANIFEST_DIR");
+        let out_dir = env!("OUT_DIR");
+        println!("{},{}", out_dir, mf);
         for key in (*t_p.load_libs.read().unwrap()).keys() {
             assert_eq!(key.to_string(), UnitType::UnitService.to_string());
             // let service_unit = u_box.as_any().downcast_ref::<ServiceUnit>().unwrap();

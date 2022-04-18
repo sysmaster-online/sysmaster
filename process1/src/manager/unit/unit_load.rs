@@ -234,15 +234,6 @@ impl UnitConfigsSub {
             name
         );
         let plugins = Arc::clone(&Plugin::get_instance());
-        let mut lib_path = env!("CARGO_MANIFEST_DIR").to_string();
-        lib_path.push_str("/../target/debug");
-        plugins.set_library_dir(&lib_path);
-        plugins.load_lib();
-        lib_path.clear();
-        lib_path.push_str(env!("CARGO_MANIFEST_DIR"));
-        lib_path.push_str("/../target/release");
-        plugins.set_library_dir(&lib_path);
-        plugins.load_lib();
         let mut subclass = match plugins.create_unit_obj(unit_type) {
             Ok(sub) => sub,
             Err(_e) => return None,
