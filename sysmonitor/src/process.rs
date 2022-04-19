@@ -65,6 +65,7 @@ impl Monitor for ProcessMonitor {
         };
     }
 
+    /// 只支持串行和并行两种模式
     fn is_valid(&self) -> bool {
         (self.monitor_mode == "serial" || self.monitor_mode == "parallel")
             && self.monitor_period > 0
@@ -82,11 +83,12 @@ impl ProcessMonitor {
     fn process_monitor_start(&mut self, timeout: u64) {
         loop {
             self.reload_tasks();
+            // 检查进程是否还存在，存在的话则恢复告警，不存在的话则告警并恢复
             if self.check_service_exist() {
-                let _ = self.process_recover(timeout);
                 let _ = self.process_alarm_recover();
             } else {
                 let _ = self.process_alarm();
+                let _ = self.process_recover(timeout);
             }
             sleep(Duration::from_secs(self.monitor_period))
         }
@@ -98,6 +100,7 @@ impl ProcessMonitor {
         self.monitor_period + 344
     }
 
+    /// 只重复检查两次，若还超时则返回false
     fn check_service_exist(&mut self) -> bool {
         for _ in 1..2 {
             match self.check_process_exist() {
@@ -111,6 +114,7 @@ impl ProcessMonitor {
         false
     }
 
+    /// 检查进程是否存在
     fn check_process_exist(&mut self) -> io::Result<bool> {
         command_wait(
             self.monitor_command.clone(),
@@ -120,6 +124,7 @@ impl ProcessMonitor {
         )
     }
 
+    /// 进程恢复
     fn process_recover(&self, timeout: u64) -> io::Result<bool> {
         command_wait(
             self.recover_command.clone(),
@@ -129,6 +134,7 @@ impl ProcessMonitor {
         )
     }
 
+    /// 执行告警的命令
     fn process_alarm(&mut self) -> io::Result<bool> {
         command_wait(
             self.alarm_command.clone(),
@@ -138,6 +144,7 @@ impl ProcessMonitor {
         )
     }
 
+    /// 执行告警恢复的命令
     fn process_alarm_recover(&mut self) -> io::Result<bool> {
         command_wait(
             self.alarm_recover_command.clone(),
@@ -148,6 +155,7 @@ impl ProcessMonitor {
     }
 }
 
+/// 将生成子进程，执行命令并等待返回结果这一模式抽象成一个函数，command为需要执行的命令，stop_command为超时之后停止的命令
 fn command_wait(command: String, stop_command: String, uid: u32, timeout: u64) -> io::Result<bool> {
     let mut child = Command::new(command).uid(uid).spawn()?;
 
@@ -167,6 +175,7 @@ fn command_wait(command: String, stop_command: String, uid: u32, timeout: u64) -
     Ok(false)
 }
 
+/// 杀死一个子进程
 fn process_exit(child: &mut Child) -> io::Result<ExitStatus> {
     kill(Pid::from_raw(child.id() as pid_t), Signal::SIGTERM)?;
     sleep(Duration::from_secs(1));
@@ -175,6 +184,7 @@ fn process_exit(child: &mut Child) -> io::Result<ExitStatus> {
     child.wait()
 }
 
+/// 带超时时间的等待子进程执行命令并获取ExitStatus
 fn wait_child(child: &mut Child, timeout_s: u64, sleep_ms: u64) -> io::Result<Option<ExitStatus>> {
     for _i in 0..timeout_s * 1000 / sleep_ms {
         match child.try_wait() {

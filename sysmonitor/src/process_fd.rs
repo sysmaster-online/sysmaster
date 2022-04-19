@@ -42,6 +42,7 @@ impl Monitor for ProcessFd {
     }
 
     fn check_status(&mut self) -> Result<(), SysMonitorError> {
+        // 向procfs里写入数值，打开监控，真正的监控由内核模块实现
         write_file(PROC_FDTHRESHOLD, self.alarm.to_string())?;
         write_file(PROC_FDENABLE, 1.to_string())?;
         Ok(())
