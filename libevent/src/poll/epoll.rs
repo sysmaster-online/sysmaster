@@ -70,25 +70,3 @@ impl AsRawFd for Epoll {
         self.epoll_fd
     }
 }
-
-#[cfg(test)]
-mod test {
-    use super::Epoll;
-    use libc::EPOLLIN;
-
-    #[test]
-    fn epoll_new() {
-        let _ = Epoll::new();
-    }
-
-    #[test]
-    fn epoll_add() {
-        let mut poll = Epoll::new().unwrap();
-        let mut events = libc::epoll_event {
-            events: EPOLLIN as u32,
-            u64: 0,
-        };
-        let _ = poll.register(poll.epoll_fd, &mut events);
-        let _ = poll.unregister(poll.epoll_fd);
-    }
-}

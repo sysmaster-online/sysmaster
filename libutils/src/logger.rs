@@ -61,8 +61,8 @@ where
 pub fn init_log_with_console(app_name: &str, log_level: u32) {
     let config = build_log_config(app_name, log_level);
     let log_init_result = log4rs::init_config(config);
-    if let Err(_r) = log_init_result {
-        println!("{}", _r.to_string());
+    if let Err(e) = log_init_result {
+        println!("{}", e);
     }
 }
 
@@ -86,15 +86,13 @@ fn build_log_config(app_name: &str, log_level: u32) -> Config {
         _ => LevelFilter::Info,
     };
 
-    let config = match Some(app_name) {
+    match Some(app_name) {
         Some(a_p) => logging_builder
             .logger(Logger::builder().build(a_p, l_level))
             .build(Root::builder().appender("console").build(l_level)),
         _ => logging_builder.build(Root::builder().appender("console").build(l_level)),
     }
-    .unwrap();
-
-    config
+    .unwrap()
 }
 
 #[cfg(test)]

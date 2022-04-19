@@ -21,6 +21,5 @@ fn main() -> Result<(), Error> {
         Err(_) => todo!(),
     };
 
-    #[allow(unreachable_code)]
     Ok(())
 }
