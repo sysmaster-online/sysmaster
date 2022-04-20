@@ -35,9 +35,28 @@ impl ServiceUnit {
                     &mut self.exec_commands[ServiceCommand::ServiceStart as usize],
                 ) {
                     Ok(_) => {}
-                    Err(e) => return Err(e),
+                    Err(e) => {
+                        println!("prepare command return err: {}", e.to_string());
+                        return Err(e);
+                    }
                 }
             }
+
+            if key == ServiceConf::ExecStop.to_string() {
+                let values = conf.get_values();
+                self.exec_commands[ServiceCommand::ServiceStop as usize] = LinkedList::new();
+                match prepare_command(
+                    &values,
+                    &mut self.exec_commands[ServiceCommand::ServiceStop as usize],
+                ) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("prepare command return err: {}", e.to_string());
+                        return Err(e);
+                    }
+                }
+            }
+
             if key == ServiceConf::ExecReload.to_string() {
                 let values = conf.get_values();
                 self.exec_commands[ServiceCommand::ServiceReload as usize] = LinkedList::new();
@@ -70,36 +89,41 @@ fn prepare_command(
     if commands.len() == 0 {
         return Ok(());
     }
-    let mut i = 0;
+
     for exec in commands.iter() {
-        let mut cmd = "";
-        let mut t_args: Vec<String> = Vec::new();
-        if let ConfValue::String(t_cmd) = exec {
-            if i == 0 {
-                cmd = t_cmd;
-                i = i + 1;
-            } else {
-                t_args.push(t_cmd.to_string());
+        let cmd = match exec {
+            ConfValue::String(s) => s,
+            _ => {
+                return Err(format!(
+                    "service config  format is error, command {:?} is error",
+                    exec
+                )
+                .into())
             }
-        } else {
-            return Err(format!(
-                "service config  format is error, command {:?} is error",
-                exec
-            )
-            .into());
-        }
+        };
 
         if cmd.is_empty() {
             return Ok(());
         }
-        let path = Path::new(&cmd);
-        if !path.exists() || !path.is_file() {
-            return Err(format!("{:?} is not exist or commad is not a file", path).into());
+
+        let mut command: Vec<String> = cmd
+            .trim_end()
+            .split_whitespace()
+            .map(|s| s.to_string())
+            .collect();
+
+        // get the command and leave the command args
+        let exec_cmd = command.remove(0);
+        let path = Path::new(&exec_cmd);
+
+        if path.is_absolute() && !path.exists() {
+            log::debug!("{:?} is not exist in parse!", path);
+            return Err(format!("{:?} is not exist!", path).into());
         }
 
         let new_command = Rc::new(RefCell::new(CommandLine {
             cmd: path.to_str().unwrap().to_string(),
-            args: t_args,
+            args: command,
             next: None,
         }));
         match command_list.back() {

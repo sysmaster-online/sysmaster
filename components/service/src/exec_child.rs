@@ -58,7 +58,11 @@ pub fn exec_child(service: &ServiceUnit, cmdline: &CommandLine, env: &HashMap<&s
         .map(|cstring| cstring.as_c_str())
         .collect::<Vec<_>>();
 
-    log::debug!("command is: {}, args is: {:?}", cmd.to_str().unwrap(), args);
+    log::debug!(
+        "exec child command is: {}, args is: {:?}",
+        cmd.to_str().unwrap(),
+        args
+    );
     match nix::unistd::execv(&cmd, &cstr_args) {
         Ok(_) => {
             log::debug!("execv returned Ok()");

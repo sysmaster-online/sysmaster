@@ -14,7 +14,6 @@ path = "src/bin/process1.rs"
 name = "pctrl"
 path = "src/bin/pctrl.rs"
 
-
 [lib]
 # crate_type = ["dylib"]
 crate_type = ["lib"]
@@ -38,3 +37,7 @@ clap = { version = "3.1.8", features = ["derive"] }
 
 [build-dependencies]
 prost-build = "0.9" # 编译 protobuf
+
+[[example]]
+name = "signals"
+path = "./examples/signal.rs"

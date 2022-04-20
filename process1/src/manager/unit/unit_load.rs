@@ -29,8 +29,8 @@ impl UnitLoad {
         let unit_load_data = UnitLoadData::new(dm, file, unitdb, rt, unit_conf_parser_mgr);
         let rc_unit_load_data = Rc::new(unit_load_data);
         UnitLoad {
-            data: rc_unit_load_data.clone(),
-            uconf_register: UnitConfigs::new(rc_unit_load_data.clone()),
+            data: Rc::clone(&rc_unit_load_data),
+            uconf_register: UnitConfigs::new(Rc::clone(&rc_unit_load_data)),
         }
     }
 
@@ -62,6 +62,7 @@ impl UnitLoadData {
         rt: Rc<UnitRT>,
         unit_conf_parser_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
     ) -> UnitLoadData {
+        log::debug!("UnitLoadData db count is {}", Rc::strong_count(&db));
         UnitLoadData {
             dm,
             db,
@@ -87,7 +88,11 @@ impl UnitLoadData {
                 Some(Rc::clone(&rc_unit))
             }
             None => {
-                log::error!("create unit obj failed.");
+                log::error!(
+                    "create unit obj failed,name is {},{}",
+                    name,
+                    Rc::strong_count(&self.db)
+                );
                 return None;
             }
         }

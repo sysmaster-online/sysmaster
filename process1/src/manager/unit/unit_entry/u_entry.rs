@@ -3,7 +3,7 @@ use super::uu_child::UeChild;
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use super::uu_state::UeState;
-use crate::manager::data::{DataManager, UnitActiveState, UnitType};
+use crate::manager::data::{DataManager, UnitActiveState, UnitConfigItem, UnitType};
 use crate::manager::unit::unit_base::{self, UnitActionError, UnitLoadState};
 use crate::manager::unit::unit_file::UnitFile;
 use crate::manager::unit::unit_parser_mgr::{UnitConfigParser, UnitParserMgr};
@@ -122,9 +122,8 @@ impl Unit {
         self.config.replace(Rc::new(config));
     }
 
-    pub(super) fn get_config(&self) -> Option<Rc<UeConfig>> {
-        let ret = Rc::clone(&self.config.borrow());
-        return Some(Rc::clone(&ret));
+    pub(super) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
+        self.config.borrow().get(item)
     }
     fn build_name_map(&self) {
         self.file.build_name_map();
@@ -229,6 +228,10 @@ impl Unit {
 
     pub fn stop(&self) -> Result<(), UnitActionError> {
         self.sub.borrow_mut().stop()
+    }
+
+    pub fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
+        self.sub.borrow_mut().sigchld_events(pid, code, signal)
     }
 
     pub fn get_load_state(&self) -> UnitLoadState {

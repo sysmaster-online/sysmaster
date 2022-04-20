@@ -5,7 +5,7 @@ use super::unit_load::UnitLoad;
 use super::unit_parser_mgr::{UnitConfigParser, UnitParserMgr};
 use super::unit_relation_atom::UnitRelationAtom;
 use super::unit_runtime::UnitRT;
-use super::UnitObj;
+use super::{UnitObj, UnitX};
 use crate::manager::data::{DataManager, JobMode, UnitState};
 use crate::manager::table::{TableOp, TableSubscribe};
 use crate::manager::MngErrno;
@@ -49,7 +49,7 @@ pub struct UnitManagerX {
 }
 
 impl UnitManagerX {
-    pub(in crate::manager) fn new(dm: Rc<DataManager>, event: Rc<RefCell<Events>>) -> UnitManagerX {
+    pub fn new(dm: Rc<DataManager>, event: Rc<RefCell<Events>>) -> UnitManagerX {
         let _dm = Rc::clone(&dm);
         let _um = UnitManager::new(Rc::clone(&_dm), event);
         UnitManagerX {
@@ -100,6 +100,7 @@ impl UnitManager {
 
     pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         if let Some(unit) = self.load.load_unit(name) {
+            log::debug!("load unit success, send to job manager");
             self.jm.exec(
                 &JobConf::new(Rc::clone(&unit), JobKind::JobStart),
                 JobMode::JobReplace,
@@ -124,6 +125,10 @@ impl UnitManager {
         }
     }
 
+    pub fn load(&self, name: &str) -> Option<Rc<UnitX>> {
+        self.load.load_unit(name)
+    }
+
     pub(in crate::manager) fn new(
         dm: Rc<DataManager>,
         event: Rc<RefCell<Events>>,
@@ -134,6 +139,7 @@ impl UnitManager {
         let _db = Rc::new(UnitDb::new());
         let rt = Rc::new(UnitRT::new());
         let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
+        _file.init_lookup_path();
 
         let _load = Rc::new(UnitLoad::new(
             Rc::clone(&_dm),
@@ -178,8 +184,12 @@ impl UnitStates {
 
     fn register(&self, dm: &DataManager) {
         let subscriber = Rc::clone(&self.data);
-        dm.register_unit_state(self.name.clone(), subscriber)
-            .expect("unit dependency has been registered.");
+        let register_result = dm.register_unit_state(self.name.clone(), subscriber);
+        if let Some(_r) = register_result {
+            log::info!("TableSubcribe for {} is already register", &self.name);
+        } else {
+            log::info!("register  TableSubcribe for {}  sucessfull", &self.name);
+        }
     }
 }
 
@@ -209,6 +219,7 @@ impl UnitStatesSub {
     }
 
     pub(self) fn insert_states(&self, source: &str, state: &UnitState) {
+        log::debug!("insert unit states source {}, state: {:?}", source, state);
         let unitx = if let Some(u) = self.um.db.units_get(source) {
             u
         } else {
@@ -248,36 +259,36 @@ mod tests {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
         let dm_manager = Rc::new(DataManager::new());
-        let um = UnitManager::new(
-            dm_manager.clone(),
-            Rc::new(RefCell::new(Events::new().unwrap())),
-        );
-        um.file.init_lookup_path();
-        let load = Rc::clone(&um.load);
-        let unit_name = String::from("config.service");
-        let loaded_unit = load.load_unit(&unit_name);
+        let _event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let um = UnitManager::new(dm_manager.clone(), Rc::clone(&_event));
 
-        match um.db.units_get(&unit_name) {
-            Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), loaded_unit.unwrap().get_id()),
-            None => assert!(false, "not fount unit: {}", unit_name),
+        let unit_name = String::from("config.service");
+        let unit = um.load(&unit_name);
+
+        match unit {
+            Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), "config.service"),
+            None => println!("test unit load, not fount unit: {}", unit_name),
         };
     }
 
     #[test]
     fn test_unit_start() {
+        logger::init_log_with_console("test_unit_load", 4);
         let dm_manager = Rc::new(DataManager::new());
-        let um = UnitManager::new(
-            dm_manager.clone(),
-            Rc::new(RefCell::new(Events::new().unwrap())),
-        );
-        um.file.init_lookup_path();
-        let load = Rc::clone(&um.load);
-        let unit_name = String::from("config.service");
-        load.load_unit(&unit_name);
+        let _event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let um = UnitManager::new(dm_manager.clone(), Rc::clone(&_event));
 
-        match um.db.units_get(&unit_name) {
-            Some(_unit_obj) => println!("found unit obj {}", unit_name),
-            None => assert!(false, "not fount unit: {}", unit_name),
-        };
+        let unit_name = String::from("config.service");
+        let unit = um.load(&unit_name);
+
+        match unit {
+            Some(u) => {
+                u.start().unwrap();
+                log::debug!("unit start end!");
+                u.stop().unwrap();
+                log::debug!("unit stop end!");
+            }
+            None => println!("load unit failed"),
+        }
     }
 }

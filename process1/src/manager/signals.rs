@@ -38,12 +38,14 @@ impl Source for Signals {
     }
 
     fn dispatch(&self, e: &mut Events) -> Result<i32, Error> {
-        println!("Dispatching signal!");
+        log::debug!("Dispatching signals!");
+
         #[allow(clippy::never_loop)]
         loop {
             match e.read_signals() {
                 Ok(Some(info)) => {
                     let signal = Signal::try_from(info.si_signo).unwrap();
+                    log::debug!("read signal from event: {}", signal);
                     match signal {
                         Signal::SIGCHLD => match self.um.child_dispatch_sigchld() {
                             Err(e) => {
@@ -59,11 +61,14 @@ impl Source for Signals {
                         Signal::SIGUSR2 => todo!(),
                         _ => todo!(),
                     }
-                    println!("read signo: {:?}", info.si_signo);
                     break;
                 }
-                Ok(None) => break,
+                Ok(None) => {
+                    log::debug!("read signals none");
+                    break;
+                }
                 Err(e) => {
+                    log::debug!("read signals error");
                     println!("{:?}", e);
                     break;
                 }

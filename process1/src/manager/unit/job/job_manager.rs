@@ -114,6 +114,7 @@ impl Source for JobManagerData {
     }
 
     fn dispatch(&self, _event: &mut Events) -> Result<i32, Error> {
+        println!("job manager data dispatch");
         self.run();
         Ok(0)
     }

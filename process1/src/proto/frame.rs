@@ -129,6 +129,7 @@ mod tests {
     use std::cell::RefCell;
     use std::net::TcpStream;
     use std::thread;
+    use std::time::Duration;
 
     use crate::manager::manager::{Action, Mode};
     use event::Events;
@@ -140,6 +141,7 @@ mod tests {
     #[should_panic]
     fn test_send_and_recv() {
         thread::spawn(move || {
+            thread::sleep(Duration::from_secs(1));
             let addr = "127.0.0.1:9527";
             let stream = TcpStream::connect(addr).unwrap();
             let mut client = ProstClientStream::new(stream);
@@ -157,9 +159,7 @@ mod tests {
                 match stream {
                     Err(e) => eprintln!("failed: {}", e),
                     Ok(stream) => {
-                        println!("{:?}", stream);
-                        let dispatch = ProstServerStream::new(&stream, manager.clone());
-                        dispatch.process().unwrap();
+                        panic!("has receive a command request");
                     }
                 }
             }

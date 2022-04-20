@@ -232,6 +232,7 @@ pub enum ServiceConf {
     ExecCondition,
     ExecStart,
     ExecReload,
+    ExecStop,
 }
 
 impl Display for ServiceConf {
@@ -241,6 +242,7 @@ impl Display for ServiceConf {
             ServiceConf::ExecCondition => write!(f, "ExecCondition"),
             ServiceConf::ExecStart => write!(f, "ExecStart"),
             ServiceConf::ExecReload => write!(f, "ExecReload"),
+            ServiceConf::ExecStop => write!(f, "ExecStop"),
         }
     }
 }
@@ -252,6 +254,7 @@ impl From<ServiceConf> for String {
             ServiceConf::ExecCondition => "ExecCondition".into(),
             ServiceConf::ExecStart => "ExecStart".into(),
             ServiceConf::ExecReload => "ExecReload".into(),
+            ServiceConf::ExecStop => "ExecStop".into(),
         }
     }
 }
