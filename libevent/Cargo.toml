@@ -11,5 +11,8 @@ crate-type = ["lib"]
 name = "event"
 
 [dependencies]
-libc = { version = "0.2.*" }
+libc = { version = "0.2" }
 utils = { path = "../libutils" }
+
+[dev-dependencies]
+nix = "0.23"
