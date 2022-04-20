@@ -92,6 +92,7 @@ impl Signals {
         let res = unsafe { libc::read(self.fd, buffer.as_mut_ptr() as *mut libc::c_void, size) };
         match res {
             x if x == size as isize => Ok(Some(unsafe { buffer.assume_init() })),
+            x if x == 0 => Ok(None),
             _ => unreachable!("partial read on signalfd"),
         }
     }
