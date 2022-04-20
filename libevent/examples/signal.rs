@@ -1,3 +1,5 @@
+// These tests cannot run as a regular test because cargo would spawn a thread to run it,
+// failing the signal masking. So we make our own, non-threaded harnessing
 use nix::unistd::fork;
 use nix::unistd::ForkResult;
 use utils::Error;
@@ -67,7 +69,7 @@ fn main() {
                 "Continuing execution in parent process, new child has pid: {}",
                 child
             );
-            e.rloop().unwrap();
+            e.run(-1).unwrap();
         }
         Ok(ForkResult::Child) => println!("I'm a new child process"),
         Err(_) => println!("Fork failed"),
