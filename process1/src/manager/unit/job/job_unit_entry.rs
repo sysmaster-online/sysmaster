@@ -52,7 +52,7 @@ impl JobUnit {
         }
     }
 
-    pub(super) fn insert_suspend(&mut self, job: Rc<Job>) {
+    pub(super) fn insert_suspend(&mut self, job: Rc<Job>, operate: bool) {
         assert!(job.is_basic_op());
         assert_eq!(job.get_stage(), JobStage::JobInit);
         assert!(!self.is_trigger(&job));
@@ -70,7 +70,9 @@ impl JobUnit {
         self.update_ready();
 
         // operate job
-        job.wait(); // wait suspended job
+        if operate {
+            job.wait(); // wait suspended job
+        }
     }
 
     pub(super) fn remove_suspend(&mut self, kind: JobKind, result: JobResult) -> Option<Rc<Job>> {
@@ -142,7 +144,7 @@ impl JobUnit {
                 update_jobs.push(job);
             } else {
                 // add other-job
-                self.insert_suspend(Rc::clone(&o_job));
+                self.insert_suspend(Rc::clone(&o_job), true);
                 add_jobs.push(Rc::clone(&o_job));
             }
         }
@@ -269,6 +271,12 @@ impl JobUnit {
         self.up_ready = false;
     }
 
+    pub(super) fn len(&self) -> usize {
+        let num_trigger: usize = self.trigger.is_some().into();
+        let num_suspend = self.suspends.len();
+        num_trigger + num_suspend
+    }
+
     pub(super) fn get_suspend(&self, kind: JobKind) -> Option<Rc<Job>> {
         self.suspends.get(&kind).cloned()
     }
@@ -284,8 +292,8 @@ impl JobUnit {
         self.trigger.as_ref().cloned()
     }
 
-    pub(super) fn get_unit(&self) -> &Rc<UnitX> {
-        &self.unit
+    pub(super) fn get_unit(&self) -> Rc<UnitX> {
+        Rc::clone(&self.unit)
     }
 
     pub(super) fn is_empty(&self) -> bool {
@@ -411,6 +419,7 @@ impl JobUnit {
 
         // the entire entry: data + status
         let next_trigger = Rc::clone(self.trigger.insert(self.sq.pop_front().unwrap())); // trigger the first suspend one
+        self.suspends.remove(&next_trigger.get_kind()); // remove the first suspend one
         self.dirty = true; // make it simple
         self.update_ready();
 

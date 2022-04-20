@@ -245,3 +245,216 @@ impl UnitDepData {
             .expect("something inserted is not found.")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::manager::data::{DataManager, UnitType};
+    use crate::manager::unit::unit_file::UnitFile;
+    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+    use crate::plugin::Plugin;
+    use std::path::PathBuf;
+    use utils::logger;
+
+    #[test]
+    fn dep_insert() {
+        let dep = UnitDep::new();
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let name_test2 = String::from("test2.service");
+        let unit_test2 = create_unit(&name_test2);
+        let name_test3 = String::from("test3.service");
+        let unit_test3 = create_unit(&name_test3);
+        let relation = UnitRelations::UnitRequires;
+
+        let old = dep.insert(
+            Rc::clone(&unit_test1),
+            relation,
+            Rc::clone(&unit_test2),
+            true,
+            0,
+        );
+        assert!(old.is_ok());
+
+        let old = dep.insert(
+            Rc::clone(&unit_test1),
+            relation,
+            Rc::clone(&unit_test3),
+            true,
+            0,
+        );
+        assert!(old.is_ok());
+
+        let old = dep.insert(
+            Rc::clone(&unit_test2),
+            relation,
+            Rc::clone(&unit_test3),
+            true,
+            0,
+        );
+        assert!(old.is_ok());
+    }
+
+    #[test]
+    fn dep_gets_atom() {
+        let dep = UnitDep::new();
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let name_test2 = String::from("test2.service");
+        let unit_test2 = create_unit(&name_test2);
+        let name_test3 = String::from("test3.service");
+        let unit_test3 = create_unit(&name_test3);
+        let relation2 = UnitRelations::UnitRequires;
+        let relation3 = UnitRelations::UnitWants;
+        let atom2 = UnitRelationAtom::UnitAtomPullInStart; // + require, - want
+        let atom3 = UnitRelationAtom::UnitAtomPullInStartIgnored; // - require, + want
+        let atom = UnitRelationAtom::UnitAtomAddStopWhenUnneededQueue; // + require, + want
+
+        let units = dep.gets_atom(&unit_test1, atom2);
+        assert_eq!(units.len(), 0);
+
+        dep.insert(
+            Rc::clone(&unit_test1),
+            relation2,
+            Rc::clone(&unit_test2),
+            true,
+            0,
+        )
+        .unwrap();
+        dep.insert(
+            Rc::clone(&unit_test1),
+            relation3,
+            Rc::clone(&unit_test3),
+            true,
+            0,
+        )
+        .unwrap();
+
+        let units = dep.gets_atom(&unit_test1, atom2);
+        assert_eq!(units.len(), 1);
+        assert!(contain_unit(&units, &unit_test2));
+        assert!(!contain_unit(&units, &unit_test3));
+
+        let units = dep.gets_atom(&unit_test1, atom3);
+        assert_eq!(units.len(), 1);
+        assert!(!contain_unit(&units, &unit_test2));
+        assert!(contain_unit(&units, &unit_test3));
+
+        let units = dep.gets_atom(&unit_test1, atom);
+        assert_eq!(units.len(), 2);
+        assert!(contain_unit(&units, &unit_test2));
+        assert!(contain_unit(&units, &unit_test3));
+    }
+
+    #[test]
+    fn dep_is_dep_atom_with() {
+        let dep = UnitDep::new();
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let name_test2 = String::from("test2.service");
+        let unit_test2 = create_unit(&name_test2);
+        let name_test3 = String::from("test3.service");
+        let unit_test3 = create_unit(&name_test3);
+        let relation2 = UnitRelations::UnitRequires;
+        let relation3 = UnitRelations::UnitWants;
+        let atom2 = UnitRelationAtom::UnitAtomPullInStart; // + require, - want
+        let atom3 = UnitRelationAtom::UnitAtomPullInStartIgnored; // - require, + want
+        let atom = UnitRelationAtom::UnitAtomAddStopWhenUnneededQueue; // + require, + want
+
+        let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test2);
+        assert_eq!(value, false);
+        let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test2);
+        assert_eq!(value, false);
+        let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test2);
+        assert_eq!(value, false);
+        let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test3);
+        assert_eq!(value, false);
+        let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test3);
+        assert_eq!(value, false);
+        let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test3);
+        assert_eq!(value, false);
+
+        dep.insert(
+            Rc::clone(&unit_test1),
+            relation2,
+            Rc::clone(&unit_test2),
+            true,
+            0,
+        )
+        .unwrap();
+        let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test2);
+        assert_eq!(value, true);
+        let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test2);
+        assert_eq!(value, false);
+        let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test2);
+        assert_eq!(value, true);
+        let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test3);
+        assert_eq!(value, false);
+        let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test3);
+        assert_eq!(value, false);
+        let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test3);
+        assert_eq!(value, false);
+
+        dep.insert(
+            Rc::clone(&unit_test1),
+            relation3,
+            Rc::clone(&unit_test3),
+            true,
+            0,
+        )
+        .unwrap();
+        let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test2);
+        assert_eq!(value, true);
+        let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test2);
+        assert_eq!(value, false);
+        let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test2);
+        assert_eq!(value, true);
+        let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test3);
+        assert_eq!(value, false);
+        let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test3);
+        assert_eq!(value, true);
+        let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test3);
+        assert_eq!(value, true);
+    }
+
+    fn create_unit(name: &str) -> Rc<UnitX> {
+        logger::init_log_with_console("test_unit_load", 4);
+        log::info!("test");
+        let dm = Rc::new(DataManager::new());
+        let file = Rc::new(UnitFile::new());
+        let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
+        let unit_type = UnitType::UnitService;
+        let plugins = Rc::clone(&Plugin::get_instance());
+        let mut config_path1 = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        config_path1.push("../target/debug");
+        plugins
+            .borrow_mut()
+            .set_library_dir(&config_path1.to_str().unwrap());
+        plugins.borrow_mut().load_lib();
+        let mut config_path2 = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        config_path2.push("../target/release");
+        plugins
+            .borrow_mut()
+            .set_library_dir(&config_path2.to_str().unwrap());
+        plugins.borrow_mut().load_lib();
+        let subclass = plugins.borrow().create_unit_obj(unit_type).unwrap();
+        Rc::new(UnitX::new(
+            dm,
+            file,
+            unit_conf_parser_mgr,
+            unit_type,
+            name,
+            subclass.into_unitobj(),
+        ))
+    }
+
+    fn contain_unit(units: &Vec<Rc<UnitX>>, unit: &Rc<UnitX>) -> bool {
+        for u in units.iter() {
+            if Rc::ptr_eq(u, unit) {
+                return true;
+            }
+        }
+
+        false
+    }
+}

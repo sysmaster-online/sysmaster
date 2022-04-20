@@ -86,6 +86,18 @@ pub struct JobInfo {
     pub stage: JobStage,
 }
 
+impl fmt::Debug for JobInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Job")
+            .field("id", &self.id)
+            .field("unit", &self.unit.get_id())
+            .field("kind", &self.kind)
+            .field("run_kind", &self.run_kind)
+            .field("stage", &self.stage)
+            .finish()
+    }
+}
+
 impl JobInfo {
     pub(super) fn map(job: &Job) -> JobInfo {
         JobInfo {
@@ -131,7 +143,7 @@ impl Eq for Job {
 
 impl Drop for Job {
     fn drop(&mut self) {
-        todo!();
+        //todo!();
     }
 }
 
@@ -265,7 +277,7 @@ impl Job {
         *self.run_kind.borrow_mut() = rkind;
 
         // is there anything else to do?
-        last_rkind == rkind
+        last_rkind != rkind
     }
 }
 
@@ -372,7 +384,7 @@ fn job_trigger_unit(run_kind: JobKind, unit: &UnitX) -> Result<(), Option<JobRes
             UnitActiveState::UnitActivating => Err(UnitActionError::UnitActionEAgain),
             _ => Err(UnitActionError::UnitActionEBadR),
         },
-        JobKind::JobNop => Ok(()), // do nothing
+        JobKind::JobNop => Err(UnitActionError::UnitActionEAlready), // do nothing
         _ => unreachable!("Invalid job run-kind."),
     };
 

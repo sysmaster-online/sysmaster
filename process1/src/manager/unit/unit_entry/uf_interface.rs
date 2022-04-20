@@ -125,7 +125,9 @@ impl UnitX {
     }
 
     pub fn get_state(&self) -> UnitActiveState {
-        todo!();
+        //UnitActiveState::UnitActive
+        self.0.current_active_state()
+        //todo!();
     }
     pub fn get_perpetual(&self) -> bool {
         todo!();

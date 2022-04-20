@@ -239,11 +239,9 @@ impl UnitStatesSub {
 mod tests {
     // use services::service::ServiceUnit;
 
-    use utils::logger;
-
     use super::*;
-    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
     use event::Events;
+    use utils::logger;
 
     #[test]
     fn test_unit_load() {

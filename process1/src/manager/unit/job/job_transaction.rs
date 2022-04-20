@@ -18,11 +18,11 @@ pub(super) fn job_trans_expand(
     mode: JobMode,
 ) -> Result<(), JobErrno> {
     // check input
-    trans_expand_check_input(config)?;
+    //trans_expand_check_input(config)?;
 
     // record
     let conf = JobConf::map(config);
-    let new = stage.record_suspend(ja, conf.clone(), mode);
+    let new = stage.record_suspend(ja, conf.clone(), mode, false);
 
     // expand
     if trans_is_expand(&conf, new, mode) {
@@ -34,6 +34,7 @@ pub(super) fn job_trans_expand(
                 trans_expand_start(stage, ja, db, &conf, mode)?;
                 trans_expand_stop(stage, ja, db, &conf, mode)?
             }
+            JobKind::JobVerify | JobKind::JobNop => {}
             _ => unreachable!("Invalid job kind."),
         }
     }

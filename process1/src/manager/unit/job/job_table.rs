@@ -31,13 +31,14 @@ impl JobTable {
         ja: &mut JobAlloc,
         config: JobConf,
         mode: JobMode,
+        operate: bool,
     ) -> bool {
         let unit = config.get_unit();
         let kind = config.get_kind();
 
         // add job only when nothing with the same 'unit'+'kind' exists
         if let None = self.t_unit.get_suspend(unit, kind) {
-            self.insert_suspend(ja.alloc(Rc::clone(unit), kind, mode))
+            self.insert_suspend(ja.alloc(Rc::clone(unit), kind, mode), operate)
                 .expect("insert a new job failed.");
             true
         } else {
@@ -146,6 +147,14 @@ impl JobTable {
         self.t_unit.clear();
     }
 
+    pub(super) fn len(&self) -> usize {
+        self.t_id.len()
+    }
+
+    pub(super) fn ready_len(&self) -> usize {
+        self.t_unit.ready_len()
+    }
+
     pub(super) fn get(&self, id: u32) -> Option<JobInfo> {
         match self.t_id.get(&id) {
             Some(job) => Some(JobInfo::map(job)),
@@ -251,7 +260,7 @@ impl JobTable {
         merge_jobs
     }
 
-    fn insert_suspend(&mut self, job: Rc<Job>) -> Result<(), JobErrno> {
+    fn insert_suspend(&mut self, job: Rc<Job>, operate: bool) -> Result<(), JobErrno> {
         // check job-id
         let id = job.get_id();
         if let Some(_) = self.t_id.get(&id) {
@@ -259,7 +268,7 @@ impl JobTable {
         }
 
         // table-unit
-        self.t_unit.insert_suspend(Rc::clone(&job));
+        self.t_unit.insert_suspend(Rc::clone(&job), operate);
 
         // table-id
         self.t_id.insert(id, job);
@@ -294,10 +303,10 @@ impl JobUnitTable {
         }
     }
 
-    pub(self) fn insert_suspend(&mut self, job: Rc<Job>) {
+    pub(self) fn insert_suspend(&mut self, job: Rc<Job>, operate: bool) {
         // t_data
         let uv = self.get_mut_uv_pad(Rc::clone(job.get_unit()));
-        uv.borrow_mut().insert_suspend(Rc::clone(&job));
+        uv.borrow_mut().insert_suspend(Rc::clone(&job), operate);
 
         // t_ready: wait to sync in 'reshuffle', just remark it in unit-value
         assert!(uv.borrow().is_dirty());
@@ -469,6 +478,10 @@ impl JobUnitTable {
         self.sync = true;
     }
 
+    pub(self) fn ready_len(&self) -> usize {
+        self.t_ready.len()
+    }
+
     pub(self) fn get_suspend(&self, unit: &UnitX, kind: JobKind) -> Option<Rc<Job>> {
         if let Some(uv) = self.t_data.get(unit) {
             uv.borrow().get_suspend(kind)
@@ -575,7 +588,7 @@ impl JobUnitTable {
         assert!(!uv.borrow().is_dirty());
 
         // try to trigger unit: trigger (order-allowed)it or pause (order-non-allowed)it
-        let (trigger_info, merge_trigger) = match self.is_uv_runnable(&uv.borrow(), db) {
+        let (trigger_info, merge_trigger) = match self.is_uv_runnable(uv, db) {
             true => uv.borrow_mut().do_trigger(),
             false => {
                 uv.borrow_mut().pause();
@@ -706,7 +719,7 @@ impl JobUnitTable {
                 .collect::<Vec<_>>();
             self.readys.clear();
             for uv in readys.iter() {
-                self.ready_sync(Rc::clone(uv.borrow().get_unit()), Rc::clone(uv));
+                self.ready_sync(uv.borrow().get_unit(), Rc::clone(uv));
             }
         }
     }
@@ -767,14 +780,15 @@ impl JobUnitTable {
             .expect("something inserted is not found.")
     }
 
-    fn is_uv_runnable(&self, uv: &JobUnit, db: &UnitDb) -> bool {
-        let unit = uv.get_unit();
+    fn is_uv_runnable(&self, uv: &Rc<RefCell<JobUnit>>, db: &UnitDb) -> bool {
+        let unit = uv.borrow().get_unit();
         for other in db
-            .dep_gets_atom(unit, UnitRelationAtom::UnitAtomAfter)
+            .dep_gets_atom(&unit, UnitRelationAtom::UnitAtomAfter)
             .iter()
         {
             if let Some(other_uv) = self.t_data.get(other) {
                 if !uv
+                    .borrow()
                     .is_next_trigger_order_with(&other_uv.borrow(), UnitRelationAtom::UnitAtomAfter)
                 {
                     return false;
@@ -782,11 +796,11 @@ impl JobUnitTable {
             }
         }
         for other in db
-            .dep_gets_atom(unit, UnitRelationAtom::UnitAtomBefore)
+            .dep_gets_atom(&unit, UnitRelationAtom::UnitAtomBefore)
             .iter()
         {
             if let Some(other_uv) = self.t_data.get(other) {
-                if !uv.is_next_trigger_order_with(
+                if !uv.borrow().is_next_trigger_order_with(
                     &other_uv.borrow(),
                     UnitRelationAtom::UnitAtomBefore,
                 ) {
@@ -796,5 +810,63 @@ impl JobUnitTable {
         }
 
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::manager::data::{DataManager, UnitType};
+    use crate::manager::unit::unit_file::UnitFile;
+    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+    use crate::plugin::Plugin;
+    use std::path::PathBuf;
+    use utils::logger;
+
+    #[test]
+    fn job_table_record_suspend() {
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let mut ja = JobAlloc::new();
+        let mut table = JobTable::new();
+
+        let new = table.record_suspend(
+            &mut ja,
+            JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop),
+            JobMode::JobReplace,
+            false,
+        );
+        assert_eq!(new, true);
+    }
+
+    fn create_unit(name: &str) -> Rc<UnitX> {
+        logger::init_log_with_console("test_unit_load", 4);
+        log::info!("test");
+        let dm = Rc::new(DataManager::new());
+        let file = Rc::new(UnitFile::new());
+        let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
+        let unit_type = UnitType::UnitService;
+        let plugins = Rc::clone(&Plugin::get_instance());
+        let mut config_path1 = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        config_path1.push("../target/debug");
+        plugins
+            .borrow_mut()
+            .set_library_dir(&config_path1.to_str().unwrap());
+        plugins.borrow_mut().load_lib();
+        let mut config_path2 = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        config_path2.push("../target/release");
+        plugins
+            .borrow_mut()
+            .set_library_dir(&config_path2.to_str().unwrap());
+        plugins.borrow_mut().load_lib();
+        let subclass = plugins.borrow().create_unit_obj(unit_type).unwrap();
+        Rc::new(UnitX::new(
+            dm,
+            file,
+            unit_conf_parser_mgr,
+            unit_type,
+            name,
+            subclass.into_unitobj(),
+        ))
     }
 }

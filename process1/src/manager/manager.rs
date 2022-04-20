@@ -8,6 +8,7 @@ use std::cell::RefCell;
 use std::error::Error as Err;
 use std::io::Error;
 use std::rc::Rc;
+use utils::Result;
 
 pub enum Mode {
     SYSTEM,
@@ -52,7 +53,7 @@ impl ManagerX {
         m
     }
 
-    pub fn startup(&self) -> Result<(), Error> {
+    pub fn startup(&self) -> Result<i32> {
         self.data.startup()
     }
 
@@ -60,7 +61,7 @@ impl ManagerX {
         self.data.add_job(job)
     }
 
-    pub fn rloop(&self) -> Result<Stats, Error> {
+    pub fn rloop(&self) -> Result<Stats> {
         self.data.rloop()
     }
 
@@ -70,7 +71,7 @@ impl ManagerX {
 
     fn register(&self, event: Rc<RefCell<Events>>) {
         let source = Rc::clone(&self.commands);
-        event.borrow_mut().add_source(source);
+        event.borrow_mut().add_source(source).unwrap();
     }
 }
 
@@ -101,10 +102,10 @@ impl Manager {
         }
     }
 
-    pub fn startup(&self) -> Result<(), Error> {
+    pub fn startup(&self) -> Result<i32> {
         let source = Rc::clone(&self.signal);
-        self.event.borrow_mut().add_source(source);
-        Ok(())
+        self.event.borrow_mut().add_source(source)?;
+        Ok(0)
     }
 
     pub fn get_job(&self, _id: JobId) -> Result<(), Error> {
@@ -135,10 +136,10 @@ impl Manager {
         todo!()
     }
 
-    pub fn rloop(&self) -> Result<Stats, Error> {
+    pub fn rloop(&self) -> Result<Stats> {
         loop {
             self.um.dispatch_load_queue();
-            self.event.borrow_mut().run(-1);
+            self.event.borrow_mut().run(-1)?;
         }
         #[allow(unreachable_code)]
         Ok(Stats::OK)
