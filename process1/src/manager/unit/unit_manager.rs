@@ -1,4 +1,4 @@
-use super::job::JobManager;
+use super::job::{JobAffect, JobConf, JobKind, JobManager};
 use super::unit_datastore::UnitDb;
 use super::unit_file::UnitFile;
 use super::unit_load::UnitLoad;
@@ -6,9 +6,10 @@ use super::unit_parser_mgr::{UnitConfigParser, UnitParserMgr};
 use super::unit_relation_atom::UnitRelationAtom;
 use super::unit_runtime::UnitRT;
 use super::UnitObj;
-use crate::manager::data::{DataManager, UnitState};
+use crate::manager::data::{DataManager, JobMode, UnitState};
 use crate::manager::table::{TableOp, TableSubscribe};
-
+use crate::manager::MngErrno;
+use event::Events;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::error::Error;
@@ -43,31 +44,43 @@ macro_rules! declure_unitobj_plugin {
 
 //#[derive(Debug)]
 pub struct UnitManagerX {
-    // associated objects
-    dm: Rc<DataManager>,
-
     states: Rc<UnitStates>,
     data: Rc<UnitManager>,
 }
 
 impl UnitManagerX {
-    pub(in crate::manager) fn new(dm: Rc<DataManager>) -> UnitManagerX {
+    pub(in crate::manager) fn new(dm: Rc<DataManager>, event: Rc<RefCell<Events>>) -> UnitManagerX {
         let _dm = Rc::clone(&dm);
-        let _um = UnitManager::new(Rc::clone(&_dm));
+        let _um = UnitManager::new(Rc::clone(&_dm), event);
         UnitManagerX {
-            dm,
             states: Rc::new(UnitStates::new(Rc::clone(&_dm), Rc::clone(&_um))),
             data: _um,
         }
     }
 
+    pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+        self.data.start_unit(name)
+    }
+
+    pub fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
+        self.data.stop_unit(name)
+    }
+
     pub fn child_dispatch_sigchld(&self) -> Result<(), Box<dyn Error>> {
         self.data.db.child_dispatch_sigchld()
+    }
+
+    pub fn dispatch_load_queue(&self) {
+        self.data.rt.dispatch_load_queue()
     }
 }
 
 //#[derive(Debug)]
 pub struct UnitManager {
+    // associated objects
+    dm: Rc<DataManager>,
+    event: Rc<RefCell<Events>>,
+
     file: Rc<UnitFile>,
     load: Rc<UnitLoad>,
     db: Rc<UnitDb>, // ALL UNIT STORE IN UNITDB,AND OTHER USE REF
@@ -85,8 +98,38 @@ impl UnitManager {
         self.db.child_unwatch_pid(pid)
     }
 
-    pub(in crate::manager) fn new(dm: Rc<DataManager>) -> Rc<UnitManager> {
+    pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+        if let Some(unit) = self.load.load_unit(name) {
+            self.jm.exec(
+                &JobConf::new(Rc::clone(&unit), JobKind::JobStart),
+                JobMode::JobReplace,
+                &mut JobAffect::new(false),
+            )?;
+            Ok(())
+        } else {
+            return Err(MngErrno::MngErrInternel);
+        }
+    }
+
+    pub fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
+        if let Some(unit) = self.load.load_unit(name) {
+            self.jm.exec(
+                &JobConf::new(Rc::clone(&unit), JobKind::JobStop),
+                JobMode::JobReplace,
+                &mut JobAffect::new(false),
+            )?;
+            Ok(())
+        } else {
+            return Err(MngErrno::MngErrInternel);
+        }
+    }
+
+    pub(in crate::manager) fn new(
+        dm: Rc<DataManager>,
+        event: Rc<RefCell<Events>>,
+    ) -> Rc<UnitManager> {
         let _dm = Rc::clone(&dm);
+        let _event = Rc::clone(&event);
         let _file = Rc::new(UnitFile::new());
         let _db = Rc::new(UnitDb::new());
         let rt = Rc::new(UnitRT::new());
@@ -101,11 +144,14 @@ impl UnitManager {
         ));
 
         let um = Rc::new(UnitManager {
+            dm,
+            event,
+
             file: Rc::clone(&_file),
             load: Rc::clone(&_load),
             db: Rc::clone(&_db),
             rt: Rc::clone(&rt),
-            jm: Rc::new(JobManager::new(Rc::clone(&_db))),
+            jm: Rc::new(JobManager::new(Rc::clone(&_db), Rc::clone(&_event))),
             unit_conf_parser_mgr: Rc::clone(&unit_conf_parser_mgr),
         });
 
@@ -162,14 +208,18 @@ impl UnitStatesSub {
         UnitStatesSub { um }
     }
 
-    pub(self) fn insert_states(&self, source: &str, _state: &UnitState) {
+    pub(self) fn insert_states(&self, source: &str, state: &UnitState) {
         let unitx = if let Some(u) = self.um.db.units_get(source) {
             u
         } else {
             return;
         };
 
-        // self.um.jm.clone().try_finish(&unitx, state.get_os(), state.get_ns(), state.get_flags());
+        self.um
+            .jm
+            .clone()
+            .try_finish(&unitx, state.get_os(), state.get_ns(), state.get_flags())
+            .unwrap();
 
         for other in self
             .um

@@ -46,7 +46,7 @@ impl CommandResponse {
         CommandResponse {
             status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
             message: msg,
-            ..Default::default()
+            // ..Default::default()
         }
     }
 

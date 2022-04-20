@@ -68,10 +68,10 @@ fn test_io() {
     let mut e = Events::new().unwrap();
     let s: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Io::new("0.0.0.0:9097")));
     let s2: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Io::new("127.0.0.1:9097")));
-    e.add_source(s.clone());
-    e.add_source(s2.clone());
-    e.run(100);
-    e.run(100);
-    e.run(100);
+    e.add_source(s.clone()).unwrap();
+    e.add_source(s2.clone()).unwrap();
+    e.run(100).unwrap();
+    e.run(100).unwrap();
+    e.run(100).unwrap();
     // e.rloop();
 }

@@ -1,6 +1,6 @@
-use utils::Error;
 use utils::Result;
 
+use crate::EventState;
 use crate::EventType;
 use crate::Events;
 use std::fmt::Debug;
@@ -15,26 +15,34 @@ pub trait Source {
         vec![]
     }
 
+    fn enabled(&self) -> EventState {
+        EventState::On
+    }
+
     fn pid(&self) -> libc::pid_t {
         0
     }
 
-    fn event_type(&self) -> EventType;
+    fn event_type(&self) -> EventType {
+        EventType::Io
+    }
 
-    fn epoll_event(&self) -> u32;
+    fn epoll_event(&self) -> u32 {
+        (libc::EPOLLIN | libc::EPOLLONESHOT) as u32
+    }
 
     fn token(&self) -> u64;
     // Here is a defalut implementation.
     // fn token(&mut self) -> u64 {
-    //     // let data: u64 = unsafe { std::mem::transmute(self) };
-    //     // data
+    //     let data: u64 = unsafe { std::mem::transmute(self) };
+    //     data
     // }
 
     fn priority(&self) -> i8 {
         0i8
     }
 
-    fn dispatch(&self, event: &mut Events) -> Result<i32, Error>;
+    fn dispatch(&self, event: &mut Events) -> Result<i32>;
 }
 
 // for HashSet

@@ -1,6 +1,4 @@
-use crate::manager::UnitSubClass;
-
-use super::manager::{UnitObj, UnitType};
+use super::manager::{UnitSubClass, UnitType};
 use dynamic_reload as dy_re;
 use log::*;
 use std::ffi::OsStr;
@@ -12,7 +10,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 pub struct Plugin {
-    unitobj_lists: Vec<Arc<Box<dyn UnitObj>>>,
+    unitobj_lists: Vec<Arc<Box<dyn UnitSubClass>>>,
     library_dir: String,
     load_libs: HashMap<UnitType, Arc<dy_re::Lib>>,
     is_loaded: bool,
@@ -119,7 +117,7 @@ impl Plugin {
                     );
                     self.load_libs.insert(unit_type, lib.clone());
                     let dy_lib = self.load_libs.get(&unit_type).unwrap();
-                    let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitObj> =
+                    let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitSubClass> =
                         unsafe { dy_lib.lib.get(b"__unit_obj_create").unwrap() };
                     let boxed_raw = fun();
                     self.unitobj_lists
@@ -177,7 +175,7 @@ impl Plugin {
             unsafe { dy_lib.lib.get(b"__unit_obj_create").unwrap() };
         let boxed_raw = fun();
 
-        return Ok(unsafe { Box::from_raw(boxed_raw) });
+        Ok(unsafe { Box::from_raw(boxed_raw) })
     }
 }
 

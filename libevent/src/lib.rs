@@ -4,10 +4,11 @@ mod signal;
 pub mod source;
 
 pub use crate::events::Events;
-pub use crate::poll::Poll;
+pub(crate) use crate::poll::Poll;
+pub(crate) use crate::signal::Signals;
 pub use crate::source::Source;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum EventType {
     Io,
     Timer,
@@ -19,6 +20,13 @@ pub enum EventType {
     Defer,
     Post,
     Exit,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum EventState {
+    On,
+    Off,
+    OneShot,
 }
 
 #[cfg(test)]
@@ -126,11 +134,14 @@ mod test {
         let mut e = Events::new().unwrap();
         let s: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Io::new("0.0.0.0:9097")));
         let s2: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Io::new("127.0.0.1:9097")));
-        e.add_source(s.clone());
-        e.add_source(s2.clone());
-        e.run(100);
-        e.run(100);
-        e.run(100);
+        e.add_source(s.clone()).unwrap();
+        e.add_source(s2.clone()).unwrap();
+        e.run(100).unwrap();
+        e.run(100).unwrap();
+        e.run(100).unwrap();
+        e.del_source(s.clone()).unwrap();
+        e.del_source(s2.clone()).unwrap();
+        println!("{:?}", e);
         // e.rloop();
     }
 }

@@ -27,7 +27,7 @@ use process1::manager::UnitActionError;
 
 const LOG_LEVEL: u32 = 4;
 const PLUGIN_NAME: &str = "ServiceUnit";
-
+#[allow(dead_code)]
 #[derive(Default)]
 pub struct ServiceUnit {
     pub unit: Option<Weak<Unit>>,
@@ -410,7 +410,21 @@ impl ServiceUnit {
         );
         let operation = state.to_kill_operation();
 
-        self.kill_service(operation);
+        match self.kill_service(operation) {
+            Ok(_) => {}
+            Err(_e) => {
+                if IN_SET!(
+                    state,
+                    ServiceState::ServiceStopWatchdog,
+                    ServiceState::ServiceStopSigterm,
+                    ServiceState::ServiceStopSigkill
+                ) {
+                    return self.run_stop_post(ServiceResult::ServiceFailureResources);
+                } else {
+                    return self.run_dead(ServiceResult::ServiceSuccess);
+                }
+            }
+        }
 
         if vec![
             ServiceState::ServiceStopWatchdog,

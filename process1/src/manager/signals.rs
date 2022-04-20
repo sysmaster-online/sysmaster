@@ -1,22 +1,22 @@
-use std::{cell::RefCell, convert::TryFrom, rc::Rc};
+use std::{convert::TryFrom, rc::Rc};
 
 use event::{EventType, Events, Source};
 use nix::{sys::signal::Signal, unistd::Pid};
 use utils::{Error, Result};
 
-use super::manager::Manager;
+use super::unit::UnitManagerX;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ProcessExit {
     Status(Pid, i32, nix::sys::signal::Signal),
 }
 pub struct Signals {
-    manager: Rc<RefCell<Manager>>,
+    um: Rc<UnitManagerX>,
 }
 
 impl Signals {
-    pub fn new(m: Rc<RefCell<Manager>>) -> Signals {
-        Signals { manager: m }
+    pub fn new(um: Rc<UnitManagerX>) -> Signals {
+        Signals { um }
     }
 }
 
@@ -45,15 +45,12 @@ impl Source for Signals {
                 Ok(Some(info)) => {
                     let signal = Signal::try_from(info.si_signo).unwrap();
                     match signal {
-                        Signal::SIGCHLD => {
-                            let mut m = self.manager.borrow_mut();
-                            match m.dispatch_sigchld() {
-                                Err(e) => {
-                                    log::error!("dispatch sigchld error: {}", e)
-                                }
-                                Ok(_) => break,
+                        Signal::SIGCHLD => match self.um.child_dispatch_sigchld() {
+                            Err(e) => {
+                                log::error!("dispatch sigchld error: {}", e)
                             }
-                        }
+                            Ok(_) => break,
+                        },
                         Signal::SIGHUP => todo!(),
                         Signal::SIGINT => todo!(),
 

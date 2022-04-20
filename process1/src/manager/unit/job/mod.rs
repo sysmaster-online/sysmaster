@@ -12,6 +12,15 @@ pub enum JobErrno {
     JobErrBadRequest,
 }
 
+use crate::manager::MngErrno;
+impl From<JobErrno> for MngErrno {
+    fn from(err: JobErrno) -> Self {
+        match err {
+            _ => MngErrno::MngErrInternel,
+        }
+    }
+}
+
 // dependency: job_entry -> {job_unit_entry | job_alloc} -> job_table -> {job_transaction | job_notify | job_stat} -> job_manager
 mod job_alloc;
 mod job_entry;

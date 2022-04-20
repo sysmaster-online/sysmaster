@@ -1,5 +1,5 @@
-use libc::getpid;
-use libc::kill;
+use nix::unistd::fork;
+use nix::unistd::ForkResult;
 use utils::Error;
 use utils::Result;
 
@@ -35,8 +35,17 @@ impl Source for Signals {
         0i8
     }
 
-    fn dispatch(&self, _: &mut Events) -> Result<i32, Error> {
+    fn dispatch(&self, e: &mut Events) -> Result<i32, Error> {
         println!("Dispatching signal!");
+        match e.read_signals() {
+            Ok(Some(info)) => {
+                println!("read signo: {:?}", info.si_signo);
+            }
+            Ok(None) => (),
+            Err(e) => {
+                println!("{:?}", e);
+            }
+        }
         Ok(0)
     }
 
@@ -49,9 +58,18 @@ impl Source for Signals {
 fn main() {
     let mut e = Events::new().unwrap();
     let s: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Signals::new()));
-    e.add_source(s.clone());
-    unsafe {
-        kill(getpid(), libc::SIGTERM);
+    e.add_source(s.clone()).unwrap();
+
+    let pid = unsafe { fork() };
+    match pid {
+        Ok(ForkResult::Parent { child, .. }) => {
+            println!(
+                "Continuing execution in parent process, new child has pid: {}",
+                child
+            );
+            e.rloop().unwrap();
+        }
+        Ok(ForkResult::Child) => println!("I'm a new child process"),
+        Err(_) => println!("Fork failed"),
     }
-    e.rloop();
 }

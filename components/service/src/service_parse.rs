@@ -12,46 +12,51 @@ use utils::unit_conf::{Conf, ConfValue, Section};
 
 impl ServiceUnit {
     pub(super) fn parse(&mut self, section: &Section<Conf>) -> Result<(), Box<dyn Error>> {
-        //self.unit.upgrade().as_ref().cloned().unwrap().get_id();
         let confs = section.get_confs();
         for conf in confs.iter() {
             let key = conf.get_key();
-            match key.to_string() {
-                _ if key == ServiceConf::ExecCondition.to_string() => {
-                    let values = conf.get_values();
-                    self.exec_commands[ServiceCommand::ServiceCondition as usize] =
-                        LinkedList::new();
-                    prepare_command(
-                        &values,
-                        &mut self.exec_commands[ServiceCommand::ServiceCondition as usize],
-                    );
+
+            if key == ServiceConf::ExecCondition.to_string() {
+                let values = conf.get_values();
+                self.exec_commands[ServiceCommand::ServiceCondition as usize] = LinkedList::new();
+                match prepare_command(
+                    &values,
+                    &mut self.exec_commands[ServiceCommand::ServiceCondition as usize],
+                ) {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
                 }
-                _ if key == ServiceConf::ExecStart.to_string() => {
-                    let values = conf.get_values();
-                    self.exec_commands[ServiceCommand::ServiceStart as usize] = LinkedList::new();
-                    prepare_command(
-                        &values,
-                        &mut self.exec_commands[ServiceCommand::ServiceStart as usize],
-                    );
+            }
+            if key == ServiceConf::ExecStart.to_string() {
+                let values = conf.get_values();
+                self.exec_commands[ServiceCommand::ServiceStart as usize] = LinkedList::new();
+                match prepare_command(
+                    &values,
+                    &mut self.exec_commands[ServiceCommand::ServiceStart as usize],
+                ) {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
                 }
-                _ if key == ServiceConf::ExecReload.to_string() => {
-                    let values = conf.get_values();
-                    self.exec_commands[ServiceCommand::ServiceReload as usize] = LinkedList::new();
-                    prepare_command(
-                        &values,
-                        &mut self.exec_commands[ServiceCommand::ServiceReload as usize],
-                    );
+            }
+            if key == ServiceConf::ExecReload.to_string() {
+                let values = conf.get_values();
+                self.exec_commands[ServiceCommand::ServiceReload as usize] = LinkedList::new();
+                match prepare_command(
+                    &values,
+                    &mut self.exec_commands[ServiceCommand::ServiceReload as usize],
+                ) {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
                 }
-                _ if key == ServiceConf::Type.to_string() => {
-                    let values = conf.get_values();
-                    for value in values.iter() {
-                        if let ConfValue::String(v) = value {
-                            self.service_type = ServiceType::from_str(v)?;
-                            break;
-                        }
+            }
+            if key == ServiceConf::Type.to_string() {
+                let values = conf.get_values();
+                for value in values.iter() {
+                    if let ConfValue::String(v) = value {
+                        self.service_type = ServiceType::from_str(v)?;
+                        break;
                     }
                 }
-                _ => {}
             }
         }
         Ok(())
