@@ -44,15 +44,13 @@ impl Plugin {
         let lib_path = env::var("PROCESS_LIB_LOAD_PATH");
         match lib_path {
             Ok(lib_path_str) => {
-                let _tmp: Vec<_> = lib_path_str.split("target").collect();
-                ret.push_str(format!("{}/target/debug;", _tmp[0]).as_str());
-                ret.push_str(format!("{}/target/release;", _tmp[0]).as_str());
+                ret.push_str(lib_path_str.as_str());
             }
             Err(_) => {
                 let _tmp_lib_path = devel_path();
                 let lib_path_str = _tmp_lib_path.unwrap_or(LIB_PLUGIN_PATH.to_string());
                 let _tmp: Vec<_> = lib_path_str.split("target").collect();
-                if _tmp.is_empty() {
+                if _tmp.is_empty() || _tmp.len() < 2 {
                     ret.push_str(lib_path_str.as_str());
                 } else {
                     ret.push_str(format!("{}target/debug;", _tmp[0]).as_str());
