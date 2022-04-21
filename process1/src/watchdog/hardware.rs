@@ -188,7 +188,7 @@ impl Watchdog for HardwareWatchdog {
 
 /// 不支持的错误列表，参考ERRNO_IS_NOT_SUPPORTED
 fn errno_is_not_supported(errno: Errno) -> bool {
-    for e in vec![
+    for e in [
         Errno::EOPNOTSUPP,
         Errno::ENOTTY,
         Errno::ENOSYS,
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_errno_is_not_supported() {
-        assert_eq!(errno_is_not_supported(Errno::ENOTTY), true);
+        assert!(errno_is_not_supported(Errno::ENOTTY));
     }
 
     #[test]
