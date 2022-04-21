@@ -1,22 +1,60 @@
 #![warn(unused_imports)]
 use super::job_entry::{Job, JobKind, JobResult, JobStage};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 #[derive(Debug)]
 pub(super) struct JobStat {
-    num: JobNum, // snapshot
-    cnt: JobCnt, // history
+    data: RefCell<JobStatData>,
 }
 
 impl JobStat {
     pub(super) fn new() -> JobStat {
         JobStat {
+            data: RefCell::new(JobStatData::new()),
+        }
+    }
+
+    pub(super) fn update_change(
+        &self,
+        change: &(&Option<Rc<Job>>, &Option<Rc<Job>>, &Option<Rc<Job>>),
+    ) {
+        self.data.borrow_mut().update_change(change)
+    }
+
+    pub(super) fn update_changes(&self, changes: &(&Vec<Rc<Job>>, &Vec<Rc<Job>>, &Vec<Rc<Job>>)) {
+        self.data.borrow_mut().update_changes(changes)
+    }
+
+    pub(super) fn update_stage_wait(&self, change: usize, inc: bool) {
+        self.data.borrow_mut().update_stage_wait(change, inc)
+    }
+
+    pub(super) fn update_stage_run(&self, change: usize, inc: bool) {
+        self.data.borrow_mut().update_stage_run(change, inc)
+    }
+
+    pub(super) fn clear_cnt(&self) {
+        self.data.borrow_mut().clear_cnt()
+    }
+}
+
+#[derive(Debug)]
+struct JobStatData {
+    num: JobNum, // snapshot
+    cnt: JobCnt, // history
+}
+
+// the declaration "pub(self)" is for identification only.
+impl JobStatData {
+    pub(self) fn new() -> JobStatData {
+        JobStatData {
             num: JobNum::new(),
             cnt: JobCnt::new(),
         }
     }
 
-    pub(super) fn update_change(
+    pub(self) fn update_change(
         &mut self,
         change: &(&Option<Rc<Job>>, &Option<Rc<Job>>, &Option<Rc<Job>>),
     ) {
@@ -29,7 +67,7 @@ impl JobStat {
         self.update_changes(&changes);
     }
 
-    pub(super) fn update_changes(
+    pub(self) fn update_changes(
         &mut self,
         changes: &(&Vec<Rc<Job>>, &Vec<Rc<Job>>, &Vec<Rc<Job>>),
     ) {
@@ -40,15 +78,15 @@ impl JobStat {
         }
     }
 
-    pub(super) fn update_stage_wait(&mut self, change: usize, inc: bool) {
+    pub(self) fn update_stage_wait(&mut self, change: usize, inc: bool) {
         self.num.update_stage_wait(change, inc);
     }
 
-    pub(super) fn update_stage_run(&mut self, change: usize, inc: bool) {
+    pub(self) fn update_stage_run(&mut self, change: usize, inc: bool) {
         self.num.update_stage_run(change, inc);
     }
 
-    pub(super) fn clear_cnt(&mut self) {
+    pub(self) fn clear_cnt(&mut self) {
         self.cnt.clear();
     }
 }
