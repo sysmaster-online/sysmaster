@@ -776,12 +776,17 @@ impl ServiceUnit {
 }
 
 impl ServiceUnit {
+    /// 软件看门狗，在service中的watchdog主要是定期接收服务进程发来的READY=1的消息，如果没收到则执行杀死或重启操作。
+    /// 打开看门狗，需要比较原有的超时时间和复写的超时时间，并判断如果是非法值则要关闭看门狗
+    /// 直接调用recvmsg系统调用从socket文件中读取字符串，再判断是否是看门狗相关的字段，如READY=1
     pub fn start_watchdog(self) {
+        // 允许覆盖timeout则使用覆盖值
         let watchdog_usec = if self.watchdog_override_enable {
             self.watchdog_override_usec
         } else {
             self.watchdog_original_usec
         };
+        // timeout为0则关闭看门狗
         if watchdog_usec == 0 || watchdog_usec == u64::MAX {
             self.stop_watchdog()
         }

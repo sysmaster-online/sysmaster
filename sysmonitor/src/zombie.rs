@@ -52,6 +52,7 @@ impl Monitor for ZombieCount {
     }
 
     fn check_status(&mut self) -> Result<(), SysMonitorError> {
+        // 调用shell命令计算当前系统僵尸进程的数量
         let cmd = "ps -A -o stat,ppid,pid,cmd | grep -e '^[Zz]' | awk '{print $0}' | wc -l";
         let output = Command::new("bash").arg("-c").arg(cmd).output()?;
         let out = String::from_utf8(output.stdout)?;
@@ -59,6 +60,7 @@ impl Monitor for ZombieCount {
 
         println!("zombie count: {}", count);
 
+        // 调用外部脚本来打印僵尸进程的父亲
         if count >= self.alarm && !self.status {
             let _ = Command::new("/usr/libexec/sysmonitor/getzombieparent.py").output()?;
         } else if count <= self.resume && self.status {

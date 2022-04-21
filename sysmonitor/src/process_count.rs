@@ -1,3 +1,4 @@
+/// 以进程数量监控为例，简述一个监控项如何实现
 use std::cmp::max;
 use std::io::{Error, ErrorKind};
 
@@ -9,6 +10,8 @@ use crate::{Monitor, Switch, SysMonitor, SysMonitorError};
 
 const CONFIG_FILE_PATH: &str = "/etc/sysmonitor/pscnt";
 
+/// 首先定义了一个结构体，使用了serde crate的Deserialize trait、default特性、rename_all特性和字段的default方法特性，
+/// 和sysmonitor结构体一样
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, rename_all = "UPPERCASE")]
 pub struct ProcessCount {
@@ -29,6 +32,7 @@ pub struct ProcessCount {
     pub status: bool,
 }
 
+/// 默认值参考用户手册
 fn alarm_default() -> u32 {
     1600
 }
@@ -53,11 +57,13 @@ fn show_top_proc_num_default() -> u32 {
     10
 }
 
+/// 然后实现上述的trait
 impl Monitor for ProcessCount {
     fn config_path(&self) -> &str {
         CONFIG_FILE_PATH
     }
 
+    /// monitor是已经由我们制定的默认值函数初始化过的结构体，因此返回self的时候只需要修改部分字段就可以了，其他的可以使用rust的..特性由monitor结构体赋值。
     fn load(&mut self, content: String, sysmonitor: SysMonitor) {
         let monitor: Self = toml::from_str(content.as_str()).unwrap();
         *self = ProcessCount {
@@ -69,6 +75,7 @@ impl Monitor for ProcessCount {
         };
     }
 
+    /// 检查是否是合法配置的函数，可以参考原有的sysmonitor代码或者用户手册里的描述实现，由一些布尔表达式组成。
     fn is_valid(&self) -> bool {
         self.alarm > self.resume
             && self.resume > 0
@@ -79,12 +86,15 @@ impl Monitor for ProcessCount {
             && self.show_top_proc_num < 1024
     }
 
+    /// 实现真正的业务流程函数check_status
     fn check_status(&mut self) -> Result<(), SysMonitorError> {
+        // 使用procfs crate列出所有的进程
         let all_processes = procfs::process::all_processes()?;
         let proc_num = all_processes.len() as u32;
 
         let mut thread_num = proc_num;
         if self.show_top_proc_num > 0 {
+            // 计算当前系统的线程数量，使用fold函数式计算方法，类似python中的reduce，将每个进程的num_threads累加到num中
             thread_num = all_processes
                 .iter()
                 .fold(0, |num, process| num + process.stat.num_threads as u32);
@@ -107,6 +117,7 @@ impl Monitor for ProcessCount {
             (pid_max as f32 * self.resume_ratio / 100.0) as u32,
         );
         self.count = proc_num;
+        // 如果超出了告警值则告警，并更新status状态
         if proc_num >= real_alarm && !self.status {
             self.report_alarm()
         } else if proc_num <= real_resume && self.status {
