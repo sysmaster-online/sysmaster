@@ -1,4 +1,4 @@
-pub use data::{UnitActiveState, UnitRelations, UnitType};
+pub use data::{DataManager, UnitActiveState, UnitRelations, UnitType};
 pub use manager::{Manager, ManagerX};
 pub use unit::{JobAffect, JobConf, JobInfo, JobKind, JobManager, JobResult, JobStage};
 pub use unit::{

@@ -1,5 +1,6 @@
 use super::unit_sets::UnitSets;
 use crate::manager::signals::ProcessExit;
+
 use crate::manager::unit::unit_entry::UnitX;
 use nix::sys::signal::Signal;
 use nix::sys::wait::{WaitPidFlag, WaitStatus};
@@ -10,32 +11,32 @@ use std::error::Error;
 use std::rc::Rc;
 
 pub(super) struct UnitChild {
-    data: RefCell<UnitChildData>,
+    data: Rc<UnitChildData>,
 }
 
 impl UnitChild {
     pub(super) fn new(units: Rc<UnitSets>) -> UnitChild {
         UnitChild {
-            data: RefCell::new(UnitChildData::new(units)),
+            data: Rc::new(UnitChildData::new(units)),
         }
     }
 
     pub(super) fn dispatch_sigchld(&self) -> Result<(), Box<dyn Error>> {
-        self.data.borrow_mut().dispatch_sigchld()
+        self.data.dispatch_sigchld()
     }
 
     pub(super) fn add_watch_pid(&self, pid: Pid, id: &str) {
-        self.data.borrow_mut().add_watch_pid(pid, id)
+        self.data.add_watch_pid(pid, id)
     }
 
     pub(super) fn unwatch_pid(&self, pid: Pid) {
-        self.data.borrow_mut().unwatch_pid(pid)
+        self.data.unwatch_pid(pid)
     }
 }
 
 struct UnitChildData {
     units: Rc<UnitSets>,
-    watch_pids: HashMap<Pid, Rc<UnitX>>, // key: pid, value: unit
+    watch_pids: RefCell<HashMap<Pid, Rc<UnitX>>>, // key: pid, value: unit
 }
 
 // the declaration "pub(self)" is for identification only.
@@ -43,11 +44,11 @@ impl UnitChildData {
     pub(self) fn new(units: Rc<UnitSets>) -> UnitChildData {
         UnitChildData {
             units,
-            watch_pids: HashMap::new(),
+            watch_pids: RefCell::new(HashMap::new()),
         }
     }
 
-    pub(self) fn dispatch_sigchld(&mut self) -> Result<(), Box<dyn Error>> {
+    pub(self) fn dispatch_sigchld(&self) -> Result<(), Box<dyn Error>> {
         log::debug!("Dispatching sighandler waiting for pid");
         let wait_pid = Pid::from_raw(-1);
         let flags = WaitPidFlag::WNOHANG;
@@ -74,29 +75,31 @@ impl UnitChildData {
 
         match process_exit {
             ProcessExit::Status(pid, code, signal) => {
-                match self.watch_pids.get(&pid) {
-                    Some(unit) => {
-                        unit.sigchld_events(pid, code, signal);
-                    }
-                    None => {
-                        log::debug!("not found unit obj of pid: {:?}", pid);
-                        return Err(format!("not found unit obj of pid: {:?}", pid).into());
-                    }
-                }
+                let unit = if let Some(unit) = self.watch_pids.borrow().get(&pid) {
+                    unit.clone()
+                } else {
+                    log::debug!("not found unit obj of pid: {:?}", pid);
+                    return Err(format!("not found unit obj of pid: {:?}", pid).into());
+                };
 
-                self.watch_pids.remove(&pid);
+                unit.sigchld_events(pid, code, signal);
+
+                self.watch_pids.borrow_mut().remove(&pid);
                 Ok(())
             }
         }
     }
 
-    pub(self) fn add_watch_pid(&mut self, pid: Pid, id: &str) {
+    pub(self) fn add_watch_pid(&self, pid: Pid, id: &str) {
         let unit = self.units.get(id).unwrap();
-        self.watch_pids.insert(pid, unit);
+        log::debug!("borrow add watch_pids for {} {}", pid, id);
+        let mut watch_pids = self.watch_pids.borrow_mut();
+        watch_pids.insert(pid, unit);
     }
 
-    pub(self) fn unwatch_pid(&mut self, pid: Pid) {
-        self.watch_pids.remove(&pid);
+    pub(self) fn unwatch_pid(&self, pid: Pid) {
+        log::debug!("borrow remove watch_pids for {}", pid);
+        self.watch_pids.borrow_mut().remove(&pid);
     }
 }
 
@@ -134,13 +137,13 @@ mod tests {
         let pid1 = Pid::from_raw(1);
         let pid2 = Pid::from_raw(2);
 
-        assert_eq!(child.data.borrow().watch_pids.len(), 0);
+        assert_eq!(child.data.watch_pids.borrow().len(), 0);
 
         child.add_watch_pid(pid1, &name_test1);
-        assert_eq!(child.data.borrow().watch_pids.len(), 1);
+        assert_eq!(child.data.watch_pids.borrow().len(), 1);
 
         child.add_watch_pid(pid2, &name_test2);
-        assert_eq!(child.data.borrow().watch_pids.len(), 2);
+        assert_eq!(child.data.watch_pids.borrow().len(), 2);
     }
 
     #[test]
@@ -156,17 +159,17 @@ mod tests {
         let pid1 = Pid::from_raw(1);
         let pid2 = Pid::from_raw(2);
 
-        assert_eq!(child.data.borrow().watch_pids.len(), 0);
+        assert_eq!(child.data.watch_pids.borrow().len(), 0);
 
         child.add_watch_pid(pid1, &name_test1);
         child.add_watch_pid(pid2, &name_test2);
-        assert_eq!(child.data.borrow().watch_pids.len(), 2);
+        assert_eq!(child.data.watch_pids.borrow().len(), 2);
 
         child.unwatch_pid(pid1);
-        assert_eq!(child.data.borrow().watch_pids.len(), 1);
+        assert_eq!(child.data.watch_pids.borrow().len(), 1);
 
         child.unwatch_pid(pid2);
-        assert_eq!(child.data.borrow().watch_pids.len(), 0);
+        assert_eq!(child.data.watch_pids.borrow().len(), 0);
     }
 
     fn create_unit(name: &str) -> Rc<UnitX> {

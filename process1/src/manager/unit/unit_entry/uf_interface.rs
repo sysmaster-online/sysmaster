@@ -66,8 +66,8 @@ impl UnitX {
     }
     pub fn release_resources(&self) {}
     pub fn check_snapshot(&self) {}
-    pub fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {
-        todo!()
+    pub fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
+        self.0.sigchld_events(pid, code, signal)
     }
     pub fn reset_failed(&self) {}
     pub fn trigger(&self, _other: &Self) {}
@@ -120,8 +120,8 @@ impl UnitX {
         }
     }
 
-    pub fn get_config(&self, _item: &UnitConfigItem) -> UnitConfigItem {
-        todo!();
+    pub fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
+        self.0.get_config(item)
     }
 
     pub fn get_state(&self) -> UnitActiveState {

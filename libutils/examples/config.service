@@ -5,8 +5,9 @@ Requires="c.service"
 Wants = "b.service"
 
 [Service]
-ExecStart=["echo 'test'"]
-
+ExecCondition=["/usr/bin/sleep 5"]
+ExecStart=["/usr/bin/echo 'test'"]
+ExecStop = ["/usr/bin/kill $MAINPID"]
 
 [Install]
-WantedBy="dbus"
+WantedBy="dbus.service"

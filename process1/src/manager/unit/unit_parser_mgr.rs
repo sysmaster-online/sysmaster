@@ -157,7 +157,10 @@ mod tests {
                                             item_c.get_key(),
                                             str.to_string()
                                         );
-                                        assert_eq!("echo 'test'".to_string(), str.to_string());
+                                        assert_eq!(
+                                            "/usr/bin/echo 'test'".to_string(),
+                                            str.to_string()
+                                        );
                                         return Ok(());
                                     }
                                     ConfValue::Interger(_) => todo!(),

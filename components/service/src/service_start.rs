@@ -1,3 +1,5 @@
+use std::thread::sleep;
+use std::time::Duration;
 use std::{collections::HashMap, process::exit};
 
 use super::exec_child;
@@ -35,9 +37,11 @@ pub fn start_service(srvc: &mut ServiceUnit, cmdline: &CommandLine) -> Result<Pi
                             .unwrap()
                             .get_id(),
                     );
+                log::debug!("child pid is :{}", child);
                 return Ok(child);
             }
             Ok(nix::unistd::ForkResult::Child) => {
+                sleep(Duration::from_secs(2));
                 exec_child::exec_child(srvc, cmdline, &env);
                 exit(0);
             }

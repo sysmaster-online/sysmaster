@@ -4,7 +4,7 @@ use crate::manager::table::{Table, TableSubscribe};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub(in crate::manager) struct DataManager {
+pub struct DataManager {
     tables: (
         RefCell<Table<String, Rc<UnitConfig>>>, // unit-config
         RefCell<Table<String, UnitState>>,      // unit-state
@@ -12,7 +12,7 @@ pub(in crate::manager) struct DataManager {
 }
 
 impl DataManager {
-    pub(in crate::manager) fn new() -> DataManager {
+    pub fn new() -> DataManager {
         DataManager {
             tables: (RefCell::new(Table::new()), RefCell::new(Table::new())),
         }

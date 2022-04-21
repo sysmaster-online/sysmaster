@@ -105,6 +105,7 @@ impl ServiceUnit {
     }*/
 
     pub fn start(&mut self) {
+        log::debug!("enter running service condition command");
         let cmds = self.exec_commands[ServiceCommand::ServiceCondition as usize].clone();
         let mut cmd = cmds.iter();
 
@@ -126,6 +127,7 @@ impl ServiceUnit {
     }
 
     fn run_prestart(&mut self) {
+        log::debug!("enter running service prestart command");
         let cmds = self.exec_commands[ServiceCommand::ServiceStartPre as usize].clone();
         let mut cmd = cmds.iter();
 
@@ -309,7 +311,8 @@ impl ServiceUnit {
     }
 
     fn run_start(&mut self) {
-        log::debug!("running service start command");
+        log::debug!("enter running service start command");
+
         self.control_command = None;
         let cmds = self.exec_commands[ServiceCommand::ServiceStart as usize].clone();
         let mut cmd = cmds.iter();
@@ -341,7 +344,8 @@ impl ServiceUnit {
                         );
                     }
                 }
-                self.set_state(ServiceState::ServiceStart);
+                self.run_start_post();
+                // self.set_state(ServiceState::ServiceStart);
             }
             None => {
                 self.run_start_post();
@@ -350,7 +354,7 @@ impl ServiceUnit {
     }
 
     fn run_start_post(&mut self) {
-        log::debug!("running start post command");
+        log::debug!("enter running service startpost command");
         let cmds = self.exec_commands[ServiceCommand::ServiceStartPost as usize].clone();
         let mut cmd = cmds.iter();
 
@@ -404,7 +408,7 @@ impl ServiceUnit {
 
     fn send_signal(&mut self, state: ServiceState, res: ServiceResult) {
         log::debug!(
-            "Sending signalsend signal of state: {:?}, service result: {:?}",
+            "Sending signal of state: {:?}, service result: {:?}",
             state,
             res
         );
@@ -447,15 +451,10 @@ impl ServiceUnit {
         } else {
             self.run_dead(ServiceResult::ServiceSuccess);
         }
-
-        log::debug!(
-            "Sending signal, state: {:?}, service result: {:?}",
-            state,
-            res
-        );
     }
 
     pub fn run_stop(&mut self, res: ServiceResult) {
+        log::debug!("enter running stop command");
         if self.result == ServiceResult::ServiceSuccess {
             self.result = res;
         }
