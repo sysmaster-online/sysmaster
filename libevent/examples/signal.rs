@@ -1,3 +1,4 @@
+use event::EventState;
 // These tests cannot run as a regular test because cargo would spawn a thread to run it,
 // failing the signal masking. So we make our own, non-threaded harnessing
 use nix::unistd::fork;
@@ -61,6 +62,7 @@ fn main() {
     let mut e = Events::new().unwrap();
     let s: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Signals::new()));
     e.add_source(s.clone()).unwrap();
+    e.set_enabled(s.clone(), EventState::OneShot).unwrap();
 
     let pid = unsafe { fork() };
     match pid {

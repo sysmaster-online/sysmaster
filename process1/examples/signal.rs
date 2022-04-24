@@ -1,5 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
+use event::EventState;
 use event::Events;
 use process1::manager::{signals::Signals, DataManager, UnitManagerX};
 
@@ -15,6 +16,10 @@ fn main() {
     let signal = Rc::new(RefCell::new(Signals::new(um.clone())));
 
     event1.borrow_mut().add_source(signal.clone()).unwrap();
+    event1
+        .borrow_mut()
+        .set_enabled(signal.clone(), EventState::On)
+        .unwrap();
     let unit_name = String::from("config.service");
 
     {

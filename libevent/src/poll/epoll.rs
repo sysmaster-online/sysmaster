@@ -1,7 +1,7 @@
 use libc::{epoll_event, EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::ptr;
-use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use utils::syscall;
 use utils::Result;
 
@@ -29,23 +29,26 @@ impl Epoll {
     }
 
     pub(crate) fn poll(&self, timeout: i32) -> Result<Vec<epoll_event>> {
-        let mut events = Vec::<epoll_event>::with_capacity(self.n_sources.load(Relaxed));
+        let size = self.n_sources.load(Ordering::Relaxed);
+        let mut events = Vec::<epoll_event>::with_capacity(size);
 
         events.clear();
-        let n_ready = syscall!(epoll_wait(
-            self.epoll_fd,
-            events.as_mut_ptr(),
-            events.capacity() as i32,
-            timeout,
-        ));
-        unsafe {
-            events.set_len(n_ready.unwrap() as usize);
+        if size > 0 {
+            let n_ready = syscall!(epoll_wait(
+                self.epoll_fd,
+                events.as_mut_ptr(),
+                events.capacity() as i32,
+                timeout,
+            ));
+            unsafe {
+                events.set_len(n_ready.unwrap() as usize);
+            }
         }
         Ok(events)
     }
 
     pub(crate) fn register(&mut self, fd: RawFd, event: &mut epoll_event) -> Result<()> {
-        self.n_sources.fetch_add(1, Relaxed);
+        self.n_sources.fetch_add(1, Ordering::Relaxed);
         syscall!(epoll_ctl(self.epoll_fd, EPOLL_CTL_ADD, fd, event)).map(|_| ())
     }
 
@@ -54,7 +57,7 @@ impl Epoll {
     }
 
     pub(crate) fn unregister(&mut self, fd: RawFd) -> Result<()> {
-        self.n_sources.fetch_sub(1, Relaxed);
+        self.n_sources.fetch_sub(1, Ordering::Relaxed);
         syscall!(epoll_ctl(self.epoll_fd, EPOLL_CTL_DEL, fd, ptr::null_mut())).map(|_| ())
     }
 }

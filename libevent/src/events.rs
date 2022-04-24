@@ -19,6 +19,7 @@ pub struct Events {
     post_sources: HashMap<u64, Rc<RefCell<dyn Source>>>,
     exit_sources: HashMap<u64, Rc<RefCell<dyn Source>>>,
     pending: BinaryHeap<Rc<RefCell<dyn Source>>>,
+    state: HashMap<u64, EventState>,
     children: HashMap<i64, i64>,
     pidfd: RawFd,
     signal: Signals,
@@ -34,6 +35,7 @@ impl Events {
             post_sources: HashMap::new(),
             exit_sources: HashMap::new(),
             pending: BinaryHeap::new(),
+            state: HashMap::new(),
             children: HashMap::new(),
             pidfd: 0,
             signal: Signals::new(),
@@ -48,31 +50,25 @@ impl Events {
         let t = source.try_borrow().unwrap().event_type();
         let s = source.try_borrow().unwrap();
         let token = s.token();
-        let mut event = libc::epoll_event {
-            events: s.epoll_event(),
-            u64: token,
-        };
         match t {
-            EventType::Io | EventType::Pidfd => {
-                self.poller.register(s.fd(), &mut event)?;
+            EventType::Io | EventType::Pidfd | EventType::Signal | EventType::Child => {
                 self.sources.insert(token, source.clone());
             }
-            EventType::Timer => todo!(),
-            EventType::TimerRelative => todo!(),
-            EventType::Signal => {
-                self.signal.reset_sigset(s.signals());
-                self.poller.register(self.signal.get_fd(), &mut event)?;
-                self.sources.insert(token, source.clone());
+            EventType::Defer => {
+                self.defer_sources.insert(token, source.clone());
             }
-            EventType::Child => {
-                self.add_child(&mut event, s.pid());
-                self.sources.insert(token, source.clone());
+            EventType::Post => {
+                self.post_sources.insert(token, source.clone());
             }
-            EventType::Inotify => todo!(),
-            EventType::Defer | EventType::Post | EventType::Exit => {
-                self.add_dpes(t, token, source.clone());
+            EventType::Exit => {
+                self.exit_sources.insert(token, source.clone());
             }
+            // todo: implement
+            EventType::Timer | EventType::TimerRelative | EventType::Inotify => todo!(),
         }
+
+        // default state
+        self.state.insert(token, EventState::Off);
 
         Ok(0)
     }
@@ -82,25 +78,15 @@ impl Events {
             return Ok(0);
         }
 
+        self.source_offline(&source)?;
+
         let t = source.try_borrow().unwrap().event_type();
         let s = source.try_borrow().unwrap();
         let token = s.token();
         match t {
-            EventType::Io | EventType::Pidfd => {
-                self.poller.unregister(s.fd())?;
+            EventType::Io | EventType::Pidfd | EventType::Signal | EventType::Child => {
                 self.sources.remove(&token);
             }
-            EventType::Timer => todo!(),
-            EventType::TimerRelative => todo!(),
-            EventType::Signal => {
-                self.poller.unregister(self.signal.get_fd())?;
-                self.sources.remove(&token);
-            }
-            EventType::Child => {
-                self.poller.unregister(self.pidfd).unwrap();
-                self.sources.remove(&token);
-            }
-            EventType::Inotify => todo!(),
             EventType::Defer => {
                 self.defer_sources
                     .remove(&token)
@@ -116,6 +102,98 @@ impl Events {
                     .remove(&token)
                     .ok_or(Error::Other { msg: "not found" })?;
             }
+            // todo: implement
+            EventType::Timer | EventType::TimerRelative | EventType::Inotify => todo!(),
+        }
+
+        // remove state
+        self.state.remove(&token);
+
+        Ok(0)
+    }
+
+    pub fn set_enabled(
+        &mut self,
+        source: Rc<RefCell<dyn Source>>,
+        state: EventState,
+    ) -> Result<i32> {
+        if source.try_borrow().is_err() {
+            return Ok(0);
+        }
+
+        let token = source.try_borrow().unwrap().token();
+        match state {
+            EventState::On | EventState::OneShot => {
+                self.source_online(&source)?;
+            }
+            EventState::Off => {
+                self.source_offline(&source)?;
+            }
+        }
+
+        // renew state
+        self.state.insert(token, state);
+
+        Ok(0)
+    }
+
+    fn source_online(&mut self, source: &Rc<RefCell<dyn Source>>) -> Result<i32> {
+        let t = source.try_borrow().unwrap().event_type();
+        let s = source.try_borrow().unwrap();
+        let token = s.token();
+        let mut event = libc::epoll_event {
+            events: s.epoll_event(),
+            u64: token,
+        };
+
+        match t {
+            EventType::Io | EventType::Pidfd => {
+                self.poller.register(s.fd(), &mut event)?;
+            }
+            EventType::Timer => todo!(),
+            EventType::TimerRelative => todo!(),
+            EventType::Signal => {
+                self.signal.reset_sigset(s.signals());
+                self.poller.register(self.signal.get_fd(), &mut event)?;
+            }
+            EventType::Child => {
+                self.add_child(&mut event, s.pid());
+            }
+            EventType::Inotify => todo!(),
+            EventType::Defer => {
+                self.pending.push(source.clone());
+            }
+            EventType::Post => todo!(),
+            EventType::Exit => todo!(),
+        }
+
+        Ok(0)
+    }
+
+    fn source_offline(&mut self, source: &Rc<RefCell<dyn Source>>) -> Result<i32> {
+        let source = source.try_borrow().unwrap();
+        // unneed unregister when source is allready Offline
+        if *self.state.get(&source.token()).unwrap() == EventState::Off {
+            return Ok(0);
+        }
+
+        let t = source.event_type();
+        match t {
+            EventType::Io | EventType::Pidfd => {
+                self.poller.unregister(source.fd())?;
+            }
+            EventType::Timer => todo!(),
+            EventType::TimerRelative => todo!(),
+            EventType::Signal => {
+                self.poller.unregister(self.signal.get_fd())?;
+            }
+            EventType::Child => {
+                self.poller.unregister(self.pidfd)?;
+            }
+            EventType::Inotify => todo!(),
+            EventType::Defer => (),
+            EventType::Post => todo!(),
+            EventType::Exit => todo!(),
         }
 
         Ok(0)
@@ -126,24 +204,6 @@ impl Events {
         self.pidfd = pidfd.try_into().unwrap();
         let _ = self.poller.register(self.pidfd, event);
         self.children.insert(pid.into(), pidfd);
-    }
-
-    fn add_dpes(&mut self, t: EventType, token: u64, source: Rc<RefCell<dyn Source>>) {
-        match t {
-            EventType::Defer => {
-                self.defer_sources.insert(token, source.clone());
-                self.pending.push(source.clone());
-            }
-            EventType::Post => {
-                self.post_sources.insert(token, source.clone());
-            }
-            EventType::Exit => {
-                self.exit_sources.insert(token, source.clone());
-            }
-            _ => {
-                unreachable!();
-            }
-        }
     }
 
     pub fn read_signals(&mut self) -> std::io::Result<Option<libc::siginfo_t>> {
@@ -193,24 +253,25 @@ impl Events {
 
         let first = self.pending_top();
         let top = first.try_borrow().unwrap();
-        match top.enabled() {
+        let state = self.state.get(&top.token()).unwrap();
+        match state {
             EventState::Off => {
-                self.del_source(first.clone())?;
+                println!("set_enabled Off: {:?}", top);
             }
             EventState::On => {
                 top.dispatch(self)?;
+                if top.event_type() == EventType::Defer {
+                    self.pending.push(first.clone());
+                }
             }
             EventState::OneShot => {
                 top.dispatch(self)?;
-                self.del_source(first.clone())?;
+                self.set_enabled(first.clone(), EventState::Off)?;
             }
         }
 
-        if top.event_type() != EventType::Defer
-            || (top.event_type() == EventType::Defer && top.enabled() != EventState::On)
-        {
-            self.pending.pop();
-        };
+        self.pending.pop();
+
         Ok(0)
     }
 
