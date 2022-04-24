@@ -1,6 +1,5 @@
 use utils::Result;
 
-use crate::EventState;
 use crate::EventType;
 use crate::Events;
 use std::fmt::Debug;
@@ -13,10 +12,6 @@ pub trait Source {
 
     fn signals(&self) -> Vec<libc::c_int> {
         vec![]
-    }
-
-    fn enabled(&self) -> EventState {
-        EventState::On
     }
 
     fn pid(&self) -> libc::pid_t {

@@ -25,3 +25,5 @@ RUST_BACKTRACE=1 cargo test --all -v -- --nocapture --test-threads=1
 #RUST_BACKTRACE=1 cargo test --all -- --nocapture
 
 RUST_BACKTRACE=1 cargo run --example signals
+
+cargo doc --all --no-deps

@@ -34,16 +34,15 @@ impl Source for Commands {
 
     fn dispatch(&self, _e: &mut Events) -> Result<i32, Error> {
         println!("Dispatching Command!");
-        for stream in self.fd.incoming() {
-            match stream {
-                Err(e) => println!("failed: {}", e),
-                Ok(stream) => {
-                    println!("{:?}", stream);
-                    let dispatch = ProstServerStream::new(&stream, self.manager.clone());
-                    dispatch.process().unwrap();
-                }
+        match self.fd.incoming().nth(0) {
+            None => println!("None CommandRequest!"),
+            Some(stream) => {
+                println!("{:?}", stream);
+                let dispatch = ProstServerStream::new(stream.unwrap(), self.manager.clone());
+                dispatch.process().unwrap();
             }
         }
+
         Ok(0)
     }
 
