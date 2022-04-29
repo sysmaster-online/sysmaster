@@ -4,6 +4,9 @@ enum ErrKind {
     Unit,
     Syscall,
     Http,
+    Proc,
+    ParseInt,
+    FromUTF8,
     Other,
 }
 
@@ -15,6 +18,9 @@ impl std::fmt::Display for ErrKind {
             ErrKind::Unit => "unit",
             ErrKind::Syscall => "syscall",
             ErrKind::Http => "http",
+            ErrKind::Proc => "procfs",
+            ErrKind::ParseInt => "parseint",
+            ErrKind::FromUTF8 => "fromutf8",
             ErrKind::Other => "other",
         };
         write!(f, "{}", err_kind)
@@ -25,11 +31,11 @@ impl std::fmt::Display for ErrKind {
 pub enum Error {
     /// An error from syscall
     #[error(
-        "{}: Got an error: (ret={}, errno={}) for syscall: {}",
-        ErrKind::Syscall,
-        ret,
-        errno,
-        syscall
+    "{}: Got an error: (ret={}, errno={}) for syscall: {}",
+    ErrKind::Syscall,
+    ret,
+    errno,
+    syscall
     )]
     Syscall {
         syscall: &'static str,
@@ -47,15 +53,23 @@ pub enum Error {
 
     /// An error getting the current pid
     #[error(
-        "{}: Unable to determine the current process pid: {}",
-        ErrKind::Protocol,
-        msg
+    "{}: Unable to determine the current process pid: {}",
+    ErrKind::Protocol,
+    msg
     )]
     Pid { msg: &'static str },
 
-    /// An error writing the cargo instructions to stdout
-    #[error("{}: There was an error writing the cargo instructions to stdout: {}", ErrKind::Http, .0)]
-    Http(#[from] http::Error),
+    /// An error from procfs
+    #[error("{}: Got an error from: {}", ErrKind::Proc, .0)]
+    Proc(#[from] procfs::ProcError),
+
+    /// An error from parse int
+    #[error("{}: Got an error from: {}", ErrKind::ParseInt, .0)]
+    ParseInt(#[from] std::num::ParseIntError),
+
+    /// An error from utf8
+    #[error("{}: Got an error from: {}", ErrKind::FromUTF8, .0)]
+    FromUTF8(#[from] std::string::FromUtf8Error),
 
     /// An error getting the current pid
     #[error("{}: Got an error: {} for unit: {}", ErrKind::Unit, msg, unit)]
@@ -66,9 +80,9 @@ pub enum Error {
 
     /// An error getting the current pid
     #[error(
-        "{}: Unable to determine the current process pid: {}",
-        ErrKind::Other,
-        msg
+    "{}: Unable to determine the current process pid: {}",
+    ErrKind::Other,
+    msg
     )]
     Other { msg: &'static str },
 }
@@ -77,11 +91,12 @@ pub type Result<T, E = Error> = anyhow::Result<T, E>;
 
 #[cfg(test)]
 mod test {
-    use super::Error;
     use std::{
         env,
         io::{self, ErrorKind},
     };
+
+    use super::Error;
 
     #[test]
     fn io_error() {
