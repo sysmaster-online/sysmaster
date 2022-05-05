@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod test {
     use std::{
-        cell::RefCell,
         net::{TcpListener, TcpStream},
         os::unix::io::{AsRawFd, RawFd},
         rc::Rc,
@@ -45,7 +44,7 @@ mod test {
             0i8
         }
 
-        fn dispatch(&self, _: &mut Events) -> Result<i32, Error> {
+        fn dispatch(&self, _: &Events) -> Result<i32, Error> {
             println!("Dispatching IO!");
             Ok(0)
         }
@@ -71,9 +70,9 @@ mod test {
         });
 
         thread::sleep(Duration::from_millis(100));
-        let mut e = Events::new().unwrap();
-        let s: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Io::new("0.0.0.0:9097")));
-        let s2: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Io::new("127.0.0.1:9097")));
+        let e = Events::new().unwrap();
+        let s: Rc<dyn Source> = Rc::new(Io::new("0.0.0.0:9097"));
+        let s2: Rc<dyn Source> = Rc::new(Io::new("127.0.0.1:9097"));
         e.add_source(s.clone()).unwrap();
         e.add_source(s2.clone()).unwrap();
 
@@ -99,8 +98,8 @@ mod test {
         });
 
         thread::sleep(Duration::from_millis(100));
-        let mut e = Events::new().unwrap();
-        let s: Rc<RefCell<dyn Source>> = Rc::new(RefCell::new(Io::new("0.0.0.0:9098")));
+        let e = Events::new().unwrap();
+        let s: Rc<dyn Source> = Rc::new(Io::new("0.0.0.0:9098"));
         e.add_source(s.clone()).unwrap();
 
         e.set_enabled(s.clone(), EventState::OneShot).unwrap();

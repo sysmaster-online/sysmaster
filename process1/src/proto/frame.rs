@@ -126,7 +126,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
     use std::net::TcpStream;
     use std::thread;
     use std::time::Duration;
@@ -152,7 +151,7 @@ mod tests {
         let fd = std::net::TcpListener::bind("127.0.0.1:9527").unwrap();
         const MODE: Mode = Mode::SYSTEM;
         const ACTION: Action = Action::RUN;
-        let _event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let _event = Rc::new(Events::new().unwrap());
         let manager = Rc::new(Manager::new(MODE, ACTION, Rc::clone(&_event)));
         loop {
             for stream in fd.incoming() {

@@ -11,7 +11,6 @@ use crate::manager::table::{TableOp, TableSubscribe};
 use crate::manager::MngErrno;
 use event::Events;
 use nix::unistd::Pid;
-use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
 
@@ -49,7 +48,7 @@ pub struct UnitManagerX {
 }
 
 impl UnitManagerX {
-    pub fn new(dm: Rc<DataManager>, event: Rc<RefCell<Events>>) -> UnitManagerX {
+    pub fn new(dm: Rc<DataManager>, event: Rc<Events>) -> UnitManagerX {
         let _dm = Rc::clone(&dm);
         let _um = UnitManager::new(Rc::clone(&_dm), event);
         UnitManagerX {
@@ -79,7 +78,7 @@ impl UnitManagerX {
 pub struct UnitManager {
     // associated objects
     dm: Rc<DataManager>,
-    event: Rc<RefCell<Events>>,
+    event: Rc<Events>,
 
     file: Rc<UnitFile>,
     load: Rc<UnitLoad>,
@@ -129,10 +128,7 @@ impl UnitManager {
         self.load.load_unit(name)
     }
 
-    pub(in crate::manager) fn new(
-        dm: Rc<DataManager>,
-        event: Rc<RefCell<Events>>,
-    ) -> Rc<UnitManager> {
+    pub(in crate::manager) fn new(dm: Rc<DataManager>, event: Rc<Events>) -> Rc<UnitManager> {
         let _dm = Rc::clone(&dm);
         let _event = Rc::clone(&event);
         let _file = Rc::new(UnitFile::new());
@@ -259,7 +255,7 @@ mod tests {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
         let dm_manager = Rc::new(DataManager::new());
-        let _event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let _event = Rc::new(Events::new().unwrap());
         let um = UnitManager::new(dm_manager.clone(), Rc::clone(&_event));
 
         let unit_name = String::from("config.service");
@@ -275,7 +271,7 @@ mod tests {
     fn test_unit_start() {
         logger::init_log_with_console("test_unit_load", 4);
         let dm_manager = Rc::new(DataManager::new());
-        let _event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let _event = Rc::new(Events::new().unwrap());
         let um = UnitManager::new(dm_manager.clone(), Rc::clone(&_event));
 
         let unit_name = String::from("config.service");

@@ -37,7 +37,7 @@ impl Source for Signals {
         0i8
     }
 
-    fn dispatch(&self, e: &mut Events) -> Result<i32, Error> {
+    fn dispatch(&self, e: &Events) -> Result<i32, Error> {
         log::debug!("Dispatching signals!");
 
         #[allow(clippy::never_loop)]

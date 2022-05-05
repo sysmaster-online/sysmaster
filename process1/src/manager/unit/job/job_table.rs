@@ -459,7 +459,7 @@ impl JobUnitTableData {
             t_ready: BTreeMap::new(),
 
             readys: Vec::new(),
-            sync: false,
+            sync: true,
         }
     }
 
@@ -818,11 +818,8 @@ impl JobUnitTableData {
             }
         }
 
-        // synchronize t_ready
-        self.ready_sync(Rc::clone(u), Rc::clone(uv));
-
-        // dirty
-        uv.clear_dirty(); // the 'dirty' entry has been synced, it's not dirty now.
+        // reshuffle itself
+        self.reshuffle_entry(entry);
 
         // resume order-related units
         for other in db.dep_gets_atom(u, UnitRelationAtom::UnitAtomAfter).iter() {

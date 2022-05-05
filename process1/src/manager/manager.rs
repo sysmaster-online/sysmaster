@@ -3,8 +3,7 @@ use super::data::DataManager;
 use super::signals::Signals;
 use super::unit::UnitManagerX;
 use super::MngErrno;
-use event::Events;
-use std::cell::RefCell;
+use event::{EventState, Events};
 use std::error::Error as Err;
 use std::io::Error;
 use std::rc::Rc;
@@ -35,21 +34,22 @@ pub enum Stats {
 }
 
 pub struct ManagerX {
-    event: Rc<RefCell<Events>>,
-    commands: Rc<RefCell<Commands>>,
+    event: Rc<Events>,
+    commands: Rc<Commands>,
     data: Rc<Manager>,
 }
 
 impl ManagerX {
     pub fn new(mode: Mode, action: Action) -> ManagerX {
-        let _event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let _event = Rc::new(Events::new().unwrap());
         let _data = Rc::new(Manager::new(mode, action, Rc::clone(&_event)));
         let m = ManagerX {
             event: Rc::clone(&_event),
-            commands: Rc::new(RefCell::new(Commands::new(Rc::clone(&_data)))),
+            commands: Rc::new(Commands::new(Rc::clone(&_data))),
             data: Rc::clone(&_data),
         };
         m.register(Rc::clone(&m.event));
+        m.enable(Rc::clone(&m.event));
         m
     }
 
@@ -69,9 +69,14 @@ impl ManagerX {
         self.data.reexec()
     }
 
-    fn register(&self, event: Rc<RefCell<Events>>) {
+    fn register(&self, event: Rc<Events>) {
         let source = Rc::clone(&self.commands);
-        event.borrow_mut().add_source(source).unwrap();
+        event.add_source(source).unwrap();
+    }
+
+    fn enable(&self, event: Rc<Events>) {
+        let source = Rc::clone(&self.commands);
+        event.set_enabled(source, EventState::On).unwrap();
     }
 }
 
@@ -81,14 +86,14 @@ pub struct Manager {
     stat: Stats,
     dm: Rc<DataManager>,
     um: Rc<UnitManagerX>,
-    event: Rc<RefCell<Events>>,
-    signal: Rc<RefCell<Signals>>,
+    event: Rc<Events>,
+    signal: Rc<Signals>,
 }
 
 type JobId = i32;
 
 impl Manager {
-    pub fn new(mode: Mode, action: Action, event: Rc<RefCell<Events>>) -> Manager {
+    pub fn new(mode: Mode, action: Action, event: Rc<Events>) -> Manager {
         let _dm = Rc::new(DataManager::new());
         let _um = Rc::new(UnitManagerX::new(Rc::clone(&_dm), Rc::clone(&event)));
         Manager {
@@ -98,13 +103,14 @@ impl Manager {
             dm: Rc::clone(&_dm),
             um: Rc::clone(&_um),
             event,
-            signal: Rc::new(RefCell::new(Signals::new(Rc::clone(&_um)))),
+            signal: Rc::new(Signals::new(Rc::clone(&_um))),
         }
     }
 
     pub fn startup(&self) -> Result<i32> {
         let source = Rc::clone(&self.signal);
-        self.event.borrow_mut().add_source(source)?;
+        self.event.add_source(source.clone())?;
+        self.event.set_enabled(source.clone(), EventState::On)?;
         Ok(0)
     }
 
@@ -139,7 +145,7 @@ impl Manager {
     pub fn rloop(&self) -> Result<Stats> {
         loop {
             self.um.dispatch_load_queue();
-            self.event.borrow_mut().run(-1)?;
+            self.event.run(-1)?;
         }
         #[allow(unreachable_code)]
         Ok(Stats::OK)

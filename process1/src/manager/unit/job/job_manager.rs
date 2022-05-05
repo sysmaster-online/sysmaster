@@ -10,7 +10,7 @@ use crate::manager::data::{JobMode, UnitActiveState, UnitConfigItem, UnitNotifyF
 use crate::manager::unit::unit_datastore::UnitDb;
 use crate::manager::unit::unit_entry::UnitX;
 use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
-use event::{EventType, Events, Source};
+use event::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
 use std::rc::Rc;
 use utils::{Error, Result};
@@ -48,8 +48,8 @@ impl JobAffect {
 }
 
 pub struct JobManager {
-    event: Rc<RefCell<Events>>,
-    data: Rc<RefCell<JobManagerData>>,
+    event: Rc<Events>,
+    data: Rc<JobManagerData>,
 }
 
 impl JobManager {
@@ -59,17 +59,21 @@ impl JobManager {
         mode: JobMode,
         affect: &mut JobAffect,
     ) -> Result<(), JobErrno> {
-        self.data.borrow().exec(config, mode, affect)
+        self.data.exec(config, mode, affect)?;
+        self.try_enable();
+        Ok(())
     }
 
     pub fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
-        self.data.borrow().notify(config, mode)
+        self.data.notify(config, mode)?;
+        self.try_enable();
+        Ok(())
     }
 
-    pub(in crate::manager::unit) fn new(db: Rc<UnitDb>, event: Rc<RefCell<Events>>) -> JobManager {
+    pub(in crate::manager::unit) fn new(db: Rc<UnitDb>, event: Rc<Events>) -> JobManager {
         let jm = JobManager {
             event,
-            data: Rc::new(RefCell::new(JobManagerData::new(db))),
+            data: Rc::new(JobManagerData::new(db)),
         };
         jm.register(Rc::clone(&jm.event));
         jm
@@ -82,20 +86,37 @@ impl JobManager {
         ns: UnitActiveState,
         flags: isize,
     ) -> Result<(), JobErrno> {
-        self.data.borrow().try_finish(unit, os, ns, flags)
+        self.data.try_finish(unit, os, ns, flags)?;
+        self.try_enable();
+        Ok(())
     }
 
     pub(in crate::manager::unit) fn remove(&self, id: u32) -> Result<(), JobErrno> {
-        self.data.borrow().remove(id)
+        self.data.remove(id)?;
+        self.try_enable();
+        Ok(())
     }
 
     pub(in crate::manager::unit) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
-        self.data.borrow().get_jobinfo(id)
+        self.data.get_jobinfo(id)
     }
 
-    fn register(&self, event: Rc<RefCell<Events>>) {
+    fn try_enable(&self) {
+        // prepare for async-running
+        if self.data.is_jobs_ready() {
+            self.enable(Rc::clone(&self.event));
+        }
+    }
+
+    fn register(&self, event: Rc<Events>) {
         let source = Rc::clone(&self.data);
-        event.borrow_mut().add_source(source).unwrap();
+        event.add_source(source).unwrap();
+    }
+
+    fn enable(&self, event: Rc<Events>) {
+        println!("job manager enable.");
+        let source = Rc::clone(&self.data);
+        event.set_enabled(source, EventState::OneShot).unwrap();
     }
 }
 
@@ -113,7 +134,7 @@ impl Source for JobManagerData {
         data
     }
 
-    fn dispatch(&self, _event: &mut Events) -> Result<i32, Error> {
+    fn dispatch(&self, _event: &Events) -> Result<i32, Error> {
         println!("job manager data dispatch");
         self.run();
         Ok(0)
@@ -172,11 +193,6 @@ impl JobManagerData {
 
         // output
         affect.record(&(add_jobs, del_jobs, update_jobs));
-
-        // prepare for async-running
-        if self.jobs.is_ready() {
-            // todo!(); enable-event
-        }
 
         Ok(())
         // if it's successful, all jobs expanded would be inserted in 'self.jobs', otherwise(failed) they would be cleared next time.
@@ -242,11 +258,6 @@ impl JobManagerData {
                 break;
             }
         }
-
-        // prepare for next round
-        if self.jobs.is_ready() {
-            // todo!(); enable-event
-        }
     }
 
     pub(self) fn try_finish(
@@ -270,11 +281,6 @@ impl JobManagerData {
         } else {
             // (asynchronous)finish not in context
             self.do_try_finish(unit, os, ns, flags); // do it
-
-            // prepare for async-running
-            if self.jobs.is_ready() {
-                // todo!(); enable-event
-            }
         }
 
         Ok(())
@@ -302,6 +308,10 @@ impl JobManagerData {
 
     pub(self) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
         self.jobs.get(id)
+    }
+
+    pub(self) fn is_jobs_ready(&self) -> bool {
+        self.jobs.is_ready()
     }
 
     fn do_try_finish(
@@ -541,7 +551,7 @@ mod tests {
 
     #[test]
     fn job_exec_single() {
-        let event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let event = Rc::new(Events::new().unwrap());
         let db = Rc::new(UnitDb::new());
         let name_test1 = String::from("test1.service");
         let unit_test1 = create_unit(&name_test1);
@@ -558,8 +568,8 @@ mod tests {
             &mut affect,
         );
         assert!(ret.is_ok());
-        assert_eq!(jm.data.borrow().jobs.len(), 1);
-        assert_eq!(jm.data.borrow().jobs.ready_len(), 1);
+        assert_eq!(jm.data.jobs.len(), 1);
+        assert_eq!(jm.data.jobs.ready_len(), 1);
 
         assert_eq!(affect.adds.len(), 1);
         let job_info = affect.adds.pop().unwrap();
@@ -571,7 +581,7 @@ mod tests {
 
     #[test]
     fn job_exec_multi() {
-        let event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let event = Rc::new(Events::new().unwrap());
         let db = Rc::new(UnitDb::new());
         let name_test1 = String::from("test1.service");
         let unit_test1 = create_unit(&name_test1);
@@ -597,8 +607,8 @@ mod tests {
             &mut affect,
         );
         assert!(ret.is_ok());
-        assert_eq!(jm.data.borrow().jobs.len(), 2);
-        assert_eq!(jm.data.borrow().jobs.ready_len(), 2);
+        assert_eq!(jm.data.jobs.len(), 2);
+        assert_eq!(jm.data.jobs.ready_len(), 2);
         assert_eq!(affect.adds.len(), 2);
         let job_info1 = affect.adds.pop().unwrap();
         assert!(
@@ -619,7 +629,7 @@ mod tests {
 
     #[test]
     fn job_run_finish_single() {
-        let event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let event = Rc::new(Events::new().unwrap());
         let db = Rc::new(UnitDb::new());
         let name_test1 = String::from("test1.service");
         let unit_test1 = create_unit(&name_test1);
@@ -635,17 +645,17 @@ mod tests {
             &mut JobAffect::new(false),
         )
         .unwrap();
-        assert_eq!(jm.data.borrow().jobs.len(), 1);
-        assert_eq!(jm.data.borrow().jobs.ready_len(), 1);
+        assert_eq!(jm.data.jobs.len(), 1);
+        assert_eq!(jm.data.jobs.ready_len(), 1);
 
-        jm.data.borrow_mut().run();
-        assert_eq!(jm.data.borrow().jobs.len(), 0);
-        assert_eq!(jm.data.borrow().jobs.ready_len(), 0);
+        jm.data.run();
+        assert_eq!(jm.data.jobs.len(), 0);
+        assert_eq!(jm.data.jobs.ready_len(), 0);
     }
 
     #[test]
     fn job_run_finish_multi() {
-        let event = Rc::new(RefCell::new(Events::new().unwrap()));
+        let event = Rc::new(Events::new().unwrap());
         let db = Rc::new(UnitDb::new());
         let name_test1 = String::from("test1.service");
         let unit_test1 = create_unit(&name_test1);
@@ -667,12 +677,12 @@ mod tests {
             &mut JobAffect::new(false),
         )
         .unwrap();
-        assert_eq!(jm.data.borrow().jobs.len(), 2);
-        assert_eq!(jm.data.borrow().jobs.ready_len(), 2);
+        assert_eq!(jm.data.jobs.len(), 2);
+        assert_eq!(jm.data.jobs.ready_len(), 2);
 
-        jm.data.borrow_mut().run();
-        assert_eq!(jm.data.borrow().jobs.len(), 0);
-        assert_eq!(jm.data.borrow().jobs.ready_len(), 0);
+        jm.data.run();
+        assert_eq!(jm.data.jobs.len(), 0);
+        assert_eq!(jm.data.jobs.ready_len(), 0);
     }
 
     fn create_unit(name: &str) -> Rc<UnitX> {

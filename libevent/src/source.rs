@@ -37,7 +37,7 @@ pub trait Source {
         0i8
     }
 
-    fn dispatch(&self, event: &mut Events) -> Result<i32>;
+    fn dispatch(&self, event: &Events) -> Result<i32>;
 }
 
 // for HashSet
