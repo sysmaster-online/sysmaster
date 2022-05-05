@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::mem;
 use std::ptr::null_mut;
 
+/// 为signal处理添加的辅助数据结构
 pub(crate) struct SigSet {
     sigset: libc::sigset_t,
 }
