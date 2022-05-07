@@ -236,7 +236,7 @@ impl EventsData {
             EventType::TimerRelative => todo!(),
             EventType::Signal => {
                 self.signal.reset_sigset(s.signals());
-                self.poller.register(self.signal.get_fd(), &mut event)?;
+                self.poller.register(self.signal.fd(), &mut event)?;
             }
             EventType::Child => {
                 self.add_child(&mut event, s.pid());
@@ -267,7 +267,7 @@ impl EventsData {
             EventType::Timer => todo!(),
             EventType::TimerRelative => todo!(),
             EventType::Signal => {
-                self.poller.unregister(self.signal.get_fd())?;
+                self.poller.unregister(self.signal.fd())?;
             }
             EventType::Child => {
                 self.poller.unregister(self.pidfd)?;
