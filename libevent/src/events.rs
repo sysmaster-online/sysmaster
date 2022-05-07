@@ -1,3 +1,5 @@
+//! # 一种基于epoll的事件调度框架
+//! An event scheduling framework based on epoll
 use crate::{EventState, EventType, Poll, Signals, Source};
 
 use utils::Error;
@@ -10,38 +12,47 @@ use std::fmt::Debug;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
 
+/// 一种基于epoll的事件调度框架
+/// An event scheduling framework based on epoll
 #[derive(Debug)]
 pub struct Events {
     data: RefCell<EventsData>,
 }
 
 impl Events {
+    /// create event
     pub fn new() -> Result<Events> {
         Ok(Events {
             data: RefCell::new(EventsData::new()),
         })
     }
 
+    /// add source which implement Source trait
     pub fn add_source(&self, source: Rc<dyn Source>) -> Result<i32> {
         self.data.borrow_mut().add_source(source)
     }
 
+    /// delete source
     pub fn del_source(&self, source: Rc<dyn Source>) -> Result<i32> {
         self.data.borrow_mut().del_source(source)
     }
 
+    /// set the dispatch state of the event
     pub fn set_enabled(&self, source: Rc<dyn Source>, state: EventState) -> Result<i32> {
         self.data.borrow_mut().set_enabled(source, state)
     }
 
+    /// read the signal content when signal source emit
     pub fn read_signals(&self) -> std::io::Result<Option<libc::siginfo_t>> {
         self.data.borrow_mut().read_signals()
     }
 
+    /// exit event loop
     pub fn set_exit(&self) {
         self.data.borrow_mut().set_exit()
     }
 
+    /// current time
     pub fn now() {
         todo!();
     }
@@ -97,7 +108,7 @@ impl Events {
 }
 
 #[derive(Debug)]
-pub struct EventsData {
+pub(crate) struct EventsData {
     poller: Poll,
     exit: bool,
     sources: HashMap<u64, Rc<dyn Source>>,
@@ -207,6 +218,7 @@ impl EventsData {
         Ok(0)
     }
 
+    /// when set to on, register events to the listening queue
     fn source_online(&mut self, source: &Rc<dyn Source>) -> Result<i32> {
         let t = source.event_type();
         let s = source;
@@ -240,6 +252,7 @@ impl EventsData {
         Ok(0)
     }
 
+    /// move the event out of the listening queue
     fn source_offline(&mut self, source: &Rc<dyn Source>) -> Result<i32> {
         // unneed unregister when source is allready Offline
         if *self.state.get(&source.token()).unwrap() == EventState::Off {
@@ -275,12 +288,13 @@ impl EventsData {
         self.children.insert(pid.into(), pidfd);
     }
 
+    /// read the signal content when signal source emit
     pub(self) fn read_signals(&mut self) -> std::io::Result<Option<libc::siginfo_t>> {
         self.signal.read_signals()
     }
 
     /// Wait for the event event through poller
-    /// And add the corresponding events to the pengding queue
+    /// And add the corresponding events to the pending queue
     pub(self) fn wait(&mut self, timeout: i32) -> bool {
         let events = {
             #[allow(clippy::never_loop)]
@@ -308,8 +322,6 @@ impl EventsData {
         }
     }
 
-    /// Wait for the event event through poller
-    /// And add the corresponding events to the pengding queue
     pub(self) fn prepare(&mut self) -> bool {
         if !self.pending_is_empty() {
             return self.wait(0);
