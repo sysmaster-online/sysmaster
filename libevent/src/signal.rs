@@ -61,7 +61,7 @@ impl Signals {
         }
     }
 
-    pub fn get_fd(&self) -> libc::c_int {
+    pub fn fd(&self) -> libc::c_int {
         self.fd
     }
 

@@ -1,12 +1,11 @@
-/// 以进程数量监控为例，简述一个监控项如何实现
-use std::cmp::max;
-use std::io::{Error, ErrorKind};
-
+//! 进程数量监控项的实现
 use procfs::sys::kernel::pid_max;
-use procfs::ProcError;
 use serde_derive::Deserialize;
 
-use crate::{Monitor, Switch, SysMonitor, SysMonitorError};
+use std::cmp::max;
+use utils::Error;
+
+use crate::{Monitor, Switch, SysMonitor};
 
 const CONFIG_FILE_PATH: &str = "/etc/sysmonitor/pscnt";
 
@@ -87,7 +86,7 @@ impl Monitor for ProcessCount {
     }
 
     /// 实现真正的业务流程函数check_status
-    fn check_status(&mut self) -> Result<(), SysMonitorError> {
+    fn check_status(&mut self) -> Result<(), Error> {
         // 使用procfs crate列出所有的进程
         let all_processes = procfs::process::all_processes()?;
         let proc_num = all_processes.len() as u32;
@@ -103,10 +102,9 @@ impl Monitor for ProcessCount {
         println!("{} {}", proc_num, thread_num);
         let pid_max = pid_max()?;
         if pid_max == 0 {
-            return Err(SysMonitorError::ProcfsError(ProcError::from(Error::new(
-                ErrorKind::Other,
-                "found pid_max is 0",
-            ))));
+            return Err(Error::Other {
+                msg: "pid_max is 0",
+            });
         }
         let real_alarm = max(
             self.alarm,
