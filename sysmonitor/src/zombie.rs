@@ -1,8 +1,10 @@
-use std::process::Command;
-
+//! 系统当前僵尸进程数量的监控
 use serde_derive::Deserialize;
 
-use crate::{Monitor, Switch, SysMonitor, SysMonitorError};
+use std::process::Command;
+use utils::Error;
+
+use crate::{Monitor, Switch, SysMonitor};
 
 const CONFIG_FILE_PATH: &str = "/etc/sysmonitor/zombie";
 
@@ -51,7 +53,7 @@ impl Monitor for ZombieCount {
         self.alarm > self.resume
     }
 
-    fn check_status(&mut self) -> Result<(), SysMonitorError> {
+    fn check_status(&mut self) -> Result<(), Error> {
         // 调用shell命令计算当前系统僵尸进程的数量
         let cmd = "ps -A -o stat,ppid,pid,cmd | grep -e '^[Zz]' | awk '{print $0}' | wc -l";
         let output = Command::new("bash").arg("-c").arg(cmd).output()?;

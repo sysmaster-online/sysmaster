@@ -1,9 +1,11 @@
-use std::fs::OpenOptions;
-use std::io::{Error, Write};
-
+//! 进程fd数量的监控
 use serde_derive::Deserialize;
 
-use crate::{Monitor, Switch, SysMonitor, SysMonitorError};
+use std::fs::OpenOptions;
+use std::io::Write;
+use utils::Error;
+
+use crate::{Monitor, Switch, SysMonitor};
 
 const CONFIG_FILE_PATH: &str = "/etc/sysmonitor/process_fd_conf";
 const PROC_FDTHRESHOLD: &str = "/proc/fdthreshold";
@@ -41,7 +43,7 @@ impl Monitor for ProcessFd {
         self.alarm > 0 && self.alarm < 100
     }
 
-    fn check_status(&mut self) -> Result<(), SysMonitorError> {
+    fn check_status(&mut self) -> Result<(), Error> {
         // 向procfs里写入数值，打开监控，真正的监控由内核模块实现
         write_file(PROC_FDTHRESHOLD, self.alarm.to_string())?;
         write_file(PROC_FDENABLE, 1.to_string())?;
@@ -51,7 +53,7 @@ impl Monitor for ProcessFd {
     fn report_alarm(&self) {}
 }
 
-fn write_file(path: &str, str: String) -> Result<(), Error> {
+fn write_file(path: &str, str: String) -> Result<(), std::io::Error> {
     let mut f = OpenOptions::new().read(false).write(true).open(path)?;
     f.write_all(str.as_bytes().as_ref())
 }

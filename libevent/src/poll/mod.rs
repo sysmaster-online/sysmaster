@@ -1,41 +1,50 @@
+//! # 一种对epoll接口的封装
+
 use libc::epoll_event;
 use std::os::unix::{io::AsRawFd, io::RawFd};
 use utils::Result;
 
-pub mod epoll;
+pub(crate) mod epoll;
 #[cfg(unix)]
 use epoll::Epoll as Poller;
 
+/// 一种对epoll接口的封装
 #[derive(Debug, Default)]
 pub struct Poll {
     poller: Poller,
 }
 
 impl Poll {
+    /// create a new poller
     pub fn new() -> Result<Poll> {
         Ok(Poll {
             poller: Poller::new()?,
         })
     }
 
+    /// clone the poller
     pub fn try_clone(&self) -> Result<Poll> {
         Ok(Poll {
             poller: self.poller.try_clone().unwrap(),
         })
     }
 
+    /// poll the poller
     pub fn poll(&self, timeout: i32) -> Result<Vec<epoll_event>> {
         self.poller.poll(timeout)
     }
 
+    /// register the source to the poller
     pub fn register(&mut self, fd: RawFd, event: &mut epoll_event) -> Result<()> {
         self.poller.register(fd, event)
     }
 
+    /// reregister the source to the poller
     pub fn reregister(&mut self, fd: RawFd, event: &mut epoll_event) -> Result<()> {
         self.poller.reregister(fd, event)
     }
 
+    /// unregister the source from the poller
     pub fn unregister(&mut self, fd: RawFd) -> Result<()> {
         self.poller.unregister(fd)
     }
