@@ -1,13 +1,11 @@
 /// sysmonitor主进程。作为系统监控的一部分，目前实现的监控类型主要和进程相关，分别是进程数量监控、僵尸进程数量监控、进程fd数量监控和关键进程监控
+use serde_derive::Deserialize;
+
 use std::default::Default;
 use std::fs;
 use std::fs::File;
-use std::io::{self, Error, Read};
-use std::num::ParseIntError;
-use std::string::FromUtf8Error;
-
-use procfs::ProcError;
-use serde_derive::Deserialize;
+use std::io::{self, Read};
+use utils::Error;
 
 use crate::process::ProcessMonitor;
 use crate::process_count::ProcessCount;
@@ -20,38 +18,7 @@ mod process_count;
 mod process_fd;
 mod zombie;
 
-#[derive(Debug)]
-pub enum SysMonitorError {
-    ProcfsError(ProcError),
-    IOError(Error),
-    ParseError(ParseIntError),
-    UtfError(FromUtf8Error),
-}
-
-impl std::convert::From<ProcError> for SysMonitorError {
-    fn from(e: ProcError) -> Self {
-        SysMonitorError::ProcfsError(e)
-    }
-}
-
-impl std::convert::From<Error> for SysMonitorError {
-    fn from(e: Error) -> Self {
-        SysMonitorError::IOError(e)
-    }
-}
-
-impl std::convert::From<ParseIntError> for SysMonitorError {
-    fn from(e: ParseIntError) -> Self {
-        SysMonitorError::ParseError(e)
-    }
-}
-
-impl std::convert::From<FromUtf8Error> for SysMonitorError {
-    fn from(e: FromUtf8Error) -> Self {
-        SysMonitorError::UtfError(e)
-    }
-}
-
+/// sysmonitor默认配置文件的路径
 const CONFIG_FILE_PATH: &str = "/etc/sysconfig/sysmonitor";
 
 /// Sysmonitor框架。首先定义了一个trait，封装了一个监控的几个特性
@@ -71,7 +38,7 @@ pub trait Monitor {
     fn config_path(&self) -> &str;
     fn load(&mut self, content: String, sysmonitor: SysMonitor);
     fn is_valid(&self) -> bool;
-    fn check_status(&mut self) -> Result<(), SysMonitorError>;
+    fn check_status(&mut self) -> Result<(), Error>;
     fn report_alarm(&self);
 }
 
@@ -121,22 +88,27 @@ pub fn config_file_load(file_path: &str) -> io::Result<String> {
     Ok(buf)
 }
 
+/// 返回true默认值
 fn on() -> bool {
     true
 }
 
+/// 监控周期默认值
 pub fn process_monitor_period_default() -> u64 {
     3
 }
 
+/// 恢复失败后再次尝试拉起周期的默认值
 fn process_recall_default_period() -> u32 {
     1
 }
 
+/// 进程重启时间默认值
 fn process_restart_default_timeout() -> u32 {
     90
 }
 
+/// 告警压制默认值
 fn process_alarm_suppress_num_default() -> u32 {
     5
 }

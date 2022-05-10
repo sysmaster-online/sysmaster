@@ -1,17 +1,19 @@
-use std::io;
-use std::os::unix::process::CommandExt;
-use std::process::{Child, Command, ExitStatus};
-use std::thread::sleep;
-use std::time::Duration;
-
+//! 关键进程的监控
 use nix::libc::pid_t;
 use nix::sys::signal::kill;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use serde_derive::Deserialize;
 
+use std::io;
+use std::os::unix::process::CommandExt;
+use std::process::{Child, Command, ExitStatus};
+use std::thread::sleep;
+use std::time::Duration;
+use utils::Error;
+
 use crate::process_monitor_period_default;
-use crate::{Monitor, Switch, SysMonitor, SysMonitorError};
+use crate::{Monitor, Switch, SysMonitor};
 
 const CONFIG_FILE_PATH: &str = "/etc/sysmonitor/process";
 const PROCESS_EXIT_TIMEOUT: u64 = 10;
@@ -71,7 +73,7 @@ impl Monitor for ProcessMonitor {
             && self.monitor_period > 0
     }
 
-    fn check_status(&mut self) -> Result<(), SysMonitorError> {
+    fn check_status(&mut self) -> Result<(), Error> {
         self.process_monitor_start(self.timeout);
         Ok(())
     }

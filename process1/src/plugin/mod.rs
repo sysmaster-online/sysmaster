@@ -10,7 +10,7 @@ use walkdir::{DirEntry, WalkDir};
 
 const LIB_PLUGIN_PATH: &str = "/usr/lib/process1/plugin/";
 
-static INSTANCE: Lazy<Arc<Plugin>> = Lazy::new(||{
+static INSTANCE: Lazy<Arc<Plugin>> = Lazy::new(|| {
     let plugin = Plugin::new();
     let default_lib_path = Plugin::get_default_libpath();
     plugin.update_library_dir(&default_lib_path);
@@ -63,7 +63,6 @@ impl Plugin {
         ret
     }
 
-
     pub fn get_instance() -> Arc<Plugin> {
         INSTANCE.clone()
     }
@@ -75,7 +74,10 @@ impl Plugin {
             }
             let libdir_path = PathBuf::from(file_name);
             if !libdir_path.exists() || !libdir_path.is_dir() {
-                log::error!("load_lib library path [{:?}] is not a dir or not exist", libdir_path);
+                log::error!(
+                    "load_lib library path [{:?}] is not a dir or not exist",
+                    libdir_path
+                );
                 return false;
             }
             true
@@ -107,7 +109,10 @@ impl Plugin {
             dynamic_reload::Search::Default,
         );
         for file_item in lib_path.iter() {
-            log::debug!("begin loading  plugin library in libraray path [{:?}]", file_item);
+            log::debug!(
+                "begin loading  plugin library in libraray path [{:?}]",
+                file_item
+            );
             for entry in WalkDir::new(file_item)
                 .min_depth(1)
                 .follow_links(true)
@@ -199,7 +204,7 @@ impl Plugin {
                 }
                 let new_libdir = PathBuf::from(new_item);
                 if !new_libdir.is_dir() || !new_libdir.is_dir() {
-                    log::error!( " the path [{}] is not a dir/not exist", new_item);
+                    log::error!(" the path [{}] is not a dir/not exist", new_item);
                     continue;
                 } else {
                     let mut _tmp_flag = false;
