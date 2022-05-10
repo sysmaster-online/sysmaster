@@ -1,15 +1,15 @@
 #![warn(unused_imports)]
-use crate::manager::data::{JobMode, UnitActiveState, UnitNotifyFlags};
+use crate::manager::data::{UnitActiveState, UnitNotifyFlags};
 use crate::manager::unit::unit_base::UnitActionError;
+use crate::manager::unit::unit_base::{JobMode, UnitRelationAtom};
 use crate::manager::unit::unit_entry::UnitX;
-use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
 use std::cell::RefCell;
 use std::fmt;
 use std::hash::Hash;
 use std::rc::Rc;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum JobKind {
+pub(in crate::manager) enum JobKind {
     // 'type' is better, but it's keyword in rust
     // basic kind
     /* mut: the stage of unit can be changed */
@@ -29,7 +29,7 @@ pub enum JobKind {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum JobResult {
+pub(in crate::manager) enum JobResult {
     JobDone,
     JobCancelled,
     JobTimeOut,
@@ -45,7 +45,7 @@ pub enum JobResult {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum JobStage {
+pub(in crate::manager) enum JobStage {
     JobInit,
     JobWait,
     JobRunning,
@@ -53,13 +53,13 @@ pub enum JobStage {
 }
 
 #[derive(Clone)]
-pub struct JobConf {
+pub(in crate::manager::unit) struct JobConf {
     unit: Rc<UnitX>,
     kind: JobKind,
 }
 
 impl JobConf {
-    pub fn new(unit: Rc<UnitX>, kind: JobKind) -> JobConf {
+    pub(in crate::manager::unit) fn new(unit: Rc<UnitX>, kind: JobKind) -> JobConf {
         JobConf { unit, kind }
     }
 
@@ -78,12 +78,12 @@ impl JobConf {
 }
 
 #[derive(Clone)]
-pub struct JobInfo {
-    pub id: u32,
-    pub unit: Rc<UnitX>,
-    pub kind: JobKind,
-    pub run_kind: JobKind,
-    pub stage: JobStage,
+pub(in crate::manager) struct JobInfo {
+    pub(in crate::manager) id: u32,
+    pub(in crate::manager) unit: Rc<UnitX>,
+    pub(in crate::manager) kind: JobKind,
+    pub(in crate::manager) run_kind: JobKind,
+    pub(in crate::manager) stage: JobStage,
 }
 
 impl fmt::Debug for JobInfo {

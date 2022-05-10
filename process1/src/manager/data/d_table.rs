@@ -1,4 +1,4 @@
-use super::unit_config::UnitConfig;
+use super::unit_dep_conf::UnitDepConf;
 use super::unit_state::UnitState;
 use crate::manager::table::{Table, TableSubscribe};
 use std::cell::RefCell;
@@ -6,8 +6,8 @@ use std::rc::Rc;
 
 pub struct DataManager {
     tables: (
-        RefCell<Table<String, Rc<UnitConfig>>>, // unit-config
-        RefCell<Table<String, UnitState>>,      // unit-state
+        RefCell<Table<String, UnitDepConf>>, // unit-dep-config
+        RefCell<Table<String, UnitState>>,   // unit-state
     ),
 }
 
@@ -18,30 +18,22 @@ impl DataManager {
         }
     }
 
-    pub(in crate::manager) fn insert_unit_config(
+    pub(in crate::manager) fn insert_ud_config(
         &self,
         u_name: String,
-        u_config: Rc<UnitConfig>,
-    ) -> Option<Rc<UnitConfig>> {
+        ud_config: UnitDepConf,
+    ) -> Option<UnitDepConf> {
         let mut table = self.tables.0.borrow_mut();
-        table.insert(u_name, u_config)
+        table.insert(u_name, ud_config)
     }
 
-    pub(in crate::manager) fn get_unit_config(&self, u_name: String) -> Option<Rc<UnitConfig>> {
-        self.tables.0.borrow().get(&u_name).map(|v| Rc::clone(v))
-    }
-    pub(in crate::manager) fn remove_unit_config(&self, u_name: &String) -> Option<Rc<UnitConfig>> {
-        let mut table = self.tables.0.borrow_mut();
-        table.remove(u_name)
-    }
-
-    pub(in crate::manager) fn register_unit_config(
+    pub(in crate::manager) fn register_ud_config(
         &self,
-        name: String,
-        subscriber: Rc<dyn TableSubscribe<String, Rc<UnitConfig>>>,
-    ) -> Option<Rc<dyn TableSubscribe<String, Rc<UnitConfig>>>> {
+        name: &str,
+        subscriber: Rc<dyn TableSubscribe<String, UnitDepConf>>,
+    ) -> Option<Rc<dyn TableSubscribe<String, UnitDepConf>>> {
         let mut table = self.tables.0.borrow_mut();
-        table.subscribe(name, subscriber)
+        table.subscribe(name.to_string(), subscriber)
     }
 
     pub(in crate::manager) fn insert_unit_state(
@@ -55,48 +47,46 @@ impl DataManager {
 
     pub(in crate::manager) fn register_unit_state(
         &self,
-        name: String,
+        name: &str,
         subscriber: Rc<dyn TableSubscribe<String, UnitState>>,
     ) -> Option<Rc<dyn TableSubscribe<String, UnitState>>> {
         let mut table = self.tables.1.borrow_mut();
-        table.subscribe(name, subscriber)
+        table.subscribe(name.to_string(), subscriber)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::{UnitActiveState, UnitNotifyFlags};
+    use crate::manager::data::{UnitActiveState, UnitNotifyFlags, UnitRelations};
     use crate::manager::table::TableOp;
 
     #[test]
-    fn dm_unit_config() {
+    fn dm_unit_dep_config() {
         let dm = DataManager::new();
-        let uc_sub = Rc::new(UnitConfigsTest::new());
+        let udc_sub = Rc::new(UnitDepConfigsTest::new());
 
-        let unit_config = UnitConfig::new();
-        let old = dm.insert_unit_config(String::from("test"), Rc::new(unit_config));
+        let ud_config = UnitDepConf::new();
+        let old = dm.insert_ud_config(String::from("test"), ud_config);
         assert!(old.is_none());
 
-        let mut unit_config = UnitConfig::new();
-        unit_config.set_name(String::from("name1"));
-        let old = dm.insert_unit_config(String::from("test"), Rc::new(unit_config));
-        assert_eq!(old.unwrap().get_name(), String::from(""));
+        let mut ud_config = UnitDepConf::new();
+        ud_config
+            .deps
+            .push((UnitRelations::UnitAfter, String::from("name")));
+        let old = dm.insert_ud_config(String::from("test"), ud_config);
+        assert_eq!(old.unwrap().deps.len(), 0);
 
-        let get = dm.get_unit_config(String::from("test"));
-        assert_eq!(get.unwrap().get_name(), String::from("name1"));
-
-        let old = dm.remove_unit_config(&String::from("test"));
-        assert_eq!(old.unwrap().get_name(), String::from("name1"));
-
-        let sub = Rc::clone(&uc_sub);
-        let old = dm.register_unit_config(String::from("config"), sub);
+        let sub = Rc::clone(&udc_sub);
+        let old = dm.register_ud_config(&String::from("config"), sub);
         assert!(old.is_none());
 
-        let mut unit_config = UnitConfig::new();
-        unit_config.set_name(String::from("name2"));
-        dm.insert_unit_config(String::from("test"), Rc::new(unit_config));
-        assert_eq!(uc_sub.get_name(), String::from("name2"));
+        let mut ud_config = UnitDepConf::new();
+        ud_config
+            .deps
+            .push((UnitRelations::UnitAfter, String::from("name")));
+        dm.insert_ud_config(String::from("test"), ud_config);
+        assert_eq!(udc_sub.len(), 1);
     }
 
     #[test]
@@ -112,10 +102,10 @@ mod tests {
 
         let ns_ing = UnitActiveState::UnitActivating;
         let old = dm.insert_unit_state(String::from("test"), UnitState::new(os, ns_ing, flags));
-        assert_eq!(old.unwrap().get_ns(), ns);
+        assert_eq!(old.unwrap().ns, ns);
 
         let sub = Rc::clone(&us_sub);
-        let old = dm.register_unit_state(String::from("state"), sub);
+        let old = dm.register_unit_state(&String::from("state"), sub);
         assert!(old.is_none());
 
         let ns_m = UnitActiveState::UnitMaintenance;
@@ -123,33 +113,29 @@ mod tests {
         assert_eq!(us_sub.get_ns(), ns_m);
     }
 
-    struct UnitConfigsTest {
-        name: RefCell<String>,
+    struct UnitDepConfigsTest {
+        len: RefCell<usize>,
     }
 
-    impl UnitConfigsTest {
-        fn new() -> UnitConfigsTest {
-            UnitConfigsTest {
-                name: RefCell::new(String::from("")),
+    impl UnitDepConfigsTest {
+        fn new() -> UnitDepConfigsTest {
+            UnitDepConfigsTest {
+                len: RefCell::new(0),
             }
         }
 
-        fn get_name(&self) -> String {
-            self.name.borrow().clone()
+        fn len(&self) -> usize {
+            *self.len.borrow()
         }
     }
 
-    impl TableSubscribe<String, Rc<UnitConfig>> for UnitConfigsTest {
-        fn filter(&self, _op: &TableOp<String, Rc<UnitConfig>>) -> bool {
-            true
-        }
-
-        fn notify(&self, op: &TableOp<String, Rc<UnitConfig>>) {
+    impl TableSubscribe<String, UnitDepConf> for UnitDepConfigsTest {
+        fn notify(&self, op: &TableOp<String, UnitDepConf>) {
             match op {
-                TableOp::TableInsert(_, config) => {
-                    *self.name.borrow_mut() = config.get_name().to_string()
+                TableOp::TableInsert(_, ud_conf) => {
+                    *self.len.borrow_mut() = ud_conf.deps.len();
                 }
-                TableOp::TableRemove(_, _) => *self.name.borrow_mut() = String::from(""),
+                TableOp::TableRemove(_, _) => *self.len.borrow_mut() = 0,
             }
         }
     }
@@ -171,13 +157,9 @@ mod tests {
     }
 
     impl TableSubscribe<String, UnitState> for UnitStatesTest {
-        fn filter(&self, _op: &TableOp<String, UnitState>) -> bool {
-            true
-        }
-
         fn notify(&self, op: &TableOp<String, UnitState>) {
             match op {
-                TableOp::TableInsert(_, state) => *self.ns.borrow_mut() = state.get_ns(),
+                TableOp::TableInsert(_, state) => *self.ns.borrow_mut() = state.ns,
                 TableOp::TableRemove(_, _) => {}
             }
         }

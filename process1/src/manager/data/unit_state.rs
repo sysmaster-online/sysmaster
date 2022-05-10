@@ -17,25 +17,13 @@ pub enum UnitNotifyFlags {
 
 #[derive(Debug)]
 pub struct UnitState {
-    os: UnitActiveState,
-    ns: UnitActiveState,
-    flags: isize,
+    pub os: UnitActiveState,
+    pub ns: UnitActiveState,
+    pub flags: isize,
 }
 
 impl UnitState {
     pub fn new(os: UnitActiveState, ns: UnitActiveState, flags: isize) -> UnitState {
         UnitState { os, ns, flags }
-    }
-
-    pub fn get_os(&self) -> UnitActiveState {
-        self.os
-    }
-
-    pub fn get_ns(&self) -> UnitActiveState {
-        self.ns
-    }
-
-    pub fn get_flags(&self) -> isize {
-        self.flags
     }
 }

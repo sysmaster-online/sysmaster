@@ -1,21 +1,31 @@
+use super::unit_sets::UnitSets;
 use crate::manager::data::UnitRelations;
+use crate::manager::table::{TableOp, TableSubscribe};
+use crate::manager::unit::unit_base::{self, UnitRelationAtom};
 use crate::manager::unit::unit_entry::UnitX;
-use crate::manager::unit::unit_relation::{self};
-use crate::manager::unit::unit_relation_atom::{self, UnitRelationAtom};
 use crate::manager::unit::UnitErrno;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub(super) struct UnitDep {
-    data: RefCell<UnitDepData>,
+    // associated objects
+    units: Rc<UnitSets>,
+
+    // owned objects
+    sub_name: String, // key for table-subscriber: UnitSets
+    sub: Rc<UnitDepSub>,
 }
 
 impl UnitDep {
-    pub(super) fn new() -> UnitDep {
-        UnitDep {
-            data: RefCell::new(UnitDepData::new()),
-        }
+    pub(super) fn new(unitsr: &Rc<UnitSets>) -> UnitDep {
+        let ud = UnitDep {
+            units: Rc::clone(unitsr),
+            sub_name: String::from("UnitDep"),
+            sub: Rc::new(UnitDepSub::new()),
+        };
+        ud.register(unitsr);
+        ud
     }
 
     pub(super) fn insert(
@@ -27,27 +37,28 @@ impl UnitDep {
         source_mask: u16,
     ) -> Result<(), UnitErrno> {
         source.dep_check(relation, &dest)?;
-        self.data
+        self.sub
+            .data
             .borrow_mut()
             .insert(source, relation, dest, reference, source_mask);
         Ok(())
     }
 
     pub(super) fn remove(&self, source: &UnitX, relation: UnitRelations, dest: &UnitX) {
-        self.data.borrow_mut().remove(source, relation, dest)
+        self.sub.data.borrow_mut().remove(source, relation, dest)
     }
 
     pub(super) fn remove_unit(&self, source: &UnitX) {
-        self.data.borrow_mut().remove_unit(source)
+        self.sub.data.borrow_mut().remove_unit(source)
     }
 
     pub(super) fn gets(&self, source: &UnitX, relation: UnitRelations) -> Vec<Rc<UnitX>> {
-        self.data.borrow().gets(source, relation)
+        self.sub.data.borrow().gets(source, relation)
     }
 
     pub(super) fn gets_atom(&self, source: &UnitX, atom: UnitRelationAtom) -> Vec<Rc<UnitX>> {
         let mut dests = Vec::new();
-        for relation in unit_relation_atom::unit_relation_from_unique_atom(atom).iter() {
+        for relation in unit_base::unit_relation_from_unique_atom(atom).iter() {
             dests.append(&mut self.gets(source, *relation));
         }
         dests
@@ -59,7 +70,7 @@ impl UnitDep {
         relation: UnitRelations,
         dest: &UnitX,
     ) -> bool {
-        self.data.borrow().is_dep_with(source, relation, dest)
+        self.sub.data.borrow().is_dep_with(source, relation, dest)
     }
 
     pub(super) fn is_dep_atom_with(
@@ -68,13 +79,44 @@ impl UnitDep {
         atom: UnitRelationAtom,
         dest: &UnitX,
     ) -> bool {
-        for relation in unit_relation_atom::unit_relation_from_unique_atom(atom).iter() {
+        for relation in unit_base::unit_relation_from_unique_atom(atom).iter() {
             if self.is_dep_with(source, *relation, dest) {
                 // something hits
                 return true;
             }
         }
         false
+    }
+
+    fn register(&self, unitsr: &UnitSets) {
+        let subscriber = Rc::clone(&self.sub);
+        unitsr.register(&self.sub_name, subscriber);
+    }
+}
+
+struct UnitDepSub {
+    data: RefCell<UnitDepData>,
+}
+
+impl TableSubscribe<String, Rc<UnitX>> for UnitDepSub {
+    fn notify(&self, op: &TableOp<String, Rc<UnitX>>) {
+        match op {
+            TableOp::TableInsert(_, _) => {} // do nothing
+            TableOp::TableRemove(_, unit) => self.remove_unit(unit),
+        }
+    }
+}
+
+// the declaration "pub(self)" is for identification only.
+impl UnitDepSub {
+    pub(self) fn new() -> UnitDepSub {
+        UnitDepSub {
+            data: RefCell::new(UnitDepData::new()),
+        }
+    }
+
+    fn remove_unit(&self, unit: &UnitX) {
+        self.data.borrow_mut().remove_unit(unit)
     }
 }
 
@@ -118,7 +160,7 @@ impl UnitDepData {
             source: 0,
             dest: source_mask,
         };
-        let relation_inverse = unit_relation::unit_relation_to_inverse(relation);
+        let relation_inverse = unit_base::unit_relation_to_inverse(relation);
 
         // insert in two-directions way
         self.insert_one_way(Rc::clone(&source), relation, Rc::clone(&dest), mask);
@@ -132,7 +174,7 @@ impl UnitDepData {
         // process reference in two-directions way
         if reference {
             let ref_relation = UnitRelations::UnitReferences;
-            let ref_relation_inverse = unit_relation::unit_relation_to_inverse(ref_relation);
+            let ref_relation_inverse = unit_base::unit_relation_to_inverse(ref_relation);
             self.insert_one_way(Rc::clone(&source), ref_relation, Rc::clone(&dest), mask);
             self.insert_one_way(
                 Rc::clone(&dest),
@@ -145,7 +187,7 @@ impl UnitDepData {
 
     pub(self) fn remove(&mut self, source: &UnitX, relation: UnitRelations, dest: &UnitX) {
         // remove in two-directions way
-        let relation_inverse = unit_relation::unit_relation_to_inverse(relation);
+        let relation_inverse = unit_base::unit_relation_to_inverse(relation);
         self.remove_one_way(source, relation, dest);
         self.remove_one_way(dest, relation_inverse, source);
     }
@@ -249,16 +291,16 @@ impl UnitDepData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::{DataManager, UnitType};
-    use crate::manager::unit::unit_file::UnitFile;
-    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+    use crate::manager::data::DataManager;
+    use crate::manager::unit::uload_util::{UnitFile, UnitParserMgr};
+    use crate::manager::unit::unit_base::UnitType;
     use crate::plugin::Plugin;
-    use std::sync::Arc;
     use utils::logger;
 
     #[test]
     fn dep_insert() {
-        let dep = UnitDep::new();
+        let sets = UnitSets::new();
+        let dep = UnitDep::new(&Rc::new(sets));
         let name_test1 = String::from("test1.service");
         let unit_test1 = create_unit(&name_test1);
         let name_test2 = String::from("test2.service");
@@ -297,7 +339,8 @@ mod tests {
 
     #[test]
     fn dep_gets_atom() {
-        let dep = UnitDep::new();
+        let sets = UnitSets::new();
+        let dep = UnitDep::new(&Rc::new(sets));
         let name_test1 = String::from("test1.service");
         let unit_test1 = create_unit(&name_test1);
         let name_test2 = String::from("test2.service");
@@ -348,7 +391,8 @@ mod tests {
 
     #[test]
     fn dep_is_dep_atom_with() {
-        let dep = UnitDep::new();
+        let sets = UnitSets::new();
+        let dep = UnitDep::new(&Rc::new(sets));
         let name_test1 = String::from("test1.service");
         let unit_test1 = create_unit(&name_test1);
         let name_test2 = String::from("test2.service");
@@ -424,12 +468,12 @@ mod tests {
         let file = Rc::new(UnitFile::new());
         let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
         let unit_type = UnitType::UnitService;
-        let plugins = Arc::clone(&Plugin::get_instance());
+        let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();
         Rc::new(UnitX::new(
-            dm,
-            file,
-            unit_conf_parser_mgr,
+            &dm,
+            &file,
+            &unit_conf_parser_mgr,
             unit_type,
             name,
             subclass.into_unitobj(),

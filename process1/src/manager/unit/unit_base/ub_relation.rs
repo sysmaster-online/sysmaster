@@ -1,6 +1,7 @@
+#![warn(unused_imports)]
 use crate::manager::data::UnitRelations;
 
-pub(super) fn unit_relation_to_inverse(relation: UnitRelations) -> UnitRelations {
+pub(in crate::manager::unit) fn unit_relation_to_inverse(relation: UnitRelations) -> UnitRelations {
     match relation {
         UnitRelations::UnitRequires => UnitRelations::UnitRequiresBy,
         UnitRelations::UnitRequisite => UnitRelations::UnitRequisiteOf,

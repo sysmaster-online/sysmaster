@@ -1,6 +1,6 @@
 use super::unit_sets::UnitSets;
 use crate::manager::signals::ProcessExit;
-
+use crate::manager::table::{TableOp, TableSubscribe};
 use crate::manager::unit::unit_entry::UnitX;
 use nix::sys::signal::Signal;
 use nix::sys::wait::{WaitPidFlag, WaitStatus};
@@ -11,14 +11,23 @@ use std::error::Error;
 use std::rc::Rc;
 
 pub(super) struct UnitChild {
+    // associated objects
+    units: Rc<UnitSets>,
+
+    // owned objects
+    sub_name: String, // key for table-subscriber: UnitSets
     data: Rc<UnitChildData>,
 }
 
 impl UnitChild {
-    pub(super) fn new(units: Rc<UnitSets>) -> UnitChild {
-        UnitChild {
-            data: Rc::new(UnitChildData::new(units)),
-        }
+    pub(super) fn new(unitsr: &Rc<UnitSets>) -> UnitChild {
+        let uc = UnitChild {
+            units: Rc::clone(unitsr),
+            sub_name: String::from("UnitChild"),
+            data: Rc::new(UnitChildData::new()),
+        };
+        uc.register(unitsr);
+        uc
     }
 
     pub(super) fn dispatch_sigchld(&self) -> Result<(), Box<dyn Error>> {
@@ -26,24 +35,39 @@ impl UnitChild {
     }
 
     pub(super) fn add_watch_pid(&self, pid: Pid, id: &str) {
-        self.data.add_watch_pid(pid, id)
+        let unit = self.units.get(id).unwrap();
+        log::debug!("borrow add watch_pids for {} {}", pid, id);
+        self.data.add_watch_pid(pid, unit)
     }
 
     pub(super) fn unwatch_pid(&self, pid: Pid) {
+        log::debug!("borrow remove watch_pids for {}", pid);
         self.data.unwatch_pid(pid)
+    }
+
+    fn register(&self, unitsr: &UnitSets) {
+        let subscriber = Rc::clone(&self.data);
+        unitsr.register(&self.sub_name, subscriber);
     }
 }
 
 struct UnitChildData {
-    units: Rc<UnitSets>,
     watch_pids: RefCell<HashMap<Pid, Rc<UnitX>>>, // key: pid, value: unit
+}
+
+impl TableSubscribe<String, Rc<UnitX>> for UnitChildData {
+    fn notify(&self, op: &TableOp<String, Rc<UnitX>>) {
+        match op {
+            TableOp::TableInsert(_, _) => {} // do nothing
+            TableOp::TableRemove(_, unit) => self.remove_unit(unit),
+        }
+    }
 }
 
 // the declaration "pub(self)" is for identification only.
 impl UnitChildData {
-    pub(self) fn new(units: Rc<UnitSets>) -> UnitChildData {
+    pub(self) fn new() -> UnitChildData {
         UnitChildData {
-            units,
             watch_pids: RefCell::new(HashMap::new()),
         }
     }
@@ -90,27 +114,27 @@ impl UnitChildData {
         }
     }
 
-    pub(self) fn add_watch_pid(&self, pid: Pid, id: &str) {
-        let unit = self.units.get(id).unwrap();
-        log::debug!("borrow add watch_pids for {} {}", pid, id);
+    pub(self) fn add_watch_pid(&self, pid: Pid, unit: Rc<UnitX>) {
         let mut watch_pids = self.watch_pids.borrow_mut();
         watch_pids.insert(pid, unit);
     }
 
     pub(self) fn unwatch_pid(&self, pid: Pid) {
-        log::debug!("borrow remove watch_pids for {}", pid);
         self.watch_pids.borrow_mut().remove(&pid);
+    }
+
+    fn remove_unit(&self, _unit: &UnitX) {
+        todo!();
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::{DataManager, UnitType};
-    use crate::manager::unit::unit_file::UnitFile;
-    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+    use crate::manager::data::DataManager;
+    use crate::manager::unit::uload_util::{UnitFile, UnitParserMgr};
+    use crate::manager::unit::unit_base::UnitType;
     use crate::plugin::Plugin;
-    use std::sync::Arc;
     use utils::logger;
 
     #[test]
@@ -118,7 +142,7 @@ mod tests {
     fn child_add_watch_pid_empty() {
         let sets = UnitSets::new();
         let name_test3 = String::from("test3.service");
-        let child = UnitChild::new(Rc::new(sets));
+        let child = UnitChild::new(&Rc::new(sets));
         let pid = Pid::from_raw(1);
 
         child.add_watch_pid(pid, &name_test3);
@@ -133,7 +157,7 @@ mod tests {
         let unit_test2 = create_unit(&name_test2);
         sets.insert(name_test1.clone(), Rc::clone(&unit_test1));
         sets.insert(name_test2.clone(), Rc::clone(&unit_test2));
-        let child = UnitChild::new(Rc::new(sets));
+        let child = UnitChild::new(&Rc::new(sets));
         let pid1 = Pid::from_raw(1);
         let pid2 = Pid::from_raw(2);
 
@@ -155,7 +179,7 @@ mod tests {
         let unit_test2 = create_unit(&name_test2);
         sets.insert(name_test1.clone(), Rc::clone(&unit_test1));
         sets.insert(name_test2.clone(), Rc::clone(&unit_test2));
-        let child = UnitChild::new(Rc::new(sets));
+        let child = UnitChild::new(&Rc::new(sets));
         let pid1 = Pid::from_raw(1);
         let pid2 = Pid::from_raw(2);
 
@@ -179,12 +203,12 @@ mod tests {
         let file = Rc::new(UnitFile::new());
         let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
         let unit_type = UnitType::UnitService;
-        let plugins = Arc::clone(&Plugin::get_instance());
+        let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();
         Rc::new(UnitX::new(
-            dm,
-            file,
-            unit_conf_parser_mgr,
+            &dm,
+            &file,
+            &unit_conf_parser_mgr,
             unit_type,
             name,
             subclass.into_unitobj(),

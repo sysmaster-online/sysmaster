@@ -1,9 +1,8 @@
 #![warn(unused_imports)]
 use super::job_entry::{JobConf, JobKind};
-use crate::manager::data::JobMode;
+use crate::manager::unit::unit_base::{JobMode, UnitRelationAtom};
 use crate::manager::unit::unit_datastore::UnitDb;
 use crate::manager::unit::unit_entry::UnitX;
-use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
 use std::rc::Rc;
 
 pub(super) fn job_notify_result(

@@ -1,22 +1,28 @@
-use super::uu_config::{InstallConfOption, UnitConfOption};
-use crate::manager::data::{DataManager, JobMode, UnitConfig, UnitRelations, UnitType};
-use crate::manager::unit::unit_base::{self, UnitLoadState};
-use crate::manager::unit::unit_parser_mgr::{SECTION_INSTALL, SECTION_UNIT};
+use super::uu_config::{UeConfig, UnitConfigItem};
+use crate::manager::data::{DataManager, UnitDepConf, UnitRelations};
+use crate::manager::unit::uload_util::{
+    UnitConfigParser, UnitFile, UnitParserMgr, SECTION_INSTALL, SECTION_UNIT,
+};
+use crate::manager::unit::unit_base::{self, JobMode, UnitLoadState, UnitType};
+use crate::null_str;
+use conf_option::{InstallConfOption, UnitConfOption};
 use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
 use utils::unit_conf::{ConfValue, Confs};
 
-use crate::null_str;
-
 //#[derive(Debug)]
 pub(super) struct UeLoad {
     // associated objects
     dm: Rc<DataManager>,
-    // key
-    id: String,
+    file: Rc<UnitFile>,
+    unit_conf_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
+    config: Rc<UeConfig>,
 
-    // data
+    // owned objects
+    /* key */
+    id: String,
+    /* data */
     load_state: RefCell<UnitLoadState>,
     config_file_path: RefCell<String>,
     config_file_mtime: RefCell<u128>,
@@ -26,9 +32,19 @@ pub(super) struct UeLoad {
 }
 
 impl UeLoad {
-    pub(super) fn new(dm: Rc<DataManager>, id: String) -> UeLoad {
+    pub(super) fn new(
+        dmr: &Rc<DataManager>,
+        filer: &Rc<UnitFile>,
+        unit_conf_mgrr: &Rc<UnitParserMgr<UnitConfigParser>>,
+        configr: &Rc<UeConfig>,
+        id: String,
+    ) -> UeLoad {
         UeLoad {
-            dm,
+            dm: Rc::clone(dmr),
+            config: Rc::clone(configr),
+            file: Rc::clone(filer),
+            unit_conf_mgr: Rc::clone(unit_conf_mgrr),
+
             id,
             load_state: RefCell::new(UnitLoadState::UnitStub),
             config_file_path: RefCell::new(null_str!("")),
@@ -52,7 +68,7 @@ impl UeLoad {
         *self.in_load_queue.borrow_mut() = t;
     }
 
-    pub(super) fn set_config_file_path(&self, config_filepath: &str) {
+    fn set_config_file_path(&self, config_filepath: &str) {
         self.config_file_path.borrow_mut().clear();
         self.config_file_path.borrow_mut().push_str(config_filepath);
     }
@@ -61,11 +77,42 @@ impl UeLoad {
         *self.in_load_queue.borrow() == true
     }
 
+    pub(super) fn unit_load(&self, confs: &Confs) -> Result<(), Box<dyn Error>> {
+        *self.in_load_queue.borrow_mut() = false;
+        match self.parse(confs) {
+            Ok(_conf) => {
+                return Ok(());
+            }
+            Err(e) => {
+                return Err(format!("{}", e.to_string()).into());
+            }
+        }
+    }
+
+    pub(super) fn get_unit_confs(&self) -> Result<Confs, Box<dyn Error>> {
+        self.build_name_map();
+        if let Some(p) = self.get_unit_file_path() {
+            self.set_config_file_path(&p);
+            let unit_type = unit_base::unit_name_to_type(&self.id); //best use of owner not name,need reconstruct
+            match self
+                .unit_conf_mgr
+                .unit_file_parser(&unit_type.to_string(), &p)
+            {
+                Ok(confs) => return Ok(confs),
+                Err(e) => {
+                    return Err(format!("{}", e.to_string()).into());
+                }
+            }
+        } else {
+            return Err(format!("Unit[ {}] file Not found", self.id).into());
+        }
+    }
+
     fn parse_unit_relation(
         &self,
         unit_name: &str,
         relation: UnitRelations,
-        u_config: &mut UnitConfig,
+        ud_conf: &mut UnitDepConf,
     ) -> Result<(), Box<dyn Error>> {
         log::debug!(
             "parse relation unit relation name is {}, relation is {:?}",
@@ -77,7 +124,7 @@ impl UeLoad {
         if unit_type == UnitType::UnitTypeInvalid {
             return Err(format!("invalid unit type of unit {}", unit_name).into());
         }
-        u_config.add_deps((relation, String::from(unit_name)));
+        ud_conf.deps.push((relation, String::from(unit_name)));
         Ok(())
     }
 
@@ -85,12 +132,12 @@ impl UeLoad {
         &self,
         confvalue: Vec<ConfValue>,
         relation: UnitRelations,
-        u_config: &mut UnitConfig,
+        ud_conf: &mut UnitDepConf,
     ) -> Result<(), Box<dyn Error>> {
         for value in confvalue.iter() {
             if let ConfValue::String(val) = value {
                 // zan shi zhe me chuli yinggai jiang unit quan bu jiexi chulai
-                let result = self.parse_unit_relation(val, relation, u_config);
+                let result = self.parse_unit_relation(val, relation, ud_conf);
                 if let Err(r) = result {
                     return Err(r);
                 }
@@ -98,8 +145,9 @@ impl UeLoad {
         }
         Ok(())
     }
-    pub(super) fn parse(&self, confs: &Confs) -> Result<(), Box<dyn Error>> {
-        let mut u_config = UnitConfig::new(); // need get config from config database,and update depends here
+
+    fn parse(&self, confs: &Confs) -> Result<(), Box<dyn Error>> {
+        let mut ud_conf = UnitDepConf::new(); // need get config from config database,and update depends here
         let unit_section = confs.get_section_by_name(SECTION_UNIT);
         if unit_section.is_none() {
             return Err(format!(
@@ -144,7 +192,7 @@ impl UeLoad {
                     let result = self.parse_unit_relations(
                         conf_values,
                         UnitRelations::UnitWantsBy,
-                        &mut u_config,
+                        &mut ud_conf,
                     );
                     if let Err(r) = result {
                         return Err(r);
@@ -154,7 +202,7 @@ impl UeLoad {
                     let result = self.parse_unit_relations(
                         conf_values,
                         UnitRelations::UnitRequiresBy,
-                        &mut u_config,
+                        &mut ud_conf,
                     );
                     if let Err(r) = result {
                         return Err(r);
@@ -164,7 +212,7 @@ impl UeLoad {
                     let result = set_base_config(conf_values);
 
                     if let ConfValue::String(_s) = result {
-                        u_config.set_install_alias(_s);
+                        self.config.set(UnitConfigItem::UcItemInsAlias(_s));
                     } else {
                         if let ConfValue::Error(_s) = result {
                             return Err(format!(
@@ -180,7 +228,7 @@ impl UeLoad {
                 _ if key == InstallConfOption::Also.to_string() => {
                     let result = set_base_config(conf_values);
                     if let ConfValue::String(_s) = result {
-                        u_config.set_install_also(_s);
+                        self.config.set(UnitConfigItem::UcItemInsAlso(_s));
                     } else {
                         if let ConfValue::Error(_s) = result {
                             return Err(format!(
@@ -211,7 +259,7 @@ impl UeLoad {
                     let result = self.parse_unit_relations(
                         confvalue,
                         UnitRelations::UnitWants,
-                        &mut u_config,
+                        &mut ud_conf,
                     );
                     if let Err(r) = result {
                         return Err(r);
@@ -222,7 +270,7 @@ impl UeLoad {
                     let result = self.parse_unit_relations(
                         confvalue,
                         UnitRelations::UnitBefore,
-                        &mut u_config,
+                        &mut ud_conf,
                     );
                     if let Err(r) = result {
                         return Err(r);
@@ -233,7 +281,7 @@ impl UeLoad {
                     let result = self.parse_unit_relations(
                         confvalue,
                         UnitRelations::UnitBefore,
-                        &mut u_config,
+                        &mut ud_conf,
                     );
                     if let Err(r) = result {
                         return Err(r);
@@ -244,7 +292,7 @@ impl UeLoad {
                     let result = self.parse_unit_relations(
                         confvalue,
                         UnitRelations::UnitRequires,
-                        &mut u_config,
+                        &mut ud_conf,
                     );
                     if let Err(r) = result {
                         return Err(r);
@@ -254,7 +302,7 @@ impl UeLoad {
                 _ if key == UnitConfOption::Desc.to_string() => {
                     let confvalue = set_base_config(conf.get_values());
                     if let ConfValue::String(str) = confvalue {
-                        u_config.set_desc(str);
+                        self.config.set(UnitConfigItem::UcItemDesc(str));
                     } else {
                         if let ConfValue::Error(_s) = confvalue {
                             return Err(format!(
@@ -270,7 +318,7 @@ impl UeLoad {
                 _ if key == UnitConfOption::Documentation.to_string() => {
                     let confvalue = set_base_config(conf.get_values());
                     if let ConfValue::String(str) = confvalue {
-                        u_config.set_documentation(str.to_string())
+                        self.config.set(UnitConfigItem::UcItemDoc(str.to_string()));
                     } else {
                         if let ConfValue::Error(_s) = confvalue {
                             return Err(format!(
@@ -286,7 +334,7 @@ impl UeLoad {
                 _ if key == UnitConfOption::AllowIsolate.to_string() => {
                     let confvalue = set_base_config(conf.get_values());
                     if let ConfValue::Boolean(v) = confvalue {
-                        u_config.set_allow_isolate(v);
+                        self.config.set(UnitConfigItem::UcItemAllowIsolate(v));
                     } else {
                         if let ConfValue::Error(_s) = confvalue {
                             return Err(format!(
@@ -302,7 +350,7 @@ impl UeLoad {
                 _ if key == UnitConfOption::IgnoreOnIolate.to_string() => {
                     let confvalue = set_base_config(conf.get_values());
                     if let ConfValue::Boolean(v) = confvalue {
-                        u_config.set_ignore_on_isolate(v);
+                        self.config.set(UnitConfigItem::UcItemIgnoreOnIsolate(v));
                     } else {
                         if let ConfValue::Error(_s) = confvalue {
                             return Err(format!(
@@ -318,7 +366,8 @@ impl UeLoad {
                 _ if key == UnitConfOption::OnSucessJobMode.to_string() => {
                     let confvalue = set_base_config(conf.get_values());
                     if let ConfValue::String(_str) = confvalue {
-                        u_config.set_on_success_job_mode(JobMode::JobReplace);
+                        self.config
+                            .set(UnitConfigItem::UcItemOnSucJobMode(JobMode::JobReplace));
                     } else {
                         if let ConfValue::Error(_s) = confvalue {
                             return Err(format!(
@@ -334,7 +383,8 @@ impl UeLoad {
                 _ if key == UnitConfOption::OnFailureJobMode.to_string() => {
                     let confvalue = set_base_config(conf.get_values());
                     if let ConfValue::Boolean(_str) = confvalue {
-                        u_config.set_on_failure_job_mode(JobMode::JobReplace);
+                        self.config
+                            .set(UnitConfigItem::UcItemOnFailJobMode(JobMode::JobReplace));
                     } else {
                         if let ConfValue::Error(_s) = confvalue {
                             return Err(format!(
@@ -357,19 +407,96 @@ impl UeLoad {
             }
         }
 
-        self.dm
-            .insert_unit_config(self.id.clone(), Rc::new(u_config));
+        self.dm.insert_ud_config(self.id.clone(), ud_conf);
         Ok(())
     }
 
-    pub(super) fn unit_load(&self, confs: &Confs) -> Result<(), Box<dyn Error>> {
-        *self.in_load_queue.borrow_mut() = false;
-        match self.parse(confs) {
-            Ok(_conf) => {
-                return Ok(());
+    fn build_name_map(&self) {
+        self.file.build_name_map();
+    }
+
+    fn get_unit_file_path(&self) -> Option<String> {
+        match self.file.get_unit_file_path(&self.id) {
+            Some(v) => return Some(v.to_string()),
+            None => {
+                log::error!("not find unit file {}", &self.id);
+                None
             }
-            Err(e) => {
-                return Err(format!("{}", e.to_string()).into());
+        }
+    }
+}
+
+mod conf_option {
+
+    use crate::manager::data::UnitRelations;
+    use core::fmt::{Display, Formatter, Result};
+
+    pub(super) enum UnitConfOption {
+        Desc,
+        Documentation,
+        Relation(UnitRelations),
+        AllowIsolate,
+        IgnoreOnIolate,
+        OnSucessJobMode,
+        OnFailureJobMode,
+    }
+
+    impl Display for UnitConfOption {
+        fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+            match self {
+                UnitConfOption::Desc => write!(f, "Description"),
+                UnitConfOption::Documentation => write!(f, "Documentation"),
+                UnitConfOption::Relation(relation) => write!(f, "{}", relation),
+                UnitConfOption::AllowIsolate => write!(f, "AllowIsolate"),
+                UnitConfOption::IgnoreOnIolate => write!(f, "IgnoreOnIolate"),
+                UnitConfOption::OnSucessJobMode => write!(f, "OnSucessJobMode"),
+                UnitConfOption::OnFailureJobMode => write!(f, "OnFailureJobMode"),
+            }
+        }
+    }
+
+    impl From<UnitConfOption> for String {
+        fn from(unit_conf_opt: UnitConfOption) -> Self {
+            match unit_conf_opt {
+                UnitConfOption::Desc => "Desc".into(),
+                UnitConfOption::Documentation => "Documentation".into(),
+                UnitConfOption::Relation(relation) => relation.into(),
+                UnitConfOption::AllowIsolate => "AllowIsolate".into(),
+                UnitConfOption::IgnoreOnIolate => "IgnoreOnIolate".into(),
+                UnitConfOption::OnSucessJobMode => "OnSucessJobMode".into(),
+                UnitConfOption::OnFailureJobMode => "OnFailureJobMode".into(),
+            }
+        }
+    }
+
+    pub(super) enum InstallConfOption {
+        Alias,
+        WantedBy,
+        RequiredBy,
+        Also,
+        DefaultInstance,
+    }
+
+    impl Display for InstallConfOption {
+        fn fmt(&self, fmt: &mut Formatter<'_>) -> Result {
+            match self {
+                InstallConfOption::Alias => write!(fmt, "Alias"),
+                InstallConfOption::WantedBy => write!(fmt, "WantedBy"),
+                InstallConfOption::RequiredBy => write!(fmt, "RequiredBy"),
+                InstallConfOption::Also => write!(fmt, "Also"),
+                InstallConfOption::DefaultInstance => write!(fmt, "DefaultInstance"),
+            }
+        }
+    }
+
+    impl From<InstallConfOption> for String {
+        fn from(install_conf_opt: InstallConfOption) -> Self {
+            match install_conf_opt {
+                InstallConfOption::Alias => "Alias".into(),
+                InstallConfOption::WantedBy => "WantedBy".into(),
+                InstallConfOption::RequiredBy => "RequiredBy".into(),
+                InstallConfOption::Also => "Also".into(),
+                InstallConfOption::DefaultInstance => "DefaultInstance".into(),
             }
         }
     }

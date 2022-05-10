@@ -3,10 +3,9 @@ use super::job_alloc::JobAlloc;
 use super::job_entry::{Job, JobConf, JobInfo, JobKind, JobResult};
 use super::job_unit_entry::JobUnit;
 use super::JobErrno;
-use crate::manager::data::{JobMode, UnitConfigItem};
+use crate::manager::unit::unit_base::{JobMode, UnitRelationAtom};
 use crate::manager::unit::unit_datastore::UnitDb;
-use crate::manager::unit::unit_entry::UnitX;
-use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
+use crate::manager::unit::unit_entry::{UnitConfigItem, UnitX};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
@@ -129,14 +128,28 @@ impl JobTable {
         // synchronize table-id: nothing changed
     }
 
-    pub(super) fn remove_unit(&self, unit: &UnitX) {
+    pub(super) fn remove_unit(&self, unit: &UnitX) -> (Option<Rc<Job>>, Vec<Rc<Job>>) {
+        // get jobs
+        let del_trigger = match self.t_unit.get_trigger_info(unit) {
+            Some((job, _)) => Some(job),
+            None => None,
+        };
+        let del_suspends = self.t_unit.get_suspends(unit);
+
         // table-id
-        for job in self.t_unit.get_suspends(unit).iter() {
+        if del_trigger.is_some() {
+            let job = del_trigger.as_ref().cloned().unwrap();
+            self.t_id.borrow_mut().remove(&job.get_id());
+        }
+
+        for job in del_suspends.iter() {
             self.t_id.borrow_mut().remove(&job.get_id());
         }
 
         // table-unit
         self.t_unit.remove_unit(unit);
+
+        (del_trigger, del_suspends)
     }
 
     pub(super) fn clear(&self) {
@@ -923,11 +936,10 @@ impl JobUnitTableData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::{DataManager, UnitType};
-    use crate::manager::unit::unit_file::UnitFile;
-    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+    use crate::manager::data::DataManager;
+    use crate::manager::unit::uload_util::{UnitFile, UnitParserMgr};
+    use crate::manager::unit::unit_base::UnitType;
     use crate::plugin::Plugin;
-    use std::sync::Arc;
     use utils::logger;
 
     #[test]
@@ -953,12 +965,12 @@ mod tests {
         let file = Rc::new(UnitFile::new());
         let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
         let unit_type = UnitType::UnitService;
-        let plugins = Arc::clone(&Plugin::get_instance());
+        let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();
         Rc::new(UnitX::new(
-            dm,
-            file,
-            unit_conf_parser_mgr,
+            &dm,
+            &file,
+            &unit_conf_parser_mgr,
             unit_type,
             name,
             subclass.into_unitobj(),

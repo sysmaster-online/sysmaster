@@ -3,11 +3,10 @@ use super::job_alloc::JobAlloc;
 use super::job_entry::{self, Job, JobConf, JobKind, JobResult};
 use super::job_table::JobTable;
 use super::JobErrno;
-use crate::manager::data::{JobMode, UnitConfigItem};
 use crate::manager::unit::unit_base::UnitActionError;
+use crate::manager::unit::unit_base::{JobMode, UnitRelationAtom};
 use crate::manager::unit::unit_datastore::UnitDb;
-use crate::manager::unit::unit_entry::UnitX;
-use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
+use crate::manager::unit::unit_entry::{UnitConfigItem, UnitX};
 use std::rc::Rc;
 
 pub(super) fn job_trans_expand(

@@ -1,9 +1,10 @@
 #![allow(unused_imports)]
-pub use job_entry::{JobConf, JobInfo, JobKind, JobResult, JobStage};
-pub use job_manager::{JobAffect, JobManager};
+pub(super) use job_entry::JobConf;
+pub(in crate::manager) use job_entry::{JobInfo, JobKind, JobResult, JobStage};
+pub(super) use job_manager::{JobAffect, JobManager};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum JobErrno {
+pub(super) enum JobErrno {
     JobErrInput,
     JobErrConflict,
     JobErrNotExisted,

@@ -1,36 +1,56 @@
 use super::u_entry::{Unit, UnitObj};
-use super::uu_config::UeConfig;
-use crate::manager::data::{
-    DataManager, UnitActiveState, UnitConfig, UnitConfigItem, UnitRelations, UnitType,
-};
-use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState};
-use crate::manager::unit::unit_file::UnitFile;
-use crate::manager::unit::unit_parser_mgr::{UnitConfigParser, UnitParserMgr};
+use super::uu_config::UnitConfigItem;
+use crate::manager::data::{DataManager, UnitActiveState, UnitRelations};
+use crate::manager::unit::uload_util::{UnitConfigParser, UnitFile, UnitParserMgr};
+use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
 use crate::manager::unit::UnitErrno;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
-use std::any::Any;
 use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
 use utils::IN_SET;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UnitX(Rc<Unit>);
+pub(in crate::manager) struct UnitX(Rc<Unit>);
 
 impl UnitX {
-    pub fn init(&self) {}
-    pub fn done(&self) {}
-    pub fn load(&self) -> Result<(), Box<dyn Error>> {
+    pub(in crate::manager) fn dump(&self) {}
+
+    pub(in crate::manager::unit) fn new(
+        dmr: &Rc<DataManager>,
+        filer: &Rc<UnitFile>,
+        unit_conf_mgrr: &Rc<UnitParserMgr<UnitConfigParser>>,
+        unit_type: UnitType,
+        name: &str,
+        subclass: Box<dyn UnitObj>,
+    ) -> UnitX {
+        let sub_obj = RefCell::new(subclass);
+        let unit = Rc::new(Unit::new(
+            unit_type,
+            name,
+            dmr,
+            filer,
+            unit_conf_mgrr,
+            sub_obj,
+        ));
+
+        unit.attach_unit(&unit);
+
+        UnitX(unit)
+    }
+
+    pub(in crate::manager::unit) fn init(&self) {}
+    pub(in crate::manager::unit) fn done(&self) {}
+    pub(in crate::manager::unit) fn load(&self) -> Result<(), Box<dyn Error>> {
         self.0.load_unit()
     }
-    pub fn try_load(&self) -> Result<(), UnitActionError> {
+    pub(in crate::manager::unit) fn try_load(&self) -> Result<(), UnitActionError> {
         // transaction_add_job_and_dependencies: bus_unit_validate_load_state + manager_unit_cache_should_retry_load + unit_load + bus_unit_validate_load_state
         todo!();
     }
-    pub fn coldplug(&self) {}
-    pub fn dump(&self) {}
-    pub fn start(&self) -> Result<(), UnitActionError> {
+    pub(in crate::manager::unit) fn coldplug(&self) {}
+    pub(in crate::manager::unit) fn start(&self) -> Result<(), UnitActionError> {
         let state = self.0.current_active_state();
 
         if state == UnitActiveState::UnitMaintenance {
@@ -43,7 +63,7 @@ impl UnitX {
 
         self.0.start()
     }
-    pub fn stop(&self) -> Result<(), UnitActionError> {
+    pub(in crate::manager::unit) fn stop(&self) -> Result<(), UnitActionError> {
         let state = self.0.current_active_state();
 
         if IN_SET!(
@@ -56,118 +76,64 @@ impl UnitX {
 
         self.0.stop()
     }
-    pub fn reload(&self) -> Result<(), UnitActionError> {
+    pub(in crate::manager::unit) fn reload(&self) -> Result<(), UnitActionError> {
         todo!();
     }
 
-    pub fn kill(&self) {}
-    pub fn check_gc(&self) -> bool {
-        todo!();
-    }
-    pub fn release_resources(&self) {}
-    pub fn check_snapshot(&self) {}
-    pub fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
+    pub(in crate::manager::unit) fn kill(&self) {}
+    pub(in crate::manager::unit) fn release_resources(&self) {}
+    pub(in crate::manager::unit) fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
         self.0.sigchld_events(pid, code, signal)
     }
-    pub fn reset_failed(&self) {}
-    pub fn trigger(&self, _other: &Self) {}
-    pub fn in_load_queue(&self) -> bool {
+    pub(in crate::manager::unit) fn reset_failed(&self) {}
+    pub(in crate::manager::unit) fn trigger(&self, _other: &Self) {}
+    pub(in crate::manager::unit) fn in_load_queue(&self) -> bool {
         self.0.in_load_queue()
     }
 
-    pub fn set_in_load_queue(&self, t: bool) {
+    pub(in crate::manager::unit) fn set_in_load_queue(&self, t: bool) {
         self.0.set_in_load_queue(t);
     }
-    pub fn dep_check(&self, _relation: UnitRelations, _other: &UnitX) -> Result<(), UnitErrno> {
+    pub(in crate::manager::unit) fn dep_check(
+        &self,
+        _relation: UnitRelations,
+        _other: &UnitX,
+    ) -> Result<(), UnitErrno> {
         // unit_add_dependency: check input
 
         Ok(())
     }
-    pub fn eq(&self, _other: &UnitX) -> bool {
-        todo!();
-    }
-    pub fn hash(&self) -> u64 {
-        todo!();
-    }
-    pub fn as_any(&self) -> &dyn Any {
-        todo!();
-    }
 
-    pub fn get_id(&self) -> &str {
+    pub(in crate::manager::unit) fn get_id(&self) -> &str {
         self.0.get_id()
     }
-    pub fn set_config(&self, _config: &UnitConfig) {
-        let name = _config.get_name();
-        if !name.is_empty() {
-            let mut ue_config = UeConfig::new();
-            ue_config.set(UnitConfigItem::UcItemName(name.to_string()));
-            ue_config.set(UnitConfigItem::UcItemDesc((&_config.desc).to_string()));
-            ue_config.set(UnitConfigItem::UcItemDoc(
-                (&_config.documentation).to_string(),
-            ));
-            ue_config.set(UnitConfigItem::UcItemAllowIsolate(_config.allow_isolate));
-            ue_config.set(UnitConfigItem::UcItemAllowIsolate(_config.allow_isolate));
-            ue_config.set(UnitConfigItem::UcItemIgnoreOnIsolate(
-                _config.ignore_on_isolate,
-            ));
-            ue_config.set(UnitConfigItem::UcItemOnSucJobMode(
-                _config.on_success_job_mode,
-            ));
-            ue_config.set(UnitConfigItem::UcItemOnFailJobMode(
-                _config.on_failure_job_mode,
-            ));
-            self.0.set_config(ue_config);
-        }
-    }
 
-    pub fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
+    pub(in crate::manager::unit) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
         self.0.get_config(item)
     }
 
-    pub fn get_state(&self) -> UnitActiveState {
+    pub(in crate::manager::unit) fn get_state(&self) -> UnitActiveState {
         //UnitActiveState::UnitActive
         self.0.current_active_state()
         //todo!();
     }
-    pub fn get_perpetual(&self) -> bool {
+    pub(in crate::manager::unit) fn get_perpetual(&self) -> bool {
         todo!();
     }
-    pub fn can_start(&self) -> bool {
+    pub(in crate::manager::unit) fn can_start(&self) -> bool {
         todo!();
     }
-    pub fn can_stop(&self) -> bool {
+    pub(in crate::manager::unit) fn can_stop(&self) -> bool {
         todo!();
     }
-    pub fn can_reload(&self) -> bool {
+    pub(in crate::manager::unit) fn can_reload(&self) -> bool {
         todo!();
     }
-    pub fn is_load_complete(&self) -> bool {
+    pub(in crate::manager::unit) fn is_load_complete(&self) -> bool {
         todo!();
     }
 
-    pub fn get_private_conf_section_name(&self) -> Option<String> {
+    pub(in crate::manager::unit) fn get_private_conf_section_name(&self) -> Option<String> {
         self.0.get_private_conf_section_name()
-    }
-    pub(in crate::manager::unit) fn new(
-        dm: Rc<DataManager>,
-        file: Rc<UnitFile>,
-        unit_conf_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
-        unit_type: UnitType,
-        name: &str,
-        subclass: Box<dyn UnitObj>,
-    ) -> UnitX {
-        let sub_obj = Rc::new(RefCell::new(subclass));
-        let unit = Rc::new(Unit::new(
-            Rc::clone(&dm),
-            file,
-            unit_conf_mgr,
-            unit_type,
-            name,
-            sub_obj.clone(),
-        ));
-
-        sub_obj.borrow_mut().attach_unit(unit.clone());
-
-        UnitX(unit)
     }
 }

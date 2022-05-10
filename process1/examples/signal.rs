@@ -1,9 +1,5 @@
+use process1::manager::{Action, ManagerX, Mode};
 use std::env;
-use std::rc::Rc;
-
-use event::EventState;
-use event::Events;
-use process1::manager::{signals::Signals, DataManager, UnitManagerX};
 
 use utils::logger;
 
@@ -20,19 +16,14 @@ fn main() {
     r_s.push_str("target/release;");
     env::set_var("PROCESS_LIB_LOAD_PATH", r_s.as_str());
 
-    let event1 = Rc::new(Events::new().unwrap());
-    let _dm = Rc::new(DataManager::new());
-    let um = Rc::new(UnitManagerX::new(Rc::clone(&_dm), event1.clone()));
-    let signal = Rc::new(Signals::new(um.clone()));
+    const MODE: Mode = Mode::SYSTEM;
+    const ACTION: Action = Action::RUN;
+    let manager = ManagerX::new(MODE, ACTION);
 
-    event1.add_source(signal.clone()).unwrap();
-    event1.set_enabled(signal.clone(), EventState::On).unwrap();
     let unit_name = String::from("config.service");
 
     {
-        um.start_unit(&unit_name).unwrap();
+        manager.start_unit(&unit_name).unwrap();
     }
     log::debug!("event runing");
-    println!("event: {:?}", event1);
-    event1.run(0).unwrap();
 }

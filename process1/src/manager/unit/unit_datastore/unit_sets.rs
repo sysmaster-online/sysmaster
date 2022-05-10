@@ -1,74 +1,58 @@
+use crate::manager::table::{Table, TableSubscribe};
 use crate::manager::unit::unit_entry::UnitX;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub(super) struct UnitSets {
-    data: RefCell<UnitSetsData>,
+    t: RefCell<Table<String, Rc<UnitX>>>,
 }
 
 impl UnitSets {
     pub(super) fn new() -> UnitSets {
         UnitSets {
-            data: RefCell::new(UnitSetsData::new()),
+            t: RefCell::new(Table::new()),
         }
     }
 
     pub(super) fn insert(&self, name: String, unit: Rc<UnitX>) -> Option<Rc<UnitX>> {
-        self.data.borrow_mut().insert(name, unit)
+        self.t.borrow_mut().insert(name, unit)
     }
 
     pub(super) fn remove(&self, name: &str) -> Option<Rc<UnitX>> {
-        self.data.borrow_mut().remove(name)
+        self.t.borrow_mut().remove(&name.to_string())
     }
 
     pub(super) fn get(&self, name: &str) -> Option<Rc<UnitX>> {
-        self.data.borrow().get(name)
+        self.t.borrow().get(&name.to_string()).cloned()
     }
 
     pub(super) fn get_all(&self) -> Vec<Rc<UnitX>> {
-        self.data.borrow().get_all()
-    }
-}
-
-struct UnitSetsData {
-    t: HashMap<String, Rc<UnitX>>, // key: string, value: unit
-}
-
-// the declaration "pub(self)" is for identification only.
-impl UnitSetsData {
-    pub(self) fn new() -> UnitSetsData {
-        UnitSetsData { t: HashMap::new() }
-    }
-
-    pub(self) fn insert(&mut self, name: String, unit: Rc<UnitX>) -> Option<Rc<UnitX>> {
-        self.t.insert(name, unit)
-    }
-
-    pub(self) fn remove(&mut self, name: &str) -> Option<Rc<UnitX>> {
-        self.t.remove(name)
-    }
-
-    pub(self) fn get(&self, name: &str) -> Option<Rc<UnitX>> {
-        self.t.get(name).cloned()
-    }
-
-    pub(self) fn get_all(&self) -> Vec<Rc<UnitX>> {
         self.t
+            .borrow()
+            .get_all()
             .iter()
-            .map(|(_, ur)| Rc::clone(ur))
+            .map(|ur| Rc::clone(ur))
             .collect::<Vec<_>>()
+    }
+
+    pub(super) fn register(
+        &self,
+        sub_name: &str,
+        subscriber: Rc<dyn TableSubscribe<String, Rc<UnitX>>>,
+    ) -> Option<Rc<dyn TableSubscribe<String, Rc<UnitX>>>> {
+        self.t
+            .borrow_mut()
+            .subscribe(sub_name.to_string(), subscriber)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::{DataManager, UnitType};
-    use crate::manager::unit::unit_file::UnitFile;
-    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+    use crate::manager::data::DataManager;
+    use crate::manager::unit::uload_util::{UnitFile, UnitParserMgr};
+    use crate::manager::unit::unit_base::UnitType;
     use crate::plugin::Plugin;
-    use std::sync::Arc;
     use utils::logger;
 
     #[test]
@@ -169,12 +153,12 @@ mod tests {
         let file = Rc::new(UnitFile::new());
         let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
         let unit_type = UnitType::UnitService;
-        let plugins = Arc::clone(&Plugin::get_instance());
+        let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();
         Rc::new(UnitX::new(
-            dm,
-            file,
-            unit_conf_parser_mgr,
+            &dm,
+            &file,
+            &unit_conf_parser_mgr,
             unit_type,
             name,
             subclass.into_unitobj(),

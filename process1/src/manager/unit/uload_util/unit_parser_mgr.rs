@@ -5,17 +5,18 @@ use utils::config_parser::ConfigParser;
 use utils::unit_conf::{ConfFactory, Section, SectionType};
 use utils::{config_parser::ConfigParse, unit_conf::Confs};
 
-pub(in crate::manager) const SECTION_UNIT: &str = "Unit";
-pub(in crate::manager) const SECTION_INSTALL: &str = "Install";
-pub struct UnitParserMgr<T> {
+pub(in crate::manager::unit) const SECTION_UNIT: &str = "Unit";
+pub(in crate::manager::unit) const SECTION_INSTALL: &str = "Install";
+pub(in crate::manager::unit) struct UnitParserMgr<T> {
     config_parsers: RefCell<HashMap<String, T>>,
 }
 
+// the declaration "pub(self)" is for identification only.
 impl<T> UnitParserMgr<T>
 where
     T: ConfigParse,
 {
-    pub(super) fn new() -> Self {
+    pub(self) fn new() -> Self {
         Self {
             config_parsers: RefCell::new(HashMap::new()),
         }
@@ -23,7 +24,7 @@ where
     /*
      *Different unit have different conf format,so need default parser
      */
-    pub(super) fn register_parser(&self, unit_type: String, config_parse: T) {
+    pub(self) fn register_parser(&self, unit_type: String, config_parse: T) {
         if self.config_parsers.borrow().get(&unit_type).is_some() {
             return;
         }
@@ -32,7 +33,7 @@ where
             .insert(unit_type, config_parse);
     }
 
-    pub(in crate::manager) fn unit_file_parser(
+    pub(in crate::manager::unit) fn unit_file_parser(
         &self,
         unit_type: &str,
         file_path: &str,
@@ -70,7 +71,8 @@ where
         u_t_parser.toml_file_parse(&buf)
     }
 }
-pub struct UnitConfigParser(ConfigParser<DefalutFactory>);
+
+pub(in crate::manager::unit) struct UnitConfigParser(ConfigParser<DefalutFactory>);
 
 impl ConfigParse for UnitConfigParser {
     fn toml_file_parse(&self, file_content: &str) -> Result<Confs, IoError> {
@@ -93,13 +95,17 @@ impl Default for UnitParserMgr<UnitConfigParser> {
 }
 
 impl UnitParserMgr<UnitConfigParser> {
-    pub fn register_parser_by_private_section_name(&self, unit_type: String, section_name: String) {
+    pub(in crate::manager::unit) fn register_parser_by_private_section_name(
+        &self,
+        unit_type: String,
+        section_name: String,
+    ) {
         let config_parse = UnitConfigParser::new(unit_type.to_string(), section_name);
         self.register_parser(unit_type, config_parse);
     }
 }
 
-pub(in crate::manager) struct DefalutFactory(String);
+struct DefalutFactory(String);
 
 impl ConfFactory for DefalutFactory {
     fn product_confs(&self) -> Confs {
