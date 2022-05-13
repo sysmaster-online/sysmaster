@@ -237,14 +237,14 @@ pub fn cg_kill_recursive(
 }
 
 mod tests {
-
     #[test]
-    fn get_cg_abs_path() {
-        let cg_path = std::path::PathBuf::from("system.slice");
-        if let Ok(p) = super::cg_abs_path(&cg_path, &std::path::PathBuf::from("")) {
+    fn test_get_cg_abs_path() {
+        use std::path::PathBuf;
+        let cg_path = PathBuf::from("system.slice");
+        if let Ok(p) = super::cg_abs_path(&cg_path, &PathBuf::from("")) {
             assert_eq!(
                 p,
-                std::path::PathBuf::from("/sys/fs/cgroup/systemd.slice/cgroup.procs")
+                PathBuf::from("/sys/fs/cgroup/systemd.slice/cgroup.procs")
             )
         }
     }

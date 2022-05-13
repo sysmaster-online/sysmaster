@@ -2,8 +2,8 @@ pub use data::{UnitActiveState, UnitNotifyFlags, UnitRelations};
 pub(super) use manager::Manager;
 pub use manager::{Action, ManagerX, Mode, Stats};
 pub use unit::{
-    CommandLine, ExecParameters, ExecSpawn, KillOperation, Unit, UnitActionError, UnitManager,
-    UnitMngUtil, UnitObj, UnitSubClass, UnitType,
+    ExecCmdError, ExecCommand, ExecContext, ExecParameters, KillOperation, Unit, UnitActionError,
+    UnitManager, UnitMngUtil, UnitObj, UnitSubClass, UnitType,
 };
 
 #[derive(Debug)]

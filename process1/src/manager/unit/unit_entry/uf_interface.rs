@@ -6,7 +6,6 @@ use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
 use crate::manager::unit::UnitErrno;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
-use std::cell::RefCell;
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -25,11 +24,8 @@ impl UnitX {
         name: &str,
         subclass: Box<dyn UnitObj>,
     ) -> UnitX {
-        let sub_obj = RefCell::new(subclass);
-        let unit = Rc::new(Unit::new(unit_type, name, dmr, filer, sub_obj));
-
+        let unit = Rc::new(Unit::new(unit_type, name, dmr, filer, subclass));
         unit.attach_unit(&unit);
-
         UnitX(unit)
     }
 
