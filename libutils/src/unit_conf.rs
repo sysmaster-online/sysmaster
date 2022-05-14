@@ -1,3 +1,5 @@
+use serde::{Serialize,Deserialize};
+
 pub struct Conf(String, ConfValue);
 
 #[derive(Debug)]
@@ -8,6 +10,35 @@ pub enum ConfValue {
     Boolean(bool),
     Array(Vec<ConfValue>),
     Error(String),
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitConf{
+    name: String,
+    desc: String,
+    documnetation: String,
+    install_alias: String,
+    install_also: String,
+    install_default_install: String,
+    allow_isolate: bool,
+    ignore_on_isolate: bool,
+    on_success_job_mode: String,
+    on_failure_job_mode: String,
+    wants: String,
+    requires: String,
+    before:String,
+    after:String
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallConf{
+    alias:String,
+    wanted_by:String,
+    required_by:String,
+    also:String,
+    default_instance:String,
 }
 
 pub enum SectionType {
@@ -60,6 +91,8 @@ impl Conf {
         ve
     }
 }
+
+
 
 pub struct Section<Conf>(String, SectionType, Vec<Conf>);
 

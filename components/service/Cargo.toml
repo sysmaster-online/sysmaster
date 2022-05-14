@@ -17,3 +17,4 @@ strum = { version = "0.23", features = ["derive"] }
 nix = "0.23.0"
 log = "0.4"
 regex = "1"
+config_proc_macro = {path = "../../config_proc_macro"}

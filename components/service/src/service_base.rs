@@ -4,6 +4,46 @@ use std::fmt;
 use std::rc::Rc;
 
 use process1::manager::{KillOperation, UnitActiveState};
+use config_proc_macro::ConfigParseM;
+
+#[derive(Serialize, Deserialize,ConfigParseM)]
+#[serdeName("Service")]
+pub struct ServiceConf {
+    #[serde(alias = "Type")]
+    pub service_type: Option<String>,
+    #[serde(alias = "ExecStart")]
+    pub exec_start: Option<String>,
+    #[serde(alias = "Sockets")]
+    pub sockets: Option<String>,
+    #[serde(alias = "Restart")]
+    pub restart: Option<String>,
+    #[serde(alias = "RestrictRealtime")]
+    pub restrict_realtime: Option<String>,
+    #[serde(alias = "RebootArgument")]
+    pub reboot_argument: Option<String>,
+    #[serde(alias = "ExecReload")]
+    pub exec_reload: Option<String>,
+    #[serde(alias = "OOMScoreAdjust")]
+    pub oom_score_adjust: Option<String>,
+    #[serde(alias = "RestartSec")]
+    pub restart_sec: Option<u64>,
+    #[serde(alias = "Slice")]
+    pub slice: Option<String>,
+    #[serde(alias = "MemoryLimit")]
+    pub memory_limit: Option<u64>,
+    #[serde(alias = "MemoryLow")]
+    pub memory_low: Option<u64>,
+    #[serde(alias = "MemoryMin")]
+    pub memory_min: Option<u64>,
+    #[serde(alias = "MemoryMax")]
+    pub memory_max: Option<u64>,
+    #[serde(alias = "MemoryHigh")]
+    pub memory_high: Option<u64>,
+    #[serde(alias = "MemorySwapMax")]
+    pub memory_swap_max: Option<u64>,
+}
+
+
 
 #[derive(PartialEq, EnumString, Display, Debug)]
 pub(in crate) enum ServiceTimeoutFailureMode {

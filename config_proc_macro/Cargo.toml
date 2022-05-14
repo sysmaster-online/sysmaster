@@ -1,0 +1,19 @@
+[package]
+name = "config_proc_macro"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+utils = { path = "../libutils" }
+syn = {version="1.0", features=["extra-traits"]}
+quote = {version = "1.0"}
+proc-macro2 = {version = "1.0"}
+strum = { version = "0.23", features = ["derive"] }
+serde_derive = "1.0.130"
+serde = "1.0.130"
+toml = "0.5.8"

@@ -4,6 +4,7 @@ use super::uu_load::UeLoad;
 use crate::manager::data::{DataManager, UnitActiveState, UnitState};
 use crate::manager::unit::uload_util::{UnitConfigParser, UnitFile, UnitParserMgr};
 use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
+
 use log;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
@@ -12,7 +13,6 @@ use std::cmp::Ordering;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
-use utils::unit_conf::{Conf, Section};
 
 pub struct Unit {
     // associated objects
@@ -57,7 +57,8 @@ impl Hash for Unit {
 pub trait UnitObj {
     fn init(&self) {}
     fn done(&self) {}
-    fn load(&mut self, section: &Section<Conf>) -> Result<(), Box<dyn Error>>;
+    fn load(&mut self, conf_str:&str) -> Result<(), Box<dyn Error>>;
+
     fn coldplug(&self) {}
     fn dump(&self) {}
     fn start(&mut self) -> Result<(), UnitActionError> {
@@ -77,6 +78,8 @@ pub trait UnitObj {
     fn get_private_conf_section_name(&self) -> Option<&str>;
     fn current_active_state(&self) -> UnitActiveState;
     fn attach_unit(&mut self, unit: Rc<Unit>);
+
+
 }
 
 impl Unit {
@@ -135,28 +138,16 @@ impl Unit {
 
     pub(super) fn load_unit(&self) -> Result<(), Box<dyn Error>> {
         self.set_in_load_queue(false);
-        match self.load.get_unit_confs() {
+        match self.load.load_unit_confs() {
             Ok(confs) => {
-                let result = self.load.unit_load(&confs);
-                if let Err(s) = result {
-                    self.load.set_load_state(UnitLoadState::UnitError);
-                    return Err(s);
-                }
-                let _ret;
-                let private_section_name = self.get_private_conf_section_name();
-                if let Some(p_s_name) = private_section_name {
-                    let _section = confs.get_section_by_name(&p_s_name);
-                    let _result = _section.map(|s| self.sub.borrow_mut().load(s));
-                    if let Some(r) = _result {
-                        _ret = r.map(|_s| self.load.set_load_state(UnitLoadState::UnitLoaded));
-                    } else {
-                        _ret = Err(format!("load Unit {} failed", self.id).into());
-                    }
+                let str_buf = confs.to_string();
+                let ret = self.sub.borrow_mut().load(&str_buf);
+                if let Ok(_) = ret {
+                    self.load.set_load_state(UnitLoadState::UnitLoaded);
                 } else {
-                    _ret = Err(format!("Cann't found private section conf for {}", self.id).into());
+                    return  Err(format!("load Unit {} failed", self.id).into());
                 }
-                self.load.set_load_state(UnitLoadState::UnitLoaded);
-                _ret
+                ret
             }
             Err(e) => {
                 self.load.set_load_state(UnitLoadState::UnitNotFound);

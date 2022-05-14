@@ -9,6 +9,7 @@ edition = "2018"
 [lib]
 crate-type = ["lib"]
 name = "utils"
+proc-macro = true
 
 [dependencies]
 toml = "0.5.8"
@@ -20,3 +21,4 @@ thiserror = "1.0"
 anyhow = "1.0"
 http = "0.2.6"
 procfs = "0.12.0"
+

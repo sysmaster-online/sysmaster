@@ -1,7 +1,7 @@
 use std::default::Default;
 use std::io::{Error as IoError, ErrorKind};
 use std::{cell::RefCell, collections::HashMap, fs::File, io::Read};
-use utils::config_parser::ConfigParser;
+use utils::config_parser::{ConfigParser};
 use utils::unit_conf::{ConfFactory, Section, SectionType};
 use utils::{config_parser::ConfigParse, unit_conf::Confs};
 
@@ -38,6 +38,7 @@ where
         unit_type: &str,
         file_path: &str,
     ) -> Result<Confs, IoError> {
+        
         let u_parser_map = self.config_parsers.borrow();
         let u_parser = u_parser_map.get(unit_type);
         let u_t_parser = match u_parser {
@@ -75,6 +76,7 @@ where
 pub(in crate::manager::unit) struct UnitConfigParser(ConfigParser<DefalutFactory>);
 
 impl ConfigParse for UnitConfigParser {
+    type Item = u32;
     fn toml_file_parse(&self, file_content: &str) -> Result<Confs, IoError> {
         self.0.toml_file_parse(file_content)
     }

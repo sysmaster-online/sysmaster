@@ -1,20 +1,40 @@
-use crate::unit_conf::{Conf, ConfFactory, ConfValue};
+use crate::unit_conf::{Conf,ConfFactory, ConfValue};
+use crate::unit_conf::Confs;
 use std::io::{Error as IOError, ErrorKind};
-use toml::Value;
+use toml::{Value};
 
-use super::unit_conf::Confs;
-pub trait ConfigParse {
+
+pub trait ConfigParse{
+    type Item;
     fn toml_file_parse(&self, file_content: &str) -> Result<Confs, IOError>;
+    fn  conf_file_parser(&self,_file_content: &str) -> Result<Option<Self::Item>,IOError>{
+        Ok(None)
+    }
 }
+
+pub fn toml_str_parse(file_content: &str) -> Result<Value,IOError>{
+    let conf: Value = match toml::from_str(file_content) {
+        Ok(conf) => conf,
+        Err(why) => {
+            return Err(IOError::new(
+                ErrorKind::Other,
+                format!("translate string to struct failed{}", why),
+            ));
+        }
+    };
+    Ok(conf)
+}
+
 pub struct ConfigParser<T: ConfFactory>(String, T);
 
 impl<T> ConfigParser<T>
 where
     T: ConfFactory,
-{
+{ 
     pub fn new(unit_type: String, factory: T) -> Self {
         Self(unit_type, factory)
     }
+
 }
 
 fn convert_value_to_confvalue(value: &Value) -> Option<ConfValue> {
@@ -33,7 +53,8 @@ fn convert_value_to_confvalue(value: &Value) -> Option<ConfValue> {
     }
 }
 
-impl<T: ConfFactory> ConfigParse for ConfigParser<T> {
+impl<'a,T: ConfFactory> ConfigParse for ConfigParser<T> {
+    type Item = u32;
     fn toml_file_parse(&self, file_content: &str) -> Result<Confs, IOError> {
         let conf: Value = match toml::from_str(file_content) {
             Ok(conf) => conf,

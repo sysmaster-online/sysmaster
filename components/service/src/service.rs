@@ -24,6 +24,7 @@ use process1::manager::UnitActionError;
 
 const LOG_LEVEL: u32 = 4;
 const PLUGIN_NAME: &str = "ServiceUnit";
+
 #[allow(dead_code)]
 #[derive(Default)]
 pub struct ServiceUnit {
@@ -783,8 +784,10 @@ impl UnitObj for ServiceUnit {
     fn done(&self) {
         todo!()
     }
-    fn load(&mut self, section: &Section<Conf>) -> Result<(), Box<dyn Error>> {
-        self.parse(section)?;
+    fn load(&mut self, conf_str: &str) -> Result<(), Box<dyn Error>> {
+        let service_parser = ServiceConf::builder_paser();
+        let service_conf: ServiceConf = service_parser.conf_file_parser(section);
+        //self.parse(section)?;
 
         self.service_add_extras();
 

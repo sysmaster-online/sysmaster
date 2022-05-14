@@ -6,6 +6,7 @@ members = [
   "sysmonitor",
   "systemd",
   "libutils",
+  "config_proc_macro",
   "tests",
   "components/service",
 ]

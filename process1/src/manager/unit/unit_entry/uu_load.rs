@@ -1,4 +1,4 @@
-use super::uu_config::{UeConfig, UnitConfigItem};
+use super::uu_config::{UeConfig, UnitConfigItem, UeConfigUnit, UeConfigInstall};
 use crate::manager::data::{DataManager, UnitDepConf, UnitRelations};
 use crate::manager::unit::uload_util::{
     UnitConfigParser, UnitFile, UnitParserMgr, SECTION_INSTALL, SECTION_UNIT,
@@ -6,11 +6,13 @@ use crate::manager::unit::uload_util::{
 use crate::manager::unit::unit_base::{self, JobMode, UnitLoadState, UnitType};
 use crate::null_str;
 use conf_option::{InstallConfOption, UnitConfOption};
+use toml::Value;
+use utils::config_parser::ConfigParse;
 use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
 use utils::unit_conf::{ConfValue, Confs};
-
+use super::uu_config_parse;
 //#[derive(Debug)]
 pub(super) struct UeLoad {
     // associated objects
@@ -58,7 +60,7 @@ impl UeLoad {
     pub(super) fn set_load_state(&self, load_state: UnitLoadState) {
         *self.load_state.borrow_mut() = load_state;
     }
-
+    
     pub(super) fn get_load_state(&self) -> UnitLoadState {
         let state = self.load_state.clone();
         state.into_inner()
@@ -77,28 +79,34 @@ impl UeLoad {
         *self.in_load_queue.borrow() == true
     }
 
-    pub(super) fn unit_load(&self, confs: &Confs) -> Result<(), Box<dyn Error>> {
-        *self.in_load_queue.borrow_mut() = false;
-        match self.parse(confs) {
-            Ok(_conf) => {
-                return Ok(());
-            }
-            Err(e) => {
-                return Err(format!("{}", e.to_string()).into());
-            }
-        }
-    }
 
-    pub(super) fn get_unit_confs(&self) -> Result<Confs, Box<dyn Error>> {
+    pub(super) fn load_unit_confs(&self) -> Result<Value, Box<dyn Error>> {
         self.build_name_map();
         if let Some(p) = self.get_unit_file_path() {
             self.set_config_file_path(&p);
-            let unit_type = unit_base::unit_name_to_type(&self.id); //best use of owner not name,need reconstruct
-            match self
-                .unit_conf_mgr
-                .unit_file_parser(&unit_type.to_string(), &p)
+            let _unit_type = unit_base::unit_name_to_type(&self.id); //best use of owner not name,need reconstruct
+            match uu_config_parse::unit_file_parser(&p)
             {
-                Ok(confs) => return Ok(confs),
+                Ok(values) => {
+                    let str_buf = values.to_string();
+                    let unit_parser = UeConfigUnit::builder_paser();
+                    let config_unit = unit_parser.conf_file_parser(&str_buf);
+                    let install_parser = UeConfigInstall::builder_paser();
+                    let install = install_parser.conf_file_parser(&str_buf);
+                    let ret1 = install.map(|_conf|{
+                        self.config.set_installconf(_conf.unwrap());
+                    });
+                    if ret1.is_err(){
+                        return Err(format!("parse unit install config for unit [{}] err{:?}",self.id,ret1.err()).into());
+                    }
+                    let ret2 = config_unit.map(|_unit|{
+                        self.config.set_unitconf(_unit.unwrap());
+                    });
+                    if ret2.is_err(){
+                        return Err(format!("parse unit config for unit [{}]  err{:?}",self.id,ret2.err()).into());
+                    }
+                    return Ok(values);
+                }
                 Err(e) => {
                     return Err(format!("{}", e.to_string()).into());
                 }
@@ -146,10 +154,11 @@ impl UeLoad {
         Ok(())
     }
 
-    fn parse(&self, confs: &Confs) -> Result<(), Box<dyn Error>> {
+    fn parse(&self) -> Result<(), Box<dyn Error>> {
         let mut ud_conf = UnitDepConf::new(); // need get config from config database,and update depends here
+        let wants = self.config.get_wants();
         let unit_section = confs.get_section_by_name(SECTION_UNIT);
-        if unit_section.is_none() {
+        if unit_section.is_none(){
             return Err(format!(
                 "config file format is error,section [{}]  not found",
                 SECTION_UNIT
@@ -164,25 +173,6 @@ impl UeLoad {
             )
             .into());
         }
-        //let parse_unit_relations = |relation| {};
-        let set_base_config = |mut conf_values: Vec<ConfValue>| {
-            let conf_value = conf_values.pop();
-            let err_str = "Config file format is error";
-            let result = conf_value.map_or_else(
-                || ConfValue::Error(err_str.to_string()),
-                |v| {
-                    if let ConfValue::String(str) = v {
-                        ConfValue::String(str)
-                    } else if let ConfValue::Boolean(v) = v {
-                        ConfValue::Boolean(v)
-                    } else {
-                        ConfValue::Error(err_str.to_string())
-                    }
-                },
-            );
-            return result;
-        };
-
         let confs = unit_install.unwrap().get_confs();
         for conf in confs.iter() {
             let key = conf.get_key();
@@ -206,39 +196,6 @@ impl UeLoad {
                     );
                     if let Err(r) = result {
                         return Err(r);
-                    }
-                }
-                _ if key == InstallConfOption::Alias.to_string() => {
-                    let result = set_base_config(conf_values);
-
-                    if let ConfValue::String(_s) = result {
-                        self.config.set(UnitConfigItem::UcItemInsAlias(_s));
-                    } else {
-                        if let ConfValue::Error(_s) = result {
-                            return Err(format!(
-                                "{},Section [{}] Conf[{}] value is not supported",
-                                _s,
-                                SECTION_INSTALL,
-                                InstallConfOption::Alias
-                            )
-                            .into());
-                        }
-                    }
-                }
-                _ if key == InstallConfOption::Also.to_string() => {
-                    let result = set_base_config(conf_values);
-                    if let ConfValue::String(_s) = result {
-                        self.config.set(UnitConfigItem::UcItemInsAlso(_s));
-                    } else {
-                        if let ConfValue::Error(_s) = result {
-                            return Err(format!(
-                                "{},Section [{}] Conf[{}] value is not supported",
-                                _s,
-                                SECTION_INSTALL,
-                                InstallConfOption::Alias
-                            )
-                            .into());
-                        }
                     }
                 }
                 _ => {
@@ -298,105 +255,6 @@ impl UeLoad {
                         return Err(r);
                     }
                 }
-
-                _ if key == UnitConfOption::Desc.to_string() => {
-                    let confvalue = set_base_config(conf.get_values());
-                    if let ConfValue::String(str) = confvalue {
-                        self.config.set(UnitConfigItem::UcItemDesc(str));
-                    } else {
-                        if let ConfValue::Error(_s) = confvalue {
-                            return Err(format!(
-                                "{},Section [{}] Conf[{}] value is not supported",
-                                _s,
-                                SECTION_INSTALL,
-                                UnitConfOption::Desc
-                            )
-                            .into());
-                        }
-                    }
-                }
-                _ if key == UnitConfOption::Documentation.to_string() => {
-                    let confvalue = set_base_config(conf.get_values());
-                    if let ConfValue::String(str) = confvalue {
-                        self.config.set(UnitConfigItem::UcItemDoc(str.to_string()));
-                    } else {
-                        if let ConfValue::Error(_s) = confvalue {
-                            return Err(format!(
-                                "{},Section [{}] Conf[{}] value is not supported",
-                                _s,
-                                SECTION_UNIT,
-                                UnitConfOption::Documentation
-                            )
-                            .into());
-                        }
-                    }
-                }
-                _ if key == UnitConfOption::AllowIsolate.to_string() => {
-                    let confvalue = set_base_config(conf.get_values());
-                    if let ConfValue::Boolean(v) = confvalue {
-                        self.config.set(UnitConfigItem::UcItemAllowIsolate(v));
-                    } else {
-                        if let ConfValue::Error(_s) = confvalue {
-                            return Err(format!(
-                                "{},Section [{}] Conf[{}] value is not supported",
-                                _s,
-                                SECTION_UNIT,
-                                UnitConfOption::AllowIsolate
-                            )
-                            .into());
-                        }
-                    }
-                }
-                _ if key == UnitConfOption::IgnoreOnIolate.to_string() => {
-                    let confvalue = set_base_config(conf.get_values());
-                    if let ConfValue::Boolean(v) = confvalue {
-                        self.config.set(UnitConfigItem::UcItemIgnoreOnIsolate(v));
-                    } else {
-                        if let ConfValue::Error(_s) = confvalue {
-                            return Err(format!(
-                                "{},Section [{}] Conf[{}] value is not supported",
-                                _s,
-                                SECTION_UNIT,
-                                UnitConfOption::IgnoreOnIolate
-                            )
-                            .into());
-                        }
-                    }
-                }
-                _ if key == UnitConfOption::OnSucessJobMode.to_string() => {
-                    let confvalue = set_base_config(conf.get_values());
-                    if let ConfValue::String(_str) = confvalue {
-                        self.config
-                            .set(UnitConfigItem::UcItemOnSucJobMode(JobMode::JobReplace));
-                    } else {
-                        if let ConfValue::Error(_s) = confvalue {
-                            return Err(format!(
-                                "{},Section [{}] Conf[{}] value is not supported",
-                                _s,
-                                SECTION_UNIT,
-                                UnitConfOption::OnSucessJobMode
-                            )
-                            .into());
-                        }
-                    }
-                }
-                _ if key == UnitConfOption::OnFailureJobMode.to_string() => {
-                    let confvalue = set_base_config(conf.get_values());
-                    if let ConfValue::Boolean(_str) = confvalue {
-                        self.config
-                            .set(UnitConfigItem::UcItemOnFailJobMode(JobMode::JobReplace));
-                    } else {
-                        if let ConfValue::Error(_s) = confvalue {
-                            return Err(format!(
-                                "{},Section [{}] Conf[{}] value is not supported",
-                                _s,
-                                SECTION_UNIT,
-                                UnitConfOption::OnFailureJobMode
-                            )
-                            .into());
-                        }
-                    }
-                }
                 _ => {
                     return Err(format!(
                         "config file of {}  section format is error",
@@ -428,76 +286,9 @@ impl UeLoad {
 
 mod conf_option {
 
-    use crate::manager::data::UnitRelations;
-    use core::fmt::{Display, Formatter, Result};
+   
 
-    pub(super) enum UnitConfOption {
-        Desc,
-        Documentation,
-        Relation(UnitRelations),
-        AllowIsolate,
-        IgnoreOnIolate,
-        OnSucessJobMode,
-        OnFailureJobMode,
-    }
 
-    impl Display for UnitConfOption {
-        fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-            match self {
-                UnitConfOption::Desc => write!(f, "Description"),
-                UnitConfOption::Documentation => write!(f, "Documentation"),
-                UnitConfOption::Relation(relation) => write!(f, "{}", relation),
-                UnitConfOption::AllowIsolate => write!(f, "AllowIsolate"),
-                UnitConfOption::IgnoreOnIolate => write!(f, "IgnoreOnIolate"),
-                UnitConfOption::OnSucessJobMode => write!(f, "OnSucessJobMode"),
-                UnitConfOption::OnFailureJobMode => write!(f, "OnFailureJobMode"),
-            }
-        }
-    }
-
-    impl From<UnitConfOption> for String {
-        fn from(unit_conf_opt: UnitConfOption) -> Self {
-            match unit_conf_opt {
-                UnitConfOption::Desc => "Desc".into(),
-                UnitConfOption::Documentation => "Documentation".into(),
-                UnitConfOption::Relation(relation) => relation.into(),
-                UnitConfOption::AllowIsolate => "AllowIsolate".into(),
-                UnitConfOption::IgnoreOnIolate => "IgnoreOnIolate".into(),
-                UnitConfOption::OnSucessJobMode => "OnSucessJobMode".into(),
-                UnitConfOption::OnFailureJobMode => "OnFailureJobMode".into(),
-            }
-        }
-    }
-
-    pub(super) enum InstallConfOption {
-        Alias,
-        WantedBy,
-        RequiredBy,
-        Also,
-        DefaultInstance,
-    }
-
-    impl Display for InstallConfOption {
-        fn fmt(&self, fmt: &mut Formatter<'_>) -> Result {
-            match self {
-                InstallConfOption::Alias => write!(fmt, "Alias"),
-                InstallConfOption::WantedBy => write!(fmt, "WantedBy"),
-                InstallConfOption::RequiredBy => write!(fmt, "RequiredBy"),
-                InstallConfOption::Also => write!(fmt, "Also"),
-                InstallConfOption::DefaultInstance => write!(fmt, "DefaultInstance"),
-            }
-        }
-    }
-
-    impl From<InstallConfOption> for String {
-        fn from(install_conf_opt: InstallConfOption) -> Self {
-            match install_conf_opt {
-                InstallConfOption::Alias => "Alias".into(),
-                InstallConfOption::WantedBy => "WantedBy".into(),
-                InstallConfOption::RequiredBy => "RequiredBy".into(),
-                InstallConfOption::Also => "Also".into(),
-                InstallConfOption::DefaultInstance => "DefaultInstance".into(),
-            }
-        }
-    }
+    
+   
 }
