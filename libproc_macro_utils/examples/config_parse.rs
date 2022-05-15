@@ -92,27 +92,6 @@ ExecCondition = ["/usr/bin/sleep 5"]
 ExecStart = ["/usr/bin/echo 'test'"]
 ExecStop = ["/usr/bin/kill $MAINPID"]
     "###;
-    let value: toml::Value = toml::from_str(r#str).unwrap();
-    println!("{}", value);
-    let v = toml_str_parse(str).unwrap();
-    println!("{}", v);
-    let vt = v.as_table().unwrap();
-    let _t = vt.get("Service");
-    /*let y:Result<ConfTest,IoError> = _t.map_or(Err(IoError::new(
-        ErrorKind::Other,
-        format!("config file not Contain Section{}", "Service")
-    )
-    ),|_v|
-        {
-            let c = toml::from_str::<ConfTest>(_v.to_string().as_str());
-            let _b = c.map_err(|e|
-            {
-                let err =format!("Error: read file buf error reason is {}", e.to_string());
-                return IoError::new(ErrorKind::Other,err)
-            });
-            return _b
-        }
-    );*/
 
     let r = a.conf_file_parse(r#str);
     // r.map(|x|);
