@@ -1,18 +1,18 @@
-use core::fmt::{Result as FmtResult};
+use core::fmt::Result as FmtResult;
+use proc_macro_utils::ConfigParseM;
+use process1::manager::{KillOperation, UnitActiveState};
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::fmt;
+use std::io::{Error as IoError, ErrorKind};
 use std::rc::Rc;
 use utils::config_parser::{toml_str_parse, ConfigParse};
-use std::io::{Error as IoError, ErrorKind};
-use process1::manager::{KillOperation, UnitActiveState};
-use proc_macro_utils::ConfigParseM;
-use serde::{Serialize, Deserialize};
 
-#[derive(Serialize, Deserialize,ConfigParseM)]
+#[derive(Serialize, Deserialize, ConfigParseM)]
 #[serdeName("Service")]
 #[serde(rename_all = "PascalCase")]
 pub(crate) struct ServiceConf {
-    #[serde(alias = "Type",default = "ServiceType::default")]
+    #[serde(alias = "Type", default = "ServiceType::default")]
     service_type: ServiceType,
     #[serde(alias = "ExecStart")]
     exec_start: Option<Vec<String>>,
@@ -49,8 +49,6 @@ pub(crate) struct ServiceConf {
     #[serde(alias = "MemorySwapMax")]
     memory_swap_max: Option<u64>,
 }
-
-
 
 #[derive(PartialEq, EnumString, Display, Debug)]
 pub(in crate) enum ServiceTimeoutFailureMode {
@@ -97,7 +95,7 @@ impl Default for ServiceRestart {
     }
 }
 
-#[derive(PartialEq, Eq,Serialize, Deserialize,EnumString, Display, Debug,Clone)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, EnumString, Display, Debug, Clone)]
 pub(crate) enum ServiceType {
     #[strum(serialize = "simple")]
     #[serde(alias = "simple")]
@@ -123,7 +121,6 @@ impl Default for ServiceType {
         ServiceType::Simple
     }
 }
-
 
 pub enum ServiceCommand {
     ServiceCondition,

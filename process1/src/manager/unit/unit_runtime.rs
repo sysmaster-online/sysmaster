@@ -99,7 +99,7 @@ impl UnitRTData {
 mod tests {
     use super::*;
     use crate::manager::data::DataManager;
-    use crate::manager::unit::uload_util::{UnitFile};
+    use crate::manager::unit::uload_util::UnitFile;
     use crate::manager::unit::unit_base::UnitType;
     use crate::plugin::Plugin;
     use utils::logger;

@@ -1,7 +1,7 @@
 use super::u_entry::{Unit, UnitObj};
 use super::uu_config::UnitConfigItem;
 use crate::manager::data::{DataManager, UnitActiveState, UnitRelations};
-use crate::manager::unit::uload_util::{UnitFile};
+use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
 use crate::manager::unit::UnitErrno;
 use nix::sys::signal::Signal;
@@ -26,13 +26,7 @@ impl UnitX {
         subclass: Box<dyn UnitObj>,
     ) -> UnitX {
         let sub_obj = RefCell::new(subclass);
-        let unit = Rc::new(Unit::new(
-            unit_type,
-            name,
-            dmr,
-            filer,
-            sub_obj,
-        ));
+        let unit = Rc::new(Unit::new(unit_type, name, dmr, filer, sub_obj));
 
         unit.attach_unit(&unit);
 

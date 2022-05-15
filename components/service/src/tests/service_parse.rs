@@ -17,7 +17,7 @@ fn test_service_parse() {
     };
 
     let mut service_unit = ServiceUnit::new();
-    let _result  =  service_unit.load(buf.as_str());
+    let _result = service_unit.load(buf.as_str());
 
     assert_ne!(
         service_unit.exec_commands[ServiceCommand::ServiceStart as usize].len(),

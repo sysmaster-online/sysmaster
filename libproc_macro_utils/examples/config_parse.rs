@@ -82,7 +82,7 @@ fn main() {
     let a = ConfTest::builder_parser();
     let str = "
     [Service]
-    name='Hushiyuan'
+    name='process1'
     ";
 
     let service_str = r###"
@@ -117,7 +117,7 @@ ExecStop = ["/usr/bin/kill $MAINPID"]
     let r = a.conf_file_parse(r#str);
     // r.map(|x|);
     let b = r.unwrap();
-    assert_eq!("Hushiyuan", b.name.as_str());
+    assert_eq!("process1", b.name.as_str());
     let sp = ServiceConf::builder_parser();
     let _service = sp.conf_file_parse(service_str).unwrap();
     assert_eq!(_service.get_service_type(), ServiceType::ServiceForking);

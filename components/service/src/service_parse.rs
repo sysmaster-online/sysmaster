@@ -9,13 +9,11 @@ use std::path::Path;
 use std::{cell::RefCell, rc::Rc};
 
 impl ServiceUnit {
-    pub(super) fn parse(&mut self,service_conf: ServiceConf) -> Result<(), Box<dyn Error>> {
-
-        let mut update_exec_command = |command_type: ServiceCommand,ps:usize|{
-
-            let commands:Option<Vec<String>> = match command_type{
-                ServiceCommand::ServiceCondition =>service_conf.get_exec_condition(),
-                ServiceCommand::ServiceStartPre =>todo!(),
+    pub(super) fn parse(&mut self, service_conf: ServiceConf) -> Result<(), Box<dyn Error>> {
+        let mut update_exec_command = |command_type: ServiceCommand, ps: usize| {
+            let commands: Option<Vec<String>> = match command_type {
+                ServiceCommand::ServiceCondition => service_conf.get_exec_condition(),
+                ServiceCommand::ServiceStartPre => todo!(),
                 ServiceCommand::ServiceStart => service_conf.get_exec_start(),
                 ServiceCommand::ServiceStartPost => todo!(),
                 ServiceCommand::ServiceReload => service_conf.get_exec_reload(),
@@ -23,34 +21,46 @@ impl ServiceUnit {
                 ServiceCommand::ServiceStopPost => todo!(),
                 ServiceCommand::ServiceCommandMax => todo!(),
             };
-            if commands.is_some(){
+            if commands.is_some() {
                 self.exec_commands[ps] = LinkedList::new();
-                match prepare_command(commands.unwrap(),&mut self.exec_commands[ps]){
-                    Ok(_) =>  Ok(()),
+                match prepare_command(commands.unwrap(), &mut self.exec_commands[ps]) {
+                    Ok(_) => Ok(()),
                     Err(e) => {
                         return Err(e);
-                    },
+                    }
                 }
-            }else{
+            } else {
                 return Err(format!("config opton is error, value cannot be null").into());
             }
         };
 
-        if let Err(e) = update_exec_command(ServiceCommand::ServiceCondition,ServiceCommand::ServiceCondition as usize){
+        if let Err(e) = update_exec_command(
+            ServiceCommand::ServiceCondition,
+            ServiceCommand::ServiceCondition as usize,
+        ) {
             return Err(e);
         }
 
-        if let Err(e) = update_exec_command(ServiceCommand::ServiceStart, ServiceCommand::ServiceStart as usize){
+        if let Err(e) = update_exec_command(
+            ServiceCommand::ServiceStart,
+            ServiceCommand::ServiceStart as usize,
+        ) {
             return Err(e);
         }
-        if let Err(e) = update_exec_command(ServiceCommand::ServiceStop,ServiceCommand::ServiceStop as usize){
+        if let Err(e) = update_exec_command(
+            ServiceCommand::ServiceStop,
+            ServiceCommand::ServiceStop as usize,
+        ) {
             return Err(e);
         }
 
-        if let Err(e) = update_exec_command(ServiceCommand::ServiceReload, ServiceCommand::ServiceReload as usize){
+        if let Err(e) = update_exec_command(
+            ServiceCommand::ServiceReload,
+            ServiceCommand::ServiceReload as usize,
+        ) {
             return Err(e);
         }
-        
+
         let s_type: ServiceType = service_conf.get_service_type();
         self.service_type = s_type;
         Ok(())
@@ -61,7 +71,6 @@ fn prepare_command(
     commands: Vec<String>,
     command_list: &mut LinkedList<Rc<RefCell<CommandLine>>>,
 ) -> Result<(), Box<dyn Error>> {
-
     if commands.len() == 0 {
         return Err(format!("config opton is error, value cannot be null").into());
     }
@@ -103,10 +112,9 @@ fn prepare_command(
         command_list.push_back(new_command.clone());
     }
 
-    if set_command{
+    if set_command {
         Ok(())
-    }else{
+    } else {
         return Err(format!("config opton is error, value cannot be null").into());
     }
-   
 }

@@ -188,7 +188,7 @@ mod unit_load {
     use super::UnitManager;
     use crate::manager::data::{DataManager, UnitDepConf};
     use crate::manager::table::{TableOp, TableSubscribe};
-    use crate::manager::unit::uload_util::{UnitFile};
+    use crate::manager::unit::uload_util::UnitFile;
     use crate::manager::unit::unit_base::{self, UnitType};
     use crate::manager::unit::unit_datastore::UnitDb;
     use crate::manager::unit::unit_entry::UnitX;

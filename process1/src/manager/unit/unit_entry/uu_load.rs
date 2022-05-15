@@ -2,13 +2,13 @@ use super::uu_config::{
     InstallConfOption, UeConfig, UeConfigInstall, UeConfigUnit, UnitConfOption, UnitConfigItem,
 };
 use crate::manager::data::{DataManager, UnitDepConf, UnitRelations};
-use crate::manager::unit::uload_util::{UnitFile};
+use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{self, UnitLoadState, UnitType};
 use crate::null_str;
 use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
-use utils::config_parser::{ConfigParse, unit_file_reader};
+use utils::config_parser::{unit_file_reader, ConfigParse};
 //#[derive(Debug)]
 pub(super) struct UeLoad {
     // associated objects
@@ -103,7 +103,7 @@ impl UeLoad {
                         .into());
                     }
                     let ret = self.parse();
-                    if ret.is_err(){
+                    if ret.is_err() {
                         return Err(format!(
                             "parse unit deps error [{}]  err{:?}",
                             self.id,

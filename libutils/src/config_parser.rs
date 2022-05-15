@@ -12,7 +12,7 @@ pub trait ConfigParse {
     }
 }
 
-pub fn unit_file_reader(file_path: &str) -> Result<String,IOError>{
+pub fn unit_file_reader(file_path: &str) -> Result<String, IOError> {
     let mut file = match File::open(file_path) {
         Err(why) => {
             return Err(IOError::new(

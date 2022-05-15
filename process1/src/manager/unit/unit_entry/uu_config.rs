@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-use crate::null_str;
 use crate::manager::{data::UnitRelations, unit::unit_base::JobMode};
+use crate::null_str;
 use proc_macro_utils::ConfigParseM;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::io::{Error as IoError, ErrorKind};
-use utils::config_parser::{toml_str_parse,  ConfigParse};
+use utils::config_parser::{toml_str_parse, ConfigParse};
 
 fn default_null_str() -> String {
     null_str!("")
@@ -332,7 +332,7 @@ impl UeConfig {
 #[cfg(test)]
 mod tests {
 
-    use utils::{logger};
+    use utils::logger;
 
     use super::UeConfigUnit;
     use utils::config_parser::ConfigParse;
@@ -362,7 +362,7 @@ Wants = "b.service""####;
                 log::debug!("error {}", r.to_string());
             }
         } else {
-            log::debug!("toml str parse sucesssful,{}",v.unwrap().to_string());
+            log::debug!("toml str parse sucesssful,{}", v.unwrap().to_string());
         }
         log::debug!("begin test for unit  conf section parse");
         let unit_parser = UeConfigUnit::builder_parser();

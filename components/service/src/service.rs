@@ -15,9 +15,9 @@ use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
+use utils::config_parser::ConfigParse;
 use utils::logger;
 use utils::IN_SET;
-use utils::config_parser::ConfigParse;
 
 use process1::manager::UnitActionError;
 
@@ -678,8 +678,8 @@ impl UnitObj for ServiceUnit {
     fn load(&mut self, conf_str: &str) -> Result<(), Box<dyn Error>> {
         let service_parser = ServiceConf::builder_parser();
         let service_conf = service_parser.conf_file_parse(conf_str);
-        let ret = service_conf.map(|_conf|{self.parse(_conf)});
-        if let Err(_e) = ret{
+        let ret = service_conf.map(|_conf| self.parse(_conf));
+        if let Err(_e) = ret {
             return Err(Box::new(_e));
         }
         self.service_add_extras();
