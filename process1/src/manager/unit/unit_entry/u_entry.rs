@@ -1,18 +1,23 @@
+use super::uu_cgroup::UeCgroup;
 use super::uu_child::UeChild;
 use super::uu_config::{UeConfig, UnitConfigItem};
 use super::uu_load::UeLoad;
 use crate::manager::data::{DataManager, UnitActiveState, UnitState};
 use crate::manager::unit::uload_util::{UnitFile};
-use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
-
+use crate::manager::unit::unit_base::{KillOperation, UnitActionError, UnitLoadState, UnitType};
+use cgroup::{self, CgFlags};
 use log;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
+use nix::NixPath;
 use std::cell::RefCell;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
+use std::path::PathBuf;
 use std::rc::Rc;
+use utils::Result;
 
 pub struct Unit {
     // associated objects
@@ -25,6 +30,7 @@ pub struct Unit {
     config: Rc<UeConfig>,
     load: UeLoad,
     child: UeChild,
+    cgroup: UeCgroup,
     sub: RefCell<Box<dyn UnitObj>>,
 }
 
@@ -102,6 +108,91 @@ impl Unit {
         &self.id
     }
 
+    pub fn prepare_exec(&self) -> Result<()> {
+        log::debug!("prepare exec cgroup");
+        self.cgroup.setup_cg_path(&self.id);
+
+        self.cgroup.prepare_cg_exec()
+    }
+
+    pub fn cg_path(&self) -> PathBuf {
+        self.cgroup.cg_path()
+    }
+    pub fn kill_context(
+        &self,
+        m_pid: Option<Pid>,
+        c_pid: Option<Pid>,
+        ko: KillOperation,
+    ) -> Result<(), Box<dyn Error>> {
+        let sig = ko.to_signal();
+        if m_pid.is_some() {
+            match nix::sys::signal::kill(m_pid.unwrap(), sig) {
+                Ok(_) => {
+                    if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
+                        match nix::sys::signal::kill(m_pid.unwrap(), Signal::SIGCONT) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::debug!("kill pid {} errno: {}", m_pid.unwrap(), e)
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to kill main service: error: {}", e);
+                }
+            }
+        }
+        if c_pid.is_some() {
+            match nix::sys::signal::kill(c_pid.unwrap(), sig) {
+                Ok(_) => {
+                    if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
+                        match nix::sys::signal::kill(c_pid.unwrap(), Signal::SIGCONT) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::debug!("kill pid {} errno: {}", c_pid.unwrap(), e)
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to kill control service: error: {}", e);
+                }
+            }
+        }
+
+        if !self.cgroup.cg_path().is_empty() {
+            let pids = self.pids_set(m_pid, c_pid);
+
+            match cgroup::cg_kill_recursive(
+                &self.cg_path(),
+                sig,
+                CgFlags::CgIgnoreSelf as isize | CgFlags::CgSigcont as isize,
+                pids,
+            ) {
+                Ok(_) => {}
+                Err(_) => {
+                    log::debug!("failed to kill cgroup context, {:?}", self.cg_path());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn pids_set(&self, m_pid: Option<Pid>, c_pid: Option<Pid>) -> HashSet<Pid> {
+        let mut pids = HashSet::new();
+
+        if m_pid.is_some() {
+            pids.insert(m_pid.unwrap());
+        }
+
+        if c_pid.is_some() {
+            pids.insert(c_pid.unwrap());
+        }
+
+        pids
+    }
+
     pub(super) fn new(
         unit_type: UnitType,
         name: &str,
@@ -117,6 +208,7 @@ impl Unit {
             config: Rc::clone(&_config),
             load: UeLoad::new(dmr, filer, &_config, String::from(name)),
             child: UeChild::new(),
+            cgroup: UeCgroup::new(),
             sub,
         }
     }

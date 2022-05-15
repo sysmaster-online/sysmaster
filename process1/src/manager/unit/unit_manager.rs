@@ -69,6 +69,10 @@ impl UnitManager {
         self.db.child_add_watch_pid(pid, id)
     }
 
+    pub fn child_watch_all_pids(&self, id: &str) {
+        self.db.child_watch_all_pids(id)
+    }
+
     pub fn child_unwatch_pid(&self, pid: Pid) {
         self.db.child_unwatch_pid(pid)
     }

@@ -20,4 +20,3 @@ thiserror = "1.0"
 anyhow = "1.0"
 http = "0.2.6"
 procfs = "0.12.0"
-

@@ -5,6 +5,7 @@ use std::{collections::HashMap, process::exit};
 use super::exec_child;
 use super::service::ServiceUnit;
 use super::service_base::{CmdError, CommandLine};
+use cgroup;
 use nix::unistd::Pid;
 
 pub fn start_service(srvc: &mut ServiceUnit, cmdline: &CommandLine) -> Result<Pid, CmdError> {
@@ -14,26 +15,17 @@ pub fn start_service(srvc: &mut ServiceUnit, cmdline: &CommandLine) -> Result<Pi
         env.insert("MAINPID", format!("{}", pid));
     }
 
+    srvc.unit()
+        .prepare_exec()
+        .map_err(|_e| CmdError::SpawnError)?;
+
     unsafe {
         match nix::unistd::fork() {
             Ok(nix::unistd::ForkResult::Parent { child }) => {
-                srvc.um
-                    .clone()
-                    .upgrade()
-                    .as_ref()
-                    .cloned()
-                    .unwrap()
-                    .child_watch_pid(
-                        child,
-                        srvc.unit
-                            .clone()
-                            .upgrade()
-                            .as_ref()
-                            .cloned()
-                            .unwrap()
-                            .get_id(),
-                    );
+                srvc.um().child_watch_pid(child, srvc.unit().get_id());
                 log::debug!("child pid is :{}", child);
+                cgroup::cg_attach(child, &srvc.unit().cg_path())
+                    .map_err(|_e| CmdError::SpawnError)?;
                 return Ok(child);
             }
             Ok(nix::unistd::ForkResult::Child) => {

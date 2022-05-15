@@ -3,6 +3,7 @@ use crate::manager::data::UnitRelations;
 use crate::manager::table::TableSubscribe;
 use crate::manager::unit::unit_entry::UnitX;
 use crate::manager::unit::UnitErrno;
+use cgroup;
 use nix::unistd::Pid;
 use std::error::Error;
 use std::rc::Rc;
@@ -82,6 +83,17 @@ impl UnitDb {
 
     pub(super) fn child_unwatch_pid(&self, pid: Pid) {
         self.child.unwatch_pid(pid)
+    }
+
+    pub(super) fn child_watch_all_pids(&self, id: &str) {
+        let u = self.units_get(id).unwrap();
+        let cg_path = u.cg_path();
+        let pids = cgroup::cg_get_pids(&cg_path);
+
+        for pid in pids {
+            log::debug!("watch all cgroup pids: {}", pid);
+            self.child.add_watch_pid(pid, id)
+        }
     }
 }
 

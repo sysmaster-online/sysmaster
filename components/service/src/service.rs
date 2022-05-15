@@ -1,6 +1,4 @@
-use process1::manager::{
-    KillOperation, Unit, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
-};
+use process1::manager::{Unit, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass};
 use process1::watchdog;
 use std::collections::LinkedList;
 use std::error::Error;
@@ -13,7 +11,6 @@ use super::service_base::{
 };
 use super::service_start;
 use log;
-use nix::errno::Errno;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::cell::RefCell;
@@ -151,13 +148,7 @@ impl ServiceUnit {
     fn unwatch_control_pid(&mut self) {
         match self.control_pid {
             Some(pid) => {
-                self.um
-                    .clone()
-                    .upgrade()
-                    .as_ref()
-                    .cloned()
-                    .unwrap()
-                    .child_unwatch_pid(pid);
+                self.um().child_unwatch_pid(pid);
                 self.control_pid = None;
             }
             None => {}
@@ -167,13 +158,7 @@ impl ServiceUnit {
     fn unwatch_main_pid(&mut self) {
         match self.main_pid {
             Some(pid) => {
-                self.um
-                    .clone()
-                    .upgrade()
-                    .as_ref()
-                    .cloned()
-                    .unwrap()
-                    .child_unwatch_pid(pid);
+                self.um().child_unwatch_pid(pid);
                 self.main_pid = None;
             }
             None => {}
@@ -190,16 +175,7 @@ impl ServiceUnit {
                         self.control_pid = Some(pid);
                     }
                     Err(_e) => {
-                        log::error!(
-                            "failed to start service: {}",
-                            self.unit
-                                .clone()
-                                .upgrade()
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
-                                .get_id()
-                        );
+                        log::error!("failed to start service: {}", self.unit().get_id());
                     }
                 }
             }
@@ -215,16 +191,7 @@ impl ServiceUnit {
                         self.main_pid = Some(pid);
                     }
                     Err(_e) => {
-                        log::error!(
-                            "failed to run main command: {}",
-                            self.unit
-                                .clone()
-                                .upgrade()
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
-                                .get_id()
-                        );
+                        log::error!("failed to run main command: {}", self.unit().get_id());
                     }
                 }
             }
@@ -287,17 +254,11 @@ impl ServiceUnit {
         // todo!()
         // trigger the unit the dependency trigger_by
 
-        self.unit
-            .clone()
-            .upgrade()
-            .as_ref()
-            .cloned()
-            .unwrap()
-            .notify(
-                self.trans_to_active_state(original_state),
-                self.trans_to_active_state(state),
-                0,
-            );
+        self.unit().notify(
+            self.trans_to_active_state(original_state),
+            self.trans_to_active_state(state),
+            0,
+        );
     }
 
     fn run_start(&mut self) {
@@ -316,16 +277,7 @@ impl ServiceUnit {
                 match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => self.main_pid = Some(pid),
                     Err(_e) => {
-                        log::error!(
-                            "failed to start service: {}",
-                            self.unit
-                                .clone()
-                                .upgrade()
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
-                                .get_id()
-                        );
+                        log::error!("failed to start service: {}", self.unit().get_id());
                         self.send_signal(
                             ServiceState::ServiceStopSigterm,
                             ServiceResult::ServiceFailureResources,
@@ -354,16 +306,7 @@ impl ServiceUnit {
                 match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
-                        log::error!(
-                            "Failed to run start post service: {}",
-                            self.unit
-                                .clone()
-                                .upgrade()
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
-                                .get_id()
-                        );
+                        log::error!("Failed to run start post service: {}", self.unit().get_id());
                     }
                 }
                 self.set_state(ServiceState::ServiceStartPost);
@@ -398,9 +341,15 @@ impl ServiceUnit {
             state,
             res
         );
+
+        self.um().child_watch_all_pids(self.unit().get_id());
+
         let operation = state.to_kill_operation();
 
-        match self.kill_service(operation) {
+        match self
+            .unit()
+            .kill_context(self.main_pid, self.control_pid, operation)
+        {
             Ok(_) => {}
             Err(_e) => {
                 if IN_SET!(
@@ -455,16 +404,7 @@ impl ServiceUnit {
                 match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
-                        log::error!(
-                            "Failed to run stop service: {}",
-                            self.unit
-                                .clone()
-                                .upgrade()
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
-                                .get_id()
-                        );
+                        log::error!("Failed to run stop service: {}", self.unit().get_id());
                     }
                 }
                 self.set_state(ServiceState::ServiceStop);
@@ -498,16 +438,7 @@ impl ServiceUnit {
                             ServiceState::ServiceFinalSigterm,
                             ServiceResult::ServiceFailureResources,
                         );
-                        log::error!(
-                            "Failed to run stop service: {}",
-                            self.unit
-                                .clone()
-                                .upgrade()
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
-                                .get_id()
-                        );
+                        log::error!("Failed to run stop service: {}", self.unit().get_id());
                     }
                 }
                 self.set_state(ServiceState::ServiceStopPost);
@@ -550,16 +481,7 @@ impl ServiceUnit {
                 match service_start::start_service(self, &*cmd.borrow()) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
-                        log::error!(
-                            "failed to start service: {}",
-                            self.unit
-                                .clone()
-                                .upgrade()
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
-                                .get_id()
-                        );
+                        log::error!("failed to start service: {}", self.unit().get_id());
                         self.enter_running(ServiceResult::ServiceSuccess);
                     }
                 }
@@ -569,47 +491,6 @@ impl ServiceUnit {
                 self.enter_running(ServiceResult::ServiceSuccess);
             }
         }
-    }
-
-    fn kill_service(&mut self, operation: KillOperation) -> Result<(), Errno> {
-        let sig = operation.to_signal();
-        if self.main_pid.is_some() {
-            match nix::sys::signal::kill(self.main_pid.unwrap(), sig) {
-                Ok(_) => {
-                    if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
-                        match nix::sys::signal::kill(self.main_pid.unwrap(), Signal::SIGCONT) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                log::debug!("kill pid {} errno: {}", self.main_pid.unwrap(), e)
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    log::warn!("Failed to kill main service: error: {}", e);
-                }
-            }
-        }
-
-        if self.control_pid.is_some() {
-            match nix::sys::signal::kill(self.control_pid.unwrap(), sig) {
-                Ok(_) => {
-                    if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
-                        match nix::sys::signal::kill(self.control_pid.unwrap(), Signal::SIGCONT) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                log::debug!("kill pid {} errno: {}", self.control_pid.unwrap(), e)
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    log::warn!("Failed to kill control service: error: {}", e);
-                }
-            }
-        }
-
-        Ok(())
     }
 
     fn current_active_state(&self) -> UnitActiveState {
@@ -626,6 +507,14 @@ impl ServiceUnit {
         }
 
         state.to_unit_active_state()
+    }
+
+    pub fn unit(&self) -> Rc<Unit> {
+        self.unit.clone().upgrade().as_ref().cloned().unwrap()
+    }
+
+    pub fn um(&self) -> Rc<UnitManager> {
+        self.um.clone().upgrade().as_ref().cloned().unwrap()
     }
 }
 
