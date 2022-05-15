@@ -1,5 +1,19 @@
-mod unit_conf_parse;
+//! This crate provides Deserializ's function for sub unit conf.
+//! ```edition 2018
+//! # use proc_macro_utils::ConfigParseM;
+//! # use std::io::{Error as IoError, ErrorKind};
+//! # use utils::config_parser::{toml_str_parse, ConfigParse};
+//! # use serde::{Deserialize, Serialize};
+//! # [derive(Serialize, Deserialize, ConfigParseM)]
+//! # [serdeName("Service")]
+//! # struct ServiceConf {
+//!    #[serde(alias = "Type", default = "ServiceType::default")]
+//!    #service_type: ServiceType,
+//! #
+//! # fn main() {}
+//! ```
 
+mod unit_conf_parse;
 use proc_macro::TokenStream;
 
 #[proc_macro_derive(ConfigParseM, attributes(serdeName))]

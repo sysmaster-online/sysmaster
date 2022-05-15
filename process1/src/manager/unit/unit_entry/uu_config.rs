@@ -4,7 +4,6 @@ use crate::manager::{data::UnitRelations, unit::unit_base::JobMode};
 use crate::null_str;
 use proc_macro_utils::ConfigParseM;
 use std::cell::RefCell;
-use std::fmt::{Display, Formatter};
 use std::io::{Error as IoError, ErrorKind};
 use utils::config_parser::{toml_str_parse, ConfigParse};
 
@@ -14,10 +13,18 @@ fn default_null_str() -> String {
 fn default_false() -> bool {
     false
 }
+
+fn default_on_success_job_mode() -> JobMode {
+    JobMode::JobFail
+}
+fn default_on_failure_job_mode() -> JobMode {
+    JobMode::JobReplace
+}
+
 #[derive(Serialize, Deserialize, ConfigParseM)]
 #[serdeName("Unit")]
 #[serde(rename_all = "PascalCase")]
-pub(crate) struct UeConfigUnit {
+pub(in crate::manager::unit) struct UeConfigUnit {
     #[serde(default = "default_null_str", alias = "Name")]
     name: String,
     #[serde(default = "default_null_str", alias = "Description")]
@@ -28,10 +35,10 @@ pub(crate) struct UeConfigUnit {
     allow_isolate: bool,
     #[serde(default = "default_false")]
     ignore_on_isolate: bool,
-    #[serde(default = "default_null_str")]
-    on_success_job_mode: String,
-    #[serde(default = "default_null_str")]
-    on_failure_job_mode: String,
+    #[serde(default = "default_on_success_job_mode")]
+    on_success_job_mode: JobMode,
+    #[serde(default = "default_on_failure_job_mode")]
+    on_failure_job_mode: JobMode,
     #[serde(default = "default_null_str")]
     wants: String,
     #[serde(default = "default_null_str")]
@@ -90,64 +97,12 @@ pub(super) enum UnitConfOption {
     OnFailureJobMode(JobMode),
 }
 
-impl Display for UnitConfOption {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            UnitConfOption::Desc => write!(f, "Description"),
-            UnitConfOption::Documentation => write!(f, "Documentation"),
-            UnitConfOption::Relation(relation) => write!(f, "{}", relation),
-            UnitConfOption::AllowIsolate => write!(f, "AllowIsolate"),
-            UnitConfOption::IgnoreOnIolate => write!(f, "IgnoreOnIolate"),
-            UnitConfOption::OnSucessJobMode(_) => write!(f, "OnSucessJobMode"),
-            UnitConfOption::OnFailureJobMode(_) => write!(f, "OnFailureJobMode"),
-        }
-    }
-}
-
-impl From<UnitConfOption> for String {
-    fn from(unit_conf_opt: UnitConfOption) -> Self {
-        match unit_conf_opt {
-            UnitConfOption::Desc => "Desc".into(),
-            UnitConfOption::Documentation => "Documentation".into(),
-            UnitConfOption::Relation(relation) => relation.into(),
-            UnitConfOption::AllowIsolate => "AllowIsolate".into(),
-            UnitConfOption::IgnoreOnIolate => "IgnoreOnIolate".into(),
-            UnitConfOption::OnSucessJobMode(_) => "OnSucessJobMode".into(),
-            UnitConfOption::OnFailureJobMode(_) => "OnFailureJobMode".into(),
-        }
-    }
-}
-
 pub(super) enum InstallConfOption {
     Alias,
     WantedBy,
     RequiredBy,
     Also,
     DefaultInstance,
-}
-
-impl Display for InstallConfOption {
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            InstallConfOption::Alias => write!(fmt, "Alias"),
-            InstallConfOption::WantedBy => write!(fmt, "WantedBy"),
-            InstallConfOption::RequiredBy => write!(fmt, "RequiredBy"),
-            InstallConfOption::Also => write!(fmt, "Also"),
-            InstallConfOption::DefaultInstance => write!(fmt, "DefaultInstance"),
-        }
-    }
-}
-
-impl From<InstallConfOption> for String {
-    fn from(install_conf_opt: InstallConfOption) -> Self {
-        match install_conf_opt {
-            InstallConfOption::Alias => "Alias".into(),
-            InstallConfOption::WantedBy => "WantedBy".into(),
-            InstallConfOption::RequiredBy => "RequiredBy".into(),
-            InstallConfOption::Also => "Also".into(),
-            InstallConfOption::DefaultInstance => "DefaultInstance".into(),
-        }
-    }
 }
 
 pub(super) struct UeConfig {
@@ -310,18 +265,18 @@ impl UeConfig {
                     .as_ref()
                     .map_or_else(|| false, |_c| _c.get_ignore_on_isolate()),
             ),
-            UnitConfigItem::UcItemOnSucJobMode(_) => {
-                UnitConfigItem::UcItemOnSucJobMode(self.unit_conf.borrow().as_ref().map_or_else(
-                    || JobMode::JobFail,
-                    |_c| _c.get_on_success_job_mode().into(),
-                ))
-            }
-            UnitConfigItem::UcItemOnFailJobMode(_) => {
-                UnitConfigItem::UcItemOnFailJobMode(self.unit_conf.borrow().as_ref().map_or_else(
-                    || JobMode::JobFail,
-                    |_c| _c.get_on_failure_job_mode().into(),
-                ))
-            }
+            UnitConfigItem::UcItemOnSucJobMode(_) => UnitConfigItem::UcItemOnSucJobMode(
+                self.unit_conf
+                    .borrow()
+                    .as_ref()
+                    .map_or_else(|| JobMode::JobFail, |_c| _c.get_on_success_job_mode()),
+            ),
+            UnitConfigItem::UcItemOnFailJobMode(_) => UnitConfigItem::UcItemOnFailJobMode(
+                self.unit_conf
+                    .borrow()
+                    .as_ref()
+                    .map_or_else(|| JobMode::JobFail, |_c| _c.get_on_failure_job_mode()),
+            ),
             UnitConfigItem::UcItemRelation(_, _) => todo!(),
             UnitConfigItem::UcItemWantedBy(_) => todo!(),
             UnitConfigItem::UcItemRequiredBy(_) => todo!(),
@@ -337,7 +292,10 @@ mod tests {
     use super::UeConfigUnit;
     use utils::config_parser::ConfigParse;
 
-    use crate::manager::unit::unit_entry::uu_config::UeConfigInstall;
+    use crate::manager::unit::{
+        unit_base::JobMode,
+        unit_entry::uu_config::{default_on_failure_job_mode, UeConfigInstall},
+    };
     #[test]
     fn test_ueconfig_load() {
         logger::init_log_with_console("test", 4);
@@ -354,7 +312,8 @@ ExecStop = ["/usr/bin/kill $MAINPID"]
 Description = "CN"
 Documentation = "192.168.1.1"
 Requires = "c.service"
-Wants = "b.service""####;
+Wants = "b.service"
+OnSuccessJobMode = "isolate""####;
 
         let v = utils::config_parser::toml_str_parse(config_str);
         if v.is_err() {
@@ -373,6 +332,11 @@ Wants = "b.service""####;
             log::debug!("{},{}", unit.get_wants(), unit.get_requires());
             assert_eq!("b.service", unit.get_wants());
             assert_eq!("c.service", unit.get_requires());
+            assert_eq!(
+                default_on_failure_job_mode(),
+                unit.get_on_failure_job_mode()
+            );
+            assert_eq!(JobMode::JobIsolate, unit.get_on_success_job_mode());
         } else {
             if let Err(r) = config_unit {
                 log::debug!("error {}", r.to_string());
