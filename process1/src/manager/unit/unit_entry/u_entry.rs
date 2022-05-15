@@ -2,7 +2,7 @@ use super::uu_child::UeChild;
 use super::uu_config::{UeConfig, UnitConfigItem};
 use super::uu_load::UeLoad;
 use crate::manager::data::{DataManager, UnitActiveState, UnitState};
-use crate::manager::unit::uload_util::{UnitConfigParser, UnitFile, UnitParserMgr};
+use crate::manager::unit::uload_util::{UnitFile};
 use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
 
 use log;
@@ -57,7 +57,7 @@ impl Hash for Unit {
 pub trait UnitObj {
     fn init(&self) {}
     fn done(&self) {}
-    fn load(&mut self, conf_str:&str) -> Result<(), Box<dyn Error>>;
+    fn load(&mut self, conf_str: &str) -> Result<(), Box<dyn Error>>;
 
     fn coldplug(&self) {}
     fn dump(&self) {}
@@ -78,8 +78,6 @@ pub trait UnitObj {
     fn get_private_conf_section_name(&self) -> Option<&str>;
     fn current_active_state(&self) -> UnitActiveState;
     fn attach_unit(&mut self, unit: Rc<Unit>);
-
-
 }
 
 impl Unit {
@@ -109,7 +107,6 @@ impl Unit {
         name: &str,
         dmr: &Rc<DataManager>,
         filer: &Rc<UnitFile>,
-        unit_conf_mgrr: &Rc<UnitParserMgr<UnitConfigParser>>,
         sub: RefCell<Box<dyn UnitObj>>,
     ) -> Self {
         let _config = Rc::new(UeConfig::new());
@@ -118,7 +115,7 @@ impl Unit {
             unit_type,
             id: String::from(name),
             config: Rc::clone(&_config),
-            load: UeLoad::new(dmr, filer, unit_conf_mgrr, &_config, String::from(name)),
+            load: UeLoad::new(dmr, filer, &_config, String::from(name)),
             child: UeChild::new(),
             sub,
         }
@@ -140,12 +137,11 @@ impl Unit {
         self.set_in_load_queue(false);
         match self.load.load_unit_confs() {
             Ok(confs) => {
-                let str_buf = confs.to_string();
-                let ret = self.sub.borrow_mut().load(&str_buf);
+                let ret = self.sub.borrow_mut().load(&confs);
                 if let Ok(_) = ret {
                     self.load.set_load_state(UnitLoadState::UnitLoaded);
                 } else {
-                    return  Err(format!("load Unit {} failed", self.id).into());
+                    return Err(format!("load Unit {} failed", self.id).into());
                 }
                 ret
             }

@@ -1,46 +1,53 @@
-use core::fmt::{Display, Formatter, Result as FmtResult};
+use core::fmt::{Result as FmtResult};
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
-
+use utils::config_parser::{toml_str_parse, ConfigParse};
+use std::io::{Error as IoError, ErrorKind};
 use process1::manager::{KillOperation, UnitActiveState};
-use config_proc_macro::ConfigParseM;
+use proc_macro_utils::ConfigParseM;
+use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize,ConfigParseM)]
 #[serdeName("Service")]
-pub struct ServiceConf {
-    #[serde(alias = "Type")]
-    pub service_type: Option<String>,
+#[serde(rename_all = "PascalCase")]
+pub(crate) struct ServiceConf {
+    #[serde(alias = "Type",default = "ServiceType::default")]
+    service_type: ServiceType,
     #[serde(alias = "ExecStart")]
-    pub exec_start: Option<String>,
+    exec_start: Option<Vec<String>>,
+    #[serde(alias = "ExecStop")]
+    exec_stop: Option<Vec<String>>,
+    #[serde(alias = "ExecCondition")]
+    exec_condition: Option<Vec<String>>,
     #[serde(alias = "Sockets")]
-    pub sockets: Option<String>,
+    sockets: Option<String>,
     #[serde(alias = "Restart")]
-    pub restart: Option<String>,
+    restart: Option<Vec<String>>,
     #[serde(alias = "RestrictRealtime")]
-    pub restrict_realtime: Option<String>,
+    restrict_realtime: Option<String>,
     #[serde(alias = "RebootArgument")]
-    pub reboot_argument: Option<String>,
+    reboot_argument: Option<String>,
     #[serde(alias = "ExecReload")]
-    pub exec_reload: Option<String>,
+    exec_reload: Option<Vec<String>>,
     #[serde(alias = "OOMScoreAdjust")]
-    pub oom_score_adjust: Option<String>,
+    oom_score_adjust: Option<String>,
     #[serde(alias = "RestartSec")]
-    pub restart_sec: Option<u64>,
+    restart_sec: Option<u64>,
     #[serde(alias = "Slice")]
-    pub slice: Option<String>,
+    slice: Option<String>,
     #[serde(alias = "MemoryLimit")]
-    pub memory_limit: Option<u64>,
+    memory_limit: Option<u64>,
     #[serde(alias = "MemoryLow")]
-    pub memory_low: Option<u64>,
+    memory_low: Option<u64>,
     #[serde(alias = "MemoryMin")]
-    pub memory_min: Option<u64>,
+    memory_min: Option<u64>,
     #[serde(alias = "MemoryMax")]
-    pub memory_max: Option<u64>,
+    memory_max: Option<u64>,
     #[serde(alias = "MemoryHigh")]
-    pub memory_high: Option<u64>,
+    memory_high: Option<u64>,
     #[serde(alias = "MemorySwapMax")]
-    pub memory_swap_max: Option<u64>,
+    memory_swap_max: Option<u64>,
 }
 
 
@@ -90,31 +97,34 @@ impl Default for ServiceRestart {
     }
 }
 
-#[derive(PartialEq, Eq, EnumString, Display, Debug)]
+#[derive(PartialEq, Eq,Serialize, Deserialize,EnumString, Display, Debug,Clone)]
 pub(crate) enum ServiceType {
     #[strum(serialize = "simple")]
-    ServiceSimple,
+    #[serde(alias = "simple")]
+    Simple,
     #[strum(serialize = "forking")]
-    SserviceForking,
+    Forking,
     #[strum(serialize = "oneshot")]
-    ServiceOneshot,
+    Oneshot,
     #[strum(serialize = "dbus")]
-    ServiceDbus,
+    Dbus,
     #[strum(serialize = "notify")]
-    ServiceNotify,
+    Notify,
     #[strum(serialize = "idle")]
-    ServiceIdle,
+    Idle,
     #[strum(serialize = "exec")]
-    ServiceExec,
-    ServiceTypeMax,
-    ServiceTypeInvalid = -1,
+    Exec,
+    TypeMax,
+    TypeInvalid = -1,
 }
 
 impl Default for ServiceType {
     fn default() -> Self {
-        ServiceType::ServiceSimple
+        ServiceType::Simple
     }
 }
+
+
 pub enum ServiceCommand {
     ServiceCondition,
     ServiceStartPre,
@@ -264,37 +274,5 @@ impl CommandLine {
 impl fmt::Display for CommandLine {
     fn fmt(&self, f: &mut fmt::Formatter) -> FmtResult {
         write!(f, "Display: {}", self.cmd)
-    }
-}
-
-pub enum ServiceConf {
-    Type,
-    ExecCondition,
-    ExecStart,
-    ExecReload,
-    ExecStop,
-}
-
-impl Display for ServiceConf {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            ServiceConf::Type => write!(f, "Type"),
-            ServiceConf::ExecCondition => write!(f, "ExecCondition"),
-            ServiceConf::ExecStart => write!(f, "ExecStart"),
-            ServiceConf::ExecReload => write!(f, "ExecReload"),
-            ServiceConf::ExecStop => write!(f, "ExecStop"),
-        }
-    }
-}
-
-impl From<ServiceConf> for String {
-    fn from(service_conf: ServiceConf) -> Self {
-        match service_conf {
-            ServiceConf::Type => "Type".into(),
-            ServiceConf::ExecCondition => "ExecCondition".into(),
-            ServiceConf::ExecStart => "ExecStart".into(),
-            ServiceConf::ExecReload => "ExecReload".into(),
-            ServiceConf::ExecStop => "ExecStop".into(),
-        }
     }
 }

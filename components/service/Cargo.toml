@@ -17,4 +17,7 @@ strum = { version = "0.23", features = ["derive"] }
 nix = "0.23.0"
 log = "0.4"
 regex = "1"
-config_proc_macro = {path = "../../config_proc_macro"}
+proc_macro_utils = {path = "../../libproc_macro_utils"}
+toml = "0.5.8"
+serde_derive = "1.0.130"
+serde = "1.0.130"

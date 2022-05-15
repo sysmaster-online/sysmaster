@@ -1,7 +1,7 @@
 use super::u_entry::{Unit, UnitObj};
 use super::uu_config::UnitConfigItem;
 use crate::manager::data::{DataManager, UnitActiveState, UnitRelations};
-use crate::manager::unit::uload_util::{UnitConfigParser, UnitFile, UnitParserMgr};
+use crate::manager::unit::uload_util::{UnitFile};
 use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
 use crate::manager::unit::UnitErrno;
 use nix::sys::signal::Signal;
@@ -20,7 +20,6 @@ impl UnitX {
     pub(in crate::manager::unit) fn new(
         dmr: &Rc<DataManager>,
         filer: &Rc<UnitFile>,
-        unit_conf_mgrr: &Rc<UnitParserMgr<UnitConfigParser>>,
         unit_type: UnitType,
         name: &str,
         subclass: Box<dyn UnitObj>,
@@ -31,7 +30,6 @@ impl UnitX {
             name,
             dmr,
             filer,
-            unit_conf_mgrr,
             sub_obj,
         ));
 

@@ -4,7 +4,8 @@ use process1::manager::{
 use process1::watchdog;
 use std::collections::LinkedList;
 use std::error::Error;
-use utils::unit_conf::{Conf, Section};
+
+use crate::service_base::ServiceConf;
 
 use super::service_base::{
     CommandLine, ExitStatusSet, ServiceCommand, ServiceRestart, ServiceResult, ServiceState,
@@ -19,6 +20,7 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use utils::logger;
 use utils::IN_SET;
+use utils::config_parser::ConfigParse;
 
 use process1::manager::UnitActionError;
 
@@ -58,7 +60,7 @@ impl ServiceUnit {
         Self {
             unit: Weak::new(),
             um: Weak::new(),
-            service_type: ServiceType::ServiceTypeInvalid,
+            service_type: ServiceType::TypeInvalid,
             state: ServiceState::ServiceStateMax,
             restart: ServiceRestart::ServiceRestartInvalid,
             restart_prevent_status: ExitStatusSet {},
@@ -86,9 +88,9 @@ impl ServiceUnit {
     }*/
 
     pub fn service_add_extras(&mut self) -> bool {
-        if self.service_type == ServiceType::ServiceTypeInvalid {
+        if self.service_type == ServiceType::TypeInvalid {
             if !self.bus_name.is_empty() {
-                self.service_type = ServiceType::ServiceDbus;
+                self.service_type = ServiceType::Dbus;
             }
         }
         true
@@ -611,7 +613,7 @@ impl ServiceUnit {
     }
 
     fn current_active_state(&self) -> UnitActiveState {
-        if self.service_type == ServiceType::ServiceIdle {
+        if self.service_type == ServiceType::Idle {
             return self.state.to_unit_active_state_idle();
         }
 
@@ -619,7 +621,7 @@ impl ServiceUnit {
     }
 
     fn trans_to_active_state(&self, state: ServiceState) -> UnitActiveState {
-        if self.service_type == ServiceType::ServiceIdle {
+        if self.service_type == ServiceType::Idle {
             return state.to_unit_active_state_idle();
         }
 
@@ -785,10 +787,12 @@ impl UnitObj for ServiceUnit {
         todo!()
     }
     fn load(&mut self, conf_str: &str) -> Result<(), Box<dyn Error>> {
-        let service_parser = ServiceConf::builder_paser();
-        let service_conf: ServiceConf = service_parser.conf_file_parser(section);
-        //self.parse(section)?;
-
+        let service_parser = ServiceConf::builder_parser();
+        let service_conf = service_parser.conf_file_parse(conf_str);
+        let ret = service_conf.map(|_conf|{self.parse(_conf)});
+        if let Err(_e) = ret{
+            return Err(Box::new(_e));
+        }
         self.service_add_extras();
 
         return self.service_verify();

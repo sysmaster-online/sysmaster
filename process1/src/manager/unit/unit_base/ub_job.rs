@@ -2,14 +2,13 @@
 
 use core::fmt::{Display, Formatter, Result};
 
-
 const JOBFAIL: &str = "fail";
 const JOBREPLACE: &str = "replace";
-const JOBREPLACEIRREVERSIBLE: &str = "replace_irreversible";  
-const JOBISOLATE: &str = "isolate";  
-const JOBFLUSH: &str  = "flush";
-const JOBIGNOREDEPENDENCIES:  &str = "ignore_dependencies";  
-const JOBIGNOREREQUIREMENTS:  &str = "ignore_requirements";  
+const JOBREPLACEIRREVERSIBLE: &str = "replace_irreversible";
+const JOBISOLATE: &str = "isolate";
+const JOBFLUSH: &str = "flush";
+const JOBIGNOREDEPENDENCIES: &str = "ignore_dependencies";
+const JOBIGNOREREQUIREMENTS: &str = "ignore_requirements";
 const JOBTRIGGER: &str = "trigger";
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
@@ -22,7 +21,6 @@ pub(in crate::manager::unit) enum JobMode {
     JobIgnoreDependencies,
     JobIgnoreRequirements,
     JobTrigger,
-    JobInValid,
 }
 
 impl Display for JobMode {
@@ -32,18 +30,17 @@ impl Display for JobMode {
             JobMode::JobReplace => write!(f, "replace"),
             JobMode::JobReplaceIrreversible => write!(f, "replace_irreversible"),
             JobMode::JobIsolate => write!(f, "isolate"),
-            JobMode::JobFlush =>  write!(f, "flush"),
+            JobMode::JobFlush => write!(f, "flush"),
             JobMode::JobIgnoreDependencies => write!(f, "ignore_dependencies"),
             JobMode::JobIgnoreRequirements => write!(f, "ignore_requirements"),
-            JobMode::JobTrigger =>write!(f, "trigger"),
-            JobMode::JobInValid => write!(f, "invalid"),
+            JobMode::JobTrigger => write!(f, "trigger"),
         }
     }
 }
 
-impl From<String> for JobMode{
+impl From<String> for JobMode {
     fn from(str: String) -> Self {
-        match str.as_str(){
+        match str.as_str() {
             JOBFAIL => JobMode::JobFail,
             JOBREPLACE => JobMode::JobReplace,
             JOBREPLACEIRREVERSIBLE => JobMode::JobReplaceIrreversible,
@@ -52,7 +49,7 @@ impl From<String> for JobMode{
             JOBIGNOREDEPENDENCIES => JobMode::JobIgnoreDependencies,
             JOBIGNOREREQUIREMENTS => JobMode::JobIgnoreRequirements,
             JOBTRIGGER => JobMode::JobTrigger,
-            other=>JobMode::JobInValid,
+            _ => JobMode::JobFail,
         }
     }
 }
@@ -68,8 +65,6 @@ impl From<JobMode> for String {
             JobMode::JobIgnoreDependencies => "ignore_dependencies".into(),
             JobMode::JobIgnoreRequirements => "ignore_requirements".into(),
             JobMode::JobTrigger => "trigger".into(),
-            JobMode::JobInValid => "".into(),
         }
     }
 }
-

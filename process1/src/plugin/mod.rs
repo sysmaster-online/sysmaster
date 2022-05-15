@@ -151,7 +151,7 @@ impl Plugin {
                 Ok(lib) => {
                     let unit_type = self.get_unit_type(v);
                     if unit_type == UnitType::UnitTypeInvalid {
-                        log::error!("invalid service type os lib {}", v);
+                        log::error!("invalid service type os lib {} skip it", v);
                         return Ok(());
                     }
                     log::debug!(

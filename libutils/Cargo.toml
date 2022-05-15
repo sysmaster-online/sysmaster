@@ -9,7 +9,6 @@ edition = "2018"
 [lib]
 crate-type = ["lib"]
 name = "utils"
-proc-macro = true
 
 [dependencies]
 toml = "0.5.8"

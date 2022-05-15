@@ -6,106 +6,73 @@ use super::service_base::{CommandLine, ServiceType};
 use std::collections::LinkedList;
 use std::error::Error;
 use std::path::Path;
-use std::str::FromStr;
 use std::{cell::RefCell, rc::Rc};
-use utils::unit_conf::{Conf, ConfValue, Section};
 
 impl ServiceUnit {
-    pub(super) fn parse(&mut self, section: &Section<Conf>) -> Result<(), Box<dyn Error>> {
-        let confs = section.get_confs();
-        for conf in confs.iter() {
-            let key = conf.get_key();
+    pub(super) fn parse(&mut self,service_conf: ServiceConf) -> Result<(), Box<dyn Error>> {
 
-            if key == ServiceConf::ExecCondition.to_string() {
-                let values = conf.get_values();
-                self.exec_commands[ServiceCommand::ServiceCondition as usize] = LinkedList::new();
-                match prepare_command(
-                    &values,
-                    &mut self.exec_commands[ServiceCommand::ServiceCondition as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-            if key == ServiceConf::ExecStart.to_string() {
-                let values = conf.get_values();
-                self.exec_commands[ServiceCommand::ServiceStart as usize] = LinkedList::new();
-                match prepare_command(
-                    &values,
-                    &mut self.exec_commands[ServiceCommand::ServiceStart as usize],
-                ) {
-                    Ok(_) => {}
+        let mut update_exec_command = |command_type: ServiceCommand,ps:usize|{
+
+            let commands:Option<Vec<String>> = match command_type{
+                ServiceCommand::ServiceCondition =>service_conf.get_exec_condition(),
+                ServiceCommand::ServiceStartPre =>todo!(),
+                ServiceCommand::ServiceStart => service_conf.get_exec_start(),
+                ServiceCommand::ServiceStartPost => todo!(),
+                ServiceCommand::ServiceReload => service_conf.get_exec_reload(),
+                ServiceCommand::ServiceStop => service_conf.get_exec_stop(),
+                ServiceCommand::ServiceStopPost => todo!(),
+                ServiceCommand::ServiceCommandMax => todo!(),
+            };
+            if commands.is_some(){
+                self.exec_commands[ps] = LinkedList::new();
+                match prepare_command(commands.unwrap(),&mut self.exec_commands[ps]){
+                    Ok(_) =>  Ok(()),
                     Err(e) => {
-                        println!("prepare command return err: {}", e.to_string());
                         return Err(e);
-                    }
+                    },
                 }
+            }else{
+                return Err(format!("config opton is error, value cannot be null").into());
             }
+        };
 
-            if key == ServiceConf::ExecStop.to_string() {
-                let values = conf.get_values();
-                self.exec_commands[ServiceCommand::ServiceStop as usize] = LinkedList::new();
-                match prepare_command(
-                    &values,
-                    &mut self.exec_commands[ServiceCommand::ServiceStop as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        println!("prepare command return err: {}", e.to_string());
-                        return Err(e);
-                    }
-                }
-            }
-
-            if key == ServiceConf::ExecReload.to_string() {
-                let values = conf.get_values();
-                self.exec_commands[ServiceCommand::ServiceReload as usize] = LinkedList::new();
-                match prepare_command(
-                    &values,
-                    &mut self.exec_commands[ServiceCommand::ServiceReload as usize],
-                ) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-            if key == ServiceConf::Type.to_string() {
-                let values = conf.get_values();
-                for value in values.iter() {
-                    if let ConfValue::String(v) = value {
-                        self.service_type = ServiceType::from_str(v)?;
-                        break;
-                    }
-                }
-            }
+        if let Err(e) = update_exec_command(ServiceCommand::ServiceCondition,ServiceCommand::ServiceCondition as usize){
+            return Err(e);
         }
+
+        if let Err(e) = update_exec_command(ServiceCommand::ServiceStart, ServiceCommand::ServiceStart as usize){
+            return Err(e);
+        }
+        if let Err(e) = update_exec_command(ServiceCommand::ServiceStop,ServiceCommand::ServiceStop as usize){
+            return Err(e);
+        }
+
+        if let Err(e) = update_exec_command(ServiceCommand::ServiceReload, ServiceCommand::ServiceReload as usize){
+            return Err(e);
+        }
+        
+        let s_type: ServiceType = service_conf.get_service_type();
+        self.service_type = s_type;
         Ok(())
     }
 }
 
 fn prepare_command(
-    commands: &Vec<ConfValue>,
+    commands: Vec<String>,
     command_list: &mut LinkedList<Rc<RefCell<CommandLine>>>,
 ) -> Result<(), Box<dyn Error>> {
+
     if commands.len() == 0 {
-        return Ok(());
+        return Err(format!("config opton is error, value cannot be null").into());
     }
 
-    for exec in commands.iter() {
-        let cmd = match exec {
-            ConfValue::String(s) => s,
-            _ => {
-                return Err(format!(
-                    "service config  format is error, command {:?} is error",
-                    exec
-                )
-                .into())
-            }
-        };
-
+    let mut set_command = false;
+    for cmd in commands.iter() {
         if cmd.is_empty() {
-            return Ok(());
+            continue;
         }
 
+        set_command = true;
         let mut command: Vec<String> = cmd
             .trim_end()
             .split_whitespace()
@@ -126,15 +93,20 @@ fn prepare_command(
             args: command,
             next: None,
         }));
+
         match command_list.back() {
             Some(command) => {
                 command.borrow_mut().next = Some(new_command.clone());
             }
             None => {}
         }
-
         command_list.push_back(new_command.clone());
     }
 
-    Ok(())
+    if set_command{
+        Ok(())
+    }else{
+        return Err(format!("config opton is error, value cannot be null").into());
+    }
+   
 }
