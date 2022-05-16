@@ -1,6 +1,6 @@
 #![warn(unused_imports)]
 use super::job_entry::{Job, JobKind};
-use crate::manager::data::JobMode;
+use crate::manager::unit::unit_base::JobMode;
 use crate::manager::unit::unit_entry::UnitX;
 use std::cell::RefCell;
 use std::collections::HashSet;

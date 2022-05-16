@@ -18,9 +18,7 @@ pub fn start_service(srvc: &mut ServiceUnit, cmdline: &CommandLine) -> Result<Pi
         match nix::unistd::fork() {
             Ok(nix::unistd::ForkResult::Parent { child }) => {
                 srvc.um
-                    .as_ref()
-                    .cloned()
-                    .unwrap()
+                    .clone()
                     .upgrade()
                     .as_ref()
                     .cloned()
@@ -28,9 +26,7 @@ pub fn start_service(srvc: &mut ServiceUnit, cmdline: &CommandLine) -> Result<Pi
                     .child_watch_pid(
                         child,
                         srvc.unit
-                            .as_ref()
-                            .cloned()
-                            .unwrap()
+                            .clone()
                             .upgrade()
                             .as_ref()
                             .cloned()

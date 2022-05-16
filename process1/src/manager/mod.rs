@@ -1,9 +1,8 @@
-pub use data::{DataManager, UnitActiveState, UnitRelations, UnitType};
-pub use manager::{Manager, ManagerX};
-pub use unit::{JobAffect, JobConf, JobInfo, JobKind, JobManager, JobResult, JobStage};
+pub use data::{UnitActiveState, UnitNotifyFlags, UnitRelations};
+pub(super) use manager::Manager;
+pub use manager::{Action, ManagerX, Mode, Stats};
 pub use unit::{
-    KillOperation, Unit, UnitActionError, UnitDb, UnitManager, UnitManagerX, UnitMngUtil, UnitObj,
-    UnitSubClass, UnitX,
+    KillOperation, Unit, UnitActionError, UnitManager, UnitMngUtil, UnitObj, UnitSubClass, UnitType,
 };
 
 #[derive(Debug)]
@@ -14,10 +13,10 @@ pub enum MngErrno {
     MngErrNotSupported,
 }
 
-pub mod commands;
+mod commands;
 #[allow(dead_code)]
-pub mod manager;
-pub mod signals;
+mod manager;
+mod signals;
 #[allow(dead_code)]
 mod unit;
 

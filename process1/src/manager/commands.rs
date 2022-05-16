@@ -1,26 +1,23 @@
-use std::{os::unix::prelude::AsRawFd, rc::Rc};
-
+use super::manager::Manager;
+use crate::proto::ProstServerStream;
 use event::{EventType, Events, Source};
+use std::os::unix::io::RawFd;
+use std::{os::unix::prelude::AsRawFd, rc::Rc};
 use utils::{Error, Result};
 
-use std::os::unix::io::RawFd;
-
-use crate::proto::ProstServerStream;
-
-use super::manager::Manager;
-
-pub struct Commands {
+pub(super) struct Commands {
     manager: Rc<Manager>,
     fd: std::net::TcpListener,
 }
 
 impl Commands {
-    pub fn new(m: Rc<Manager>) -> Commands {
+    pub(super) fn new(mr: &Rc<Manager>) -> Commands {
         let fd = std::net::TcpListener::bind("127.0.0.1:9527").unwrap();
-        Commands { manager: m, fd }
+        Commands {
+            manager: Rc::clone(mr),
+            fd,
+        }
     }
-
-    pub fn handle(&self) {}
 }
 
 impl Source for Commands {

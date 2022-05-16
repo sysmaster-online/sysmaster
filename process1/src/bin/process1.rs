@@ -1,5 +1,5 @@
 use log::info;
-use process1::manager::manager::{Action, ManagerX, Mode, Stats};
+use process1::manager::{Action, ManagerX, Mode, Stats};
 use std::io::Error;
 use utils::logger;
 

@@ -7,26 +7,26 @@ use utils::path_lookup::LookupPaths;
 use utils::{path_lookup, time_util};
 use walkdir::WalkDir;
 
-pub(super) struct UnitFile {
+pub(in crate::manager::unit) struct UnitFile {
     data: RefCell<UnitFileData>,
 }
 
 impl UnitFile {
-    pub(super) fn new() -> UnitFile {
+    pub(in crate::manager::unit) fn new() -> UnitFile {
         UnitFile {
             data: RefCell::new(UnitFileData::new()),
         }
     }
 
-    pub(super) fn build_name_map(&self) -> bool {
+    pub(in crate::manager::unit) fn build_name_map(&self) -> bool {
         self.data.borrow_mut().build_name_map()
     }
 
-    pub(super) fn get_unit_file_path(&self, unit_name: &str) -> Option<String> {
+    pub(in crate::manager::unit) fn get_unit_file_path(&self, unit_name: &str) -> Option<String> {
         self.data.borrow().get_unit_file_path(unit_name)
     }
 
-    pub(super) fn init_lookup_path(&self) {
+    pub(in crate::manager::unit) fn init_lookup_path(&self) {
         self.data.borrow_mut().init_lookup_path()
     }
 }

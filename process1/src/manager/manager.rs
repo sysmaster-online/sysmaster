@@ -37,28 +37,41 @@ pub struct ManagerX {
     event: Rc<Events>,
     commands: Rc<Commands>,
     data: Rc<Manager>,
+    signal: Rc<Signals>,
 }
 
 impl ManagerX {
     pub fn new(mode: Mode, action: Action) -> ManagerX {
         let _event = Rc::new(Events::new().unwrap());
-        let _data = Rc::new(Manager::new(mode, action, Rc::clone(&_event)));
+        let _data = Rc::new(Manager::new(mode, action, &_event));
         let m = ManagerX {
             event: Rc::clone(&_event),
-            commands: Rc::new(Commands::new(Rc::clone(&_data))),
+            commands: Rc::new(Commands::new(&_data)),
             data: Rc::clone(&_data),
+            signal: Rc::new(Signals::new(&_data)),
         };
-        m.register(Rc::clone(&m.event));
-        m.enable(Rc::clone(&m.event));
+        m.register(&_event);
+        m.enable(&_event);
         m
     }
 
     pub fn startup(&self) -> Result<i32> {
-        self.data.startup()
+        let source = Rc::clone(&self.signal);
+        self.event.add_source(source.clone())?;
+        self.event.set_enabled(source.clone(), EventState::On)?;
+        Ok(0)
     }
 
     pub fn add_job(&self, job: JobId) -> Result<(), Error> {
         self.data.add_job(job)
+    }
+
+    pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+        self.data.start_unit(name)
+    }
+
+    pub fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
+        self.data.stop_unit(name)
     }
 
     pub fn rloop(&self) -> Result<Stats> {
@@ -69,80 +82,67 @@ impl ManagerX {
         self.data.reexec()
     }
 
-    fn register(&self, event: Rc<Events>) {
+    fn register(&self, event: &Rc<Events>) {
         let source = Rc::clone(&self.commands);
         event.add_source(source).unwrap();
     }
 
-    fn enable(&self, event: Rc<Events>) {
+    fn enable(&self, event: &Rc<Events>) {
         let source = Rc::clone(&self.commands);
         event.set_enabled(source, EventState::On).unwrap();
     }
 }
 
-pub struct Manager {
+pub(crate) struct Manager {
     mode: Mode,
     action: Action,
     stat: Stats,
+
     dm: Rc<DataManager>,
-    um: Rc<UnitManagerX>,
+    um: UnitManagerX,
     event: Rc<Events>,
-    signal: Rc<Signals>,
 }
 
 type JobId = i32;
 
 impl Manager {
-    pub fn new(mode: Mode, action: Action, event: Rc<Events>) -> Manager {
+    pub(crate) fn new(mode: Mode, action: Action, eventr: &Rc<Events>) -> Manager {
         let _dm = Rc::new(DataManager::new());
-        let _um = Rc::new(UnitManagerX::new(Rc::clone(&_dm), Rc::clone(&event)));
         Manager {
             mode,
             action,
             stat: Stats::INIT,
             dm: Rc::clone(&_dm),
-            um: Rc::clone(&_um),
-            event,
-            signal: Rc::new(Signals::new(Rc::clone(&_um))),
+            um: UnitManagerX::new(&_dm, eventr),
+            event: Rc::clone(eventr),
         }
     }
 
-    pub fn startup(&self) -> Result<i32> {
-        let source = Rc::clone(&self.signal);
-        self.event.add_source(source.clone())?;
-        self.event.set_enabled(source.clone(), EventState::On)?;
-        Ok(0)
-    }
-
-    pub fn get_job(&self, _id: JobId) -> Result<(), Error> {
+    pub(crate) fn get_job(&self, _id: JobId) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn get_unit(&self, _name: &str) -> Result<(), Error> {
+    pub(crate) fn get_unit(&self, _name: &str) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn load_unit(&self, _name: &str) -> Result<(), Error> {
-        todo!()
-    }
-
-    pub fn add_job(&self, _job: JobId) -> Result<(), Error> {
+    pub(crate) fn add_job(&self, _job: JobId) -> Result<(), Error> {
         Ok(())
     }
 
-    pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub(crate) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.um.start_unit(name)
     }
 
-    pub fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub(crate) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.um.stop_unit(name)
     }
 
-    pub fn clear_jobs(&self) -> Result<(), Error> {
+    pub(crate) fn clear_jobs(&self) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn rloop(&self) -> Result<Stats> {
+    pub(crate) fn rloop(&self) -> Result<Stats> {
         loop {
             self.um.dispatch_load_queue();
             self.event.run(-1)?;
@@ -151,39 +151,39 @@ impl Manager {
         Ok(Stats::OK)
     }
 
-    pub fn reload(&mut self) -> Result<(), Error> {
+    pub(crate) fn reload(&mut self) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn reboot(&mut self) -> Result<(), Error> {
+    pub(crate) fn reboot(&mut self) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn reexec(&self) -> Result<(), Error> {
+    pub(crate) fn reexec(&self) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn switch_root(&mut self) -> Result<(), Error> {
+    pub(crate) fn switch_root(&mut self) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn check_finished(&self) -> Result<(), Error> {
+    pub(crate) fn check_finished(&self) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn reset_failed(&mut self) -> Result<(), Error> {
+    pub(crate) fn reset_failed(&mut self) -> Result<(), Error> {
         todo!()
     }
 
-    pub fn exit(&mut self) {
+    pub(crate) fn exit(&mut self) {
         self.stat = Stats::EXIT;
     }
 
-    pub fn state(&self) -> Result<Stats, Error> {
+    pub(crate) fn state(&self) -> Result<Stats, Error> {
         todo!()
     }
 
-    pub fn dispatch_sigchld(&mut self) -> Result<(), Box<dyn Err>> {
+    pub(crate) fn dispatch_sigchld(&self) -> Result<(), Box<dyn Err>> {
         self.um.child_dispatch_sigchld()
     }
 }
@@ -192,57 +192,6 @@ impl Drop for Manager {
     fn drop(&mut self) {}
 }
 
-pub trait Mangerobj {
-    fn init(&self) {}
-
-    fn load(&self);
-
-    fn dispatch(&self) -> i32;
-
-    fn reload(&self) -> Option<i32>;
-
-    fn destroy(&self);
-
-    // reserved for sd event
-    fn event_dispatch(&self) -> Option<i32>;
-}
-
-pub struct MangerLoader {
-    pub managers: Vec<Box<dyn Mangerobj>>,
-}
-
-impl MangerLoader {
-    pub fn new() -> Self {
-        MangerLoader {
-            managers: Vec::new(),
-        }
-    }
-    pub fn load_plugins(&mut self, d: Box<dyn Mangerobj>) {
-        self.managers.push(d);
-    }
-
-    pub fn run(&mut self) -> i32 {
-        let mut ret: i32 = 0;
-        for m in self.managers.iter() {
-            m.init();
-            m.load();
-            ret = m.dispatch();
-        }
-        ret
-    }
-
-    pub fn destroy(&self) {
-        for m in self.managers.iter() {
-            m.destroy();
-        }
-    }
-
-    pub fn reload(&self) {
-        for m in self.managers.iter() {
-            m.reload();
-        }
-    }
-}
 #[cfg(test)]
 mod tests {
     // use crate::manager::service::ServiceUnit;

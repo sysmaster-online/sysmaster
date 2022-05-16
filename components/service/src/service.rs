@@ -2,11 +2,8 @@ use process1::manager::{
     KillOperation, Unit, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
 };
 use process1::watchdog;
-use std::any::{Any, TypeId};
-use std::collections::hash_map::DefaultHasher;
 use std::collections::LinkedList;
 use std::error::Error;
-use std::hash::{Hash, Hasher};
 use utils::unit_conf::{Conf, Section};
 
 use super::service_base::{
@@ -30,8 +27,8 @@ const PLUGIN_NAME: &str = "ServiceUnit";
 #[allow(dead_code)]
 #[derive(Default)]
 pub struct ServiceUnit {
-    pub unit: Option<Weak<Unit>>,
-    pub um: Option<Weak<UnitManager>>,
+    pub unit: Weak<Unit>,
+    pub um: Weak<UnitManager>,
     pub(crate) service_type: ServiceType,
     state: ServiceState,
     restart: ServiceRestart,
@@ -58,8 +55,8 @@ pub struct ServiceUnit {
 impl ServiceUnit {
     pub fn new() -> Self {
         Self {
-            unit: None,
-            um: None,
+            unit: Weak::new(),
+            um: Weak::new(),
             service_type: ServiceType::ServiceTypeInvalid,
             state: ServiceState::ServiceStateMax,
             restart: ServiceRestart::ServiceRestartInvalid,
@@ -152,9 +149,7 @@ impl ServiceUnit {
         match self.control_pid {
             Some(pid) => {
                 self.um
-                    .as_ref()
-                    .cloned()
-                    .unwrap()
+                    .clone()
                     .upgrade()
                     .as_ref()
                     .cloned()
@@ -170,9 +165,7 @@ impl ServiceUnit {
         match self.main_pid {
             Some(pid) => {
                 self.um
-                    .as_ref()
-                    .cloned()
-                    .unwrap()
+                    .clone()
                     .upgrade()
                     .as_ref()
                     .cloned()
@@ -197,9 +190,7 @@ impl ServiceUnit {
                         log::error!(
                             "failed to start service: {}",
                             self.unit
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
+                                .clone()
                                 .upgrade()
                                 .as_ref()
                                 .cloned()
@@ -224,9 +215,7 @@ impl ServiceUnit {
                         log::error!(
                             "failed to run main command: {}",
                             self.unit
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
+                                .clone()
                                 .upgrade()
                                 .as_ref()
                                 .cloned()
@@ -296,9 +285,7 @@ impl ServiceUnit {
         // trigger the unit the dependency trigger_by
 
         self.unit
-            .as_ref()
-            .cloned()
-            .unwrap()
+            .clone()
             .upgrade()
             .as_ref()
             .cloned()
@@ -329,9 +316,7 @@ impl ServiceUnit {
                         log::error!(
                             "failed to start service: {}",
                             self.unit
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
+                                .clone()
                                 .upgrade()
                                 .as_ref()
                                 .cloned()
@@ -369,9 +354,7 @@ impl ServiceUnit {
                         log::error!(
                             "Failed to run start post service: {}",
                             self.unit
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
+                                .clone()
                                 .upgrade()
                                 .as_ref()
                                 .cloned()
@@ -472,9 +455,7 @@ impl ServiceUnit {
                         log::error!(
                             "Failed to run stop service: {}",
                             self.unit
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
+                                .clone()
                                 .upgrade()
                                 .as_ref()
                                 .cloned()
@@ -517,9 +498,7 @@ impl ServiceUnit {
                         log::error!(
                             "Failed to run stop service: {}",
                             self.unit
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
+                                .clone()
                                 .upgrade()
                                 .as_ref()
                                 .cloned()
@@ -571,9 +550,7 @@ impl ServiceUnit {
                         log::error!(
                             "failed to start service: {}",
                             self.unit
-                                .as_ref()
-                                .cloned()
-                                .unwrap()
+                                .clone()
                                 .upgrade()
                                 .as_ref()
                                 .cloned()
@@ -886,13 +863,7 @@ impl UnitObj for ServiceUnit {
     fn kill(&self) {
         todo!()
     }
-    fn check_gc(&self) -> bool {
-        todo!()
-    }
     fn release_resources(&self) {
-        todo!()
-    }
-    fn check_snapshot(&self) {
         todo!()
     }
     fn sigchld_events(&mut self, pid: Pid, code: i32, status: Signal) {
@@ -900,52 +871,6 @@ impl UnitObj for ServiceUnit {
     }
     fn reset_failed(&self) {
         todo!()
-    }
-
-    fn eq(&self, other: &dyn UnitObj) -> bool {
-        if let Some(other) = other.as_any().downcast_ref::<ServiceUnit>() {
-            return self
-                .unit
-                .as_ref()
-                .cloned()
-                .unwrap()
-                .upgrade()
-                .as_ref()
-                .cloned()
-                .unwrap()
-                == other
-                    .unit
-                    .as_ref()
-                    .cloned()
-                    .unwrap()
-                    .upgrade()
-                    .as_ref()
-                    .cloned()
-                    .unwrap();
-        }
-        false
-    }
-
-    fn hash(&self) -> u64 {
-        let mut h = DefaultHasher::new();
-        Hash::hash(&(TypeId::of::<ServiceUnit>()), &mut h);
-        h.write(
-            self.unit
-                .as_ref()
-                .cloned()
-                .unwrap()
-                .upgrade()
-                .as_ref()
-                .cloned()
-                .unwrap()
-                .get_id()
-                .as_bytes(),
-        );
-        h.finish()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn get_private_conf_section_name(&self) -> Option<&str> {
@@ -957,13 +882,13 @@ impl UnitObj for ServiceUnit {
     }
 
     fn attach_unit(&mut self, unit: Rc<Unit>) {
-        self.unit = Some(Rc::downgrade(&unit));
+        self.unit = Rc::downgrade(&unit);
     }
 }
 
 impl UnitMngUtil for ServiceUnit {
     fn attach(&mut self, um: Rc<UnitManager>) {
-        self.um = Some(Rc::downgrade(&um));
+        self.um = Rc::downgrade(&um);
     }
 }
 

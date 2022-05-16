@@ -62,7 +62,7 @@ impl<S> ProstServerStream<S>
 where
     S: Read + Write + Unpin + Send,
 {
-    pub fn new(stream: S, manager: Rc<Manager>) -> Self {
+    pub(crate) fn new(stream: S, manager: Rc<Manager>) -> Self {
         Self {
             inner: stream,
             manager,
@@ -126,15 +126,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::super::abi::unit_comm::Action as UnitAction;
+    use super::*;
     use std::net::TcpStream;
     use std::thread;
     use std::time::Duration;
-
-    use crate::manager::manager::{Action, Mode};
-    use event::Events;
-
-    use super::super::abi::unit_comm::Action as UnitAction;
-    use super::*;
 
     #[test]
     #[should_panic]
@@ -149,15 +145,11 @@ mod tests {
         });
 
         let fd = std::net::TcpListener::bind("127.0.0.1:9527").unwrap();
-        const MODE: Mode = Mode::SYSTEM;
-        const ACTION: Action = Action::RUN;
-        let _event = Rc::new(Events::new().unwrap());
-        let manager = Rc::new(Manager::new(MODE, ACTION, Rc::clone(&_event)));
         loop {
             for stream in fd.incoming() {
                 match stream {
                     Err(e) => eprintln!("failed: {}", e),
-                    Ok(stream) => {
+                    Ok(_stream) => {
                         panic!("has receive a command request");
                     }
                 }

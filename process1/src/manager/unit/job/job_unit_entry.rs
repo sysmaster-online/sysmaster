@@ -1,8 +1,8 @@
 #![warn(unused_imports)]
 use super::job_entry::{Job, JobAttrKind, JobInfo, JobKind, JobResult, JobStage};
 use crate::manager::data::UnitActiveState;
+use crate::manager::unit::unit_base::UnitRelationAtom;
 use crate::manager::unit::unit_entry::UnitX;
-use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
 use std::cell::RefCell;
 use std::collections::{HashMap, LinkedList};
 use std::rc::Rc;

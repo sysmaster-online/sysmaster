@@ -1,8 +1,9 @@
-pub use d_table::DataManager;
-pub(in crate::manager) use unit_config::{JobMode, UnitConfig, UnitConfigItem};
-pub use unit_config::{UnitRelations, UnitType};
-pub use unit_state::{UnitActiveState, UnitNotifyFlags, UnitState};
+pub(super) use d_table::DataManager;
+pub(super) use unit_dep_conf::UnitDepConf;
+pub use unit_dep_conf::UnitRelations;
+pub(super) use unit_state::UnitState;
+pub use unit_state::{UnitActiveState, UnitNotifyFlags};
 
 mod d_table;
-mod unit_config;
+mod unit_dep_conf;
 mod unit_state;

@@ -1,16 +1,12 @@
-extern crate siphasher;
 use super::uu_child::UeChild;
-use super::uu_config::UeConfig;
+use super::uu_config::{UeConfig, UnitConfigItem};
 use super::uu_load::UeLoad;
-use super::uu_state::UeState;
-use crate::manager::data::{DataManager, UnitActiveState, UnitConfigItem, UnitType};
-use crate::manager::unit::unit_base::{self, UnitActionError, UnitLoadState};
-use crate::manager::unit::unit_file::UnitFile;
-use crate::manager::unit::unit_parser_mgr::{UnitConfigParser, UnitParserMgr};
+use crate::manager::data::{DataManager, UnitActiveState, UnitState};
+use crate::manager::unit::uload_util::{UnitConfigParser, UnitFile, UnitParserMgr};
+use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
 use log;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
-use std::any::Any;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::error::Error;
@@ -20,15 +16,16 @@ use utils::unit_conf::{Conf, Section};
 
 pub struct Unit {
     // associated objects
-    file: Rc<UnitFile>,
-    unit_conf_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
+    dm: Rc<DataManager>,
+
+    // owned objects
     unit_type: UnitType,
     id: String,
-    config: RefCell<Rc<UeConfig>>,
-    state: UeState,
+
+    config: Rc<UeConfig>,
     load: UeLoad,
     child: UeChild,
-    sub: Rc<RefCell<Box<dyn UnitObj>>>,
+    sub: RefCell<Box<dyn UnitObj>>,
 }
 
 impl PartialEq for Unit {
@@ -72,16 +69,10 @@ pub trait UnitObj {
     fn reload(&mut self) {}
 
     fn kill(&self) {}
-    fn check_gc(&self) -> bool;
     fn release_resources(&self) {}
-    fn check_snapshot(&self) {}
     fn sigchld_events(&mut self, _pid: Pid, _code: i32, _status: Signal) {}
     fn reset_failed(&self) {}
     fn trigger(&mut self, _other: Rc<RefCell<Box<dyn UnitObj>>>) {}
-
-    fn eq(&self, other: &dyn UnitObj) -> bool;
-    fn hash(&self) -> u64;
-    fn as_any(&self) -> &dyn Any;
 
     fn get_private_conf_section_name(&self) -> Option<&str>;
     fn current_active_state(&self) -> UnitActiveState;
@@ -89,101 +80,6 @@ pub trait UnitObj {
 }
 
 impl Unit {
-    pub(super) fn new(
-        dm: Rc<DataManager>,
-        file: Rc<UnitFile>,
-        unit_conf_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
-        unit_type: UnitType,
-        name: &str,
-        sub: Rc<RefCell<Box<dyn UnitObj>>>,
-    ) -> Self {
-        Unit {
-            unit_type,
-            file,
-            unit_conf_mgr,
-            id: String::from(name),
-            config: RefCell::new(Rc::new(UeConfig::new())),
-            state: UeState::new(Rc::clone(&dm)),
-            load: UeLoad::new(Rc::clone(&dm), String::from(name)),
-            child: UeChild::new(),
-            sub,
-        }
-    }
-
-    pub fn in_load_queue(&self) -> bool {
-        self.load.in_load_queue()
-    }
-
-    pub fn set_in_load_queue(&self, t: bool) {
-        self.load.set_in_load_queue(t);
-    }
-
-    pub(super) fn set_config(&self, config: UeConfig) {
-        self.config.replace(Rc::new(config));
-    }
-
-    pub(super) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
-        self.config.borrow().get(item)
-    }
-    fn build_name_map(&self) {
-        self.file.build_name_map();
-    }
-
-    fn get_unit_file_path(&self) -> Option<String> {
-        match self.file.get_unit_file_path(&self.id) {
-            Some(v) => return Some(v.to_string()),
-            None => {
-                log::error!("not find unit file {}", &self.id);
-                None
-            }
-        }
-    }
-
-    pub fn load_unit(&self) -> Result<(), Box<dyn Error>> {
-        self.set_in_load_queue(false);
-        self.build_name_map();
-        if let Some(p) = self.get_unit_file_path() {
-            self.load.set_config_file_path(&p);
-            let unit_type = unit_base::unit_name_to_type(&self.id); //best use of owner not name,need reconstruct
-            let confs = self
-                .unit_conf_mgr
-                .unit_file_parser(&unit_type.to_string(), &p);
-            match confs {
-                Ok(confs) => {
-                    let result = self.load.unit_load(&confs);
-                    if let Err(s) = result {
-                        self.load.set_load_state(UnitLoadState::UnitError);
-                        return Err(s);
-                    }
-                    let _ret;
-                    let private_section_name = self.get_private_conf_section_name();
-                    if let Some(p_s_name) = private_section_name {
-                        let _section = confs.get_section_by_name(&p_s_name);
-                        let _result = _section.map(|s| self.sub.borrow_mut().load(s));
-                        if let Some(r) = _result {
-                            _ret = r.map(|_s| self.load.set_load_state(UnitLoadState::UnitLoaded));
-                        } else {
-                            _ret = Err(format!("load Unit {} failed", self.id).into());
-                        }
-                    } else {
-                        _ret = Err(
-                            format!("Cann't found private section conf for {}", self.id).into()
-                        );
-                    }
-                    self.load.set_load_state(UnitLoadState::UnitLoaded);
-                    _ret
-                }
-                Err(e) => {
-                    self.load.set_load_state(UnitLoadState::UnitNotFound);
-                    return Err(format!("{}", e.to_string()).into());
-                }
-            }
-        } else {
-            self.load.set_load_state(UnitLoadState::UnitNotFound);
-            return Err(format!("Unit[ {}] file Not found", self.id).into());
-        }
-    }
-
     pub fn notify(
         &self,
         original_state: UnitActiveState,
@@ -197,44 +93,108 @@ impl Unit {
                 new_state
             );
         }
-        self.state
-            .update(&self.id, original_state, new_state, flags);
+        let u_state = UnitState::new(original_state, new_state, flags);
+        self.dm.insert_unit_state(self.id.clone(), u_state);
     }
 
     pub fn get_id(&self) -> &str {
         &self.id
     }
 
-    pub fn get_unit_type(&self) -> UnitType {
-        self.unit_type
+    pub(super) fn new(
+        unit_type: UnitType,
+        name: &str,
+        dmr: &Rc<DataManager>,
+        filer: &Rc<UnitFile>,
+        unit_conf_mgrr: &Rc<UnitParserMgr<UnitConfigParser>>,
+        sub: RefCell<Box<dyn UnitObj>>,
+    ) -> Self {
+        let _config = Rc::new(UeConfig::new());
+        Unit {
+            dm: Rc::clone(dmr),
+            unit_type,
+            id: String::from(name),
+            config: Rc::clone(&_config),
+            load: UeLoad::new(dmr, filer, unit_conf_mgrr, &_config, String::from(name)),
+            child: UeChild::new(),
+            sub,
+        }
     }
 
-    pub fn get_private_conf_section_name(&self) -> Option<String> {
-        let sub = Rc::clone(&self.sub);
-        let str = sub
+    pub(super) fn in_load_queue(&self) -> bool {
+        self.load.in_load_queue()
+    }
+
+    pub(super) fn set_in_load_queue(&self, t: bool) {
+        self.load.set_in_load_queue(t);
+    }
+
+    pub(super) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
+        self.config.get(item)
+    }
+
+    pub(super) fn load_unit(&self) -> Result<(), Box<dyn Error>> {
+        self.set_in_load_queue(false);
+        match self.load.get_unit_confs() {
+            Ok(confs) => {
+                let result = self.load.unit_load(&confs);
+                if let Err(s) = result {
+                    self.load.set_load_state(UnitLoadState::UnitError);
+                    return Err(s);
+                }
+                let _ret;
+                let private_section_name = self.get_private_conf_section_name();
+                if let Some(p_s_name) = private_section_name {
+                    let _section = confs.get_section_by_name(&p_s_name);
+                    let _result = _section.map(|s| self.sub.borrow_mut().load(s));
+                    if let Some(r) = _result {
+                        _ret = r.map(|_s| self.load.set_load_state(UnitLoadState::UnitLoaded));
+                    } else {
+                        _ret = Err(format!("load Unit {} failed", self.id).into());
+                    }
+                } else {
+                    _ret = Err(format!("Cann't found private section conf for {}", self.id).into());
+                }
+                self.load.set_load_state(UnitLoadState::UnitLoaded);
+                _ret
+            }
+            Err(e) => {
+                self.load.set_load_state(UnitLoadState::UnitNotFound);
+                return Err(e);
+            }
+        }
+    }
+
+    pub(super) fn get_private_conf_section_name(&self) -> Option<String> {
+        let str = self
+            .sub
             .borrow()
             .get_private_conf_section_name()
             .map(|s| s.to_string());
         str
     }
 
-    pub fn current_active_state(&self) -> UnitActiveState {
+    pub(super) fn current_active_state(&self) -> UnitActiveState {
         self.sub.borrow().current_active_state()
     }
 
-    pub fn start(&self) -> Result<(), UnitActionError> {
+    pub(super) fn start(&self) -> Result<(), UnitActionError> {
         self.sub.borrow_mut().start()
     }
 
-    pub fn stop(&self) -> Result<(), UnitActionError> {
+    pub(super) fn stop(&self) -> Result<(), UnitActionError> {
         self.sub.borrow_mut().stop()
     }
 
-    pub fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
+    pub(super) fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
         self.sub.borrow_mut().sigchld_events(pid, code, signal)
     }
 
-    pub fn get_load_state(&self) -> UnitLoadState {
+    pub(super) fn get_load_state(&self) -> UnitLoadState {
         self.load.get_load_state()
+    }
+
+    pub(super) fn attach_unit(&self, unit: &Rc<Unit>) {
+        self.sub.borrow_mut().attach_unit(Rc::clone(unit))
     }
 }

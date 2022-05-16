@@ -1,6 +1,7 @@
+use super::unit_base::UnitRelationAtom;
 use crate::manager::data::UnitRelations;
+use crate::manager::table::TableSubscribe;
 use crate::manager::unit::unit_entry::UnitX;
-use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
 use crate::manager::unit::UnitErrno;
 use nix::unistd::Pid;
 use std::error::Error;
@@ -10,10 +11,10 @@ use unit_dep::UnitDep;
 use unit_sets::UnitSets;
 
 //#[derive(Debug)]
-pub struct UnitDb {
+pub(super) struct UnitDb {
     units: Rc<UnitSets>,
-    dep: Rc<UnitDep>,
-    child: Rc<UnitChild>,
+    dep: UnitDep,
+    child: UnitChild,
 }
 
 impl UnitDb {
@@ -21,22 +22,10 @@ impl UnitDb {
         let _units = Rc::new(UnitSets::new());
         UnitDb {
             units: Rc::clone(&_units),
-            dep: Rc::new(UnitDep::new()),
-            child: Rc::new(UnitChild::new(Rc::clone(&_units))),
+            dep: UnitDep::new(&_units),
+            child: UnitChild::new(&_units),
         }
     }
-
-    /*pub fn get_instance() -> Rc<RefCell<UnitStorage<K,V>>> {
-        static mut PLUGIN: Option<Rc<RefCell<UnitStorage<K,V>>>> = None;
-        unsafe {
-            PLUGIN
-                .get_or_insert_with(|| {
-                    let mut unitStorage: UnitStorage<K, V> = Self::new();
-                    Rc::new(RefCell::new(unitStorage))
-                })
-                .clone()
-        }
-    }*/
 
     pub(super) fn units_insert(&self, name: String, unit: Rc<UnitX>) -> Option<Rc<UnitX>> {
         self.units.insert(name, unit)
@@ -48,6 +37,14 @@ impl UnitDb {
 
     pub(super) fn units_get_all(&self) -> Vec<Rc<UnitX>> {
         self.units.get_all()
+    }
+
+    pub(super) fn units_register(
+        &self,
+        sub_name: &str,
+        subscriber: Rc<dyn TableSubscribe<String, Rc<UnitX>>>,
+    ) -> Option<Rc<dyn TableSubscribe<String, Rc<UnitX>>>> {
+        self.units.register(sub_name, subscriber)
     }
 
     pub(super) fn dep_insert(
@@ -88,6 +85,7 @@ impl UnitDb {
     }
 }
 
+// dependency: unit_sets -> {unit_dep | unit_child}
 mod unit_child;
 mod unit_dep;
 mod unit_sets;

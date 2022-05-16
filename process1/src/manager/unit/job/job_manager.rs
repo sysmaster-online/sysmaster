@@ -6,28 +6,29 @@ use super::job_stat::JobStat;
 use super::job_table::JobTable;
 use super::job_transaction::{self};
 use super::JobErrno;
-use crate::manager::data::{JobMode, UnitActiveState, UnitConfigItem, UnitNotifyFlags};
+use crate::manager::data::{UnitActiveState, UnitNotifyFlags};
+use crate::manager::table::{TableOp, TableSubscribe};
+use crate::manager::unit::unit_base::{JobMode, UnitRelationAtom};
 use crate::manager::unit::unit_datastore::UnitDb;
-use crate::manager::unit::unit_entry::UnitX;
-use crate::manager::unit::unit_relation_atom::UnitRelationAtom;
+use crate::manager::unit::unit_entry::{UnitConfigItem, UnitX};
 use event::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
 use std::rc::Rc;
 use utils::{Error, Result};
 
 #[derive(Debug)]
-pub struct JobAffect {
+pub(in crate::manager::unit) struct JobAffect {
     // data
-    pub adds: Vec<JobInfo>,
-    pub dels: Vec<JobInfo>,
-    pub updates: Vec<JobInfo>,
+    pub(in crate::manager::unit) adds: Vec<JobInfo>,
+    pub(in crate::manager::unit) dels: Vec<JobInfo>,
+    pub(in crate::manager::unit) updates: Vec<JobInfo>,
 
     // control
     interested: bool,
 }
 
 impl JobAffect {
-    pub fn new(interested: bool) -> JobAffect {
+    pub(in crate::manager::unit) fn new(interested: bool) -> JobAffect {
         JobAffect {
             adds: Vec::new(),
             dels: Vec::new(),
@@ -47,13 +48,27 @@ impl JobAffect {
     }
 }
 
-pub struct JobManager {
+pub(in crate::manager::unit) struct JobManager {
+    // associated objects
     event: Rc<Events>,
+
+    // owned objects
+    sub_name: String, // key for table-subscriber: UnitSets
     data: Rc<JobManagerData>,
 }
 
 impl JobManager {
-    pub fn exec(
+    pub(in crate::manager::unit) fn new(dbr: &Rc<UnitDb>, eventr: &Rc<Events>) -> JobManager {
+        let jm = JobManager {
+            event: Rc::clone(eventr),
+            sub_name: String::from("JobManager"),
+            data: Rc::new(JobManagerData::new(dbr)),
+        };
+        jm.register(eventr, dbr);
+        jm
+    }
+
+    pub(in crate::manager::unit) fn exec(
         &self,
         config: &JobConf,
         mode: JobMode,
@@ -64,19 +79,14 @@ impl JobManager {
         Ok(())
     }
 
-    pub fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
+    pub(in crate::manager::unit) fn notify(
+        &self,
+        config: &JobConf,
+        mode: JobMode,
+    ) -> Result<(), JobErrno> {
         self.data.notify(config, mode)?;
         self.try_enable();
         Ok(())
-    }
-
-    pub(in crate::manager::unit) fn new(db: Rc<UnitDb>, event: Rc<Events>) -> JobManager {
-        let jm = JobManager {
-            event,
-            data: Rc::new(JobManagerData::new(db)),
-        };
-        jm.register(Rc::clone(&jm.event));
-        jm
     }
 
     pub(in crate::manager::unit) fn try_finish(
@@ -104,19 +114,24 @@ impl JobManager {
     fn try_enable(&self) {
         // prepare for async-running
         if self.data.is_jobs_ready() {
-            self.enable(Rc::clone(&self.event));
+            self.enable(&self.event);
         }
     }
 
-    fn register(&self, event: Rc<Events>) {
+    fn register(&self, eventr: &Rc<Events>, dbr: &Rc<UnitDb>) {
+        // event
         let source = Rc::clone(&self.data);
-        event.add_source(source).unwrap();
+        eventr.add_source(source).unwrap();
+
+        // db
+        let subscriber = Rc::clone(&self.data);
+        dbr.units_register(&self.sub_name, subscriber);
     }
 
-    fn enable(&self, event: Rc<Events>) {
+    fn enable(&self, eventr: &Rc<Events>) {
         println!("job manager enable.");
         let source = Rc::clone(&self.data);
-        event.set_enabled(source, EventState::OneShot).unwrap();
+        eventr.set_enabled(source, EventState::OneShot).unwrap();
     }
 }
 
@@ -141,11 +156,21 @@ impl Source for JobManagerData {
     }
 }
 
+impl TableSubscribe<String, Rc<UnitX>> for JobManagerData {
+    fn notify(&self, op: &TableOp<String, Rc<UnitX>>) {
+        match op {
+            TableOp::TableInsert(_, _) => {} // do nothing
+            TableOp::TableRemove(_, unit) => self.remove_unit(unit),
+        }
+    }
+}
+
 //#[derive(Debug)]
 struct JobManagerData {
     // associated objects
     db: Rc<UnitDb>,
 
+    // owned objects
     // control
     ja: JobAlloc,
 
@@ -164,6 +189,22 @@ struct JobManagerData {
 
 // the declaration "pub(self)" is for identification only.
 impl JobManagerData {
+    pub(self) fn new(dbr: &Rc<UnitDb>) -> JobManagerData {
+        JobManagerData {
+            db: Rc::clone(dbr),
+
+            ja: JobAlloc::new(),
+
+            jobs: JobTable::new(),
+            stage: JobTable::new(),
+
+            running: RefCell::new(false),
+            text: RefCell::new(None),
+
+            stat: JobStat::new(),
+        }
+    }
+
     pub(self) fn exec(
         &self,
         config: &JobConf,
@@ -205,22 +246,6 @@ impl JobManagerData {
 
         self.do_notify(config, Some(mode));
         Ok(())
-    }
-
-    pub(self) fn new(db: Rc<UnitDb>) -> JobManagerData {
-        JobManagerData {
-            db,
-
-            ja: JobAlloc::new(),
-
-            jobs: JobTable::new(),
-            stage: JobTable::new(),
-
-            running: RefCell::new(false),
-            text: RefCell::new(None),
-
-            stat: JobStat::new(),
-        }
     }
 
     pub(self) fn run(&self) {
@@ -312,6 +337,19 @@ impl JobManagerData {
 
     pub(self) fn is_jobs_ready(&self) -> bool {
         self.jobs.is_ready()
+    }
+
+    fn remove_unit(&self, unit: &UnitX) {
+        // delete related jobs
+        let (del_trigger, del_suspends) = self.jobs.remove_unit(unit);
+
+        // update statistics
+        self.stat.update_change(&(&None, &del_trigger, &None));
+        self.stat
+            .update_changes(&(&Vec::new(), &del_suspends, &Vec::new()));
+        self.stat
+            .update_stage_run(del_trigger.is_none().into(), false); // remove-unit[run->end]: decrease 'run'
+        self.stat.update_stage_wait(del_suspends.len(), false); // remove-unit[wait->end]: decrease 'wait'
     }
 
     fn do_try_finish(
@@ -541,10 +579,10 @@ fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::{DataManager, UnitRelations, UnitType};
+    use crate::manager::data::{DataManager, UnitRelations};
     use crate::manager::unit::job::JobStage;
-    use crate::manager::unit::unit_file::UnitFile;
-    use crate::manager::unit::unit_parser_mgr::UnitParserMgr;
+    use crate::manager::unit::uload_util::{UnitFile, UnitParserMgr};
+    use crate::manager::unit::unit_base::UnitType;
     use crate::plugin::Plugin;
     use utils::logger;
 
@@ -558,7 +596,7 @@ mod tests {
         let unit_test2 = create_unit(&name_test2);
         db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
         db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
-        let jm = JobManager::new(db, event);
+        let jm = JobManager::new(&db, &event);
 
         let mut affect = JobAffect::new(true);
         let ret = jm.exec(
@@ -597,7 +635,7 @@ mod tests {
             0,
         )
         .unwrap();
-        let jm = JobManager::new(db, event);
+        let jm = JobManager::new(&db, &event);
 
         let mut affect = JobAffect::new(true);
         let ret = jm.exec(
@@ -636,7 +674,7 @@ mod tests {
         let unit_test2 = create_unit(&name_test2);
         db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
         db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
-        let jm = JobManager::new(db, event);
+        let jm = JobManager::new(&db, &event);
 
         jm.exec(
             &JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop),
@@ -662,7 +700,7 @@ mod tests {
         let unit_test2 = create_unit(&name_test2);
         db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
         db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
-        let jm = JobManager::new(db, event);
+        let jm = JobManager::new(&db, &event);
 
         jm.exec(
             &JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop),
@@ -694,9 +732,9 @@ mod tests {
         let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();
         Rc::new(UnitX::new(
-            dm,
-            file,
-            unit_conf_parser_mgr,
+            &dm,
+            &file,
+            &unit_conf_parser_mgr,
             unit_type,
             name,
             subclass.into_unitobj(),

@@ -2,14 +2,15 @@ use super::{
     unit_comm::Action, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
 };
 use crate::manager::Manager;
+use http::StatusCode;
 use std::rc::Rc;
 
-pub trait Executer {
+pub(crate) trait Executer {
     /// 处理 Command，返回 Response
     fn execute(self, manager: Rc<Manager>) -> CommandResponse;
 }
 
-pub fn dispatch(cmd: CommandRequest, manager: Rc<Manager>) -> CommandResponse {
+pub(crate) fn dispatch(cmd: CommandRequest, manager: Rc<Manager>) -> CommandResponse {
     println!("commandRequest :{:?}", cmd);
     let res = match cmd.request_data {
         Some(RequestData::Ucomm(param)) => param.execute(manager),
@@ -29,8 +30,14 @@ impl Executer for UnitComm {
             _ => todo!(),
         };
         match ret {
-            Ok(_) => CommandResponse::ok(),
-            Err(_e) => CommandResponse::internal_error(String::from("error.")),
+            Ok(_) => CommandResponse {
+                status: StatusCode::OK.as_u16() as _,
+                ..Default::default()
+            },
+            Err(_e) => CommandResponse {
+                status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                message: String::from("error."),
+            },
         }
     }
 }

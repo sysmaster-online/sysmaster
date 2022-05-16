@@ -8,7 +8,11 @@ pub(super) enum TableOp<'a, K, V> {
 }
 
 pub(super) trait TableSubscribe<K, V> {
-    fn filter(&self, op: &TableOp<K, V>) -> bool;
+    fn filter(&self, _op: &TableOp<K, V>) -> bool {
+        // default: everything is allowed
+        true
+    }
+
     fn notify(&self, op: &TableOp<K, V>);
 }
 
@@ -52,6 +56,10 @@ where
 
     pub(super) fn get(&self, k: &K) -> Option<&V> {
         self.data.get(k)
+    }
+
+    pub(super) fn get_all(&self) -> Vec<&V> {
+        self.data.iter().map(|(_, vr)| vr).collect::<Vec<_>>()
     }
 
     pub(super) fn subscribe(
@@ -227,10 +235,6 @@ mod tests {
     }
 
     impl TableSubscribe<u32, char> for TableTest {
-        fn filter(&self, _op: &TableOp<u32, char>) -> bool {
-            true
-        }
-
         fn notify(&self, op: &TableOp<u32, char>) {
             match op {
                 TableOp::TableInsert(k, v) => {

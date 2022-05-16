@@ -1,8 +1,9 @@
+#![warn(unused_imports)]
 use crate::manager::data::UnitRelations;
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 #[repr(u64)]
-pub(super) enum UnitRelationAtom {
+pub(in crate::manager::unit) enum UnitRelationAtom {
     UnitAtomPullInStart = 1u64 << 0,
     UnitAtomPullInStartIgnored = 1u64 << 1,
     UnitAtomPullInVerify = 1u64 << 2,
@@ -39,7 +40,9 @@ pub(super) enum UnitRelationAtom {
     UnitAtomSliceOf = 1u64 << 33,
 }
 
-pub(super) fn unit_relation_to_atom(relation: UnitRelations) -> Vec<UnitRelationAtom> {
+pub(in crate::manager::unit) fn unit_relation_to_atom(
+    relation: UnitRelations,
+) -> Vec<UnitRelationAtom> {
     let mut atoms = Vec::new();
     match relation {
         UnitRelations::UnitRequires => {
@@ -170,7 +173,9 @@ pub(super) fn unit_relation_to_atom(relation: UnitRelations) -> Vec<UnitRelation
     atoms
 }
 
-pub(super) fn unit_relation_from_unique_atom(atom: UnitRelationAtom) -> Vec<UnitRelations> {
+pub(in crate::manager::unit) fn unit_relation_from_unique_atom(
+    atom: UnitRelationAtom,
+) -> Vec<UnitRelations> {
     let mut deps = Vec::new();
     match atom {
         UnitRelationAtom::UnitAtomPullInStart => {

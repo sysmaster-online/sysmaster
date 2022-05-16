@@ -1,22 +1,22 @@
-use std::{convert::TryFrom, rc::Rc};
-
+use super::manager::Manager;
 use event::{EventType, Events, Source};
 use nix::{sys::signal::Signal, unistd::Pid};
+use std::{convert::TryFrom, rc::Rc};
 use utils::{Error, Result};
 
-use super::unit::UnitManagerX;
-
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ProcessExit {
+pub(super) enum ProcessExit {
     Status(Pid, i32, nix::sys::signal::Signal),
 }
-pub struct Signals {
-    um: Rc<UnitManagerX>,
+pub(super) struct Signals {
+    manager: Rc<Manager>,
 }
 
 impl Signals {
-    pub fn new(um: Rc<UnitManagerX>) -> Signals {
-        Signals { um }
+    pub(super) fn new(mr: &Rc<Manager>) -> Signals {
+        Signals {
+            manager: Rc::clone(mr),
+        }
     }
 }
 
@@ -47,7 +47,7 @@ impl Source for Signals {
                     let signal = Signal::try_from(info.si_signo).unwrap();
                     log::debug!("read signal from event: {}", signal);
                     match signal {
-                        Signal::SIGCHLD => match self.um.child_dispatch_sigchld() {
+                        Signal::SIGCHLD => match self.manager.dispatch_sigchld() {
                             Err(e) => {
                                 log::error!("dispatch sigchld error: {}", e)
                             }
