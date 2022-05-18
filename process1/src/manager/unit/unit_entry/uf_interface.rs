@@ -122,10 +122,6 @@ impl UnitX {
         todo!();
     }
 
-    pub(in crate::manager::unit) fn get_private_conf_section_name(&self) -> Option<String> {
-        self.0.get_private_conf_section_name()
-    }
-
     pub(in crate::manager::unit) fn cg_path(&self) -> PathBuf {
         self.0.cg_path()
     }
