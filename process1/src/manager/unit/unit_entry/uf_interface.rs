@@ -8,6 +8,7 @@ use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::error::Error;
+use std::path::PathBuf;
 use std::rc::Rc;
 use utils::IN_SET;
 
@@ -135,5 +136,9 @@ impl UnitX {
 
     pub(in crate::manager::unit) fn get_private_conf_section_name(&self) -> Option<String> {
         self.0.get_private_conf_section_name()
+    }
+
+    pub(in crate::manager::unit) fn cg_path(&self) -> PathBuf {
+        self.0.cg_path()
     }
 }
