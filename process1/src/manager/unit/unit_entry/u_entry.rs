@@ -3,7 +3,7 @@ use super::uu_child::UeChild;
 use super::uu_config::{UeConfig, UnitConfigItem};
 use super::uu_load::UeLoad;
 use crate::manager::data::{DataManager, UnitActiveState, UnitState};
-use crate::manager::unit::uload_util::{UnitConfigParser, UnitFile, UnitParserMgr};
+use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{KillOperation, UnitActionError, UnitLoadState, UnitType};
 use cgroup::{self, CgFlags};
 use log;
@@ -17,7 +17,6 @@ use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::rc::Rc;
-use utils::unit_conf::{Conf, Section};
 use utils::Result;
 
 pub struct Unit {
@@ -64,7 +63,8 @@ impl Hash for Unit {
 pub trait UnitObj {
     fn init(&self) {}
     fn done(&self) {}
-    fn load(&mut self, section: &Section<Conf>) -> Result<(), Box<dyn Error>>;
+    fn load(&mut self, conf_str: &str) -> Result<(), Box<dyn Error>>;
+
     fn coldplug(&self) {}
     fn dump(&self) {}
     fn start(&mut self) -> Result<(), UnitActionError> {
@@ -198,7 +198,6 @@ impl Unit {
         name: &str,
         dmr: &Rc<DataManager>,
         filer: &Rc<UnitFile>,
-        unit_conf_mgrr: &Rc<UnitParserMgr<UnitConfigParser>>,
         sub: RefCell<Box<dyn UnitObj>>,
     ) -> Self {
         let _config = Rc::new(UeConfig::new());
@@ -207,7 +206,7 @@ impl Unit {
             unit_type,
             id: String::from(name),
             config: Rc::clone(&_config),
-            load: UeLoad::new(dmr, filer, unit_conf_mgrr, &_config, String::from(name)),
+            load: UeLoad::new(dmr, filer, &_config, String::from(name)),
             child: UeChild::new(),
             cgroup: UeCgroup::new(),
             sub,
@@ -228,28 +227,15 @@ impl Unit {
 
     pub(super) fn load_unit(&self) -> Result<(), Box<dyn Error>> {
         self.set_in_load_queue(false);
-        match self.load.get_unit_confs() {
+        match self.load.load_unit_confs() {
             Ok(confs) => {
-                let result = self.load.unit_load(&confs);
-                if let Err(s) = result {
-                    self.load.set_load_state(UnitLoadState::UnitError);
-                    return Err(s);
-                }
-                let _ret;
-                let private_section_name = self.get_private_conf_section_name();
-                if let Some(p_s_name) = private_section_name {
-                    let _section = confs.get_section_by_name(&p_s_name);
-                    let _result = _section.map(|s| self.sub.borrow_mut().load(s));
-                    if let Some(r) = _result {
-                        _ret = r.map(|_s| self.load.set_load_state(UnitLoadState::UnitLoaded));
-                    } else {
-                        _ret = Err(format!("load Unit {} failed", self.id).into());
-                    }
+                let ret = self.sub.borrow_mut().load(&confs);
+                if let Ok(_) = ret {
+                    self.load.set_load_state(UnitLoadState::UnitLoaded);
                 } else {
-                    _ret = Err(format!("Cann't found private section conf for {}", self.id).into());
+                    return Err(format!("load Unit {} failed", self.id).into());
                 }
-                self.load.set_load_state(UnitLoadState::UnitLoaded);
-                _ret
+                ret
             }
             Err(e) => {
                 self.load.set_load_state(UnitLoadState::UnitNotFound);

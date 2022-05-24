@@ -1,9 +1,54 @@
-use core::fmt::{Display, Formatter, Result as FmtResult};
+use core::fmt::Result as FmtResult;
+use proc_macro_utils::ConfigParseM;
+use process1::manager::{KillOperation, UnitActiveState};
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::fmt;
+use std::io::{Error as IoError, ErrorKind};
 use std::rc::Rc;
+use utils::config_parser::{toml_str_parse, ConfigParse};
 
-use process1::manager::{KillOperation, UnitActiveState};
+#[derive(Serialize, Deserialize, ConfigParseM)]
+#[serdeName("Service")]
+#[serde(rename_all = "PascalCase")]
+pub(crate) struct ServiceConf {
+    #[serde(alias = "Type", default = "ServiceType::default")]
+    service_type: ServiceType,
+    #[serde(alias = "ExecStart")]
+    exec_start: Option<Vec<String>>,
+    #[serde(alias = "ExecStop")]
+    exec_stop: Option<Vec<String>>,
+    #[serde(alias = "ExecCondition")]
+    exec_condition: Option<Vec<String>>,
+    #[serde(alias = "Sockets")]
+    sockets: Option<String>,
+    #[serde(alias = "Restart")]
+    restart: Option<Vec<String>>,
+    #[serde(alias = "RestrictRealtime")]
+    restrict_realtime: Option<String>,
+    #[serde(alias = "RebootArgument")]
+    reboot_argument: Option<String>,
+    #[serde(alias = "ExecReload")]
+    exec_reload: Option<Vec<String>>,
+    #[serde(alias = "OOMScoreAdjust")]
+    oom_score_adjust: Option<String>,
+    #[serde(alias = "RestartSec")]
+    restart_sec: Option<u64>,
+    #[serde(alias = "Slice")]
+    slice: Option<String>,
+    #[serde(alias = "MemoryLimit")]
+    memory_limit: Option<u64>,
+    #[serde(alias = "MemoryLow")]
+    memory_low: Option<u64>,
+    #[serde(alias = "MemoryMin")]
+    memory_min: Option<u64>,
+    #[serde(alias = "MemoryMax")]
+    memory_max: Option<u64>,
+    #[serde(alias = "MemoryHigh")]
+    memory_high: Option<u64>,
+    #[serde(alias = "MemorySwapMax")]
+    memory_swap_max: Option<u64>,
+}
 
 #[derive(PartialEq, EnumString, Display, Debug)]
 pub(in crate) enum ServiceTimeoutFailureMode {
@@ -50,31 +95,33 @@ impl Default for ServiceRestart {
     }
 }
 
-#[derive(PartialEq, Eq, EnumString, Display, Debug)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, EnumString, Display, Debug, Clone)]
 pub(crate) enum ServiceType {
     #[strum(serialize = "simple")]
-    ServiceSimple,
+    #[serde(alias = "simple")]
+    Simple,
     #[strum(serialize = "forking")]
-    SserviceForking,
+    Forking,
     #[strum(serialize = "oneshot")]
-    ServiceOneshot,
+    Oneshot,
     #[strum(serialize = "dbus")]
-    ServiceDbus,
+    Dbus,
     #[strum(serialize = "notify")]
-    ServiceNotify,
+    Notify,
     #[strum(serialize = "idle")]
-    ServiceIdle,
+    Idle,
     #[strum(serialize = "exec")]
-    ServiceExec,
-    ServiceTypeMax,
-    ServiceTypeInvalid = -1,
+    Exec,
+    TypeMax,
+    TypeInvalid = -1,
 }
 
 impl Default for ServiceType {
     fn default() -> Self {
-        ServiceType::ServiceSimple
+        ServiceType::Simple
     }
 }
+
 pub enum ServiceCommand {
     ServiceCondition,
     ServiceStartPre,
@@ -224,37 +271,5 @@ impl CommandLine {
 impl fmt::Display for CommandLine {
     fn fmt(&self, f: &mut fmt::Formatter) -> FmtResult {
         write!(f, "Display: {}", self.cmd)
-    }
-}
-
-pub enum ServiceConf {
-    Type,
-    ExecCondition,
-    ExecStart,
-    ExecReload,
-    ExecStop,
-}
-
-impl Display for ServiceConf {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            ServiceConf::Type => write!(f, "Type"),
-            ServiceConf::ExecCondition => write!(f, "ExecCondition"),
-            ServiceConf::ExecStart => write!(f, "ExecStart"),
-            ServiceConf::ExecReload => write!(f, "ExecReload"),
-            ServiceConf::ExecStop => write!(f, "ExecStop"),
-        }
-    }
-}
-
-impl From<ServiceConf> for String {
-    fn from(service_conf: ServiceConf) -> Self {
-        match service_conf {
-            ServiceConf::Type => "Type".into(),
-            ServiceConf::ExecCondition => "ExecCondition".into(),
-            ServiceConf::ExecStart => "ExecStart".into(),
-            ServiceConf::ExecReload => "ExecReload".into(),
-            ServiceConf::ExecStop => "ExecStop".into(),
-        }
     }
 }

@@ -26,6 +26,7 @@ walkdir = "2"
 siphasher = { version = "0.3", features = ["serde"] }
 utils = { path = "../libutils" }
 event = { path = "../libevent" }
+proc_macro_utils = {path = "../libproc_macro_utils"}
 cgroup = { path = "../libcgroup" }
 strum = { version = "0.23", features = ["derive"] }
 nix = "0.23.0"
@@ -36,6 +37,9 @@ prost = "0.9" # 处理 protobuf 的代码
 http = "0.2" # 我们使用 HTTP status code 所以引入这个类型库
 clap = { version = "3.1.8", features = ["derive"] }
 once_cell = { version = "1.5.2"}
+serde_derive = "1.0.130"
+serde = "1.0.130"
+toml = "0.5.8"
 
 [build-dependencies]
 prost-build = "0.9" # 编译 protobuf

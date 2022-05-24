@@ -188,7 +188,7 @@ mod unit_load {
     use super::UnitManager;
     use crate::manager::data::{DataManager, UnitDepConf};
     use crate::manager::table::{TableOp, TableSubscribe};
-    use crate::manager::unit::uload_util::{UnitConfigParser, UnitFile, UnitParserMgr};
+    use crate::manager::unit::uload_util::UnitFile;
     use crate::manager::unit::unit_base::{self, UnitType};
     use crate::manager::unit::unit_datastore::UnitDb;
     use crate::manager::unit::unit_entry::UnitX;
@@ -242,7 +242,6 @@ mod unit_load {
 
         // owned objects
         file: Rc<UnitFile>,
-        unit_conf_parser_mgr: Rc<UnitParserMgr<UnitConfigParser>>,
     }
 
     // the declaration "pub(self)" is for identification only.
@@ -254,7 +253,6 @@ mod unit_load {
         ) -> UnitLoadData {
             log::debug!("UnitLoadData db count is {}", Rc::strong_count(dbr));
             let _file = Rc::new(UnitFile::new());
-            let _unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
             _file.init_lookup_path();
             UnitLoadData {
                 dm: Rc::clone(dmr),
@@ -262,7 +260,6 @@ mod unit_load {
                 db: Rc::clone(dbr),
                 rt: Rc::clone(rtr),
                 file: Rc::clone(&_file),
-                unit_conf_parser_mgr: Rc::clone(&_unit_conf_parser_mgr),
             }
         }
 
@@ -319,17 +316,12 @@ mod unit_load {
                 Ok(sub) => sub,
                 Err(_e) => return None,
             };
-            subclass.get_private_conf_section_name().map(|s| {
-                self.unit_conf_parser_mgr
-                    .register_parser_by_private_section_name(unit_type.to_string(), s.to_string())
-            });
 
             subclass.attach(self.um.clone().into_inner().upgrade().unwrap());
 
             Some(Rc::new(UnitX::new(
                 &self.dm,
                 &self.file,
-                &self.unit_conf_parser_mgr,
                 unit_type,
                 name,
                 subclass.into_unitobj(),

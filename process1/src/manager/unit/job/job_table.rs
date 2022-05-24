@@ -937,7 +937,7 @@ impl JobUnitTableData {
 mod tests {
     use super::*;
     use crate::manager::data::DataManager;
-    use crate::manager::unit::uload_util::{UnitFile, UnitParserMgr};
+    use crate::manager::unit::uload_util::UnitFile;
     use crate::manager::unit::unit_base::UnitType;
     use crate::plugin::Plugin;
     use utils::logger;
@@ -963,14 +963,12 @@ mod tests {
         log::info!("test");
         let dm = Rc::new(DataManager::new());
         let file = Rc::new(UnitFile::new());
-        let unit_conf_parser_mgr = Rc::new(UnitParserMgr::default());
         let unit_type = UnitType::UnitService;
         let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();
         Rc::new(UnitX::new(
             &dm,
             &file,
-            &unit_conf_parser_mgr,
             unit_type,
             name,
             subclass.into_unitobj(),
