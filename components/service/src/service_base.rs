@@ -1,11 +1,7 @@
-use core::fmt::Result as FmtResult;
 use proc_macro_utils::ConfigParseM;
 use process1::manager::{KillOperation, UnitActiveState};
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
-use std::fmt;
 use std::io::{Error as IoError, ErrorKind};
-use std::rc::Rc;
 use utils::config_parser::{toml_str_parse, ConfigParse};
 
 #[derive(Serialize, Deserialize, ConfigParseM)]
@@ -245,31 +241,5 @@ impl ServiceState {
     }
 }
 
-#[allow(dead_code)]
-pub enum CmdError {
-    Timeout,
-    NoCmdFound,
-    SpawnError,
-}
-
 #[derive(PartialEq, Default, Debug)]
 pub(super) struct DualTimestamp {}
-
-#[derive(PartialEq, Clone, Eq, Debug)]
-pub struct CommandLine {
-    pub cmd: String,
-    pub args: Vec<String>,
-    pub next: Option<Rc<RefCell<CommandLine>>>,
-}
-
-impl CommandLine {
-    pub fn update_next(&mut self, next: Rc<RefCell<CommandLine>>) {
-        self.next = Some(next)
-    }
-}
-
-impl fmt::Display for CommandLine {
-    fn fmt(&self, f: &mut fmt::Formatter) -> FmtResult {
-        write!(f, "Display: {}", self.cmd)
-    }
-}

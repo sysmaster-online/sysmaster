@@ -1,3 +1,4 @@
+pub use execute::{CommandLine, ExecParameters, ExecSpawn};
 pub use unit_base::{KillOperation, UnitActionError, UnitType};
 pub use unit_entry::{Unit, UnitObj};
 pub(super) use unit_manager::UnitManagerX;
@@ -15,8 +16,9 @@ pub enum UnitErrno {
 // unit_base -> {uload_util} ->
 // unit_entry ->
 // {unit_datastore -> unit_runtime} ->
-// {job} -> unit_manager
+// {job | execute} -> unit_manager
 
+mod execute;
 mod job;
 mod uload_util;
 mod unit_base;

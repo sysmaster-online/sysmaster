@@ -2,7 +2,8 @@ use crate::service_base::ServiceConf;
 
 use super::service::ServiceUnit;
 use super::service_base::ServiceCommand;
-use super::service_base::{CommandLine, ServiceType};
+use super::service_base::ServiceType;
+use process1::manager::CommandLine;
 use std::collections::LinkedList;
 use std::error::Error;
 use std::path::Path;

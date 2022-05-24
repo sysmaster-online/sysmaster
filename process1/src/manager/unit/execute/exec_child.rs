@@ -1,14 +1,14 @@
-use std::collections::HashMap;
-
-use super::service::ServiceUnit;
-use super::service_base::CommandLine;
+use crate::manager::Unit;
 use log;
 use regex::Regex;
+use std::rc::Rc;
+
+use super::{CommandLine, ExecParameters};
 
 fn build_exec_environment(
-    _service: &ServiceUnit,
+    _unit: Rc<Unit>,
     cmdline: &CommandLine,
-    env: &HashMap<&str, String>,
+    env: Rc<ExecParameters>,
 ) -> (std::ffi::CString, Vec<std::ffi::CString>) {
     // let command = cmdline.borrow();
     let cmd = std::ffi::CString::new(cmdline.cmd.clone()).unwrap();
@@ -36,7 +36,7 @@ fn build_exec_environment(
 
             if let Some(val) = match_result {
                 let v = val.trim_matches('$').trim_matches('{').trim_matches('}');
-                if let Some(target) = env.get(v) {
+                if let Some(target) = env.get_env(v) {
                     args.push(
                         std::ffi::CString::new(var_regex.replace(arg, target).to_string()).unwrap(),
                     );
@@ -51,8 +51,8 @@ fn build_exec_environment(
     (cmd, args)
 }
 
-pub fn exec_child(service: &ServiceUnit, cmdline: &CommandLine, env: &HashMap<&str, String>) {
-    let (cmd, args) = build_exec_environment(service, cmdline, env);
+pub fn exec_child(unit: Rc<Unit>, cmdline: &CommandLine, params: Rc<ExecParameters>) {
+    let (cmd, args) = build_exec_environment(unit, cmdline, params);
     let cstr_args = args
         .iter()
         .map(|cstring| cstring.as_c_str())
