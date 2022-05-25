@@ -338,7 +338,7 @@ impl JobAttr {
 pub(super) fn job_process_unit(
     run_kind: JobKind,
     ns: UnitActiveState,
-    flags: isize,
+    flags: UnitNotifyFlags,
 ) -> (Option<JobResult>, bool) {
     match run_kind {
         JobKind::JobStart => job_process_unit_start(ns),
@@ -443,9 +443,12 @@ fn job_process_unit_stop(ns: UnitActiveState) -> (Option<JobResult>, bool) {
     }
 }
 
-fn job_process_unit_reload(ns: UnitActiveState, flags: isize) -> (Option<JobResult>, bool) {
+fn job_process_unit_reload(
+    ns: UnitActiveState,
+    flags: UnitNotifyFlags,
+) -> (Option<JobResult>, bool) {
     let mut result = JobResult::JobDone;
-    if flags & UnitNotifyFlags::UnitNotifyReloadFailure as isize != 0 {
+    if flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE) {
         result = JobResult::JobFailed;
     }
     match ns {

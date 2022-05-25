@@ -1,12 +1,15 @@
+use bitflags::bitflags;
 use nix::errno::Errno;
 use std::io::Error;
 
 mod cgroup;
 
-pub enum CgFlags {
-    CgSigcont = 1 << 0,
-    CgIgnoreSelf = 1 << 1,
-    CgRemove = 1 << 2,
+bitflags! {
+    pub struct CgFlags: u8 {
+        const SIGCONT = 1 << 0;
+        const IGNORE_SELF = 1 << 1;
+        const REMOVE = 1 << 2;
+    }
 }
 
 #[derive(Debug)]

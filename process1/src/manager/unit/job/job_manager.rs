@@ -94,7 +94,7 @@ impl JobManager {
         unit: &Rc<UnitX>,
         os: UnitActiveState,
         ns: UnitActiveState,
-        flags: isize,
+        flags: UnitNotifyFlags,
     ) -> Result<(), JobErrno> {
         self.data.try_finish(unit, os, ns, flags)?;
         self.try_enable();
@@ -181,7 +181,7 @@ struct JobManagerData {
 
     // status
     running: RefCell<bool>,
-    text: RefCell<Option<(Rc<UnitX>, UnitActiveState, UnitActiveState, isize)>>, // (unit, os, ns, flags) for synchronous finish
+    text: RefCell<Option<(Rc<UnitX>, UnitActiveState, UnitActiveState, UnitNotifyFlags)>>, // (unit, os, ns, flags) for synchronous finish
 
     // statistics
     stat: JobStat,
@@ -290,7 +290,7 @@ impl JobManagerData {
         unit: &Rc<UnitX>,
         os: UnitActiveState,
         ns: UnitActiveState,
-        flags: isize,
+        flags: UnitNotifyFlags,
     ) -> Result<(), JobErrno> {
         // in order to simplify the mechanism, the running(trigger) and ending(finish) processes need to be isolated.
         if *self.running.borrow() {
@@ -300,8 +300,7 @@ impl JobManagerData {
                 return Err(JobErrno::JobErrInput);
             }
 
-            *self.text.borrow_mut() =
-                Some((Rc::clone(unit), os.clone(), ns.clone(), flags.clone()));
+            *self.text.borrow_mut() = Some((Rc::clone(unit), os.clone(), ns.clone(), flags));
         // update and record it.
         } else {
             // (asynchronous)finish not in context
@@ -357,7 +356,7 @@ impl JobManagerData {
         unit: &Rc<UnitX>,
         os: UnitActiveState,
         ns: UnitActiveState,
-        flags: isize,
+        flags: UnitNotifyFlags,
     ) {
         let mut generated = false;
         if let Some((trigger, pause)) = self.jobs.get_trigger_info(unit) {
@@ -493,10 +492,10 @@ impl JobManagerData {
         unit: &Rc<UnitX>,
         os: UnitActiveState,
         ns: UnitActiveState,
-        flags: isize,
+        flags: UnitNotifyFlags,
     ) {
         // OnFailure=
-        if ns != os && flags & UnitNotifyFlags::UnitNotifyWillAutoRestart as isize == 0 {
+        if ns != os && !flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART) {
             match ns {
                 UnitActiveState::UnitFailed => {
                     if let UnitConfigItem::UcItemOnFailJobMode(mode) =
@@ -510,8 +509,10 @@ impl JobManagerData {
         }
 
         // OnSuccess=
+        // if ns == UnitActiveState::UnitInActive
+        //     && flags & UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART == 0
         if ns == UnitActiveState::UnitInActive
-            && flags & UnitNotifyFlags::UnitNotifyWillAutoRestart as isize == 0
+            && !flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART)
         {
             match os {
                 UnitActiveState::UnitFailed
