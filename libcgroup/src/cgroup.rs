@@ -185,8 +185,12 @@ fn cg_kill_process(
         match nix::sys::signal::kill(pid, signal) {
             Ok(_) => {
                 if flags & CgFlags::CgSigcont as isize != 0 {
-                    nix::sys::signal::kill(pid, Signal::SIGCONT)
-                        .map_err(|_e| log::debug!("send SIGCONT to cgroup process failed"));
+                    match nix::sys::signal::kill(pid, Signal::SIGCONT) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            log::debug!("send SIGCONT to cgroup process failed");
+                        }
+                    }
                 }
             }
             Err(e) => {
@@ -233,23 +237,20 @@ pub fn cg_kill_recursive(
 }
 
 mod tests {
-    use super::cg_abs_path;
-    use super::cg_type;
-    use std::path::PathBuf;
 
     #[test]
-    fn test_get_cg_abs_path() {
-        let cg_path = PathBuf::from("system.slice");
-        if let Ok(p) = cg_abs_path(&cg_path, &PathBuf::from("")) {
+    fn get_cg_abs_path() {
+        let cg_path = std::path::PathBuf::from("system.slice");
+        if let Ok(p) = super::cg_abs_path(&cg_path, &std::path::PathBuf::from("")) {
             assert_eq!(
                 p,
-                PathBuf::from("/sys/fs/cgroup/systemd.slice/cgroup.procs")
+                std::path::PathBuf::from("/sys/fs/cgroup/systemd.slice/cgroup.procs")
             )
         }
     }
 
     #[test]
     fn test_cg_file_type() {
-        println!("file type is {:?}", cg_type());
+        println!("file type is {:?}", super::cg_type());
     }
 }

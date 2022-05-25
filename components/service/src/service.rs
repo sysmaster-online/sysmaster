@@ -1,4 +1,7 @@
-use process1::manager::{Unit, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass};
+use process1::manager::{
+    CommandLine, ExecParameters, ExecSpawn, Unit, UnitActiveState, UnitManager, UnitMngUtil,
+    UnitObj, UnitSubClass,
+};
 use process1::watchdog;
 use std::collections::LinkedList;
 use std::error::Error;
@@ -6,10 +9,8 @@ use std::error::Error;
 use crate::service_base::ServiceConf;
 
 use super::service_base::{
-    CommandLine, ExitStatusSet, ServiceCommand, ServiceRestart, ServiceResult, ServiceState,
-    ServiceType,
+    ExitStatusSet, ServiceCommand, ServiceRestart, ServiceResult, ServiceState, ServiceType,
 };
-use super::service_start;
 use log;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
@@ -109,7 +110,7 @@ impl ServiceUnit {
         match cmd.next() {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
-                match service_start::start_service(self, &*cmd.borrow()) {
+                match self.spawn(cmd.clone(), 0) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
                         self.run_dead(ServiceResult::ServiceFailureResources);
@@ -132,8 +133,7 @@ impl ServiceUnit {
         match cmd.next() {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
-
-                match service_start::start_service(self, &*cmd.borrow()) {
+                match self.spawn(cmd.clone(), 0) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
                         self.run_dead(ServiceResult::ServiceFailureResources);
@@ -170,7 +170,7 @@ impl ServiceUnit {
         if let Some(control_command) = &self.control_command {
             if let Some(cmd) = &control_command.clone().borrow().next {
                 self.control_command = Some(cmd.clone());
-                match service_start::start_service(self, &*cmd.borrow()) {
+                match self.spawn(cmd.clone(), 0) {
                     Ok(pid) => {
                         self.control_pid = Some(pid);
                     }
@@ -186,7 +186,7 @@ impl ServiceUnit {
         if let Some(main_command) = &self.main_command {
             if let Some(cmd) = &main_command.clone().borrow().next {
                 self.main_command = Some(cmd.clone());
-                match service_start::start_service(self, &*cmd.borrow()) {
+                match self.spawn(cmd.clone(), 0) {
                     Ok(pid) => {
                         self.main_pid = Some(pid);
                     }
@@ -274,7 +274,7 @@ impl ServiceUnit {
             Some(cmd) => {
                 self.main_command = Some(cmd.clone());
 
-                match service_start::start_service(self, &*cmd.borrow()) {
+                match self.spawn(cmd.clone(), 0) {
                     Ok(pid) => self.main_pid = Some(pid),
                     Err(_e) => {
                         log::error!("failed to start service: {}", self.unit().get_id());
@@ -303,7 +303,7 @@ impl ServiceUnit {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
 
-                match service_start::start_service(self, &*cmd.borrow()) {
+                match self.spawn(cmd.clone(), 0) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
                         log::error!("Failed to run start post service: {}", self.unit().get_id());
@@ -401,7 +401,7 @@ impl ServiceUnit {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
 
-                match service_start::start_service(self, &*cmd.borrow()) {
+                match self.spawn(cmd.clone(), 0) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
                         log::error!("Failed to run stop service: {}", self.unit().get_id());
@@ -431,7 +431,7 @@ impl ServiceUnit {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
 
-                match service_start::start_service(self, &*cmd.borrow()) {
+                match self.spawn(cmd.clone(), 0) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
                         self.send_signal(
@@ -478,7 +478,7 @@ impl ServiceUnit {
             Some(cmd) => {
                 self.control_command = Some(cmd.clone());
 
-                match service_start::start_service(self, &*cmd.borrow()) {
+                match self.spawn(cmd.clone(), 0) {
                     Ok(pid) => self.control_pid = Some(pid),
                     Err(_e) => {
                         log::error!("failed to start service: {}", self.unit().get_id());
@@ -515,6 +515,25 @@ impl ServiceUnit {
 
     pub fn um(&self) -> Rc<UnitManager> {
         self.um.clone().upgrade().as_ref().cloned().unwrap()
+    }
+
+    fn spawn(&self, cmd: Rc<RefCell<CommandLine>>, _time_out: u64) -> Result<Pid, Box<dyn Error>> {
+        let params = ExecParameters::new();
+
+        if let Some(pid) = self.main_pid {
+            params.add_env("MAINPID", format!("{}", pid));
+        }
+
+        self.unit().prepare_exec()?;
+
+        let exec_spawn = ExecSpawn::new(self.unit(), self.um(), cmd.clone(), Rc::new(params));
+        match exec_spawn.start() {
+            Ok(pid) => Ok(pid),
+            Err(_e) => {
+                log::error!("failed to start service: {}", self.unit().get_id());
+                Err(format!("spawn exec return error").into())
+            }
+        }
     }
 }
 
