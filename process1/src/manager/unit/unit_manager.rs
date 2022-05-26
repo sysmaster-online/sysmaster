@@ -1,7 +1,8 @@
+use super::execute::{ExecCmdError, ExecCommand, ExecParameters, ExecSpawn};
 use super::job::{JobAffect, JobConf, JobKind, JobManager};
 use super::unit_base::{JobMode, UnitRelationAtom};
 use super::unit_datastore::UnitDb;
-use super::unit_entry::{UnitObj, UnitX};
+use super::unit_entry::{Unit, UnitObj, UnitX};
 use super::unit_runtime::UnitRT;
 use crate::manager::data::{DataManager, UnitState};
 use crate::manager::table::{TableOp, TableSubscribe};
@@ -61,6 +62,7 @@ pub struct UnitManager {
     rt: Rc<UnitRT>,
     load: UnitLoad,
     jm: JobManager,
+    exec: ExecSpawn,
 }
 
 // the declaration "pub(self)" is for identification only.
@@ -77,7 +79,16 @@ impl UnitManager {
         self.db.child_unwatch_pid(pid)
     }
 
-    pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub fn exec_spawn(
+        &self,
+        unit: &Unit,
+        cmdline: &ExecCommand,
+        params: &ExecParameters,
+    ) -> Result<Pid, ExecCmdError> {
+        self.exec.spawn(unit, cmdline, params)
+    }
+
+    pub(self) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         if let Some(unit) = self.load_unit(name) {
             log::debug!("load unit success, send to job manager");
             self.jm.exec(
@@ -91,7 +102,7 @@ impl UnitManager {
         }
     }
 
-    pub fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub(self) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
         if let Some(unit) = self.load_unit(name) {
             self.jm.exec(
                 &JobConf::new(Rc::clone(&unit), JobKind::JobStop),
@@ -112,6 +123,7 @@ impl UnitManager {
             db: Rc::clone(&_db),
             rt: Rc::clone(&_rt),
             jm: JobManager::new(&_db, eventr),
+            exec: ExecSpawn::new(),
         });
         um.load.set_um(&um);
         um
@@ -158,7 +170,7 @@ impl UnitManager {
 }
 
 pub trait UnitMngUtil {
-    fn attach(&mut self, um: Rc<UnitManager>);
+    fn attach(&self, um: Rc<UnitManager>);
 }
 
 pub trait UnitSubClass: UnitObj + UnitMngUtil {
@@ -312,7 +324,7 @@ mod unit_load {
                 name
             );
             let plugins = Plugin::get_instance();
-            let mut subclass = match plugins.create_unit_obj(unit_type) {
+            let subclass = match plugins.create_unit_obj(unit_type) {
                 Ok(sub) => sub,
                 Err(_e) => return None,
             };

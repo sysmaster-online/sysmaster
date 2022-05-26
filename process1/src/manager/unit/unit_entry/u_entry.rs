@@ -10,7 +10,6 @@ use log;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use nix::NixPath;
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::error::Error;
@@ -31,7 +30,7 @@ pub struct Unit {
     load: UeLoad,
     child: UeChild,
     cgroup: UeCgroup,
-    sub: RefCell<Box<dyn UnitObj>>,
+    sub: Box<dyn UnitObj>,
 }
 
 impl PartialEq for Unit {
@@ -63,27 +62,26 @@ impl Hash for Unit {
 pub trait UnitObj {
     fn init(&self) {}
     fn done(&self) {}
-    fn load(&mut self, conf_str: &str) -> Result<(), Box<dyn Error>>;
+    fn load(&self, conf_str: &str) -> Result<(), Box<dyn Error>>;
 
     fn coldplug(&self) {}
     fn dump(&self) {}
-    fn start(&mut self) -> Result<(), UnitActionError> {
+    fn start(&self) -> Result<(), UnitActionError> {
         Ok(())
     }
-    fn stop(&mut self) -> Result<(), UnitActionError> {
+    fn stop(&self) -> Result<(), UnitActionError> {
         Ok(())
     }
-    fn reload(&mut self) {}
+    fn reload(&self) {}
 
     fn kill(&self) {}
     fn release_resources(&self) {}
-    fn sigchld_events(&mut self, _pid: Pid, _code: i32, _status: Signal) {}
+    fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {}
     fn reset_failed(&self) {}
-    fn trigger(&mut self, _other: Rc<RefCell<Box<dyn UnitObj>>>) {}
 
     fn get_private_conf_section_name(&self) -> Option<&str>;
     fn current_active_state(&self) -> UnitActiveState;
-    fn attach_unit(&mut self, unit: Rc<Unit>);
+    fn attach_unit(&self, unit: Rc<Unit>);
 }
 
 impl Unit {
@@ -198,7 +196,7 @@ impl Unit {
         name: &str,
         dmr: &Rc<DataManager>,
         filer: &Rc<UnitFile>,
-        sub: RefCell<Box<dyn UnitObj>>,
+        sub: Box<dyn UnitObj>,
     ) -> Self {
         let _config = Rc::new(UeConfig::new());
         Unit {
@@ -229,7 +227,7 @@ impl Unit {
         self.set_in_load_queue(false);
         match self.load.load_unit_confs() {
             Ok(confs) => {
-                let ret = self.sub.borrow_mut().load(&confs);
+                let ret = self.sub.load(&confs);
                 if let Ok(_) = ret {
                     self.load.set_load_state(UnitLoadState::UnitLoaded);
                 } else {
@@ -247,26 +245,25 @@ impl Unit {
     pub(super) fn get_private_conf_section_name(&self) -> Option<String> {
         let str = self
             .sub
-            .borrow()
             .get_private_conf_section_name()
             .map(|s| s.to_string());
         str
     }
 
     pub(super) fn current_active_state(&self) -> UnitActiveState {
-        self.sub.borrow().current_active_state()
+        self.sub.current_active_state()
     }
 
     pub(super) fn start(&self) -> Result<(), UnitActionError> {
-        self.sub.borrow_mut().start()
+        self.sub.start()
     }
 
     pub(super) fn stop(&self) -> Result<(), UnitActionError> {
-        self.sub.borrow_mut().stop()
+        self.sub.stop()
     }
 
     pub(super) fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
-        self.sub.borrow_mut().sigchld_events(pid, code, signal)
+        self.sub.sigchld_events(pid, code, signal)
     }
 
     pub(super) fn get_load_state(&self) -> UnitLoadState {
@@ -274,6 +271,6 @@ impl Unit {
     }
 
     pub(super) fn attach_unit(&self, unit: &Rc<Unit>) {
-        self.sub.borrow_mut().attach_unit(Rc::clone(unit))
+        self.sub.attach_unit(Rc::clone(unit))
     }
 }

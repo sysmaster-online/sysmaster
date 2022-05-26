@@ -1,4 +1,4 @@
-pub use execute::{CommandLine, ExecParameters, ExecSpawn};
+pub use execute::{ExecCmdError, ExecCommand, ExecContext, ExecParameters};
 pub use unit_base::{KillOperation, UnitActionError, UnitType};
 pub use unit_entry::{Unit, UnitObj};
 pub(super) use unit_manager::UnitManagerX;
