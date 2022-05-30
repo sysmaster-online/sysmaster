@@ -23,6 +23,18 @@ pub trait Source {
         0
     }
 
+    /// timer on useconds
+    fn time(&self) -> u64 {
+        u64::MAX
+    }
+
+    /// timer on useconds, USEC_PER_SEC * SEC you want to
+    /// When both are implemented, time_relative() shall prevail
+    fn time_relative(&self) -> u64 {
+        // USEC_PER_SEC * SEC you want to;
+        u64::MAX
+    }
+
     /// Specify the type of source
     fn event_type(&self) -> EventType {
         EventType::Io

@@ -107,6 +107,7 @@ pub mod events;
 pub mod poll;
 mod signal;
 pub mod source;
+mod timer;
 
 pub use crate::events::Events;
 pub(crate) use crate::poll::Poll;
@@ -115,20 +116,28 @@ pub use crate::source::Source;
 
 /// 支持添加到框架中的事件类型
 /// An event scheduling framework based on epoll
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum EventType {
     /// Io类型
     Io,
-    /// 定时器
-    Timer,
-    /// 相对时间定时器
-    TimerRelative,
+    /// realtime定时器
+    TimerRealtime,
+    /// boottime定时器
+    TimerBoottime,
+    /// monotonic定时器
+    TimerMonotonic,
+    /// realtime alarm定时器
+    TimerRealtimeAlarm,
+    /// boottime alarm定时器
+    TimerBoottimeAlarm,
     /// 信号
     Signal,
     /// 子进程
     Child,
     /// 进程
     Pidfd,
+    /// Watchdog
+    Watchdog,
     /// Inotify监控
     Inotify,
     /// Defer事件, 每一次LOOP执行一次

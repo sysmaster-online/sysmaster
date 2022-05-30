@@ -10,7 +10,7 @@ pub(crate) struct SigSet {
 impl SigSet {
     /// Initialize to include nothing.
     pub fn empty() -> SigSet {
-        let mut sigset = mem::MaybeUninit::uninit();
+        let mut sigset = mem::MaybeUninit::zeroed();
         let _ = unsafe { libc::sigemptyset(sigset.as_mut_ptr()) };
 
         unsafe {
@@ -87,7 +87,7 @@ impl Signals {
     }
 
     pub fn read_signals(&mut self) -> std::io::Result<Option<libc::siginfo_t>> {
-        let mut buffer = mem::MaybeUninit::<libc::siginfo_t>::uninit();
+        let mut buffer = mem::MaybeUninit::<libc::siginfo_t>::zeroed();
 
         let size = mem::size_of_val(&buffer);
         let res = unsafe { libc::read(self.fd, buffer.as_mut_ptr() as *mut libc::c_void, size) };
