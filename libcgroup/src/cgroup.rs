@@ -157,13 +157,12 @@ fn remove_dir(cg_path: &PathBuf) -> Result<(), CgroupErr> {
 fn cg_kill_process(
     cg_path: &PathBuf,
     signal: Signal,
-    mut flags: isize,
+    mut flags: CgFlags,
     pids: HashSet<Pid>,
     item: &str,
 ) -> Result<(), CgroupErr> {
     if IN_SET!(signal, Signal::SIGCONT, Signal::SIGKILL) {
-        let f = CgFlags::CgSigcont as isize;
-        flags &= !f;
+        flags &= !CgFlags::SIGCONT;
     }
 
     let path = cg_abs_path(cg_path, &PathBuf::from(item))?;
@@ -184,7 +183,7 @@ fn cg_kill_process(
         log::debug!("kill pid {} in cgroup.procs", pid);
         match nix::sys::signal::kill(pid, signal) {
             Ok(_) => {
-                if flags & CgFlags::CgSigcont as isize != 0 {
+                if flags.contains(CgFlags::SIGCONT) {
                     match nix::sys::signal::kill(pid, Signal::SIGCONT) {
                         Ok(_) => {}
                         Err(_) => {
@@ -206,7 +205,7 @@ fn cg_kill_process(
 fn cg_kill(
     cg_path: &PathBuf,
     signal: Signal,
-    flags: isize,
+    flags: CgFlags,
     pids: HashSet<Pid>,
 ) -> Result<(), CgroupErr> {
     cg_kill_process(cg_path, signal, flags, pids, "cgroup.procs")?;
@@ -217,14 +216,14 @@ fn cg_kill(
 pub fn cg_kill_recursive(
     cg_path: &PathBuf,
     signal: Signal,
-    flags: isize,
+    flags: CgFlags,
     pids: HashSet<Pid>,
 ) -> Result<(), CgroupErr> {
     // kill cgroups
     // todo kill sub cgroups
     cg_kill(cg_path, signal, flags, pids)?;
 
-    if flags & CgFlags::CgRemove as isize != 0 {
+    if flags.contains(CgFlags::REMOVE) {
         match remove_dir(cg_path) {
             Ok(_) => {}
             Err(e) => {

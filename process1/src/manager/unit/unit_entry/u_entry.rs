@@ -5,6 +5,7 @@ use super::uu_load::UeLoad;
 use crate::manager::data::{DataManager, UnitActiveState, UnitState};
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{KillOperation, UnitActionError, UnitLoadState, UnitType};
+use crate::manager::UnitNotifyFlags;
 use cgroup::{self, CgFlags};
 use log;
 use nix::sys::signal::Signal;
@@ -89,7 +90,7 @@ impl Unit {
         &self,
         original_state: UnitActiveState,
         new_state: UnitActiveState,
-        flags: isize,
+        flags: UnitNotifyFlags,
     ) {
         if original_state != new_state {
             log::debug!(
@@ -164,7 +165,7 @@ impl Unit {
             match cgroup::cg_kill_recursive(
                 &self.cg_path(),
                 sig,
-                CgFlags::CgIgnoreSelf as isize | CgFlags::CgSigcont as isize,
+                CgFlags::IGNORE_SELF | CgFlags::SIGCONT,
                 pids,
             ) {
                 Ok(_) => {}

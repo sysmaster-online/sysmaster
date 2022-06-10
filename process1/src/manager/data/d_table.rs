@@ -94,7 +94,7 @@ mod tests {
         let dm = DataManager::new();
         let os = UnitActiveState::UnitInActive;
         let ns = UnitActiveState::UnitActive;
-        let flags = UnitNotifyFlags::UnitNotifyReloadFailure as isize;
+        let flags = UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE;
         let us_sub = Rc::new(UnitStatesTest::new(ns));
 
         let old = dm.insert_unit_state(String::from("test"), UnitState::new(os, ns, flags));

@@ -1,3 +1,5 @@
+use bitflags::bitflags;
+
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum UnitActiveState {
     UnitActive,
@@ -9,21 +11,22 @@ pub enum UnitActiveState {
     UnitMaintenance,
 }
 
-#[derive(Eq, PartialEq, Clone, Copy, Debug)]
-pub enum UnitNotifyFlags {
-    UnitNotifyReloadFailure = 1 << 0,
-    UnitNotifyWillAutoRestart = 1 << 1,
+bitflags! {
+    pub struct UnitNotifyFlags: u8 {
+        const UNIT_NOTIFY_RELOAD_FAILURE = 1 << 0;
+        const UNIT_NOTIFY_WILL_AUTO_RESTART = 1 << 1;
+    }
 }
 
 #[derive(Debug)]
 pub struct UnitState {
     pub os: UnitActiveState,
     pub ns: UnitActiveState,
-    pub flags: isize,
+    pub flags: UnitNotifyFlags,
 }
 
 impl UnitState {
-    pub fn new(os: UnitActiveState, ns: UnitActiveState, flags: isize) -> UnitState {
+    pub fn new(os: UnitActiveState, ns: UnitActiveState, flags: UnitNotifyFlags) -> UnitState {
         UnitState { os, ns, flags }
     }
 }

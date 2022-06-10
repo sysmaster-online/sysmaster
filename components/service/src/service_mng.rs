@@ -6,7 +6,9 @@ use super::service_spawn::ServiceSpawn;
 use log;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
-use process1::manager::{ExecCommand, KillOperation, UnitActionError, UnitActiveState};
+use process1::manager::{
+    ExecCommand, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 use utils::IN_SET;
@@ -434,7 +436,9 @@ impl ServiceMng {
         let service_type = self.config.service_type();
         let os = service_state_to_unit_state(service_type, original_state);
         let ns = service_state_to_unit_state(service_type, state);
-        self.comm.unit().notify(os, ns, 0);
+        self.comm
+            .unit()
+            .notify(os, ns, UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE);
     }
 
     fn service_alive(&self) -> bool {
