@@ -1,5 +1,6 @@
 //! # 一种基于epoll的事件调度框架
 //! An event scheduling framework based on epoll
+use crate::timer::Timer;
 use crate::{EventState, EventType, Poll, Signals, Source};
 
 use utils::Error;
@@ -9,7 +10,8 @@ use std::cell::RefCell;
 use std::collections::{BinaryHeap, HashMap};
 use std::convert::TryInto;
 use std::fmt::Debug;
-use std::os::unix::io::RawFd;
+use std::mem::MaybeUninit;
+use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::rc::Rc;
 
 /// 一种基于epoll的事件调度框架
@@ -37,7 +39,7 @@ impl Events {
         self.data.borrow_mut().del_source(source)
     }
 
-    /// set the dispatch state of the event
+    /// set the source state
     pub fn set_enabled(&self, source: Rc<dyn Source>, state: EventState) -> Result<i32> {
         self.data.borrow_mut().set_enabled(source, state)
     }
@@ -72,12 +74,18 @@ impl Events {
     /// Process the event in a loop until exiting actively
     pub fn rloop(&self) -> Result<i32> {
         loop {
+            if let true = self.data.borrow().exit() {
+                return Ok(0);
+            }
             self.run(-1i32)?;
         }
     }
 
     /// Fetch the highest priority event processing on the pending queue
     fn dispatch(&self) -> Result<i32> {
+        if let true = self.data.borrow().exit() {
+            return Ok(0);
+        }
         let first = self.data.borrow_mut().pending_pop();
         if first.is_none() {
             return Ok(0);
@@ -119,7 +127,9 @@ pub(crate) struct EventsData {
     state: HashMap<u64, EventState>,
     children: HashMap<i64, i64>,
     pidfd: RawFd,
+    timerfd: HashMap<EventType, RawFd>,
     signal: Signals,
+    timer: Timer,
 }
 
 // the declaration "pub(self)" is for identification only.
@@ -136,14 +146,16 @@ impl EventsData {
             state: HashMap::new(),
             children: HashMap::new(),
             pidfd: 0,
+            timerfd: HashMap::new(),
             signal: Signals::new(),
+            timer: Timer::new(),
         }
     }
 
     pub(self) fn add_source(&mut self, source: Rc<dyn Source>) -> Result<i32> {
-        let t = source.event_type();
+        let et = source.event_type();
         let token = source.token();
-        match t {
+        match et {
             EventType::Io | EventType::Pidfd | EventType::Signal | EventType::Child => {
                 self.sources.insert(token, source.clone());
             }
@@ -156,8 +168,14 @@ impl EventsData {
             EventType::Exit => {
                 self.exit_sources.insert(token, source.clone());
             }
+            EventType::TimerRealtime
+            | EventType::TimerBoottime
+            | EventType::TimerMonotonic
+            | EventType::TimerRealtimeAlarm
+            | EventType::TimerBoottimeAlarm => (),
             // todo: implement
-            EventType::Timer | EventType::TimerRelative | EventType::Inotify => todo!(),
+            EventType::Inotify => todo!(),
+            EventType::Watchdog => todo!(),
         }
 
         // default state
@@ -191,8 +209,14 @@ impl EventsData {
                     .remove(&token)
                     .ok_or(Error::Other { msg: "not found" })?;
             }
+            EventType::TimerRealtime
+            | EventType::TimerBoottime
+            | EventType::TimerMonotonic
+            | EventType::TimerRealtimeAlarm
+            | EventType::TimerBoottimeAlarm => (),
             // todo: implement
-            EventType::Timer | EventType::TimerRelative | EventType::Inotify => todo!(),
+            EventType::Inotify => todo!(),
+            EventType::Watchdog => todo!(),
         }
 
         // remove state
@@ -203,13 +227,22 @@ impl EventsData {
 
     pub(self) fn set_enabled(&mut self, source: Rc<dyn Source>, state: EventState) -> Result<i32> {
         let token = source.token();
-        match state {
-            EventState::On | EventState::OneShot => {
-                self.source_online(&source)?;
-            }
-            EventState::Off => {
-                self.source_offline(&source)?;
-            }
+
+        let et = source.event_type();
+        match et {
+            EventType::Watchdog
+            | EventType::Inotify
+            | EventType::Defer
+            | EventType::Post
+            | EventType::Exit => (),
+            _ => match state {
+                EventState::On | EventState::OneShot => {
+                    self.source_online(&source)?;
+                }
+                EventState::Off => {
+                    self.source_offline(&source)?;
+                }
+            },
         }
 
         // renew state
@@ -219,69 +252,96 @@ impl EventsData {
     }
 
     /// when set to on, register events to the listening queue
-    fn source_online(&mut self, source: &Rc<dyn Source>) -> Result<i32> {
-        let t = source.event_type();
-        let s = source;
-        let token = s.token();
+    pub(self) fn source_online(&mut self, source: &Rc<dyn Source>) -> Result<i32> {
+        let et = source.event_type();
+        let token = source.token();
         let mut event = libc::epoll_event {
-            events: s.epoll_event(),
+            events: source.epoll_event(),
             u64: token,
         };
 
-        match t {
+        match et {
             EventType::Io | EventType::Pidfd => {
-                self.poller.register(s.fd(), &mut event)?;
+                self.poller.register(source.fd(), &mut event)?;
             }
-            EventType::Timer => todo!(),
-            EventType::TimerRelative => todo!(),
             EventType::Signal => {
-                self.signal.reset_sigset(s.signals());
+                self.signal.reset_sigset(source.signals());
                 self.poller.register(self.signal.fd(), &mut event)?;
             }
             EventType::Child => {
-                self.add_child(&mut event, s.pid());
+                self.add_child(&mut event, source.pid());
             }
-            EventType::Inotify => todo!(),
+            EventType::TimerRealtime
+            | EventType::TimerBoottime
+            | EventType::TimerMonotonic
+            | EventType::TimerRealtimeAlarm
+            | EventType::TimerBoottimeAlarm => match self.timerfd.get(&et) {
+                None => {
+                    let fd = unsafe {
+                        libc::timerfd_create(
+                            self.timer.clockid(&et),
+                            libc::TFD_NONBLOCK | libc::TFD_CLOEXEC,
+                        )
+                    };
+                    self.timerfd.insert(et, fd);
+                    self.poller.register(fd, &mut event)?;
+                    self.timer.push(source.clone());
+                }
+                Some(_) => self.timer.push(source.clone()),
+            },
             EventType::Defer => {
                 self.pending.push(source.clone());
             }
+            EventType::Inotify => todo!(),
             EventType::Post => todo!(),
             EventType::Exit => todo!(),
+            EventType::Watchdog => todo!(),
         }
 
         Ok(0)
     }
 
     /// move the event out of the listening queue
-    fn source_offline(&mut self, source: &Rc<dyn Source>) -> Result<i32> {
+    pub(self) fn source_offline(&mut self, source: &Rc<dyn Source>) -> Result<i32> {
         // unneed unregister when source is allready Offline
         if *self.state.get(&source.token()).unwrap() == EventState::Off {
             return Ok(0);
         }
 
-        let t = source.event_type();
-        match t {
+        let et = source.event_type();
+        match et {
             EventType::Io | EventType::Pidfd => {
                 self.poller.unregister(source.fd())?;
             }
-            EventType::Timer => todo!(),
-            EventType::TimerRelative => todo!(),
             EventType::Signal => {
                 self.poller.unregister(self.signal.fd())?;
             }
             EventType::Child => {
                 self.poller.unregister(self.pidfd)?;
             }
+            EventType::TimerRealtime
+            | EventType::TimerBoottime
+            | EventType::TimerMonotonic
+            | EventType::TimerRealtimeAlarm
+            | EventType::TimerBoottimeAlarm => {
+                if self.timer.is_empty(&et) {
+                    let fd = self.timerfd.get(&et);
+                    if let Some(fd) = fd {
+                        self.poller.unregister(fd.as_raw_fd())?
+                    }
+                }
+            }
             EventType::Inotify => todo!(),
             EventType::Defer => (),
             EventType::Post => todo!(),
             EventType::Exit => todo!(),
+            EventType::Watchdog => todo!(),
         }
 
         Ok(0)
     }
 
-    fn add_child(&mut self, event: &mut libc::epoll_event, pid: libc::pid_t) {
+    pub(self) fn add_child(&mut self, event: &mut libc::epoll_event, pid: libc::pid_t) {
         let pidfd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) };
         self.pidfd = pidfd.try_into().unwrap();
         let _ = self.poller.register(self.pidfd, event);
@@ -311,8 +371,25 @@ impl EventsData {
         for event in events.iter() {
             #[allow(unaligned_references)]
             let token = &event.u64;
-            let s = self.sources.get(token).unwrap();
-            self.pending.push(s.clone());
+            if let Some(s) = self.sources.get(token) {
+                self.pending.push(s.clone());
+            }
+        }
+
+        for et in [
+            EventType::TimerRealtime,
+            EventType::TimerBoottime,
+            EventType::TimerMonotonic,
+            EventType::TimerRealtimeAlarm,
+            EventType::TimerBoottimeAlarm,
+        ] {
+            if let Some(next) = self.timer.next(&et) {
+                if self.timer.timerid(&et) >= next {
+                    while let Some(source) = self.timer.pop(&et) {
+                        self.pending_push(source);
+                    }
+                }
+            }
         }
 
         if !self.pending_is_empty() || !events.is_empty() {
@@ -323,11 +400,38 @@ impl EventsData {
     }
 
     pub(self) fn prepare(&mut self) -> bool {
-        if !self.pending_is_empty() {
-            return self.wait(0);
+        let mut ret = false;
+
+        for et in [
+            EventType::TimerRealtime,
+            EventType::TimerBoottime,
+            EventType::TimerMonotonic,
+            EventType::TimerRealtimeAlarm,
+            EventType::TimerBoottimeAlarm,
+        ] {
+            self.timer.now();
+            if let Some(next) = self.timer.next(&et) {
+                if self.timer.timerid(&et) >= next {
+                    while let Some(source) = self.timer.pop(&et) {
+                        self.pending_push(source);
+                    }
+                    ret = true;
+                } else {
+                    let new_value = self.timer.timer_stored(next);
+                    let mut old_value = MaybeUninit::<libc::itimerspec>::zeroed();
+                    unsafe {
+                        libc::timerfd_settime(
+                            self.timerfd.get(&et).unwrap().as_raw_fd(),
+                            libc::TFD_TIMER_ABSTIME,
+                            &new_value,
+                            old_value.as_mut_ptr(),
+                        );
+                    }
+                }
+            }
         }
 
-        false
+        ret
     }
 
     pub(self) fn pending_pop(&mut self) -> Option<Rc<dyn Source>> {
@@ -350,7 +454,7 @@ impl EventsData {
         self.exit
     }
 
-    fn pending_is_empty(&self) -> bool {
+    pub(self) fn pending_is_empty(&self) -> bool {
         self.pending.is_empty()
     }
 }
