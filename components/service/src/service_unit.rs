@@ -87,10 +87,6 @@ impl UnitObj for ServiceUnit {
         todo!()
     }
 
-    fn get_private_conf_section_name(&self) -> Option<&str> {
-        Some("Service")
-    }
-
     fn current_active_state(&self) -> UnitActiveState {
         self.mng.current_active_state()
     }

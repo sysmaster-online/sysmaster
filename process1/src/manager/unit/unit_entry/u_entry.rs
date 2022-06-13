@@ -80,7 +80,6 @@ pub trait UnitObj {
     fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {}
     fn reset_failed(&self) {}
 
-    fn get_private_conf_section_name(&self) -> Option<&str>;
     fn current_active_state(&self) -> UnitActiveState;
     fn attach_unit(&self, unit: Rc<Unit>);
 }
@@ -241,14 +240,6 @@ impl Unit {
                 return Err(e);
             }
         }
-    }
-
-    pub(super) fn get_private_conf_section_name(&self) -> Option<String> {
-        let str = self
-            .sub
-            .get_private_conf_section_name()
-            .map(|s| s.to_string());
-        str
     }
 
     pub(super) fn current_active_state(&self) -> UnitActiveState {

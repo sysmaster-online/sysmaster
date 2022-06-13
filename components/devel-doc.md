@@ -1,41 +1,196 @@
-大纲--->详细描述unit框架所需各类unit实现的能力，需要时简要描述关联unit框架实现原理。
+# process1 扩展子类开发指南 #
 
-一、UnitSubClass实现+插件注册
-1、运行环境说明
-当前process1采用单线程运行环境，所以各process1管理单元（unit）在实现时需要以异步无阻塞方式编程。
-2、实现子类操作对象管理
+process1为Linux系统下的一号进程，是linux内核启动后第一个用户态进程，在系统启动过程中和关机过程中，完成相关资源的初始化和回收工作：
+
+开机过程中主要完成以下工作：
+
+1. 设备驱动的加载以及以及初始化，如磁盘设备，网络设备等。
+2. 文件系统初始化及挂载。
+3. 系统配置的初始化，如网络配置等，其他需要在系统启动过程中重新初始化的部分。
+4. 随系统启动而自启动的进程的启动。
+
+关机过程主要完成以下工作：
+1.资源的回收，如缓存的持久化。
+2.业务进程的关闭
+
+process1支撑以上工作，提供可以扩展的开发框架，支持开发多种管理单元（后文称为Unit），完成需要在开机和关机过程中可以方便扩展需要注入的系统启动过程中需要执行的工作，扩展Unit的开发流程如下：
+
+需要启动的进程，初始化的系统配置，如网络配置，
+本文当详细描述，如何基于process1开发框架，process1扩展开发新的子类，具体的开发流程如下：
+![avatar](u_dev_process.jpg)
+
+## 子类UnitSubClass实现 ##
+
+子Unit的行为约束通过三个trait来定义，分别是：
+
+```rust
+//定义Unit单元所有可以执行的行为，具体的行为列表可以参考代码文件：
+//process1/src/manager/unit/unit_entry/u_entry.rs
+pub trait UnitObj;
+
+//由于rust不支持面向对象，此trait实现从子Unit到UnitObj的downgrade.
+pub trait UnitSubClass;
+
+//将UnitManger（UnitManger是所有子类管理父类，由于rust不支持多态，无法基于基类做转换，所以增加此trait） attach到子类实例上
+pub trait UnitMngUtil;
+
+```
+
+1. 前置条件说明
+
+   当前process1采用单线程运行环境，所以各process1管理单元（unit）在实现时需要以异步无阻塞方式编程.
+
+2. 子类行为分类说明
 unit作为所管理的系统资源在process1中的投影，unit在通过os接口操作对应系统资源时，同时维护对应系统资源的状态和历史操作结果。
-（1）系统资源管理
-根据业务诉求提炼出其所需管理的系统资源，并通过os接口对这些系统资源进行管理，对外提供系统资源的操作接口，包括：start、stop、reload。
-（2）通用场景【必选】
-a、状态管理
-unit框架基于各类unit状态提供了诸多功能，并根据系统资源操作方式制定了标准unit状态组，要求各类unit提供其状态获取接口和状态变更通告。
-状态获取：各类unit内部可以根据自身实现来制定其内部状态组，但在框架向各类unit获取状态时需要进行内部状态组到标准unit状态组的装换(current_active_state)。
-状态通告：各类unit在其状态发生变化时需要将状态变化信息通告给unit框架，为方便各类unit实现，unit框架提供的状态变更通告接口支持重入。
-【编码示例】
-（3）典型场景【可选】
-a、依赖关系
-不同unit间存在依赖关系时，除了在unit配置文件中明确配置外，常见的一种场景是需要根据运行环境对其他相关unit进行默认依赖，这样可以减小维护人员的配置压力。为此，unit框架提供了一些接口供各类unit动态自主添加unit依赖关系，以支持各类unit在此场景中的开发。
-添加unit依赖关系：支持在不同unit间添加指定依赖关系。
-【编码示例】
-b、进程管理
-各类unit在管理对应系统资源时，常见的一种场景是需要在一个独立进程环境中完成对应系统资源的操作，这样可以增加系统的健壮性。为此，unit框架提供了一些公共能力来进行（process1进程之外）独立进程的操作，以方便各类unit在此场景中的开发。
-进程通信：支持各类unit通过系统调用kill向指定进程组发送各种信号。
-进程id跟踪：在各类unit提供pid-unit对应关系数据的情况下，支持根据pid对应关系进行sigchld信号分发(sigchld_events)。
-进程拉起：支持各类unit通过系统调用fork+execve拉起子进程（含cgroup设置），同时支持多种运行环境参数设置。
-【编码示例】
 
-3、实现子类配置文件解析
-定义私有配置段名称(get_private_conf_section_name)、定义配置项字段、实现配置项get/set[可选]函数、实现对外操作接口(load)。
-待补充？
-【编码示例】
+    - 子类生命周期行为：
+    根据业务诉求提炼出其所需管理的系统资源，并通过os接口对这些系统资源进行管理，对外提供系统资源的操作接口，包括：start、stop、reload。
 
-4、插件注册
-各类unit以插件方式集成到process1中，unit框架提供了插件注册能力，以支持各类unit完成注册。
-插件注册：在各类unit提供分配带默认值实例的情况下，支持根据类型名称注册指定类型的unit子类插件。
-【编码示例】
+    - 子类的状态管理
+        - 状态映射
+        unit框架为各个子类定义了标准的状态机，并基于此状态驱动Unit的生命周期行为，各个子类Unit也可以实现自己的状态管理，但是需要将自己的状态通过接口映射到unit框架的基础状态，这个通过实现接口
 
-5、增加附加功能
+        ```rust
+        fn current_active_state(&self) -> UnitActiveState;
+        ```
+
+        - 状态驱动
+        状态机的驱动，由个子类根据自身的行为来驱动，当子类在变更自己的状态的时候，需要显示的调用unit的notify接口，通知unit，状态发生了变更，来驱动状态机的状态迁移，为方便各类unit实现，notify接口支持重入。
+
+    ```rust
+    fn set_state(&self, state: ServiceState) {
+        let original_state = self.state();
+        *self.state.borrow_mut() = state;
+        // check the new state
+        if !vec![
+            ServiceState::Start,
+            ServiceState::StartPost,
+            ServiceState::Runing,
+            ServiceState::Reload,
+            ServiceState::Stop,
+            ServiceState::StopWatchdog,
+            ServiceState::StopSigterm,
+            ServiceState::StopSigkill,
+            ServiceState::StopPost,
+            ServiceState::FinalWatchdog,
+            ServiceState::FinalSigterm,
+            ServiceState::FinalSigkill,
+        ]
+        .contains(&state)
+        {
+            self.pid.unwatch_main();
+            self.main_command.borrow_mut().clear();
+        }
+
+        if !vec![
+            ServiceState::Condition,
+            ServiceState::StartPre,
+            ServiceState::Start,
+            ServiceState::StartPost,
+            ServiceState::Reload,
+            ServiceState::Stop,
+            ServiceState::StopWatchdog,
+            ServiceState::StopSigterm,
+            ServiceState::StopSigkill,
+            ServiceState::StopPost,
+            ServiceState::FinalWatchdog,
+            ServiceState::FinalSigterm,
+            ServiceState::FinalSigkill,
+            ServiceState::Cleaning,
+        ]
+        .contains(&state)
+        {
+            self.pid.unwatch_control();
+            self.control_command.borrow_mut().clear();
+        }
+
+        log::debug!(
+            "original state: {:?}, change to: {:?}",
+            original_state,
+            state
+        );
+        // todo!()
+        // trigger the unit the dependency trigger_by
+
+        let service_type = self.config.service_type();
+        let os = service_state_to_unit_state(service_type, original_state);
+        let ns = service_state_to_unit_state(service_type, state);
+        self.comm
+            .unit()
+            .notify(os, ns, UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE);
+    }
+    ```
+
+3. 子类的依赖关系动态管理[可选]
+    process1框架明确定义了子类的依赖关系，并且会根据依赖关系，执行子类的行为，依赖关系除了通过配置文件配置外，还可以通过接口动态添加，这样子类可以提前定义一些缺省的，公共依赖，而无需再每个配置文件增加这样的配置。降低配置文件中的重复配置，减少配置工作量，也可以对管理员隐藏这些配置。
+
+    ```rust
+    【编码示例】待补充
+    //todo
+    ```
+
+4. 进程管理[可选]
+   扩展子unit在实现的时候，常见的一种场景是需要创建一个新的进程来执行自己要完成的动作，如启动一个守护进程，通过一个新的集成来配置网络，等等，为此，unit框架提供了一些公共的进程操作的能力来进行(process1进程之外）独立进程的操作，以方便各类unit在此场景中的开发。
+   - 进程通信：支持各类unit通过系统调用kill向指定进程组发送各种信号。
+   - 进程id跟踪：在各类unit提供pid-unit对应关系数据的情况下，支持根据pid对应关系进行sigchld信号分发(sigchld_events)。
+   - 进程拉起：支持各类unit通过系统调用fork+execve拉起子进程（含cgroup设置），同时支持多种运行环境参数设置。
+
+    ```rust
+
+    ```
+
+5. 实现子类配置文件解析
+
+   配置文件为toml格式，具体个是如下：
+
+   ```toml
+       [Unit]
+       Description="CN"
+       Documentation="192.168.1.1"
+       Requires="c.service"
+       Wants = "b.service"
+
+       [SubUnitName]
+       ExecCondition=["/usr/bin/sleep 5"]
+       ExecStart=["/usr/bin/echo 'test'"]
+       ExecStop = ["/usr/bin/kill $MAINPID"]
+
+       [Install]
+       WantedBy="dbus.service"
+    ```
+
+    process1框架提供了标准的解析宏ConfigParseM，可以方便的将配置文件转化成子类配置数据结构，代码示例如下：
+
+    ```rust
+        #[derive(Serialize, Deserialize, ConfigParseM)]
+        #[serdeName("SubUnitName")]
+        #[serde(rename_all = "PascalCase")]
+        pub(super) struct SubUnitConf {
+            #[serde(alias = "Type", default = "ServiceType::default")]
+            service_type: ServiceType,
+            #[serde(alias = "BusName")]
+            bus_name: Option<String>,
+        }
+        ```
+    配置文件的数据结构需要实现Serialize和Deserialize，并且通过ConfigParseM宏，可以方便的解析
+    ConfigParseM宏的属性serdeName，指定数据结构映射到toml文件的具体配置段的名称，如示例代码中的[SubUnitName],定义好之后就可以通过一下代码完成解析：
+
+    ```rust
+        fn load(&self, conf_str: &str) -> Result<(), Box<dyn Error>> {
+            let sub_unit_parser = SubUnitConf::builder_parser();
+            let service_conf = sub_unit_parser.conf_file_parse(conf_str);
+            .....
+        }
+    ```
+
+6. 插件注册
+   各类unit以插件方式集成到process1中，unit框架提供了插件注册能力的宏declure_unitobj_plugin，以支持各子unit的注册，插件是一动态库形式加载的，动态库的命名需要和子类的名称保持一致，如service，则动态库的名称应该为libservice.so
+
+   ```rust
+   declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default, PLUGIN_NAME, LOG_LEVEL);
+   ```
+
+7. 增加附加功能
 增加配置项：同步骤3
 增加处理逻辑：围绕对象管理逻辑增加新增附加功能，在不实质影响对象管理逻辑的条件下，尽可能将新增附加功能以独立模块方式呈现。
 
