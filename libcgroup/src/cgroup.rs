@@ -78,7 +78,6 @@ fn cgtype_to_path(cg_type: CgType) -> &'static str {
 fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf, CgroupErr> {
     let cg_type = cg_type()?;
     let base_path = cgtype_to_path(cg_type);
-
     let path_buf: PathBuf = PathBuf::from(base_path);
     return Ok(path_buf.join(cg_path).join(suffix));
 }
@@ -100,6 +99,7 @@ pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<(), CgroupErr> {
 
 pub fn cg_create(cg_path: &PathBuf) -> Result<(), CgroupErr> {
     let abs_cg_path: PathBuf = cg_abs_path(cg_path, &PathBuf::from(""))?;
+
     log::debug!("cgroup create path {:?}", abs_cg_path.clone());
     fs::create_dir_all(abs_cg_path.clone()).map_err(|e| CgroupErr::IoError(e))?;
 
@@ -237,14 +237,40 @@ pub fn cg_kill_recursive(
 
 mod tests {
     #[test]
-    fn test_get_cg_abs_path() {
+    fn test_cg_create() {
+        use nix::unistd::Pid;
+        use std::io::ErrorKind;
         use std::path::PathBuf;
+
+        let cg_type = if let Ok(cg_type) = super::cg_type() {
+            cg_type
+        } else {
+            println!("cgroup is not supported");
+            return;
+        };
+
         let cg_path = PathBuf::from("system.slice");
+        if let Err(e) = super::cg_create(&cg_path) {
+            match e {
+                crate::CgroupErr::IoError(err) => {
+                    if err.kind() == ErrorKind::PermissionDenied {
+                        println!("no permission to create cgroup");
+                        return;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let base_path = super::cgtype_to_path(cg_type);
+        let path_buf: PathBuf = PathBuf::from(base_path);
         if let Ok(p) = super::cg_abs_path(&cg_path, &PathBuf::from("")) {
-            assert_eq!(
-                p,
-                PathBuf::from("/sys/fs/cgroup/systemd.slice/cgroup.procs")
-            )
+            assert_eq!(p, path_buf.join(&cg_path).join(&PathBuf::from("")),)
+        }
+
+        if let Err(_e) = super::cg_attach(Pid::from_raw(-1), &cg_path) {
+            println!("attach failed");
+            return;
         }
     }
 
