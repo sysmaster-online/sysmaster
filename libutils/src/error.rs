@@ -5,7 +5,9 @@ enum ErrKind {
     Http,
     Proc,
     ParseInt,
+    ParseFloat,
     FromUTF8,
+    ParseBoolen,
     Other,
 }
 
@@ -19,6 +21,8 @@ impl std::fmt::Display for ErrKind {
             ErrKind::ParseInt => "parseint",
             ErrKind::FromUTF8 => "fromutf8",
             ErrKind::Other => "other",
+            ErrKind::ParseBoolen => "parseboolen",
+            ErrKind::ParseFloat => "parsefloat",
         };
         write!(f, "{}", err_kind)
     }
@@ -51,6 +55,14 @@ pub enum Error {
     /// An error from parse int
     #[error("{}: Got an error from: {}", ErrKind::ParseInt, .0)]
     ParseInt(#[from] std::num::ParseIntError),
+
+    /// An error from parse float
+    #[error("{}: Got an error from: {}", ErrKind::ParseFloat, .0)]
+    ParseFloat(#[from] std::num::ParseFloatError),
+
+    /// An error from parse string to boolen
+    #[error("{}: Got an error from: {}", ErrKind::ParseBoolen, .0)]
+    ParseBoolError(String),
 
     /// An error from utf8
     #[error("{}: Got an error from: {}", ErrKind::FromUTF8, .0)]

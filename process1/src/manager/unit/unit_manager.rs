@@ -4,12 +4,14 @@ use super::unit_base::{JobMode, UnitRelationAtom};
 use super::unit_datastore::UnitDb;
 use super::unit_entry::{Unit, UnitObj, UnitX};
 use super::unit_runtime::UnitRT;
+use super::UnitType;
 use crate::manager::data::{DataManager, UnitState};
 use crate::manager::table::{TableOp, TableSubscribe};
 use crate::manager::MngErrno;
 use event::Events;
 use nix::unistd::Pid;
 use std::error::Error;
+use std::path::Path;
 use std::rc::Rc;
 use unit_load::UnitLoad;
 
@@ -86,6 +88,25 @@ impl UnitManager {
         params: &ExecParameters,
     ) -> Result<Pid, ExecCmdError> {
         self.exec.spawn(unit, cmdline, params)
+    }
+
+    pub fn load_unit_success(&self, name: &str) -> bool {
+        if let Some(_unit) = self.load_unit(name) {
+            return true;
+        }
+
+        return false;
+    }
+
+    pub fn load_related_unit_success(&self, name: &str, unit_type: UnitType) -> bool {
+        let stem_name = Path::new(name).file_stem().unwrap().to_str().unwrap();
+        let relate_name = format!("{}.{}", stem_name, String::from(unit_type));
+
+        if let Some(_unit) = self.load_unit(&relate_name) {
+            return true;
+        }
+
+        return false;
     }
 
     pub(self) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {

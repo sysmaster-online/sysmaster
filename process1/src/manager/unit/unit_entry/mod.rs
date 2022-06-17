@@ -1,4 +1,4 @@
-pub use u_entry::{Unit, UnitObj};
+pub use u_entry::{Unit, UnitObj, UnitRef};
 pub(in crate::manager) use uf_interface::UnitX;
 pub(super) use uu_config::UnitConfigItem;
 

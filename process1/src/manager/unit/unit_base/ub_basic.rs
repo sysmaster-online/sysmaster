@@ -15,9 +15,9 @@ pub enum UnitType {
 impl From<UnitType> for String {
     fn from(u_t: UnitType) -> Self {
         match u_t {
-            UnitType::UnitService => "Service".into(),
-            UnitType::UnitTarget => "Target".into(),
-            UnitType::UnitTypeMax => "Max".into(),
+            UnitType::UnitService => "service".into(),
+            UnitType::UnitTarget => "target".into(),
+            UnitType::UnitTypeMax => null_str!("").into(),
             UnitType::UnitTypeInvalid => null_str!("").into(),
             UnitType::UnitTypeErrnoMax => null_str!("").into(),
         }
