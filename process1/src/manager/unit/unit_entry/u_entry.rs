@@ -2,10 +2,10 @@ use super::uu_cgroup::UeCgroup;
 use super::uu_child::UeChild;
 use super::uu_config::{UeConfig, UnitConfigItem};
 use super::uu_load::UeLoad;
-use crate::manager::data::{DataManager, UnitActiveState, UnitState};
+use crate::manager::data::{DataManager, UnitActiveState, UnitDepConf, UnitState};
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{KillOperation, UnitActionError, UnitLoadState, UnitType};
-use crate::manager::UnitNotifyFlags;
+use crate::manager::{UnitNotifyFlags, UnitRelations};
 use cgroup::{self, CgFlags};
 use log;
 use nix::sys::signal::Signal;
@@ -18,6 +18,34 @@ use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::rc::Rc;
 use utils::Result;
+
+pub struct UnitRef {
+    source: Option<String>,
+    target: Option<String>,
+}
+
+impl UnitRef {
+    pub fn new() -> Self {
+        UnitRef {
+            source: None,
+            target: None,
+        }
+    }
+
+    pub fn set_ref(&mut self, source: String, target: String) {
+        self.source = Some(source);
+        self.target = Some(target);
+    }
+
+    pub fn unset_ref(&mut self) {
+        self.source = None;
+        self.target = None;
+    }
+
+    pub fn target(&self) -> Option<&String> {
+        self.target.as_ref()
+    }
+}
 
 pub struct Unit {
     // associated objects
@@ -189,6 +217,19 @@ impl Unit {
         }
 
         pids
+    }
+
+    pub fn insert_two_deps(
+        &self,
+        ra: UnitRelations,
+        rb: UnitRelations,
+        u_name: String,
+    ) -> Option<UnitDepConf> {
+        let mut ud_conf = UnitDepConf::new();
+        ud_conf.deps.push((ra, u_name.to_string()));
+        ud_conf.deps.push((rb, u_name.to_string()));
+
+        self.dm.insert_ud_config(self.get_id().to_string(), ud_conf)
     }
 
     pub(super) fn new(

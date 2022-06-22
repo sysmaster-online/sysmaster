@@ -9,4 +9,5 @@ members = [
   "libproc_macro_utils",
   "tests",
   "components/service",
+  "components/socket",
 ]

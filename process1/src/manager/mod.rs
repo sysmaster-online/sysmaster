@@ -3,7 +3,7 @@ pub(super) use manager::Manager;
 pub use manager::{Action, ManagerX, Mode, Stats};
 pub use unit::{
     ExecCmdError, ExecCommand, ExecContext, ExecParameters, KillOperation, Unit, UnitActionError,
-    UnitManager, UnitMngUtil, UnitObj, UnitSubClass, UnitType,
+    UnitManager, UnitMngUtil, UnitObj, UnitRef, UnitSubClass, UnitType,
 };
 
 #[derive(Debug)]
