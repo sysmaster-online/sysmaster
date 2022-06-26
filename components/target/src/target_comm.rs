@@ -43,6 +43,6 @@ impl TargetCommData {
     }
 
     pub(self) fn unit(&self) -> Option<Rc<Unit>> {
-       self.unit.clone().upgrade()
+        self.unit.clone().upgrade()
     }
 }

@@ -6,27 +6,27 @@
 
 use std::rc::Rc;
 
-use super::target_mng::TargetMng;
 use super::target_comm::TargetComm;
-use process1::manager::{UnitObj,UnitSubClass,UnitMngUtil,UnitActiveState};
+use super::target_mng::TargetMng;
+use process1::manager::{UnitActiveState, UnitMngUtil, UnitObj, UnitSubClass};
 use utils::logger;
 
-struct Target{
+struct Target {
     comm: Rc<TargetComm>,
     mng: Rc<TargetMng>,
 }
 
-impl Target{
-    fn new()-> Target{
-        let _comm =  Rc::new(TargetComm::new());
-        Target{
+impl Target {
+    fn new() -> Target {
+        let _comm = Rc::new(TargetComm::new());
+        Target {
             comm: Rc::clone(&_comm),
-            mng: Rc::new(TargetMng::new(&_comm))
+            mng: Rc::new(TargetMng::new(&_comm)),
         }
     }
 }
 
-impl UnitObj for Target{
+impl UnitObj for Target {
     fn load(&self, _conf_str: &str) -> utils::Result<(), Box<dyn std::error::Error>> {
         //todo add default dependency funnction neeed add
         Ok(())
@@ -69,30 +69,34 @@ impl UnitObj for Target{
 
     fn release_resources(&self) {}
 
-    fn sigchld_events(&self, _pid: nix::unistd::Pid, _code: i32, _status: nix::sys::signal::Signal) {}
+    fn sigchld_events(
+        &self,
+        _pid: nix::unistd::Pid,
+        _code: i32,
+        _status: nix::sys::signal::Signal,
+    ) {
+    }
 
     fn reset_failed(&self) {}
 }
 
-impl UnitSubClass for Target{
+impl UnitSubClass for Target {
     fn into_unitobj(self: Box<Self>) -> Box<dyn UnitObj> {
-       Box::new(*self)
+        Box::new(*self)
     }
 }
 
-
-impl UnitMngUtil for Target{
+impl UnitMngUtil for Target {
     fn attach(&self, _um: Rc<process1::manager::UnitManager>) {
-        return
+        return;
     }
 }
 
-impl Default for Target{
-    fn default() -> Self{
+impl Default for Target {
+    fn default() -> Self {
         Target::new()
     }
 }
-
 
 const LOG_LEVEL: u32 = 4;
 const PLUGIN_NAME: &str = "TargetUnit";
@@ -100,6 +104,4 @@ use process1::declure_unitobj_plugin;
 declure_unitobj_plugin!(Target, Target::default, PLUGIN_NAME, LOG_LEVEL);
 
 #[cfg(test)]
-mod tests{
-    
-}
+mod tests {}

@@ -6,23 +6,22 @@
 //! ```toml
 //! [Unit]
 //! Description = ""
-//! 
+//!
 //! [Install]
-//! WantedBy = 
+//! WantedBy =
 //! ```
 //! ## 自动依赖
-//! 
+//!
 //! ### 隐含依赖
 //! 没有隐含依赖
-//! 
+//!
 //! ### 默认依赖
 //! 如果设置了DefaultDependencies = no ，否则会默认增加如下依赖关系：
 //! + 对通过XXX
 //! + Conflicts = shutdown.target 与 Before = shutdown.target的依赖
 
-
-mod target_mng;
 mod target_comm;
+mod target_mng;
 mod target_unit;
 
 #[cfg(test)]

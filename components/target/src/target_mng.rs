@@ -66,7 +66,9 @@ impl TargetMng {
         if state != o_state {
             log::debug!(
                 "{} original state[{:?}] ->new state[{:?}]",
-                self.comm.unit().map_or_else(||"0".to_string(),|u| u.get_id().to_string()),
+                self.comm
+                    .unit()
+                    .map_or_else(|| "0".to_string(), |u| u.get_id().to_string()),
                 o_state,
                 state,
             );
@@ -82,12 +84,11 @@ impl TargetMng {
             );
         }
     }
-    
     fn state(&self) -> TargetState {
         *self.state.borrow()
     }
 
-    pub fn to_unit_state(&self) -> UnitActiveState{
+    pub fn to_unit_state(&self) -> UnitActiveState {
         self.state().to_unit_state()
     }
 }

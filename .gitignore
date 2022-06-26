@@ -1,4 +1,4 @@
 target
-!/components/target
+!components/target/
 .vscode
 Cargo.lock
