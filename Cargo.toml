@@ -10,4 +10,5 @@ members = [
   "tests",
   "components/service",
   "components/socket",
+  "components/target",
 ]

@@ -33,3 +33,23 @@ impl Default for LookupPaths {
         Self::new()
     }
 }
+
+
+#[cfg(test)]
+mod tests{
+
+    use crate::logger;
+
+    use super::LookupPaths;
+    #[test]
+    fn test_init_lookup_paths(){
+        logger::init_log_with_console("test_init_lookup_paths", 4);
+        let mut _lp = LookupPaths::default();
+        _lp.init_lookup_paths();
+
+        for item in _lp.search_path.iter(){
+            log::info!("lookup path is{:?}",item);
+        }
+        assert_eq!(_lp.search_path.last(),Some(&env!("CARGO_MANIFEST_DIR")));
+    }
+}
