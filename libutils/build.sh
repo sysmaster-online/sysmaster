@@ -4,5 +4,5 @@ echo $p_w_d
 
 target_dir=$1
 echo $target_dir
-cp -a $p_w_d/examples/*  $target_dir/../../../
+cp -a $p_w_d/examples/*  $target_dir
 exit $?

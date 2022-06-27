@@ -106,7 +106,5 @@ declure_unitobj_plugin!(Target, Target::default, PLUGIN_NAME, LOG_LEVEL);
 #[cfg(test)]
 mod tests {
     #[test]
-    fn test() {
-        
-    }
+    fn test() {}
 }

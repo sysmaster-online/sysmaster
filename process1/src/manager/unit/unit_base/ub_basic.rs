@@ -1,8 +1,8 @@
 #![warn(unused_imports)]
 use crate::null_str;
 use core::fmt::{Display, Formatter, Result as FmtResult};
-use std::{str::FromStr, num::ParseIntError};
 use nix::sys::signal::Signal;
+use std::{num::ParseIntError, str::FromStr};
 
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
 pub enum UnitType {
@@ -14,16 +14,15 @@ pub enum UnitType {
     UnitTypeErrnoMax,
 }
 
-impl FromStr for UnitType{
+impl FromStr for UnitType {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let ret= match s{
-           "Service" => UnitType::UnitService,
-           "Target" => UnitType::UnitTarget,
-           "Socket" => UnitType::UnitSocket,
-           _ => UnitType::UnitTypeInvalid,
-
+        let ret = match s {
+            "Service" => UnitType::UnitService,
+            "Target" => UnitType::UnitTarget,
+            "Socket" => UnitType::UnitSocket,
+            _ => UnitType::UnitTypeInvalid,
         };
         Ok(ret)
     }
@@ -49,7 +48,6 @@ impl Display for UnitType {
             UnitType::UnitTypeMax => write!(f, "Max"),
             UnitType::UnitTypeInvalid => write!(f, ""),
             UnitType::UnitTypeErrnoMax => write!(f, ""),
-           
         }
     }
 }

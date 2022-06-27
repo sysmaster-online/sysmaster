@@ -121,13 +121,12 @@ impl UnitFileData {
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::UnitFile;
-    
-    fn test_init_lookup_path(){
+
+    fn test_init_lookup_path() {
         let _unit_file = UnitFile::new();
         _unit_file.init_lookup_path();
         _unit_file.build_name_map();
-
     }
 }

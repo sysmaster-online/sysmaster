@@ -25,7 +25,7 @@ static INSTANCE: Lazy<Arc<Plugin>> = Lazy::new(|| {
 
 pub struct Plugin {
     /*unitobj_lists: RefCell<Vec<Arc<Box<dyn UnitSubClass>>>>,//hide unit obj mut use refcell*/
-    lib_type:RwLock<Vec<(String,String)>>,
+    lib_type: RwLock<Vec<(String, String)>>,
     library_dir: RwLock<Vec<String>>,
     load_libs: RwLock<HashMap<UnitType, Arc<dy_re::Lib>>>,
     _loaded: RwLock<bool>,
@@ -43,39 +43,44 @@ impl Plugin {
         }
     }
 
-    fn get_unit_type_lib_map()-> String{
+    fn get_unit_type_lib_map() -> String {
         let mut buf = String::with_capacity(256);
         let out_dir = env::var("OUT_DIR");
-        let lib_path_str = out_dir.unwrap_or(LIB_PLUGIN_PATH.to_string());
+        let lib_path_str = out_dir.unwrap_or_else(|_| {
+            let ld_path = env::var("LD_LIBRARY_PATH").unwrap();
+            let _tmp = ld_path.split(":").collect::<Vec<_>>()[0];
+            return _tmp.to_string();
+        });
+
         let _tmp: Vec<_> = lib_path_str.split("build").collect();
-        
-        let mut conf_file = format!("{}/plugin.conf",LIB_PLUGIN_PATH);
+
+        let mut conf_file = format!("{}/plugin.conf", LIB_PLUGIN_PATH);
         let mut path = Path::new(&conf_file);
-        if !path.exists(){
-            conf_file  = format!("{}/conf/plugin.conf",_tmp[0]);
+        if !path.exists() {
+            conf_file = format!("{}/conf/plugin.conf", _tmp[0]);
+            log::debug!("{}", conf_file);
             path = Path::new(&conf_file);
         }
 
         let display = path.display();
-        match File::open(path){
-            Ok(mut _f ) =>{
-                if let Ok(_s) = _f.read_to_string(&mut buf){
-                    log::debug!("plugin support library is {}",buf);
-                }else{
-                    log::error!(
-                        "library type is not config"
-                    );
+        match File::open(path) {
+            Ok(mut _f) => {
+                if let Ok(_s) = _f.read_to_string(&mut buf) {
+                    log::debug!("plugin support library is {}", buf);
+                } else {
+                    log::error!("library type is not config");
                 }
             }
             Err(e) => {
                 log::error!(
-                    "library type config file is not found,err msg {}:{:?}",display,e
+                    "library type config file is not found,err msg {}:{:?}",
+                    display,
+                    e
                 );
-            },
+            }
         }
         return buf;
     }
-
 
     fn get_default_libpath() -> String {
         let mut ret: String = String::with_capacity(256);
@@ -221,19 +226,19 @@ impl Plugin {
 
     fn get_unit_type(&self, name: &str) -> UnitType {
         let read_s = self.lib_type.read().unwrap();
-        for line in read_s.iter(){
-            if name.contains(&line.1){
-               return UnitType::from_str(&line.0).unwrap();
+        for line in read_s.iter() {
+            if name.contains(&line.1) {
+                return UnitType::from_str(&line.0).unwrap();
             }
         }
-        return UnitType::UnitTypeInvalid
+        return UnitType::UnitTypeInvalid;
     }
 
-    pub (self) fn init_unit_type_lib_map(&self,unit_type_lib_map:&str){
-        for line in unit_type_lib_map.lines(){
+    pub(self) fn init_unit_type_lib_map(&self, unit_type_lib_map: &str) {
+        for line in unit_type_lib_map.lines() {
             let _v_s: Vec<_> = line.split(":").collect();
             let mut _lib_w = self.lib_type.write().unwrap();
-            (*_lib_w).push((_v_s[0].to_string(),_v_s[1].to_string()));
+            (*_lib_w).push((_v_s[0].to_string(), _v_s[1].to_string()));
         }
     }
     ///
@@ -351,8 +356,8 @@ mod tests {
         for key in (*t_p.load_libs.read().unwrap()).keys() {
             // let service_unit = u_box.as_any().downcast_ref::<ServiceUnit>().unwrap();
             // assert_eq!(service_unit.get_unit_name(),"");
-            let unittype=UnitType::from_str(key.to_string().as_str()).unwrap();
-            assert_ne!(unittype.to_string(),UnitType::UnitTypeInvalid.to_string());
+            let unittype = UnitType::from_str(key.to_string().as_str()).unwrap();
+            assert_ne!(unittype.to_string(), UnitType::UnitTypeInvalid.to_string());
         }
     }
 }

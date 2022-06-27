@@ -452,9 +452,9 @@ mod tests {
             None => println!("load unit failed"),
         }
     }
-    
+
     #[test]
-    fn test_units_load(){
+    fn test_units_load() {
         logger::init_log_with_console("test_units_load", 4);
         let mut unit_name_lists: Vec<String> = Vec::new();
         let dm_manager = Rc::new(DataManager::new());
@@ -463,7 +463,7 @@ mod tests {
 
         unit_name_lists.push("config.service".to_string());
         unit_name_lists.push("testsunit.target".to_string());
-        for u_name in unit_name_lists.iter(){
+        for u_name in unit_name_lists.iter() {
             let unit = um.load_unit(u_name);
             match unit {
                 Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), u_name),

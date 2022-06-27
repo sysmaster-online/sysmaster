@@ -29,11 +29,16 @@ impl LookupPaths {
             out_dir
         };
         let _tmp_lib_path = devel_path();
-        let out_dir=_tmp_lib_path.unwrap();
+        let out_dir = _tmp_lib_path.unwrap_or_else(|_x| {
+            let ld_path = env::var("LD_LIBRARY_PATH").unwrap();
+            let _tmp = ld_path.split(":").collect::<Vec<_>>()[0];
+            let _tmp_path = _tmp.split("target").collect::<Vec<_>>()[0];
+            return _tmp_path.to_string();
+        });
         self.search_path.push(ETC_SYSTEM_PATH.to_string());
         self.search_path.push(LIB_SYSTEM_PATH.to_string());
         let tmp_str: Vec<_> = out_dir.split("build").collect();
-        self.search_path.push(format!("{}",tmp_str[0]));
+        self.search_path.push(format!("{}", tmp_str[0]));
     }
 }
 
@@ -43,9 +48,8 @@ impl Default for LookupPaths {
     }
 }
 
-
 #[cfg(test)]
-mod tests{
+mod tests {
 
     use std::env;
 
@@ -53,16 +57,18 @@ mod tests{
 
     use super::LookupPaths;
     #[test]
-    fn test_init_lookup_paths(){
+    fn test_init_lookup_paths() {
         logger::init_log_with_console("test_init_lookup_paths", 4);
         let mut _lp = LookupPaths::default();
         _lp.init_lookup_paths();
-
-        for item in _lp.search_path.iter(){
-            log::info!("lookup path is{:?}",item);
+        for item in _lp.search_path.iter() {
+            log::info!("lookup path is{:?}", item);
         }
         let tmp_dir = env::var("OUT_DIR").unwrap();
         let tmp_dir_v: Vec<_> = tmp_dir.split("build").collect();
-        assert_eq!(_lp.search_path.last().unwrap().to_string(),tmp_dir_v[0].to_string());
+        assert_eq!(
+            _lp.search_path.last().unwrap().to_string(),
+            tmp_dir_v[0].to_string()
+        );
     }
 }
