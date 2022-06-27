@@ -1,22 +1,39 @@
 #![warn(unused_imports)]
 use crate::null_str;
-use core::fmt::{Display, Formatter, Result};
+use core::fmt::{Display, Formatter, Result as FmtResult};
+use std::{str::FromStr, num::ParseIntError};
 use nix::sys::signal::Signal;
 
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
 pub enum UnitType {
     UnitService = 0,
     UnitTarget,
+    UnitSocket,
     UnitTypeMax,
     UnitTypeInvalid,
     UnitTypeErrnoMax,
 }
 
+impl FromStr for UnitType{
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let ret= match s{
+           "Service" => UnitType::UnitService,
+           "Target" => UnitType::UnitTarget,
+           "Socket" => UnitType::UnitSocket,
+           _ => UnitType::UnitTypeInvalid,
+
+        };
+        Ok(ret)
+    }
+}
 impl From<UnitType> for String {
     fn from(u_t: UnitType) -> Self {
         match u_t {
             UnitType::UnitService => "service".into(),
             UnitType::UnitTarget => "target".into(),
+            UnitType::UnitSocket => "socket".into(),
             UnitType::UnitTypeMax => null_str!("").into(),
             UnitType::UnitTypeInvalid => null_str!("").into(),
             UnitType::UnitTypeErrnoMax => null_str!("").into(),
@@ -24,13 +41,15 @@ impl From<UnitType> for String {
     }
 }
 impl Display for UnitType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             UnitType::UnitService => write!(f, "Service"),
             UnitType::UnitTarget => write!(f, "Target"),
+            UnitType::UnitSocket => write!(f, "Socket"),
             UnitType::UnitTypeMax => write!(f, "Max"),
             UnitType::UnitTypeInvalid => write!(f, ""),
             UnitType::UnitTypeErrnoMax => write!(f, ""),
+           
         }
     }
 }

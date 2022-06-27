@@ -104,4 +104,9 @@ use process1::declure_unitobj_plugin;
 declure_unitobj_plugin!(Target, Target::default, PLUGIN_NAME, LOG_LEVEL);
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    #[test]
+    fn test() {
+        
+    }
+}

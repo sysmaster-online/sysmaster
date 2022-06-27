@@ -1,6 +1,0 @@
-[Unit]
-Description = "Testsunit Description"
-Requires = "Multi-user.target"
-After = "Multi-user.target"
-Conflicts = "rescue.target"
-AllowIsolate = yes

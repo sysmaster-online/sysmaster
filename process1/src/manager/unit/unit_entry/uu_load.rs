@@ -83,14 +83,12 @@ impl UeLoad {
                     let ret1 = install.map(|_conf| {
                         self.config.set_installconf(_conf);
                     });
-                    if ret1.is_err() {
-                        return Err(format!(
-                            "parse unit install config for unit [{}] err{:?}",
-                            self.id,
-                            ret1.err()
-                        )
-                        .into());
+                    if ret1.is_err() {//Install section is not requires
+                        log::error!("parse unit install config for unit [{}] err{:?}",
+                        self.id,
+                        ret1.err()); 
                     }
+
                     let ret2 = config_unit.map(|_unit| {
                         self.config.set_unitconf(_unit);
                     });

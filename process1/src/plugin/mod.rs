@@ -3,6 +3,10 @@ use dynamic_reload as dy_re;
 use log::*;
 use once_cell::sync::Lazy;
 use std::ffi::OsStr;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use std::str::FromStr;
 use std::sync::RwLock;
 use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
 use std::{env, io};
@@ -13,12 +17,15 @@ const LIB_PLUGIN_PATH: &str = "/usr/lib/process1/plugin/";
 static INSTANCE: Lazy<Arc<Plugin>> = Lazy::new(|| {
     let plugin = Plugin::new();
     let default_lib_path = Plugin::get_default_libpath();
+    let unit_type_lib_map = Plugin::get_unit_type_lib_map();
+    plugin.init_unit_type_lib_map(&unit_type_lib_map);
     plugin.update_library_dir(&default_lib_path);
     Arc::new(plugin)
 });
 
 pub struct Plugin {
     /*unitobj_lists: RefCell<Vec<Arc<Box<dyn UnitSubClass>>>>,//hide unit obj mut use refcell*/
+    lib_type:RwLock<Vec<(String,String)>>,
     library_dir: RwLock<Vec<String>>,
     load_libs: RwLock<HashMap<UnitType, Arc<dy_re::Lib>>>,
     _loaded: RwLock<bool>,
@@ -29,11 +36,46 @@ impl Plugin {
     fn new() -> Self {
         Self {
             //unitobj_lists: RefCell::new(Vec::new()),
+            lib_type: RwLock::new(Vec::new()),
             library_dir: RwLock::new(Vec::new()),
             load_libs: RwLock::new(HashMap::new()),
             _loaded: RwLock::new(false),
         }
     }
+
+    fn get_unit_type_lib_map()-> String{
+        let mut buf = String::with_capacity(256);
+        let out_dir = env::var("OUT_DIR");
+        let lib_path_str = out_dir.unwrap_or(LIB_PLUGIN_PATH.to_string());
+        let _tmp: Vec<_> = lib_path_str.split("build").collect();
+        
+        let mut conf_file = format!("{}/plugin.conf",LIB_PLUGIN_PATH);
+        let mut path = Path::new(&conf_file);
+        if !path.exists(){
+            conf_file  = format!("{}/conf/plugin.conf",_tmp[0]);
+            path = Path::new(&conf_file);
+        }
+
+        let display = path.display();
+        match File::open(path){
+            Ok(mut _f ) =>{
+                if let Ok(_s) = _f.read_to_string(&mut buf){
+                    log::debug!("plugin support library is {}",buf);
+                }else{
+                    log::error!(
+                        "library type is not config"
+                    );
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "library type config file is not found,err msg {}:{:?}",display,e
+                );
+            },
+        }
+        return buf;
+    }
+
 
     fn get_default_libpath() -> String {
         let mut ret: String = String::with_capacity(256);
@@ -49,12 +91,11 @@ impl Plugin {
             Err(_) => {
                 let _tmp_lib_path = devel_path();
                 let lib_path_str = _tmp_lib_path.unwrap_or(LIB_PLUGIN_PATH.to_string());
-                let _tmp: Vec<_> = lib_path_str.split("target").collect();
+                let _tmp: Vec<_> = lib_path_str.split("build").collect();
                 if _tmp.is_empty() || _tmp.len() < 2 {
                     ret.push_str(lib_path_str.as_str());
                 } else {
-                    ret.push_str(format!("{}target/debug;", _tmp[0]).as_str());
-                    ret.push_str(format!("{}target/release;", _tmp[0]).as_str());
+                    ret.push_str(format!("{}", _tmp[0]).as_str());
                 }
             }
         }
@@ -179,11 +220,21 @@ impl Plugin {
     }
 
     fn get_unit_type(&self, name: &str) -> UnitType {
-        if name.contains("libservice") {
-            return UnitType::UnitService;
+        let read_s = self.lib_type.read().unwrap();
+        for line in read_s.iter(){
+            if name.contains(&line.1){
+               return UnitType::from_str(&line.0).unwrap();
+            }
         }
+        return UnitType::UnitTypeInvalid
+    }
 
-        UnitType::UnitTypeInvalid
+    pub (self) fn init_unit_type_lib_map(&self,unit_type_lib_map:&str){
+        for line in unit_type_lib_map.lines(){
+            let _v_s: Vec<_> = line.split(":").collect();
+            let mut _lib_w = self.lib_type.write().unwrap();
+            (*_lib_w).push((_v_s[0].to_string(),_v_s[1].to_string()));
+        }
     }
     ///
     /// default plugin library path is /usr/lib/process1/plugin/
@@ -283,6 +334,7 @@ impl Plugin {
 
 #[cfg(test)]
 mod tests {
+
     use utils::logger;
 
     use super::*;
@@ -295,11 +347,12 @@ mod tests {
         let t_p = plugins;
         let mf = env!("CARGO_MANIFEST_DIR");
         let out_dir = env!("OUT_DIR");
-        println!("{},{}", out_dir, mf);
+        log::info!("{},{}", out_dir, mf);
         for key in (*t_p.load_libs.read().unwrap()).keys() {
-            assert_eq!(key.to_string(), UnitType::UnitService.to_string());
             // let service_unit = u_box.as_any().downcast_ref::<ServiceUnit>().unwrap();
             // assert_eq!(service_unit.get_unit_name(),"");
+            let unittype=UnitType::from_str(key.to_string().as_str()).unwrap();
+            assert_ne!(unittype.to_string(),UnitType::UnitTypeInvalid.to_string());
         }
     }
 }
