@@ -1,3 +1,30 @@
+//!plugin 支持对子unit的component 的so进行动态加载
+//! 对unit的实现动态库进行加载需要满足以下条件
+//! 1. 子类实现的动态库（*.so）的查找路径为以下优先级
+//!  a.优先查找/usr/lib/process1/plugin/路径下的动态库
+//!  b.查找rust cargo构建的输出目录如target/debug/或者target/release
+//!  c.LD_LIBRARY_PATH环境变量指定的第一个路径。
+//! 在使用cargo开发阶段，b和c两种方式实际上都是指向process1工程checkout目录下的/target/debug或者release目录，例如
+//! process1被克隆到/home/test目录下，这输出目录为/home/test/target/debug或者release目录
+//! 2.子类类型和对应so的映射关系配置文件，默认查找路径同 子类动态库的查找路径。该文件在源码树下的路径为process1/conf/plugin.conf
+//! 在开发阶段会通过build脚本默认发布到/target/debug或者release目录下，该阶段 无需关系，如果需要单独运行process1，
+//! 需要将该配置文件从构建发布目录(target/debug/conf)拷贝到/usr/lib/process1/plugin目录下，否则process1无法加载对应的so文件。
+//! 改文件的配置格式为unitType:soname,如：
+//! ```text
+//! Service:libservice
+//! Target:libtarget
+//! Socket:libsocket
+//! ```
+//! 3.子类的实现导入如下的宏定义
+//! ```macro_rules
+//! const LOG_LEVEL: u32 = 4;
+//! const PLUGIN_NAME: &str = "TargetUnit";
+//! use process1::declure_unitobj_plugin;
+//! declure_unitobj_plugin!(Target, Target::default, PLUGIN_NAME, LOG_LEVEL);
+//! ```
+//! plugin或根据对对应unit配置文件的名字找到对应的so，并动态加载，如XXX.service这查找libservice.so,XXX.socket 则会查找libsocket.so
+//!
+
 use super::manager::{UnitSubClass, UnitType};
 use dynamic_reload as dy_re;
 use log::*;
