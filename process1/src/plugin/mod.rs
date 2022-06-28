@@ -26,6 +26,7 @@
 //!
 
 use super::manager::{UnitSubClass, UnitType};
+use dy_re::Lib;
 use dynamic_reload as dy_re;
 use log::*;
 use once_cell::sync::Lazy;
@@ -37,7 +38,6 @@ use std::str::FromStr;
 use std::sync::RwLock;
 use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
 use std::{env, io};
-use utils::env_cargo;
 use walkdir::{DirEntry, WalkDir};
 
 const LIB_PLUGIN_PATH: &str = "/usr/lib/process1/plugin/";
@@ -74,16 +74,32 @@ impl Plugin {
     fn get_unit_type_lib_map() -> String {
         let mut buf = String::with_capacity(256);
 
-        let conf_file = if let Ok(p) = env_cargo::env_path() {
-            format!("{}/conf/plugin.conf", p)
-        } else {
-            format!("{}/plugin.conf", LIB_PLUGIN_PATH)
+        let devel_path = || {
+            let out_dir = env::var("OUT_DIR").unwrap_or_else(|_x| {
+                let ld_path = env::var("LD_LIBRARY_PATH").map_or("".to_string(), |_v| {
+                    let _tmp = _v.split(":").collect::<Vec<_>>()[0];
+                    let _tmp_path = _tmp.split("target").collect::<Vec<_>>()[0];
+                    _tmp_path.to_string()
+                });
+                ld_path
+            });
+            out_dir
         };
 
-        let path = Path::new(&conf_file);
+        let mut conf_file = format!("{}plugin.conf", LIB_PLUGIN_PATH);
+        let mut path = Path::new(&conf_file);
         if !path.exists() {
-            log::debug!("{}", conf_file);
-            return String::new();
+            let lib_path_str = devel_path();
+            log::debug!(
+                "plugin conf file not found in:[{}],try find in devel path:[{}]",
+                conf_file,
+                lib_path_str
+            );
+            if !lib_path_str.is_empty() && lib_path_str.contains("build") {
+                let _tmp: Vec<_> = lib_path_str.split("build").collect();
+                conf_file = format!("{}/conf/plugin.conf", _tmp[0]);
+            }
+            path = Path::new(&conf_file);
         }
 
         let display = path.display();
@@ -319,7 +335,7 @@ impl Plugin {
         };
         log::debug!("begine update library load path [{}]", library_dir);
         if update_dir() {
-            Self::load_lib(self);
+            self.load_lib();
         }
     }
 
@@ -346,18 +362,36 @@ impl Plugin {
             log::info!("plugin is not loaded");
             return Err(format!("plugin is not loaded").into());
         }
-        let dy_lib = match (*self.load_libs.read().unwrap()).get(&unit_type) {
-            Some(lib) => lib.clone(),
-            None => {
-                return Err(format!("the {:?} plugin is not exist", unit_type.to_string()).into())
+        let mut retry_count = 0;
+        let dy_lib = loop {
+            let dy_lib: Result<Arc<Lib>, String> = match (*self.load_libs.read().unwrap())
+                .get(&unit_type)
+            {
+                Some(lib) => Ok(lib.clone()),
+                None => Err(format!("the {:?} plugin is not exist", unit_type.to_string()).into()),
+            };
+            if dy_lib.is_err() {
+                if retry_count < 2 {
+                    retry_count += 1;
+                    self.load_lib();
+                    continue;
+                } else {
+                    return Err(
+                        format!("the {:?} plugin is not exist", unit_type.to_string()).into(),
+                    );
+                }
             }
+            break dy_lib;
         };
 
-        let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitSubClass> =
-            unsafe { dy_lib.lib.get(b"__unit_obj_create").unwrap() };
-        let boxed_raw = fun();
-
-        Ok(unsafe { Box::from_raw(boxed_raw) })
+        if let Ok(_dy_lib) = dy_lib {
+            let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitSubClass> =
+                unsafe { _dy_lib.lib.get(b"__unit_obj_create").unwrap() };
+            let boxed_raw = fun();
+            Ok(unsafe { Box::from_raw(boxed_raw) })
+        } else {
+            Err(format!("the {:?} plugin is not exist", unit_type.to_string()).into())
+        }
     }
 }
 
