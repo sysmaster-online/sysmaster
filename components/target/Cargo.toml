@@ -1,0 +1,24 @@
+[package]
+name = "target"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[lib]
+crate-type = ["cdylib"]
+name = "target"
+
+[dependencies]
+dynamic_reload = "0.4.0"
+utils = { path = "../../libutils" }
+cgroup = { path = "../../libcgroup" }
+process1 = { path = "../../process1" }
+strum = { version = "0.23", features = ["derive"] }
+nix = "0.23.0"
+log = "0.4"
+proc_macro_utils = {path = "../../libproc_macro_utils"}
+toml = "0.5.8"
+serde_derive = "1.0.130"
+serde = "1.0.130"
