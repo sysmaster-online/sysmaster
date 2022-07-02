@@ -7,7 +7,7 @@ use log;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use process1::manager::{
-    ExecCommand, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags,
+    ExecCommand, ExecFlags, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -34,12 +34,11 @@ enum ServiceState {
     Failed,
     AutoRestart,
     Cleaning,
-    StateMax,
 }
 
 impl Default for ServiceState {
     fn default() -> Self {
-        ServiceState::StateMax
+        ServiceState::Dead
     }
 }
 
@@ -81,7 +80,7 @@ impl ServiceMng {
             config: Rc::clone(configr),
             pid: Rc::clone(&_pid),
             spawn: ServiceSpawn::new(commr, &_pid),
-            state: RefCell::new(ServiceState::StateMax),
+            state: RefCell::new(ServiceState::Dead),
             result: RefCell::new(ServiceResult::Success),
             main_command: RefCell::new(Vec::new()),
             control_command: RefCell::new(Vec::new()),
@@ -158,7 +157,7 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::Condition);
         match self.control_command_pop() {
             Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0) {
+                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => self.enter_dead(ServiceResult::FailureResources),
                 }
@@ -176,7 +175,7 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::StartPre);
         match self.control_command_pop() {
             Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0) {
+                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => self.enter_dead(ServiceResult::FailureResources),
                 }
@@ -194,7 +193,7 @@ impl ServiceMng {
         self.main_command_fill(ServiceCommand::Start);
         match self.main_command_pop() {
             Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0) {
+                match self.spawn.start_service(&cmd, 0, ExecFlags::PASS_FDS) {
                     Ok(pid) => self.pid.set_main(pid),
                     Err(_e) => {
                         log::error!("failed to start service: {}", self.comm.unit().get_id());
@@ -219,7 +218,7 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::StartPost);
         match self.control_command_pop() {
             Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0) {
+                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
                         log::error!(
@@ -258,7 +257,7 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::Stop);
         match self.control_command_pop() {
             Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0) {
+                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
                         log::error!("Failed to run stop service: {}", self.comm.unit().get_id());
@@ -279,7 +278,7 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::StopPost);
         match self.control_command_pop() {
             Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0) {
+                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
                         self.enter_signal(
@@ -317,7 +316,7 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::Reload);
         match self.control_command_pop() {
             Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0) {
+                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
                         log::error!("failed to start service: {}", self.comm.unit().get_id());
@@ -449,7 +448,7 @@ impl ServiceMng {
     fn run_next_control(&self) {
         log::debug!("runing next control command");
         if let Some(cmd) = self.control_command_pop() {
-            match self.spawn.start_service(&cmd, 0) {
+            match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                 Ok(pid) => self.pid.set_control(pid),
                 Err(_e) => {
                     log::error!("failed to start service: {}", self.comm.unit().get_id());
@@ -460,7 +459,7 @@ impl ServiceMng {
 
     fn run_next_main(&self) {
         if let Some(cmd) = self.main_command_pop() {
-            match self.spawn.start_service(&cmd, 0) {
+            match self.spawn.start_service(&cmd, 0, ExecFlags::PASS_FDS) {
                 Ok(pid) => self.pid.set_main(pid),
                 Err(_e) => {
                     log::error!("failed to run main command: {}", self.comm.unit().get_id());
@@ -626,7 +625,6 @@ impl ServiceState {
             | ServiceState::StopPost
             | ServiceState::StopSigterm
             | ServiceState::StopSigkill
-            | ServiceState::StateMax
             | ServiceState::FinalSigterm
             | ServiceState::FinalSigkill
             | ServiceState::FinalWatchdog => UnitActiveState::UnitDeActivating,
@@ -651,7 +649,6 @@ impl ServiceState {
             | ServiceState::StopPost
             | ServiceState::StopSigterm
             | ServiceState::StopSigkill
-            | ServiceState::StateMax
             | ServiceState::FinalSigterm
             | ServiceState::FinalSigkill
             | ServiceState::FinalWatchdog => UnitActiveState::UnitDeActivating,

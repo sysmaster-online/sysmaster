@@ -377,7 +377,7 @@ fn job_trigger_unit(run_kind: JobKind, unit: &UnitX) -> Result<(), Option<JobRes
         JobKind::JobStart => unit.start(),
         JobKind::JobStop => unit.stop(),
         JobKind::JobReload => unit.reload(),
-        JobKind::JobVerify => match unit.get_state() {
+        JobKind::JobVerify => match unit.active_state() {
             UnitActiveState::UnitActive | UnitActiveState::UnitReloading => {
                 Err(UnitActionError::UnitActionEAlready)
             }
@@ -407,6 +407,8 @@ fn job_trigger_err_to_result(err: UnitActionError) -> Option<JobResult> {
         UnitActionError::UnitActionEStale => Some(JobResult::JobOnce),
         UnitActionError::UnitActionEFailed => Some(JobResult::JobFailed),
         UnitActionError::UnitActionEInval => Some(JobResult::JobFailed),
+        UnitActionError::UnitActionEBusy => Some(JobResult::JobFailed),
+        UnitActionError::UnitActionENoent => Some(JobResult::JobFailed),
     }
 }
 
@@ -467,7 +469,7 @@ fn job_process_unit_reload(
 }
 
 fn job_merge_unit(kind: JobKind, unit: &UnitX) -> JobKind {
-    let us_is_active_or_reloading = match unit.get_state() {
+    let us_is_active_or_reloading = match unit.active_state() {
         UnitActiveState::UnitActive | UnitActiveState::UnitReloading => true,
         _ => false,
     };

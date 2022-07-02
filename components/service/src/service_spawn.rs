@@ -1,7 +1,7 @@
 use super::service_comm::ServiceComm;
 use super::service_pid::ServicePid;
 use nix::unistd::Pid;
-use process1::manager::{ExecCommand, ExecParameters};
+use process1::manager::{ExecCommand, ExecFlags, ExecParameters};
 use std::error::Error;
 use std::rc::Rc;
 
@@ -22,8 +22,9 @@ impl ServiceSpawn {
         &self,
         cmdline: &ExecCommand,
         _time_out: u64,
+        ec_flags: ExecFlags,
     ) -> Result<Pid, Box<dyn Error>> {
-        let params = ExecParameters::new();
+        let mut params = ExecParameters::new();
         if let Some(pid) = self.pid.main() {
             params.add_env("MAINPID", format!("{}", pid));
         }
@@ -31,15 +32,24 @@ impl ServiceSpawn {
         let unit = self.comm.unit();
         let um = self.comm.um();
         unit.prepare_exec()?;
+
+        if ec_flags.contains(ExecFlags::PASS_FDS) {
+            params.insert_fds(self.collect_socket_fds());
+        }
+
         match um.exec_spawn(&unit, cmdline, &params) {
             Ok(pid) => {
                 um.child_watch_pid(pid, unit.get_id());
                 Ok(pid)
             }
-            Err(_e) => {
-                log::error!("failed to start service: {}", unit.get_id());
+            Err(e) => {
+                log::error!("failed to start service: {}, error:{:?}", unit.get_id(), e);
                 Err(format!("spawn exec return error").into())
             }
         }
+    }
+
+    fn collect_socket_fds(&self) -> Vec<i32> {
+        self.comm.um().collect_socket_fds(self.comm.unit().get_id())
     }
 }

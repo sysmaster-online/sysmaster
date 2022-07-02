@@ -7,6 +7,7 @@ use crate::manager::unit::UnitErrno;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::error::Error;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
 use utils::IN_SET;
@@ -40,13 +41,14 @@ impl UnitX {
     }
     pub(in crate::manager::unit) fn coldplug(&self) {}
     pub(in crate::manager::unit) fn start(&self) -> Result<(), UnitActionError> {
+        log::debug!("unitx start the unit {}", self.get_id());
         let state = self.0.current_active_state();
 
         if state == UnitActiveState::UnitMaintenance {
             return Err(UnitActionError::UnitActionEAgain);
         }
 
-        if self.0.get_load_state() != UnitLoadState::UnitLoaded {
+        if self.0.load_state() != UnitLoadState::UnitLoaded {
             return Err(UnitActionError::UnitActionEInval);
         }
 
@@ -101,11 +103,35 @@ impl UnitX {
         self.0.get_config(item)
     }
 
-    pub(in crate::manager::unit) fn get_state(&self) -> UnitActiveState {
+    pub(in crate::manager::unit) fn active_state(&self) -> UnitActiveState {
         //UnitActiveState::UnitActive
         self.0.current_active_state()
         //todo!();
     }
+
+    pub(in crate::manager::unit) fn active_or_activating(&self) -> bool {
+        IN_SET!(
+            self.0.current_active_state(),
+            UnitActiveState::UnitActive,
+            UnitActiveState::UnitActivating,
+            UnitActiveState::UnitReloading
+        )
+    }
+
+    pub(in crate::manager::unit) fn activeted(&self) -> bool {
+        // the unit is in activating or actived.
+        if IN_SET!(
+            self.0.current_active_state(),
+            UnitActiveState::UnitInActive,
+            UnitActiveState::UnitFailed,
+            UnitActiveState::UnitActivating
+        ) {
+            return false;
+        }
+
+        true
+    }
+
     pub(in crate::manager::unit) fn get_perpetual(&self) -> bool {
         todo!();
     }
@@ -124,5 +150,25 @@ impl UnitX {
 
     pub(in crate::manager::unit) fn cg_path(&self) -> PathBuf {
         self.0.cg_path()
+    }
+
+    pub(in crate::manager::unit) fn load_state(&self) -> UnitLoadState {
+        self.0.load_state()
+    }
+
+    pub(in crate::manager::unit) fn unit_type(&self) -> UnitType {
+        self.0.unit_type()
+    }
+
+    pub(in crate::manager::unit) fn collect_fds(&self) -> Vec<i32> {
+        self.0.collect_fds()
+    }
+}
+
+impl Deref for UnitX {
+    type Target = Rc<Unit>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

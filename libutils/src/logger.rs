@@ -70,7 +70,7 @@ fn build_log_config(app_name: &str, log_level: u32) -> Config {
     let mut pattern = String::new();
     pattern += "{d(%Y-%m-%d %H:%M:%S)} ";
     pattern += "{h({l}):<5} ";
-    pattern += "{m}{n}";
+    pattern += "{M} {m}{n}";
     let stdout = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(&pattern)))
         .target(Target::Stderr)

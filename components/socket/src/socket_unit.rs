@@ -1,3 +1,8 @@
+//! SocketUnit类型socket类型的总入口，需要实现UnitObj,UnitMngUtil,以及UnitSubClass三个trait,
+//! UnitObj是Unit的抽象，定义对process1提供的具体行为，
+//! UnitMngUtil是为了关联subUnit和Manger，由于rust不支持继承和多态，因此需要采用这种方式来间接支持
+//！ UnitSubClass为了实现SubUnit到UnitObj的转换，简介达成多态的目的
+
 use nix::{sys::signal::Signal, unistd::Pid};
 use process1::manager::{
     Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
@@ -9,14 +14,17 @@ use crate::{
     socket_config::{SocketConf, SocketConfig},
     socket_load::SocketLoad,
     socket_mng::SocketMng,
+    socket_port::SocketPorts,
 };
 use utils::{config_parser::ConfigParse, logger};
 
 #[allow(dead_code)]
+// the structuer of the socket unit type
 struct SocketUnit {
     comm: Rc<SocketComm>,
     config: Rc<SocketConfig>,
-    mng: SocketMng,
+    mng: Rc<SocketMng>,
+    ports: Rc<SocketPorts>,
     load: SocketLoad,
 }
 
@@ -30,12 +38,14 @@ impl UnitObj for SocketUnit {
     }
 
     fn load(&self, conf_str: &str) -> Result<(), Box<dyn Error>> {
+        log::debug!("socket beigin to load conf file");
         let socket_parser = SocketConf::builder_parser();
         let socket_conf = socket_parser.conf_file_parse(conf_str);
 
         let ret = socket_conf.map(|conf| self.load.parse(conf));
 
         if let Err(e) = ret {
+            log::error!("socket unit parse conf error: {}", e.to_string());
             return Err(Box::new(e));
         }
 
@@ -48,10 +58,10 @@ impl UnitObj for SocketUnit {
         todo!()
     }
 
+    // the function entrance to start the unit
     fn start(&self) -> Result<(), UnitActionError> {
-        log::debug!("begin to start the service unit");
+        self.ports.attach(self.mng.clone());
         self.mng.start_check()?;
-
         self.mng.start_action();
 
         Ok(())
@@ -62,6 +72,9 @@ impl UnitObj for SocketUnit {
     }
 
     fn stop(&self) -> Result<(), UnitActionError> {
+        self.mng.stop_check()?;
+        self.mng.stop_action();
+
         Ok(())
     }
 
@@ -75,7 +88,9 @@ impl UnitObj for SocketUnit {
         todo!()
     }
 
-    fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {}
+    fn sigchld_events(&self, pid: Pid, code: i32, status: Signal) {
+        self.mng.sigchld_event(pid, code, status)
+    }
 
     fn reset_failed(&self) {
         todo!()
@@ -85,11 +100,16 @@ impl UnitObj for SocketUnit {
         self.mng.current_active_state()
     }
 
+    fn collect_fds(&self) -> Vec<i32> {
+        self.ports.collect_fds()
+    }
+
     fn attach_unit(&self, unit: Rc<Unit>) {
         self.comm.attach_unit(unit);
     }
 }
 
+// attach the UnitManager for weak reference
 impl UnitMngUtil for SocketUnit {
     fn attach(&self, um: Rc<UnitManager>) {
         self.comm.attach_um(um);
@@ -106,11 +126,14 @@ impl SocketUnit {
     fn new() -> SocketUnit {
         let _comm = Rc::new(SocketComm::new());
         let _config = Rc::new(SocketConfig::new());
+        let ports = Rc::new(SocketPorts::new());
+        let mng = Rc::new(SocketMng::new(&_comm, &_config, &ports));
         SocketUnit {
             comm: Rc::clone(&_comm),
             config: Rc::clone(&_config),
-            mng: SocketMng::new(&_comm, &_config),
-            load: SocketLoad::new(&_config, &_comm),
+            mng: mng.clone(),
+            load: SocketLoad::new(&_config, &_comm, &ports),
+            ports: ports.clone(),
         }
     }
 }
@@ -126,4 +149,5 @@ const PLUGIN_NAME: &str = "SocketUnit";
 
 use process1::declure_unitobj_plugin;
 
+// define the method to create the instance of the unit
 declure_unitobj_plugin!(SocketUnit, SocketUnit::default, PLUGIN_NAME, LOG_LEVEL);

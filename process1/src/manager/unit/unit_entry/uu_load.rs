@@ -51,7 +51,7 @@ impl UeLoad {
         *self.load_state.borrow_mut() = load_state;
     }
 
-    pub(super) fn get_load_state(&self) -> UnitLoadState {
+    pub(super) fn load_state(&self) -> UnitLoadState {
         let state = self.load_state.clone();
         state.into_inner()
     }

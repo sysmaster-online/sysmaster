@@ -1,4 +1,4 @@
-use nix::libc;
+use nix::{libc, sys::socket::SockProtocol};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -62,4 +62,41 @@ impl From<String> for NetlinkProtocol {
             _ => NetlinkProtocol::NetlinkInvalid,
         }
     }
+}
+
+impl From<NetlinkProtocol> for SockProtocol {
+    fn from(protocol: NetlinkProtocol) -> Self {
+        match protocol {
+            NetlinkProtocol::NetlinkRoute => SockProtocol::NetlinkRoute,
+            NetlinkProtocol::NetlinkFirewall => todo!(),
+            NetlinkProtocol::NetlinkInetDiag => SockProtocol::NetlinkSockDiag,
+            NetlinkProtocol::NetlinkNflog => todo!(),
+            NetlinkProtocol::NetlinkXfrm => todo!(),
+            NetlinkProtocol::NetlinkSelinux => SockProtocol::NetlinkSELinux,
+            NetlinkProtocol::NetlinkIscsi => SockProtocol::NetlinkISCSI,
+            NetlinkProtocol::NetlinkAudit => SockProtocol::NetlinkAudit,
+            NetlinkProtocol::NetlinkFibLookup => SockProtocol::NetlinkFIBLookup,
+            NetlinkProtocol::NetlinkConnector => todo!(),
+            NetlinkProtocol::NetlinkNetfilter => SockProtocol::NetlinkNetFilter,
+            NetlinkProtocol::NetlinkIpv6Fw => SockProtocol::NetlinkIPv6Firewall,
+            NetlinkProtocol::NetlinkDnrtMag => SockProtocol::NetlinkDECNetRoutingMessage,
+            NetlinkProtocol::NetlinkKobjectUevent => SockProtocol::NetlinkKObjectUEvent,
+            NetlinkProtocol::NetlinkGeneric => todo!(),
+            NetlinkProtocol::NetlinkSCSITransport => SockProtocol::NetlinkSCSITransport,
+            NetlinkProtocol::NetlinkEcryptfs => todo!(),
+            NetlinkProtocol::NetlinkRdma => SockProtocol::NetlinkRDMA,
+            NetlinkProtocol::NetlinkInvalid => todo!(),
+        }
+    }
+}
+
+/// command对应的启动阶段
+#[allow(dead_code)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Copy, Clone)]
+pub(super) enum SocketCommand {
+    StartPre,
+    StartChown,
+    StartPost,
+    StopPre,
+    StopPost,
 }
