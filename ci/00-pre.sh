@@ -9,6 +9,20 @@ sh rustlang.sh -y
 
 source ~/.bashrc
 
+##Fix cargo clippy timeout : replace cargo crates with ustc
+# Modify config
+cat << EOF >> ~/.cargo/config
+[source.crates-io]
+registry = "https://github.com/rust-lang/crates.io-index"
+# 指定镜像
+replace-with = 'ustc'
+# 中国科学技术大学
+[source.ustc]
+registry = "https://mirrors.ustc.edu.cn/crates.io-index"
+EOF
+# Delete cache
+rm -rf  ~/.cargo/.package-cache
+
 
 ##拉取代码
 #rm -rf process1
