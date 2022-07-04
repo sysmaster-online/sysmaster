@@ -228,21 +228,13 @@ impl EventsData {
     pub(self) fn set_enabled(&mut self, source: Rc<dyn Source>, state: EventState) -> Result<i32> {
         let token = source.token();
 
-        let et = source.event_type();
-        match et {
-            EventType::Watchdog
-            | EventType::Inotify
-            | EventType::Defer
-            | EventType::Post
-            | EventType::Exit => (),
-            _ => match state {
-                EventState::On | EventState::OneShot => {
-                    self.source_online(&source)?;
-                }
-                EventState::Off => {
-                    self.source_offline(&source)?;
-                }
-            },
+        match state {
+            EventState::On | EventState::OneShot => {
+                self.source_online(&source)?;
+            }
+            EventState::Off => {
+                self.source_offline(&source)?;
+            }
         }
 
         // renew state
@@ -429,6 +421,10 @@ impl EventsData {
                     }
                 }
             }
+        }
+
+        if !self.pending_is_empty() {
+            return self.wait(0);
         }
 
         ret
