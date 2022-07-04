@@ -84,7 +84,6 @@ impl TargetMng {
             );
         }
     }
-
     fn state(&self) -> TargetState {
         *self.state.borrow()
     }

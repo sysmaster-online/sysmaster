@@ -416,8 +416,8 @@ mod tests {
     use utils::logger;
 
     #[test]
-    fn test_unit_load() {
-        logger::init_log_with_console("test_unit_load", 4);
+    fn test_service_unit_load() {
+        logger::init_log_with_console("test_service_unit_load", 4);
         log::info!("test");
         let dm_manager = Rc::new(DataManager::new());
         let _event = Rc::new(Events::new().unwrap());
@@ -433,8 +433,8 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_start() {
-        logger::init_log_with_console("test_unit_load", 4);
+    fn test_service_unit_start() {
+        logger::init_log_with_console("test_service_unit_start", 4);
         let dm_manager = Rc::new(DataManager::new());
         let _event = Rc::new(Events::new().unwrap());
         let um = UnitManager::new(&dm_manager, &_event);
@@ -450,6 +450,25 @@ mod tests {
                 log::debug!("unit stop end!");
             }
             None => println!("load unit failed"),
+        }
+    }
+
+    #[test]
+    fn test_units_load() {
+        logger::init_log_with_console("test_units_load", 4);
+        let mut unit_name_lists: Vec<String> = Vec::new();
+        let dm_manager = Rc::new(DataManager::new());
+        let _event = Rc::new(Events::new().unwrap());
+        let um = UnitManager::new(&dm_manager, &_event);
+
+        unit_name_lists.push("config.service".to_string());
+        unit_name_lists.push("testsunit.target".to_string());
+        for u_name in unit_name_lists.iter() {
+            let unit = um.load_unit(u_name);
+            match unit {
+                Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), u_name),
+                None => println!("test unit load, not fount unit: {}", u_name),
+            };
         }
     }
 }
