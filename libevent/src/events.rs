@@ -363,9 +363,8 @@ impl EventsData {
         };
 
         for event in events.iter() {
-            #[allow(unaligned_references)]
-            let token = &event.u64;
-            if let Some(s) = self.sources.get(token) {
+            let token = event.u64;
+            if let Some(s) = self.sources.get(&token) {
                 self.pending.push(s.clone());
             }
         }
