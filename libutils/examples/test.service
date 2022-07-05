@@ -5,7 +5,7 @@ Documentation="192.168.1.1"
 #Wants = "b.service"
 
 [Service]
-ExecCondition=["/usr/bin/sleep 5"]
+ExecCondition=["/usr/bin/sleep 15"]
 ExecStart=["/bin/echo 'test'"]
 ExecStop = ["/bin/kill $MAINPID"]
 

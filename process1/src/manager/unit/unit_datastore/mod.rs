@@ -60,6 +60,16 @@ impl UnitDb {
             .insert(source, relation, dest, reference, source_mask)
     }
 
+    pub(super) fn dep_gets(&self, name: &str, relation: UnitRelations) -> Vec<Rc<UnitX>> {
+        let unitx = self.units_get(name);
+
+        if unitx.is_none() {
+            return Vec::new();
+        }
+
+        self.dep.gets(&unitx.unwrap(), relation)
+    }
+
     pub(super) fn dep_gets_atom(&self, source: &UnitX, atom: UnitRelationAtom) -> Vec<Rc<UnitX>> {
         self.dep.gets_atom(source, atom)
     }

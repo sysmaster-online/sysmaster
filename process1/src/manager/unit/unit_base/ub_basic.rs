@@ -68,6 +68,7 @@ pub(in crate::manager::unit) fn unit_name_to_type(unit_name: &str) -> UnitType {
     match words[words.len() - 1] {
         "service" => UnitType::UnitService,
         "target" => UnitType::UnitTarget,
+        "socket" => UnitType::UnitSocket,
         _ => UnitType::UnitTypeInvalid,
     }
 }
@@ -92,6 +93,8 @@ pub enum UnitActionError {
     UnitActionEStale,
     UnitActionEFailed,
     UnitActionEInval,
+    UnitActionEBusy,
+    UnitActionENoent,
 }
 
 pub enum KillOperation {

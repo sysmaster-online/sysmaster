@@ -1,0 +1,17 @@
+[Unit]
+Description="CN"
+Documentation="192.168.1.1"
+
+[Socket]
+ExecStartPre=["/usr/bin/sleep 5"]
+ListenStream="31972"
+Accept = "N"
+ReceiveBuffer = "4K"
+SendBuffer = "4K"
+PassPacketInfo = "off"
+PassCredentials = "off"
+PassSecurity = "on"
+SocketMode="0600"
+
+[Install]
+WantedBy="dbus.service"

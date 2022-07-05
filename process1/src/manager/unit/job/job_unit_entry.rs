@@ -643,7 +643,7 @@ impl JobUnitData {
 
     fn jobs_ms_start_or_reload(&mut self, del_jobs: &mut Vec<Rc<Job>>) {
         // 'start' <=or=> 'reload'
-        let us_is_active_or_reloading = match self.unit.get_state() {
+        let us_is_active_or_reloading = match self.unit.active_state() {
             UnitActiveState::UnitActive | UnitActiveState::UnitReloading => true,
             _ => false,
         };

@@ -1,9 +1,11 @@
-use std::cell::RefCell;
+//! socket_config模块socket类型配置文件的定义，以及保存配置文件解析之后的内容
+//!
 
-use crate::{socket_base::PortType, socket_port::SocketPort};
-use nix::libc::mode_t;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+use crate::socket_base::SocketCommand;
 use proc_macro_utils::ConfigParseM;
-use process1::manager::UnitRef;
+use process1::manager::{ExecCommand, UnitRef};
 use serde::{Deserialize, Serialize};
 use std::io::{Error as IoError, ErrorKind};
 use utils::config_parser::{toml_str_parse, ConfigParse};
@@ -18,30 +20,40 @@ pub(super) enum ListeningItem {
 #[serdeName("Socket")]
 #[serde(rename_all = "PascalCase")]
 pub(super) struct SocketConf {
+    #[serde(alias = "ExecStartPre")]
+    exec_start_pre: Option<Vec<String>>,
+    #[serde(alias = "ExecStartChown")]
+    exec_start_chown: Option<Vec<String>>,
+    #[serde(alias = "ExecStartPost")]
+    exec_start_post: Option<Vec<String>>,
+    #[serde(alias = "ExecStopPre")]
+    exec_stop_pre: Option<Vec<String>>,
+    #[serde(alias = "ExecStopPost")]
+    exec_stop_post: Option<Vec<String>>,
     #[serde(alias = "ListenStream")]
-    listen_stream: String,
-    #[serde(alias = "ListenDataGram")]
-    listen_datagram: String,
+    listen_stream: Option<String>,
+    #[serde(alias = "ListenDatagram")]
+    listen_datagram: Option<String>,
     #[serde(alias = "ListenNetlink")]
-    listen_netlink: String,
+    listen_netlink: Option<String>,
     #[serde(alias = "PassPacketInfo")]
-    pass_pktinfo: String,
+    pass_pktinfo: Option<String>,
     #[serde(alias = "Accept")]
-    accept: String,
+    accept: Option<String>,
     #[serde(alias = "Service")]
-    service: String,
+    service: Option<String>,
     #[serde(alias = "ReceiveBuffer")]
-    receive_buffer: String,
-    #[serde(alias = "ReceiveBuffer")]
-    send_buffer: String,
+    receive_buffer: Option<String>,
+    #[serde(alias = "SendBuffer")]
+    send_buffer: Option<String>,
     #[serde(alias = "PassCredentials")]
-    pass_cred: String,
+    pass_cred: Option<String>,
     #[serde(alias = "Symlinks")]
-    symlinks: Vec<String>,
+    symlinks: Option<Vec<String>>,
     #[serde(alias = "PassSecurity")]
-    pass_sec: String,
+    pass_sec: Option<String>,
     #[serde(alias = "SocketMode")]
-    socket_mode: String,
+    socket_mode: Option<String>,
 }
 
 pub(super) enum SocketConfigItem {
@@ -74,51 +86,47 @@ impl SocketConfig {
         self.data.borrow().get(item)
     }
 
-    pub(super) fn push_port(&self, port: SocketPort) {
-        self.data.borrow_mut().push_port(port);
-    }
-
-    pub(super) fn clear_ports(&self) {
-        self.data.borrow_mut().clear_ports();
-    }
-
     pub(super) fn set_ref(&self, source: String, target: String) {
         self.data.borrow_mut().set_ref(source, target);
-    }
-
-    pub(super) fn no_accept_socket(&self) -> bool {
-        self.data.borrow_mut().no_accept_socket()
     }
 
     pub(super) fn unit_ref_target(&self) -> Option<String> {
         self.data.borrow_mut().unit_ref_target()
     }
+
+    pub(super) fn insert_exec_cmds(&self, cmd_type: SocketCommand, cmd_line: Rc<ExecCommand>) {
+        self.data.borrow_mut().insert_exec_cmds(cmd_type, cmd_line)
+    }
+
+    pub(super) fn exec_cmds(&self, cmd_type: SocketCommand) -> Vec<Rc<ExecCommand>> {
+        self.data.borrow().exec_cmds(cmd_type)
+    }
 }
 
 struct SocketConfigData {
-    ports: Vec<SocketPort>,
     pass_pktinfo: bool,
     accept: bool,
     cred: bool,
     pass_sec: bool,
-    socket_mode: mode_t,
+    socket_mode: u32,
     service: RefCell<UnitRef>,
     receive_buffer: u64,
     send_buffer: u64,
+    exec_commands: HashMap<SocketCommand, Vec<Rc<ExecCommand>>>,
 }
 
 impl SocketConfigData {
     fn new() -> SocketConfigData {
         SocketConfigData {
-            ports: Vec::new(),
             pass_pktinfo: false,
             accept: false,
             service: RefCell::new(UnitRef::new()),
             cred: false,
             pass_sec: false,
-            socket_mode: 0o666,
+            socket_mode: 0,
             receive_buffer: 0,
             send_buffer: 0,
+            exec_commands: HashMap::new(),
         }
     }
 
@@ -150,34 +158,8 @@ impl SocketConfigData {
         }
     }
 
-    pub(super) fn push_port(&mut self, port: SocketPort) {
-        self.ports.push(port)
-    }
-
-    pub(super) fn clear_ports(&mut self) {
-        self.ports.clear();
-    }
-
     pub(super) fn set_ref(&mut self, source: String, target: String) {
         self.service.borrow_mut().set_ref(source, target);
-    }
-
-    pub(super) fn no_accept_socket(&self) -> bool {
-        if !self.accept {
-            return true;
-        }
-
-        for port in self.ports.iter() {
-            if port.p_type() != PortType::Socket {
-                return true;
-            }
-
-            if !port.can_accept() {
-                return true;
-            }
-        }
-
-        false
     }
 
     pub(super) fn unit_ref_target(&mut self) -> Option<String> {
@@ -185,5 +167,30 @@ impl SocketConfigData {
             .borrow()
             .target()
             .map_or(None, |v| Some(v.to_string()))
+    }
+
+    pub(self) fn insert_exec_cmds(&mut self, cmd_type: SocketCommand, cmd_line: Rc<ExecCommand>) {
+        self.get_mut_cmds_pad(cmd_type).push(cmd_line);
+    }
+
+    pub(self) fn exec_cmds(&self, cmd_type: SocketCommand) -> Vec<Rc<ExecCommand>> {
+        if let Some(cmds) = self.exec_commands.get(&cmd_type) {
+            cmds.iter().map(|clr| Rc::clone(clr)).collect::<_>()
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn get_mut_cmds_pad(&mut self, cmd_type: SocketCommand) -> &mut Vec<Rc<ExecCommand>> {
+        // verify existance
+        if let None = self.exec_commands.get(&cmd_type) {
+            // nothing exists, pad it.
+            self.exec_commands.insert(cmd_type, Vec::new());
+        }
+
+        // return the one that must exist
+        self.exec_commands
+            .get_mut(&cmd_type)
+            .expect("something inserted is not found.")
     }
 }

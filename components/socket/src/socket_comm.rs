@@ -1,3 +1,7 @@
+//! socket_comm模块提供公共对象的管理，主要包含对UnitManager和Unit对象的weak引用。
+//! 需要调用公共对象提供的方法。
+//!
+
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},

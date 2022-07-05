@@ -111,6 +111,13 @@ impl JobManager {
         self.data.get_jobinfo(id)
     }
 
+    pub(in crate::manager::unit) fn has_stop_job(&self, unit: &Rc<UnitX>) -> bool {
+        match self.data.get_suspends(unit) {
+            Some(_) => true,
+            None => false,
+        }
+    }
+
     fn try_enable(&self) {
         // prepare for async-running
         if self.data.is_jobs_ready() {
@@ -129,7 +136,6 @@ impl JobManager {
     }
 
     fn enable(&self, eventr: &Rc<Events>) {
-        println!("job manager enable.");
         let source = Rc::clone(&self.data);
         eventr.set_enabled(source, EventState::OneShot).unwrap();
     }
@@ -144,13 +150,17 @@ impl Source for JobManagerData {
         0
     }
 
+    fn priority(&self) -> i8 {
+        -10
+    }
+
     fn token(&self) -> u64 {
         let data: u64 = unsafe { std::mem::transmute(self) };
         data
     }
 
     fn dispatch(&self, _event: &Events) -> Result<i32, Error> {
-        println!("job manager data dispatch");
+        log::debug!("job manager data dispatch");
         self.run();
         Ok(0)
     }
@@ -336,6 +346,10 @@ impl JobManagerData {
 
     pub(self) fn is_jobs_ready(&self) -> bool {
         self.jobs.is_ready()
+    }
+
+    pub(self) fn get_suspends(&self, unit: &Rc<UnitX>) -> Option<JobInfo> {
+        self.jobs.get_suspend(unit, JobKind::JobStop)
     }
 
     fn remove_unit(&self, unit: &UnitX) {

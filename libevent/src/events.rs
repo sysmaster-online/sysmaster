@@ -64,9 +64,11 @@ impl Events {
         if self.data.borrow().exit() {
             return Ok(0);
         }
+
         if !self.data.borrow_mut().prepare() {
             self.data.borrow_mut().wait(timeout);
         }
+
         self.dispatch()?;
         Ok(0)
     }

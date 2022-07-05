@@ -16,11 +16,7 @@ impl SocketSpawn {
     }
 
     #[allow(dead_code)]
-    pub(super) fn start_socket(
-        &self,
-        cmdline: &ExecCommand,
-        _time_out: u64,
-    ) -> Result<Pid, Box<dyn Error>> {
+    pub(super) fn start_socket(&self, cmdline: &ExecCommand) -> Result<Pid, Box<dyn Error>> {
         let params = ExecParameters::new();
 
         let unit = self.comm.unit();

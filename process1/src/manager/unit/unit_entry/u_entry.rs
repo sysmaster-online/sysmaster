@@ -107,6 +107,9 @@ pub trait UnitObj {
     fn release_resources(&self) {}
     fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {}
     fn reset_failed(&self) {}
+    fn collect_fds(&self) -> Vec<i32> {
+        Vec::new()
+    }
 
     fn current_active_state(&self) -> UnitActiveState;
     fn attach_unit(&self, unit: Rc<Unit>);
@@ -299,11 +302,19 @@ impl Unit {
         self.sub.sigchld_events(pid, code, signal)
     }
 
-    pub(super) fn get_load_state(&self) -> UnitLoadState {
-        self.load.get_load_state()
+    pub(super) fn load_state(&self) -> UnitLoadState {
+        self.load.load_state()
     }
 
     pub(super) fn attach_unit(&self, unit: &Rc<Unit>) {
         self.sub.attach_unit(Rc::clone(unit))
+    }
+
+    pub(super) fn unit_type(&self) -> UnitType {
+        self.unit_type
+    }
+
+    pub(super) fn collect_fds(&self) -> Vec<i32> {
+        self.sub.collect_fds()
     }
 }

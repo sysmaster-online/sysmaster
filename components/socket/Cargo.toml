@@ -13,6 +13,7 @@ name = "socket"
 dynamic_reload = "0.4.0"
 utils = { path = "../../libutils" }
 cgroup = { path = "../../libcgroup" }
+event = { path = "../../libevent" }
 process1 = { path = "../../process1" }
 strum = { version = "0.23", features = ["derive"] }
 nix = "0.23.0"

@@ -1,14 +1,14 @@
 use super::execute::{ExecCmdError, ExecCommand, ExecParameters, ExecSpawn};
 use super::job::{JobAffect, JobConf, JobKind, JobManager};
-use super::unit_base::{JobMode, UnitRelationAtom};
+use super::unit_base::{JobMode, UnitLoadState, UnitRelationAtom};
 use super::unit_datastore::UnitDb;
 use super::unit_entry::{Unit, UnitObj, UnitX};
 use super::unit_runtime::UnitRT;
-use super::UnitType;
+use super::{UnitActionError, UnitType};
 use crate::manager::data::{DataManager, UnitState};
 use crate::manager::table::{TableOp, TableSubscribe};
-use crate::manager::MngErrno;
-use event::Events;
+use crate::manager::{MngErrno, UnitRelations};
+use event::{EventState, Events, Source};
 use nix::unistd::Pid;
 use std::error::Error;
 use std::path::Path;
@@ -65,6 +65,7 @@ pub struct UnitManager {
     load: UnitLoad,
     jm: JobManager,
     exec: ExecSpawn,
+    events: Rc<Events>,
 }
 
 // the declaration "pub(self)" is for identification only.
@@ -90,6 +91,7 @@ impl UnitManager {
         self.exec.spawn(unit, cmdline, params)
     }
 
+    // load the unit for reference name
     pub fn load_unit_success(&self, name: &str) -> bool {
         if let Some(_unit) = self.load_unit(name) {
             return true;
@@ -98,6 +100,7 @@ impl UnitManager {
         return false;
     }
 
+    // load the unit of the dependency UnitType
     pub fn load_related_unit_success(&self, name: &str, unit_type: UnitType) -> bool {
         let stem_name = Path::new(name).file_stem().unwrap().to_str().unwrap();
         let relate_name = format!("{}.{}", stem_name, String::from(unit_type));
@@ -109,7 +112,79 @@ impl UnitManager {
         return false;
     }
 
-    pub(self) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+    // check the unit active state of of reference name
+    pub fn unit_enabled(&self, name: &str) -> Result<(), UnitActionError> {
+        let u = if let Some(unit) = self.db.units_get(name) {
+            unit
+        } else {
+            return Err(UnitActionError::UnitActionENoent);
+        };
+
+        if u.load_state() != UnitLoadState::UnitLoaded {
+            log::error!("related service unit: {} is not loaded", name);
+            return Err(UnitActionError::UnitActionENoent);
+        }
+
+        if u.activeted() {
+            return Err(UnitActionError::UnitActionEBusy);
+        }
+
+        return Ok(());
+    }
+
+    pub fn register(&self, source: Rc<dyn Source>) {
+        self.events.add_source(source).unwrap();
+    }
+
+    pub fn enable(&self, source: Rc<dyn Source>, state: EventState) {
+        self.events.set_enabled(source, state).unwrap();
+    }
+
+    pub fn unregister(&self, source: Rc<dyn Source>) {
+        self.events.del_source(source).unwrap();
+    }
+
+    // check if there is already a stop job in process
+    pub fn has_stop_job(&self, name: &str) -> bool {
+        let u = if let Some(unit) = self.db.units_get(name) {
+            unit
+        } else {
+            return false;
+        };
+
+        self.jm.has_stop_job(&u)
+    }
+
+    // return the fds that trigger the unit {name};
+    pub fn collect_socket_fds(&self, name: &str) -> Vec<i32> {
+        let deps = self.db.dep_gets(name, UnitRelations::UnitTriggeredBy);
+        let mut fds = Vec::new();
+        for dep in deps.iter() {
+            if dep.unit_type() != UnitType::UnitSocket {
+                continue;
+            }
+
+            fds.extend(dep.collect_fds())
+        }
+
+        fds
+    }
+
+    // check the unit that will be triggerd by {name} is in active or activating state
+    pub fn relation_active_or_pending(&self, name: &str) -> bool {
+        let deps = self.db.dep_gets(name, UnitRelations::UnitTriggers);
+        let mut pending: bool = false;
+        for dep in deps.iter() {
+            if dep.active_or_activating() {
+                pending = true;
+                break;
+            }
+        }
+
+        pending
+    }
+
+    pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         if let Some(unit) = self.load_unit(name) {
             log::debug!("load unit success, send to job manager");
             self.jm.exec(
@@ -117,6 +192,7 @@ impl UnitManager {
                 JobMode::JobReplace,
                 &mut JobAffect::new(false),
             )?;
+            log::debug!("job exec success");
             Ok(())
         } else {
             return Err(MngErrno::MngErrInternel);
@@ -145,6 +221,7 @@ impl UnitManager {
             rt: Rc::clone(&_rt),
             jm: JobManager::new(&_db, eventr),
             exec: ExecSpawn::new(),
+            events: eventr.clone(),
         });
         um.load.set_um(&um);
         um
@@ -201,10 +278,10 @@ pub trait UnitSubClass: UnitObj + UnitMngUtil {
 // #[macro_use]
 // use crate::unit_name_to_type;
 //unitManger composition of units with hash map
-
 #[macro_export]
 macro_rules! declure_unitobj_plugin {
     ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {
+        // method for create the unit instance
         #[no_mangle]
         pub fn __unit_obj_create() -> *mut dyn $crate::manager::UnitSubClass {
             logger::init_log_with_default($name, $level);
