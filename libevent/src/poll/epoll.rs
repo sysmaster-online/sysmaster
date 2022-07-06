@@ -40,8 +40,12 @@ impl Epoll {
                 events.capacity() as i32,
                 timeout,
             ));
-            unsafe {
-                events.set_len(n_ready.unwrap() as usize);
+
+            match n_ready {
+                Ok(n_ready) => unsafe {
+                    events.set_len(n_ready as usize);
+                },
+                Err(e) => return Err(e),
             }
         }
         Ok(events)
