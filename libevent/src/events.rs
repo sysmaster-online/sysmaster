@@ -3,13 +3,14 @@
 use crate::timer::Timer;
 use crate::{EventState, EventType, Poll, Signals, Source};
 
+use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, InotifyEvent, WatchDescriptor};
+use nix::NixPath;
 use utils::Error;
 use utils::Result;
 
 use std::cell::RefCell;
 use std::collections::{BinaryHeap, HashMap};
 use std::convert::TryInto;
-use std::fmt::Debug;
 use std::mem::MaybeUninit;
 use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::rc::Rc;
@@ -29,37 +30,32 @@ impl Events {
         })
     }
 
-    /// add source which implement Source trait
+    /// for all: add source which implement Source trait
     pub fn add_source(&self, source: Rc<dyn Source>) -> Result<i32> {
         self.data.borrow_mut().add_source(source)
     }
 
-    /// delete source
+    /// for all: delete source
     pub fn del_source(&self, source: Rc<dyn Source>) -> Result<i32> {
         self.data.borrow_mut().del_source(source)
     }
 
-    /// set the source state
+    /// for all: set the source enabled state
     pub fn set_enabled(&self, source: Rc<dyn Source>, state: EventState) -> Result<i32> {
         self.data.borrow_mut().set_enabled(source, state)
     }
 
-    /// read the signal content when signal source emit
-    pub fn read_signals(&self) -> std::io::Result<Option<libc::siginfo_t>> {
-        self.data.borrow_mut().read_signals()
-    }
-
-    /// exit event loop
+    /// for all: exit event loop
     pub fn set_exit(&self) {
         self.data.borrow_mut().set_exit()
     }
 
-    /// current time
+    /// for all: current time
     pub fn now() {
         todo!();
     }
 
-    /// Scheduling once, processing an event
+    /// for all: Scheduling once, processing an event
     pub fn run(&self, timeout: i32) -> Result<i32> {
         if self.data.borrow().exit() {
             return Ok(0);
@@ -73,7 +69,7 @@ impl Events {
         Ok(0)
     }
 
-    /// Process the event in a loop until exiting actively
+    /// for all: Process the event in a loop until exiting actively
     pub fn rloop(&self) -> Result<i32> {
         loop {
             if let true = self.data.borrow().exit() {
@@ -83,7 +79,7 @@ impl Events {
         }
     }
 
-    /// Fetch the highest priority event processing on the pending queue
+    /// private: Fetch the highest priority event processing on the pending queue
     fn dispatch(&self) -> Result<i32> {
         if let true = self.data.borrow().exit() {
             return Ok(0);
@@ -115,6 +111,26 @@ impl Events {
 
         Ok(0)
     }
+
+    /// for signal: read the signal content when signal source emit
+    pub fn read_signals(&self) -> std::io::Result<Option<libc::siginfo_t>> {
+        self.data.borrow_mut().read_signals()
+    }
+
+    /// for inotify: add watch point to inotify event
+    pub fn add_watch<P: ?Sized + NixPath>(&self, path: &P, mask: AddWatchFlags) -> WatchDescriptor {
+        self.data.borrow_mut().add_watch(path, mask)
+    }
+
+    /// for inotify: rm watch point to inotify event
+    pub fn rm_watch(&self, wd: WatchDescriptor) {
+        self.data.borrow_mut().rm_watch(wd);
+    }
+
+    /// for inotify: read the inotify event when dispatch
+    pub fn read_events(&self) -> Vec<InotifyEvent> {
+        self.data.borrow_mut().read_events()
+    }
 }
 
 #[derive(Debug)]
@@ -132,6 +148,7 @@ pub(crate) struct EventsData {
     timerfd: HashMap<EventType, RawFd>,
     signal: Signals,
     timer: Timer,
+    inotify: Inotify,
 }
 
 // the declaration "pub(self)" is for identification only.
@@ -151,6 +168,7 @@ impl EventsData {
             timerfd: HashMap::new(),
             signal: Signals::new(),
             timer: Timer::new(),
+            inotify: Inotify::init(InitFlags::IN_CLOEXEC | InitFlags::IN_NONBLOCK).unwrap(),
         }
     }
 
@@ -158,7 +176,11 @@ impl EventsData {
         let et = source.event_type();
         let token = source.token();
         match et {
-            EventType::Io | EventType::Pidfd | EventType::Signal | EventType::Child => {
+            EventType::Io
+            | EventType::Pidfd
+            | EventType::Signal
+            | EventType::Child
+            | EventType::Inotify => {
                 self.sources.insert(token, source.clone());
             }
             EventType::Defer => {
@@ -176,7 +198,6 @@ impl EventsData {
             | EventType::TimerRealtimeAlarm
             | EventType::TimerBoottimeAlarm => (),
             // todo: implement
-            EventType::Inotify => todo!(),
             EventType::Watchdog => todo!(),
         }
 
@@ -193,7 +214,11 @@ impl EventsData {
         let s = source;
         let token = s.token();
         match t {
-            EventType::Io | EventType::Pidfd | EventType::Signal | EventType::Child => {
+            EventType::Io
+            | EventType::Pidfd
+            | EventType::Signal
+            | EventType::Child
+            | EventType::Inotify => {
                 self.sources.remove(&token);
             }
             EventType::Defer => {
@@ -217,7 +242,6 @@ impl EventsData {
             | EventType::TimerRealtimeAlarm
             | EventType::TimerBoottimeAlarm => (),
             // todo: implement
-            EventType::Inotify => todo!(),
             EventType::Watchdog => todo!(),
         }
 
@@ -286,7 +310,9 @@ impl EventsData {
             EventType::Defer => {
                 self.pending.push(source.clone());
             }
-            EventType::Inotify => todo!(),
+            EventType::Inotify => {
+                self.poller.register(self.inotify.as_raw_fd(), &mut event)?;
+            }
             EventType::Post => todo!(),
             EventType::Exit => todo!(),
             EventType::Watchdog => todo!(),
@@ -325,7 +351,9 @@ impl EventsData {
                     }
                 }
             }
-            EventType::Inotify => todo!(),
+            EventType::Inotify => {
+                self.poller.unregister(self.inotify.as_raw_fd())?;
+            }
             EventType::Defer => (),
             EventType::Post => todo!(),
             EventType::Exit => todo!(),
@@ -345,6 +373,23 @@ impl EventsData {
     /// read the signal content when signal source emit
     pub(self) fn read_signals(&mut self) -> std::io::Result<Option<libc::siginfo_t>> {
         self.signal.read_signals()
+    }
+
+    /// add watch point to inotify event
+    pub(self) fn add_watch<P: ?Sized + NixPath>(
+        &self,
+        path: &P,
+        mask: AddWatchFlags,
+    ) -> WatchDescriptor {
+        self.inotify.add_watch(path, mask).unwrap()
+    }
+
+    pub(self) fn rm_watch(&self, wd: WatchDescriptor) {
+        self.inotify.rm_watch(wd).unwrap();
+    }
+
+    pub(self) fn read_events(&self) -> Vec<InotifyEvent> {
+        self.inotify.read_events().unwrap()
     }
 
     /// Wait for the event event through poller

@@ -12,7 +12,5 @@ name = "event"
 
 [dependencies]
 libc = { version = "0.2" }
+nix = { version = "0.24" }
 utils = { path = "../libutils" }
-
-[dev-dependencies]
-nix = "0.23"
