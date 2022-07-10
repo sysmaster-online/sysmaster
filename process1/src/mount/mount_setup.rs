@@ -1,0 +1,389 @@
+use bitflags::bitflags;
+use nix::{
+    errno::Errno,
+    fcntl::{AtFlags, OFlag},
+    mount::MsFlags,
+    sys::stat::Mode,
+    unistd::AccessFlags,
+};
+use std::{collections::HashMap, error::Error, fs, path::Path};
+use utils::{fs_util, mount_util, path_util, proc_cmdline};
+
+use cgroup::{self, CgType};
+
+const EARLY_MOUNT_NUM: u8 = 4;
+const CGROUP_ROOT: &str = "/sys/fs/cgroup/";
+
+type Callback = fn() -> bool;
+
+lazy_static! {
+    static ref MOUNT_TABLE: Vec<MountPoint> = {
+        let mut table: Vec<MountPoint> = Vec::new();
+        // table.push(MountPoint {
+        //     source: String::from("proc"),
+        //     target: String::from("/test"),
+        //     fs_type: String::from("proc"),
+        //     options: None,
+        //     flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+        //     callback: Some(cg_unified_wanted),
+        //     mode: MountMode::MNT_FATAL
+        // });
+        // table.push(MountPoint {
+        //     source: String::from("sysfs"),
+        //     target: String::from("/sys"),
+        //     fs_type: String::from("sysfs"),
+        //     options: None,
+        //     flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+        // });
+        // table.push(MountPoint {
+        //     source: String::from("devtmpfs"),
+        //     target: String::from("/dev"),
+        //     fs_type: String::from("devtmpfs"),
+        //     options: Some("mode=755,size=4m,nr_inodes=64K".to_string()),
+        //     flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_STRICTATIME,
+        // });
+        // table.push(MountPoint {
+        //     source: String::from("securityfs"),
+        //     target: String::from("/sys/kernel/security"),
+        //     fs_type: String::from("securityfs"),
+        //     options: None,
+        //     flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+        // });
+        // table.push(MountPoint {
+        //     source: String::from("tmpfs"),
+        //     target: String::from("/dev/shm"),
+        //     fs_type: String::from("tmpfs"),
+        //     options: Some("1777".to_string()),
+        //     flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+        // });
+        table.push(MountPoint {
+            source: String::from("cgroup2"),
+            target: String::from("/sys/fs/cgroup"),
+            fs_type: String::from("cgroup2"),
+            options: Some("nsdelegate".to_string()),
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+            callback: Some(cg_unified_wanted),
+            mode: MountMode::MNT_WRITABLE,
+        });
+        table.push(MountPoint {
+            source: String::from("cgroup2"),
+            target: String::from("/sys/fs/cgroup"),
+            fs_type: String::from("cgroup2"),
+            options: None,
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+            callback: Some(cg_unified_wanted),
+            mode: MountMode::MNT_WRITABLE,
+        });
+
+        table.push(MountPoint {
+            source: String::from("tmpfs"),
+            target: String::from("/sys/fs/cgroup"),
+            fs_type: String::from("tmpfs"),
+            options: Some("mode=755".to_string()),
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV| MsFlags::MS_STRICTATIME,
+            callback: Some(cg_legacy_wanted),
+            mode: MountMode::MNT_FATAL,
+        });
+        table.push(MountPoint {
+            source: String::from("cgroup2"),
+            target: String::from("/sys/fs/cgroup/unified"),
+            fs_type: String::from("cgroup2"),
+            options: Some("nsdelegate".to_string()),
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+            callback: Some(cg_unifiedv1_wanted),
+            mode: MountMode::MNT_WRITABLE,
+        });
+        table.push(MountPoint {
+            source: String::from("cgroup2"),
+            target: String::from("/sys/fs/cgroup/unified"),
+            fs_type: String::from("cgroup2"),
+            options: None,
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+            callback: Some(cg_unifiedv1_wanted),
+            mode: MountMode::MNT_WRITABLE,
+        });
+        table.push(MountPoint {
+            source: String::from("cgroup"),
+            target: String::from("/sys/fs/cgroup/process1"),
+            fs_type: String::from("cgroup"),
+            options: Some("none,name=process1".to_string()),
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+            callback: Some(cg_legacy_wanted),
+            mode: MountMode::MNT_WRITABLE,
+        });
+
+        table
+    };
+}
+
+bitflags! {
+    pub struct MountMode: u8 {
+        const MNT_NONE = 0;
+        const MNT_FATAL = 1 << 0;
+        const MNT_WRITABLE = 1 << 1;
+    }
+}
+
+struct MountPoint {
+    source: String,
+    target: String,
+    fs_type: String,
+    options: Option<String>,
+    flags: MsFlags,
+    callback: Option<Callback>,
+    mode: MountMode,
+}
+
+impl MountPoint {
+    fn new(
+        source: String,
+        target: String,
+        fs_type: String,
+        options: Option<String>,
+        flags: MsFlags,
+    ) -> MountPoint {
+        MountPoint {
+            source,
+            target,
+            fs_type,
+            options,
+            flags,
+            callback: None,
+            mode: MountMode::MNT_NONE,
+        }
+    }
+
+    fn set_target(&mut self, target: &str) {
+        self.target = target.to_string();
+    }
+
+    fn mount(&self) -> Result<(), Errno> {
+        if self.callback.is_some() && !self.callback.unwrap()() {
+            log::debug!("callback is not satified");
+            return Ok(());
+        }
+
+        log::debug!("check valid mount point: {}", self.target.to_string());
+        match self.invalid_mount_point(AtFlags::AT_SYMLINK_FOLLOW) {
+            Ok(v) => {
+                if v {
+                    log::debug!("invalid mount point");
+                    return Ok(());
+                }
+            }
+            Err(e) => {
+                log::debug!("invalid mount point errno: {}", e);
+                if e != Errno::ENOENT && self.mode.contains(MountMode::MNT_FATAL) {
+                    return Err(e);
+                }
+            }
+        }
+
+        log::debug!("create target dir: {}", self.target.to_string());
+        fs::create_dir_all(self.target.to_string()).map_err(|_e| Errno::EINVAL)?;
+
+        let source = self.source.as_str();
+        let target = self.target.as_str();
+        let fs_type = self.fs_type.as_str();
+
+        let options = if self.options.is_none() {
+            None
+        } else {
+            Some(self.options.as_ref().unwrap().as_str())
+        };
+
+        log::debug!(
+            "mount source: {}, target: {}, type:{}, flags:{:?}, options: {:?}",
+            source,
+            target,
+            fs_type,
+            self.flags,
+            options
+        );
+        nix::mount::mount(Some(source), target, Some(fs_type), self.flags, options)?;
+
+        if let Err(e) = nix::unistd::access(target, AccessFlags::W_OK) {
+            nix::mount::umount(target)?;
+            fs::remove_dir(Path::new(target));
+
+            return Err(e);
+        }
+
+        Ok(())
+    }
+
+    fn invalid_mount_point(&self, flags: AtFlags) -> Result<bool, Errno> {
+        if path_util::path_equal(&self.target, "/") {
+            return Ok(true);
+        }
+
+        // todo!()
+        // symlink
+
+        let path = Path::new(&self.target);
+        let ret = fs_util::open_parent(
+            path,
+            OFlag::O_PATH | OFlag::O_CLOEXEC,
+            Mode::from_bits(0).unwrap(),
+        )?;
+
+        let last_file_name = path.file_name().unwrap_or_default();
+
+        let ret = mount_util::mount_point_fd_valid(ret, last_file_name.to_str().unwrap(), flags)?;
+
+        Ok(ret)
+    }
+}
+
+// mount the minimal mount point for enable the most basic function
+pub fn mount_setup_early() -> Result<(), Errno> {
+    for i in 0..EARLY_MOUNT_NUM {
+        MOUNT_TABLE[i as usize].mount()?;
+    }
+
+    Ok(())
+}
+
+// mount the point of all the mount_table
+pub fn mount_setup() -> Result<(), Errno> {
+    for i in 0..MOUNT_TABLE.len() {
+        MOUNT_TABLE[i as usize].mount()?;
+    }
+
+    Ok(())
+}
+
+// mount all the cgroup controller subsystem
+pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
+    if !cg_legacy_wanted() {
+        return Ok(());
+    }
+
+    let mut controllers = cgroup::cg_controllers()?;
+    let mut index = 0 as usize;
+
+    while index < controllers.len() {
+        let mut m_point = MountPoint::new(
+            "cgroup".to_string(),
+            "".to_string(),
+            "cgroup".to_string(),
+            None,
+            MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+        );
+
+        let pair_con = pair_controller(&controllers[index]);
+        let mut pair = false;
+
+        let (target, other) = if let Some(con) = pair_con {
+            pair = true;
+            for idx in index..controllers.len() {
+                if controllers[idx] == con {
+                    controllers.remove(idx);
+                    break;
+                }
+            }
+            (format!("{},{}", controllers[index], con), con.to_string())
+        } else {
+            (controllers[index].to_string(), "".to_string())
+        };
+
+        let target = CGROUP_ROOT.to_string() + &target;
+        m_point.set_target(&target);
+        m_point.mount()?;
+
+        if pair {
+            symlink_controller(target.to_string(), other);
+            symlink_controller(target.to_string(), controllers[index].to_string());
+        }
+
+        index = index + 1;
+    }
+
+    nix::mount::mount(
+        Some("tmpfs"),
+        CGROUP_ROOT,
+        Some("tmpfs"),
+        MsFlags::MS_REMOUNT
+            | MsFlags::MS_NOSUID
+            | MsFlags::MS_NOEXEC
+            | MsFlags::MS_NODEV
+            | MsFlags::MS_STRICTATIME
+            | MsFlags::MS_RDONLY,
+        Some("mode=755,size=4m,nr_inodes=1k"),
+    )?;
+
+    Ok(())
+}
+
+// return the pair controller which will join with the original controller
+fn pair_controller(controller: &str) -> Option<String> {
+    let mut pairs = HashMap::new();
+    pairs.insert("cpu", "cpuacct");
+    pairs.insert("net_cls", "net_prio");
+
+    for (key, val) in pairs {
+        if controller == key {
+            return Some(val.to_string());
+        }
+
+        if controller == val {
+            return Some(key.to_string());
+        }
+    }
+
+    None
+}
+
+fn symlink_controller(source: String, alias: String) -> Result<(), Errno> {
+    let target = CGROUP_ROOT.to_string() + &alias;
+    fs_util::symlink(&source, &target, false)?;
+    Ok(())
+}
+
+fn cg_unified_wanted() -> bool {
+    let cg_ver = cgroup::cg_type();
+
+    if cg_ver.is_ok() {
+        return cg_ver.unwrap() == CgType::UnifiedV2;
+    }
+
+    let ret = proc_cmdline::proc_cmdline_get_bool("process1.unified_cgroup_hierarchy");
+    if ret.is_ok() {
+        return ret.unwrap();
+    }
+
+    let ret = proc_cmdline::cmdline_get_value("cgroup_no_v1");
+    if ret.is_ok() {
+        let val = ret.unwrap();
+        if val.is_some() && val.unwrap() == "all" {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn cg_legacy_wanted() -> bool {
+    let cg_ver = cgroup::cg_type();
+
+    if cg_ver.is_ok() {
+        return cg_ver.unwrap() != CgType::UnifiedV2;
+    }
+
+    true
+}
+
+fn cg_unifiedv1_wanted() -> bool {
+    let cg_ver = cgroup::cg_type();
+
+    if cg_ver.is_ok() {
+        return cg_ver.unwrap() != CgType::UnifiedV2;
+    }
+
+    let ret = proc_cmdline::proc_cmdline_get_bool("process1.unified_v1_controller");
+    if ret.is_ok() {
+        return ret.unwrap();
+    }
+
+    false
+}

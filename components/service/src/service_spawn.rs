@@ -36,7 +36,7 @@ impl ServiceSpawn {
         if ec_flags.contains(ExecFlags::PASS_FDS) {
             params.insert_fds(self.collect_socket_fds());
         }
-
+        log::debug!("begin to exec spawn");
         match um.exec_spawn(&unit, cmdline, &params) {
             Ok(pid) => {
                 um.child_watch_pid(pid, unit.get_id());

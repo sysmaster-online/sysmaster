@@ -1,3 +1,5 @@
+use crate::CgType;
+
 use super::CgFlags;
 use super::CgroupErr;
 use nix::sys::signal::Signal;
@@ -6,25 +8,22 @@ use nix::sys::statfs::CGROUP2_SUPER_MAGIC;
 use nix::sys::statfs::CGROUP_SUPER_MAGIC;
 use nix::sys::statfs::TMPFS_MAGIC;
 use nix::unistd::Pid;
+use regex::Regex;
 use std::collections::HashSet;
 use std::fs;
+use std::fs::File;
+use std::io;
 use std::io::{BufRead, BufReader};
+use std::io::{Error as IOError, ErrorKind};
 use std::path::PathBuf;
+
 use utils::IN_SET;
 
 const CG_BASE_DIR: &str = "/sys/fs/cgroup";
 const CG_UNIFIED_DIR: &str = "/sys/fs/cgroup/unified";
 const CG_V1_DIR: &str = "/sys/fs/cgroup/process1";
 
-#[derive(Debug)]
-enum CgType {
-    None,
-    UnifiedV1,
-    UnifiedV2,
-    Legacy,
-}
-
-fn cg_type() -> Result<CgType, CgroupErr> {
+pub fn cg_type() -> Result<CgType, CgroupErr> {
     // 查询cgroup的版本类型
     let stat = if let Ok(s) = statfs(CG_BASE_DIR) {
         s
@@ -98,9 +97,8 @@ pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<(), CgroupErr> {
 }
 
 pub fn cg_create(cg_path: &PathBuf) -> Result<(), CgroupErr> {
+    log::debug!("cgroup create path {:?}", cg_path);
     let abs_cg_path: PathBuf = cg_abs_path(cg_path, &PathBuf::from(""))?;
-
-    log::debug!("cgroup create path {:?}", abs_cg_path.clone());
     fs::create_dir_all(abs_cg_path.clone()).map_err(|e| CgroupErr::IoError(e))?;
 
     Ok(())
@@ -112,7 +110,9 @@ pub fn cg_escape(id: &str) -> &str {
 }
 
 fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>, CgroupErr> {
+    log::debug!("cg_path is: {:?}", cg_path);
     let path = cg_abs_path(cg_path, &PathBuf::from(item))?;
+    log::debug!("get pids from path: {:?}", path);
     let file = fs::OpenOptions::new()
         .read(true)
         .open(path)
@@ -235,6 +235,43 @@ pub fn cg_kill_recursive(
     Ok(())
 }
 
+pub fn cg_controllers() -> Result<Vec<String>, IOError> {
+    let file = match File::open("/proc/cgroups") {
+        Err(why) => {
+            return Err(IOError::new(
+                ErrorKind::Other,
+                format!("Error: Open file failed detail {}{}!", why, "/proc/cgroups"),
+            ))
+        }
+        Ok(file) => file,
+    };
+
+    let lines = io::BufReader::new(file).lines();
+    let var_regex = Regex::new(r"([a-zA-Z_]+)\s+(\d+)\s+(\d+)\s+(\d+)").unwrap();
+    let mut controllers = Vec::new();
+
+    lines.for_each(|tmp| {
+        if let Ok(line) = tmp {
+            let cap = var_regex.captures(&line);
+            if let Some(cap) = cap {
+                let match_result = {
+                    if let Some(mat) = cap.get(1) {
+                        Some(mat.as_str())
+                    } else {
+                        None
+                    }
+                };
+
+                if let Some(val) = match_result {
+                    controllers.push(val.to_string());
+                }
+            }
+        }
+    });
+
+    Ok(controllers)
+}
+
 mod tests {
     #[test]
     fn test_cg_create() {
@@ -277,5 +314,16 @@ mod tests {
     #[test]
     fn test_cg_file_type() {
         println!("file type is {:?}", super::cg_type());
+    }
+
+    #[test]
+    fn test_cg_controllers() {
+        let ret = super::cg_controllers();
+
+        assert_ne!(ret.is_err(), true);
+
+        for c in ret.unwrap() {
+            println!("cgroup controller: {}", c);
+        }
     }
 }

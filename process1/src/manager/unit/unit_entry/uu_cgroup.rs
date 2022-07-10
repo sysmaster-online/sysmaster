@@ -50,6 +50,7 @@ impl UnitCgroupData {
     }
 
     fn set_default_cg_path(&mut self, id: &str) {
+        log::debug!("**************Setting default cg path: {}", id);
         let cg_tree_name = PathBuf::from(cgroup::cg_escape(id));
 
         self.cg_path = cg_tree_name;

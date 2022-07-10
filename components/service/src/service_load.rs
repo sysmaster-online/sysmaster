@@ -38,6 +38,7 @@ impl ServiceLoad {
     }
 
     pub(super) fn parse(&self, service_conf: ServiceConf) -> Result<(), Box<dyn Error>> {
+        self.config.set_conf(&service_conf);
         let update_exec_command = |command_type: ServiceCommand| {
             let commands: Option<Vec<String>> = match command_type {
                 ServiceCommand::Condition => service_conf.get_exec_condition(),
@@ -57,7 +58,7 @@ impl ServiceLoad {
                     }
                 }
             } else {
-                return Err(format!("config opton is error, value cannot be null").into());
+                return Ok(());
             }
         };
 

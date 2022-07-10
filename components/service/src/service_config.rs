@@ -72,7 +72,7 @@ impl ServiceConfig {
         }
     }
 
-    pub(super) fn set_conf(&self, conf: ServiceConf) {
+    pub(super) fn set_conf(&self, conf: &ServiceConf) {
         self.data.borrow_mut().set_conf(conf)
     }
 
@@ -111,8 +111,8 @@ impl ServiceConfigData {
         }
     }
 
-    pub(self) fn set_conf(&mut self, conf: ServiceConf) {
-        self.conf.replace(conf);
+    pub(self) fn set_conf(&mut self, conf: &ServiceConf) {
+        self.conf.replace(*conf);
     }
 
     pub(self) fn set(&mut self, item: ServiceConfigItem) {
