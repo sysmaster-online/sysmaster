@@ -204,7 +204,7 @@ impl MountPoint {
 
         if let Err(e) = nix::unistd::access(target, AccessFlags::W_OK) {
             nix::mount::umount(target)?;
-            fs::remove_dir(Path::new(target));
+            fs::remove_dir(Path::new(target)).map_err(|_e| Errno::EBUSY)?;
 
             return Err(e);
         }
@@ -292,8 +292,24 @@ pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
         m_point.mount()?;
 
         if pair {
-            symlink_controller(target.to_string(), other);
-            symlink_controller(target.to_string(), controllers[index].to_string());
+            symlink_controller(target.to_string(), other.to_string()).map_err(|e| {
+                format!(
+                    "create symlink  from {} to {} error: {}",
+                    target.to_string(),
+                    other,
+                    e
+                )
+            })?;
+            symlink_controller(target.to_string(), controllers[index].to_string()).map_err(
+                |e| {
+                    format!(
+                        "create symlink  from {} to {} error: {}",
+                        target.to_string(),
+                        controllers[index].to_string(),
+                        e
+                    )
+                },
+            )?;
         }
 
         index = index + 1;

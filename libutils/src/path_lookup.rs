@@ -1,5 +1,3 @@
-use std::env;
-
 use crate::env_cargo;
 
 const ETC_SYSTEM_PATH: &str = "/etc/process1/system";

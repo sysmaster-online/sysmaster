@@ -19,12 +19,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     //     format!("failed to mount early mount point, errno: {}", e)
     // })?;
 
-    // mount_setup::mount_setup().map_err(|e| {
-    //     log::error!("failed to mount mount point, errno: {}", e);
-    //     format!("failed to mount mount point, errno: {}", e)
-    // })?;
+    mount_setup::mount_setup().map_err(|e| {
+        log::error!("failed to mount mount point, errno: {}", e);
+        format!("failed to mount mount point, errno: {}", e)
+    })?;
 
-    // initialize_runtime()?;
+    initialize_runtime()?;
 
     let manager = ManagerX::new(MODE, ACTION);
     manager.startup().unwrap();
