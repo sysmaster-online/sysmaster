@@ -57,7 +57,7 @@ impl ServiceLoad {
                     }
                 }
             } else {
-                return Err(format!("config opton is error, value cannot be null").into());
+                return Ok(());
             }
         };
 

@@ -37,6 +37,7 @@ use std::str::FromStr;
 use std::sync::RwLock;
 use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
 use std::{env, io};
+use utils::env_cargo;
 use walkdir::{DirEntry, WalkDir};
 
 const LIB_PLUGIN_PATH: &str = "/usr/lib/process1/plugin/";
@@ -72,21 +73,17 @@ impl Plugin {
 
     fn get_unit_type_lib_map() -> String {
         let mut buf = String::with_capacity(256);
-        let out_dir = env::var("OUT_DIR");
-        let lib_path_str = out_dir.unwrap_or_else(|_| {
-            let ld_path = env::var("LD_LIBRARY_PATH").unwrap();
-            let _tmp = ld_path.split(":").collect::<Vec<_>>()[0];
-            return _tmp.to_string();
-        });
 
-        let _tmp: Vec<_> = lib_path_str.split("build").collect();
+        let conf_file = if let Ok(p) = env_cargo::env_path() {
+            format!("{}/conf/plugin.conf", p)
+        } else {
+            format!("{}/plugin.conf", LIB_PLUGIN_PATH)
+        };
 
-        let mut conf_file = format!("{}/plugin.conf", LIB_PLUGIN_PATH);
-        let mut path = Path::new(&conf_file);
+        let path = Path::new(&conf_file);
         if !path.exists() {
-            conf_file = format!("{}/conf/plugin.conf", _tmp[0]);
             log::debug!("{}", conf_file);
-            path = Path::new(&conf_file);
+            return String::new();
         }
 
         let display = path.display();

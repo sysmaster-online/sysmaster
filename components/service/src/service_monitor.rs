@@ -41,8 +41,8 @@ impl ServiceMonitorData {
     }
 
     pub(self) fn start_action(&mut self) {
-        if let ServiceConfigItem::ScItemWatchdogSec(Some(wd_sec)) =
-            self.config.get(&ServiceConfigItem::ScItemWatchdogSec(None))
+        if let ServiceConfigItem::ScItemWatchdogSec(wd_sec) =
+            self.config.get(&ServiceConfigItem::ScItemWatchdogSec(0))
         {
             self.watchdog_original_usec = wd_sec;
         }

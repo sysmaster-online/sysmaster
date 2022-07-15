@@ -56,8 +56,8 @@ pub(super) struct ServiceConf {
 
 pub(super) enum ServiceConfigItem {
     ScItemType(ServiceType),
-    ScItemRestartSec(Option<u64>),
-    ScItemWatchdogSec(Option<u64>),
+    ScItemRestartSec(u64),
+    ScItemWatchdogSec(u64),
     ScItemBusName(Option<String>),
 }
 
@@ -70,10 +70,6 @@ impl ServiceConfig {
         ServiceConfig {
             data: RefCell::new(ServiceConfigData::new()),
         }
-    }
-
-    pub(super) fn set_conf(&self, conf: ServiceConf) {
-        self.data.borrow_mut().set_conf(conf)
     }
 
     pub(super) fn set(&self, item: ServiceConfigItem) {
@@ -98,7 +94,10 @@ impl ServiceConfig {
 }
 
 struct ServiceConfigData {
-    conf: Option<ServiceConf>,
+    service_type: ServiceType,
+    restart_sec: u64,
+    watchdog_sec: u64,
+    bus_name: Option<String>,
     exec_commands: HashMap<ServiceCommand, Vec<Rc<ExecCommand>>>, // key: ServiceCommand, value: commands
 }
 
@@ -106,30 +105,28 @@ struct ServiceConfigData {
 impl ServiceConfigData {
     pub(self) fn new() -> ServiceConfigData {
         ServiceConfigData {
-            conf: None,
+            service_type: ServiceType::default(),
             exec_commands: HashMap::new(),
+            restart_sec: 0,
+            watchdog_sec: 0,
+            bus_name: None,
         }
-    }
-
-    pub(self) fn set_conf(&mut self, conf: ServiceConf) {
-        self.conf.replace(conf);
     }
 
     pub(self) fn set(&mut self, item: ServiceConfigItem) {
         match item {
             ServiceConfigItem::ScItemType(st) => {
-                self.conf.as_mut().unwrap().set_service_type(st);
+                self.service_type = st;
             }
-            ServiceConfigItem::ScItemRestartSec(Some(rs_sec)) => {
-                self.conf.as_mut().unwrap().set_restart_sec(rs_sec);
+            ServiceConfigItem::ScItemRestartSec(rs_sec) => {
+                self.restart_sec = rs_sec;
             }
-            ServiceConfigItem::ScItemWatchdogSec(Some(wd_sec)) => {
-                self.conf.as_mut().unwrap().set_watchdog_sec(wd_sec);
+            ServiceConfigItem::ScItemWatchdogSec(wd_sec) => {
+                self.watchdog_sec = wd_sec;
             }
-            ServiceConfigItem::ScItemBusName(Some(bus_name)) => {
-                self.conf.as_mut().unwrap().set_bus_name(bus_name);
+            ServiceConfigItem::ScItemBusName(bus_name) => {
+                self.bus_name = bus_name;
             }
-            _ => unreachable!("not supported!"),
         }
     }
 
@@ -139,33 +136,21 @@ impl ServiceConfigData {
 
     pub(self) fn get(&self, item: &ServiceConfigItem) -> ServiceConfigItem {
         match item {
-            ServiceConfigItem::ScItemType(_) => ServiceConfigItem::ScItemType(
-                self.conf
-                    .as_ref()
-                    .map_or_else(|| ServiceType::default(), |_c| _c.get_service_type()),
-            ),
-            ServiceConfigItem::ScItemRestartSec(_) => ServiceConfigItem::ScItemRestartSec(
-                self.conf
-                    .as_ref()
-                    .map_or_else(|| None, |_c| _c.get_restart_sec()),
-            ),
-            ServiceConfigItem::ScItemWatchdogSec(_) => ServiceConfigItem::ScItemWatchdogSec(
-                self.conf
-                    .as_ref()
-                    .map_or_else(|| None, |_c| _c.get_watchdog_sec()),
-            ),
-            ServiceConfigItem::ScItemBusName(_) => ServiceConfigItem::ScItemBusName(
-                self.conf
-                    .as_ref()
-                    .map_or_else(|| None, |_c| _c.get_bus_name()),
-            ),
+            ServiceConfigItem::ScItemType(_) => ServiceConfigItem::ScItemType(self.service_type),
+            ServiceConfigItem::ScItemRestartSec(_) => {
+                ServiceConfigItem::ScItemRestartSec(self.restart_sec)
+            }
+            ServiceConfigItem::ScItemWatchdogSec(_) => {
+                ServiceConfigItem::ScItemWatchdogSec(self.watchdog_sec)
+            }
+            ServiceConfigItem::ScItemBusName(_) => {
+                ServiceConfigItem::ScItemBusName(self.bus_name.as_ref().map(|s| s.to_string()))
+            }
         }
     }
 
     pub(self) fn service_type(&self) -> ServiceType {
-        self.conf
-            .as_ref()
-            .map_or_else(|| ServiceType::default(), |_c| _c.get_service_type())
+        self.service_type
     }
 
     pub(self) fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Vec<Rc<ExecCommand>> {

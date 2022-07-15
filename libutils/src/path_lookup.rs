@@ -1,4 +1,4 @@
-use std::env;
+use crate::env_cargo;
 
 const ETC_SYSTEM_PATH: &str = "/etc/process1/system";
 const LIB_SYSTEM_PATH: &str = "/usr/lib/process1/system";
@@ -24,21 +24,15 @@ impl LookupPaths {
     }
 
     pub fn init_lookup_paths(&mut self) {
-        let devel_path = || {
-            let out_dir = env::var("OUT_DIR");
-            out_dir
-        };
-        let _tmp_lib_path = devel_path();
-        let out_dir = _tmp_lib_path.unwrap_or_else(|_x| {
-            let ld_path = env::var("LD_LIBRARY_PATH").unwrap();
-            let _tmp = ld_path.split(":").collect::<Vec<_>>()[0];
-            let _tmp_path = _tmp.split("target").collect::<Vec<_>>()[0];
-            return _tmp_path.to_string();
-        });
         self.search_path.push(ETC_SYSTEM_PATH.to_string());
         self.search_path.push(LIB_SYSTEM_PATH.to_string());
-        let tmp_str: Vec<_> = out_dir.split("build").collect();
-        self.search_path.push(format!("{}", tmp_str[0]));
+
+        let env_path = env_cargo::env_path();
+        if env_path.is_err() {
+            log::debug!("{:?}", env_path);
+            return;
+        }
+        self.search_path.push(format!("{}", env_path.unwrap()));
     }
 }
 

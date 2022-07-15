@@ -23,7 +23,12 @@ fn main() {
     let unit_name = String::from("config.service");
 
     {
-        manager.start_unit(&unit_name).unwrap();
+        match manager.start_unit(&unit_name) {
+            Ok(_) => {}
+            Err(e) => {
+                println!("start error: {:?}", e)
+            }
+        }
     }
     log::debug!("event runing");
 }

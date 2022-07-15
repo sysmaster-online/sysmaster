@@ -12,6 +12,14 @@ bitflags! {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum CgType {
+    None,
+    UnifiedV1,
+    UnifiedV2,
+    Legacy,
+}
+
 #[derive(Debug)]
 pub enum CgroupErr {
     IoError(Error),
@@ -31,7 +39,9 @@ impl std::fmt::Display for CgroupErr {
 }
 
 pub use crate::cgroup::cg_attach;
+pub use crate::cgroup::cg_controllers;
 pub use crate::cgroup::cg_create;
 pub use crate::cgroup::cg_escape;
 pub use crate::cgroup::cg_get_pids;
 pub use crate::cgroup::cg_kill_recursive;
+pub use crate::cgroup::cg_type;
