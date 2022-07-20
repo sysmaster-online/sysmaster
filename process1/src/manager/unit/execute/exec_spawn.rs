@@ -173,26 +173,23 @@ fn close_all_fds(fds: Vec<i32>) -> bool {
         .into_iter()
         .filter_entry(|e| !is_valid_fd(e))
     {
-        let entry = if let Ok(en) = entry {
-            en
-        } else {
-            log::error!("walf dir error: ");
-            continue;
-        };
-
-        // let entry = entry.unwrap();
-        let file_name = entry.file_name().to_str().unwrap();
-        log::debug!("close file name is {}", file_name);
-
-        let fd = file_name.parse::<i32>().unwrap();
-
-        if fds.contains(&fd) {
-            continue;
-        }
-
-        log::debug!("socket fds: {:?}, close fd {}", fds, fd);
-
-        fd_util::close(fd);
+        entry.map_or_else(
+            |_e| {
+                log::error!("walf dir error {:?}", _e);
+                return;
+            },
+            |_e| {
+                let file_name = _e.file_name().to_str().unwrap();
+                let fd = file_name.parse::<i32>().unwrap();
+                if fds.contains(&fd) {
+                    log::debug!("close file name is {}", file_name);
+                    return;
+                }
+                log::debug!("socket fds: {:?}, close fd {}", fds, fd);
+                fd_util::close(fd);
+                return;
+            },
+        );
     }
 
     true
