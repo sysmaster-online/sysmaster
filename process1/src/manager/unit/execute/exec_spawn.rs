@@ -6,6 +6,7 @@ use nix::fcntl::FcntlArg;
 use nix::unistd::{self, ForkResult, Pid};
 use regex::Regex;
 use std::convert::TryInto;
+use std::path::PathBuf;
 use std::process;
 use std::thread;
 use std::time::Duration;
@@ -168,6 +169,7 @@ fn is_valid_fd(entry: &DirEntry) -> bool {
 }
 
 fn close_all_fds(fds: Vec<i32>) -> bool {
+    let opend_dir = PathBuf::from(format!("/proc/{}/fd", nix::unistd::getpid()));
     for entry in WalkDir::new("/proc/self/fd")
         .min_depth(1)
         .into_iter()
@@ -185,6 +187,13 @@ fn close_all_fds(fds: Vec<i32>) -> bool {
                     log::debug!("close file name is {}", file_name);
                     return;
                 }
+
+                let link_name = std::fs::read_link(_e.path()).map_or(PathBuf::from(""), |e| e);
+                if link_name == opend_dir {
+                    log::debug!("not close self opened fd");
+                    return;
+                }
+
                 log::debug!("socket fds: {:?}, close fd {}", fds, fd);
                 fd_util::close(fd);
                 return;
