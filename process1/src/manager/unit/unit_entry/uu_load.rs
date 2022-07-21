@@ -24,6 +24,7 @@ pub(super) struct UeLoad {
     config_file_path: RefCell<String>,
     config_file_mtime: RefCell<u128>,
     in_load_queue: RefCell<bool>,
+    in_target_dep_queue: RefCell<bool>,
     default_dependencies: bool,
 }
 
@@ -43,6 +44,7 @@ impl UeLoad {
             config_file_path: RefCell::new(null_str!("")),
             config_file_mtime: RefCell::new(0),
             in_load_queue: RefCell::new(false),
+            in_target_dep_queue: RefCell::new(false),
             default_dependencies: true,
         }
     }
@@ -69,6 +71,14 @@ impl UeLoad {
         *self.in_load_queue.borrow() == true
     }
 
+    pub(super) fn set_in_target_dep_queue(&self, t: bool) {
+        self.in_target_dep_queue.replace(t);
+    }
+
+    pub(super) fn in_target_dep_queue(&self) -> bool {
+        *self.in_target_dep_queue.borrow() == true
+    }
+
     pub(super) fn load_unit_confs(&self) -> Result<String, Box<dyn Error>> {
         self.build_name_map();
         if let Some(p) = self.get_unit_file_path() {
@@ -78,18 +88,20 @@ impl UeLoad {
                 Ok(_vs) => {
                     let unit_parser = UeConfigUnit::builder_parser();
                     let config_unit = unit_parser.conf_file_parse(&_vs);
-                    let install_parser = UeConfigInstall::builder_parser();
-                    let install = install_parser.conf_file_parse(&_vs);
-                    let ret1 = install.map(|_conf| {
-                        self.config.set_installconf(_conf);
-                    });
-                    if ret1.is_err() {
-                        //Install section is not requires
-                        log::error!(
-                            "parse unit install config for unit [{}] err{:?}",
-                            self.id,
-                            ret1.err()
-                        );
+                    if _unit_type != UnitType::UnitTarget {
+                        let install_parser = UeConfigInstall::builder_parser();
+                        let install = install_parser.conf_file_parse(&_vs);
+                        let ret1 = install.map(|_conf| {
+                            self.config.set_installconf(_conf);
+                        });
+                        if ret1.is_err() {
+                            //Install section is not requires
+                            log::error!(
+                                "parse unit install config for unit [{}] err{:?}",
+                                self.id,
+                                ret1.err()
+                            );
+                        }
                     }
 
                     let ret2 = config_unit.map(|_unit| {

@@ -263,6 +263,14 @@ impl Unit {
         self.load.set_in_load_queue(t);
     }
 
+    pub(super) fn in_target_dep_queue(&self) -> bool {
+        self.load.in_target_dep_queue()
+    }
+
+    pub(super) fn set_in_target_dep_queue(&self, t: bool) {
+        self.load.set_in_target_dep_queue(t);
+    }
+
     pub(super) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
         self.config.get(item)
     }

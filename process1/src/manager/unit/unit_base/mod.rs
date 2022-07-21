@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 pub(super) use ub_basic::unit_name_to_type;
-pub use ub_basic::{KillOperation, UnitActionError, UnitType};
+pub use ub_basic::{KillOperation, UnitActionError, UnitDependencyMask, UnitType};
 pub(super) use ub_job::JobMode;
 pub(super) use ub_load::UnitLoadState;
 pub(super) use ub_relation::unit_relation_to_inverse;
