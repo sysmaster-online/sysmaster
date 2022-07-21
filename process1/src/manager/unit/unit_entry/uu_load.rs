@@ -24,6 +24,7 @@ pub(super) struct UeLoad {
     config_file_path: RefCell<String>,
     config_file_mtime: RefCell<u128>,
     in_load_queue: RefCell<bool>,
+    in_target_dep_queue: RefCell<bool>,
     default_dependencies: bool,
 }
 
@@ -43,6 +44,7 @@ impl UeLoad {
             config_file_path: RefCell::new(null_str!("")),
             config_file_mtime: RefCell::new(0),
             in_load_queue: RefCell::new(false),
+            in_target_dep_queue: RefCell::new(false),
             default_dependencies: true,
         }
     }
@@ -73,6 +75,13 @@ impl UeLoad {
         self.config
             .load_fragment_and_dropin(self.file.as_ref(), &self.id)?;
         Ok(())
+    }
+    pub(super) fn set_in_target_dep_queue(&self, t: bool) {
+        self.in_target_dep_queue.replace(t);
+    }
+
+    pub(super) fn in_target_dep_queue(&self) -> bool {
+        *self.in_target_dep_queue.borrow() == true
     }
 
     fn parse(&self) {
