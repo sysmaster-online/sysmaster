@@ -1,9 +1,10 @@
 use crate::env_cargo;
 
-const ETC_SYSTEM_PATH: &str = "/etc/process1/system";
-const LIB_SYSTEM_PATH: &str = "/usr/lib/process1/system";
+const ETC_SYSTEM_PATH: &str = "/etc/process1/";
+const RUN_SYSTEM_PATH: &str = "/run/process1/";
+const LIB_SYSTEM_PATH: &str = "/usr/lib/process1/";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LookupPaths {
     pub search_path: Vec<String>,
     pub generator: String,
@@ -24,8 +25,9 @@ impl LookupPaths {
     }
 
     pub fn init_lookup_paths(&mut self) {
-        self.search_path.push(ETC_SYSTEM_PATH.to_string());
         self.search_path.push(LIB_SYSTEM_PATH.to_string());
+        self.search_path.push(RUN_SYSTEM_PATH.to_string());
+        self.search_path.push(ETC_SYSTEM_PATH.to_string());
 
         let env_path = env_cargo::env_path();
         if env_path.is_err() {

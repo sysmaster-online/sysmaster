@@ -1,5 +1,7 @@
+use std::fs;
 use std::io::{Error as IOError, ErrorKind};
 
+use std::path::PathBuf;
 use std::{fs::File, io::Read};
 pub trait ConfigParse {
     type Item;
@@ -46,4 +48,51 @@ pub fn toml_str_parse(file_content: &str) -> Result<toml::Value, IOError> {
         }
     };
     Ok(conf)
+}
+
+pub fn merge_toml(paths: &Vec<PathBuf>, to: &mut PathBuf) -> Result<(), IOError> {
+    let mut merged: toml::Value = toml::Value::Table(toml::value::Table::new());
+    for file in paths {
+        let value: toml::value::Table =
+            toml::from_slice(&fs::read(&file).expect(&format!("Error reading {:?}", file)))
+                .expect(&format!("Expected TOML table in {:?}", file));
+        merge(&mut merged, &toml::Value::Table(value));
+    }
+    fs::write(to, merged.to_string())
+}
+
+fn merge(merged: &mut toml::Value, value: &toml::Value) {
+    match value {
+        toml::Value::String(_)
+        | toml::Value::Integer(_)
+        | toml::Value::Float(_)
+        | toml::Value::Boolean(_)
+        | toml::Value::Datetime(_) => *merged = value.clone(),
+        toml::Value::Array(x) => match merged {
+            toml::Value::Array(merged) => {
+                for (k, v) in x.iter().enumerate() {
+                    match merged.get_mut(k) {
+                        Some(x) => merge(x, v),
+                        None => {
+                            let _ = merged.insert(k.clone(), v.clone());
+                        }
+                    }
+                }
+            }
+            _ => *merged = value.clone(),
+        },
+        toml::Value::Table(x) => match merged {
+            toml::Value::Table(merged) => {
+                for (k, v) in x.iter() {
+                    match merged.get_mut(k) {
+                        Some(x) => merge(x, v),
+                        None => {
+                            let _ = merged.insert(k.clone(), v.clone());
+                        }
+                    }
+                }
+            }
+            _ => *merged = value.clone(),
+        },
+    }
 }

@@ -1,5 +1,5 @@
 use super::u_entry::{Unit, UnitObj};
-use super::uu_config::UnitConfigItem;
+use super::uu_config::UeConfig;
 use crate::manager::data::{DataManager, UnitActiveState, UnitRelations};
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
@@ -99,9 +99,9 @@ impl UnitX {
         self.0.get_id()
     }
 
-    pub(in crate::manager::unit) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
-        self.0.get_config(item)
-    }
+    // pub(in crate::manager::unit) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
+    //     self.0.get_config(item)
+    // }
 
     pub(in crate::manager::unit) fn active_state(&self) -> UnitActiveState {
         //UnitActiveState::UnitActive
@@ -162,6 +162,10 @@ impl UnitX {
 
     pub(in crate::manager::unit) fn collect_fds(&self) -> Vec<i32> {
         self.0.collect_fds()
+    }
+
+    pub fn get_config(&self) -> Rc<UeConfig> {
+        self.0.get_config()
     }
 }
 

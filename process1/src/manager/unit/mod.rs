@@ -26,3 +26,27 @@ mod unit_datastore;
 mod unit_entry;
 mod unit_manager;
 mod unit_runtime;
+
+pub use serde::{Deserialize, Deserializer};
+
+pub trait DeserializeWith: Sized {
+    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>;
+}
+
+impl DeserializeWith for Vec<String> {
+    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(de)?;
+        let mut vec = Vec::new();
+
+        for l in s.split_whitespace() {
+            vec.push(l.to_string());
+        }
+
+        Ok(vec)
+    }
+}
