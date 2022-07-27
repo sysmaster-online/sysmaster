@@ -293,7 +293,7 @@ fn trans_affect_isolate(
 
     for other in db.units_get_all().iter() {
         // it is allowed not to be affected by isolation
-        if let true = other.get_config().Unit.ignore_on_isolate {
+        if let true = other.get_config().Unit.IgnoreOnIsolate {
             continue;
         }
 

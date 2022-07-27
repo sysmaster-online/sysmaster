@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use confique::{Config, Error};
 
 use crate::manager::unit::uload_util::UnitFile;
@@ -15,53 +16,53 @@ pub(crate) struct UeConfig {
 #[derive(Config, Default)]
 pub(crate) struct UeConfigUnit {
     #[config(default = "")]
-    pub desc: String,
+    pub Description: String,
     #[config(default = "")]
-    pub documentation: String,
+    pub Documentation: String,
     #[config(default = false)]
-    pub allow_isolate: bool,
+    pub AllowIsolate: bool,
     #[config(default = false)]
-    pub ignore_on_isolate: bool,
+    pub IgnoreOnIsolate: bool,
+    // #[config(deserialize_with = JobMode::deserialize_with)]
+    // #[config(default = "replace")]
+    // pub on_success_job_mode: JobMode,
     #[config(deserialize_with = JobMode::deserialize_with)]
     #[config(default = "replace")]
-    pub on_success_job_mode: JobMode,
-    #[config(deserialize_with = JobMode::deserialize_with)]
-    #[config(default = "replace")]
-    pub on_failure_job_mode: JobMode,
+    pub OnFailureJobMode: JobMode,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
-    pub wants: Vec<String>,
+    pub Wants: Vec<String>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
-    pub requires: Vec<String>,
+    pub Requires: Vec<String>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
-    pub before: Vec<String>,
+    pub Before: Vec<String>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
-    pub after: Vec<String>,
+    pub After: Vec<String>,
 }
 
 #[derive(Config, Default)]
 pub(crate) struct UeConfigInstall {
     #[config(default = "")]
-    pub alias: String,
+    pub Alias: String,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
-    pub wanted_by: Vec<String>,
+    pub WantedBy: Vec<String>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
-    pub required_by: Vec<String>,
+    pub RequiredBy: Vec<String>,
     #[config(default = "")]
-    pub also: String,
+    pub Also: String,
     #[config(default = "")]
-    pub default_instance: String,
-    #[config(default = "")]
-    pub install_alias: String,
-    #[config(default = "")]
-    pub install_also: String,
-    #[config(default = "")]
-    pub install_default_install: String,
+    pub DefaultInstance: String,
+    // #[config(default = "")]
+    // pub install_alias: String,
+    // #[config(default = "")]
+    // pub install_also: String,
+    // #[config(default = "")]
+    // pub install_default_install: String,
 }
 
 impl UeConfig {
@@ -81,13 +82,13 @@ impl UeConfig {
 
         // dropin
         for v in files.get_unit_id_dropin_wants(name) {
-            configer.Unit.wants.push(v.to_string_lossy().to_string());
-            configer.Unit.after.push(v.to_string_lossy().to_string());
+            configer.Unit.Wants.push(v.to_string_lossy().to_string());
+            configer.Unit.After.push(v.to_string_lossy().to_string());
         }
 
         for v in files.get_unit_id_dropin_requires(name) {
-            configer.Unit.requires.push(v.to_string_lossy().to_string());
-            configer.Unit.after.push(v.to_string_lossy().to_string());
+            configer.Unit.Requires.push(v.to_string_lossy().to_string());
+            configer.Unit.After.push(v.to_string_lossy().to_string());
         }
         Ok(configer)
     }

@@ -484,7 +484,7 @@ impl JobManagerData {
         if !force {
             // is forced removement a failure?
             if result != JobResult::JobDone {
-                if let JobMode::JobFail = unit.get_config().Unit.on_failure_job_mode {
+                if let JobMode::JobFail = unit.get_config().Unit.OnFailureJobMode {
                     self.exec_on(
                         Rc::clone(unit),
                         UnitRelationAtom::UnitAtomOnFailure,
@@ -514,7 +514,7 @@ impl JobManagerData {
         if ns != os && !flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART) {
             match ns {
                 UnitActiveState::UnitFailed => {
-                    if let JobMode::JobFail = unit.get_config().Unit.on_failure_job_mode {
+                    if let JobMode::JobFail = unit.get_config().Unit.OnFailureJobMode {
                         self.exec_on(
                             Rc::clone(unit),
                             UnitRelationAtom::UnitAtomOnFailure,
@@ -537,10 +537,10 @@ impl JobManagerData {
                 | UnitActiveState::UnitInActive
                 | UnitActiveState::UnitMaintenance => {}
                 _ => {
-                    if let JobMode::JobFail = unit.get_config().Unit.on_failure_job_mode {
+                    if let JobMode::JobFail = unit.get_config().Unit.OnFailureJobMode {
                         self.exec_on(
                             Rc::clone(unit),
-                            UnitRelationAtom::UnitAtomOnFailure,
+                            UnitRelationAtom::UnitAtomOnSuccess,
                             JobMode::JobFail,
                         );
                     }
@@ -581,7 +581,7 @@ fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno
             return Err(JobErrno::JobErrInput);
         }
 
-        if let false = unit.get_config().Unit.allow_isolate {
+        if let false = unit.get_config().Unit.AllowIsolate {
             return Err(JobErrno::JobErrInput);
         }
     }

@@ -80,25 +80,25 @@ impl UeLoad {
 
         ud_conf
             .deps
-            .insert(UnitRelations::UnitWants, self.config.Unit.wants.clone());
+            .insert(UnitRelations::UnitWants, self.config.Unit.Wants.clone());
         ud_conf
             .deps
-            .insert(UnitRelations::UnitAfter, self.config.Unit.after.clone());
+            .insert(UnitRelations::UnitAfter, self.config.Unit.After.clone());
         ud_conf
             .deps
-            .insert(UnitRelations::UnitBefore, self.config.Unit.before.clone());
+            .insert(UnitRelations::UnitBefore, self.config.Unit.Before.clone());
         ud_conf.deps.insert(
             UnitRelations::UnitRequires,
-            self.config.Unit.requires.clone(),
+            self.config.Unit.Requires.clone(),
         );
 
         ud_conf.deps.insert(
             UnitRelations::UnitWantsBy,
-            self.config.Install.wanted_by.clone(),
+            self.config.Install.WantedBy.clone(),
         );
         ud_conf.deps.insert(
             UnitRelations::UnitRequiresBy,
-            self.config.Install.required_by.clone(),
+            self.config.Install.RequiredBy.clone(),
         );
         self.dm.insert_ud_config(self.id.clone(), ud_conf);
     }
