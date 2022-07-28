@@ -10,7 +10,7 @@ use crate::manager::data::{UnitActiveState, UnitNotifyFlags};
 use crate::manager::table::{TableOp, TableSubscribe};
 use crate::manager::unit::unit_base::{JobMode, UnitRelationAtom};
 use crate::manager::unit::unit_datastore::UnitDb;
-use crate::manager::unit::unit_entry::{UnitConfigItem, UnitX};
+use crate::manager::unit::unit_entry::UnitX;
 use event::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -484,10 +484,12 @@ impl JobManagerData {
         if !force {
             // is forced removement a failure?
             if result != JobResult::JobDone {
-                if let UnitConfigItem::UcItemOnFailJobMode(mode) =
-                    unit.get_config(&UnitConfigItem::UcItemOnFailJobMode(JobMode::JobFail))
-                {
-                    self.exec_on(Rc::clone(unit), UnitRelationAtom::UnitAtomOnFailure, mode);
+                if let JobMode::JobFail = unit.get_config().Unit.OnFailureJobMode {
+                    self.exec_on(
+                        Rc::clone(unit),
+                        UnitRelationAtom::UnitAtomOnFailure,
+                        JobMode::JobFail,
+                    );
                 }
             }
         }
@@ -512,10 +514,12 @@ impl JobManagerData {
         if ns != os && !flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART) {
             match ns {
                 UnitActiveState::UnitFailed => {
-                    if let UnitConfigItem::UcItemOnFailJobMode(mode) =
-                        unit.get_config(&UnitConfigItem::UcItemOnFailJobMode(JobMode::JobFail))
-                    {
-                        self.exec_on(Rc::clone(unit), UnitRelationAtom::UnitAtomOnFailure, mode);
+                    if let JobMode::JobFail = unit.get_config().Unit.OnFailureJobMode {
+                        self.exec_on(
+                            Rc::clone(unit),
+                            UnitRelationAtom::UnitAtomOnFailure,
+                            JobMode::JobFail,
+                        );
                     }
                 }
                 _ => {}
@@ -533,10 +537,12 @@ impl JobManagerData {
                 | UnitActiveState::UnitInActive
                 | UnitActiveState::UnitMaintenance => {}
                 _ => {
-                    if let UnitConfigItem::UcItemOnSucJobMode(mode) =
-                        unit.get_config(&UnitConfigItem::UcItemOnSucJobMode(JobMode::JobFail))
-                    {
-                        self.exec_on(Rc::clone(unit), UnitRelationAtom::UnitAtomOnSuccess, mode);
+                    if let JobMode::JobFail = unit.get_config().Unit.OnFailureJobMode {
+                        self.exec_on(
+                            Rc::clone(unit),
+                            UnitRelationAtom::UnitAtomOnSuccess,
+                            JobMode::JobFail,
+                        );
                     }
                 }
             };
@@ -575,9 +581,7 @@ fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno
             return Err(JobErrno::JobErrInput);
         }
 
-        if let UnitConfigItem::UcItemAllowIsolate(false) =
-            unit.get_config(&UnitConfigItem::UcItemAllowIsolate(false))
-        {
+        if let false = unit.get_config().Unit.AllowIsolate {
             return Err(JobErrno::JobErrInput);
         }
     }

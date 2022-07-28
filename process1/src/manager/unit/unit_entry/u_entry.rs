@@ -1,11 +1,11 @@
 use super::uu_cgroup::UeCgroup;
 use super::uu_child::UeChild;
-use super::uu_config::{UeConfig, UnitConfigItem};
+use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
-use crate::manager::data::{DataManager, UnitActiveState, UnitDepConf, UnitState};
+use crate::manager::data::{DataManager, UnitActiveState, UnitState};
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{KillOperation, UnitActionError, UnitLoadState, UnitType};
-use crate::manager::{UnitNotifyFlags, UnitRelations};
+use crate::manager::UnitNotifyFlags;
 use cgroup::{self, CgFlags};
 use log;
 use nix::sys::signal::Signal;
@@ -17,6 +17,7 @@ use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::rc::Rc;
+use utils::config_parser::unit_file_reader;
 use utils::Result;
 
 pub struct UnitRef {
@@ -91,7 +92,7 @@ impl Hash for Unit {
 pub trait UnitObj {
     fn init(&self) {}
     fn done(&self) {}
-    fn load(&self, conf_str: &str) -> Result<(), Box<dyn Error>>;
+    fn load(&self, conf: &str) -> Result<(), Box<dyn Error>>;
 
     fn coldplug(&self) {}
     fn dump(&self) {}
@@ -147,6 +148,7 @@ impl Unit {
     pub fn cg_path(&self) -> PathBuf {
         self.cgroup.cg_path()
     }
+
     pub fn kill_context(
         &self,
         m_pid: Option<Pid>,
@@ -222,18 +224,20 @@ impl Unit {
         pids
     }
 
-    pub fn insert_two_deps(
-        &self,
-        ra: UnitRelations,
-        rb: UnitRelations,
-        u_name: String,
-    ) -> Option<UnitDepConf> {
-        let mut ud_conf = UnitDepConf::new();
-        ud_conf.deps.push((ra, u_name.to_string()));
-        ud_conf.deps.push((rb, u_name.to_string()));
+    // pub fn insert_two_deps(
+    //     &self,
+    //     ra: UnitRelations,
+    //     rb: UnitRelations,
+    //     u_name: String,
+    // ) -> Option<UnitDepConf> {
+    //     let mut ud_conf = UnitDepConf::new();
+    //     for rl in [ra, rb] {
+    //         let vec = ud_conf.deps.get(&rl).unwrap();
+    //         vec.push(u_name.clone());
+    //     }
 
-        self.dm.insert_ud_config(self.get_id().to_string(), ud_conf)
-    }
+    //     self.dm.insert_ud_config(self.get_id().to_string(), ud_conf)
+    // }
 
     pub(super) fn new(
         unit_type: UnitType,
@@ -242,7 +246,7 @@ impl Unit {
         filer: &Rc<UnitFile>,
         sub: Box<dyn UnitObj>,
     ) -> Self {
-        let _config = Rc::new(UeConfig::new());
+        let _config = Rc::new(UeConfig::default());
         Unit {
             dm: Rc::clone(dmr),
             unit_type,
@@ -255,6 +259,10 @@ impl Unit {
         }
     }
 
+    pub(super) fn get_config(&self) -> Rc<UeConfig> {
+        self.config.clone()
+    }
+
     pub(super) fn in_load_queue(&self) -> bool {
         self.load.in_load_queue()
     }
@@ -263,25 +271,28 @@ impl Unit {
         self.load.set_in_load_queue(t);
     }
 
-    pub(super) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
-        self.config.get(item)
-    }
-
     pub(super) fn load_unit(&self) -> Result<(), Box<dyn Error>> {
         self.set_in_load_queue(false);
         match self.load.load_unit_confs() {
-            Ok(confs) => {
-                let ret = self.sub.load(&confs);
-                if let Ok(_) = ret {
-                    self.load.set_load_state(UnitLoadState::UnitLoaded);
-                } else {
-                    return Err(format!("load Unit {} failed", self.id).into());
+            Ok(_) => Ok({
+                let paths = self.load.get_unit_id_fragment_pathbuf();
+                let path = paths.first().unwrap();
+                match unit_file_reader(path.to_str().unwrap()) {
+                    Ok(str) => {
+                        let ret = self.sub.load(&str);
+                        if let Ok(_) = ret {
+                            self.load.set_load_state(UnitLoadState::UnitLoaded);
+                        } else {
+                            return Err(format!("load Unit {} failed", self.id).into());
+                        }
+                    }
+
+                    Err(_) => {}
                 }
-                ret
-            }
+            }),
             Err(e) => {
                 self.load.set_load_state(UnitLoadState::UnitNotFound);
-                return Err(e);
+                return Err(Box::new(e));
             }
         }
     }

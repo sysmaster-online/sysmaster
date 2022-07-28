@@ -1,4 +1,5 @@
 use core::fmt::{Display, Formatter, Result};
+use std::collections::HashMap;
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone)]
 pub enum UnitRelations {
@@ -122,11 +123,13 @@ impl From<UnitRelations> for String {
 }
 
 pub struct UnitDepConf {
-    pub deps: Vec<(UnitRelations, String)>,
+    pub deps: HashMap<UnitRelations, Vec<String>>,
 }
 
 impl UnitDepConf {
     pub fn new() -> UnitDepConf {
-        UnitDepConf { deps: Vec::new() }
+        UnitDepConf {
+            deps: HashMap::new(),
+        }
     }
 }

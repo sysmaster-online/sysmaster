@@ -1,6 +1,6 @@
 pub use u_entry::{Unit, UnitObj, UnitRef};
 pub(in crate::manager) use uf_interface::UnitX;
-pub(super) use uu_config::UnitConfigItem;
+// pub(super) use uu_config::UnitConfigItem;
 
 // dependency: {uu_config | uu_cgroup} -> {uu_load | uu_child} -> u_entry -> uf_interface
 mod u_entry;

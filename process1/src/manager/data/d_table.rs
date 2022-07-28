@@ -58,8 +58,9 @@ impl DataManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::{UnitActiveState, UnitNotifyFlags, UnitRelations};
+    use crate::manager::data::{UnitActiveState, UnitNotifyFlags};
     use crate::manager::table::TableOp;
+    use crate::manager::UnitRelations;
 
     #[test]
     fn dm_unit_dep_config() {
@@ -71,9 +72,9 @@ mod tests {
         assert!(old.is_none());
 
         let mut ud_config = UnitDepConf::new();
-        ud_config
-            .deps
-            .push((UnitRelations::UnitAfter, String::from("name")));
+        let mut vec = Vec::new();
+        vec.push(String::from("name"));
+        ud_config.deps.insert(UnitRelations::UnitAfter, vec);
         let old = dm.insert_ud_config(String::from("test"), ud_config);
         assert_eq!(old.unwrap().deps.len(), 0);
 
@@ -82,13 +83,12 @@ mod tests {
         assert!(old.is_none());
 
         let mut ud_config = UnitDepConf::new();
-        ud_config
-            .deps
-            .push((UnitRelations::UnitAfter, String::from("name")));
+        let mut vec = Vec::new();
+        vec.push(String::from("name"));
+        ud_config.deps.insert(UnitRelations::UnitAfter, vec);
         dm.insert_ud_config(String::from("test"), ud_config);
         assert_eq!(udc_sub.len(), 1);
     }
-
     #[test]
     fn dm_unit_state() {
         let dm = DataManager::new();

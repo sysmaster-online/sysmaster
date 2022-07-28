@@ -1,9 +1,10 @@
 use std::env;
 
-const ETC_SYSTEM_PATH: &str = "/etc/process1/system";
-const LIB_SYSTEM_PATH: &str = "/usr/lib/process1/system";
+const ETC_SYSTEM_PATH: &str = "/etc/process1/";
+const RUN_SYSTEM_PATH: &str = "/run/process1/";
+const LIB_SYSTEM_PATH: &str = "/usr/lib/process1/";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LookupPaths {
     pub search_path: Vec<String>,
     pub generator: String,
@@ -36,8 +37,9 @@ impl LookupPaths {
             out_dir
         };
 
-        self.search_path.push(ETC_SYSTEM_PATH.to_string());
         self.search_path.push(LIB_SYSTEM_PATH.to_string());
+        self.search_path.push(RUN_SYSTEM_PATH.to_string());
+        self.search_path.push(ETC_SYSTEM_PATH.to_string());
         let out_dir = devel_path();
         if !out_dir.is_empty() && out_dir.contains("build") {
             let tmp_str: Vec<_> = out_dir.split("build").collect();

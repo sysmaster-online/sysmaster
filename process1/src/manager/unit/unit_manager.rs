@@ -362,14 +362,13 @@ mod unit_load {
             rtr: &Rc<UnitRT>,
         ) -> UnitLoadData {
             log::debug!("UnitLoadData db count is {}", Rc::strong_count(dbr));
-            let _file = Rc::new(UnitFile::new());
-            _file.init_lookup_path();
+            let file = Rc::new(UnitFile::new());
             UnitLoadData {
                 dm: Rc::clone(dmr),
                 um: RefCell::new(Weak::new()),
                 db: Rc::clone(dbr),
                 rt: Rc::clone(rtr),
-                file: Rc::clone(&_file),
+                file: Rc::clone(&file),
             }
         }
 
@@ -460,20 +459,22 @@ mod unit_load {
             };
 
             // dependency
-            for (relation, o_name) in config.deps.iter() {
-                let tmp_unit: Rc<UnitX>;
-                if let Some(o_unit) = self.load_unit(o_name) {
-                    tmp_unit = Rc::clone(&o_unit);
-                } else {
-                    log::error!("create unit obj error in unit manger");
-                    return;
-                }
+            for (relation, list) in config.deps.iter() {
+                for o_name in list {
+                    let tmp_unit: Rc<UnitX>;
+                    if let Some(o_unit) = self.load_unit(o_name) {
+                        tmp_unit = Rc::clone(&o_unit);
+                    } else {
+                        log::error!("create unit obj error in unit manger");
+                        return;
+                    }
 
-                if let Err(_e) = self
-                    .db
-                    .dep_insert(Rc::clone(&unit), *relation, tmp_unit, true, 0)
-                {
-                    // debug
+                    if let Err(_e) =
+                        self.db
+                            .dep_insert(Rc::clone(&unit), *relation, tmp_unit, true, 0)
+                    {
+                        // debug
+                    }
                 }
             }
         }
@@ -539,7 +540,7 @@ mod tests {
         let um = UnitManager::new(&dm_manager, &_event);
 
         unit_name_lists.push("config.service".to_string());
-        unit_name_lists.push("testsunit.target".to_string());
+        // unit_name_lists.push("testsunit.target".to_string());
         for u_name in unit_name_lists.iter() {
             let unit = um.load_unit(u_name);
             match unit {

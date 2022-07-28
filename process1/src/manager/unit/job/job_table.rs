@@ -5,7 +5,7 @@ use super::job_unit_entry::JobUnit;
 use super::JobErrno;
 use crate::manager::unit::unit_base::{JobMode, UnitRelationAtom};
 use crate::manager::unit::unit_datastore::UnitDb;
-use crate::manager::unit::unit_entry::{UnitConfigItem, UnitX};
+use crate::manager::unit::unit_entry::UnitX;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
@@ -493,9 +493,7 @@ impl JobUnitTableData {
 
         for (unit, uv) in self.t_data.iter() {
             // condition
-            if let UnitConfigItem::UcItemIgnoreOnIsolate(true) =
-                unit.get_config(&UnitConfigItem::UcItemIgnoreOnIsolate(false))
-            {
+            if let true = unit.get_config().Unit.IgnoreOnIsolate {
                 continue;
             }
 

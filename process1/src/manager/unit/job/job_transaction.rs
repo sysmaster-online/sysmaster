@@ -6,7 +6,7 @@ use super::JobErrno;
 use crate::manager::unit::unit_base::UnitActionError;
 use crate::manager::unit::unit_base::{JobMode, UnitRelationAtom};
 use crate::manager::unit::unit_datastore::UnitDb;
-use crate::manager::unit::unit_entry::{UnitConfigItem, UnitX};
+use crate::manager::unit::unit_entry::UnitX;
 use std::rc::Rc;
 
 pub(super) fn job_trans_expand(
@@ -293,9 +293,7 @@ fn trans_affect_isolate(
 
     for other in db.units_get_all().iter() {
         // it is allowed not to be affected by isolation
-        if let UnitConfigItem::UcItemIgnoreOnIsolate(true) =
-            other.get_config(&UnitConfigItem::UcItemIgnoreOnIsolate(false))
-        {
+        if let true = other.get_config().Unit.IgnoreOnIsolate {
             continue;
         }
 

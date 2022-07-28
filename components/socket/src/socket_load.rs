@@ -41,11 +41,11 @@ impl SocketLoad {
                 }
             }
 
-            self.comm.unit().insert_two_deps(
-                UnitRelations::UnitBefore,
-                UnitRelations::UnitTriggers,
-                self.config.unit_ref_target().unwrap(),
-            );
+            // self.comm.unit().insert_two_deps(
+            //     UnitRelations::UnitBefore,
+            //     UnitRelations::UnitTriggers,
+            //     self.config.unit_ref_target().unwrap(),
+            // );
         }
         true
     }
