@@ -16,12 +16,13 @@ pub enum MngErrno {
 
 mod commands;
 #[allow(dead_code)]
-mod manager;
-mod signals;
-#[allow(dead_code)]
-mod unit;
-
-#[allow(dead_code)]
 mod data;
 #[allow(dead_code)]
+mod manager;
+#[allow(dead_code)]
+mod reliability;
+mod signals;
+#[allow(dead_code)]
 mod table;
+#[allow(dead_code)]
+mod unit;
