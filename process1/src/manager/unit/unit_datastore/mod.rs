@@ -109,6 +109,10 @@ impl UnitDb {
             self.child.add_watch_pid(pid, id)
         }
     }
+
+    pub(super) fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {
+        self.child.get_unit_by_pid(pid)
+    }
 }
 
 // dependency: unit_sets -> {unit_dep | unit_child}

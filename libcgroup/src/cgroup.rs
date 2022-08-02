@@ -16,6 +16,7 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::io::{Error as IOError, ErrorKind};
 use std::path::PathBuf;
+use walkdir::{DirEntry, WalkDir};
 
 use utils::IN_SET;
 
@@ -110,9 +111,7 @@ pub fn cg_escape(id: &str) -> &str {
 }
 
 fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>, CgroupErr> {
-    log::debug!("cg_path is: {:?}", cg_path);
     let path = cg_abs_path(cg_path, &PathBuf::from(item))?;
-    log::debug!("get pids from path: {:?}", path);
     let file = fs::OpenOptions::new()
         .read(true)
         .open(path)
@@ -272,16 +271,121 @@ pub fn cg_controllers() -> Result<Vec<String>, IOError> {
     Ok(controllers)
 }
 
+fn cg_read_event(cg_path: &PathBuf, event: &str) -> Result<String, CgroupErr> {
+    let events_path = cg_abs_path(cg_path, &PathBuf::from("cgroup.events"))?;
+    let file = File::open(events_path).map_err(|e| CgroupErr::IoError(e))?;
+    let reader = BufReader::new(file);
+
+    for line in reader.lines() {
+        let content = line.map_err(|e| CgroupErr::IoError(e))?;
+        let words: Vec<String> = content
+            .trim()
+            .split_whitespace()
+            .map(|c| c.to_string())
+            .collect();
+
+        if words.len() != 2 {
+            continue;
+        }
+
+        if words[0].trim() != event {
+            continue;
+        }
+
+        return Ok(words[1].trim().to_string());
+    }
+
+    Ok("".to_string())
+}
+
+fn cg_is_empty(cg_path: &PathBuf) -> bool {
+    let procs_path = cg_abs_path(cg_path, &PathBuf::from("cgroup.procs"));
+    if procs_path.is_err() {
+        return true;
+    }
+
+    if !procs_path.unwrap().exists() {
+        return true;
+    }
+
+    if let Ok(pids) = get_pids(cg_path, "cgroup.procs") {
+        if pids.len() == 0 {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+fn is_dir(entry: &DirEntry) -> bool {
+    if entry.file_type().is_dir() {
+        return true;
+    }
+
+    return false;
+}
+
+pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
+    if cg_path == &PathBuf::from("") || cg_path == &PathBuf::from("/") {
+        return Ok(true);
+    }
+
+    let cg_type = cg_type()?;
+    if cg_type <= CgType::Legacy {
+        return Ok(false);
+    }
+
+    if cg_type == CgType::UnifiedV2 || cg_type == CgType::UnifiedV1 {
+        match cg_read_event(cg_path, "populated") {
+            Ok(v) => {
+                log::debug!("cg read event value:{}", v.to_string());
+                return Ok(v == "0");
+            }
+            Err(e) => match e {
+                CgroupErr::IoError(_e) => {
+                    if _e.kind() == ErrorKind::NotFound {
+                        return Ok(true);
+                    }
+                }
+                _ => return Err(e),
+            },
+        }
+    } else {
+        if !cg_is_empty(cg_path) {
+            return Ok(false);
+        }
+
+        let cgroup_path = cg_abs_path(cg_path, &PathBuf::from(""))?;
+
+        for entry in WalkDir::new(cgroup_path)
+            .min_depth(1)
+            .max_depth(1)
+            .into_iter()
+            .filter_entry(|e| !is_dir(e))
+        {
+            if entry.is_err() {
+                continue;
+            }
+
+            let sub_cg = cg_path.join(entry.unwrap().path());
+            let exist = cg_is_empty_recursive(&sub_cg)?;
+            if exist {
+                return Ok(false);
+            }
+        }
+
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
 mod tests {
     #[test]
     fn test_cg_create() {
-        use nix::sys::signal::Signal;
         use nix::unistd::Pid;
-        use std::collections::HashSet;
         use std::io::ErrorKind;
         use std::path::PathBuf;
-
-        use crate::CgFlags;
 
         let cg_type = if let Ok(cg_type) = super::cg_type() {
             cg_type

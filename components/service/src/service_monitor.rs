@@ -41,8 +41,15 @@ impl ServiceMonitorData {
     }
 
     pub(self) fn start_action(&mut self) {
-        if self.config.Service.WatchdogUSec.is_some() {
-            if let Some(wd_sec) = self.config.Service.WatchdogUSec {
+        if self
+            .config
+            .config_data()
+            .borrow()
+            .Service
+            .WatchdogUSec
+            .is_some()
+        {
+            if let Some(wd_sec) = self.config.config_data().borrow().Service.WatchdogUSec {
                 self.watchdog_original_usec = wd_sec;
             }
         }

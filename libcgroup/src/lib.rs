@@ -12,12 +12,12 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum CgType {
     None,
+    Legacy,
     UnifiedV1,
     UnifiedV2,
-    Legacy,
 }
 
 #[derive(Debug)]
@@ -43,5 +43,6 @@ pub use crate::cgroup::cg_controllers;
 pub use crate::cgroup::cg_create;
 pub use crate::cgroup::cg_escape;
 pub use crate::cgroup::cg_get_pids;
+pub use crate::cgroup::cg_is_empty_recursive;
 pub use crate::cgroup::cg_kill_recursive;
 pub use crate::cgroup::cg_type;

@@ -72,33 +72,42 @@ impl UeLoad {
         self.file.build_name_map(self.id.clone());
         self.config
             .load_fragment_and_dropin(self.file.as_ref(), &self.id)?;
+
         Ok(())
     }
 
     fn parse(&self) {
         let mut ud_conf = UnitDepConf::new(); // need get config from config database,and update depends hereW
 
-        ud_conf
-            .deps
-            .insert(UnitRelations::UnitWants, self.config.Unit.Wants.clone());
-        ud_conf
-            .deps
-            .insert(UnitRelations::UnitAfter, self.config.Unit.After.clone());
-        ud_conf
-            .deps
-            .insert(UnitRelations::UnitBefore, self.config.Unit.Before.clone());
+        ud_conf.deps.insert(
+            UnitRelations::UnitWants,
+            self.config.config_data().borrow().Unit.Wants.clone(),
+        );
+        ud_conf.deps.insert(
+            UnitRelations::UnitAfter,
+            self.config.config_data().borrow().Unit.After.clone(),
+        );
+        ud_conf.deps.insert(
+            UnitRelations::UnitBefore,
+            self.config.config_data().borrow().Unit.Before.clone(),
+        );
         ud_conf.deps.insert(
             UnitRelations::UnitRequires,
-            self.config.Unit.Requires.clone(),
+            self.config.config_data().borrow().Unit.Requires.clone(),
         );
 
         ud_conf.deps.insert(
             UnitRelations::UnitWantsBy,
-            self.config.Install.WantedBy.clone(),
+            self.config.config_data().borrow().Install.WantedBy.clone(),
         );
         ud_conf.deps.insert(
             UnitRelations::UnitRequiresBy,
-            self.config.Install.RequiredBy.clone(),
+            self.config
+                .config_data()
+                .borrow()
+                .Install
+                .RequiredBy
+                .clone(),
         );
         self.dm.insert_ud_config(self.id.clone(), ud_conf);
     }

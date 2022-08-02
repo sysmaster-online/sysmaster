@@ -1,8 +1,8 @@
 use std::env;
 
-const ETC_SYSTEM_PATH: &str = "/etc/process1/";
-const RUN_SYSTEM_PATH: &str = "/run/process1/";
-const LIB_SYSTEM_PATH: &str = "/usr/lib/process1/";
+const ETC_SYSTEM_PATH: &str = "/etc/process1";
+const RUN_SYSTEM_PATH: &str = "/run/process1";
+const LIB_SYSTEM_PATH: &str = "/usr/lib/process1";
 
 #[derive(Debug, Clone)]
 pub struct LookupPaths {

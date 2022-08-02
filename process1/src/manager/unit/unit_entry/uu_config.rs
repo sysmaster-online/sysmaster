@@ -1,12 +1,61 @@
 #![allow(non_snake_case)]
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use confique::{Config, Error};
 
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::JobMode;
 use crate::manager::unit::DeserializeWith;
 
-#[derive(Config, Default, Debug)]
 pub(crate) struct UeConfig {
+    data: Rc<RefCell<UeConfigData>>,
+}
+
+impl UeConfig {
+    pub(crate) fn new() -> Self {
+        UeConfig {
+            data: Rc::new(RefCell::new(UeConfigData::default())),
+        }
+    }
+
+    pub(super) fn load_fragment_and_dropin(
+        &self,
+        files: &UnitFile,
+        name: &String,
+    ) -> Result<(), Error> {
+        let mut builder = UeConfigData::builder().env();
+
+        // fragment
+        for v in files.get_unit_id_fragment_pathbuf(name) {
+            builder = builder.file(&v);
+        }
+
+        let mut configer = builder.load()?;
+
+        // dropin
+        for v in files.get_unit_id_dropin_wants(name) {
+            configer.Unit.Wants.push(v.to_string_lossy().to_string());
+            configer.Unit.After.push(v.to_string_lossy().to_string());
+        }
+
+        for v in files.get_unit_id_dropin_requires(name) {
+            configer.Unit.Requires.push(v.to_string_lossy().to_string());
+            configer.Unit.After.push(v.to_string_lossy().to_string());
+        }
+
+        *self.data.borrow_mut() = configer;
+
+        Ok(())
+    }
+
+    pub(crate) fn config_data(&self) -> Rc<RefCell<UeConfigData>> {
+        self.data.clone()
+    }
+}
+
+#[derive(Config, Default, Debug)]
+pub(crate) struct UeConfigData {
     #[config(nested)]
     pub Unit: UeConfigUnit,
     #[config(nested)]
@@ -65,34 +114,34 @@ pub(crate) struct UeConfigInstall {
     // pub install_default_install: String,
 }
 
-impl UeConfig {
-    pub fn load_fragment_and_dropin(
-        &self,
-        files: &UnitFile,
-        name: &String,
-    ) -> Result<UeConfig, Error> {
-        let mut builder = UeConfig::builder().env();
+// impl UeConfigData {
+//     pub fn load_fragment_and_dropin(
+//         &self,
+//         files: &UnitFile,
+//         name: &String,
+//     ) -> Result<UeConfigData, Error> {
+//         let mut builder = UeConfigData::builder().env();
 
-        // fragment
-        for v in files.get_unit_id_fragment_pathbuf(name) {
-            builder = builder.file(&v);
-        }
+//         // fragment
+//         for v in files.get_unit_id_fragment_pathbuf(name) {
+//             builder = builder.file(&v);
+//         }
 
-        let mut configer = builder.load()?;
+//         let mut configer = builder.load()?;
 
-        // dropin
-        for v in files.get_unit_id_dropin_wants(name) {
-            configer.Unit.Wants.push(v.to_string_lossy().to_string());
-            configer.Unit.After.push(v.to_string_lossy().to_string());
-        }
+//         // dropin
+//         for v in files.get_unit_id_dropin_wants(name) {
+//             configer.Unit.Wants.push(v.to_string_lossy().to_string());
+//             configer.Unit.After.push(v.to_string_lossy().to_string());
+//         }
 
-        for v in files.get_unit_id_dropin_requires(name) {
-            configer.Unit.Requires.push(v.to_string_lossy().to_string());
-            configer.Unit.After.push(v.to_string_lossy().to_string());
-        }
-        Ok(configer)
-    }
-}
+//         for v in files.get_unit_id_dropin_requires(name) {
+//             configer.Unit.Requires.push(v.to_string_lossy().to_string());
+//             configer.Unit.After.push(v.to_string_lossy().to_string());
+//         }
+//         Ok(configer)
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -106,7 +155,7 @@ mod tests {
 
     use confique::Config;
 
-    use crate::manager::unit::unit_entry::uu_config::UeConfig;
+    use crate::manager::unit::unit_entry::uu_config::UeConfigData;
 
     fn get_project_root() -> io::Result<PathBuf> {
         let path = env::current_dir()?;
@@ -131,7 +180,7 @@ mod tests {
         let mut file_path = get_project_root().unwrap();
         file_path.push("libutils/examples/config.service.toml");
 
-        let mut builder = UeConfig::builder().env();
+        let mut builder = UeConfigData::builder().env();
         builder = builder.file(&file_path);
 
         let result = builder.load();

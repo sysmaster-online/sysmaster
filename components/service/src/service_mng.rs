@@ -4,17 +4,31 @@ use super::service_config::ServiceConfig;
 use super::service_pid::ServicePid;
 use super::service_spawn::ServiceSpawn;
 use log;
+use nix::errno::Errno;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use process1::manager::{
     ExecCommand, ExecFlags, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags,
 };
 use std::cell::RefCell;
+use std::fmt;
+use std::path::Path;
 use std::rc::Rc;
-use utils::IN_SET;
+use utils::{fd_util, IN_SET};
+use utils::{file_util, process_util, Error};
+
+use std::{
+    os::unix::prelude::{AsRawFd, FromRawFd, RawFd},
+    path::PathBuf,
+    rc::Weak,
+};
+
+use event::{EventState, EventType, Events, Source};
+use nix::libc;
+use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-enum ServiceState {
+pub(self) enum ServiceState {
     Dead,
     Condition,
     StartPre,
@@ -43,8 +57,9 @@ impl Default for ServiceState {
 }
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-enum ServiceResult {
+pub(self) enum ServiceResult {
     Success,
+    FailureProtocol,
     FailureResources,
     FailureTimeout,
     FailureSignal,
@@ -70,10 +85,15 @@ pub(super) struct ServiceMng {
     result: RefCell<ServiceResult>,
     main_command: RefCell<Vec<ExecCommand>>,
     control_command: RefCell<Vec<ExecCommand>>,
+    rd: Rc<RunningData>,
 }
 
 impl ServiceMng {
-    pub(super) fn new(commr: &Rc<ServiceComm>, configr: &Rc<ServiceConfig>) -> ServiceMng {
+    pub(super) fn new(
+        commr: &Rc<ServiceComm>,
+        configr: &Rc<ServiceConfig>,
+        rd: &Rc<RunningData>,
+    ) -> ServiceMng {
         let _pid = Rc::new(ServicePid::new(commr));
         ServiceMng {
             comm: Rc::clone(commr),
@@ -84,6 +104,7 @@ impl ServiceMng {
             result: RefCell::new(ServiceResult::Success),
             main_command: RefCell::new(Vec::new()),
             control_command: RefCell::new(Vec::new()),
+            rd: rd.clone(),
         }
     }
 
@@ -148,7 +169,7 @@ impl ServiceMng {
     }
 
     pub(super) fn current_active_state(&self) -> UnitActiveState {
-        if let Some(service_type) = self.config.Service.Type {
+        if let Some(service_type) = self.config.config_data().borrow().Service.Type {
             service_state_to_unit_state(service_type, self.state())
         } else {
             UnitActiveState::UnitFailed
@@ -194,25 +215,45 @@ impl ServiceMng {
         self.pid.unwatch_control();
         self.pid.unwatch_main();
         self.main_command_fill(ServiceCommand::Start);
-        match self.main_command_pop() {
-            Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0, ExecFlags::PASS_FDS) {
-                    Ok(pid) => self.pid.set_main(pid),
-                    Err(_e) => {
-                        log::error!("failed to start service: {}", self.comm.unit().get_id());
-                        self.enter_signal(
-                            ServiceState::StopSigterm,
-                            ServiceResult::FailureResources,
-                        );
-                    }
-                }
-                self.enter_start_post();
-                // self.set_state(ServiceState::Start);
-            }
-            None => {
-                self.enter_start_post();
-            }
+
+        let service_type = self.config.service_type();
+
+        let cmd = if service_type == ServiceType::Forking {
+            self.control_command_fill(ServiceCommand::Start);
+            self.control_command_pop()
+        } else {
+            self.main_command_fill(ServiceCommand::Start);
+            self.main_command_pop()
+        };
+
+        if cmd.is_none() {
+            self.set_state(ServiceState::Start);
+            self.enter_start_post();
+            return;
         }
+
+        let ret = self
+            .spawn
+            .start_service(&cmd.unwrap(), 0, ExecFlags::PASS_FDS);
+
+        if ret.is_err() {
+            log::error!("failed to start service: {}", self.comm.unit().get_id());
+            self.enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
+        }
+
+        let pid = ret.unwrap();
+        log::debug!("service type is: {}, forking pid is: {}", service_type, pid);
+        if service_type == ServiceType::Forking {
+            // for foring service type, we consider the process startup complete when the process exit;
+            log::debug!("in forking type, set pid {} to control pid", pid);
+            self.pid.set_control(pid);
+            self.set_state(ServiceState::Start);
+        } else {
+            self.pid.set_main(pid);
+            self.enter_start_post();
+        }
+
+        return;
     }
 
     fn enter_start_post(&self) {
@@ -435,7 +476,7 @@ impl ServiceMng {
         // todo!()
         // trigger the unit the dependency trigger_by
 
-        if let Some(service_type) = self.config.Service.Type {
+        if let service_type = self.config.service_type() {
             let os = service_state_to_unit_state(service_type, original_state);
             let ns = service_state_to_unit_state(service_type, state);
             self.comm
@@ -517,6 +558,158 @@ impl ServiceMng {
     //         .borrow_mut()
     //         .insert(cmd_type, cmds.clone());
     // }
+
+    fn load_pid_file(&self) -> Result<bool, Error> {
+        let pid_file = self
+            .config
+            .config_data()
+            .borrow()
+            .Service
+            .PIDFile
+            .as_ref()
+            .map(|s| s.to_string());
+        if pid_file.is_none() {
+            return Err(Error::Other {
+                msg: "pid file is not configured",
+            });
+        }
+
+        let file = &pid_file.unwrap();
+        let pid_file_path = Path::new(file);
+        if !pid_file_path.exists() || !pid_file_path.is_file() {
+            return Err(Error::Other {
+                msg: "pid file is not a file or not exist",
+            });
+        }
+
+        let pid = match file_util::read_first_line(&pid_file_path) {
+            Ok(line) => line.trim().parse::<i32>(),
+            Err(e) => return Err(Error::from(e)),
+        };
+
+        if pid.is_err() {
+            log::debug!(
+                "failed to parse pid from pid_file {:?}, err: {:?}",
+                pid_file_path,
+                pid
+            );
+            return Err(Error::Other {
+                msg: "parsed the pid from pid file failed",
+            });
+        }
+
+        let pid = Pid::from_raw(pid.unwrap());
+        if !self.pid.main().is_none() && self.pid.main().unwrap() == pid {
+            return Ok(false);
+        }
+
+        self.valid_main_pid(pid)?;
+
+        self.pid.unwatch_main();
+        self.pid.set_main(pid);
+        self.comm
+            .um()
+            .child_watch_pid(pid, self.comm.unit().get_id());
+
+        Ok(true)
+    }
+
+    fn valid_main_pid(&self, pid: Pid) -> Result<bool, Error> {
+        if pid == nix::unistd::getpid() {
+            return Err(Error::Other {
+                msg: "main pid is the process1's pid",
+            });
+        }
+
+        if !self.pid.control().is_none() && self.pid.control().unwrap() == pid {
+            return Err(Error::Other {
+                msg: "main pid is the control process",
+            });
+        }
+
+        if !process_util::alive(pid) {
+            return Err(Error::Other {
+                msg: "main pid is not alive",
+            });
+        }
+
+        if self
+            .comm
+            .um()
+            .same_unit_with_pid(self.comm.unit().get_id(), pid)
+        {
+            return Ok(true);
+        }
+
+        Ok(false)
+    }
+
+    pub fn demand_pid_file(&self) -> Result<(), Error> {
+        let pid_file_inotify = PathIntofy::new(PathBuf::from(
+            self.config
+                .config_data()
+                .borrow()
+                .Service
+                .PIDFile
+                .as_ref()
+                .unwrap(),
+        ));
+
+        self.rd.attach_inotify(Rc::new(pid_file_inotify));
+
+        return self.watch_pid_file();
+    }
+
+    pub fn watch_pid_file(&self) -> Result<(), Error> {
+        let pid_file_inotify = self.rd.path_inotify();
+        log::debug!("watch pid file: {}", pid_file_inotify);
+        match pid_file_inotify.add_watch_path() {
+            Ok(_) => {
+                self.comm.um().register(pid_file_inotify.clone());
+                self.comm
+                    .um()
+                    .enable(pid_file_inotify.clone(), EventState::On);
+                if let Err(e) = self.retry_pid_file() {
+                    log::warn!("retry load pid file error: {}, Ignore and Continue", e);
+                }
+                return Ok(());
+            }
+
+            Err(e) => {
+                log::debug!(
+                    "failed to add watch for pid file {:?}, err: {}",
+                    pid_file_inotify.path,
+                    e
+                );
+                self.unwatch_pid_file();
+
+                return Err(e);
+            }
+        }
+    }
+
+    pub(super) fn unwatch_pid_file(&self) {
+        log::debug!("unwatch pid file {}", self.rd.path_inotify());
+        self.rd.path_inotify().unwatch();
+    }
+
+    pub(super) fn retry_pid_file(&self) -> Result<bool, Error> {
+        log::debug!("retry loading pid file: {}", self.rd.path_inotify());
+        self.load_pid_file()?;
+
+        self.unwatch_pid_file();
+        self.enter_running(ServiceResult::Success);
+
+        Ok(true)
+    }
+
+    fn cgroup_good(&self) -> bool {
+        if let Ok(v) = cgroup::cg_is_empty_recursive(&self.comm.unit().cg_path()) {
+            return !v;
+        }
+
+        false
+    }
 }
 
 impl ServiceMng {
@@ -543,6 +736,13 @@ impl ServiceMng {
         }
 
         if self.pid.main() == Some(pid) {
+            // for main pid updated by the process before its exited, updated the main pid.
+            if let Ok(v) = self.load_pid_file() {
+                if v {
+                    return;
+                }
+            }
+
             self.pid.reset_main();
 
             if self.result() == ServiceResult::Success {
@@ -582,51 +782,123 @@ impl ServiceMng {
 
             if !self.control_command.borrow().is_empty() && res == ServiceResult::Success {
                 self.run_next_control();
-            } else {
-                self.control_command.borrow_mut().clear();
-                match self.state() {
-                    ServiceState::Condition => {
-                        if res == ServiceResult::Success {
-                            self.enter_prestart();
-                        } else {
-                            self.enter_signal(ServiceState::StopSigterm, res);
-                        }
-                    }
-                    ServiceState::StartPre => {
-                        if res == ServiceResult::Success {
-                            self.enter_start();
-                        } else {
-                            self.enter_signal(ServiceState::StopSigterm, res);
-                        }
-                    }
-                    ServiceState::Start => {
-                        if res == ServiceResult::Success {
-                            self.enter_start_post();
-                        }
-                    }
-                    ServiceState::StartPost => {
-                        self.enter_running(ServiceResult::Success);
-                    }
-                    ServiceState::Runing => todo!(),
-                    ServiceState::Reload => {
-                        self.enter_running(res);
-                    }
-                    ServiceState::Stop => {
+                return;
+            }
+
+            self.control_command.borrow_mut().clear();
+            match self.state() {
+                ServiceState::Condition => {
+                    if res == ServiceResult::Success {
+                        self.enter_prestart();
+                    } else {
                         self.enter_signal(ServiceState::StopSigterm, res);
                     }
-                    ServiceState::StopSigterm
-                    | ServiceState::StopSigkill
-                    | ServiceState::StopWatchdog => {
-                        self.enter_stop_post(res);
-                    }
-                    ServiceState::StopPost => {
-                        self.enter_signal(ServiceState::FinalSigterm, res);
-                    }
-                    ServiceState::FinalSigterm | ServiceState::FinalSigkill => {
-                        self.enter_dead(res);
-                    }
-                    _ => {}
                 }
+                ServiceState::StartPre => {
+                    if res == ServiceResult::Success {
+                        self.enter_start();
+                    } else {
+                        self.enter_signal(ServiceState::StopSigterm, res);
+                    }
+                }
+                ServiceState::Start => {
+                    // only forking type will be in Start state with the control pid exit.
+                    if self.config.service_type() == ServiceType::Forking {
+                        log::debug!("in sigchild, forking type control pid exit");
+                        if res == ServiceResult::Success
+                            && self.config.config_data().borrow().Service.PIDFile.is_some()
+                        {
+                            // will load the pid_file after the forking pid exist.
+                            let start_post_exist = if self
+                                .config
+                                .get_exec_cmds(ServiceCommand::StartPost)
+                                .is_some()
+                            {
+                                self.config
+                                    .get_exec_cmds(ServiceCommand::StartPost)
+                                    .unwrap()
+                                    .len()
+                                    != 0
+                            } else {
+                                false
+                            };
+
+                            let loaded = self.load_pid_file();
+                            log::debug!(
+                                "service in Start state, load pid file result: {:?}",
+                                loaded
+                            );
+                            if loaded.is_err() && !start_post_exist {
+                                match self.demand_pid_file() {
+                                    Ok(_) => {
+                                        if !self.cgroup_good() {
+                                            self.enter_signal(
+                                                ServiceState::StopSigterm,
+                                                ServiceResult::FailureProtocol,
+                                            );
+                                        }
+                                    }
+                                    Err(_e) => {
+                                        log::error!("demand pid file failed: {:?}", _e);
+                                        self.enter_signal(
+                                            ServiceState::StopSigterm,
+                                            ServiceResult::FailureProtocol,
+                                        );
+                                    }
+                                }
+                                return;
+                            }
+
+                            self.enter_start_post();
+                        } else {
+                            self.enter_signal(ServiceState::StopSigterm, res);
+                        }
+                    }
+                }
+                ServiceState::StartPost => {
+                    if res != ServiceResult::Success {
+                        self.enter_signal(ServiceState::StopSigterm, res);
+                    }
+                    if self.config.config_data().borrow().Service.PIDFile.is_some() {
+                        let loaded = self.load_pid_file();
+                        if loaded.is_err() {
+                            match self.demand_pid_file() {
+                                Ok(_) => {
+                                    if !self.cgroup_good() {
+                                        self.enter_stop(ServiceResult::FailureProtocol);
+                                    }
+                                }
+                                Err(_) => {
+                                    self.enter_signal(
+                                        ServiceState::StopSigterm,
+                                        ServiceResult::FailureProtocol,
+                                    );
+                                }
+                            }
+                            return;
+                        }
+                    }
+                    self.enter_running(ServiceResult::Success);
+                }
+                ServiceState::Runing => todo!(),
+                ServiceState::Reload => {
+                    self.enter_running(res);
+                }
+                ServiceState::Stop => {
+                    self.enter_signal(ServiceState::StopSigterm, res);
+                }
+                ServiceState::StopSigterm
+                | ServiceState::StopSigkill
+                | ServiceState::StopWatchdog => {
+                    self.enter_stop_post(res);
+                }
+                ServiceState::StopPost => {
+                    self.enter_signal(ServiceState::FinalSigterm, res);
+                }
+                ServiceState::FinalSigterm | ServiceState::FinalSigkill => {
+                    self.enter_dead(res);
+                }
+                _ => {}
             }
         }
     }
@@ -696,4 +968,240 @@ fn service_state_to_unit_state(service_type: ServiceType, state: ServiceState) -
     }
 
     state.to_unit_active_state()
+}
+
+pub(super) struct RunningData {
+    mng: RefCell<Weak<ServiceMng>>,
+    data: RefCell<Rtdata>,
+}
+
+impl RunningData {
+    pub fn new() -> Self {
+        RunningData {
+            mng: RefCell::new(Weak::new()),
+            data: RefCell::new(Rtdata::new()),
+        }
+    }
+
+    pub(self) fn attach_inotify(&self, path_inotify: Rc<PathIntofy>) {
+        path_inotify.attach(self.mng.borrow_mut().clone());
+        self.data.borrow_mut().attach_inotify(path_inotify);
+    }
+
+    pub(self) fn path_inotify(&self) -> Rc<PathIntofy> {
+        self.data.borrow().path_inotify()
+    }
+
+    pub(super) fn attach_mng(&self, mng: Rc<ServiceMng>) {
+        *self.mng.borrow_mut() = Rc::downgrade(&mng);
+    }
+}
+
+struct Rtdata {
+    path_inotify: Option<Rc<PathIntofy>>,
+}
+
+impl Rtdata {
+    pub(self) fn new() -> Self {
+        Rtdata { path_inotify: None }
+    }
+
+    pub(self) fn attach_inotify(&mut self, path_inotify: Rc<PathIntofy>) {
+        self.path_inotify = Some(path_inotify)
+    }
+
+    pub(self) fn path_inotify(&self) -> Rc<PathIntofy> {
+        self.path_inotify.as_ref().unwrap().clone()
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Hash)]
+enum PathType {
+    Changed,
+    Modified,
+}
+
+struct PathIntofy {
+    path: PathBuf,
+    p_type: PathType,
+    inotify: RefCell<RawFd>,
+    wd: RefCell<Option<WatchDescriptor>>,
+    mng: RefCell<Weak<ServiceMng>>,
+}
+
+impl fmt::Display for PathIntofy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "path: {:?}, path type: {:?}, inotify fd: {}",
+            self.path,
+            self.p_type,
+            *self.inotify.borrow()
+        )
+    }
+}
+
+impl PathIntofy {
+    fn new(path: PathBuf) -> Self {
+        PathIntofy {
+            path,
+            p_type: PathType::Modified,
+            inotify: RefCell::new(-1),
+            wd: RefCell::new(None),
+            mng: RefCell::new(Weak::new()),
+        }
+    }
+
+    pub(super) fn attach(&self, mng: Weak<ServiceMng>) {
+        log::debug!("attach service mng to path inotify");
+        *self.mng.borrow_mut() = mng;
+    }
+
+    fn add_watch_path(&self) -> Result<bool, Error> {
+        self.unwatch();
+
+        let inotify = Inotify::init(InitFlags::all()).map_err(|_e| Error::Other {
+            msg: "create initofy fd err",
+        })?;
+        *self.inotify.borrow_mut() = inotify.as_raw_fd();
+
+        let ansters = self.path.as_path().ancestors();
+        let mut primary: bool = true;
+        let mut flags: AddWatchFlags;
+
+        let mut exist = false;
+        for anster in ansters {
+            flags = if primary {
+                AddWatchFlags::IN_DELETE_SELF
+                    | AddWatchFlags::IN_MOVE_SELF
+                    | AddWatchFlags::IN_ATTRIB
+                    | AddWatchFlags::IN_CLOSE_WRITE
+                    | AddWatchFlags::IN_CREATE
+                    | AddWatchFlags::IN_DELETE
+                    | AddWatchFlags::IN_MOVED_FROM
+                    | AddWatchFlags::IN_MOVED_TO
+                    | AddWatchFlags::IN_MODIFY
+            } else {
+                AddWatchFlags::IN_DELETE_SELF
+                    | AddWatchFlags::IN_MOVE_SELF
+                    | AddWatchFlags::IN_ATTRIB
+                    | AddWatchFlags::IN_CREATE
+                    | AddWatchFlags::IN_MOVED_TO
+            };
+
+            log::debug!(
+                "inotify fd is: {}, flags is: {:?}, path: {:?}",
+                *self.inotify.borrow(),
+                flags,
+                anster
+            );
+
+            match inotify.add_watch(anster, flags) {
+                Ok(wd) => {
+                    if primary {
+                        *self.wd.borrow_mut() = Some(wd);
+                    }
+
+                    exist = true;
+                    break;
+                }
+                Err(err) => {
+                    log::error!("watch on path {:?} error: {:?}", anster, err);
+                }
+            }
+
+            primary = false;
+        }
+
+        if !exist {
+            return Err(Error::Other {
+                msg: "watch on any of the ancester failed",
+            });
+        }
+
+        Ok(true)
+    }
+
+    fn unwatch(&self) {
+        fd_util::close(*self.inotify.borrow());
+        *self.inotify.borrow_mut() = RawFd::from(-1);
+    }
+
+    fn read_fd_event(&self) -> Result<bool, Error> {
+        let inotify = unsafe { Inotify::from_raw_fd(*self.inotify.borrow_mut()) };
+        let events = match inotify.read_events() {
+            Ok(events) => events,
+            Err(e) => {
+                if e == Errno::EAGAIN || e == Errno::EINTR {
+                    return Ok(false);
+                }
+
+                return Err(Error::Other {
+                    msg: "read evnets from inotify error",
+                });
+            }
+        };
+
+        if IN_SET!(self.p_type, PathType::Changed, PathType::Modified) {
+            for event in events {
+                if let Some(ref wd) = *self.wd.borrow() {
+                    if event.wd == *wd {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    pub(super) fn mng(&self) -> Rc<ServiceMng> {
+        self.mng.borrow().clone().upgrade().unwrap()
+    }
+}
+
+impl Source for PathIntofy {
+    fn fd(&self) -> RawFd {
+        *self.inotify.borrow()
+    }
+
+    fn event_type(&self) -> EventType {
+        EventType::Io
+    }
+
+    fn epoll_event(&self) -> u32 {
+        (libc::EPOLLIN) as u32
+    }
+
+    fn priority(&self) -> i8 {
+        0i8
+    }
+
+    fn dispatch(&self, _: &Events) -> Result<i32, Error> {
+        log::debug!("dispatch initify pid file: {:?}", self.path);
+        match self.read_fd_event() {
+            Ok(_) => {
+                if let Ok(_v) = self.mng().retry_pid_file() {
+                    return Ok(0);
+                }
+
+                if let Ok(_v) = self.mng().watch_pid_file() {
+                    return Ok(0);
+                }
+            }
+            Err(e) => {
+                log::error!("in inotify dispatch, read event error: {}", e);
+            }
+        }
+
+        self.mng().unwatch_pid_file();
+        self.mng()
+            .enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
+        Ok(0)
+    }
+
+    fn token(&self) -> u64 {
+        let data: u64 = unsafe { std::mem::transmute(self) };
+        data
+    }
 }

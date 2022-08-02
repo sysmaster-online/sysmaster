@@ -484,7 +484,13 @@ impl JobManagerData {
         if !force {
             // is forced removement a failure?
             if result != JobResult::JobDone {
-                if let JobMode::JobFail = unit.get_config().Unit.OnFailureJobMode {
+                if let JobMode::JobFail = unit
+                    .get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .OnFailureJobMode
+                {
                     self.exec_on(
                         Rc::clone(unit),
                         UnitRelationAtom::UnitAtomOnFailure,
@@ -514,7 +520,13 @@ impl JobManagerData {
         if ns != os && !flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART) {
             match ns {
                 UnitActiveState::UnitFailed => {
-                    if let JobMode::JobFail = unit.get_config().Unit.OnFailureJobMode {
+                    if let JobMode::JobFail = unit
+                        .get_config()
+                        .config_data()
+                        .borrow()
+                        .Unit
+                        .OnFailureJobMode
+                    {
                         self.exec_on(
                             Rc::clone(unit),
                             UnitRelationAtom::UnitAtomOnFailure,
@@ -537,7 +549,13 @@ impl JobManagerData {
                 | UnitActiveState::UnitInActive
                 | UnitActiveState::UnitMaintenance => {}
                 _ => {
-                    if let JobMode::JobFail = unit.get_config().Unit.OnFailureJobMode {
+                    if let JobMode::JobFail = unit
+                        .get_config()
+                        .config_data()
+                        .borrow()
+                        .Unit
+                        .OnFailureJobMode
+                    {
                         self.exec_on(
                             Rc::clone(unit),
                             UnitRelationAtom::UnitAtomOnSuccess,
@@ -581,7 +599,7 @@ fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno
             return Err(JobErrno::JobErrInput);
         }
 
-        if let false = unit.get_config().Unit.AllowIsolate {
+        if let false = unit.get_config().config_data().borrow().Unit.AllowIsolate {
             return Err(JobErrno::JobErrInput);
         }
     }
