@@ -56,6 +56,18 @@ lazy_static! {
         //     options: Some("1777".to_string()),
         //     flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
         // });
+
+        // the first remount only for test, will be delete later.
+        table.push(MountPoint {
+            source: String::from("tmpfs"),
+            target: String::from("/sys/fs/cgroup"),
+            fs_type: String::from("tmpfs"),
+            options: None,
+            flags: MsFlags::MS_REMOUNT | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+            callback: Some(cg_legacy_wanted),
+            mode: MountMode::MNT_WRITABLE,
+        });
+
         table.push(MountPoint {
             source: String::from("cgroup2"),
             target: String::from("/sys/fs/cgroup"),
@@ -167,7 +179,17 @@ impl MountPoint {
         match self.invalid_mount_point(AtFlags::AT_SYMLINK_FOLLOW) {
             Ok(v) => {
                 if v {
-                    log::debug!("invalid mount point");
+                    if self.flags.intersects(MsFlags::MS_REMOUNT) {
+                        log::debug!("remount the root mount point for writable");
+                        nix::mount::mount::<str, str, str, str>(
+                            Some(self.source.as_str()),
+                            self.target.as_str(),
+                            Some(self.fs_type.as_str()),
+                            self.flags,
+                            None,
+                        )?;
+                    }
+                    log::debug!("mount point maybe is already mounted");
                     return Ok(());
                 }
             }

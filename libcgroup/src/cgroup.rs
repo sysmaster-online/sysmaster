@@ -275,9 +275,13 @@ pub fn cg_controllers() -> Result<Vec<String>, IOError> {
 mod tests {
     #[test]
     fn test_cg_create() {
+        use nix::sys::signal::Signal;
         use nix::unistd::Pid;
+        use std::collections::HashSet;
         use std::io::ErrorKind;
         use std::path::PathBuf;
+
+        use crate::CgFlags;
 
         let cg_type = if let Ok(cg_type) = super::cg_type() {
             cg_type
@@ -305,10 +309,21 @@ mod tests {
             assert_eq!(p, path_buf.join(&cg_path).join(&PathBuf::from("")),)
         }
 
-        if let Err(_e) = super::cg_attach(Pid::from_raw(-1), &cg_path) {
+        if let Err(_e) = super::cg_attach(Pid::from_raw(1), &cg_path) {
             println!("attach failed");
             return;
         }
+
+        let pids = super::cg_get_pids(&cg_path);
+        assert_ne!(pids.len(), 0);
+
+        if let Err(_e) = super::cg_attach(Pid::from_raw(1), &PathBuf::from("")) {
+            println!("attach pid to root cgroup, error: {:?}", _e);
+            return;
+        }
+
+        let pids = super::cg_get_pids(&cg_path);
+        assert_eq!(pids.len(), 0);
     }
 
     #[test]
