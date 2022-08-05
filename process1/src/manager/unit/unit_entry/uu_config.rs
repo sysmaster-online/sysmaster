@@ -5,7 +5,7 @@ use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::JobMode;
 use crate::manager::unit::DeserializeWith;
 
-#[derive(Config, Default)]
+#[derive(Config, Default, Debug)]
 pub(crate) struct UeConfig {
     #[config(nested)]
     pub Unit: UeConfigUnit,
@@ -13,7 +13,7 @@ pub(crate) struct UeConfig {
     pub Install: UeConfigInstall,
 }
 
-#[derive(Config, Default)]
+#[derive(Config, Default, Debug)]
 pub(crate) struct UeConfigUnit {
     #[config(default = "")]
     pub Description: String,
@@ -43,7 +43,7 @@ pub(crate) struct UeConfigUnit {
     pub After: Vec<String>,
 }
 
-#[derive(Config, Default)]
+#[derive(Config, Default, Debug)]
 pub(crate) struct UeConfigInstall {
     #[config(default = "")]
     pub Alias: String,
@@ -91,5 +91,51 @@ impl UeConfig {
             configer.Unit.After.push(v.to_string_lossy().to_string());
         }
         Ok(configer)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        env,
+        ffi::OsString,
+        fs::read_dir,
+        io::{self, ErrorKind},
+        path::PathBuf,
+    };
+
+    use confique::Config;
+
+    use crate::manager::unit::unit_entry::uu_config::UeConfig;
+
+    fn get_project_root() -> io::Result<PathBuf> {
+        let path = env::current_dir()?;
+        let mut path_ancestors = path.as_path().ancestors();
+
+        while let Some(p) = path_ancestors.next() {
+            let has_cargo = read_dir(p)?
+                .into_iter()
+                .any(|p| p.unwrap().file_name() == OsString::from("Cargo.lock"));
+            if has_cargo {
+                return Ok(PathBuf::from(p));
+            }
+        }
+        Err(io::Error::new(
+            ErrorKind::NotFound,
+            "Ran out of places to find Cargo.toml",
+        ))
+    }
+
+    #[test]
+    fn test_service_parse() {
+        let mut file_path = get_project_root().unwrap();
+        file_path.push("libutils/examples/config.service.toml");
+
+        let mut builder = UeConfig::builder().env();
+        builder = builder.file(&file_path);
+
+        let result = builder.load();
+
+        println!("{:?}", result);
     }
 }

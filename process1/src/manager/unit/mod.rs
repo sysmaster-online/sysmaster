@@ -1,3 +1,5 @@
+use std::path::Path;
+
 pub use execute::{ExecCmdError, ExecCommand, ExecContext, ExecFlags, ExecParameters};
 pub use unit_base::{KillOperation, UnitActionError, UnitType};
 pub use unit_entry::{Unit, UnitObj, UnitRef};
@@ -45,6 +47,44 @@ impl DeserializeWith for Vec<String> {
 
         for l in s.split_whitespace() {
             vec.push(l.to_string());
+        }
+
+        Ok(vec)
+    }
+}
+
+impl DeserializeWith for Vec<ExecCommand> {
+    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(de)?;
+
+        let mut vec = vec![];
+
+        for cmd in s.trim().split_terminator(';') {
+            if cmd.is_empty() {
+                continue;
+            }
+
+            let mut command: Vec<String> = cmd
+                .trim()
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect();
+
+            // get the command and leave the command args
+            let exec_cmd = command.remove(0);
+            let path = Path::new(&exec_cmd);
+
+            if path.is_absolute() && !path.exists() {
+                log::debug!("{:?} is not exist in parse!", path);
+                continue;
+            }
+
+            let cmd = path.to_str().unwrap().to_string();
+            let new_command = ExecCommand::new(cmd, command);
+            vec.push(new_command);
         }
 
         Ok(vec)

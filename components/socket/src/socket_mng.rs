@@ -1,22 +1,19 @@
 //! socket_mng模块是socket类型的核心逻辑，主要实现socket端口的管理，子进程的拉起及子类型的状态管理。
 //!
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, path::Path, rc::Rc};
 
 use event::EventState;
 use nix::{sys::signal::Signal, unistd::Pid};
 use process1::manager::{
-    ExecCommand, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags,
+    ExecCommand, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags, UnitRef,
+    UnitType,
 };
 use utils::IN_SET;
 
 use crate::{
-    socket_base::SocketCommand,
-    socket_comm::SocketComm,
-    socket_config::{SocketConfig, SocketConfigItem},
-    socket_pid::SocketPid,
-    socket_port::SocketPorts,
-    socket_spawn::SocketSpawn,
+    socket_base::SocketCommand, socket_comm::SocketComm, socket_config::SocketConfig,
+    socket_pid::SocketPid, socket_port::SocketPorts, socket_spawn::SocketSpawn,
 };
 
 #[allow(dead_code)]
@@ -96,8 +93,9 @@ pub(super) struct SocketMng {
     spawn: SocketSpawn,
     state: Rc<RefCell<SocketState>>,
     result: RefCell<SocketResult>,
-    control_command: RefCell<Vec<Rc<ExecCommand>>>,
+    control_command: RefCell<Vec<ExecCommand>>,
     refused: RefCell<i32>,
+    service: RefCell<UnitRef>,
 }
 
 impl SocketMng {
@@ -117,7 +115,38 @@ impl SocketMng {
             control_command: RefCell::new(Vec::new()),
             pid: pid.clone(),
             refused: RefCell::new(0),
+            service: RefCell::new(UnitRef::new()),
         }
+    }
+
+    pub(super) fn set_ref(&self, source: String, target: String) {
+        self.service.borrow_mut().set_ref(source, target);
+    }
+
+    pub(super) fn load_related_unit(&self, related_type: UnitType) -> bool {
+        let unit_name = self.comm.unit().get_id().to_string();
+        let stem_name = Path::new(&unit_name).file_stem().unwrap().to_str().unwrap();
+
+        let suffix = String::from(related_type);
+        if suffix.len() == 0 {
+            return false;
+        }
+
+        let relate_name = format!("{}.{}", stem_name, suffix);
+        if !self.comm.um().load_unit_success(&relate_name) {
+            return false;
+        }
+
+        self.set_ref(self.comm.unit().get_id().to_string(), relate_name);
+
+        true
+    }
+
+    pub(super) fn unit_ref_target(&self) -> Option<String> {
+        self.service
+            .borrow()
+            .target()
+            .map_or(None, |v| Some(v.to_string()))
     }
 
     pub(super) fn start_check(&self) -> Result<(), UnitActionError> {
@@ -143,12 +172,11 @@ impl SocketMng {
             return Ok(());
         }
 
-        self.config.unit_ref_target().map_or(Ok(()), |name| {
-            match self.comm.um().unit_enabled(&name) {
+        self.unit_ref_target()
+            .map_or(Ok(()), |name| match self.comm.um().unit_enabled(&name) {
                 Ok(_) => Ok(()),
                 Err(e) => Err(e),
-            }
-        })?;
+            })?;
 
         Ok(())
     }
@@ -208,15 +236,11 @@ impl SocketMng {
                 .um()
                 .relation_active_or_pending(self.comm.unit().get_id())
             {
-                if self.config.unit_ref_target().is_none() {
+                if self.unit_ref_target().is_none() {
                     self.enter_stop_pre(SocketResult::FailureResources);
                     return;
                 }
-                match self
-                    .comm
-                    .um()
-                    .start_unit(&self.config.unit_ref_target().unwrap())
-                {
+                match self.comm.um().start_unit(&self.unit_ref_target().unwrap()) {
                     Ok(_) => {}
                     Err(_) => {
                         self.enter_stop_pre(SocketResult::FailureResources);
@@ -297,9 +321,7 @@ impl SocketMng {
 
     fn enter_listening(&self) {
         log::debug!("enter start listening state");
-        if let SocketConfigItem::ScAccept(accept) =
-            self.config.get(&SocketConfigItem::ScAccept(false))
-        {
+        if let Some(accept) = self.config.Socket.Accept {
             if !accept {
                 self.flush_ports();
             }
@@ -528,10 +550,12 @@ impl SocketMng {
     }
 
     fn control_command_fill(&self, cmd_type: SocketCommand) {
-        *self.control_command.borrow_mut() = self.config.exec_cmds(cmd_type);
+        if let Some(cmds) = self.config.get_exec_cmds(cmd_type) {
+            *self.control_command.borrow_mut() = cmds
+        }
     }
 
-    fn control_command_pop(&self) -> Option<Rc<ExecCommand>> {
+    fn control_command_pop(&self) -> Option<ExecCommand> {
         self.control_command.borrow_mut().pop()
     }
 

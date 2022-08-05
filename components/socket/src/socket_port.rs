@@ -20,7 +20,7 @@ use std::{
 
 use crate::{
     socket_base::PortType,
-    socket_config::{SocketConfig, SocketConfigItem},
+    socket_config::SocketConfig,
     socket_mng::{SocketMng, SocketState},
 };
 
@@ -382,31 +382,25 @@ impl SocketPort {
     }
 
     pub(super) fn apply_sock_opt(&self, fd: RawFd) {
-        if let SocketConfigItem::ScPassPktinfo(v) =
-            self.config.get(&SocketConfigItem::ScPassPktinfo(false))
-        {
+        if let Some(v) = self.config.Socket.PassPacketInfo {
             if let Err(e) = socket_util::set_pkginfo(fd, self.family(), v) {
                 log::warn!("set socket pkginfo errno: {}", e);
             }
         }
 
-        if let SocketConfigItem::ScCred(v) = self.config.get(&SocketConfigItem::ScCred(false)) {
+        if let Some(v) = self.config.Socket.PassCredentials {
             if let Err(e) = socket_util::set_pass_cred(fd, v) {
                 log::warn!("set socket pass cred errno: {}", e);
             }
         }
 
-        if let SocketConfigItem::ScReceiveBuffer(v) =
-            self.config.get(&SocketConfigItem::ScReceiveBuffer(0))
-        {
+        if let Some(v) = self.config.Socket.ReceiveBuffer {
             if let Err(e) = socket_util::set_receive_buffer(fd, v as usize) {
                 log::warn!("set socket receive buffer errno: {}", e);
             }
         }
 
-        if let SocketConfigItem::ScSendBuffer(v) =
-            self.config.get(&SocketConfigItem::ScSendBuffer(0))
-        {
+        if let Some(v) = self.config.Socket.SendBuffer {
             if let Err(e) = socket_util::set_send_buffer(fd, v as usize) {
                 log::warn!("set socket send buffer errno: {}", e);
             }
@@ -439,9 +433,7 @@ impl Source for SocketPort {
             return Ok(0);
         }
 
-        if let SocketConfigItem::ScAccept(accept) =
-            self.config.get(&SocketConfigItem::ScAccept(false))
-        {
+        if let Some(accept) = self.config.Socket.Accept {
             if accept && self.p_type() == PortType::Socket && self.can_accept() {
                 let afd = self
                     .accept()
@@ -474,7 +466,7 @@ mod tests {
     #[test]
     fn test_socket_ports() {
         let ports = SocketPorts::new();
-        let config = Rc::new(SocketConfig::new());
+        let config = Rc::new(SocketConfig::default());
 
         let sockv4 = SockAddr::Inet(InetAddr::new(IpAddr::new_v4(0, 0, 0, 0), 31457));
         let socket_addr = SocketAddress::new(sockv4, SockType::Stream, None);

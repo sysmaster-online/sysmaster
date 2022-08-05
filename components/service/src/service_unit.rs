@@ -1,6 +1,5 @@
 use super::service_comm::ServiceComm;
-use super::service_config::{ServiceConf, ServiceConfig};
-use super::service_load::ServiceLoad;
+use super::service_config::ServiceConfig;
 use super::service_mng::ServiceMng;
 use super::service_monitor::ServiceMonitor;
 use log;
@@ -10,15 +9,14 @@ use process1::manager::{
     Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
 };
 use std::error::Error;
+use std::path::PathBuf;
 use std::rc::Rc;
-use utils::config_parser::ConfigParse;
 use utils::logger;
 
 struct ServiceUnit {
     comm: Rc<ServiceComm>,
     config: Rc<ServiceConfig>,
     mng: ServiceMng,
-    load: ServiceLoad,
     monitor: ServiceMonitor,
 }
 
@@ -31,16 +29,12 @@ impl UnitObj for ServiceUnit {
         todo!()
     }
 
-    fn load(&self, conf_str: &str) -> Result<(), Box<dyn Error>> {
-        let service_parser = ServiceConf::builder_parser();
-        let service_conf = service_parser.conf_file_parse(conf_str);
-        let ret = service_conf.map(|_conf| self.load.parse(_conf));
-        if let Err(_e) = ret {
-            return Err(Box::new(_e));
-        }
-        self.load.service_add_extras();
+    fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
+        self.config.load(paths);
+        // // self.load.service_add_extras();
+        // self.config.parse_commands(&mut self.mng);
 
-        return self.load.service_verify();
+        return self.service_verify();
     }
 
     fn coldplug(&self) {
@@ -110,15 +104,18 @@ impl UnitSubClass for ServiceUnit {
 
 impl ServiceUnit {
     fn new() -> ServiceUnit {
-        let _comm = Rc::new(ServiceComm::new());
-        let _config = Rc::new(ServiceConfig::new());
+        let comm = Rc::new(ServiceComm::new());
+        let config = Rc::new(ServiceConfig::default());
         ServiceUnit {
-            comm: Rc::clone(&_comm),
-            config: Rc::clone(&_config),
-            mng: ServiceMng::new(&_comm, &_config),
-            load: ServiceLoad::new(&_config),
-            monitor: ServiceMonitor::new(&_config),
+            comm: Rc::clone(&comm),
+            config: Rc::clone(&config),
+            mng: ServiceMng::new(&comm, &config),
+            monitor: ServiceMonitor::new(&config),
         }
+    }
+
+    pub fn service_verify(&self) -> Result<(), Box<dyn Error>> {
+        Ok(())
     }
 }
 
@@ -132,32 +129,3 @@ const LOG_LEVEL: u32 = 4;
 const PLUGIN_NAME: &str = "ServiceUnit";
 use process1::declure_unitobj_plugin;
 declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default, PLUGIN_NAME, LOG_LEVEL);
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::service_base::ServiceCommand;
-    use process1::manager::UnitObj;
-    use std::{fs::File, io::Read};
-
-    #[test]
-    fn test_service_parse() {
-        let file_path = "../../libutils/examples/config.service";
-        let mut file = File::open(file_path).unwrap();
-        let mut buf = String::new();
-        match file.read_to_string(&mut buf) {
-            Ok(s) => s,
-            Err(_e) => {
-                return;
-            }
-        };
-
-        let service = ServiceUnit::new();
-        let _result = service.load(buf.as_str());
-        assert_ne!(service.config.get_exec_cmds(ServiceCommand::Start).len(), 0);
-
-        for command in &service.config.get_exec_cmds(ServiceCommand::Start) {
-            println!("cmd: {}, args: {:?}", command.path(), command.argv());
-        }
-    }
-}

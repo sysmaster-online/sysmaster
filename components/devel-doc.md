@@ -159,28 +159,103 @@ unit作为所管理的系统资源在process1中的投影，unit在通过os接�
        WantedBy="dbus.service"
     ```
 
-    process1框架提供了标准的解析宏ConfigParseM，可以方便的将配置文件转化成子类配置数据结构，代码示例如下：
+    process1框架使用Confique来解析配置，可以方便的将配置文件转化成子类配置数据结构，代码示例如下：
 
     ```rust
-        #[derive(Serialize, Deserialize, ConfigParseM)]
-        #[serdeName("SubUnitName")]
-        #[serde(rename_all = "PascalCase")]
-        pub(super) struct SubUnitConf {
-            #[serde(alias = "Type", default = "ServiceType::default")]
-            service_type: ServiceType,
-            #[serde(alias = "BusName")]
-            bus_name: Option<String>,
+       #[derive(Config, Default)]
+        pub(crate) struct UeConfig {
+            #[config(nested)]
+            pub Unit: UeConfigUnit,   // section [Unit]
+            #[config(nested)]
+            pub Install: UeConfigInstall, // section [Install]
+        }
+
+        #[derive(Config, Default)]
+        pub(crate) struct UeConfigUnit {
+            #[config(default = "")]
+            pub Description: String,
+            #[config(default = "")]
+            pub Documentation: String,
+            #[config(default = false)]
+            pub AllowIsolate: bool,
+            #[config(default = false)]
+            pub IgnoreOnIsolate: bool,
+            // #[config(deserialize_with = JobMode::deserialize_with)]
+            // #[config(default = "replace")]
+            // pub on_success_job_mode: JobMode,
+            #[config(deserialize_with = JobMode::deserialize_with)]   // 配置对应字段的解析函数
+            #[config(default = "replace")]
+            pub OnFailureJobMode: JobMode,
+            #[config(deserialize_with = Vec::<String>::deserialize_with)]
+            #[config(default = "")]
+            pub Wants: Vec<String>,
+            #[config(deserialize_with = Vec::<String>::deserialize_with)]
+            #[config(default = "")]
+            pub Requires: Vec<String>,
+            #[config(deserialize_with = Vec::<String>::deserialize_with)]
+            #[config(default = "")]
+            pub Before: Vec<String>,
+            #[config(deserialize_with = Vec::<String>::deserialize_with)]
+            #[config(default = "")]
+            pub After: Vec<String>,
+        }
+
+        #[derive(Config, Default)]
+        pub(crate) struct UeConfigInstall {
+            #[config(default = "")]
+            pub Alias: String,
+            #[config(deserialize_with = Vec::<String>::deserialize_with)]
+            #[config(default = "")]
+            pub WantedBy: Vec<String>,
+            #[config(deserialize_with = Vec::<String>::deserialize_with)]
+            #[config(default = "")]
+            pub RequiredBy: Vec<String>,
+            #[config(default = "")]
+            pub Also: String,
+            #[config(default = "")]
+            pub DefaultInstance: String,
+            // #[config(default = "")]
+            // pub install_alias: String,
+            // #[config(default = "")]
+            // pub install_also: String,
+            // #[config(default = "")]
+            // pub install_default_install: String,
         }
         ```
-    配置文件的数据结构需要实现Serialize和Deserialize，并且通过ConfigParseM宏，可以方便的解析
-    ConfigParseM宏的属性serdeName，指定数据结构映射到toml文件的具体配置段的名称，如示例代码中的[SubUnitName],定义好之后就可以通过一下代码完成解析：
-
+    配置文件的数据结构的字段, confique支持基本的数据类型,一些复杂的数据类型,需要实现自行实现Trait DeserializeWith.
     ```rust
-        fn load(&self, conf_str: &str) -> Result<(), Box<dyn Error>> {
-            let sub_unit_parser = SubUnitConf::builder_parser();
-            let service_conf = sub_unit_parser.conf_file_parse(conf_str);
-            .....
+    pub trait DeserializeWith: Sized {
+    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>;
+    }
+
+    impl DeserializeWith for Vec<String> {
+        fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let s = String::deserialize(de)?;
+            let mut vec = Vec::new();
+
+            for l in s.split_whitespace() {
+                vec.push(l.to_string());
+            }
+
+            Ok(vec)
         }
+    }
+    ```
+    在配置加载时,将配置file()添加进来,最终load起来,之后数据结构中的字段便可以访问.注意, confique当前使用的toml格式的配置文件.
+    ```rust
+        let mut builder = UeConfig::builder().env();
+
+        // fragment
+        for v in files.get_unit_id_fragment_pathbuf(name) {
+            builder = builder.file(&v);
+        }
+
+        let mut configer = builder.load()?;
     ```
 
 6. 插件注册
