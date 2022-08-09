@@ -1,4 +1,4 @@
-use super::service_config::{ServiceConfig, ServiceConfigItem};
+use super::service_config::ServiceConfig;
 use process1::watchdog;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -41,10 +41,10 @@ impl ServiceMonitorData {
     }
 
     pub(self) fn start_action(&mut self) {
-        if let ServiceConfigItem::ScItemWatchdogSec(wd_sec) =
-            self.config.get(&ServiceConfigItem::ScItemWatchdogSec(0))
-        {
-            self.watchdog_original_usec = wd_sec;
+        if self.config.Service.WatchdogUSec.is_some() {
+            if let Some(wd_sec) = self.config.Service.WatchdogUSec {
+                self.watchdog_original_usec = wd_sec;
+            }
         }
         self.watchdog_override_enable = false;
         self.watchdog_override_usec = u64::MAX;

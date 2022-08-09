@@ -4,7 +4,7 @@
 // UnitMngUtil是为了关联subUnit和Manger，由于rust不支持继承和多态，因此需要采用这种方式来间接支持
 // UnitSubClass为了实现SubUnit到UnitObj的转换，简介达成多态的目的
 
-use std::rc::Rc;
+use std::{path::PathBuf, rc::Rc};
 
 use super::target_comm::TargetComm;
 use super::target_mng::TargetMng;
@@ -27,7 +27,7 @@ impl Target {
 }
 
 impl UnitObj for Target {
-    fn load(&self, _conf_str: &str) -> utils::Result<(), Box<dyn std::error::Error>> {
+    fn load(&self, _conf_str: &Vec<PathBuf>) -> utils::Result<(), Box<dyn std::error::Error>> {
         //todo add default dependency funnction neeed add
         Ok(())
     }

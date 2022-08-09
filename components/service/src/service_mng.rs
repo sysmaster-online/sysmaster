@@ -68,8 +68,8 @@ pub(super) struct ServiceMng {
     spawn: ServiceSpawn,
     state: RefCell<ServiceState>,
     result: RefCell<ServiceResult>,
-    main_command: RefCell<Vec<Rc<ExecCommand>>>,
-    control_command: RefCell<Vec<Rc<ExecCommand>>>,
+    main_command: RefCell<Vec<ExecCommand>>,
+    control_command: RefCell<Vec<ExecCommand>>,
 }
 
 impl ServiceMng {
@@ -148,8 +148,11 @@ impl ServiceMng {
     }
 
     pub(super) fn current_active_state(&self) -> UnitActiveState {
-        let service_type = self.config.service_type();
-        service_state_to_unit_state(service_type, self.state())
+        if let Some(service_type) = self.config.Service.Type {
+            service_state_to_unit_state(service_type, self.state())
+        } else {
+            UnitActiveState::UnitFailed
+        }
     }
 
     fn enter_contion(&self) {
@@ -432,12 +435,13 @@ impl ServiceMng {
         // todo!()
         // trigger the unit the dependency trigger_by
 
-        let service_type = self.config.service_type();
-        let os = service_state_to_unit_state(service_type, original_state);
-        let ns = service_state_to_unit_state(service_type, state);
-        self.comm
-            .unit()
-            .notify(os, ns, UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE);
+        if let Some(service_type) = self.config.Service.Type {
+            let os = service_state_to_unit_state(service_type, original_state);
+            let ns = service_state_to_unit_state(service_type, state);
+            self.comm
+                .unit()
+                .notify(os, ns, UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE);
+        }
     }
 
     fn service_alive(&self) -> bool {
@@ -481,20 +485,38 @@ impl ServiceMng {
     }
 
     fn main_command_fill(&self, cmd_type: ServiceCommand) {
-        *self.main_command.borrow_mut() = self.config.get_exec_cmds(cmd_type);
+        if let Some(cmds) = self.config.get_exec_cmds(cmd_type) {
+            *self.main_command.borrow_mut() = cmds
+        }
     }
 
-    fn main_command_pop(&self) -> Option<Rc<ExecCommand>> {
+    fn main_command_pop(&self) -> Option<ExecCommand> {
         self.main_command.borrow_mut().pop()
     }
 
     fn control_command_fill(&self, cmd_type: ServiceCommand) {
-        *self.control_command.borrow_mut() = self.config.get_exec_cmds(cmd_type);
+        if let Some(cmds) = self.config.get_exec_cmds(cmd_type) {
+            *self.control_command.borrow_mut() = cmds
+        }
     }
 
-    fn control_command_pop(&self) -> Option<Rc<ExecCommand>> {
+    fn control_command_pop(&self) -> Option<ExecCommand> {
         self.control_command.borrow_mut().pop()
     }
+
+    // pub fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Vec<ExecCommand> {
+    //     if let Some(cmds) = self.exec_commands.borrow_mut().get(&cmd_type) {
+    //         cmds.as_slice()
+    //     } else {
+    //         Vec::new()
+    //     }
+    // }
+
+    // pub fn insert_exec_cmds(&mut self, cmd_type: ServiceCommand, cmds: Vec<ExecCommand>) {
+    //     self.exec_commands
+    //         .borrow_mut()
+    //         .insert(cmd_type, cmds.clone());
+    // }
 }
 
 impl ServiceMng {

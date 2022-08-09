@@ -7,16 +7,13 @@ use nix::{sys::signal::Signal, unistd::Pid};
 use process1::manager::{
     Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
 };
-use std::{error::Error, rc::Rc};
+use std::{error::Error, path::PathBuf, rc::Rc};
 
 use crate::{
-    socket_comm::SocketComm,
-    socket_config::{SocketConf, SocketConfig},
-    socket_load::SocketLoad,
-    socket_mng::SocketMng,
-    socket_port::SocketPorts,
+    socket_comm::SocketComm, socket_config::SocketConfig, socket_load::SocketLoad,
+    socket_mng::SocketMng, socket_port::SocketPorts,
 };
-use utils::{config_parser::ConfigParse, logger};
+use utils::logger;
 
 #[allow(dead_code)]
 // the structuer of the socket unit type
@@ -37,19 +34,13 @@ impl UnitObj for SocketUnit {
         todo!()
     }
 
-    fn load(&self, conf_str: &str) -> Result<(), Box<dyn Error>> {
+    fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
         log::debug!("socket beigin to load conf file");
-        let socket_parser = SocketConf::builder_parser();
-        let socket_conf = socket_parser.conf_file_parse(conf_str);
+        self.config.load(&paths)?;
 
-        let ret = socket_conf.map(|conf| self.load.parse(conf));
+        self.load.parse(self.config.as_ref(), &self.mng)?;
 
-        if let Err(e) = ret {
-            log::error!("socket unit parse conf error: {}", e.to_string());
-            return Err(Box::new(e));
-        }
-
-        self.load.socket_add_extras();
+        self.load.socket_add_extras(&self.mng);
 
         return self.load.socket_verify();
     }
@@ -125,15 +116,15 @@ impl UnitSubClass for SocketUnit {
 impl SocketUnit {
     fn new() -> SocketUnit {
         let _comm = Rc::new(SocketComm::new());
-        let _config = Rc::new(SocketConfig::new());
+        let _config = Rc::new(SocketConfig::default());
         let ports = Rc::new(SocketPorts::new());
         let mng = Rc::new(SocketMng::new(&_comm, &_config, &ports));
         SocketUnit {
             comm: Rc::clone(&_comm),
             config: Rc::clone(&_config),
             mng: mng.clone(),
-            load: SocketLoad::new(&_config, &_comm, &ports),
             ports: ports.clone(),
+            load: SocketLoad::new(&_config, &_comm, &ports),
         }
     }
 }

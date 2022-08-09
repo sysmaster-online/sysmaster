@@ -29,7 +29,7 @@ event = { path = "../libevent" }
 proc_macro_utils = {path = "../libproc_macro_utils"}
 cgroup = { path = "../libcgroup" }
 strum = { version = "0.23", features = ["derive"] }
-nix = "0.23.0"
+nix = "0.24"
 log = "0.4"
 libc = "0.2.*"
 signal-hook = "0.3.13"

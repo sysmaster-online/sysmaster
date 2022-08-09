@@ -522,9 +522,9 @@ mod tests {
 
         match unit {
             Some(u) => {
-                u.start().unwrap();
+                u.start();
                 log::debug!("unit start end!");
-                u.stop().unwrap();
+                u.stop();
                 log::debug!("unit stop end!");
             }
             None => println!("load unit failed"),

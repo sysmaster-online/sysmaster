@@ -92,7 +92,7 @@ impl Hash for Unit {
 pub trait UnitObj {
     fn init(&self) {}
     fn done(&self) {}
-    fn load(&self, conf: &str) -> Result<(), Box<dyn Error>>;
+    fn load(&self, conf: &Vec<PathBuf>) -> Result<(), Box<dyn Error>>;
 
     fn coldplug(&self) {}
     fn dump(&self) {}
@@ -276,18 +276,11 @@ impl Unit {
         match self.load.load_unit_confs() {
             Ok(_) => Ok({
                 let paths = self.load.get_unit_id_fragment_pathbuf();
-                let path = paths.first().unwrap();
-                match unit_file_reader(path.to_str().unwrap()) {
-                    Ok(str) => {
-                        let ret = self.sub.load(&str);
-                        if let Ok(_) = ret {
-                            self.load.set_load_state(UnitLoadState::UnitLoaded);
-                        } else {
-                            return Err(format!("load Unit {} failed", self.id).into());
-                        }
-                    }
-
-                    Err(_) => {}
+                let ret = self.sub.load(&paths);
+                if let Ok(_) = ret {
+                    self.load.set_load_state(UnitLoadState::UnitLoaded);
+                } else {
+                    return Err(format!("load Unit {} failed", self.id).into());
                 }
             }),
             Err(e) => {
