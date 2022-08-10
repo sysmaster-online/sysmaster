@@ -3,6 +3,7 @@
 
 use nix::sys::socket::{InetAddr, IpAddr, SockAddr, SockProtocol, SockType, UnixAddr};
 use process1::manager::UnitType;
+use std::cell::RefCell;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::{error::Error, rc::Rc};
@@ -10,7 +11,7 @@ use utils::socket_util;
 
 use crate::socket_base::{NetlinkProtocol, PortType};
 use crate::socket_comm::SocketComm;
-use crate::socket_config::{ListeningItem, SocketConfig};
+use crate::socket_config::{ListeningItem, SocketConfig, SocketConfigData};
 use crate::socket_mng::SocketMng;
 use crate::socket_port::{SocketAddress, SocketPort, SocketPorts};
 
@@ -57,16 +58,16 @@ impl SocketLoad {
 
     pub(super) fn parse(
         &self,
-        socket_conf: &SocketConfig,
+        socket_conf: Rc<RefCell<SocketConfigData>>,
         mng: &Rc<SocketMng>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         log::debug!("begin to parse socket section");
 
-        self.parse_listen_socket(ListeningItem::Stream, socket_conf)?;
+        self.parse_listen_socket(ListeningItem::Stream, socket_conf.clone())?;
 
-        self.parse_listen_socket(ListeningItem::Datagram, socket_conf)?;
+        self.parse_listen_socket(ListeningItem::Datagram, socket_conf.clone())?;
 
-        self.parse_listen_socket(ListeningItem::Netlink, socket_conf)?;
+        self.parse_listen_socket(ListeningItem::Netlink, socket_conf.clone())?;
 
         self.parse_socket_service(mng)?;
 
@@ -74,7 +75,7 @@ impl SocketLoad {
     }
 
     fn can_accept(&self) -> bool {
-        if let Some(accept) = self.config.Socket.Accept {
+        if let Some(accept) = self.config.config_data().borrow().Socket.Accept {
             if !accept {
                 return true;
             }
@@ -84,7 +85,7 @@ impl SocketLoad {
     }
 
     fn parse_socket_service(&self, mng: &Rc<SocketMng>) -> Result<(), Box<dyn Error>> {
-        if let Some(service) = self.config.Socket.Service.clone() {
+        if let Some(service) = self.config.config_data().borrow().Socket.Service.clone() {
             if !service.ends_with(".service") {
                 return Err(format!("socket service must be end with .service").into());
             }
@@ -102,12 +103,12 @@ impl SocketLoad {
     fn parse_listen_socket(
         &self,
         item: ListeningItem,
-        socket_conf: &SocketConfig,
+        socket_conf: Rc<RefCell<SocketConfigData>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // let sock_addr
         match item {
             ListeningItem::Stream => {
-                if let Some(listen_stream) = socket_conf.Socket.ListenStream.clone() {
+                if let Some(listen_stream) = socket_conf.borrow().Socket.ListenStream.clone() {
                     if listen_stream.is_empty() {
                         return Ok(());
                     }
@@ -129,7 +130,7 @@ impl SocketLoad {
                 };
             }
             ListeningItem::Datagram => {
-                if let Some(listen_datagram) = socket_conf.Socket.ListenDatagram.clone() {
+                if let Some(listen_datagram) = socket_conf.borrow().Socket.ListenDatagram.clone() {
                     if listen_datagram.is_empty() {
                         return Ok(());
                     }
@@ -151,7 +152,7 @@ impl SocketLoad {
                 }
             }
             ListeningItem::Netlink => {
-                if let Some(listen_netlink) = socket_conf.Socket.ListenNetlink.clone() {
+                if let Some(listen_netlink) = socket_conf.borrow().Socket.ListenNetlink.clone() {
                     if listen_netlink.is_empty() {
                         return Ok(());
                     }

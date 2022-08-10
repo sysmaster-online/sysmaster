@@ -321,7 +321,7 @@ impl SocketMng {
 
     fn enter_listening(&self) {
         log::debug!("enter start listening state");
-        if let Some(accept) = self.config.Socket.Accept {
+        if let Some(accept) = self.config.config_data().borrow().Socket.Accept {
             if !accept {
                 self.flush_ports();
             }

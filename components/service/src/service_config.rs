@@ -149,6 +149,6 @@ mod tests {
 
         let result = config.load(&paths);
 
-        println!("{:?}", result);
+        assert_eq!(result.is_err(), false);
     }
 }
