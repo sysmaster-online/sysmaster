@@ -7,10 +7,14 @@ use super::unit_runtime::UnitRT;
 use super::{UnitActionError, UnitType};
 use crate::manager::data::{DataManager, UnitState};
 use crate::manager::table::{TableOp, TableSubscribe};
-use crate::manager::{MngErrno, UnitRelations};
+use crate::manager::{MngErrno, UnitActiveState, UnitRelations};
 use event::{EventState, Events, Source};
+use libmount::mountinfo;
 use nix::unistd::Pid;
+use std::collections::HashSet;
 use std::error::Error;
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
 use std::rc::Rc;
 use unit_load::UnitLoad;
@@ -45,6 +49,10 @@ impl UnitManagerX {
         self.data.db.child_dispatch_sigchld()
     }
 
+    pub(in crate::manager) fn dispatch_mountinfo(&self) -> Result<(), MngErrno> {
+        self.data.dispatch_mountinfo()
+    }
+
     pub(in crate::manager) fn dispatch_load_queue(&self) {
         self.data.rt.dispatch_load_queue()
     }
@@ -68,6 +76,14 @@ pub struct UnitManager {
     jm: JobManager,
     exec: ExecSpawn,
     events: Rc<Events>,
+}
+
+fn mount_point_to_unit_name(mount_point: &str) -> String {
+    let mut res = String::from(mount_point).replace("/", "-") + ".mount";
+    if res != "-.mount" {
+        res = String::from(&res[1..])
+    }
+    res
 }
 
 // the declaration "pub(self)" is for identification only.
@@ -230,6 +246,69 @@ impl UnitManager {
         } else {
             return Err(MngErrno::MngErrInternel);
         }
+    }
+
+    pub(self) fn dispatch_mountinfo(&self) -> Result<(), MngErrno> {
+        // First mark all active mount point we have as dead.
+        let mut dead_mount_set: HashSet<String> = HashSet::new();
+        for unit in self.db.units_get_all().iter() {
+            if unit.unit_type() == UnitType::UnitMount
+                && unit.active_state() == UnitActiveState::UnitActive
+            {
+                dead_mount_set.insert(String::from(unit.get_id()));
+            }
+        }
+
+        // Then start mount point we don't know.
+        let mut mountinfo_content = String::new();
+        File::open("/proc/self/mountinfo")
+            .unwrap()
+            .read_to_string(&mut mountinfo_content)
+            .unwrap();
+        let parser = mountinfo::Parser::new(mountinfo_content.as_bytes());
+        for mount_result in parser {
+            match mount_result {
+                Ok(mount) => {
+                    // We don't process autofs for now, because it is not
+                    // .mount but .automount in systemd.
+                    if mount.fstype.to_str() == Some("autofs") {
+                        continue;
+                    }
+                    let unit_name = mount_point_to_unit_name(mount.mount_point.to_str().unwrap());
+                    if dead_mount_set.contains(unit_name.as_str()) {
+                        dead_mount_set.remove(unit_name.as_str());
+                    } else {
+                        let unit = self.load.load_unit(unit_name.as_str()).unwrap();
+                        match unit.start() {
+                            Ok(_) => {
+                                log::debug!("{} change to mounted.", unit_name)
+                            }
+                            Err(_) => {
+                                log::error!("Failed to start {}", unit_name)
+                            }
+                        }
+                    }
+                }
+                Err(err) => {
+                    log::error!("Failed to parse /proc/self/mountinfo: {}", err);
+                }
+            }
+        }
+
+        // Finally stop mount point in dead_mount_set.
+        for unit_name in dead_mount_set.into_iter() {
+            if let Some(unit) = self.db.units_get(unit_name.as_str()) {
+                match unit.stop() {
+                    Ok(_) => {
+                        log::debug!("{} change to dead.", unit_name)
+                    }
+                    Err(_) => {
+                        log::error!("Failed to stop {}.", unit_name)
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     pub(self) fn new(dmr: &Rc<DataManager>, eventr: &Rc<Events>) -> Rc<UnitManager> {
@@ -444,14 +523,17 @@ mod unit_load {
             }
 
             log::info!(
-                "begin create obj for  type {}, name {} by plugin",
+                "begin create obj for type {}, name {} by plugin",
                 unit_type.to_string(),
                 name
             );
             let plugins = Plugin::get_instance();
             let subclass = match plugins.create_unit_obj(unit_type) {
                 Ok(sub) => sub,
-                Err(_e) => return None,
+                Err(_e) => {
+                    log::error!("Failed to create unit_obj!");
+                    return None;
+                }
             };
 
             subclass.attach(self.um.clone().into_inner().upgrade().unwrap());

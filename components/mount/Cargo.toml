@@ -1,0 +1,17 @@
+[package]
+name = "mount"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+name = "mount"
+
+[dependencies]
+dynamic_reload = "0.4.0"
+utils = { path = "../../libutils" }
+process1 = { path = "../../process1" }
+nix = "0.24"
+log = "0.4"

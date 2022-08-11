@@ -9,6 +9,7 @@ pub enum UnitType {
     UnitService = 0,
     UnitTarget,
     UnitSocket,
+    UnitMount,
     UnitTypeMax,
     UnitTypeInvalid,
     UnitTypeErrnoMax,
@@ -22,6 +23,7 @@ impl FromStr for UnitType {
             "Service" => UnitType::UnitService,
             "Target" => UnitType::UnitTarget,
             "Socket" => UnitType::UnitSocket,
+            "Mount" => UnitType::UnitMount,
             _ => UnitType::UnitTypeInvalid,
         };
         Ok(ret)
@@ -33,6 +35,7 @@ impl From<UnitType> for String {
             UnitType::UnitService => "service".into(),
             UnitType::UnitTarget => "target".into(),
             UnitType::UnitSocket => "socket".into(),
+            UnitType::UnitMount => "mount".into(),
             UnitType::UnitTypeMax => null_str!("").into(),
             UnitType::UnitTypeInvalid => null_str!("").into(),
             UnitType::UnitTypeErrnoMax => null_str!("").into(),
@@ -45,6 +48,7 @@ impl Display for UnitType {
             UnitType::UnitService => write!(f, "Service"),
             UnitType::UnitTarget => write!(f, "Target"),
             UnitType::UnitSocket => write!(f, "Socket"),
+            UnitType::UnitMount => write!(f, "Mount"),
             UnitType::UnitTypeMax => write!(f, "Max"),
             UnitType::UnitTypeInvalid => write!(f, ""),
             UnitType::UnitTypeErrnoMax => write!(f, ""),
@@ -74,6 +78,7 @@ pub(in crate::manager::unit) fn unit_name_to_type(unit_name: &str) -> UnitType {
         "service" => UnitType::UnitService,
         "target" => UnitType::UnitTarget,
         "socket" => UnitType::UnitSocket,
+        "mount" => UnitType::UnitMount,
         _ => UnitType::UnitTypeInvalid,
     }
 }

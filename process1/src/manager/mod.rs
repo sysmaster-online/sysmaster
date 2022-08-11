@@ -20,6 +20,7 @@ mod commands;
 mod data;
 #[allow(dead_code)]
 mod manager;
+mod mount_monitor;
 #[allow(dead_code)]
 mod reliability;
 mod signals;
