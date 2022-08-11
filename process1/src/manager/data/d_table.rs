@@ -23,8 +23,10 @@ impl DataManager {
         u_name: String,
         ud_config: UnitDepConf,
     ) -> Option<UnitDepConf> {
-        let mut table = self.tables.0.borrow_mut();
-        table.insert(u_name, ud_config)
+        {
+            let old = self.tables.0.borrow_mut().insert(u_name, ud_config);
+            old
+        }
     }
 
     pub(in crate::manager) fn register_ud_config(

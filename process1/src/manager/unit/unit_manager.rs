@@ -410,6 +410,14 @@ mod unit_load {
             }
         }
 
+        pub(self) fn push_dep_unit_into_load_queue(&self, name: &str) -> Option<Rc<UnitX>> {
+            if let Some(unit) = self.db.units_get(name) {
+                return Some(Rc::clone(&unit));
+            };
+            let unit = self.prepare_unit(name);
+            unit
+        }
+
         pub(self) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
             if let Some(unit) = self.db.units_get(name) {
                 return Some(Rc::clone(&unit));
@@ -420,7 +428,7 @@ mod unit_load {
             } else {
                 return None;
             };
-            log::info!("push new unit into load queue");
+            log::info!("begin dispatch unit in  load queue");
             self.rt.dispatch_load_queue();
             Some(Rc::clone(&u))
         }
@@ -482,7 +490,8 @@ mod unit_load {
             for (relation, list) in config.deps.iter() {
                 for o_name in list {
                     let tmp_unit: Rc<UnitX>;
-                    if let Some(o_unit) = self.load_unit(o_name) {
+                    if let Some(o_unit) = self.push_dep_unit_into_load_queue(o_name) {
+                        //此处不能直接调用unit_load，会嵌套
                         tmp_unit = Rc::clone(&o_unit);
                     } else {
                         log::error!("create unit obj error in unit manger");
@@ -492,6 +501,7 @@ mod unit_load {
                     if let Err(_e) =
                         self.db
                             .dep_insert(Rc::clone(&unit), *relation, tmp_unit, true, 0)
+                    //依赖关系插入，但是未判断是否load成功，如果unit无法load，是否应该记录依赖关系
                     {
                         // debug
                     }

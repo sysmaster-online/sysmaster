@@ -52,6 +52,11 @@ impl Display for UnitType {
     }
 }
 
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
+pub enum UnitDependencyMask {
+    UnitDependencyDefault = 1 << 2,
+}
+
 // #[macro_export]
 // macro_rules! unit_name_to_type{
 //     ($name:expr) => {
