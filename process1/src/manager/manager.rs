@@ -1,5 +1,6 @@
 use super::commands::Commands;
 use super::data::DataManager;
+use super::mount_monitor::MountMonitor;
 use super::signals::Signals;
 use super::unit::UnitManagerX;
 use super::MngErrno;
@@ -38,6 +39,7 @@ pub struct ManagerX {
     commands: Rc<Commands>,
     data: Rc<Manager>,
     signal: Rc<Signals>,
+    mount_monitor: Rc<MountMonitor>,
 }
 
 impl ManagerX {
@@ -49,6 +51,7 @@ impl ManagerX {
             commands: Rc::new(Commands::new(&_data)),
             data: Rc::clone(&_data),
             signal: Rc::new(Signals::new(&_data)),
+            mount_monitor: Rc::new(MountMonitor::new(&_data)),
         };
         m.register(&_event);
         m.enable(&_event);
@@ -56,9 +59,17 @@ impl ManagerX {
     }
 
     pub fn startup(&self) -> Result<i32> {
-        let source = Rc::clone(&self.signal);
-        self.event.add_source(source.clone())?;
-        self.event.set_enabled(source.clone(), EventState::On)?;
+        log::debug!("Adding signals source to event loop.");
+        let signal_source = Rc::clone(&self.signal);
+        self.event.add_source(signal_source.clone())?;
+        self.event
+            .set_enabled(signal_source.clone(), EventState::On)?;
+
+        log::debug!("Adding mount source to event loop.");
+        let mount_source = Rc::clone(&self.mount_monitor);
+        self.event.add_source(mount_source.clone())?;
+        self.event
+            .set_enabled(mount_source.clone(), EventState::On)?;
         Ok(0)
     }
 
@@ -185,6 +196,10 @@ impl Manager {
 
     pub(crate) fn dispatch_sigchld(&self) -> Result<(), Box<dyn Err>> {
         self.um.child_dispatch_sigchld()
+    }
+
+    pub(crate) fn dispatch_mountinfo(&self) -> Result<(), MngErrno> {
+        self.um.dispatch_mountinfo()
     }
 }
 

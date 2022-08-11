@@ -214,7 +214,7 @@ impl Plugin {
                         log::info!("Plugin load unit plugin[{:?}] sucessfull", file_name);
                     } else if let Err(_e) = result {
                         log::error!(
-                            "Plugin load unit plugin[{:?}] failed,deatil is {}",
+                            "Plugin load unit plugin[{:?}] failed, deatil is {}",
                             file_name,
                             _e.to_string()
                         );

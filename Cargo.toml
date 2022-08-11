@@ -11,4 +11,5 @@ members = [
   "components/service",
   "components/socket",
   "components/target",
+  "components/mount",
 ]
