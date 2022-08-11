@@ -15,6 +15,8 @@ use std::path::Path;
 use std::rc::Rc;
 use unit_load::UnitLoad;
 
+use utils::process_util;
+
 //#[derive(Debug)]
 pub(in crate::manager) struct UnitManagerX {
     sub_name: String, // key for table-subscriber: UnitState
@@ -182,6 +184,24 @@ impl UnitManager {
         }
 
         pending
+    }
+
+    // check the pid corresponding unit is the same with the unit
+    pub fn same_unit_with_pid(&self, unit: &str, pid: Pid) -> bool {
+        if !process_util::valid_pid(pid) {
+            return false;
+        }
+
+        let p_unit = self.db.get_unit_by_pid(pid);
+        if p_unit.is_none() {
+            return false;
+        }
+
+        if p_unit.unwrap().get_id() == unit {
+            return true;
+        }
+
+        false
     }
 
     pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {

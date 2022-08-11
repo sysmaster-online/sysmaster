@@ -45,6 +45,10 @@ impl UnitChild {
         self.data.unwatch_pid(pid)
     }
 
+    pub(super) fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {
+        self.data.get_unit_by_pid(pid)
+    }
+
     fn register(&self, unitsr: &UnitSets) {
         let subscriber = Rc::clone(&self.data);
         unitsr.register(&self.sub_name, subscriber);
@@ -121,6 +125,10 @@ impl UnitChildData {
 
     pub(self) fn unwatch_pid(&self, pid: Pid) {
         self.watch_pids.borrow_mut().remove(&pid);
+    }
+
+    pub(self) fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {
+        self.watch_pids.borrow().get(&pid).map(|u| u.clone())
     }
 
     fn remove_unit(&self, _unit: &UnitX) {

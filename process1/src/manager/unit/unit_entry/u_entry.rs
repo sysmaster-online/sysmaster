@@ -17,7 +17,6 @@ use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::rc::Rc;
-use utils::config_parser::unit_file_reader;
 use utils::Result;
 
 pub struct UnitRef {
@@ -246,7 +245,7 @@ impl Unit {
         filer: &Rc<UnitFile>,
         sub: Box<dyn UnitObj>,
     ) -> Self {
-        let _config = Rc::new(UeConfig::default());
+        let _config = Rc::new(UeConfig::new());
         Unit {
             dm: Rc::clone(dmr),
             unit_type,

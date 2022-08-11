@@ -51,6 +51,7 @@ pub(super) enum ServiceType {
     #[serde(alias = "simple")]
     Simple,
     #[strum(serialize = "forking")]
+    #[serde(alias = "forking")]
     Forking,
     #[strum(serialize = "oneshot")]
     Oneshot,

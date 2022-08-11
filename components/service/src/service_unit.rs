@@ -1,3 +1,5 @@
+use crate::service_mng::RunningData;
+
 use super::service_comm::ServiceComm;
 use super::service_config::ServiceConfig;
 use super::service_mng::ServiceMng;
@@ -8,6 +10,7 @@ use nix::unistd::Pid;
 use process1::manager::{
     Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
 };
+use std::cell::RefCell;
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -16,7 +19,7 @@ use utils::logger;
 struct ServiceUnit {
     comm: Rc<ServiceComm>,
     config: Rc<ServiceConfig>,
-    mng: ServiceMng,
+    mng: Rc<ServiceMng>,
     monitor: ServiceMonitor,
 }
 
@@ -30,10 +33,9 @@ impl UnitObj for ServiceUnit {
     }
 
     fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
-        self.config.load(paths);
+        self.config.load(paths)?;
         // // self.load.service_add_extras();
         // self.config.parse_commands(&mut self.mng);
-
         return self.service_verify();
     }
 
@@ -105,11 +107,15 @@ impl UnitSubClass for ServiceUnit {
 impl ServiceUnit {
     fn new() -> ServiceUnit {
         let comm = Rc::new(ServiceComm::new());
-        let config = Rc::new(ServiceConfig::default());
+        let config = Rc::new(ServiceConfig::new());
+
+        let rt = Rc::new(RunningData::new());
+        let mng = Rc::new(ServiceMng::new(&comm, &config, &rt));
+        rt.attach_mng(mng.clone());
         ServiceUnit {
             comm: Rc::clone(&comm),
             config: Rc::clone(&config),
-            mng: ServiceMng::new(&comm, &config),
+            mng: mng.clone(),
             monitor: ServiceMonitor::new(&config),
         }
     }

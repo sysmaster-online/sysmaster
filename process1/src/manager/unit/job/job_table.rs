@@ -493,7 +493,13 @@ impl JobUnitTableData {
 
         for (unit, uv) in self.t_data.iter() {
             // condition
-            if let true = unit.get_config().Unit.IgnoreOnIsolate {
+            if let true = unit
+                .get_config()
+                .config_data()
+                .borrow()
+                .Unit
+                .IgnoreOnIsolate
+            {
                 continue;
             }
 

@@ -38,7 +38,7 @@ impl UnitObj for SocketUnit {
         log::debug!("socket beigin to load conf file");
         self.config.load(&paths)?;
 
-        self.load.parse(self.config.as_ref(), &self.mng)?;
+        self.load.parse(self.config.config_data(), &self.mng)?;
 
         self.load.socket_add_extras(&self.mng);
 
@@ -116,7 +116,7 @@ impl UnitSubClass for SocketUnit {
 impl SocketUnit {
     fn new() -> SocketUnit {
         let _comm = Rc::new(SocketComm::new());
-        let _config = Rc::new(SocketConfig::default());
+        let _config = Rc::new(SocketConfig::new());
         let ports = Rc::new(SocketPorts::new());
         let mng = Rc::new(SocketMng::new(&_comm, &_config, &ports));
         SocketUnit {

@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
+use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use super::service_base::ServiceType;
 use crate::service_base::ServiceCommand;
@@ -8,8 +10,49 @@ use confique::Error;
 use process1::manager::DeserializeWith;
 use process1::manager::ExecCommand;
 
-#[derive(Config, Default, Debug)]
 pub(super) struct ServiceConfig {
+    data: Rc<RefCell<ServiceConfigData>>,
+}
+
+impl ServiceConfig {
+    pub(super) fn new() -> Self {
+        ServiceConfig {
+            data: Rc::new(RefCell::new(ServiceConfigData::default())),
+        }
+    }
+
+    pub(super) fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Error> {
+        let mut builder = ServiceConfigData::builder().env();
+
+        log::debug!("service load path: {:?}", paths);
+        // fragment
+        for v in paths {
+            builder = builder.file(&v);
+        }
+
+        *self.data.borrow_mut() = builder.load()?;
+        Ok(())
+    }
+
+    pub(super) fn config_data(&self) -> Rc<RefCell<ServiceConfigData>> {
+        self.data.clone()
+    }
+
+    pub(super) fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Option<Vec<ExecCommand>> {
+        self.data.borrow().get_exec_cmds(cmd_type)
+    }
+
+    pub(super) fn service_type(&self) -> ServiceType {
+        self.data
+            .borrow()
+            .Service
+            .Type
+            .map_or(ServiceType::Simple, |e| e)
+    }
+}
+
+#[derive(Config, Default, Debug)]
+pub(super) struct ServiceConfigData {
     #[config(nested)]
     pub Service: SectionService,
 }
@@ -47,20 +90,10 @@ pub(super) struct SectionService {
     pub MemoryMax: Option<u64>,
     pub MemoryHigh: Option<u64>,
     pub MemorySwapMax: Option<u64>,
+    pub PIDFile: Option<String>,
 }
 
-impl ServiceConfig {
-    pub fn load(&self, paths: &Vec<PathBuf>) -> Result<Self, Error> {
-        let mut builder = Self::builder().env();
-
-        // fragment
-        for v in paths {
-            builder = builder.file(&v);
-        }
-
-        builder.load()
-    }
-
+impl ServiceConfigData {
     pub fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Option<Vec<ExecCommand>> {
         match cmd_type {
             ServiceCommand::Condition => self.Service.ExecCondition.clone(),
@@ -112,10 +145,10 @@ mod tests {
         let mut paths = Vec::new();
         paths.push(file_path);
 
-        let config: ServiceConfig = Default::default();
+        let config = ServiceConfig::new();
 
         let result = config.load(&paths);
 
-        println!("{:?}", result);
+        assert_eq!(result.is_err(), false);
     }
 }

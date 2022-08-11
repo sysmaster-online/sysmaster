@@ -382,25 +382,25 @@ impl SocketPort {
     }
 
     pub(super) fn apply_sock_opt(&self, fd: RawFd) {
-        if let Some(v) = self.config.Socket.PassPacketInfo {
+        if let Some(v) = self.config.config_data().borrow().Socket.PassPacketInfo {
             if let Err(e) = socket_util::set_pkginfo(fd, self.family(), v) {
                 log::warn!("set socket pkginfo errno: {}", e);
             }
         }
 
-        if let Some(v) = self.config.Socket.PassCredentials {
+        if let Some(v) = self.config.config_data().borrow().Socket.PassCredentials {
             if let Err(e) = socket_util::set_pass_cred(fd, v) {
                 log::warn!("set socket pass cred errno: {}", e);
             }
         }
 
-        if let Some(v) = self.config.Socket.ReceiveBuffer {
+        if let Some(v) = self.config.config_data().borrow().Socket.ReceiveBuffer {
             if let Err(e) = socket_util::set_receive_buffer(fd, v as usize) {
                 log::warn!("set socket receive buffer errno: {}", e);
             }
         }
 
-        if let Some(v) = self.config.Socket.SendBuffer {
+        if let Some(v) = self.config.config_data().borrow().Socket.SendBuffer {
             if let Err(e) = socket_util::set_send_buffer(fd, v as usize) {
                 log::warn!("set socket send buffer errno: {}", e);
             }
@@ -433,7 +433,7 @@ impl Source for SocketPort {
             return Ok(0);
         }
 
-        if let Some(accept) = self.config.Socket.Accept {
+        if let Some(accept) = self.config.config_data().borrow().Socket.Accept {
             if accept && self.p_type() == PortType::Socket && self.can_accept() {
                 let afd = self
                     .accept()
@@ -466,7 +466,7 @@ mod tests {
     #[test]
     fn test_socket_ports() {
         let ports = SocketPorts::new();
-        let config = Rc::new(SocketConfig::default());
+        let config = Rc::new(SocketConfig::new());
 
         let sockv4 = SockAddr::Inet(InetAddr::new(IpAddr::new_v4(0, 0, 0, 0), 31457));
         let socket_addr = SocketAddress::new(sockv4, SockType::Stream, None);

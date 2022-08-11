@@ -1,7 +1,9 @@
 //! socket_config模块socket类型配置文件的定义，以及保存配置文件解析之后的内容
 //!
 #![allow(non_snake_case)]
+use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use confique::{Config, Error};
 use process1::manager::DeserializeWith;
@@ -15,14 +17,46 @@ pub(super) enum ListeningItem {
     Netlink,
 }
 
-#[derive(Config, Default, Debug)]
 pub struct SocketConfig {
+    data: Rc<RefCell<SocketConfigData>>,
+}
+
+impl SocketConfig {
+    pub(super) fn new() -> Self {
+        SocketConfig {
+            data: Rc::new(RefCell::new(SocketConfigData::default())),
+        }
+    }
+
+    pub(super) fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Error> {
+        let mut builder = SocketConfigData::builder().env();
+
+        // fragment
+        for v in paths {
+            builder = builder.file(&v);
+        }
+
+        *self.data.borrow_mut() = builder.load()?;
+        Ok(())
+    }
+
+    pub(super) fn config_data(&self) -> Rc<RefCell<SocketConfigData>> {
+        self.data.clone()
+    }
+
+    pub(super) fn get_exec_cmds(&self, cmd_type: SocketCommand) -> Option<Vec<ExecCommand>> {
+        self.data.borrow().get_exec_cmds(cmd_type)
+    }
+}
+
+#[derive(Config, Default, Debug)]
+pub(crate) struct SocketConfigData {
     #[config(nested)]
     pub Socket: SectionSocket,
 }
 
 #[derive(Config, Default, Debug)]
-pub struct SectionSocket {
+pub(crate) struct SectionSocket {
     #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
     pub ExecStartPre: Option<Vec<ExecCommand>>,
     #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
@@ -48,18 +82,7 @@ pub struct SectionSocket {
     pub SocketMode: Option<u32>,
 }
 
-impl SocketConfig {
-    pub(super) fn load(&self, paths: &Vec<PathBuf>) -> Result<Self, Error> {
-        let mut builder = Self::builder().env();
-
-        // fragment
-        for v in paths {
-            builder = builder.file(&v);
-        }
-
-        builder.load()
-    }
-
+impl SocketConfigData {
     pub(super) fn get_exec_cmds(&self, cmd_type: SocketCommand) -> Option<Vec<ExecCommand>> {
         match cmd_type {
             SocketCommand::StartPre => self.Socket.ExecStartPre.clone(),
@@ -89,11 +112,10 @@ mod tests {
         let mut paths = Vec::new();
         paths.push(file_path);
 
-        let config: SocketConfig = Default::default();
-
+        let config = SocketConfig::new();
         let result = config.load(&paths);
 
-        println!("{:?}", result);
+        assert_eq!(result.is_err(), false);
     }
 
     fn get_project_root() -> io::Result<PathBuf> {
