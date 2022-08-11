@@ -6,12 +6,13 @@ sudo yum install -y gcc openssl-libs
 git config --global url."https://github.91chi.fun/https://github.com/".insteadOf "https://github.com/"
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustlang.sh
 sh rustlang.sh -y
+rm -rf rustlang.sh
 
 source ~/.bashrc
 
 ##Fix cargo clippy timeout : replace cargo crates with ustc
 # Modify config
-cat << EOF >> ~/.cargo/config
+cat << EOF > ~/.cargo/config
 [source.crates-io]
 registry = "https://github.com/rust-lang/crates.io-index"
 # 指定镜像
