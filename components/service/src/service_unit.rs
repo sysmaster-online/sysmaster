@@ -1,3 +1,4 @@
+use crate::service_base::{ServiceCommand, ServiceType};
 use crate::service_mng::RunningData;
 
 use super::service_comm::ServiceComm;
@@ -10,9 +11,12 @@ use nix::unistd::Pid;
 use process1::manager::{
     Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
 };
+
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
+
+use utils::error::Error as ServiceError;
 use utils::logger;
 
 struct ServiceUnit {
@@ -135,6 +139,29 @@ impl ServiceUnit {
                 .ExecStart
                 .is_none()
         {}
+
+        if self.config.service_type() != ServiceType::Oneshot
+            && self.config.get_exec_cmds(ServiceCommand::Start).is_none()
+        {
+            return Err(Box::new(ServiceError::Other {
+                msg: "No ExecStart command is configured, service type is not oneshot",
+            }));
+        }
+
+        if self.config.service_type() != ServiceType::Oneshot
+            && self
+                .config
+                .get_exec_cmds(ServiceCommand::Start)
+                .unwrap()
+                .len()
+                > 1
+        {
+            return Err(Box::new(ServiceError::Other {
+                msg:
+                    "More than Oneshot ExecStart command is configured, service type is not oneshot",
+            }));
+        }
+
         Ok(())
     }
 }
