@@ -12,4 +12,6 @@ members = [
   "components/socket",
   "components/target",
   "components/mount",
+  "utilites/random_seed",
+  "utilites/rc-local-generator",
 ]
