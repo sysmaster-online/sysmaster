@@ -287,8 +287,13 @@ impl ServiceMng {
             self.enter_signal(ServiceState::StopSigterm, sr);
         } else if self.service_alive() {
             self.set_state(ServiceState::Runing);
-        } else {
-            self.enter_stop(sr);
+        }
+
+        match self.config.config_data().borrow().Service.RemainAfterExit {
+            Some(reamin_after_exit) if reamin_after_exit == true => {
+                self.set_state(ServiceState::Exited);
+            }
+            _ => self.enter_stop(sr),
         }
     }
 

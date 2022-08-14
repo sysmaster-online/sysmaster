@@ -114,35 +114,6 @@ pub(crate) struct UeConfigInstall {
     // pub install_default_install: String,
 }
 
-// impl UeConfigData {
-//     pub fn load_fragment_and_dropin(
-//         &self,
-//         files: &UnitFile,
-//         name: &String,
-//     ) -> Result<UeConfigData, Error> {
-//         let mut builder = UeConfigData::builder().env();
-
-//         // fragment
-//         for v in files.get_unit_id_fragment_pathbuf(name) {
-//             builder = builder.file(&v);
-//         }
-
-//         let mut configer = builder.load()?;
-
-//         // dropin
-//         for v in files.get_unit_id_dropin_wants(name) {
-//             configer.Unit.Wants.push(v.to_string_lossy().to_string());
-//             configer.Unit.After.push(v.to_string_lossy().to_string());
-//         }
-
-//         for v in files.get_unit_id_dropin_requires(name) {
-//             configer.Unit.Requires.push(v.to_string_lossy().to_string());
-//             configer.Unit.After.push(v.to_string_lossy().to_string());
-//         }
-//         Ok(configer)
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use std::{

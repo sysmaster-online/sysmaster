@@ -91,6 +91,7 @@ pub(super) struct SectionService {
     pub MemoryHigh: Option<u64>,
     pub MemorySwapMax: Option<u64>,
     pub PIDFile: Option<String>,
+    pub RemainAfterExit: Option<bool>,
 }
 
 impl ServiceConfigData {

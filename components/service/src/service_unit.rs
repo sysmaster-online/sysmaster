@@ -10,7 +10,6 @@ use nix::unistd::Pid;
 use process1::manager::{
     Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
 };
-use std::cell::RefCell;
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -121,6 +120,21 @@ impl ServiceUnit {
     }
 
     pub fn service_verify(&self) -> Result<(), Box<dyn Error>> {
+        if self
+            .config
+            .config_data()
+            .borrow()
+            .Service
+            .RemainAfterExit
+            .is_none()
+            && self
+                .config
+                .config_data()
+                .borrow()
+                .Service
+                .ExecStart
+                .is_none()
+        {}
         Ok(())
     }
 }
