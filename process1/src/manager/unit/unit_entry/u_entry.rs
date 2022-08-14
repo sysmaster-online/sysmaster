@@ -11,7 +11,6 @@ use log;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use nix::NixPath;
-use std::any::Any;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::error::Error;
@@ -210,6 +209,14 @@ impl Unit {
         Ok(())
     }
 
+    pub fn default_dependencies(&self) -> bool {
+        self.get_config()
+            .config_data()
+            .borrow()
+            .Unit
+            .DefaultDependencies
+    }
+
     fn pids_set(&self, m_pid: Option<Pid>, c_pid: Option<Pid>) -> HashSet<Pid> {
         let mut pids = HashSet::new();
 
@@ -290,6 +297,7 @@ impl Unit {
         match self.load.load_unit_confs() {
             Ok(_) => Ok({
                 let paths = self.load.get_unit_id_fragment_pathbuf();
+                log::debug!("begin exec sub class load");
                 let ret = self.sub.load(&paths);
                 if let Ok(_) = ret {
                     self.load.set_load_state(UnitLoadState::UnitLoaded);
@@ -299,7 +307,7 @@ impl Unit {
             }),
             Err(e) => {
                 self.load.set_load_state(UnitLoadState::UnitNotFound);
-                return Err(Box::new(e));
+                return Err(e);
             }
         }
     }

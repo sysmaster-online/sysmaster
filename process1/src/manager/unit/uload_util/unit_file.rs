@@ -169,7 +169,7 @@ impl UnitFileData {
                     }
                 },
                 Err(e) => {
-                    log::debug!("failed to get metadata of {}, err: {}", dir, e);
+                    log::debug!("lookup path {}   of unit file config err: {}", dir, e);
                 }
             }
         }

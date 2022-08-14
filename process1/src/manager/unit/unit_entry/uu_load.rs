@@ -1,10 +1,9 @@
-use confique::Error;
-
 use crate::manager::data::{DataManager, UnitDepConf, UnitRelations};
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::UnitLoadState;
 use crate::null_str;
 use std::cell::RefCell;
+use std::error::Error as stdError;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -25,7 +24,6 @@ pub(super) struct UeLoad {
     config_file_mtime: RefCell<u128>,
     in_load_queue: RefCell<bool>,
     in_target_dep_queue: RefCell<bool>,
-    default_dependencies: bool,
 }
 
 impl UeLoad {
@@ -45,7 +43,6 @@ impl UeLoad {
             config_file_mtime: RefCell::new(0),
             in_load_queue: RefCell::new(false),
             in_target_dep_queue: RefCell::new(false),
-            default_dependencies: true,
         }
     }
 
@@ -70,11 +67,11 @@ impl UeLoad {
         *self.in_load_queue.borrow() == true
     }
 
-    pub(super) fn load_unit_confs(&self) -> Result<(), Error> {
+    pub(super) fn load_unit_confs(&self) -> Result<(), Box<dyn stdError>> {
         self.file.build_name_map(self.id.clone());
         self.config
             .load_fragment_and_dropin(self.file.as_ref(), &self.id)?;
-
+        self.parse();
         Ok(())
     }
     pub(super) fn set_in_target_dep_queue(&self, t: bool) {

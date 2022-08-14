@@ -177,6 +177,10 @@ impl UnitX {
     pub fn get_config(&self) -> Rc<UeConfig> {
         self.0.get_config()
     }
+
+    pub(in crate::manager::unit) fn default_dependencies(&self) -> bool {
+        self.0.default_dependencies()
+    }
 }
 
 impl Deref for UnitX {

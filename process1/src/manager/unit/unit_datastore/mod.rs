@@ -33,6 +33,10 @@ impl UnitDb {
         self.units.insert(name, unit)
     }
 
+    pub(super) fn unit_remove(&self, name: &str) {
+        self.units.remove(name);
+    }
+
     pub(super) fn units_get(&self, name: &str) -> Option<Rc<UnitX>> {
         self.units.get(name)
     }

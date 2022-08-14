@@ -3,8 +3,8 @@ pub(super) use manager::Manager;
 pub use manager::{Action, ManagerX, Mode, Stats};
 pub use unit::{
     DeserializeWith, ExecCmdError, ExecCommand, ExecContext, ExecFlags, ExecParameters,
-    KillOperation, Unit, UnitActionError, UnitManager, UnitMngUtil, UnitObj, UnitRef, UnitSubClass,
-    UnitType,
+    KillOperation, Unit, UnitActionError, UnitDependencyMask, UnitManager, UnitMngUtil, UnitObj,
+    UnitRef, UnitRelationAtom, UnitSubClass, UnitType,
 };
 
 #[derive(Debug)]

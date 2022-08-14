@@ -2,7 +2,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use confique::{Config, Error};
+use confique::Config;
+use std::error::Error as stdError;
 
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::JobMode;
@@ -23,11 +24,20 @@ impl UeConfig {
         &self,
         files: &UnitFile,
         name: &String,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Box<dyn stdError>> {
         let mut builder = UeConfigData::builder().env();
 
+        let unit_conf_frag = files.get_unit_id_fragment_pathbuf(name);
+        if unit_conf_frag.is_empty() {
+            log::error!("config file  for  {} is not exist", name);
+            return Err(format!("config file for {}is not exist", name).into());
+        }
         // fragment
-        for v in files.get_unit_id_fragment_pathbuf(name) {
+        for v in unit_conf_frag {
+            if !v.exists() {
+                log::error!("config file is not exist");
+                return Err(format!("config file is not exist {}", name).into());
+            }
             builder = builder.file(&v);
         }
 
@@ -72,6 +82,8 @@ pub(crate) struct UeConfigUnit {
     pub AllowIsolate: bool,
     #[config(default = false)]
     pub IgnoreOnIsolate: bool,
+    #[config(default = true)]
+    pub DefaultDependencies: bool,
     // #[config(deserialize_with = JobMode::deserialize_with)]
     // #[config(default = "replace")]
     // pub on_success_job_mode: JobMode,
