@@ -4,9 +4,8 @@ pub use ub_basic::{KillOperation, UnitActionError, UnitDependencyMask, UnitType}
 pub(super) use ub_job::JobMode;
 pub(super) use ub_load::UnitLoadState;
 pub(super) use ub_relation::unit_relation_to_inverse;
-pub(super) use ub_relation_atom::{
-    unit_relation_from_unique_atom, unit_relation_to_atom, UnitRelationAtom,
-};
+pub use ub_relation_atom::UnitRelationAtom;
+pub(super) use ub_relation_atom::{unit_relation_from_unique_atom, unit_relation_to_atom};
 
 // dependency: ub_basic -> {ub_relation | ub_relation_atom} -> {ub_load | ub_job}
 mod ub_basic;

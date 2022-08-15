@@ -5,7 +5,7 @@
 *target_unit->target_mng->target_comm
 */
 
-use process1::manager::Unit;
+use process1::manager::{Unit, UnitManager};
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},
@@ -28,21 +28,41 @@ impl TargetComm {
     pub(super) fn unit(&self) -> Option<Rc<Unit>> {
         self.data.borrow().unit()
     }
+
+    pub(super) fn attach_um(&self, um: Rc<UnitManager>) {
+        self.data.borrow_mut().attach_um(um)
+    }
+
+    pub(super) fn um(&self) -> Option<Rc<UnitManager>> {
+        self.data.borrow().um()
+    }
 }
 struct TargetCommData {
     unit: Weak<Unit>,
+    um: Weak<UnitManager>,
 }
 
 impl TargetCommData {
     pub(self) fn new() -> TargetCommData {
-        TargetCommData { unit: Weak::new() }
+        TargetCommData {
+            unit: Weak::new(),
+            um: Weak::new(),
+        }
     }
 
-    fn attach_unit(&mut self, unit: Rc<Unit>) {
+    pub(self) fn attach_unit(&mut self, unit: Rc<Unit>) {
         self.unit = Rc::downgrade(&unit);
+    }
+
+    pub(self) fn attach_um(&mut self, um: Rc<UnitManager>) {
+        self.um = Rc::downgrade(&um);
     }
 
     pub(self) fn unit(&self) -> Option<Rc<Unit>> {
         self.unit.clone().upgrade()
+    }
+
+    pub(self) fn um(&self) -> Option<Rc<UnitManager>> {
+        self.um.clone().upgrade()
     }
 }

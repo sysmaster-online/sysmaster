@@ -3,7 +3,7 @@ use crate::manager::data::UnitRelations;
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 #[repr(u64)]
-pub(in crate::manager::unit) enum UnitRelationAtom {
+pub enum UnitRelationAtom {
     UnitAtomPullInStart = 1u64 << 0,
     UnitAtomPullInStartIgnored = 1u64 << 1,
     UnitAtomPullInVerify = 1u64 << 2,

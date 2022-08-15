@@ -8,7 +8,10 @@ use std::{path::PathBuf, rc::Rc};
 
 use super::target_comm::TargetComm;
 use super::target_mng::TargetMng;
-use process1::manager::{UnitActiveState, UnitMngUtil, UnitObj, UnitSubClass};
+use process1::manager::{
+    UnitActiveState, UnitDependencyMask, UnitMngUtil, UnitObj, UnitRelationAtom, UnitRelations,
+    UnitSubClass,
+};
 use utils::logger;
 
 struct Target {
@@ -24,14 +27,58 @@ impl Target {
             mng: Rc::new(TargetMng::new(&_comm)),
         }
     }
+
+    pub(self) fn add_default_dependencies(&self) {
+        if self.comm.um().is_none() {
+            return;
+        }
+
+        if let Some(unit) = self.comm.unit() {
+            log::debug!("add default dependencies for target[{}]", unit.get_id());
+            if !unit.default_dependencies() {
+                return;
+            }
+            let um = self.comm.um().unwrap();
+            let deps = um.get_dependency_list(
+                unit.get_id(),
+                UnitRelationAtom::UnitAtomAddDefaultTargetDependencyQueue,
+            );
+            for _u in deps {
+                if !_u.default_dependencies() {
+                    continue;
+                }
+
+                if um.unit_has_dependecy(
+                    unit.get_id(),
+                    UnitRelationAtom::UnitAtomBefore,
+                    _u.get_id(),
+                ) {
+                    continue;
+                }
+
+                let e = um.unit_add_dependency(
+                    unit.get_id(),
+                    UnitRelations::UnitAfter,
+                    _u.get_id(),
+                    true,
+                    UnitDependencyMask::UnitDependencyDefault,
+                );
+                if e.is_err() {
+                    log::error!("add default dependencies erro {:?}", e);
+                    return;
+                }
+            }
+        }
+    }
 }
 
 impl UnitObj for Target {
     fn load(&self, _conf_str: &Vec<PathBuf>) -> utils::Result<(), Box<dyn std::error::Error>> {
         //todo add default dependency funnction neeed add
+        log::debug!("load for target");
+        self.add_default_dependencies();
         Ok(())
     }
-
     fn current_active_state(&self) -> UnitActiveState {
         self.mng.to_unit_state()
     }
@@ -88,6 +135,7 @@ impl UnitSubClass for Target {
 
 impl UnitMngUtil for Target {
     fn attach(&self, _um: Rc<process1::manager::UnitManager>) {
+        self.comm.attach_um(_um);
         return;
     }
 }

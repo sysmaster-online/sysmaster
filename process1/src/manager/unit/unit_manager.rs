@@ -1,6 +1,6 @@
 use super::execute::{ExecCmdError, ExecCommand, ExecParameters, ExecSpawn};
 use super::job::{JobAffect, JobConf, JobKind, JobManager};
-use super::unit_base::{JobMode, UnitLoadState, UnitRelationAtom};
+use super::unit_base::{JobMode, UnitDependencyMask, UnitLoadState, UnitRelationAtom};
 use super::unit_datastore::UnitDb;
 use super::unit_entry::{Unit, UnitObj, UnitX};
 use super::unit_runtime::UnitRT;
@@ -148,6 +148,72 @@ impl UnitManager {
         }
 
         return Ok(());
+    }
+
+    pub fn unit_has_dependecy(
+        &self,
+        s_u_name: &str,
+        atom: UnitRelationAtom,
+        t_u_name: &str,
+    ) -> bool {
+        let s_unit = if let Some(s_unit) = self.db.units_get(s_u_name) {
+            s_unit
+        } else {
+            return false;
+        };
+
+        let t_unit = if let Some(unit) = self.db.units_get(t_u_name) {
+            unit
+        } else {
+            return false;
+        };
+
+        self.db.dep_is_dep_atom_with(&s_unit, atom, &t_unit)
+    }
+
+    ///add a unit depenency to th unit deplist
+    /// can called by sub unit
+    /// sub unit add some default dependency
+    ///
+    pub fn unit_add_dependency(
+        &self,
+        unit_name: &str,
+        relation: UnitRelations,
+        target_name: &str,
+        add_ref: bool,
+        mask: UnitDependencyMask,
+    ) -> Result<(), UnitActionError> {
+        let s_unit = if let Some(unit) = self.db.units_get(unit_name) {
+            unit
+        } else {
+            return Err(UnitActionError::UnitActionENoent);
+        };
+        let t_unit = if let Some(unit) = self.db.units_get(target_name) {
+            unit
+        } else {
+            return Err(UnitActionError::UnitActionENoent);
+        };
+
+        self.rt
+            .unit_add_dependency(s_unit, relation, t_unit, add_ref, mask);
+        Ok(())
+    }
+
+    pub fn get_dependency_list(&self, unit_name: &str, atom: UnitRelationAtom) -> Vec<Rc<Unit>> {
+        let mut ret_list: Vec<Rc<Unit>> = Vec::new();
+        let s_unit = if let Some(unit) = self.db.units_get(unit_name) {
+            unit
+        } else {
+            log::error!("unit [{}] not found!!!!!", unit_name);
+            return ret_list;
+        };
+
+        let dep_units = self.rt.get_dependency_list(&s_unit, atom);
+        for unit_x in dep_units {
+            let a = Rc::clone(&*(*unit_x));
+            ret_list.push(a);
+        }
+        ret_list
     }
 
     pub fn register(&self, source: Rc<dyn Source>) {
@@ -657,6 +723,30 @@ mod tests {
             let unit = um.load_unit(u_name);
             match unit {
                 Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), u_name),
+                None => println!("test unit load, not fount unit: {}", u_name),
+            };
+        }
+    }
+    #[test]
+    fn test_target_unit_load() {
+        logger::init_log_with_console("test_target_unit_load", 4);
+        let mut unit_name_lists: Vec<String> = Vec::new();
+        let dm_manager = Rc::new(DataManager::new());
+        let _event = Rc::new(Events::new().unwrap());
+        let um = UnitManager::new(&dm_manager, &_event);
+
+        unit_name_lists.push("testsunit.target".to_string());
+        // unit_name_lists.push("testsunit.target".to_string());
+        for u_name in unit_name_lists.iter() {
+            let unit = um.load_unit(u_name);
+            match unit {
+                Some(_unit_obj) => {
+                    println!(
+                        "{:?}",
+                        _unit_obj.get_config().config_data().borrow().Unit.Requires
+                    );
+                    assert_eq!(_unit_obj.get_id(), u_name);
+                }
                 None => println!("test unit load, not fount unit: {}", u_name),
             };
         }

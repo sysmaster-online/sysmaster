@@ -1,4 +1,4 @@
-use super::unit_base::UnitRelationAtom;
+use super::unit_base::{UnitDependencyMask, UnitRelationAtom};
 use super::unit_datastore::UnitDb;
 use super::unit_entry::UnitX;
 use super::UnitType;
@@ -32,6 +32,26 @@ impl UnitRT {
 
     pub(super) fn dispatch_load_queue(&self) {
         self.data.dispatch_load_queue();
+    }
+
+    pub(super) fn get_dependency_list(
+        &self,
+        source: &UnitX,
+        atom: UnitRelationAtom,
+    ) -> Vec<Rc<UnitX>> {
+        self.data.get_dependency_list(source, atom)
+    }
+
+    pub(super) fn unit_add_dependency(
+        &self,
+        source: Rc<UnitX>,
+        relation: UnitRelations,
+        target: Rc<UnitX>,
+        add_ref: bool,
+        mask: UnitDependencyMask,
+    ) {
+        self.data
+            .unit_add_dependency(source, relation, target, add_ref, mask)
     }
 
     pub(super) fn push_load_queue(&self, unit: Rc<UnitX>) {
@@ -93,7 +113,33 @@ impl UnitRTData {
                 },
             }
         }
+        log::debug!("dispatch target dep queue");
         self.dispatch_target_dep_queue();
+    }
+
+    pub(self) fn get_dependency_list(
+        &self,
+        source: &UnitX,
+        atom: UnitRelationAtom,
+    ) -> Vec<Rc<UnitX>> {
+        self.db.dep_gets_atom(source, atom)
+    }
+
+    pub(self) fn unit_add_dependency(
+        &self,
+        source: Rc<UnitX>,
+        relation: UnitRelations,
+        target: Rc<UnitX>,
+        add_ref: bool,
+        _mask: UnitDependencyMask,
+    ) {
+        if let Err(_e) = self
+            .db
+            .dep_insert(source, relation, target, add_ref, 1 << 2)
+        {
+            log::error!("dispatch_target_dep_queue add defalt dep err {:?}", _e);
+            return;
+        }
     }
 
     fn dispatch_target_dep_queue(&self) {
@@ -103,10 +149,10 @@ impl UnitRTData {
                 None => break,
                 Some(unit) => {
                     unit.set_in_target_dep_queue(false);
-                    for dep_target in self
-                        .db
-                        .dep_gets_atom(&unit, UnitRelationAtom::UnitAtomDefaultTargetDependencies)
-                    {
+                    for dep_target in self.get_dependency_list(
+                        &unit,
+                        UnitRelationAtom::UnitAtomDefaultTargetDependencies,
+                    ) {
                         if dep_target.unit_type() != UnitType::UnitTarget {
                             log::debug!("dep unit type is not target, continue");
                             continue;
@@ -117,25 +163,25 @@ impl UnitRTData {
                             log::debug!("dep unit  is not loaded, continue");
                             continue;
                         }
-
+                        if !unit.default_dependencies() || !dep_target.default_dependencies() {
+                            log::debug!("default dependecies option is false");
+                            continue;
+                        }
                         if self.db.dep_is_dep_atom_with(
-                            &unit,
-                            UnitRelationAtom::UnitAtomBefore,
                             &dep_target,
+                            UnitRelationAtom::UnitAtomBefore,
+                            &unit,
                         ) {
                             continue;
                         }
 
-                        if let Err(_e) = self.db.dep_insert(
+                        self.unit_add_dependency(
                             Rc::clone(&unit),
                             UnitRelations::UnitAfter,
                             dep_target,
                             true,
-                            1 << 2,
-                        ) {
-                            log::error!("dispatch_target_dep_queue add defalt dep err {:?}", _e);
-                            return;
-                        }
+                            UnitDependencyMask::UnitDependencyDefault,
+                        );
                     }
                 }
             }
