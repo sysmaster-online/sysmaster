@@ -12,6 +12,7 @@ members = [
   "components/socket",
   "components/target",
   "components/mount",
-  "utilites/random_seed",
-  "utilites/rc-local-generator",
+  "utilities/random_seed",
+  "utilities/rc-local-generator",
+  "utilities/fstab",
 ]
