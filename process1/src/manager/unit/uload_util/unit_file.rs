@@ -18,8 +18,8 @@ impl UnitFile {
         }
     }
 
-    pub fn build_name_map(&self, name: String) -> bool {
-        self.data.borrow_mut().build_id_map(name)
+    pub fn build_name_map(&self, name: String, has_loaded: bool) -> bool {
+        self.data.borrow_mut().build_id_map(name, has_loaded)
     }
 
     pub fn get_unit_id_fragment_pathbuf(&self, name: &String) -> Vec<PathBuf> {
@@ -46,7 +46,6 @@ struct UnitFileData {
     unit_name_map: HashMap<String, String>,
     lookup_path: LookupPaths,
     last_updated_timestamp_hash: u64,
-    updated_timestamp_hash: u64,
 }
 
 // the declaration "pub(self)" is for identification only.
@@ -61,7 +60,6 @@ impl UnitFileData {
             unit_name_map: HashMap::new(),
             lookup_path,
             last_updated_timestamp_hash: 0,
-            updated_timestamp_hash: 0,
         }
     }
 
@@ -86,15 +84,12 @@ impl UnitFileData {
         }
     }
 
-    pub(self) fn build_id_map(&mut self, name: String) -> bool {
-        if let true = self.lookup_paths_updated() {
+    pub(self) fn build_id_map(&mut self, name: String, has_loaded: bool) -> bool {
+        if !has_loaded || self.lookup_paths_updated() {
             self.build_id_fragment(&name);
             self.build_id_dropin(&name, "wants".to_string());
             self.build_id_dropin(&name, "requires".to_string());
-
-            self.last_updated_timestamp_hash = self.updated_timestamp_hash;
         }
-
         false
     }
 
@@ -157,6 +152,7 @@ impl UnitFileData {
 
     pub(self) fn lookup_paths_updated(&mut self) -> bool {
         let updated: u64;
+        let mut path_updated = true;
         let mut siphash24 = SipHasher24::new_with_keys(0, 0);
         for dir in &self.lookup_path.search_path {
             match fs::metadata(&dir) {
@@ -169,13 +165,15 @@ impl UnitFileData {
                     }
                 },
                 Err(e) => {
-                    log::debug!("lookup path {}   of unit file config err: {}", dir, e);
+                    log::debug!("lookup path {} of unit file config err: {}", dir, e);
                 }
             }
         }
 
         updated = siphash24.finish();
-        self.updated_timestamp_hash = updated;
-        return updated != self.last_updated_timestamp_hash;
+
+        path_updated = updated != self.last_updated_timestamp_hash;
+        self.last_updated_timestamp_hash = updated;
+        return path_updated;
     }
 }
