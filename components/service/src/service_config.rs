@@ -60,7 +60,6 @@ pub(super) struct ServiceConfigData {
 #[derive(Config, Default, Debug)]
 pub(super) struct SectionService {
     pub Type: Option<ServiceType>,
-    pub BusName: Option<String>,
     #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
     pub ExecStart: Option<Vec<ExecCommand>>,
     #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]

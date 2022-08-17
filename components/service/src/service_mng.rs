@@ -227,6 +227,11 @@ impl ServiceMng {
         };
 
         if cmd.is_none() {
+            if self.config.service_type() != ServiceType::Oneshot {
+                log::error!("no start command is configured and service type is oneshot");
+                self.enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
+                return;
+            }
             self.set_state(ServiceState::Start);
             self.enter_start_post();
             return;
@@ -243,14 +248,26 @@ impl ServiceMng {
 
         let pid = ret.unwrap();
         log::debug!("service type is: {}, forking pid is: {}", service_type, pid);
-        if service_type == ServiceType::Forking {
-            // for foring service type, we consider the process startup complete when the process exit;
-            log::debug!("in forking type, set pid {} to control pid", pid);
-            self.pid.set_control(pid);
-            self.set_state(ServiceState::Start);
-        } else {
-            self.pid.set_main(pid);
-            self.enter_start_post();
+
+        match service_type {
+            ServiceType::Simple => {
+                self.pid.set_main(pid);
+                self.enter_start_post();
+            }
+            ServiceType::Forking => {
+                // for foring service type, we consider the process startup complete when the process exit;
+                log::debug!("in forking type, set pid {} to control pid", pid);
+                self.pid.set_control(pid);
+                self.set_state(ServiceState::Start);
+            }
+            ServiceType::Oneshot => {
+                self.pid.set_main(pid);
+                self.set_state(ServiceState::Start);
+            }
+            ServiceType::Notify => todo!(),
+            ServiceType::Idle => todo!(),
+            ServiceType::Exec => todo!(),
+            _ => {}
         }
 
         return;
@@ -481,13 +498,11 @@ impl ServiceMng {
         // todo!()
         // trigger the unit the dependency trigger_by
 
-        if let service_type = self.config.service_type() {
-            let os = service_state_to_unit_state(service_type, original_state);
-            let ns = service_state_to_unit_state(service_type, state);
-            self.comm
-                .unit()
-                .notify(os, ns, UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE);
-        }
+        let os = service_state_to_unit_state(self.config.service_type(), original_state);
+        let ns = service_state_to_unit_state(self.config.service_type(), state);
+        self.comm
+            .unit()
+            .notify(os, ns, UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE);
     }
 
     fn service_alive(&self) -> bool {
@@ -754,16 +769,25 @@ impl ServiceMng {
                 self.set_result(res);
             }
 
-            if !self.main_command.borrow().is_empty() && res == ServiceResult::Success {
+            if !self.main_command.borrow().is_empty()
+                && res == ServiceResult::Success
+                && self.config.service_type() == ServiceType::Oneshot
+            {
                 self.run_next_main();
             } else {
                 self.main_command.borrow_mut().clear();
                 match self.state() {
                     ServiceState::Dead => todo!(),
-                    ServiceState::Start => {
-                        self.enter_signal(ServiceState::StopSigterm, res);
+                    ServiceState::Start if self.config.service_type() == ServiceType::Oneshot => {
+                        if res == ServiceResult::Success {
+                            self.enter_start_post();
+                        } else {
+                            self.enter_signal(ServiceState::StopSigterm, res);
+                        }
                     }
-
+                    ServiceState::Start => {
+                        self.enter_running(res);
+                    }
                     ServiceState::StartPost | ServiceState::Reload => {
                         self.enter_stop(res);
                     }
