@@ -68,7 +68,10 @@ impl UeLoad {
     }
 
     pub(super) fn load_unit_confs(&self) -> Result<(), Box<dyn stdError>> {
-        self.file.build_name_map(self.id.clone());
+        self.file.build_name_map(
+            self.id.clone(),
+            self.load_state() == UnitLoadState::UnitLoaded,
+        );
         self.config
             .load_fragment_and_dropin(self.file.as_ref(), &self.id)?;
         self.parse();
