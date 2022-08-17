@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, ffi::CString, path::PathBuf, rc::Rc};
 
 #[derive(PartialEq, Clone, Eq, Debug)]
 pub struct ExecCommand {
@@ -36,6 +36,7 @@ pub struct ExecContext {
 pub struct ExecParameters {
     environment: Rc<EnvData>,
     fds: Vec<i32>,
+    notify_sock: Option<PathBuf>,
 }
 
 struct EnvData {
@@ -56,6 +57,16 @@ impl EnvData {
     fn get(&self, key: &str) -> Option<String> {
         self.env.borrow().get(key).map(|s| s.to_string())
     }
+
+    fn envs(&self) -> Vec<CString> {
+        let mut envs = Vec::new();
+
+        for (key, value) in &*self.env.borrow() {
+            envs.push(std::ffi::CString::new(format!("{}={}", key, value)).unwrap());
+        }
+
+        envs
+    }
 }
 
 impl ExecParameters {
@@ -63,6 +74,7 @@ impl ExecParameters {
         ExecParameters {
             environment: Rc::new(EnvData::new()),
             fds: Vec::new(),
+            notify_sock: None,
         }
     }
 
@@ -74,12 +86,20 @@ impl ExecParameters {
         self.environment.get(key)
     }
 
+    pub fn envs(&self) -> Vec<CString> {
+        self.environment.envs()
+    }
+
     pub fn insert_fds(&mut self, fds: Vec<i32>) {
         self.fds = fds
     }
 
     pub fn fds(&self) -> Vec<i32> {
         self.fds.iter().map(|v| *v).collect()
+    }
+
+    pub fn set_notify_sock(&mut self, notify_sock: PathBuf) {
+        self.notify_sock = Some(notify_sock)
     }
 }
 

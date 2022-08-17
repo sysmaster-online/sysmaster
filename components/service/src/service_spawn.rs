@@ -1,3 +1,6 @@
+use crate::service_base::ServiceType;
+use crate::service_config::ServiceConfig;
+
 use super::service_comm::ServiceComm;
 use super::service_pid::ServicePid;
 use nix::unistd::Pid;
@@ -8,13 +11,19 @@ use std::rc::Rc;
 pub(super) struct ServiceSpawn {
     comm: Rc<ServiceComm>,
     pid: Rc<ServicePid>,
+    config: Rc<ServiceConfig>,
 }
 
 impl ServiceSpawn {
-    pub(super) fn new(commr: &Rc<ServiceComm>, pidr: &Rc<ServicePid>) -> ServiceSpawn {
+    pub(super) fn new(
+        commr: &Rc<ServiceComm>,
+        pidr: &Rc<ServicePid>,
+        configr: &Rc<ServiceConfig>,
+    ) -> ServiceSpawn {
         ServiceSpawn {
             comm: Rc::clone(commr),
             pid: Rc::clone(pidr),
+            config: configr.clone(),
         }
     }
 
@@ -25,6 +34,7 @@ impl ServiceSpawn {
         ec_flags: ExecFlags,
     ) -> Result<Pid, Box<dyn Error>> {
         let mut params = ExecParameters::new();
+
         if let Some(pid) = self.pid.main() {
             params.add_env("MAINPID", format!("{}", pid));
         }
@@ -36,6 +46,17 @@ impl ServiceSpawn {
         if ec_flags.contains(ExecFlags::PASS_FDS) {
             params.insert_fds(self.collect_socket_fds());
         }
+
+        if self.config.service_type() == ServiceType::Notify {
+            let notify_sock = um.notify_socket().unwrap();
+            log::debug!("add NOTIFY_SOCKET env: {}", notify_sock.to_str().unwrap());
+            params.add_env(
+                "NOTIFY_SOCKET",
+                format!("{}", notify_sock.to_str().unwrap()),
+            );
+            params.set_notify_sock(notify_sock);
+        }
+
         log::debug!("begin to exec spawn");
         match um.exec_spawn(&unit, cmdline, &params) {
             Ok(pid) => {

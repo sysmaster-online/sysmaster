@@ -6,19 +6,22 @@ use super::unit_entry::{Unit, UnitObj, UnitX};
 use super::unit_runtime::UnitRT;
 use super::{UnitActionError, UnitType};
 use crate::manager::data::{DataManager, UnitState};
+use crate::manager::manager_config::ManagerConfig;
 use crate::manager::table::{TableOp, TableSubscribe};
 use crate::manager::{MngErrno, UnitActiveState, UnitRelations};
 use event::{EventState, Events, Source};
 use libmount::mountinfo;
+use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use unit_load::UnitLoad;
 
+use utils::error::Error as ServiceError;
 use utils::process_util;
 
 //#[derive(Debug)]
@@ -28,10 +31,14 @@ pub(in crate::manager) struct UnitManagerX {
 }
 
 impl UnitManagerX {
-    pub(in crate::manager) fn new(dmr: &Rc<DataManager>, eventr: &Rc<Events>) -> UnitManagerX {
+    pub(in crate::manager) fn new(
+        dmr: &Rc<DataManager>,
+        eventr: &Rc<Events>,
+        configm: &Rc<ManagerConfig>,
+    ) -> UnitManagerX {
         let umx = UnitManagerX {
             sub_name: String::from("UnitManagerX"),
-            data: UnitManager::new(dmr, eventr),
+            data: UnitManager::new(dmr, eventr, configm),
         };
         umx.register(dmr);
         umx
@@ -66,6 +73,15 @@ impl UnitManagerX {
             log::info!("register  TableSubcribe for {}  sucessfull", &self.sub_name);
         }
     }
+
+    pub(crate) fn notify_message(
+        &self,
+        ucred: &UnixCredentials,
+        messages: &HashMap<&str, &str>,
+        fds: &Vec<i32>,
+    ) -> Result<(), ServiceError> {
+        self.data.notify_message(ucred, messages, fds)
+    }
 }
 
 //#[derive(Debug)]
@@ -76,6 +92,7 @@ pub struct UnitManager {
     jm: JobManager,
     exec: ExecSpawn,
     events: Rc<Events>,
+    config: Rc<ManagerConfig>,
 }
 
 fn mount_point_to_unit_name(mount_point: &str) -> String {
@@ -301,6 +318,14 @@ impl UnitManager {
         }
     }
 
+    pub fn notify_socket(&self) -> Option<PathBuf> {
+        self.config.notify_sock()
+    }
+
+    pub(in crate::manager) fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {
+        self.db.get_unit_by_pid(pid)
+    }
+
     pub(self) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
         if let Some(unit) = self.load_unit(name) {
             self.jm.exec(
@@ -377,7 +402,11 @@ impl UnitManager {
         Ok(())
     }
 
-    pub(self) fn new(dmr: &Rc<DataManager>, eventr: &Rc<Events>) -> Rc<UnitManager> {
+    pub(self) fn new(
+        dmr: &Rc<DataManager>,
+        eventr: &Rc<Events>,
+        configm: &Rc<ManagerConfig>,
+    ) -> Rc<UnitManager> {
         let _db = Rc::new(UnitDb::new());
         let _rt = Rc::new(UnitRT::new(&_db));
         let um = Rc::new(UnitManager {
@@ -387,6 +416,7 @@ impl UnitManager {
             jm: JobManager::new(&_db, eventr),
             exec: ExecSpawn::new(),
             events: eventr.clone(),
+            config: configm.clone(),
         });
         um.load.set_um(&um);
         um
@@ -394,6 +424,24 @@ impl UnitManager {
 
     fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
         self.load.load_unit(name)
+    }
+
+    fn notify_message(
+        &self,
+        ucred: &UnixCredentials,
+        messages: &HashMap<&str, &str>,
+        fds: &Vec<i32>,
+    ) -> Result<(), ServiceError> {
+        let unit = self.get_unit_by_pid(Pid::from_raw(ucred.pid()));
+        log::debug!("get unit by ucred pid: {}", ucred.pid());
+
+        if unit.is_some() {
+            unit.unwrap().notify_message(ucred, messages, fds)?;
+            return Ok(());
+        }
+
+        log::warn!("Not found the unit for pid: {}", ucred.pid());
+        Ok(())
     }
 }
 
@@ -674,10 +722,10 @@ mod tests {
     #[test]
     fn test_service_unit_load() {
         logger::init_log_with_console("test_service_unit_load", 4);
-        log::info!("test");
+        let configm = Rc::new(ManagerConfig::new());
         let dm_manager = Rc::new(DataManager::new());
         let _event = Rc::new(Events::new().unwrap());
-        let um = UnitManager::new(&dm_manager, &_event);
+        let um = UnitManager::new(&dm_manager, &_event, &configm);
 
         let unit_name = String::from("config.service");
         let unit = um.load_unit(&unit_name);
@@ -691,9 +739,10 @@ mod tests {
     #[test]
     fn test_service_unit_start() {
         logger::init_log_with_console("test_service_unit_start", 4);
+        let configm = Rc::new(ManagerConfig::new());
         let dm_manager = Rc::new(DataManager::new());
         let _event = Rc::new(Events::new().unwrap());
-        let um = UnitManager::new(&dm_manager, &_event);
+        let um = UnitManager::new(&dm_manager, &_event, &configm);
 
         let unit_name = String::from("config.service");
         let unit = um.load_unit(&unit_name);
@@ -713,9 +762,10 @@ mod tests {
     fn test_units_load() {
         logger::init_log_with_console("test_units_load", 4);
         let mut unit_name_lists: Vec<String> = Vec::new();
+        let configm = Rc::new(ManagerConfig::new());
         let dm_manager = Rc::new(DataManager::new());
         let _event = Rc::new(Events::new().unwrap());
-        let um = UnitManager::new(&dm_manager, &_event);
+        let um = UnitManager::new(&dm_manager, &_event, &configm);
 
         unit_name_lists.push("config.service".to_string());
         // unit_name_lists.push("testsunit.target".to_string());
@@ -730,10 +780,11 @@ mod tests {
     #[test]
     fn test_target_unit_load() {
         logger::init_log_with_console("test_target_unit_load", 4);
+        let configm = Rc::new(ManagerConfig::new());
         let mut unit_name_lists: Vec<String> = Vec::new();
         let dm_manager = Rc::new(DataManager::new());
         let _event = Rc::new(Events::new().unwrap());
-        let um = UnitManager::new(&dm_manager, &_event);
+        let um = UnitManager::new(&dm_manager, &_event, &configm);
 
         unit_name_lists.push("testsunit.target".to_string());
         // unit_name_lists.push("testsunit.target".to_string());

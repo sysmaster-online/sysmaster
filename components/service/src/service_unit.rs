@@ -1,4 +1,4 @@
-use crate::service_base::{ServiceCommand, ServiceType};
+use crate::service_base::{NotifyAccess, ServiceCommand, ServiceType};
 use crate::service_mng::RunningData;
 
 use super::service_comm::ServiceComm;
@@ -7,11 +7,13 @@ use super::service_mng::ServiceMng;
 use super::service_monitor::ServiceMonitor;
 use log;
 use nix::sys::signal::Signal;
+use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
 use process1::manager::{
     Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
 };
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -37,8 +39,9 @@ impl UnitObj for ServiceUnit {
 
     fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
         self.config.load(paths)?;
-        // // self.load.service_add_extras();
-        // self.config.parse_commands(&mut self.mng);
+
+        self.service_add_extras()?;
+
         return self.service_verify();
     }
 
@@ -93,6 +96,21 @@ impl UnitObj for ServiceUnit {
     fn attach_unit(&self, unit: Rc<Unit>) {
         self.comm.attach_unit(unit);
     }
+
+    fn notify_message(
+        &self,
+        ucred: &UnixCredentials,
+        messages: &HashMap<&str, &str>,
+        fds: &Vec<i32>,
+    ) -> Result<(), ServiceError> {
+        log::debug!(
+            "begin to start service notify message, ucred: {:?}, pids: {:?}, messages: {:?}",
+            ucred,
+            fds,
+            messages
+        );
+        self.mng.notify_message(ucred, messages, fds)
+    }
 }
 
 impl UnitMngUtil for ServiceUnit {
@@ -121,6 +139,14 @@ impl ServiceUnit {
             mng: mng.clone(),
             monitor: ServiceMonitor::new(&config),
         }
+    }
+
+    pub fn service_add_extras(&self) -> Result<(), Box<dyn Error>> {
+        if self.config.service_type() == ServiceType::Notify {
+            self.config.set_notify_access(NotifyAccess::Main);
+        }
+
+        Ok(())
     }
 
     pub fn service_verify(&self) -> Result<(), Box<dyn Error>> {

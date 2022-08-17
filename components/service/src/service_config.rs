@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use super::service_base::ServiceType;
+use crate::service_base::NotifyAccess;
 use crate::service_base::ServiceCommand;
 use confique::Config;
 use confique::Error;
@@ -49,12 +50,22 @@ impl ServiceConfig {
             .Type
             .map_or(ServiceType::Simple, |e| e)
     }
+
+    pub(super) fn set_notify_access(&self, v: NotifyAccess) {
+        self.data.borrow_mut().set_notify_access(v)
+    }
 }
 
 #[derive(Config, Default, Debug)]
 pub(super) struct ServiceConfigData {
     #[config(nested)]
     pub Service: SectionService,
+}
+
+impl ServiceConfigData {
+    pub(super) fn set_notify_access(&mut self, v: NotifyAccess) {
+        self.Service.set_notify_access(v)
+    }
 }
 
 #[derive(Config, Default, Debug)]
@@ -91,6 +102,13 @@ pub(super) struct SectionService {
     pub MemorySwapMax: Option<u64>,
     pub PIDFile: Option<String>,
     pub RemainAfterExit: Option<bool>,
+    pub NotifyAccess: Option<NotifyAccess>,
+}
+
+impl SectionService {
+    pub(super) fn set_notify_access(&mut self, v: NotifyAccess) {
+        self.NotifyAccess = Some(v);
+    }
 }
 
 impl ServiceConfigData {

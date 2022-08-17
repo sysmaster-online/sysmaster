@@ -5,6 +5,7 @@ use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
 use crate::manager::unit::UnitErrno;
 use nix::sys::signal::Signal;
+use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
 use std::error::Error;
 use std::ops::Deref;
