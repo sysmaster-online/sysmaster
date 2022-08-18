@@ -700,7 +700,8 @@ mod unit_load {
                             .dep_insert(Rc::clone(&unit), *relation, tmp_unit, true, 0)
                     //依赖关系插入，但是未判断是否load成功，如果unit无法load，是否应该记录依赖关系
                     {
-                        // debug
+                        log::debug!("add dependency relation failed for source unit is {},dependency unit is {}",unit.get_id(),o_name);
+                        return;
                     }
                 }
             }
@@ -719,6 +720,15 @@ mod tests {
     use super::*;
     use event::Events;
     use utils::logger;
+
+    fn init_dm_for_test() -> (Rc<DataManager>, Rc<Events>, Rc<UnitManager>) {
+        logger::init_log_with_console("manager test", 4);
+        let dm_manager = Rc::new(DataManager::new());
+        let _event = Rc::new(Events::new().unwrap());
+        let configm = Rc::new(ManagerConfig::new());
+        let um = UnitManager::new(&dm_manager, &_event, &configm);
+        (dm_manager, _event, um)
+    }
 
     #[test]
     fn test_service_unit_load() {
@@ -756,6 +766,21 @@ mod tests {
                 log::debug!("unit stop end!");
             }
             None => println!("load unit failed"),
+        }
+    }
+
+    #[test]
+    fn test_service_unit_start_conflicts() {
+        let dm = init_dm_for_test();
+        let conflict_unit_name = String::from("conflict.service");
+        let confilict_unit = dm.2.start_unit(&conflict_unit_name);
+        match confilict_unit {
+            Ok(_v) => {
+                assert!(true, "conflict unit start sucessfull");
+            }
+            Err(e) => {
+                assert!(false, "load unit failed {},{:?}", conflict_unit_name, e);
+            }
         }
     }
 

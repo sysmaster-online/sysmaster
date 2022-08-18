@@ -3,6 +3,7 @@ use std::path::Path;
 pub enum ConditionType {
     PathExists,
     FileNotEmpty,
+    NeedsUpdate,
     _MAX,
 }
 
@@ -40,6 +41,7 @@ impl Condition {
         let mut result = match self.c_type {
             ConditionType::PathExists => self.test_path_exists(),
             ConditionType::FileNotEmpty => self.test_file_not_empty(),
+            ConditionType::NeedsUpdate => self.test_needs_update(),
             ConditionType::_MAX => todo!(),
         };
         if self.revert() >= 1 {
@@ -80,6 +82,10 @@ impl Condition {
         } else {
             return 0;
         }
+    }
+
+    fn test_needs_update(&self) -> i8 {
+        0
     }
 }
 
