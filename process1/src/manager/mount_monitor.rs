@@ -133,6 +133,8 @@ impl Source for MountMonitor {
 
 #[cfg(test)]
 mod test {
+    use crate::manager::manager_config::ManagerConfig;
+
     use super::super::manager::{Action, Manager, Mode};
     use event::EventState;
     use event::Events;
@@ -145,7 +147,8 @@ mod test {
         let e = Rc::new(Events::new().unwrap());
         const MODE: Mode = Mode::SYSTEM;
         const ACTION: Action = Action::RUN;
-        let manager = Rc::new(Manager::new(MODE, ACTION, &e));
+        let configm = Rc::new(ManagerConfig::new());
+        let manager = Rc::new(Manager::new(MODE, ACTION, &e, &configm));
         let mount_source = Rc::new(MountMonitor::new(&manager));
 
         e.add_source(mount_source.clone()).unwrap();

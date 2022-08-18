@@ -1,3 +1,5 @@
+use crate::service_base::NotifyState;
+
 use super::service_base::{ServiceCommand, ServiceType};
 use super::service_comm::ServiceComm;
 use super::service_config::ServiceConfig;
@@ -6,19 +8,22 @@ use super::service_spawn::ServiceSpawn;
 use log;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
+use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
 use process1::manager::{
     ExecCommand, ExecFlags, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags,
 };
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt;
+use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
 use std::rc::Rc;
-use utils::{fd_util, IN_SET};
-use utils::{file_util, process_util, Error};
+use utils::{fd_util, Error, IN_SET};
+use utils::{file_util, process_util};
 
 use std::{
-    os::unix::prelude::{AsRawFd, FromRawFd, RawFd},
+    os::unix::prelude::{FromRawFd, RawFd},
     path::PathBuf,
     rc::Weak,
 };
@@ -99,7 +104,7 @@ impl ServiceMng {
             comm: Rc::clone(commr),
             config: Rc::clone(configr),
             pid: Rc::clone(&_pid),
-            spawn: ServiceSpawn::new(commr, &_pid),
+            spawn: ServiceSpawn::new(commr, &_pid, configr),
             state: RefCell::new(ServiceState::Dead),
             result: RefCell::new(ServiceResult::Success),
             main_command: RefCell::new(Vec::new()),
@@ -260,11 +265,11 @@ impl ServiceMng {
                 self.pid.set_control(pid);
                 self.set_state(ServiceState::Start);
             }
-            ServiceType::Oneshot => {
+            ServiceType::Oneshot | ServiceType::Notify => {
                 self.pid.set_main(pid);
                 self.set_state(ServiceState::Start);
             }
-            ServiceType::Notify => todo!(),
+
             ServiceType::Idle => todo!(),
             ServiceType::Exec => todo!(),
             _ => {}
@@ -304,13 +309,14 @@ impl ServiceMng {
             self.enter_signal(ServiceState::StopSigterm, sr);
         } else if self.service_alive() {
             self.set_state(ServiceState::Runing);
-        }
-
-        match self.config.config_data().borrow().Service.RemainAfterExit {
-            Some(reamin_after_exit) if reamin_after_exit == true => {
+        } else if let Some(remain_after_exit) =
+            self.config.config_data().borrow().Service.RemainAfterExit
+        {
+            if remain_after_exit == true {
                 self.set_state(ServiceState::Exited);
             }
-            _ => self.enter_stop(sr),
+        } else {
+            self.enter_stop(sr);
         }
     }
 
@@ -333,6 +339,10 @@ impl ServiceMng {
             }
             None => self.enter_signal(ServiceState::StopSigterm, ServiceResult::Success),
         }
+    }
+
+    fn enter_stop_by_notify(&self) {
+        self.set_state(ServiceState::StopSigterm);
     }
 
     fn enter_stop_post(&self, res: ServiceResult) {
@@ -785,6 +795,16 @@ impl ServiceMng {
                             self.enter_signal(ServiceState::StopSigterm, res);
                         }
                     }
+                    ServiceState::Start if self.config.service_type() == ServiceType::Notify => {
+                        if res != ServiceResult::Success {
+                            self.enter_signal(ServiceState::StopSigterm, res);
+                        } else {
+                            self.enter_signal(
+                                ServiceState::StopSigterm,
+                                ServiceResult::FailureProtocol,
+                            );
+                        }
+                    }
                     ServiceState::Start => {
                         self.enter_running(res);
                     }
@@ -933,6 +953,68 @@ impl ServiceMng {
     }
 }
 
+impl ServiceMng {
+    pub(super) fn notify_message(
+        &self,
+        ucred: &UnixCredentials,
+        messages: &HashMap<&str, &str>,
+        _fds: &Vec<i32>,
+    ) -> Result<(), Error> {
+        if let Some(&pidr) = messages.get("MAINPID") {
+            if IN_SET!(
+                self.state(),
+                ServiceState::Start,
+                ServiceState::StartPost,
+                ServiceState::Runing
+            ) {
+                let pid = pidr.parse::<i32>()?;
+                let main_pid = Pid::from_raw(pid);
+                if Some(main_pid) != self.pid.main() {
+                    let valid = self.valid_main_pid(main_pid)?;
+
+                    if ucred.pid() == 0 || valid {
+                        self.pid.set_main(main_pid);
+                        self.comm
+                            .um()
+                            .child_watch_pid(main_pid, self.comm.unit().get_id());
+                    }
+                }
+            }
+        };
+
+        for (&key, &value) in messages {
+            if key == "READY" && value == "1" {
+                log::debug!("service plugin get READY=1");
+                self.rd.set_notify_state(NotifyState::Ready);
+                if self.config.service_type() == ServiceType::Notify
+                    && self.state() == ServiceState::Start
+                {
+                    self.enter_start_post();
+                }
+            }
+
+            if key == "STOPPING" && value == "1" {
+                self.rd.set_notify_state(NotifyState::Stoping);
+                if self.state() == ServiceState::Runing {
+                    self.enter_stop_by_notify();
+                }
+            }
+
+            if key == "ERRNO" {
+                let err = value.parse::<i32>();
+                if err.is_err() {
+                    log::warn!("parse ERRNO failed in received messages");
+                    continue;
+                }
+
+                self.rd.set_errno(err.unwrap());
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl ServiceState {
     fn to_unit_active_state(&self) -> UnitActiveState {
         match *self {
@@ -1024,15 +1106,49 @@ impl RunningData {
     pub(super) fn attach_mng(&self, mng: Rc<ServiceMng>) {
         *self.mng.borrow_mut() = Rc::downgrade(&mng);
     }
+
+    pub(super) fn set_errno(&self, errno: i32) {
+        self.data.borrow_mut().set_errno(errno);
+    }
+
+    pub(super) fn set_notify_state(&self, notify_state: NotifyState) {
+        self.data.borrow_mut().set_notify_state(notify_state);
+    }
+
+    pub(super) fn notify_state(&self) -> NotifyState {
+        self.data.borrow().notify_state()
+    }
 }
 
 struct Rtdata {
+    errno: i32,
+    notify_state: NotifyState,
     path_inotify: Option<Rc<PathIntofy>>,
 }
 
 impl Rtdata {
     pub(self) fn new() -> Self {
-        Rtdata { path_inotify: None }
+        Rtdata {
+            errno: 0,
+            notify_state: NotifyState::Unknown,
+            path_inotify: None,
+        }
+    }
+
+    pub(self) fn set_notify_state(&mut self, notify_state: NotifyState) {
+        self.notify_state = notify_state;
+    }
+
+    pub(self) fn notify_state(&self) -> NotifyState {
+        self.notify_state
+    }
+
+    pub(self) fn set_errno(&mut self, errno: i32) {
+        self.errno = errno;
+    }
+
+    pub(self) fn errno(&mut self) -> i32 {
+        self.errno
     }
 
     pub(self) fn attach_inotify(&mut self, path_inotify: Rc<PathIntofy>) {

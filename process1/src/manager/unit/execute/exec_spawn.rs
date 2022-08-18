@@ -60,7 +60,9 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters) {
         args
     );
 
-    let envs = build_environment(unit, params.fds().len());
+    let mut envs = build_environment(unit, params.fds().len());
+    envs.append(&mut params.envs());
+
     log::debug!("exec child env env is: {:?}", envs);
 
     let envs_cstr = envs.iter().map(|v| v.as_c_str()).collect::<Vec<_>>();
@@ -82,6 +84,7 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters) {
         return;
     }
 
+    log::debug!("exec child envs to execve is: {:?}", envs_cstr);
     match unistd::execve(&cmd, &cstr_args, &envs_cstr) {
         Ok(_) => {
             log::debug!("execv returned Ok()");

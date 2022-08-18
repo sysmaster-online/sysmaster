@@ -56,9 +56,8 @@ pub(super) enum ServiceType {
     #[strum(serialize = "oneshot")]
     #[serde(alias = "oneshot")]
     Oneshot,
-    #[strum(serialize = "dbus")]
-    Dbus,
     #[strum(serialize = "notify")]
+    #[serde(alias = "notify")]
     Notify,
     #[strum(serialize = "idle")]
     Idle,
@@ -88,3 +87,21 @@ pub(super) enum ServiceCommand {
 
 #[derive(PartialEq, Default, Debug)]
 pub(super) struct DualTimestamp {}
+
+#[derive(PartialEq, Eq, Serialize, Deserialize, EnumString, Display, Debug, Clone, Copy)]
+pub(super) enum NotifyAccess {
+    #[strum(serialize = "none")]
+    #[serde(alias = "none")]
+    None,
+    #[strum(serialize = "main")]
+    #[serde(alias = "main")]
+    Main,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub(super) enum NotifyState {
+    Unknown,
+    Ready,
+    Reloading,
+    Stoping,
+}

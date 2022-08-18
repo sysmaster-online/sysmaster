@@ -9,15 +9,18 @@ use crate::manager::UnitNotifyFlags;
 use cgroup::{self, CgFlags};
 use log;
 use nix::sys::signal::Signal;
+use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
 use nix::NixPath;
 use std::cmp::Ordering;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::rc::Rc;
 use utils::Result;
+
+use utils::error::Error as ServiceError;
 
 pub struct UnitRef {
     source: Option<String>,
@@ -113,6 +116,15 @@ pub trait UnitObj {
 
     fn current_active_state(&self) -> UnitActiveState;
     fn attach_unit(&self, unit: Rc<Unit>);
+
+    fn notify_message(
+        &self,
+        _ucred: &UnixCredentials,
+        _events: &HashMap<&str, &str>,
+        _fds: &Vec<i32>,
+    ) -> Result<(), ServiceError> {
+        Ok(())
+    }
 }
 
 impl Unit {
@@ -343,5 +355,14 @@ impl Unit {
 
     pub(super) fn collect_fds(&self) -> Vec<i32> {
         self.sub.collect_fds()
+    }
+
+    pub(in crate::manager) fn notify_message(
+        &self,
+        ucred: &UnixCredentials,
+        messages: &HashMap<&str, &str>,
+        fds: &Vec<i32>,
+    ) -> Result<(), ServiceError> {
+        self.sub.notify_message(ucred, messages, fds)
     }
 }
