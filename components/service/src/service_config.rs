@@ -54,6 +54,13 @@ impl ServiceConfig {
     pub(super) fn set_notify_access(&self, v: NotifyAccess) {
         self.data.borrow_mut().set_notify_access(v)
     }
+
+    pub(super) fn environments(&self) -> Option<Vec<String>> {
+        match &self.data.borrow().Service.Environment {
+            Some(v) => Some(v.iter().map(|v| v.to_string()).collect()),
+            None => None,
+        }
+    }
 }
 
 #[derive(Config, Default, Debug)]
@@ -103,6 +110,8 @@ pub(super) struct SectionService {
     pub PIDFile: Option<String>,
     pub RemainAfterExit: Option<bool>,
     pub NotifyAccess: Option<NotifyAccess>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    pub Environment: Option<Vec<String>>,
 }
 
 impl SectionService {

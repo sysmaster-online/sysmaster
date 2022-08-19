@@ -1,4 +1,5 @@
 use super::exec_base::{ExecCmdError, ExecCommand, ExecParameters};
+use super::ExecContext;
 use crate::manager::unit::Unit;
 use cgroup;
 use log;
@@ -8,6 +9,7 @@ use regex::Regex;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use std::process;
+use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
 use walkdir::DirEntry;
@@ -27,6 +29,7 @@ impl ExecSpawn {
         unit: &Unit,
         cmdline: &ExecCommand,
         params: &ExecParameters,
+        ctx: Rc<ExecContext>,
     ) -> Result<Pid, ExecCmdError> {
         unsafe {
             match unistd::fork() {
@@ -38,7 +41,7 @@ impl ExecSpawn {
                 }
                 Ok(ForkResult::Child) => {
                     thread::sleep(Duration::from_secs(2));
-                    exec_child(unit, cmdline, params);
+                    exec_child(unit, cmdline, params, ctx.clone());
                     process::exit(0);
                 }
                 Err(_e) => return Err(ExecCmdError::SpawnError),
@@ -47,7 +50,13 @@ impl ExecSpawn {
     }
 }
 
-fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters) {
+fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: Rc<ExecContext>) {
+    log::debug!("exec context params: {:?}", ctx.envs());
+
+    for (key, value) in ctx.envs() {
+        params.add_env(&key, value.to_string());
+    }
+
     let (cmd, args) = build_run_args(unit, cmdline, params);
     let cstr_args = args
         .iter()

@@ -4,7 +4,7 @@ use super::unit_base::{JobMode, UnitDependencyMask, UnitLoadState, UnitRelationA
 use super::unit_datastore::UnitDb;
 use super::unit_entry::{Unit, UnitObj, UnitX};
 use super::unit_runtime::UnitRT;
-use super::{UnitActionError, UnitType};
+use super::{ExecContext, UnitActionError, UnitType};
 use crate::manager::data::{DataManager, UnitState};
 use crate::manager::manager_config::ManagerConfig;
 use crate::manager::table::{TableOp, TableSubscribe};
@@ -122,8 +122,9 @@ impl UnitManager {
         unit: &Unit,
         cmdline: &ExecCommand,
         params: &ExecParameters,
+        ctx: Rc<ExecContext>,
     ) -> Result<Pid, ExecCmdError> {
-        self.exec.spawn(unit, cmdline, params)
+        self.exec.spawn(unit, cmdline, params, ctx.clone())
     }
 
     // load the unit for reference name

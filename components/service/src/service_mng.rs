@@ -11,7 +11,8 @@ use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
 use process1::manager::{
-    ExecCommand, ExecFlags, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags,
+    ExecCommand, ExecContext, ExecFlags, KillOperation, UnitActionError, UnitActiveState,
+    UnitNotifyFlags,
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -98,13 +99,14 @@ impl ServiceMng {
         commr: &Rc<ServiceComm>,
         configr: &Rc<ServiceConfig>,
         rd: &Rc<RunningData>,
+        exec_ctx: &Rc<ExecContext>,
     ) -> ServiceMng {
         let _pid = Rc::new(ServicePid::new(commr));
         ServiceMng {
             comm: Rc::clone(commr),
             config: Rc::clone(configr),
             pid: Rc::clone(&_pid),
-            spawn: ServiceSpawn::new(commr, &_pid, configr),
+            spawn: ServiceSpawn::new(commr, &_pid, configr, exec_ctx),
             state: RefCell::new(ServiceState::Dead),
             result: RefCell::new(ServiceResult::Success),
             main_command: RefCell::new(Vec::new()),

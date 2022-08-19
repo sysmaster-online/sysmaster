@@ -30,7 +30,28 @@ pub enum ExecCmdError {
 }
 
 pub struct ExecContext {
-    env: Vec<String>,
+    envs: RefCell<HashMap<String, String>>,
+}
+
+impl ExecContext {
+    pub fn new() -> ExecContext {
+        ExecContext {
+            envs: RefCell::new(HashMap::new()),
+        }
+    }
+
+    pub fn insert_env(&self, key: String, value: String) {
+        self.envs.borrow_mut().insert(key, value);
+    }
+
+    pub fn envs(&self) -> HashMap<String, String> {
+        let mut tmp = HashMap::new();
+
+        for (key, value) in &*self.envs.borrow() {
+            tmp.insert(key.to_string(), value.to_string());
+        }
+        tmp
+    }
 }
 
 pub struct ExecParameters {
