@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Hash, PartialEq, Eq, Copy, Clone)]
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum UnitRelations {
     UnitRequires,
     UnitRequisite,

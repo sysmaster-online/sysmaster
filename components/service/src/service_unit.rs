@@ -11,7 +11,7 @@ use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
 use process1::manager::{
     ExecContext, Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj,
-    UnitSubClass,
+    UnitRelations, UnitSubClass,
 };
 
 use std::collections::HashMap;
@@ -158,6 +158,23 @@ impl ServiceUnit {
 
                     self.exec_ctx
                         .insert_env(content[0].to_string(), content[1].to_string());
+                }
+            }
+            None => {}
+        }
+
+        match self.config.sockets() {
+            Some(sockets) => {
+                for socket in sockets {
+                    self.comm.unit().insert_two_deps(
+                        UnitRelations::UnitWants,
+                        UnitRelations::UnitAfter,
+                        socket.to_string(),
+                    );
+
+                    self.comm
+                        .unit()
+                        .insert_dep(UnitRelations::UnitTriggeredBy, socket.clone());
                 }
             }
             None => {}
