@@ -121,8 +121,6 @@ pub mod mngr_comm {
 pub struct SysComm {
     #[prost(enumeration="sys_comm::Action", tag="1")]
     pub action: i32,
-    #[prost(string, tag="2")]
-    pub unitname: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `SysComm`.
 pub mod sys_comm {

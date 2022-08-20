@@ -7,14 +7,14 @@ use super::signals::Signals;
 use super::unit::UnitManagerX;
 use super::MngErrno;
 use event::{EventState, Events};
+use nix::sys::reboot::{reboot, RebootMode};
 use nix::sys::socket::UnixCredentials;
 use std::collections::HashMap;
 use std::error::Error as Err;
 use std::io::Error;
 use std::rc::Rc;
 use utils::error::Error as ServiceError;
-use utils::Result;
-
+use utils::{process_util, Result};
 pub enum Mode {
     SYSTEM,
     USER,
@@ -189,8 +189,18 @@ impl Manager {
         todo!()
     }
 
-    pub(crate) fn reboot(&mut self) -> Result<(), Error> {
-        todo!()
+    pub(crate) fn reboot(&self, reboot_mode: RebootMode) -> Result<(), MngErrno> {
+        // self.start_unit("shutdown.target");
+        let mut pids = process_util::kill_all_pids(15);
+        pids = process_util::wait_pids(pids, 10000000);
+        if pids.is_empty() {
+            return Ok(());
+        }
+        pids = process_util::kill_all_pids(9);
+        pids = process_util::wait_pids(pids, 10000000);
+        log::info!("Rebooting...");
+        reboot(reboot_mode);
+        Ok(())
     }
 
     pub(crate) fn reexec(&self) -> Result<(), Error> {

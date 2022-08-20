@@ -2,7 +2,7 @@ use clap::Parser;
 use std::net::TcpStream;
 
 use process1::proto::{
-    abi::{unit_comm::Action, CommandRequest},
+    abi::{sys_comm, unit_comm, CommandRequest},
     ProstClientStream,
 };
 use utils::Error;
@@ -35,35 +35,52 @@ enum SubCmd {
     #[clap(display_order = 3)]
     Status { unit_name: Option<String> },
 
+    /// [system] shutdown the system
+    Shutdown {},
+
     /// manager command
     DaemonReload {},
+}
+
+enum CommAction {
+    UnitAction(unit_comm::Action),
+    SysAction(sys_comm::Action),
 }
 
 fn main() -> Result<(), Error> {
     let args = Args::parse();
 
-    // let cmd = args.subcmd;
-
     let (action, unit_name) = match args.subcmd {
-        SubCmd::Start { unit_name } => (Action::Start, unit_name),
-        SubCmd::Stop { unit_name } => (Action::Stop, unit_name),
-        SubCmd::Status { unit_name } => (Action::Status, unit_name),
+        SubCmd::Start { unit_name } => {
+            (CommAction::UnitAction(unit_comm::Action::Start), unit_name)
+        }
+        SubCmd::Stop { unit_name } => (CommAction::UnitAction(unit_comm::Action::Stop), unit_name),
+        SubCmd::Status { unit_name } => {
+            (CommAction::UnitAction(unit_comm::Action::Status), unit_name)
+        }
+        SubCmd::Shutdown {} => (CommAction::SysAction(sys_comm::Action::Shutdown), None),
         _ => unreachable!(),
     };
-    // let action = Action::from_str(&args.action)?;
+
     let addr = "127.0.0.1:9527";
     // 连接服务器
     let stream = TcpStream::connect(addr).unwrap();
 
     let mut client = ProstClientStream::new(stream);
 
-    let cmd = CommandRequest::new_unitcomm(action, unit_name.unwrap());
-
-    println!("{:?}", cmd);
-
-    let data = client.execute(cmd).unwrap();
-
-    println!("{:?}", data);
-
+    match action {
+        CommAction::UnitAction(a) => {
+            let cmd = CommandRequest::new_unitcomm(a, unit_name.unwrap());
+            println!("{:?}", cmd);
+            let data = client.execute(cmd).unwrap();
+            println!("{:?}", data);
+        }
+        CommAction::SysAction(a) => {
+            let cmd = CommandRequest::new_syscomm(a);
+            println!("{:?}", cmd);
+            let data = client.execute(cmd).unwrap();
+            println!("{:?}", data);
+        }
+    }
     Ok(())
 }
