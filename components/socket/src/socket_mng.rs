@@ -6,8 +6,8 @@ use std::{cell::RefCell, path::Path, rc::Rc};
 use event::EventState;
 use nix::{sys::signal::Signal, unistd::Pid};
 use process1::manager::{
-    ExecCommand, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags, UnitRef,
-    UnitType,
+    ExecCommand, ExecContext, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags,
+    UnitRef, UnitType,
 };
 use utils::IN_SET;
 
@@ -103,13 +103,14 @@ impl SocketMng {
         commr: &Rc<SocketComm>,
         configr: &Rc<SocketConfig>,
         ports: &Rc<SocketPorts>,
+        exec_ctx: &Rc<ExecContext>,
     ) -> SocketMng {
         let pid = Rc::new(SocketPid::new(commr));
         SocketMng {
             comm: commr.clone(),
             config: configr.clone(),
             ports: ports.clone(),
-            spawn: SocketSpawn::new(commr),
+            spawn: SocketSpawn::new(commr, exec_ctx),
             state: Rc::new(RefCell::new(SocketState::StateMax)),
             result: RefCell::new(SocketResult::Success),
             control_command: RefCell::new(Vec::new()),

@@ -10,7 +10,8 @@ use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
 use process1::manager::{
-    Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
+    ExecContext, Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj,
+    UnitSubClass,
 };
 
 use std::collections::HashMap;
@@ -26,6 +27,7 @@ struct ServiceUnit {
     config: Rc<ServiceConfig>,
     mng: Rc<ServiceMng>,
     monitor: ServiceMonitor,
+    exec_ctx: Rc<ExecContext>,
 }
 
 impl UnitObj for ServiceUnit {
@@ -39,6 +41,8 @@ impl UnitObj for ServiceUnit {
 
     fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
         self.config.load(paths)?;
+
+        self.parse()?;
 
         self.service_add_extras()?;
 
@@ -129,16 +133,37 @@ impl ServiceUnit {
     fn new() -> ServiceUnit {
         let comm = Rc::new(ServiceComm::new());
         let config = Rc::new(ServiceConfig::new());
+        let context = Rc::new(ExecContext::new());
 
         let rt = Rc::new(RunningData::new());
-        let mng = Rc::new(ServiceMng::new(&comm, &config, &rt));
+        let mng = Rc::new(ServiceMng::new(&comm, &config, &rt, &context));
         rt.attach_mng(mng.clone());
         ServiceUnit {
             comm: Rc::clone(&comm),
             config: Rc::clone(&config),
             mng: mng.clone(),
             monitor: ServiceMonitor::new(&config),
+            exec_ctx: context.clone(),
         }
+    }
+
+    pub(super) fn parse(&self) -> Result<(), Box<dyn Error>> {
+        match self.config.environments() {
+            Some(envs) => {
+                for env in envs {
+                    let content: Vec<&str> = env.split("=").map(|s| s.trim()).collect();
+                    if content.len() != 2 {
+                        continue;
+                    }
+
+                    self.exec_ctx
+                        .insert_env(content[0].to_string(), content[1].to_string());
+                }
+            }
+            None => {}
+        }
+
+        Ok(())
     }
 
     pub fn service_add_extras(&self) -> Result<(), Box<dyn Error>> {

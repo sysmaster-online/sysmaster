@@ -4,7 +4,7 @@ use crate::service_config::ServiceConfig;
 use super::service_comm::ServiceComm;
 use super::service_pid::ServicePid;
 use nix::unistd::Pid;
-use process1::manager::{ExecCommand, ExecFlags, ExecParameters};
+use process1::manager::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
 use std::error::Error;
 use std::rc::Rc;
 
@@ -12,6 +12,7 @@ pub(super) struct ServiceSpawn {
     comm: Rc<ServiceComm>,
     pid: Rc<ServicePid>,
     config: Rc<ServiceConfig>,
+    exec_ctx: Rc<ExecContext>,
 }
 
 impl ServiceSpawn {
@@ -19,11 +20,13 @@ impl ServiceSpawn {
         commr: &Rc<ServiceComm>,
         pidr: &Rc<ServicePid>,
         configr: &Rc<ServiceConfig>,
+        exec_ctx: &Rc<ExecContext>,
     ) -> ServiceSpawn {
         ServiceSpawn {
             comm: Rc::clone(commr),
             pid: Rc::clone(pidr),
             config: configr.clone(),
+            exec_ctx: exec_ctx.clone(),
         }
     }
 
@@ -58,7 +61,7 @@ impl ServiceSpawn {
         }
 
         log::debug!("begin to exec spawn");
-        match um.exec_spawn(&unit, cmdline, &params) {
+        match um.exec_spawn(&unit, cmdline, &params, self.exec_ctx.clone()) {
             Ok(pid) => {
                 um.child_watch_pid(pid, unit.get_id());
                 Ok(pid)

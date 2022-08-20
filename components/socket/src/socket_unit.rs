@@ -5,7 +5,8 @@
 
 use nix::{sys::signal::Signal, unistd::Pid};
 use process1::manager::{
-    Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass,
+    ExecContext, Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj,
+    UnitSubClass,
 };
 use std::{error::Error, path::PathBuf, rc::Rc};
 
@@ -115,10 +116,11 @@ impl UnitSubClass for SocketUnit {
 
 impl SocketUnit {
     fn new() -> SocketUnit {
+        let context = Rc::new(ExecContext::new());
         let _comm = Rc::new(SocketComm::new());
         let _config = Rc::new(SocketConfig::new());
         let ports = Rc::new(SocketPorts::new());
-        let mng = Rc::new(SocketMng::new(&_comm, &_config, &ports));
+        let mng = Rc::new(SocketMng::new(&_comm, &_config, &ports, &context));
         SocketUnit {
             comm: Rc::clone(&_comm),
             config: Rc::clone(&_config),

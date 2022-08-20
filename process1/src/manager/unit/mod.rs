@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 pub use execute::{ExecCmdError, ExecCommand, ExecContext, ExecFlags, ExecParameters};
 pub use unit_base::{
@@ -47,8 +47,8 @@ impl DeserializeWith for Vec<String> {
         let s = String::deserialize(de)?;
         let mut vec = Vec::new();
 
-        for l in s.split_whitespace() {
-            vec.push(l.to_string());
+        for l in s.split_terminator(';') {
+            vec.push(l.trim().to_string());
         }
 
         Ok(vec)
