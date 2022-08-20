@@ -200,7 +200,7 @@ pub(super) struct SocketPort {
     config: Rc<SocketConfig>,
 
     p_type: PortType,
-    fd: RefCell<isize>,
+    fd: RefCell<RawFd>,
     sa: RefCell<SocketAddress>,
 }
 
@@ -232,7 +232,7 @@ impl SocketPort {
     }
 
     pub(super) fn fd(&self) -> RawFd {
-        (*self.fd.borrow()).try_into().unwrap()
+        *self.fd.borrow()
     }
 
     pub(super) fn can_accept(&self) -> bool {
@@ -240,10 +240,7 @@ impl SocketPort {
     }
 
     pub(super) fn accept(&self) -> Result<i32, Errno> {
-        match socket::accept4(
-            (*self.fd.borrow()).try_into().unwrap(),
-            SockFlag::SOCK_NONBLOCK | SockFlag::SOCK_CLOEXEC,
-        ) {
+        match socket::accept4(self.fd(), SockFlag::SOCK_NONBLOCK | SockFlag::SOCK_CLOEXEC) {
             Ok(fd) => {
                 return Ok(fd);
             }
@@ -263,9 +260,7 @@ impl SocketPort {
                 *self.fd.borrow_mut() = self
                     .sa
                     .borrow()
-                    .socket_listen(SockFlag::SOCK_CLOEXEC | SockFlag::SOCK_NONBLOCK, 128)?
-                    .try_into()
-                    .unwrap();
+                    .socket_listen(SockFlag::SOCK_CLOEXEC | SockFlag::SOCK_NONBLOCK, 128)?;
             }
             PortType::Fifo => todo!(),
             PortType::Invalid => todo!(),
@@ -275,11 +270,11 @@ impl SocketPort {
     }
 
     pub(super) fn close(&self) {
-        if *self.fd.borrow() < 0 {
+        if self.fd() < 0 {
             return;
         }
 
-        fd_util::close((*self.fd.borrow()).try_into().unwrap());
+        fd_util::close(self.fd());
 
         *self.fd.borrow_mut() = -1;
         match self.p_type {
@@ -292,8 +287,7 @@ impl SocketPort {
     }
 
     pub(super) fn flush_accept(&self) {
-        let accept_conn =
-            socket::getsockopt((*self.fd.borrow()).try_into().unwrap(), sockopt::AcceptConn);
+        let accept_conn = socket::getsockopt(self.fd(), sockopt::AcceptConn);
         if accept_conn.is_err() {
             return;
         }
@@ -303,11 +297,7 @@ impl SocketPort {
         }
 
         for _i in 1..1024 {
-            match io_util::wait_for_events(
-                (*self.fd.borrow()).try_into().unwrap(),
-                PollFlags::POLLIN,
-                0,
-            ) {
+            match io_util::wait_for_events(self.fd(), PollFlags::POLLIN, 0) {
                 Ok(v) => {
                     if v == 0 {
                         return;
@@ -321,12 +311,9 @@ impl SocketPort {
                 }
             }
 
-            match socket::accept4(
-                (*self.fd.borrow()).try_into().unwrap(),
-                SockFlag::SOCK_NONBLOCK | SockFlag::SOCK_CLOEXEC,
-            ) {
+            match socket::accept4(self.fd(), SockFlag::SOCK_NONBLOCK | SockFlag::SOCK_CLOEXEC) {
                 Ok(_) => {
-                    fd_util::close((*self.fd.borrow()).try_into().unwrap());
+                    fd_util::close(self.fd());
                 }
                 Err(e) => {
                     if e == Errno::EAGAIN {
@@ -342,18 +329,14 @@ impl SocketPort {
 
     pub(super) fn flush_fd(&self) {
         loop {
-            match io_util::wait_for_events(
-                (*self.fd.borrow()).try_into().unwrap(),
-                PollFlags::POLLIN,
-                0,
-            ) {
+            match io_util::wait_for_events(self.fd(), PollFlags::POLLIN, 0) {
                 Ok(v) => {
                     if v == 0 {
                         return;
                     }
 
                     let mut buf = [0; 2048];
-                    match nix::unistd::read((*self.fd.borrow()).try_into().unwrap(), &mut buf) {
+                    match nix::unistd::read(self.fd(), &mut buf) {
                         Ok(v) => {
                             if v == 0 {
                                 return;

@@ -1,7 +1,7 @@
 [package]
 name = "target"
 version = "0.1.0"
-edition = "2021"
+edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,7 +18,6 @@ process1 = { path = "../../process1" }
 strum = { version = "0.23", features = ["derive"] }
 nix = "0.24"
 log = "0.4"
-proc_macro_utils = {path = "../../libproc_macro_utils"}
 toml = "0.5.8"
 serde_derive = "1.0.130"
 serde = "1.0.130"
