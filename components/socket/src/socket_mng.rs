@@ -454,8 +454,10 @@ impl SocketMng {
     fn open_fds(&self) -> Result<(), UnitActionError> {
         let ports = self.ports.ports();
         for port in ports.iter() {
-            port.open_port()
-                .map_err(|_e| return UnitActionError::UnitActionEFailed)?;
+            port.open_port().map_err(|_e| {
+                log::error!("open port error: {}", _e);
+                return UnitActionError::UnitActionEFailed;
+            })?;
 
             port.apply_sock_opt(port.fd());
         }

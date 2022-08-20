@@ -1,10 +1,12 @@
 //! socket_load模块实现socket配置文件的加载解析。
 //!
 
-use nix::sys::socket::{InetAddr, IpAddr, SockAddr, SockProtocol, SockType, UnixAddr};
+use nix::sys::socket::{
+    NetlinkAddr, SockProtocol, SockType, SockaddrIn, SockaddrIn6, SockaddrLike, UnixAddr,
+};
 use process1::manager::UnitType;
 use std::cell::RefCell;
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::PathBuf;
 use std::{error::Error, rc::Rc};
 use utils::socket_util;
@@ -157,18 +159,23 @@ impl SocketLoad {
                         return Ok(());
                     }
 
-                    if let Ok(socket_addr) = self.parse_netlink_address(&listen_netlink) {
-                        let mut port = SocketPort::new(socket_addr, self.config.clone());
-                        port.set_sc_type(PortType::Socket);
-                        self.ports.push_port(Rc::new(port));
-                    } else {
-                        log::error!("create stream listening socket failed: {}", listen_netlink);
+                    if let Err(e) = self.parse_netlink_address(&listen_netlink) {
+                        log::error!(
+                            "create stream listening socket: {}, failed: {:?}",
+                            listen_netlink,
+                            e
+                        );
                         return Err(format!(
                             "create stream listening socket failed: {}",
                             listen_netlink
                         )
                         .into());
                     }
+
+                    let socket_addr = self.parse_netlink_address(&listen_netlink).unwrap();
+                    let mut port = SocketPort::new(socket_addr, self.config.clone());
+                    port.set_sc_type(PortType::Socket);
+                    self.ports.push_port(Rc::new(port));
                 }
             }
         }
@@ -182,7 +189,7 @@ impl SocketLoad {
             .split_whitespace()
             .map(|s| s.to_string())
             .collect();
-        if words.len() == 2 {
+        if words.len() != 2 {
             return Err(format!("Netlink configuration format is not correct: {}", item).into());
         }
 
@@ -197,9 +204,10 @@ impl SocketLoad {
             return Err(format!("Netlink group is invalid").into());
         };
 
-        let sock_addr: SockAddr = SockAddr::new_netlink(0, group);
+        let net_link = NetlinkAddr::new(0, group);
+
         return Ok(SocketAddress::new(
-            sock_addr,
+            Box::new(net_link),
             SockType::Raw,
             Some(SockProtocol::from(family)),
         ));
@@ -211,19 +219,14 @@ impl SocketLoad {
         socket_type: SockType,
     ) -> Result<SocketAddress, Box<dyn Error>> {
         if item.starts_with("/") {
-            let sock_unit = SockAddr::new_unix(&PathBuf::from(item))?;
-
-            return Ok(SocketAddress::new(sock_unit, socket_type, None));
+            let unix_addr = UnixAddr::new(&PathBuf::from(item))?;
+            return Ok(SocketAddress::new(Box::new(unix_addr), socket_type, None));
         }
 
         if item.starts_with("@") {
             let unix_addr = UnixAddr::new_abstract(item.as_bytes())?;
 
-            return Ok(SocketAddress::new(
-                SockAddr::Unix(unix_addr),
-                socket_type,
-                None,
-            ));
+            return Ok(SocketAddress::new(Box::new(unix_addr), socket_type, None));
         }
 
         if let Ok(port) = item.parse::<u16>() {
@@ -231,21 +234,27 @@ impl SocketLoad {
                 return Err(format!("invalid port number").into());
             }
 
-            let sock_unit = if socket_util::ipv6_is_supported() {
-                let sock_unit =
-                    SockAddr::Inet(InetAddr::new(IpAddr::new_v6(0, 0, 0, 0, 0, 0, 0, 0), port));
-                sock_unit
-            } else {
-                let sock_unit = SockAddr::Inet(InetAddr::new(IpAddr::new_v4(0, 0, 0, 0), port));
-                sock_unit
-            };
+            if socket_util::ipv6_is_supported() {
+                let addr = SockaddrIn6::from(SocketAddrV6::new(
+                    Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0),
+                    port,
+                    0,
+                    0,
+                ));
+                return Ok(SocketAddress::new(Box::new(addr), socket_type, None));
+            }
 
-            return Ok(SocketAddress::new(sock_unit, socket_type, None));
+            let addr = SockaddrIn::from(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), port));
+            return Ok(SocketAddress::new(Box::new(addr), socket_type, None));
         }
 
         if let Ok(socket_addr) = item.parse::<SocketAddr>() {
-            let sock_unit = SockAddr::Inet(InetAddr::from_std(&socket_addr));
-            return Ok(SocketAddress::new(sock_unit, socket_type, None));
+            let sock_addr: Box<dyn SockaddrLike> = match socket_addr {
+                SocketAddr::V4(addr) => Box::new(SockaddrIn::from(addr)),
+                SocketAddr::V6(addr) => Box::new(SockaddrIn6::from(addr)),
+            };
+
+            return Ok(SocketAddress::new(sock_addr, socket_type, None));
         }
 
         return Err(format!("invalid listening config").into());

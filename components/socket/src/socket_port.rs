@@ -8,11 +8,12 @@ use nix::{
     sys::socket::{
         self,
         sockopt::{self, ReuseAddr},
-        AddressFamily, SockAddr, SockFlag, SockProtocol, SockType,
+        AddressFamily, SockFlag, SockProtocol, SockType, SockaddrLike, UnixAddr,
     },
 };
 use std::{
     cell::RefCell,
+    fmt, fs,
     os::unix::prelude::RawFd,
     path::PathBuf,
     rc::{Rc, Weak},
@@ -90,7 +91,6 @@ impl SocketPortsData {
     }
 
     pub(self) fn ports(&self) -> Vec<Rc<SocketPort>> {
-        log::debug!("ports length: {}", self.ports.len());
         self.ports.iter().map(|p| p.clone()).collect::<_>()
     }
 
@@ -117,14 +117,14 @@ impl SocketPortsData {
 
 #[allow(dead_code)]
 pub(super) struct SocketAddress {
-    sock_addr: SockAddr,
+    sock_addr: Box<dyn SockaddrLike>,
     sa_type: SockType,
     protocol: Option<SockProtocol>,
 }
 
 impl SocketAddress {
     pub(super) fn new(
-        sock_addr: SockAddr,
+        sock_addr: Box<dyn SockaddrLike>,
         sa_type: SockType,
         protocol: Option<SockProtocol>,
     ) -> SocketAddress {
@@ -144,25 +144,44 @@ impl SocketAddress {
     }
 
     pub(super) fn path(&self) -> Option<PathBuf> {
-        if self.sock_addr.family() != AddressFamily::Unix {
+        if self.sock_addr.family() != Some(AddressFamily::Unix) {
             return None;
         }
 
-        if let SockAddr::Unix(unix_addr) = self.sock_addr {
+        if let Some(unix_addr) =
+            unsafe { UnixAddr::from_raw(self.sock_addr.as_ptr(), Some(self.sock_addr.len())) }
+        {
             return unix_addr.path().map(|p| p.to_path_buf());
         }
         None
     }
 
     pub(super) fn family(&self) -> AddressFamily {
-        self.sock_addr.family()
+        self.sock_addr.family().unwrap()
     }
 
     pub(super) fn socket_listen(&self, falgs: SockFlag, backlog: usize) -> Result<i32, Errno> {
-        let fd = socket::socket(self.sock_addr.family(), self.sa_type, falgs, self.protocol)?;
+        log::debug!(
+            "create socket, family: {:?}, type: {:?}, protocol: {:?}",
+            self.sock_addr.family().unwrap(),
+            self.sa_type,
+            self.protocol
+        );
+        let fd = socket::socket(
+            self.sock_addr.family().unwrap(),
+            self.sa_type,
+            falgs,
+            self.protocol,
+        )?;
 
         socket::setsockopt(fd, ReuseAddr, &true)?;
-        socket::bind(fd, &self.sock_addr)?;
+
+        if let Some(path) = self.path() {
+            let parent_path = path.as_path().parent();
+            fs::create_dir_all(parent_path.unwrap()).map_err(|_e| Errno::EINVAL)?;
+        }
+
+        socket::bind(fd, &*self.sock_addr)?;
 
         if self.can_accept() {
             match socket::listen(fd, backlog) {
@@ -177,20 +196,29 @@ impl SocketAddress {
     }
 
     pub(super) fn unlink(&self) {
-        if self.sock_addr.family() == AddressFamily::Unix {
-            let path = self.path();
-            if path.is_none() {
-                return;
-            }
-
-            let tmp = path.unwrap();
-            match nix::unistd::unlink(&tmp) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::warn!("Unable to unlink {:?}, error: {}", tmp, e)
+        log::debug!("unlink socket, just usefull in unix mode");
+        if let Some(AddressFamily::Unix) = self.sock_addr.family() {
+            if let Some(path) = self.path() {
+                log::debug!("unlink path: {:?}", path);
+                match nix::unistd::unlink(&path) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        log::warn!("Unable to unlink {:?}, error: {}", path, e)
+                    }
                 }
             }
         }
+    }
+}
+
+impl fmt::Display for SocketAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "sock type: {:?}, sock family: {:?}",
+            self.sa_type,
+            self.sock_addr.family().unwrap(),
+        )
     }
 }
 
@@ -437,10 +465,24 @@ impl Source for SocketPort {
     }
 }
 
+impl fmt::Display for SocketPort {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "port type: {:?}, socket address: {}",
+            self.p_type(),
+            self.sa.borrow()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use nix::sys::socket::{InetAddr, IpAddr, SockAddr, SockType};
-    use std::rc::Rc;
+    use nix::sys::socket::{SockType, SockaddrIn};
+    use std::{
+        net::{Ipv4Addr, SocketAddrV4},
+        rc::Rc,
+    };
 
     use crate::{socket_base::PortType, socket_config::SocketConfig};
 
@@ -450,9 +492,8 @@ mod tests {
     fn test_socket_ports() {
         let ports = SocketPorts::new();
         let config = Rc::new(SocketConfig::new());
-
-        let sockv4 = SockAddr::Inet(InetAddr::new(IpAddr::new_v4(0, 0, 0, 0), 31457));
-        let socket_addr = SocketAddress::new(sockv4, SockType::Stream, None);
+        let sock_addr = SockaddrIn::from(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 31457));
+        let socket_addr = SocketAddress::new(Box::new(sock_addr), SockType::Stream, None);
 
         let mut p = SocketPort::new(socket_addr, config.clone());
         p.set_sc_type(PortType::Socket);
