@@ -61,6 +61,13 @@ impl ServiceConfig {
             None => None,
         }
     }
+
+    pub(super) fn sockets(&self) -> Option<Vec<String>> {
+        match &self.data.borrow().Service.Sockets {
+            Some(v) => Some(v.iter().map(|v| v.to_string()).collect()),
+            None => None,
+        }
+    }
 }
 
 #[derive(Config, Default, Debug)]
@@ -92,7 +99,8 @@ pub(super) struct SectionService {
     pub ExecReload: Option<Vec<ExecCommand>>,
     #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
     pub ExecCondition: Option<Vec<ExecCommand>>,
-    pub Sockets: Option<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    pub Sockets: Option<Vec<String>>,
     // #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
     // pub Restart: Option<Vec<ExecCommand>>,
     pub RestrictRealtime: Option<String>,

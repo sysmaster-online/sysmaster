@@ -6,10 +6,10 @@ use super::uu_condition::{
 };
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
-use crate::manager::data::{DataManager, UnitActiveState, UnitState};
+use crate::manager::data::{DataManager, UnitActiveState, UnitDepConf, UnitState};
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{KillOperation, UnitActionError, UnitLoadState, UnitType};
-use crate::manager::UnitNotifyFlags;
+use crate::manager::{UnitNotifyFlags, UnitRelations};
 use cgroup::{self, CgFlags};
 use log;
 use nix::sys::signal::Signal;
@@ -341,6 +341,35 @@ impl Unit {
         }
 
         pids
+    }
+
+    pub fn insert_two_deps(
+        &self,
+        ra: UnitRelations,
+        rb: UnitRelations,
+        u_name: String,
+    ) -> Option<UnitDepConf> {
+        log::debug!(
+            "insert two relations {:?} and {:?} to unit {}",
+            ra,
+            rb,
+            u_name.to_string()
+        );
+        let mut ud_conf = UnitDepConf::new();
+
+        for rl in [ra, rb] {
+            ud_conf.deps.insert(rl, vec![u_name.clone()]);
+        }
+
+        self.dm.insert_ud_config(self.get_id().to_string(), ud_conf)
+    }
+
+    pub fn insert_dep(&self, ra: UnitRelations, u_name: String) -> Option<UnitDepConf> {
+        log::debug!("insert relation {:?} to unit {}", ra, u_name.to_string());
+        let mut ud_conf = UnitDepConf::new();
+        ud_conf.deps.insert(ra, vec![u_name.clone()]);
+
+        self.dm.insert_ud_config(self.get_id().to_string(), ud_conf)
     }
 
     pub(super) fn get_config(&self) -> Rc<UeConfig> {
