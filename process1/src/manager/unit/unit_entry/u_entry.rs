@@ -1,5 +1,9 @@
 use super::uu_cgroup::UeCgroup;
 use super::uu_child::UeChild;
+use super::uu_condition::{
+    UeCondition, ASSERT_PATH_EXISTS, CONDITION_FILE_NOT_EMPTY, CONDITION_NEEDS_UPDATE,
+    CONDITION_PATH_EXISTS,
+};
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use crate::manager::data::{DataManager, UnitActiveState, UnitState};
@@ -62,6 +66,7 @@ pub struct Unit {
     load: UeLoad,
     child: UeChild,
     cgroup: UeCgroup,
+    conditions: Rc<UeCondition>,
     sub: Box<dyn UnitObj>,
 }
 
@@ -128,6 +133,85 @@ pub trait UnitObj {
 }
 
 impl Unit {
+    pub(super) fn new(
+        unit_type: UnitType,
+        name: &str,
+        dmr: &Rc<DataManager>,
+        filer: &Rc<UnitFile>,
+        sub: Box<dyn UnitObj>,
+    ) -> Self {
+        let _config = Rc::new(UeConfig::new());
+        Unit {
+            dm: Rc::clone(dmr),
+            unit_type,
+            id: String::from(name),
+            config: Rc::clone(&_config),
+            load: UeLoad::new(dmr, filer, &_config, String::from(name)),
+            child: UeChild::new(),
+            cgroup: UeCgroup::new(),
+            conditions: Rc::new(UeCondition::new()),
+            sub,
+        }
+    }
+
+    fn conditions(&self) -> Rc<UeCondition> {
+        let flag = self.conditions.init_flag();
+        if flag != 0 {
+            return Rc::clone(&self.conditions);
+        } else {
+            //need to reconstruct the code, expose the config detail out is wrong
+            self.conditions.add_condition(
+                CONDITION_FILE_NOT_EMPTY,
+                String::from(
+                    self.get_config()
+                        .config_data()
+                        .borrow()
+                        .Unit
+                        .ConditionFileNotEmpty
+                        .as_str(),
+                ),
+            );
+
+            self.conditions.add_condition(
+                CONDITION_NEEDS_UPDATE,
+                String::from(
+                    self.get_config()
+                        .config_data()
+                        .borrow()
+                        .Unit
+                        .ConditionNeedsUpdate
+                        .as_str(),
+                ),
+            );
+
+            self.conditions.add_condition(
+                CONDITION_PATH_EXISTS,
+                String::from(
+                    self.get_config()
+                        .config_data()
+                        .borrow()
+                        .Unit
+                        .ConditionPathExists
+                        .as_str(),
+                ),
+            );
+
+            self.conditions.add_assert(
+                ASSERT_PATH_EXISTS,
+                String::from(
+                    self.get_config()
+                        .config_data()
+                        .borrow()
+                        .Unit
+                        .AssertPathExists
+                        .as_str(),
+                ),
+            );
+        }
+
+        Rc::clone(&self.conditions)
+    }
+
     pub fn notify(
         &self,
         original_state: UnitActiveState,
@@ -229,6 +313,22 @@ impl Unit {
             .DefaultDependencies
     }
 
+    pub fn ignore_on_isolate(&self) -> bool {
+        self.get_config()
+            .config_data()
+            .borrow()
+            .Unit
+            .IgnoreOnIsolate
+    }
+
+    pub fn set_ignore_on_isolate(&self, ignore_on_isolate: bool) {
+        self.get_config()
+            .config_data()
+            .borrow_mut()
+            .Unit
+            .IgnoreOnIsolate = ignore_on_isolate;
+    }
+
     fn pids_set(&self, m_pid: Option<Pid>, c_pid: Option<Pid>) -> HashSet<Pid> {
         let mut pids = HashSet::new();
 
@@ -241,41 +341,6 @@ impl Unit {
         }
 
         pids
-    }
-
-    // pub fn insert_two_deps(
-    //     &self,
-    //     ra: UnitRelations,
-    //     rb: UnitRelations,
-    //     u_name: String,
-    // ) -> Option<UnitDepConf> {
-    //     let mut ud_conf = UnitDepConf::new();
-    //     for rl in [ra, rb] {
-    //         let vec = ud_conf.deps.get(&rl).unwrap();
-    //         vec.push(u_name.clone());
-    //     }
-
-    //     self.dm.insert_ud_config(self.get_id().to_string(), ud_conf)
-    // }
-
-    pub(super) fn new(
-        unit_type: UnitType,
-        name: &str,
-        dmr: &Rc<DataManager>,
-        filer: &Rc<UnitFile>,
-        sub: Box<dyn UnitObj>,
-    ) -> Self {
-        let _config = Rc::new(UeConfig::new());
-        Unit {
-            dm: Rc::clone(dmr),
-            unit_type,
-            id: String::from(name),
-            config: Rc::clone(&_config),
-            load: UeLoad::new(dmr, filer, &_config, String::from(name)),
-            child: UeChild::new(),
-            cgroup: UeCgroup::new(),
-            sub,
-        }
     }
 
     pub(super) fn get_config(&self) -> Rc<UeConfig> {
@@ -330,6 +395,32 @@ impl Unit {
     }
 
     pub(super) fn start(&self) -> Result<(), UnitActionError> {
+        let active_state = self.current_active_state();
+        let us_is_active_or_reloading = match active_state {
+            UnitActiveState::UnitActive | UnitActiveState::UnitReloading => true,
+            _ => false,
+        };
+
+        if us_is_active_or_reloading {
+            return Err(UnitActionError::UnitActionEAlready);
+        }
+
+        if active_state == UnitActiveState::UnitMaintenance {
+            return Err(UnitActionError::UnitActionEAgain);
+        }
+
+        if self.load_state() != UnitLoadState::UnitLoaded {
+            return Err(UnitActionError::UnitActionEInval);
+        }
+        if active_state != UnitActiveState::UnitActivating && !self.conditions().condtions_test() {
+            log::debug!("Starting failed because condtion test failed");
+            return Err(UnitActionError::UnitActionEInval);
+        }
+        if active_state != UnitActiveState::UnitActivating && !self.conditions().asserts_test() {
+            log::error!("Starting failed because assert test failed");
+            return Err(UnitActionError::UnitActionEInval);
+        }
+
         self.sub.start()
     }
 

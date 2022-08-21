@@ -80,6 +80,7 @@ pub(crate) struct UeConfigUnit {
     pub Documentation: String,
     #[config(default = false)]
     pub AllowIsolate: bool,
+    //设置为true时，执行systemctl isolate时，此单元不会被停止,对于service,target,socket timer,path来说，默认为false,对于其他单元，默认为true
     #[config(default = false)]
     pub IgnoreOnIsolate: bool,
     #[config(default = true)]
@@ -102,6 +103,17 @@ pub(crate) struct UeConfigUnit {
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
     pub After: Vec<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    #[config(default = "")]
+    pub Conflicts: Vec<String>,
+    #[config(default = "")]
+    pub ConditionFileNotEmpty: String,
+    #[config(default = "")]
+    pub ConditionNeedsUpdate: String,
+    #[config(default = "")]
+    pub ConditionPathExists: String,
+    #[config(default = "")]
+    pub AssertPathExists: String,
 }
 
 #[derive(Config, Default, Debug)]

@@ -1,7 +1,8 @@
 [Unit]
 Description="CN"
 Documentation="192.168.1.1"
-
+Requires="test.service"
+Conflicts = "config.service"
 
 [Service]
 Type="Simple"
@@ -9,6 +10,7 @@ ExecCondition="/usr/bin/sleep 5"
 ExecStart="/bin/echo 'test'"
 ExecStop="/bin/kill $MAINPID"
 WatchdogUSec=10
+
 
 [Install]
 WantedBy="dbus.service"

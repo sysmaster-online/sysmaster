@@ -96,7 +96,14 @@ impl UnitFileData {
     pub fn build_id_fragment(&mut self, name: &String) {
         let mut pathbuf_fragment = Vec::new();
         for v in &self.lookup_path.search_path {
-            let path = format!("{}/{}", v, name);
+            if let Err(_e) = fs::metadata(v) {
+                continue;
+            }
+            let path = if v.ends_with("/") {
+                format!("{}{}", v, name)
+            } else {
+                format!("{}/{}", v, name)
+            };
             let tmp = Path::new(&path);
             if tmp.exists() && !tmp.is_symlink() {
                 let path = format!("{}.toml", tmp.to_string_lossy().to_string());
@@ -164,8 +171,9 @@ impl UnitFileData {
                         log::error!("failed to get mtime {}", dir);
                     }
                 },
-                Err(e) => {
-                    log::debug!("lookup path {} of unit file config err: {}", dir, e);
+                Err(_e) => {
+                    log::debug!("unit file config lookup path {}  not found", dir);
+                    continue;
                 }
             }
         }

@@ -37,14 +37,14 @@ impl LookupPaths {
             out_dir
         };
 
-        self.search_path.push(LIB_SYSTEM_PATH.to_string());
-        self.search_path.push(RUN_SYSTEM_PATH.to_string());
-        self.search_path.push(ETC_SYSTEM_PATH.to_string());
         let out_dir = devel_path();
         if !out_dir.is_empty() && out_dir.contains("build") {
             let tmp_str: Vec<_> = out_dir.split("build").collect();
             self.search_path.push(format!("{}", tmp_str[0]));
         }
+        self.search_path.push(LIB_SYSTEM_PATH.to_string());
+        self.search_path.push(RUN_SYSTEM_PATH.to_string());
+        self.search_path.push(ETC_SYSTEM_PATH.to_string());
     }
 }
 
@@ -73,7 +73,7 @@ mod tests {
         let tmp_dir = env::var("OUT_DIR").unwrap();
         let tmp_dir_v: Vec<_> = tmp_dir.split("build").collect();
         assert_eq!(
-            _lp.search_path.last().unwrap().to_string(),
+            _lp.search_path.first().unwrap().to_string(),
             tmp_dir_v[0].to_string()
         );
     }

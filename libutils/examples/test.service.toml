@@ -1,8 +1,6 @@
 [Unit]
 Description="CN"
 Documentation="192.168.1.1"
-#Requires="c.service"
-#Wants = "b.service"
 
 [Service]
 ExecCondition="/usr/bin/sleep 15"

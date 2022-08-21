@@ -1,7 +1,6 @@
 use crate::manager::data::{DataManager, UnitDepConf, UnitRelations};
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::UnitLoadState;
-use crate::null_str;
 use std::cell::RefCell;
 use std::error::Error as stdError;
 use std::path::PathBuf;
@@ -20,8 +19,6 @@ pub(super) struct UeLoad {
     id: String,
     /* data */
     load_state: RefCell<UnitLoadState>,
-    config_file_path: RefCell<String>,
-    config_file_mtime: RefCell<u128>,
     in_load_queue: RefCell<bool>,
     in_target_dep_queue: RefCell<bool>,
 }
@@ -39,8 +36,6 @@ impl UeLoad {
             file: Rc::clone(filer),
             id,
             load_state: RefCell::new(UnitLoadState::UnitStub),
-            config_file_path: RefCell::new(null_str!("")),
-            config_file_mtime: RefCell::new(0),
             in_load_queue: RefCell::new(false),
             in_target_dep_queue: RefCell::new(false),
         }
@@ -118,6 +113,12 @@ impl UeLoad {
                 .RequiredBy
                 .clone(),
         );
+
+        ud_conf.deps.insert(
+            UnitRelations::UnitConflicts,
+            self.config.config_data().borrow().Unit.Conflicts.clone(),
+        );
+
         self.dm.insert_ud_config(self.id.clone(), ud_conf);
     }
 }

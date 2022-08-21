@@ -44,16 +44,6 @@ impl UnitX {
     pub(in crate::manager::unit) fn coldplug(&self) {}
     pub(in crate::manager::unit) fn start(&self) -> Result<(), UnitActionError> {
         log::debug!("unitx start the unit {}", self.get_id());
-        let state = self.0.current_active_state();
-
-        if state == UnitActiveState::UnitMaintenance {
-            return Err(UnitActionError::UnitActionEAgain);
-        }
-
-        if self.0.load_state() != UnitLoadState::UnitLoaded {
-            return Err(UnitActionError::UnitActionEInval);
-        }
-
         self.0.start()
     }
     pub(in crate::manager::unit) fn stop(&self) -> Result<(), UnitActionError> {
@@ -117,7 +107,6 @@ impl UnitX {
     pub(in crate::manager::unit) fn active_state(&self) -> UnitActiveState {
         //UnitActiveState::UnitActive
         self.0.current_active_state()
-        //todo!();
     }
 
     pub(in crate::manager::unit) fn active_or_activating(&self) -> bool {

@@ -7,5 +7,6 @@ mod u_entry;
 mod uf_interface;
 mod uu_cgroup;
 mod uu_child;
+mod uu_condition;
 mod uu_config;
 mod uu_load;

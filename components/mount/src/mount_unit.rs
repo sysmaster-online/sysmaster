@@ -30,6 +30,10 @@ impl MountUnit {
 
 impl UnitObj for MountUnit {
     fn load(&self, paths: &Vec<PathBuf>) -> utils::Result<(), Box<dyn std::error::Error>> {
+        if self.comm.unit().is_some() {
+            self.comm.unit().unwrap().set_ignore_on_isolate(true);
+        }
+
         Ok(())
     }
 
