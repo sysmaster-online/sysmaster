@@ -3,16 +3,8 @@ name = "process1"
 version = "0.1.0"
 authors = ["overweight <hexiaowen@huawei.com>"]
 edition = "2018"
-default-run = "process1"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[[bin]]
-name = "process1"
-path = "src/bin/process1.rs"
-
-[[bin]]
-name = "pctrl"
-path = "src/bin/pctrl.rs"
 
 [lib]
 # crate_type = ["dylib"]

@@ -49,6 +49,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_timer() {
         let e = Events::new().unwrap();
         let s: Rc<dyn Source> = Rc::new(Timer::new());
@@ -56,7 +57,7 @@ mod test {
 
         e.set_enabled(s.clone(), EventState::On).unwrap();
 
-        let watch = Path::new("/proc");
+        let watch = Path::new("/");
         let wd = e.add_watch(watch, AddWatchFlags::IN_ALL_EVENTS);
 
         e.rloop().unwrap();
