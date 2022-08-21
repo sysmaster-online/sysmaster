@@ -30,6 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     manager.startup().unwrap();
     manager.add_job(0).unwrap();
 
+    manager.start_unit("basic.target");
     match manager.rloop() {
         Ok(Stats::REEXECUTE) => manager.reexec()?,
         Ok(_) => todo!(),

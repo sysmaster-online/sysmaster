@@ -1,8 +1,9 @@
 use super::{
-    unit_comm::Action, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
+    sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
 };
 use crate::manager::Manager;
 use http::StatusCode;
+use nix::sys::reboot::RebootMode;
 use std::rc::Rc;
 
 pub(crate) trait Executer {
@@ -25,8 +26,8 @@ pub(crate) fn dispatch(cmd: CommandRequest, manager: Rc<Manager>) -> CommandResp
 impl Executer for UnitComm {
     fn execute(self, manager: Rc<Manager>) -> CommandResponse {
         let ret = match self.action() {
-            Action::Start => manager.start_unit(&self.unitname),
-            Action::Stop => manager.stop_unit(&self.unitname),
+            unit_comm::Action::Start => manager.start_unit(&self.unitname),
+            unit_comm::Action::Stop => manager.stop_unit(&self.unitname),
             _ => todo!(),
         };
         match ret {
@@ -49,7 +50,25 @@ impl Executer for MngrComm {
 }
 
 impl Executer for SysComm {
-    fn execute(self, _manager: Rc<Manager>) -> CommandResponse {
-        todo!()
+    fn execute(self, manager: Rc<Manager>) -> CommandResponse {
+        let ret = match self.action() {
+            sys_comm::Action::Hibernate => manager.reboot(RebootMode::RB_SW_SUSPEND),
+            sys_comm::Action::Suspend => manager.reboot(RebootMode::RB_SW_SUSPEND),
+            sys_comm::Action::Halt => manager.reboot(RebootMode::RB_HALT_SYSTEM),
+            sys_comm::Action::Poweroff => manager.reboot(RebootMode::RB_POWER_OFF),
+            sys_comm::Action::Shutdown => manager.reboot(RebootMode::RB_POWER_OFF),
+            sys_comm::Action::Reboot => manager.reboot(RebootMode::RB_AUTOBOOT),
+            _ => todo!(),
+        };
+        match ret {
+            Ok(_) => CommandResponse {
+                status: StatusCode::OK.as_u16() as _,
+                ..Default::default()
+            },
+            Err(_e) => CommandResponse {
+                status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                message: String::from("error."),
+            },
+        }
     }
 }

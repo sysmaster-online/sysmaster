@@ -27,4 +27,12 @@ impl CommandRequest {
             })),
         }
     }
+
+    pub fn new_syscomm(action: sys_comm::Action) -> Self {
+        Self {
+            request_data: Some(RequestData::Syscomm(SysComm {
+                action: action.into(),
+            })),
+        }
+    }
 }

@@ -79,5 +79,4 @@ message SysComm {
     HIBERNATE = 5;
   }
   Action action = 1;
-  string unitname = 2;
 }
