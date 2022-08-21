@@ -3,7 +3,7 @@
 //! 1. 子类实现的动态库（*.so）的查找路径为以下优先级
 //!  a.优先查找/usr/lib/process1/plugin/路径下的动态库
 //!  b.查找rust cargo构建的输出目录如target/debug/或者target/release
-//!  c.LD_LIBRARY_PATH环境变量指定的第一个路径。
+//!  c.PROCESS_LIB_LOAD_PATH环境变量指定的路径。
 //! 在使用cargo开发阶段，b和c两种方式实际上都是指向process1工程checkout目录下的/target/debug或者release目录，例如
 //! process1被克隆到/home/test目录下，这输出目录为/home/test/target/debug或者release目录
 //! 2.子类类型和对应so的映射关系配置文件，默认查找路径同 子类动态库的查找路径。该文件在源码树下的路径为process1/conf/plugin.conf
@@ -76,11 +76,7 @@ impl Plugin {
 
         let devel_path = || {
             let out_dir = env::var("OUT_DIR").unwrap_or_else(|_x| {
-                let ld_path = env::var("LD_LIBRARY_PATH").map_or("".to_string(), |_v| {
-                    let _tmp = _v.split(":").collect::<Vec<_>>()[0];
-                    let _tmp_path = _tmp.split("target").collect::<Vec<_>>()[0];
-                    _tmp_path.to_string()
-                });
+                let ld_path = env::var("PROCESS_LIB_LOAD_PATH").map_or("".to_string(), |_v| _v);
                 ld_path
             });
             out_dir
@@ -95,9 +91,12 @@ impl Plugin {
                 conf_file,
                 lib_path_str
             );
-            if !lib_path_str.is_empty() && lib_path_str.contains("build") {
+
+            if lib_path_str.contains("build") {
                 let _tmp: Vec<_> = lib_path_str.split("build").collect();
                 conf_file = format!("{}/conf/plugin.conf", _tmp[0]);
+            } else {
+                conf_file = format!("{}/conf/plugin.conf", lib_path_str);
             }
             path = Path::new(&conf_file);
         }
@@ -124,24 +123,31 @@ impl Plugin {
 
     fn get_default_libpath() -> String {
         let mut ret: String = String::with_capacity(256);
-        let devel_path = || {
-            let out_dir = env::var("OUT_DIR");
+        let devel_path = |env_key: &str| {
+            let out_dir = env::var(env_key).map_or("".to_string(), |_v| {
+                if _v.contains("build") {
+                    let _tmp: Vec<_> = _v.split("build").collect();
+                    String::from(_tmp[0])
+                } else {
+                    _v
+                }
+            });
             out_dir
         };
-        let lib_path = env::var("PROCESS_LIB_LOAD_PATH");
-        match lib_path {
-            Ok(lib_path_str) => {
-                ret.push_str(lib_path_str.as_str());
-            }
-            Err(_) => {
-                let _tmp_lib_path = devel_path();
-                let lib_path_str = _tmp_lib_path.unwrap_or(LIB_PLUGIN_PATH.to_string());
-                let _tmp: Vec<_> = lib_path_str.split("build").collect();
-                if _tmp.is_empty() || _tmp.len() < 2 {
-                    ret.push_str(lib_path_str.as_str());
-                } else {
-                    ret.push_str(format!("{}", _tmp[0]).as_str());
-                }
+        let lib_path_devel = devel_path("OUT_DIR");
+        let lib_path_env = devel_path("PROCESS_LIB_LOAD_PATH");
+        let _lib_path = [
+            LIB_PLUGIN_PATH,
+            lib_path_devel.as_str(),
+            lib_path_env.as_str(),
+        ];
+        for _tmp_str in _lib_path {
+            let path = Path::new(_tmp_str);
+            if !path.exists() || !path.is_dir() {
+                continue;
+            } else {
+                ret.push_str(_tmp_str);
+                break;
             }
         }
         ret
@@ -297,7 +303,7 @@ impl Plugin {
                     continue;
                 }
                 let new_libdir = PathBuf::from(new_item);
-                if !new_libdir.is_dir() || !new_libdir.is_dir() {
+                if !new_libdir.exists() || !new_libdir.is_dir() {
                     log::error!(" the path [{}] is not a dir/not exist", new_item);
                     continue;
                 } else {
@@ -333,7 +339,7 @@ impl Plugin {
             }
             return set_flag;
         };
-        log::debug!("begine update library load path [{}]", library_dir);
+        log::debug!("begain update library load path [{}]", library_dir);
         if update_dir() {
             self.load_lib();
         }
