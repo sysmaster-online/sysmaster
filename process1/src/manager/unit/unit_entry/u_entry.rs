@@ -160,55 +160,59 @@ impl Unit {
             return Rc::clone(&self.conditions);
         } else {
             //need to reconstruct the code, expose the config detail out is wrong
-            self.conditions.add_condition(
+            let add_condition = |condop: &str, _params: &str| {
+                if _params.is_empty() {
+                    return;
+                }
+                self.conditions.add_condition(condop, String::from(_params));
+            };
+
+            let add_assert = |assert_op: &str, _params: &str| {
+                if _params.is_empty() {
+                    return;
+                }
+                self.conditions.add_assert(assert_op, String::from(_params));
+            };
+            add_condition(
                 CONDITION_FILE_NOT_EMPTY,
-                String::from(
-                    self.get_config()
-                        .config_data()
-                        .borrow()
-                        .Unit
-                        .ConditionFileNotEmpty
-                        .as_str(),
-                ),
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionFileNotEmpty
+                    .as_str(),
             );
 
-            self.conditions.add_condition(
+            add_condition(
                 CONDITION_NEEDS_UPDATE,
-                String::from(
-                    self.get_config()
-                        .config_data()
-                        .borrow()
-                        .Unit
-                        .ConditionNeedsUpdate
-                        .as_str(),
-                ),
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionNeedsUpdate
+                    .as_str(),
             );
 
-            self.conditions.add_condition(
+            add_condition(
                 CONDITION_PATH_EXISTS,
-                String::from(
-                    self.get_config()
-                        .config_data()
-                        .borrow()
-                        .Unit
-                        .ConditionPathExists
-                        .as_str(),
-                ),
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionPathExists
+                    .as_str(),
             );
 
-            self.conditions.add_assert(
+            add_assert(
                 ASSERT_PATH_EXISTS,
-                String::from(
-                    self.get_config()
-                        .config_data()
-                        .borrow()
-                        .Unit
-                        .AssertPathExists
-                        .as_str(),
-                ),
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .AssertPathExists
+                    .as_str(),
             );
         }
-
         Rc::clone(&self.conditions)
     }
 

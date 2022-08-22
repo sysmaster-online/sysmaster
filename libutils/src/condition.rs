@@ -1,5 +1,6 @@
 use std::path::Path;
 
+#[derive(Eq, PartialEq)]
 pub enum ConditionType {
     PathExists,
     FileNotEmpty,
