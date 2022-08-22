@@ -22,11 +22,15 @@ impl From<JobErrno> for MngErrno {
     }
 }
 
-// dependency: job_entry -> {job_unit_entry | job_alloc} -> job_table -> {job_transaction | job_notify | job_stat} -> job_manager
+// dependency:
+// job_rentry -> job_entry ->
+// {job_unit_entry | job_alloc} -> job_table ->
+// {job_transaction | job_notify | job_stat} -> job_manager
 mod job_alloc;
 mod job_entry;
 mod job_manager;
 mod job_notify;
+mod job_rentry;
 mod job_stat;
 mod job_table;
 mod job_transaction;

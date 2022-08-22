@@ -18,7 +18,7 @@ pub enum UnitErrno {
 
 // dependency:
 // unit_base -> {uload_util} ->
-// unit_entry ->
+// unit_rentry -> unit_entry ->
 // {unit_datastore -> unit_runtime} ->
 // {job | execute} -> unit_manager
 
@@ -29,6 +29,7 @@ mod unit_base;
 mod unit_datastore;
 mod unit_entry;
 mod unit_manager;
+mod unit_rentry;
 mod unit_runtime;
 
 pub use serde::{Deserialize, Deserializer};
