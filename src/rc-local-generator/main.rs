@@ -1,7 +1,9 @@
 pub mod rc_local_generator;
 use rc_local_generator::*;
+use utils::logger;
 
 fn main() {
+    logger::init_log_with_console("rc_local_generator", 4);
     /*解析命令行参数 命令个数为1或者是4*/
     let args: Vec<String> = std::env::args().collect();
 

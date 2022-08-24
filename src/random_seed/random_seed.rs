@@ -1,43 +1,50 @@
-use nix::ioctl_readwrite;
+use nix::ioctl_write_ptr;
+use std::alloc::{alloc, dealloc, Layout};
 use std::ffi::CString;
-use std::io;
 use std::path::{Path, PathBuf};
-use std::{env, str};
+use std::{env, mem, str};
 use std::{
     fs::{self, read_link, File},
-    io::{Read, Seek, Write},
+    io::{self, Read, Seek, Write},
     os::unix::prelude::AsRawFd,
 };
 
 pub const RAMDOM_POOL_SIZE_MIN: usize = 512;
-pub const RANDOM_SEED: &str = "/var/lib/systemd/random-seed";
-pub const RAMDOM_SEED_DIR: &str = "/var/lib/systemd";
+pub const RANDOM_SEED: &str = "/usr/lib/process1/random-seed";
+pub const RAMDOM_SEED_DIR: &str = "/usr/lib/process1";
 pub const RANDOM_POOL_SIZE_MAX: usize = 10 * 1024 * 1024;
 
-fn read_one_line_file() -> Result<String, ()> {
-    let str =
-        fs::read_to_string("/proc/sys/kernel/random/poolsize").unwrap_or_else(|_| String::new());
+fn read_one_line_file(path: &str) -> Result<String, ()> {
+    let str = fs::read_to_string(path).unwrap_or_else(|_| String::new());
 
     if str.is_empty() {
         log::error!("Failed to read pool size from kernel.");
-        return Err(());
+        return Result::Err(());
     }
 
     for line in str.lines() {
         if line.trim().is_empty() {
             continue;
         } else {
-            return Ok(String::from(line));
+            return Result::Ok(String::from(line));
         }
     }
-    Err(())
+    Result::Err(())
 }
 
 pub fn random_pool_size() -> usize {
-    match read_one_line_file() {
+    match read_one_line_file("/proc/sys/kernel/random/poolsize") {
         Err(_) => RAMDOM_POOL_SIZE_MIN,
         Ok(str) => match str.parse::<usize>() {
-            Ok(size) => size / 8,
+            Ok(size) => {
+                let mut size = size / 8;
+                if size < RAMDOM_POOL_SIZE_MIN {
+                    size = RAMDOM_POOL_SIZE_MIN;
+                } else if size > RANDOM_POOL_SIZE_MAX {
+                    size = RANDOM_POOL_SIZE_MAX;
+                }
+                size
+            }
             Err(_) => RAMDOM_POOL_SIZE_MIN,
         },
     }
@@ -53,7 +60,7 @@ pub fn get_random(data: &mut Vec<u8>, flags: u32) -> Result<usize, ()> {
         return Err(());
     }
 
-    Ok(size as usize)
+    Result::Ok(size as usize)
 }
 
 pub fn chmod_and_chown(file: &mut File) -> bool {
@@ -62,7 +69,6 @@ pub fn chmod_and_chown(file: &mut File) -> bool {
     let cstr = CString::new(file_path.to_str().unwrap()).unwrap();
 
     unsafe {
-        // let path = file_path.to_str().unwrap().as_ptr();
         let mut r = libc::chmod(cstr.as_ptr(), 0o600);
         if r != 0 {
             return false;
@@ -75,40 +81,54 @@ pub fn chmod_and_chown(file: &mut File) -> bool {
 }
 
 const ENTROPY_IOCTL_BASE: u8 = b'R';
-const ENTROPY_SETOPTIONS: u8 = 3;
+const ENTROPY_SETOPTIONS: u8 = 0x03;
+#[repr(C)]
+pub struct rand_pool_info {
+    entropy_count: i32,
+    buf_size: i32,
+    buf: [u8; 0],
+}
 
-ioctl_readwrite!(rndaddentropy, ENTROPY_IOCTL_BASE, ENTROPY_SETOPTIONS, u8);
+ioctl_write_ptr!(
+    rndaddentropy,
+    ENTROPY_IOCTL_BASE,
+    ENTROPY_SETOPTIONS,
+    rand_pool_info
+);
 pub fn random_write_entropy(random_fd: &mut File, data: &mut Vec<u8>, credit: bool) -> bool {
     assert!(!data.is_empty());
 
     if data.is_empty() {
         return false;
     }
-    println!("{credit}");
     if credit {
-        let mut vec: Vec<u8> = Vec::new();
-        vec.append(&mut (data.len() as i32 * 2).to_be_bytes().to_vec());
-        vec.append(&mut ((data.len() as i32) / 4).to_be_bytes().to_vec());
-        vec.append(data);
-        println!("{:?},{}", vec, vec.len());
         unsafe {
-            let result = match rndaddentropy(random_fd.as_raw_fd(), vec.as_mut_ptr()) {
-                Ok(size) => size,
+            let info_size = mem::size_of::<rand_pool_info>();
+            let layout =
+                Layout::from_size_align(data.len() + info_size, mem::align_of::<u8>()).unwrap();
+            let ptr = alloc(layout);
+            let r_p_info = ptr as *mut rand_pool_info;
+            (*r_p_info).entropy_count = (data.len() * 8) as i32;
+            (*r_p_info).buf_size = data.len() as i32;
+            // *(ptr as *mut i32) = (data.len() * 8) as i32;
+            // *(ptr.add(4) as *mut i32) = data.len() as i32;
+            let ptr_data = ptr.add(info_size);
+            for (index, value) in data.iter().enumerate() {
+                *ptr_data.add(index) = *value;
+            }
+            let result = match rndaddentropy(random_fd.as_raw_fd(), ptr as *const rand_pool_info) {
+                Ok(_) => true,
                 Err(err) => {
                     println!("{err}");
-                    return false;
+                    false
                 }
             };
-
-            println!("{result}");
-            if result as usize != vec.len() {
-                return false;
-            }
+            dealloc(ptr, layout);
+            result
         }
     } else {
-        return loop_write(random_fd, data);
+        loop_write(random_fd, data)
     }
-    true
 }
 
 pub fn fsync_full(file: &mut File) -> bool {
@@ -405,8 +425,10 @@ fn parse_boolean(str: &str) -> Result<bool, ()> {
 pub fn run(arg: &str) -> Result<(), String> {
     let mut buf_size = random_pool_size();
 
-    if let Err(err) = fs::create_dir_all(RAMDOM_SEED_DIR) {
-        return Err(format!("Failed to create directory:{}", err));
+    if !Path::new(RAMDOM_SEED_DIR).exists() {
+        if let Err(err) = fs::create_dir_all(RAMDOM_SEED_DIR) {
+            return Err(format!("Failed to create directory:{}", err));
+        }
     }
 
     let mut seed_fd = match fs::OpenOptions::new()
@@ -416,7 +438,10 @@ pub fn run(arg: &str) -> Result<(), String> {
         .open(RANDOM_SEED)
     {
         Err(err) => {
-            return Err(format!("Failed to open {}, err:{}", RANDOM_SEED, err));
+            if err.kind() == io::ErrorKind::NotFound {
+                return Ok(());
+            }
+            return Err(format!("open random-seed failed: {}", err));
         }
         Ok(file) => file,
     };
@@ -432,6 +457,7 @@ pub fn run(arg: &str) -> Result<(), String> {
         Ok(file) => file,
     };
 
+    let size = seed_fd.metadata().unwrap().len();
     // let mut synchronous: bool = false;
     let write_seed_file: bool;
     let read_seed_file: bool;
@@ -440,6 +466,9 @@ pub fn run(arg: &str) -> Result<(), String> {
             // synchronous = true;
             read_seed_file = true;
             write_seed_file = false;
+            if size == 0 {
+                return Ok(());
+            }
         }
         "save" => {
             read_seed_file = false;
@@ -451,7 +480,6 @@ pub fn run(arg: &str) -> Result<(), String> {
         }
     }
 
-    let size = seed_fd.metadata().unwrap().len();
     if size > buf_size as u64 {
         let buf_size_u64 = std::cmp::min(size, RANDOM_POOL_SIZE_MAX as u64);
         buf_size = buf_size_u64 as usize;
@@ -504,9 +532,9 @@ pub fn run(arg: &str) -> Result<(), String> {
 
         let is_credit = lets_credit == CreditEntropy::CreditEntropyYesForced
             || lets_credit == CreditEntropy::CreditEntropyYesPlease;
-        let mut vec = buf.to_vec();
-        vec.resize(size_seed, 0);
-        if !random_write_entropy(&mut random_fd, &mut vec, is_credit) {
+        // let mut vec = buf.to_vec();
+        // vec.resize(size_seed, 0);
+        if !random_write_entropy(&mut random_fd, &mut buf, is_credit) {
             return Err("Failed to write seed to /dev/urandom.".to_string());
         }
     }
@@ -648,22 +676,26 @@ mod test {
         let mut writer = fs::File::create("writer.txt").unwrap();
         let mut vecdata = data[..get_size].to_vec();
         assert!(random_write_entropy(&mut writer, &mut vecdata, false));
-        // assert!(random_write_entropy(& mut writer, & mut vecdata, true));
+        let mut random_fd = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/urandom")
+            .unwrap();
+        // assert!(random_write_entropy(&mut random_fd, &mut vecdata, true));
         chmod_and_chown(&mut writer);
         fs::remove_file("writer.txt").unwrap();
     }
 
     #[test]
     fn get_random_test() {
-        let mut data1 = vec![0u8; 512];
+        let mut data1 = vec![0u8; 4096];
         let get_size = get_random(&mut data1, 0x0001).unwrap();
+        println!("get_random_size:{get_size}");
+        println!("get_random_size:{:?}", data1);
         assert!(get_size >= 512);
-        let mut file = match fs::OpenOptions::new().read(true).open("random-seed") {
-            Ok(file) => file,
-            Err(_) => return,
-        };
-        let mut data = [0u8; 512];
-        assert_eq!(loop_read(&mut file, &mut data), Ok(512));
+        let mut file = fs::File::create("random-seed").unwrap();
+        assert_eq!(loop_write(&mut file, &mut data1), true);
+        fs::remove_file("random-seed").unwrap();
         // assert_eq!(data1, data.to_vec());
     }
 
@@ -677,11 +709,5 @@ mod test {
         xattr::remove("xattr_test.txt", "user.random-seed-credittable").unwrap();
         assert_eq!(getxattr(&mut file, &mut str).unwrap(), false);
         fs::remove_file("xattr_test.txt").unwrap();
-    }
-
-    #[test]
-    fn run_test() {
-        // assert_eq!(run("load"), Ok(()));
-        // assert_eq!(run("save"), Ok(()));
     }
 }
