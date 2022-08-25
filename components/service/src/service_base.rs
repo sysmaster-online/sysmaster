@@ -1,4 +1,5 @@
-use serde::{Deserialize, Serialize};
+use process1::manager::DeserializeWith;
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(PartialEq, EnumString, Display, Debug)]
 pub(super) enum ServiceTimeoutFailureMode {
@@ -70,6 +71,23 @@ pub(super) enum ServiceType {
 impl Default for ServiceType {
     fn default() -> Self {
         ServiceType::Simple
+    }
+}
+
+impl DeserializeWith for ServiceType {
+    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(de)?;
+
+        match s.as_ref() {
+            "simple" => Ok(ServiceType::Simple),
+            "forking" => Ok(ServiceType::Forking),
+            "oneshot" => Ok(ServiceType::Oneshot),
+            "notify" => Ok(ServiceType::Notify),
+            &_ => Ok(ServiceType::Simple),
+        }
     }
 }
 

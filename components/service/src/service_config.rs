@@ -44,11 +44,7 @@ impl ServiceConfig {
     }
 
     pub(super) fn service_type(&self) -> ServiceType {
-        self.data
-            .borrow()
-            .Service
-            .Type
-            .map_or(ServiceType::Simple, |e| e)
+        self.data.borrow().Service.Type
     }
 
     pub(super) fn set_notify_access(&self, v: NotifyAccess) {
@@ -84,7 +80,9 @@ impl ServiceConfigData {
 
 #[derive(Config, Default, Debug)]
 pub(super) struct SectionService {
-    pub Type: Option<ServiceType>,
+    #[config(deserialize_with = ServiceType::deserialize_with)]
+    #[config(default = "simple")]
+    pub Type: ServiceType,
     #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
     pub ExecStart: Option<Vec<ExecCommand>>,
     #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
