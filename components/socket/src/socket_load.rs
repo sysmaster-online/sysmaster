@@ -4,7 +4,7 @@
 use nix::sys::socket::{
     NetlinkAddr, SockProtocol, SockType, SockaddrIn, SockaddrIn6, SockaddrLike, UnixAddr,
 };
-use process1::manager::UnitType;
+use process1::manager::{UnitRelations, UnitType};
 use std::cell::RefCell;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::PathBuf;
@@ -45,11 +45,11 @@ impl SocketLoad {
                 }
             }
 
-            // self.comm.unit().insert_two_deps(
-            //     UnitRelations::UnitBefore,
-            //     UnitRelations::UnitTriggers,
-            //     self.config.unit_ref_target().unwrap(),
-            // );
+            self.comm.unit().insert_two_deps(
+                UnitRelations::UnitBefore,
+                UnitRelations::UnitTriggers,
+                mng.unit_ref_target().unwrap(),
+            );
         }
         true
     }
