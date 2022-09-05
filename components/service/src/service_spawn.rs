@@ -5,6 +5,7 @@ use super::service_comm::ServiceComm;
 use super::service_pid::ServicePid;
 use nix::unistd::Pid;
 use process1::manager::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
+use std::env;
 use std::error::Error;
 use std::rc::Rc;
 
@@ -37,6 +38,13 @@ impl ServiceSpawn {
         ec_flags: ExecFlags,
     ) -> Result<Pid, Box<dyn Error>> {
         let mut params = ExecParameters::new();
+
+        params.add_env(
+            "PATH",
+            env::var("PATH").unwrap_or(
+                "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".to_string(),
+            ),
+        );
 
         if let Some(pid) = self.pid.main() {
             params.add_env("MAINPID", format!("{}", pid));
