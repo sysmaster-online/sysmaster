@@ -111,12 +111,8 @@ fn build_run_args(
     cmdline: &ExecCommand,
     env: &ExecParameters,
 ) -> (std::ffi::CString, Vec<std::ffi::CString>) {
-    // let command = cmdline.borrow();
     let cmd = std::ffi::CString::new(cmdline.path().clone()).unwrap();
-
-    let exec_name = std::path::PathBuf::from(cmdline.path());
-    let exec_name = exec_name.file_name().unwrap().to_str().unwrap();
-    let exec_name = std::ffi::CString::new::<Vec<u8>>(exec_name.bytes().collect()).unwrap();
+    let exec_name = std::ffi::CString::new(cmdline.path().clone()).unwrap();
 
     let mut args = Vec::new();
     args.push(exec_name);
