@@ -99,6 +99,23 @@ impl UnitFileData {
             if let Err(_e) = fs::metadata(v) {
                 continue;
             }
+            let pathd = format!("{}/{}.d", v, name);
+            let dir = Path::new(&pathd);
+            if dir.is_dir() {
+                for entry in dir.read_dir().unwrap() {
+                    let fragment = entry.unwrap().path();
+                    if fragment.is_file() {
+                        let file_name =
+                            String::from(fragment.file_name().unwrap().to_str().unwrap());
+                        if file_name.starts_with(".") || file_name.ends_with(".toml") {
+                            continue;
+                        }
+                        let path = format!("{}.toml", fragment.to_string_lossy().to_string());
+                        std::fs::copy(fragment, &path);
+                        pathbuf_fragment.push(Path::new(&path).to_path_buf());
+                    }
+                }
+            }
             let path = if v.ends_with("/") {
                 format!("{}{}", v, name)
             } else {
@@ -110,19 +127,6 @@ impl UnitFileData {
                 std::fs::copy(tmp, &path);
                 let to = Path::new(&path);
                 pathbuf_fragment.push(to.to_path_buf());
-            }
-            let pathd = format!("{}/{}.d", v, name);
-            let dir = Path::new(&pathd);
-            if dir.is_dir() {
-                for entry in dir.read_dir().unwrap() {
-                    let fragment = entry.unwrap().path();
-                    if fragment.is_file() {
-                        let path = format!("{}.toml", fragment.to_string_lossy().to_string());
-                        std::fs::copy(fragment, &path);
-                        let to = Path::new(&path);
-                        pathbuf_fragment.push(to.to_path_buf());
-                    }
-                }
             }
         }
 
