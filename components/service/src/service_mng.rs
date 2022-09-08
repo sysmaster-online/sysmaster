@@ -176,11 +176,7 @@ impl ServiceMng {
     }
 
     pub(super) fn current_active_state(&self) -> UnitActiveState {
-        if let Some(service_type) = self.config.config_data().borrow().Service.Type {
-            service_state_to_unit_state(service_type, self.state())
-        } else {
-            UnitActiveState::UnitFailed
-        }
+        service_state_to_unit_state(self.config.service_type(), self.state())
     }
 
     fn enter_contion(&self) {
