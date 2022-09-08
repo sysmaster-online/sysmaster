@@ -55,7 +55,11 @@ impl UnitObj for ServiceUnit {
 
     fn start(&self) -> Result<(), UnitActionError> {
         log::debug!("begin to start the service unit");
-        self.mng.start_check()?;
+        let started = self.mng.start_check()?;
+        if started {
+            log::debug!("service already in starting, just return immediately");
+            return Ok(());
+        }
 
         self.monitor.start_action();
         self.mng.start_action();

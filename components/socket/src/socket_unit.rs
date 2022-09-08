@@ -53,7 +53,13 @@ impl UnitObj for SocketUnit {
     // the function entrance to start the unit
     fn start(&self) -> Result<(), UnitActionError> {
         self.ports.attach(self.mng.clone());
-        self.mng.start_check()?;
+
+        let starting = self.mng.start_check()?;
+        if starting {
+            log::debug!("socket already in start");
+            return Ok(());
+        }
+
         self.mng.start_action();
 
         Ok(())
@@ -64,7 +70,12 @@ impl UnitObj for SocketUnit {
     }
 
     fn stop(&self) -> Result<(), UnitActionError> {
-        self.mng.stop_check()?;
+        let stoping = self.mng.stop_check()?;
+        if stoping {
+            log::debug!("socket already in stop, return immediretly");
+            return Ok(());
+        }
+
         self.mng.stop_action();
 
         Ok(())

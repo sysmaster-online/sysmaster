@@ -115,7 +115,7 @@ impl ServiceMng {
         }
     }
 
-    pub(super) fn start_check(&self) -> Result<(), UnitActionError> {
+    pub(super) fn start_check(&self) -> Result<bool, UnitActionError> {
         if IN_SET!(
             self.state(),
             ServiceState::Stop,
@@ -131,7 +131,18 @@ impl ServiceMng {
             return Err(UnitActionError::UnitActionEAgain);
         }
 
-        Ok(())
+        // service is in starting
+        if IN_SET!(
+            self.state(),
+            ServiceState::Condition,
+            ServiceState::StartPre,
+            ServiceState::Start,
+            ServiceState::StartPost
+        ) {
+            return Ok(true);
+        }
+
+        Ok(false)
     }
 
     pub(super) fn start_action(&self) {
@@ -140,15 +151,16 @@ impl ServiceMng {
     }
 
     pub(super) fn stop_check(&self) -> Result<(), UnitActionError> {
-        let stop_state = vec![
+        if IN_SET!(
+            self.state(),
             ServiceState::Stop,
             ServiceState::StopSigterm,
             ServiceState::StopSigkill,
             ServiceState::StopPost,
-        ];
-
-        if stop_state.contains(&self.state()) {
-            return Err(UnitActionError::UnitActionEAlready);
+            ServiceState::FinalSigterm,
+            ServiceState::FinalSigkill
+        ) {
+            return Ok(());
         }
 
         Ok(())
@@ -306,7 +318,11 @@ impl ServiceMng {
         if self.result() != ServiceResult::Success {
             self.enter_signal(ServiceState::StopSigterm, sr);
         } else if self.service_alive() {
-            self.set_state(ServiceState::Runing);
+            if self.rd.notify_state() == NotifyState::Stoping {
+                self.enter_stop_by_notify();
+            } else {
+                self.set_state(ServiceState::Runing);
+            }
         } else if let Some(remain_after_exit) =
             self.config.config_data().borrow().Service.RemainAfterExit
         {
@@ -514,8 +530,11 @@ impl ServiceMng {
     }
 
     fn service_alive(&self) -> bool {
-        // todo!()
-        true
+        if let Ok(v) = self.pid.main_alive() {
+            return v;
+        }
+
+        self.cgroup_good()
     }
 
     fn run_next_control(&self) {
@@ -660,7 +679,6 @@ impl ServiceMng {
                 msg: "main pid is not alive",
             });
         }
-
         if self
             .comm
             .um()
