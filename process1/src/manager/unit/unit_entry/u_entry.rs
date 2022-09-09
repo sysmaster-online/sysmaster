@@ -458,6 +458,16 @@ impl Unit {
     }
 
     pub(super) fn stop(&self) -> Result<(), UnitActionError> {
+        let active_state = self.current_active_state();
+        let inactive_or_failed = match active_state {
+            UnitActiveState::UnitInActive | UnitActiveState::UnitFailed => true,
+            _ => false,
+        };
+
+        if inactive_or_failed {
+            return Err(UnitActionError::UnitActionEAlready);
+        }
+
         self.sub.stop()
     }
 

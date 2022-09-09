@@ -1,7 +1,9 @@
 use super::service_comm::ServiceComm;
 use nix::unistd::Pid;
+use process1::manager::UnitActionError;
 use std::cell::RefCell;
 use std::rc::Rc;
+use utils::process_util;
 
 pub(super) struct ServicePid {
     comm: Rc<ServiceComm>,
@@ -59,6 +61,10 @@ impl ServicePid {
     pub(super) fn control(&self) -> Option<Pid> {
         self.data.borrow().control()
     }
+
+    pub(super) fn main_alive(&self) -> Result<bool, UnitActionError> {
+        self.data.borrow().main_alive()
+    }
 }
 
 struct ServicePidData {
@@ -97,5 +103,13 @@ impl ServicePidData {
 
     pub(self) fn control(&self) -> Option<Pid> {
         self.control.as_ref().cloned()
+    }
+
+    pub(self) fn main_alive(&self) -> Result<bool, UnitActionError> {
+        if self.main.is_none() {
+            return Err(UnitActionError::UnitActionEAgain);
+        }
+
+        Ok(process_util::alive(self.main.unwrap()))
     }
 }

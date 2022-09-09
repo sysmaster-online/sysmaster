@@ -150,7 +150,7 @@ impl SocketMng {
             .map_or(None, |v| Some(v.to_string()))
     }
 
-    pub(super) fn start_check(&self) -> Result<(), UnitActionError> {
+    pub(super) fn start_check(&self) -> Result<bool, UnitActionError> {
         if IN_SET!(
             self.state(),
             SocketState::StopPre,
@@ -170,7 +170,7 @@ impl SocketMng {
             SocketState::StartChown,
             SocketState::StartPost
         ) {
-            return Ok(());
+            return Ok(true);
         }
 
         self.unit_ref_target()
@@ -179,7 +179,7 @@ impl SocketMng {
                 Err(e) => Err(e),
             })?;
 
-        Ok(())
+        Ok(false)
     }
 
     pub(super) fn start_action(&self) {
@@ -190,7 +190,7 @@ impl SocketMng {
         self.enter_stop_pre(SocketResult::Success)
     }
 
-    pub(super) fn stop_check(&self) -> Result<(), UnitActionError> {
+    pub(super) fn stop_check(&self) -> Result<bool, UnitActionError> {
         if IN_SET!(
             self.state(),
             SocketState::StopPre,
@@ -200,7 +200,7 @@ impl SocketMng {
             SocketState::FinalSigterm,
             SocketState::FinalSigkill
         ) {
-            return Ok(());
+            return Ok(true);
         }
 
         if IN_SET!(
@@ -213,7 +213,7 @@ impl SocketMng {
             return Err(UnitActionError::UnitActionEAgain);
         }
 
-        Ok(())
+        Ok(false)
     }
 
     pub(super) fn current_active_state(&self) -> UnitActiveState {
