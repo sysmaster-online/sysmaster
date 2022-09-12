@@ -38,6 +38,7 @@ use std::str::FromStr;
 use std::sync::RwLock;
 use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
 use std::{env, io};
+use utils::Error as uError;
 use walkdir::{DirEntry, WalkDir};
 
 const LIB_PLUGIN_PATH: &str = "/usr/lib/process1/plugin/";
@@ -75,11 +76,12 @@ impl Plugin {
         let mut buf = String::with_capacity(256);
 
         let devel_path = || {
-            let out_dir = env::var("OUT_DIR").unwrap_or_else(|_x| {
+            let out_dir = env!("OUT_DIR");
+            if out_dir.is_empty() {
                 let ld_path = env::var("PROCESS_LIB_LOAD_PATH").map_or("".to_string(), |_v| _v);
-                ld_path
-            });
-            out_dir
+                return ld_path;
+            }
+            out_dir.to_string()
         };
 
         let mut conf_file = format!("{}plugin.conf", LIB_PLUGIN_PATH);
@@ -89,7 +91,7 @@ impl Plugin {
             log::debug!(
                 "plugin conf file not found in:[{}],try find in devel path:[{}]",
                 conf_file,
-                lib_path_str
+                lib_path_str,
             );
 
             if lib_path_str.contains("build") {
@@ -123,25 +125,25 @@ impl Plugin {
 
     fn get_default_libpath() -> String {
         let mut ret: String = String::with_capacity(256);
-        let devel_path = |env_key: &str| {
-            let out_dir = env::var(env_key).map_or("".to_string(), |_v| {
-                if _v.contains("build") {
-                    let _tmp: Vec<_> = _v.split("build").collect();
-                    String::from(_tmp[0])
-                } else {
-                    _v
-                }
-            });
-            out_dir
+        let devel_path = |out_dir: &str| {
+            if out_dir.contains("build") {
+                let _tmp: Vec<_> = out_dir.split("build").collect();
+                return String::from(_tmp[0]);
+            } else {
+                return out_dir.to_string();
+            };
         };
-        let lib_path_devel = devel_path("OUT_DIR");
-        let lib_path_env = devel_path("PROCESS_LIB_LOAD_PATH");
+        let lib_path_devel = devel_path(env!("OUT_DIR"));
+        let lib_path_env = env::var("PROCESS_LIB_LOAD_PATH").map_or("".to_string(), |_v| _v);
         let _lib_path = [
             LIB_PLUGIN_PATH,
             lib_path_devel.as_str(),
             lib_path_env.as_str(),
         ];
         for _tmp_str in _lib_path {
+            if _tmp_str.is_empty() {
+                continue;
+            }
             let path = Path::new(_tmp_str);
             if !path.exists() || !path.is_dir() {
                 continue;
@@ -239,11 +241,18 @@ impl Plugin {
         reload_handler: &mut dynamic_reload::DynamicReload,
     ) -> io::Result<()> {
         if let Some(v) = filename.to_str() {
+            let unit_type = self.get_unit_type(v);
+            if unit_type == UnitType::UnitTypeInvalid {
+                log::error!("lib name {} is invalid skip it", v);
+                return Ok(());
+            }
+
             match reload_handler.add_library(v, dynamic_reload::PlatformName::No) {
                 Ok(lib) => {
-                    let unit_type = self.get_unit_type(v);
-                    if unit_type == UnitType::UnitTypeInvalid {
-                        log::error!("invalid service type os lib {} skip it", v);
+                    let _sym: Result<dy_re::Symbol<fn() -> *mut dyn UnitSubClass>, _> =
+                        unsafe { lib.lib.get(b"__unit_obj_create") };
+                    if _sym.is_err() {
+                        log::error!("lib {} not contain __unit_obj_create  sym skip it", v);
                         return Ok(());
                     }
                     log::debug!(
@@ -254,14 +263,6 @@ impl Plugin {
                         let mut wloadlibs = self.load_libs.write().unwrap();
                         (*wloadlibs).insert(unit_type, lib.clone());
                     }
-                    /*
-                    let dy_lib = (*self.load_libs.read().unwrap()).get(&unit_type).unwrap();
-                    let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitSubClass> =
-                        unsafe { dy_lib.lib.get(b"__unit_obj_create").unwrap() };
-                    let boxed_raw = fun();
-                    self.unitobj_lists.borrow_mut()
-                        .push(Arc::new(unsafe { Box::from_raw(boxed_raw) }));
-                    */
                     log::info!("loading dynamic lib sucessfully");
                 }
                 Err(e) => error!("error loading Unable to load dynamic lib, err {:?}", e),
@@ -391,10 +392,14 @@ impl Plugin {
         };
 
         if let Ok(_dy_lib) = dy_lib {
-            let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitSubClass> =
-                unsafe { _dy_lib.lib.get(b"__unit_obj_create").unwrap() };
-            let boxed_raw = fun();
-            Ok(unsafe { Box::from_raw(boxed_raw) })
+            let _sym = unsafe { _dy_lib.lib.get(b"__unit_obj_create") };
+            if _sym.is_ok() {
+                let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitSubClass> = _sym.unwrap();
+                let boxed_raw = fun();
+                Ok(unsafe { Box::from_raw(boxed_raw) })
+            } else {
+                Err(format!("the library of {:?} is invalid", unit_type.to_string()).into())
+            }
         } else {
             Err(format!("the {:?} plugin is not exist", unit_type.to_string()).into())
         }
@@ -408,6 +413,12 @@ mod tests {
 
     use super::*;
     // use services::service::ServiceUnit;
+
+    fn init_test() -> Arc<Plugin> {
+        logger::init_log_with_console("test_unit_load", 4);
+        let plugins = Arc::clone(&Plugin::get_instance());
+        return plugins;
+    }
 
     #[test]
     fn test_plugin_load_library() {
@@ -423,5 +434,17 @@ mod tests {
             let unittype = UnitType::from_str(key.to_string().as_str()).unwrap();
             assert_ne!(unittype.to_string(), UnitType::UnitTypeInvalid.to_string());
         }
+    }
+
+    #[test]
+    fn test_plugin_create_unit() {
+        logger::init_log_with_console("test_unit_load", 4);
+        let plugin = init_test();
+        let unitobj = plugin.create_unit_obj(UnitType::UnitService);
+        assert!(
+            unitobj.is_ok(),
+            "create unit [{}] failed",
+            UnitType::UnitService
+        );
     }
 }
