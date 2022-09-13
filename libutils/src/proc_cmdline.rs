@@ -32,14 +32,12 @@ fn cmdline_content() -> Result<String, IOError> {
 pub fn cmdline_get_value(key: &str) -> Result<Option<String>, Error> {
     let buf = cmdline_content()?;
 
-    let cmdline: Vec<&str> = buf.trim_end().split_whitespace().collect();
+    let cmdline: Vec<&str> = buf.split_whitespace().collect();
 
     for cmd in cmdline.iter() {
-        let k_val: Vec<&str> = cmd.split("=").map(|s| s.trim()).collect();
-        if k_val.len() == 2 {
-            if k_val[0] == key {
-                return Ok(Some(k_val[1].to_string()));
-            }
+        let k_val: Vec<&str> = cmd.split('=').map(|s| s.trim()).collect();
+        if k_val.len() == 2 && k_val[0] == key {
+            return Ok(Some(k_val[1].to_string()));
         }
     }
 

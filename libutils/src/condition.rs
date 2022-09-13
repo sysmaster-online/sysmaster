@@ -19,12 +19,12 @@ pub struct Condition {
 }
 
 impl Condition {
-    pub fn new(_type: ConditionType, trigger: i8, revert: i8, _params: String) -> Self {
+    pub fn new(c_type: ConditionType, trigger: i8, revert: i8, params: String) -> Self {
         Condition {
-            c_type: _type,
-            trigger: trigger,
-            revert: revert,
-            params: _params,
+            c_type,
+            trigger,
+            revert,
+            params,
         }
     }
     pub fn trigger(&self) -> i8 {
@@ -49,40 +49,22 @@ impl Condition {
             result = !result;
         }
 
-        if result > 0 {
-            true
-        } else {
-            false
-        }
+        result > 0
     }
 
     fn test_path_exists(&self) -> i8 {
         let tmp_path = Path::new(&self.params);
         let result = tmp_path.exists();
-        if result {
-            return 1;
-        } else {
-            return 0;
-        }
+        result as i8
     }
 
     fn test_file_not_empty(&self) -> i8 {
         let tmp_path = Path::new(&self.params);
         let result = tmp_path
             .metadata()
-            .map(|m| {
-                if m.is_file() {
-                    m.len() > 0
-                } else {
-                    return false;
-                }
-            })
+            .map(|m| if m.is_file() { m.len() > 0 } else { false })
             .unwrap_or(false);
-        if result {
-            return 1;
-        } else {
-            return 0;
-        }
+        result as i8
     }
 
     fn test_needs_update(&self) -> i8 {
@@ -93,9 +75,9 @@ impl Condition {
 #[cfg(test)]
 mod test {
     use crate::logger;
+    use tests::get_project_root;
 
     use super::{Condition, ConditionType};
-    use crate::test_util::get_project_root;
 
     #[test]
     fn test_condition_test() {

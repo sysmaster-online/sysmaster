@@ -3,7 +3,7 @@ use std::path::Path;
 pub fn path_equal(a: &str, b: &str) -> bool {
     let p_a = Path::new(a);
     let p_b = Path::new(b);
-    return p_a == p_b;
+    p_a == p_b
 }
 
 #[cfg(test)]

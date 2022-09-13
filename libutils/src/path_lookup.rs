@@ -26,21 +26,19 @@ impl LookupPaths {
 
     pub fn init_lookup_paths(&mut self) {
         let devel_path = || {
-            let out_dir = env::var("OUT_DIR").unwrap_or_else(|_x| {
-                let ld_path = env::var("LD_LIBRARY_PATH").map_or("".to_string(), |_v| {
-                    let _tmp = _v.split(":").collect::<Vec<_>>()[0];
+            env::var("OUT_DIR").unwrap_or_else(|_x| {
+                env::var("LD_LIBRARY_PATH").map_or("".to_string(), |_v| {
+                    let _tmp = _v.split(':').collect::<Vec<_>>()[0];
                     let _tmp_path = _tmp.split("target").collect::<Vec<_>>()[0];
                     _tmp_path.to_string()
-                });
-                ld_path
-            });
-            out_dir
+                })
+            })
         };
 
         let out_dir = devel_path();
         if !out_dir.is_empty() && out_dir.contains("build") {
             let tmp_str: Vec<_> = out_dir.split("build").collect();
-            self.search_path.push(format!("{}", tmp_str[0]));
+            self.search_path.push(tmp_str[0].to_string());
         }
         self.search_path.push(LIB_SYSTEM_PATH.to_string());
         self.search_path.push(RUN_SYSTEM_PATH.to_string());

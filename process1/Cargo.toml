@@ -43,6 +43,9 @@ libmount = "0.1.15"
 [build-dependencies]
 prost-build = "0.9" # 编译 protobuf
 
+[dev-dependencies]
+tests = { path = "../libtests" }
+
 [[example]]
 name = "signals"
 path = "./examples/signal.rs"

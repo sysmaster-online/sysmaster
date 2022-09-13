@@ -11,5 +11,5 @@ pub fn read_first_line(path: &Path) -> Result<String, Error> {
 
     let _length = buffer.read_line(&mut first_line);
 
-    return Ok(first_line);
+    Ok(first_line)
 }

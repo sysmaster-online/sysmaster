@@ -17,7 +17,7 @@ pub fn fd_nonblock(fd: i32, nonblock: bool) -> Result<(), Errno> {
 
     nix::fcntl::fcntl(fd, FcntlArg::F_SETFL(nflag))?;
 
-    return Ok(());
+    Ok(())
 }
 
 pub fn fd_cloexec(fd: i32) -> Result<(), Errno> {
@@ -29,7 +29,7 @@ pub fn fd_cloexec(fd: i32) -> Result<(), Errno> {
 
     nix::fcntl::fcntl(fd, FcntlArg::F_SETFD(nflag))?;
 
-    return Ok(());
+    Ok(())
 }
 
 pub fn close(fd: i32) {
