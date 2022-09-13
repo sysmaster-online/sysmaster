@@ -139,7 +139,11 @@ impl UnitFileData {
                 for entry in dir.read_dir().unwrap() {
                     let dropin = entry.unwrap().path();
                     if dropin.is_symlink() {
-                        pathbuf_dropin.push(dropin);
+                        if let Ok(abs_path) = dropin.canonicalize() {
+                            let mut file_name = PathBuf::new();
+                            file_name.push(abs_path.file_name().unwrap());
+                            pathbuf_dropin.push(file_name);
+                        }
                     }
                 }
             }
