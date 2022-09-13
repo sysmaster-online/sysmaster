@@ -689,10 +689,6 @@ impl JobUnitData {
         }
     }
 
-    fn is_trigger_wait(&self) -> bool {
-        self.calc_natural_ready() == Some(false)
-    }
-
     fn calc_ready(&self) -> Option<bool> {
         if !self.pause {
             // the entry has not been paused
@@ -757,5 +753,449 @@ impl JobUnitData {
             Some(t) => t.as_ref() == job,
             None => false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::manager::data::DataManager;
+    use crate::manager::unit::uload_util::UnitFile;
+    use crate::manager::unit::unit_base::{JobMode, UnitType};
+    use crate::manager::unit::unit_entry::UnitX;
+    use crate::plugin::Plugin;
+    use utils::logger;
+
+    #[test]
+    fn juv_api_len() {
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let mut id: u32 = 0;
+        id = id.wrapping_add(1); // ++
+        let job = Rc::new(Job::new(id, Rc::clone(&unit_test1), JobKind::JobStart));
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+
+        // nothing exists
+        assert_eq!(uv.len(), 0);
+
+        // something exists
+        uv.insert_suspend(job, false);
+        assert_eq!(uv.len(), 1);
+    }
+
+    #[test]
+    fn juv_api_merge() {
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let (_, job_start, _, _, _) = prepare_jobs(&unit_test1, JobMode::JobReplace);
+        let (_, stage_start, _, _, _) = prepare_jobs(&unit_test1, JobMode::JobReplace);
+        let jobs = JobUnit::new(Rc::clone(&unit_test1));
+
+        // merge nothing
+        let stage = JobUnit::new(Rc::clone(&unit_test1));
+        stage.insert_suspend(Rc::clone(&job_start), false);
+        assert_eq!(stage.len(), 1);
+        let (add_jobs, del_jobs, update_jobs) = jobs.merge_suspends(&stage);
+        let ret = jobs.reshuffle();
+        assert_eq!(ret.len(), 0);
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(add_jobs.len(), 1);
+        assert_eq!(del_jobs.len(), 0);
+        assert_eq!(update_jobs.len(), 0);
+
+        // merge something
+        let stage = JobUnit::new(Rc::clone(&unit_test1));
+        stage.insert_suspend(Rc::clone(&stage_start), false);
+        assert_eq!(stage.len(), 1);
+        let (add_jobs, del_jobs, update_jobs) = jobs.merge_suspends(&stage);
+        let ret = jobs.reshuffle();
+        assert_eq!(ret.len(), 0);
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(add_jobs.len(), 0);
+        assert_eq!(del_jobs.len(), 0);
+        assert_eq!(update_jobs.len(), 1);
+    }
+
+    #[test]
+    fn juv_api_reshuffle() {
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let (job_nop, job_start, job_reload, job_restart, _) =
+            prepare_jobs(&unit_test1, JobMode::JobReplace);
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+
+        // nothing
+        let ret = uv.reshuffle();
+        assert_eq!(ret.len(), 0);
+
+        // reload+nop
+        uv.insert_suspend(Rc::clone(&job_nop), true);
+        uv.insert_suspend(Rc::clone(&job_reload), true);
+        let ret = uv.reshuffle();
+        assert_eq!(ret.len(), 0);
+        assert_eq!(uv.len(), 2);
+        let job = uv.data.borrow().get_next_trigger();
+        assert_eq!(job.get_id(), job_reload.get_id());
+
+        // start+reload
+        uv.insert_suspend(Rc::clone(&job_start), true);
+        let ret = uv.reshuffle();
+        assert_eq!(ret.len(), 1);
+        assert_eq!(uv.len(), 2);
+        let job = uv.data.borrow().get_next_trigger();
+        assert_eq!(job.get_id(), job_start.get_id());
+
+        // restart+start
+        uv.insert_suspend(Rc::clone(&job_restart), true);
+        let ret = uv.reshuffle();
+        assert_eq!(ret.len(), 1);
+        assert_eq!(uv.len(), 2);
+        let job = uv.data.borrow().get_next_trigger();
+        assert_eq!(job.get_id(), job_restart.get_id());
+    }
+
+    #[test]
+    fn juv_api_replace_with_unirreversible() {
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let mode = JobMode::JobReplace;
+        let (_, uv_start, _, _, uv_stop) = prepare_jobs(&unit_test1, mode);
+        let (_, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+
+        // nothing vs nothing
+        assert_eq!(uv.is_suspends_replace_with(&other), true);
+
+        // stop vs nothing
+        uv.insert_suspend(Rc::clone(&uv_stop), true);
+        assert_eq!(uv.is_suspends_replace_with(&other), true);
+
+        // stop vs stop
+        other.insert_suspend(Rc::clone(&o_stop), true);
+        assert_eq!(uv.is_suspends_replace_with(&other), true);
+
+        // non-stop vs stop
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+        uv.insert_suspend(Rc::clone(&uv_start), true);
+        assert_eq!(uv.is_suspends_replace_with(&other), true);
+
+        // non-stop vs nothing
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        assert_eq!(uv.is_suspends_replace_with(&other), true);
+
+        // non-stop vs non-stop
+        other.insert_suspend(Rc::clone(&o_start), true);
+        assert_eq!(uv.is_suspends_replace_with(&other), true);
+    }
+
+    #[test]
+    fn juv_api_replace_with_irreversible() {
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let mode = JobMode::JobReplaceIrreversible;
+        let (_, uv_start, _, _, uv_stop) = prepare_jobs(&unit_test1, mode);
+        let (_, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+
+        // nothing vs nothing
+        assert_eq!(uv.is_suspends_replace_with(&other), true);
+
+        // stop vs nothing
+        uv.insert_suspend(Rc::clone(&uv_stop), true);
+        assert_eq!(uv.is_suspends_replace_with(&other), true);
+
+        // stop vs stop
+        other.insert_suspend(Rc::clone(&o_stop), true);
+        assert_eq!(uv.is_suspends_replace_with(&other), true);
+
+        // non-stop vs stop
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+        uv.insert_suspend(Rc::clone(&uv_start), true);
+        assert_eq!(uv.is_suspends_replace_with(&other), false);
+
+        // non-stop vs nothing
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        assert_eq!(uv.is_suspends_replace_with(&other), true);
+
+        // non-stop vs non-stop
+        other.insert_suspend(Rc::clone(&o_start), true);
+        assert_eq!(uv.is_suspends_replace_with(&other), true);
+    }
+
+    #[test]
+    fn juv_api_order_with_unignore() {
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let mode = JobMode::JobReplace;
+        let (uv_nop, uv_start, _, _, uv_stop) = prepare_jobs(&unit_test1, mode);
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        let before = UnitRelationAtom::UnitAtomBefore;
+        let after = UnitRelationAtom::UnitAtomAfter;
+
+        // nop
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+
+        /* nop vs nop */
+        uv.insert_suspend(Rc::clone(&uv_nop), true);
+        uv.reshuffle();
+        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        /* nop vs start */
+        other.insert_suspend(Rc::clone(&o_start), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        /* nop vs stop */
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        // start
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+
+        /* start vs nop */
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+        uv.insert_suspend(Rc::clone(&uv_start), true);
+        uv.reshuffle();
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        /* start vs start */
+        other.insert_suspend(Rc::clone(&o_start), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), false);
+
+        /* start vs stop */
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), false);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), false);
+
+        // stop
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+
+        /* stop vs nop */
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+        uv.insert_suspend(Rc::clone(&uv_stop), true);
+        uv.reshuffle();
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        /* stop vs start */
+        other.insert_suspend(Rc::clone(&o_start), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        /* stop vs stop */
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), false);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+    }
+
+    #[test]
+    fn juv_api_order_with_ignore() {
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let mode = JobMode::JobIgnoreDependencies;
+        let (uv_nop, uv_start, _, _, uv_stop) = prepare_jobs(&unit_test1, mode);
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        let before = UnitRelationAtom::UnitAtomBefore;
+        let after = UnitRelationAtom::UnitAtomAfter;
+
+        // nop
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+
+        /* nop vs nop */
+        uv.insert_suspend(Rc::clone(&uv_nop), true);
+        uv.reshuffle();
+        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        /* nop vs start */
+        other.insert_suspend(Rc::clone(&o_start), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        /* nop vs stop */
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        // start
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+
+        /* start vs nop */
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+        uv.insert_suspend(Rc::clone(&uv_start), true);
+        uv.reshuffle();
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        /* start vs start */
+        other.insert_suspend(Rc::clone(&o_start), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        /* start vs stop */
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+
+        /* stop vs nop */
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+        uv.insert_suspend(Rc::clone(&uv_stop), true);
+        uv.reshuffle();
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        /* stop vs start */
+        other.insert_suspend(Rc::clone(&o_start), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+
+        /* stop vs stop */
+        let other = JobUnit::new(Rc::clone(&unit_test1));
+        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.reshuffle();
+        assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
+        assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
+    }
+
+    #[test]
+    fn juv_calc_ready() {
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let (job_nop, job_start, _, _, _) = prepare_jobs(&unit_test1, JobMode::JobReplace);
+        let uv = JobUnit::new(Rc::clone(&unit_test1));
+
+        // nothing
+        assert_eq!(uv.data.borrow().calc_ready(), None);
+
+        // suspend
+        uv.insert_suspend(Rc::clone(&job_nop), true);
+        let ret = uv.reshuffle();
+        assert_eq!(uv.len(), 1);
+        assert_eq!(ret.len(), 0);
+        assert_eq!(uv.data.borrow().calc_ready(), Some(true));
+
+        // trigger
+        /* trigger */
+        let (next_trigger, merge_trigger) = uv.data.borrow_mut().do_next_trigger();
+        assert_eq!(next_trigger.get_id(), job_nop.get_id());
+        assert!(merge_trigger.is_none());
+        assert_eq!(uv.data.borrow().calc_ready(), None);
+        /* retrigger */
+        uv.data.borrow_mut().retrigger_trigger();
+        assert_eq!(uv.data.borrow().calc_ready(), Some(false));
+        /* pause+resume */
+        uv.pause();
+        assert_eq!(uv.data.borrow().calc_ready(), None);
+        uv.resume();
+        assert_eq!(uv.data.borrow().calc_ready(), Some(false));
+        /* trigger-again */
+        let (next_trigger, merge_trigger) = uv.data.borrow_mut().do_next_trigger();
+        assert_eq!(next_trigger.get_id(), job_nop.get_id());
+        assert!(merge_trigger.is_none());
+        assert_eq!(uv.data.borrow().calc_ready(), None);
+
+        // trigger + suspend
+        /* trigger */
+        uv.insert_suspend(Rc::clone(&job_start), true);
+        let ret = uv.reshuffle();
+        assert_eq!(uv.len(), 2);
+        assert_eq!(ret.len(), 0);
+        assert_eq!(uv.data.borrow().calc_ready(), None);
+        /* retrigger */
+        uv.data.borrow_mut().retrigger_trigger();
+        assert_eq!(uv.data.borrow().calc_ready(), Some(false));
+        /* trigger-again */
+        let (next_trigger, merge_trigger) = uv.data.borrow_mut().do_next_trigger();
+        assert_eq!(next_trigger.get_id(), job_nop.get_id());
+        assert!(merge_trigger.is_none());
+        assert_eq!(uv.data.borrow().calc_ready(), None);
+    }
+
+    fn prepare_jobs(
+        unit: &Rc<UnitX>,
+        mode: JobMode,
+    ) -> (Rc<Job>, Rc<Job>, Rc<Job>, Rc<Job>, Rc<Job>) {
+        let mut id: u32 = 0;
+
+        id = id.wrapping_add(1); // ++
+        let job_nop = Rc::new(Job::new(id, Rc::clone(unit), JobKind::JobNop));
+        job_nop.init_attr(mode);
+
+        id = id.wrapping_add(1); // ++
+        let job_start = Rc::new(Job::new(id, Rc::clone(unit), JobKind::JobStart));
+        job_start.init_attr(mode);
+
+        id = id.wrapping_add(1); // ++
+        let job_reload = Rc::new(Job::new(id, Rc::clone(unit), JobKind::JobReload));
+        job_reload.init_attr(mode);
+
+        id = id.wrapping_add(1); // ++
+        let job_restart = Rc::new(Job::new(id, Rc::clone(unit), JobKind::JobRestart));
+        job_restart.init_attr(mode);
+
+        id = id.wrapping_add(1); // ++
+        let job_stop = Rc::new(Job::new(id, Rc::clone(unit), JobKind::JobStop));
+        job_stop.init_attr(mode);
+
+        (job_nop, job_start, job_reload, job_restart, job_stop)
+    }
+
+    fn create_unit(name: &str) -> Rc<UnitX> {
+        logger::init_log_with_console("test_unit_load", 4);
+        log::info!("test");
+        let dm = Rc::new(DataManager::new());
+        let file = Rc::new(UnitFile::new());
+        let unit_type = UnitType::UnitService;
+        let plugins = Plugin::get_instance();
+        let subclass = plugins.create_unit_obj(unit_type).unwrap();
+        Rc::new(UnitX::new(
+            &dm,
+            &file,
+            unit_type,
+            name,
+            subclass.into_unitobj(),
+        ))
     }
 }

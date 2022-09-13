@@ -420,3 +420,54 @@ fn value_try_sub(value: &mut usize, sub: usize) -> bool {
     }
     o
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::manager::data::DataManager;
+    use crate::manager::unit::uload_util::UnitFile;
+    use crate::manager::unit::unit_base::UnitType;
+    use crate::manager::unit::unit_entry::UnitX;
+    use crate::plugin::Plugin;
+    use utils::logger;
+
+    #[test]
+    fn js_api() {
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let stat = JobStat::new();
+        let mut id: u32 = 0;
+        id = id.wrapping_add(1); // ++
+        let job = Rc::new(Job::new(id, Rc::clone(&unit_test1), JobKind::JobStart));
+
+        // nothing exists
+        assert_eq!(stat.data.borrow().num.kind.total(), 0);
+
+        // something exists
+        stat.update_change(&(&Some(job), &None, &None));
+        assert_eq!(stat.data.borrow().num.kind.total(), 1);
+        assert_eq!(stat.data.borrow().cnt.op.total(), 1);
+
+        // clear
+        stat.clear_cnt();
+        assert_eq!(stat.data.borrow().num.kind.total(), 1);
+        assert_eq!(stat.data.borrow().cnt.op.total(), 0);
+    }
+
+    fn create_unit(name: &str) -> Rc<UnitX> {
+        logger::init_log_with_console("test_unit_load", 4);
+        log::info!("test");
+        let dm = Rc::new(DataManager::new());
+        let file = Rc::new(UnitFile::new());
+        let unit_type = UnitType::UnitService;
+        let plugins = Plugin::get_instance();
+        let subclass = plugins.create_unit_obj(unit_type).unwrap();
+        Rc::new(UnitX::new(
+            &dm,
+            &file,
+            unit_type,
+            name,
+            subclass.into_unitobj(),
+        ))
+    }
+}

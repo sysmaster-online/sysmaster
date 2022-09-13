@@ -953,12 +953,8 @@ mod tests {
         let mut ja = JobAlloc::new();
         let table = JobTable::new();
 
-        let new = table.record_suspend(
-            &mut ja,
-            JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop),
-            JobMode::JobReplace,
-            false,
-        );
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop);
+        let new = table.record_suspend(&mut ja, conf, JobMode::JobReplace, false);
         assert_eq!(new, true);
     }
 
