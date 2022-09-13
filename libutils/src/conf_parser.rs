@@ -19,13 +19,13 @@ pub fn parse_boolen(item: &str) -> Result<bool> {
 
 pub fn parse_size(item: &str, base: Base) -> Result<u64> {
     let item = item.trim();
-    if item.len() == 0 {
+    if item.is_empty() {
         return Err(Error::Other {
             msg: "empty string",
         });
     }
 
-    if item.starts_with("-") {
+    if item.starts_with('-') {
         return Err(Error::Other {
             msg: "invalue string",
         });
@@ -77,7 +77,7 @@ pub fn parse_size(item: &str, base: Base) -> Result<u64> {
             continue;
         };
 
-        if char::from(*v).is_digit(10) {
+        if char::from(*v).is_ascii_digit() {
             continue;
         }
 

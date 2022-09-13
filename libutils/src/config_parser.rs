@@ -6,11 +6,10 @@ use std::{fs::File, io::Read};
 pub trait ConfigParse {
     type Item;
     fn conf_file_parse(&self, _file_content: &str) -> Result<Self::Item, IOError> {
-        let ret: Result<Self::Item, IOError> = Err(IOError::new(
+        Err(IOError::new(
             ErrorKind::Other,
             format!("config file not Contain Section{}", "Service"),
-        ));
-        return ret;
+        ))
     }
 }
 
@@ -53,9 +52,10 @@ pub fn toml_str_parse(file_content: &str) -> Result<toml::Value, IOError> {
 pub fn merge_toml(paths: &Vec<PathBuf>, to: &mut PathBuf) -> Result<(), IOError> {
     let mut merged: toml::Value = toml::Value::Table(toml::value::Table::new());
     for file in paths {
-        let value: toml::value::Table =
-            toml::from_slice(&fs::read(&file).expect(&format!("Error reading {:?}", file)))
-                .expect(&format!("Expected TOML table in {:?}", file));
+        let value: toml::value::Table = toml::from_slice(
+            &fs::read(&file).unwrap_or_else(|_| panic!("Error reading {:?}", file)),
+        )
+        .unwrap_or_else(|_| panic!("Error reading {:?}", file));
         merge(&mut merged, &toml::Value::Table(value));
     }
     fs::write(to, merged.to_string())
@@ -74,7 +74,7 @@ fn merge(merged: &mut toml::Value, value: &toml::Value) {
                     match merged.get_mut(k) {
                         Some(x) => merge(x, v),
                         None => {
-                            let _ = merged.insert(k.clone(), v.clone());
+                            merged.insert(k, v.clone());
                         }
                     }
                 }

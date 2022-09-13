@@ -7,7 +7,7 @@ use nix::{
 use std::os::unix::prelude::RawFd;
 
 fn ppoll_timeout(fds: &mut [PollFd], timeout: Option<TimeSpec>) -> Result<libc::c_int, Errno> {
-    if fds.len() == 0 {
+    if fds.is_empty() {
         return Ok(0);
     }
 
@@ -17,12 +17,12 @@ fn ppoll_timeout(fds: &mut [PollFd], timeout: Option<TimeSpec>) -> Result<libc::
         return Ok(0);
     }
 
-    for i in 0..fds.len() {
-        if fds[i].revents().is_none() {
+    for item in fds {
+        if item.revents().is_none() {
             continue;
         }
 
-        if fds[i].revents().unwrap().eq(&PollFlags::POLLNVAL) {
+        if item.revents().unwrap().eq(&PollFlags::POLLNVAL) {
             return Err(Errno::EBADF);
         }
     }
@@ -40,5 +40,5 @@ pub fn wait_for_events(fd: RawFd, event: PollFlags, time_out: i64) -> Result<lib
 
     let ret = ppoll_timeout(&mut fds, Some(time_spec))?;
 
-    return Ok(ret);
+    Ok(ret)
 }

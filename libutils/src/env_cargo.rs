@@ -3,13 +3,7 @@ use std::env;
 use crate::Error;
 
 pub fn env_path() -> Result<String, Error> {
-    let devel_path = || {
-        let out_dir = env::var("OUT_DIR");
-        out_dir
-    };
-
-    let _tmp_lib_path = devel_path();
-    let out_dir = match _tmp_lib_path {
+    let out_dir = match env::var("OUT_DIR") {
         Ok(v) => v,
         Err(_e) => {
             let ld_path = env::var("LD_LIBRARY_PATH");
@@ -19,14 +13,14 @@ pub fn env_path() -> Result<String, Error> {
                 });
             }
             let ld_path = ld_path.unwrap();
-            let _tmp = ld_path.split(":").collect::<Vec<_>>()[0];
+            let _tmp = ld_path.split(':').collect::<Vec<_>>()[0];
             let _tmp_path = _tmp.split("target").collect::<Vec<_>>()[0];
             _tmp_path.to_string()
         }
     };
 
     let tmp_str: Vec<_> = out_dir.split("build").collect();
-    if tmp_str.len() < 1 {
+    if tmp_str.is_empty() {
         return Err(Error::Other {
             msg: "not running with cargo",
         });

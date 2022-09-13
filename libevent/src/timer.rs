@@ -1,4 +1,3 @@
-use libc;
 use std::{
     collections::{BinaryHeap, HashMap},
     mem,

@@ -27,19 +27,19 @@ pub fn process_state(pid: Pid) -> Result<char, Error> {
     if stat.len() < 3 {
         return Err(Error::new(
             ErrorKind::Other,
-            format!("invalid process stat format"),
+            "invalid process stat format".to_string(),
         ));
     }
 
     let p_stat: Vec<char> = stat[3].trim().chars().collect();
 
-    if p_stat.len() == 0 {
+    if p_stat.is_empty() {
         return Err(Error::new(
             ErrorKind::Other,
-            format!("invalid process state"),
+            "invalid process state".to_string(),
         ));
     }
-    return Ok(p_stat[0]);
+    Ok(p_stat[0])
 }
 
 pub fn alive(pid: Pid) -> bool {
@@ -78,25 +78,23 @@ pub fn kill_all_pids(signal: i32) -> HashSet<i32> {
     let mut pids: HashSet<i32> = HashSet::new();
     let proc_path = Path::new("/proc");
     let read_dir = read_dir(proc_path).unwrap();
-    for entry in read_dir {
-        if let Ok(dir_entry) = entry {
-            // Skip files.
-            if let Ok(file_type) = dir_entry.file_type() {
-                if file_type.is_file() {
-                    continue;
-                }
-            }
-            let file_name = String::from(dir_entry.file_name().to_str().unwrap());
-            // Check pid directory.
-            if let Ok(pid_raw) = file_name.parse::<i32>() {
-                unsafe {
-                    log::debug!("killing pid: {} by signal {}", pid_raw, signal);
-                    kill(pid_raw, signal);
-                    pids.insert(pid_raw);
-                }
-            } else {
+    for entry in read_dir.flatten() {
+        // Skip files.
+        if let Ok(file_type) = entry.file_type() {
+            if file_type.is_file() {
                 continue;
             }
+        }
+        let file_name = String::from(entry.file_name().to_str().unwrap());
+        // Check pid directory.
+        if let Ok(pid_raw) = file_name.parse::<i32>() {
+            unsafe {
+                log::debug!("killing pid: {} by signal {}", pid_raw, signal);
+                kill(pid_raw, signal);
+                pids.insert(pid_raw);
+            }
+        } else {
+            continue;
         }
     }
     pids
@@ -111,14 +109,10 @@ pub fn wait_pids(mut pids: HashSet<i32>, timeout: u64) -> HashSet<i32> {
 
     loop {
         // 1. Find killed process by kernel.
-        loop {
-            if let Ok(wait_status) = waitpid(Pid::from_raw(-1), Some(WaitPidFlag::WNOHANG)) {
-                if let Some(pid) = wait_status.pid() {
-                    log::debug!("successfully killed pid: {} found by kernel.", pid.as_raw());
-                    pids.remove(&pid.as_raw());
-                } else {
-                    break;
-                }
+        while let Ok(wait_status) = waitpid(Pid::from_raw(-1), Some(WaitPidFlag::WNOHANG)) {
+            if let Some(pid) = wait_status.pid() {
+                log::debug!("successfully killed pid: {} found by kernel.", pid.as_raw());
+                pids.remove(&pid.as_raw());
             } else {
                 break;
             }

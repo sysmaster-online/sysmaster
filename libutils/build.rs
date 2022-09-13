@@ -9,7 +9,7 @@ fn main() {
     println!("{:?},{:?}", s_cmd, t[0]);
 
     let result = Command::new(&s_cmd)
-        .args(&[&format!("{}", t[0])])
+        .args(&[t[0].to_string()])
         .status()
         .unwrap();
     println!("{:?}", result);

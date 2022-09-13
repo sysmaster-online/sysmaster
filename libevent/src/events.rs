@@ -434,11 +434,7 @@ impl EventsData {
             }
         }
 
-        if !self.pending_is_empty() || !events.is_empty() {
-            true
-        } else {
-            false
-        }
+        !self.pending_is_empty() || !events.is_empty()
     }
 
     pub(self) fn prepare(&mut self) -> bool {

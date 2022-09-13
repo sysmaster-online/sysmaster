@@ -150,7 +150,7 @@ pub enum EventType {
 
 /// 事件的调度状态
 /// The dispatch status of the event
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum EventState {
     /// 开启调度
     On,

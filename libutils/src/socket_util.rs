@@ -21,7 +21,7 @@ pub fn set_pkginfo(fd: RawFd, family: AddressFamily, v: bool) -> Result<(), Errn
         socket::AddressFamily::Inet6 => {
             socket::setsockopt(fd as RawFd, sockopt::Ipv6RecvPacketInfo, &v)
         }
-        _ => return Err(Errno::EAFNOSUPPORT),
+        _ => Err(Errno::EAFNOSUPPORT),
     }
 }
 
