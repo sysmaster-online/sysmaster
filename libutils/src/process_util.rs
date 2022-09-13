@@ -97,6 +97,7 @@ pub fn kill_all_pids(signal: i32) -> HashSet<i32> {
             continue;
         }
     }
+    // return PIDs we want to kill
     pids
 }
 
@@ -144,4 +145,38 @@ pub fn wait_pids(mut pids: HashSet<i32>, timeout: u64) -> HashSet<i32> {
         }
     }
     pids
+}
+
+#[cfg(test)]
+mod tests {
+    use nix::libc::kill;
+    use std::collections::HashSet;
+    use std::process::Command;
+    use std::thread;
+
+    use crate::process_util::wait_pids;
+    #[test]
+    fn test_wait_pids() {
+        let mut pids: HashSet<i32> = HashSet::new();
+        for i in 100..109 {
+            let str_i = i.to_string();
+            let child = Command::new("/usr/bin/sleep")
+                .args([str_i.as_str()])
+                .spawn()
+                .expect("Failed to fork /usr/bin/sleep");
+            pids.insert(child.id() as i32);
+        }
+
+        let pids_spawn = pids.clone();
+        thread::spawn(move || {
+            for pid in pids_spawn {
+                unsafe {
+                    kill(pid, 15);
+                }
+            }
+        });
+
+        let res = wait_pids(pids, 10000000);
+        assert_eq!(res.len(), 0);
+    }
 }
