@@ -1,9 +1,11 @@
 #[cfg(test)]
 mod test {
     use nix::sys::inotify::AddWatchFlags;
+    use std::fs::File;
     use std::os::unix::prelude::RawFd;
     use std::path::Path;
     use std::rc::Rc;
+    use std::thread;
     use utils::Error;
 
     use event::Events;
@@ -49,15 +51,18 @@ mod test {
     }
 
     #[test]
-    #[ignore]
     fn test_timer() {
+        thread::spawn(move || loop {
+            let _ = File::create("/tmp/xxxxxxfoo.txt").unwrap();
+        });
+
         let e = Events::new().unwrap();
         let s: Rc<dyn Source> = Rc::new(Timer::new());
         e.add_source(s.clone()).unwrap();
 
         e.set_enabled(s.clone(), EventState::On).unwrap();
 
-        let watch = Path::new("/");
+        let watch = Path::new("/tmp");
         let wd = e.add_watch(watch, AddWatchFlags::IN_ALL_EVENTS);
 
         e.rloop().unwrap();
