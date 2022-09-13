@@ -7,7 +7,7 @@ use super::signals::Signals;
 use super::unit::UnitManagerX;
 use super::MngErrno;
 use event::{EventState, Events};
-use nix::sys::reboot::{reboot, RebootMode};
+use nix::sys::reboot::{self, RebootMode};
 use nix::sys::socket::UnixCredentials;
 use std::collections::HashMap;
 use std::error::Error as Err;
@@ -108,7 +108,7 @@ impl ManagerX {
     }
 
     pub fn reexec(&self) -> Result<(), Error> {
-        self.data.reexec()
+        todo!()
     }
 
     fn register(&self, event: &Rc<Events>) {
@@ -152,14 +152,6 @@ impl Manager {
         }
     }
 
-    pub(crate) fn get_job(&self, _id: JobId) -> Result<(), Error> {
-        todo!()
-    }
-
-    pub(crate) fn get_unit(&self, _name: &str) -> Result<(), Error> {
-        todo!()
-    }
-
     pub(crate) fn add_job(&self, _job: JobId) -> Result<(), Error> {
         Ok(())
     }
@@ -172,10 +164,6 @@ impl Manager {
         self.um.stop_unit(name)
     }
 
-    pub(crate) fn clear_jobs(&self) -> Result<(), Error> {
-        todo!()
-    }
-
     pub(crate) fn rloop(&self) -> Result<Stats> {
         loop {
             self.um.dispatch_load_queue();
@@ -183,10 +171,6 @@ impl Manager {
         }
         #[allow(unreachable_code)]
         Ok(Stats::OK)
-    }
-
-    pub(crate) fn reload(&mut self) -> Result<(), Error> {
-        todo!()
     }
 
     pub(crate) fn reboot(&self, reboot_mode: RebootMode) -> Result<(), MngErrno> {
@@ -197,34 +181,10 @@ impl Manager {
             return Ok(());
         }
         pids = process_util::kill_all_pids(9);
-        pids = process_util::wait_pids(pids, 10000000);
+        process_util::wait_pids(pids, 10000000);
         log::info!("Rebooting...");
-        reboot(reboot_mode);
+        let _ = reboot::reboot(reboot_mode); // make lint happy
         Ok(())
-    }
-
-    pub(crate) fn reexec(&self) -> Result<(), Error> {
-        todo!()
-    }
-
-    pub(crate) fn switch_root(&mut self) -> Result<(), Error> {
-        todo!()
-    }
-
-    pub(crate) fn check_finished(&self) -> Result<(), Error> {
-        todo!()
-    }
-
-    pub(crate) fn reset_failed(&mut self) -> Result<(), Error> {
-        todo!()
-    }
-
-    pub(crate) fn exit(&mut self) {
-        self.stat = Stats::EXIT;
-    }
-
-    pub(crate) fn state(&self) -> Result<Stats, Error> {
-        todo!()
     }
 
     pub(crate) fn dispatch_sigchld(&self) -> Result<(), Box<dyn Err>> {
@@ -245,16 +205,33 @@ impl Manager {
     }
 }
 
-impl Drop for Manager {
-    fn drop(&mut self) {}
-}
-
 #[cfg(test)]
 mod tests {
-    // use crate::manager::service::ServiceUnit;
-
-    // use super::*;
+    use super::*;
 
     #[test]
-    fn test_mangerplugin() {}
+    fn manager_api() {
+        let manager = ManagerX::new(Mode::SYSTEM, Action::RUN);
+        let _ = manager.startup();
+        let ret = manager.add_job(0);
+        assert!(ret.is_ok());
+
+        let ret = manager.start_unit("config.target");
+        assert!(ret.is_ok());
+
+        let ret = manager.stop_unit("config.service");
+        assert!(ret.is_ok());
+
+        let ret = manager.data.dispatch_sigchld();
+        assert!(ret.is_err()); // no signal input
+
+        let ret = manager.data.dispatch_mountinfo();
+        assert!(ret.is_ok());
+
+        let ucred = UnixCredentials::new();
+        let messages = HashMap::new();
+        let fds = Vec::new();
+        let ret = manager.data.notify_message(&ucred, &messages, &fds);
+        assert!(ret.is_ok());
+    }
 }
