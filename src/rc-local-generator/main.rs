@@ -1,31 +1,19 @@
+//! # rc-local-generator
+//!
+//! 将会在/etc/rc.local 存在并可执行的情况下，将其封装为rc-local.service 服务，并加入到系统启动流程的末尾阶段
+
 pub mod rc_local_generator;
 use rc_local_generator::*;
 use utils::logger;
 
 fn main() {
     logger::init_log_with_console("rc_local_generator", 4);
-    /*解析命令行参数 命令个数为1或者是4*/
-    let args: Vec<String> = std::env::args().collect();
-
-    let args_size = args.len();
-    let mut str_to = String::new();
-
-    if 1 == args_size {
-        str_to.push_str("/tmp");
-    } else if 1 < args_size && 4 == args_size {
-        str_to.push_str(&args[1]);
-    } else {
-        log::debug!("This program takes zero or three arguments.");
-        return;
-    }
 
     /*判断rc.local是否存在并且可执行*/
     let e = check_executable(RC_LOCAL_PATH);
     match e {
         Ok(_) => {
-            str_to = str_to + "/" + "multi-user.target";
-
-            let f = add_symlink("rc-local.service", &str_to);
+            let f = add_symlink("rc-local.service", "/etc/process1/basic.target");
             match f {
                 Ok(()) => {}
                 Err(_) => log::debug!("failed to create symlink!"),
