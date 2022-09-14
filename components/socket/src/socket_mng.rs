@@ -271,10 +271,11 @@ impl SocketMng {
             Some(cmd) => {
                 match self.spawn.start_socket(&cmd) {
                     Ok(pid) => self.pid.set_control(pid),
-                    Err(_e) => {
+                    Err(e) => {
                         log::error!(
-                            "Failed to run start post service: {}",
-                            self.comm.unit().get_id()
+                            "Failed to run start pre service: {}, error: {:?}",
+                            self.comm.unit().get_id(),
+                            e
                         );
                         self.enter_dead(SocketResult::FailureResources);
                         return;
@@ -616,10 +617,79 @@ impl SocketMng {
                     self.enter_dead(res);
                 }
                 _ => {
-                    log::error!("control commad should not exit");
+                    log::error!(
+                        "control commad should not exit， current state is : {:?}",
+                        self.state()
+                    );
                     assert!(false);
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_socket_active_state() {
+        use super::SocketState;
+        use process1::manager::UnitActiveState;
+
+        assert_eq!(
+            SocketState::Dead.to_unit_active_state(),
+            UnitActiveState::UnitInActive
+        );
+        assert_eq!(
+            SocketState::StartPre.to_unit_active_state(),
+            UnitActiveState::UnitActivating
+        );
+        assert_eq!(
+            SocketState::StartChown.to_unit_active_state(),
+            UnitActiveState::UnitActivating
+        );
+        assert_eq!(
+            SocketState::StartPost.to_unit_active_state(),
+            UnitActiveState::UnitActivating
+        );
+        assert_eq!(
+            SocketState::Listening.to_unit_active_state(),
+            UnitActiveState::UnitActive
+        );
+        assert_eq!(
+            SocketState::Running.to_unit_active_state(),
+            UnitActiveState::UnitActive
+        );
+        assert_eq!(
+            SocketState::StopPre.to_unit_active_state(),
+            UnitActiveState::UnitDeActivating
+        );
+        assert_eq!(
+            SocketState::StopPreSigterm.to_unit_active_state(),
+            UnitActiveState::UnitDeActivating
+        );
+        assert_eq!(
+            SocketState::StopPost.to_unit_active_state(),
+            UnitActiveState::UnitDeActivating
+        );
+        assert_eq!(
+            SocketState::StopPreSigkill.to_unit_active_state(),
+            UnitActiveState::UnitDeActivating
+        );
+        assert_eq!(
+            SocketState::FinalSigterm.to_unit_active_state(),
+            UnitActiveState::UnitDeActivating
+        );
+        assert_eq!(
+            SocketState::FinalSigterm.to_unit_active_state(),
+            UnitActiveState::UnitDeActivating
+        );
+        assert_eq!(
+            SocketState::Failed.to_unit_active_state(),
+            UnitActiveState::UnitFailed
+        );
+        assert_eq!(
+            SocketState::Cleaning.to_unit_active_state(),
+            UnitActiveState::UnitMaintenance
+        );
     }
 }

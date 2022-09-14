@@ -216,7 +216,7 @@ mod tests {
         let ret = manager.add_job(0);
         assert!(ret.is_ok());
 
-        let ret = manager.start_unit("config.target");
+        let ret = manager.start_unit("config.service");
         assert!(ret.is_ok());
 
         let ret = manager.stop_unit("config.service");

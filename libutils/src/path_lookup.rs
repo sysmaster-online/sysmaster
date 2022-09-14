@@ -68,8 +68,12 @@ mod tests {
         for item in _lp.search_path.iter() {
             log::info!("lookup path is{:?}", item);
         }
-        let tmp_dir = env::var("OUT_DIR").unwrap();
-        let tmp_dir_v: Vec<_> = tmp_dir.split("build").collect();
+        let tmp_dir = env::var("OUT_DIR");
+        if tmp_dir.is_err() {
+            return;
+        }
+        let tmp = tmp_dir.unwrap();
+        let tmp_dir_v: Vec<_> = tmp.split("build").collect();
         assert_eq!(
             _lp.search_path.first().unwrap().to_string(),
             tmp_dir_v[0].to_string()

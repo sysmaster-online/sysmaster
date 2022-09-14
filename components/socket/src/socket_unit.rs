@@ -27,14 +27,6 @@ struct SocketUnit {
 }
 
 impl UnitObj for SocketUnit {
-    fn init(&self) {
-        todo!()
-    }
-
-    fn done(&self) {
-        todo!()
-    }
-
     fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
         log::debug!("socket beigin to load conf file");
         self.config.load(&paths)?;
@@ -44,10 +36,6 @@ impl UnitObj for SocketUnit {
         self.load.socket_add_extras(&self.mng);
 
         return self.load.socket_verify();
-    }
-
-    fn coldplug(&self) {
-        todo!()
     }
 
     // the function entrance to start the unit
@@ -65,10 +53,6 @@ impl UnitObj for SocketUnit {
         Ok(())
     }
 
-    fn dump(&self) {
-        todo!()
-    }
-
     fn stop(&self) -> Result<(), UnitActionError> {
         let stoping = self.mng.stop_check()?;
         if stoping {
@@ -83,20 +67,8 @@ impl UnitObj for SocketUnit {
 
     fn reload(&self) {}
 
-    fn kill(&self) {
-        todo!()
-    }
-
-    fn release_resources(&self) {
-        todo!()
-    }
-
     fn sigchld_events(&self, pid: Pid, code: i32, status: Signal) {
         self.mng.sigchld_event(pid, code, status)
-    }
-
-    fn reset_failed(&self) {
-        todo!()
     }
 
     fn current_active_state(&self) -> UnitActiveState {

@@ -67,9 +67,12 @@ pub(crate) struct SectionSocket {
     pub ExecStopPre: Option<Vec<ExecCommand>>,
     #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
     pub ExecStopPost: Option<Vec<ExecCommand>>,
-    pub ListenStream: Option<String>,
-    pub ListenDatagram: Option<String>,
-    pub ListenNetlink: Option<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    pub ListenStream: Option<Vec<String>>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    pub ListenDatagram: Option<Vec<String>>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    pub ListenNetlink: Option<Vec<String>>,
     pub PassPacketInfo: Option<bool>,
     pub Accept: Option<bool>,
     pub Service: Option<String>,
@@ -90,6 +93,27 @@ impl SocketConfigData {
             SocketCommand::StartPost => self.Socket.ExecStartPost.clone(),
             SocketCommand::StopPre => self.Socket.ExecStopPre.clone(),
             SocketCommand::StopPost => self.Socket.ExecStopPost.clone(),
+        }
+    }
+
+    pub(super) fn listen_stream(&self) -> Option<Vec<String>> {
+        match &self.Socket.ListenStream {
+            Some(v) => Some(v.iter().map(|v| v.to_string()).collect()),
+            None => None,
+        }
+    }
+
+    pub(super) fn listen_datagram(&self) -> Option<Vec<String>> {
+        match &self.Socket.ListenDatagram {
+            Some(v) => Some(v.iter().map(|v| v.to_string()).collect()),
+            None => None,
+        }
+    }
+
+    pub(super) fn listen_netlink(&self) -> Option<Vec<String>> {
+        match &self.Socket.ListenNetlink {
+            Some(v) => Some(v.iter().map(|v| v.to_string()).collect()),
+            None => None,
         }
     }
 }

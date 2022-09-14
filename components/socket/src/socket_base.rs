@@ -100,3 +100,88 @@ pub(super) enum SocketCommand {
     StopPre,
     StopPost,
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::socket_base::{NetlinkProtocol, PortType};
+
+    #[test]
+    fn test_netlink_from_string() {
+        assert_eq!(
+            NetlinkProtocol::from("route".to_string()),
+            NetlinkProtocol::NetlinkRoute
+        );
+        assert_eq!(
+            NetlinkProtocol::from("firewall".to_string()),
+            NetlinkProtocol::NetlinkFirewall
+        );
+        assert_eq!(
+            NetlinkProtocol::from("inet-diag".to_string()),
+            NetlinkProtocol::NetlinkInetDiag
+        );
+        assert_eq!(
+            NetlinkProtocol::from("nflog".to_string()),
+            NetlinkProtocol::NetlinkNflog
+        );
+        assert_eq!(
+            NetlinkProtocol::from("xfrm".to_string()),
+            NetlinkProtocol::NetlinkXfrm
+        );
+        assert_eq!(
+            NetlinkProtocol::from("selinux".to_string()),
+            NetlinkProtocol::NetlinkSelinux
+        );
+        assert_eq!(
+            NetlinkProtocol::from("iscsi".to_string()),
+            NetlinkProtocol::NetlinkIscsi
+        );
+        assert_eq!(
+            NetlinkProtocol::from("audit".to_string()),
+            NetlinkProtocol::NetlinkAudit
+        );
+        assert_eq!(
+            NetlinkProtocol::from("fib-lookup".to_string()),
+            NetlinkProtocol::NetlinkFibLookup
+        );
+        assert_eq!(
+            NetlinkProtocol::from("connector".to_string()),
+            NetlinkProtocol::NetlinkConnector
+        );
+        assert_eq!(
+            NetlinkProtocol::from("netfilter".to_string()),
+            NetlinkProtocol::NetlinkNetfilter
+        );
+        assert_eq!(
+            NetlinkProtocol::from("ip6-fw".to_string()),
+            NetlinkProtocol::NetlinkIpv6Fw
+        );
+        assert_eq!(
+            NetlinkProtocol::from("dnrtmsg".to_string()),
+            NetlinkProtocol::NetlinkDnrtMag
+        );
+        assert_eq!(
+            NetlinkProtocol::from("kobject_uevent".to_string()),
+            NetlinkProtocol::NetlinkKobjectUevent
+        );
+        assert_eq!(
+            NetlinkProtocol::from("generic".to_string()),
+            NetlinkProtocol::NetlinkGeneric
+        );
+        assert_eq!(
+            NetlinkProtocol::from("scsitransport".to_string()),
+            NetlinkProtocol::NetlinkSCSITransport
+        );
+        assert_eq!(
+            NetlinkProtocol::from("ecryptfs".to_string()),
+            NetlinkProtocol::NetlinkEcryptfs
+        );
+        assert_eq!(
+            NetlinkProtocol::from("rdma".to_string()),
+            NetlinkProtocol::NetlinkRdma
+        );
+        assert_eq!(
+            NetlinkProtocol::from("test".to_string()),
+            NetlinkProtocol::NetlinkInvalid
+        );
+    }
+}
