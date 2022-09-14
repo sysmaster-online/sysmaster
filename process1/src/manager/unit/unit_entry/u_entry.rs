@@ -500,3 +500,35 @@ impl Unit {
         self.sub.notify_message(ucred, messages, fds)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use crate::{
+        manager::{data::DataManager, unit::uload_util::UnitFile, UnitType},
+        plugin::Plugin,
+    };
+
+    use super::Unit;
+
+    fn unit_init() -> Unit {
+        let unit_file = UnitFile::new();
+        let dm = DataManager::new();
+        let plugin = Plugin::get_instance();
+        let sub_obj = plugin.create_unit_obj(UnitType::UnitService);
+        let unit = Unit::new(
+            UnitType::UnitService,
+            "UnitTestService",
+            &Rc::new(dm),
+            &Rc::new(unit_file),
+            sub_obj.unwrap().into_unitobj(),
+        );
+        unit
+    }
+    #[test]
+    fn test_unit_start() {
+        let _unit = unit_init();
+        let stat = _unit.start();
+    }
+}

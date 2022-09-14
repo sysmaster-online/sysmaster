@@ -38,7 +38,6 @@ use std::str::FromStr;
 use std::sync::RwLock;
 use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
 use std::{env, io};
-use utils::Error as uError;
 use walkdir::{DirEntry, WalkDir};
 
 const LIB_PLUGIN_PATH: &str = "/usr/lib/process1/plugin/";
@@ -60,7 +59,6 @@ pub struct Plugin {
     _loaded: RwLock<bool>,
 }
 
-#[allow(dead_code)]
 impl Plugin {
     fn new() -> Self {
         Self {
@@ -415,16 +413,14 @@ mod tests {
     // use services::service::ServiceUnit;
 
     fn init_test() -> Arc<Plugin> {
-        logger::init_log_with_console("test_unit_load", 4);
+        logger::init_log_with_console("test_plugin_log_init", 4);
         let plugins = Arc::clone(&Plugin::get_instance());
         return plugins;
     }
 
     #[test]
     fn test_plugin_load_library() {
-        logger::init_log_with_console("test_unit_load", 4);
-        let plugins = Arc::clone(&Plugin::get_instance());
-        let t_p = plugins;
+        let t_p = init_test() ;
         let mf = env!("CARGO_MANIFEST_DIR");
         let out_dir = env!("OUT_DIR");
         log::info!("{},{}", out_dir, mf);
