@@ -30,58 +30,60 @@ fn mount_one(fstab_item: &FSTabItem) -> i32 {
             ])
             .status()
     }
-    match mount_status {
-        Ok(status) => {
-            if let Some(r) = status.code() {
-                if r != 0 {
-                    log::error!(
-                        "Failed to mount {}, exitcode: {}",
-                        &fstab_item.device_spec,
-                        r
-                    );
-                } else {
-                    log::info!("Mounted {}", &fstab_item.device_spec);
-                }
-                r
-            } else {
-                log::error!("Unexpected error when mount {}", &fstab_item.device_spec);
-                -1
-            }
-        }
+    let status = match mount_status {
+        Ok(status) => status,
         Err(_) => {
-            log::error!("Failed to executing {}!", MOUNT_BIN);
-            -1
+            log::error!("Failed to execute {}", MOUNT_BIN);
+            return -1;
         }
+    };
+    let r = match status.code() {
+        Some(r) => r,
+        None => {
+            log::error!("Unexpected error when mount {}", &fstab_item.device_spec);
+            return -1;
+        }
+    };
+    if r != 0 {
+        log::error!(
+            "Failed to mount {}, exitcode: {}",
+            &fstab_item.device_spec,
+            r
+        );
+        return -1;
     }
+    log::info!("Mounted {}", &fstab_item.device_spec);
+    return 0;
 }
 
 fn swap_on(fstab_item: &FSTabItem) -> i32 {
-    match Command::new(SWAP_BIN)
+    let status = match Command::new(SWAP_BIN)
         .args([&fstab_item.device_spec])
         .status()
     {
-        Ok(status) => {
-            if let Some(r) = status.code() {
-                if r != 0 {
-                    log::error!(
-                        "Failed to swapon {}, exitcode: {}",
-                        &fstab_item.device_spec,
-                        r
-                    );
-                } else {
-                    log::info!("Swapped on {}", &fstab_item.device_spec);
-                }
-                r
-            } else {
-                log::error!("Unexpected error when swapon {}", &fstab_item.device_spec);
-                -1
-            }
-        }
+        Ok(status) => status,
         Err(_) => {
-            log::error!("Failed to executing {}!", SWAP_BIN);
-            -1
+            log::error!("Failed to execute {}", SWAP_BIN);
+            return -1;
         }
+    };
+    let r = match status.code() {
+        Some(r) => r,
+        None => {
+            log::error!("Unexpected error when swapon {}", &fstab_item.device_spec);
+            return -1;
+        }
+    };
+    if r != 0 {
+        log::error!(
+            "Failed to swapon {}, exitcode: {}",
+            &fstab_item.device_spec,
+            r
+        );
+        return -1;
     }
+    log::info!("Swapped on {}", &fstab_item.device_spec);
+    return 0;
 }
 
 fn consume_one(fstab_item: &mut FSTabItem) {
@@ -145,5 +147,114 @@ fn main() {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use inotify::EventMask;
+    use nix::unistd::getuid;
+    use std::fs;
+    use std::path::Path;
+    use std::sync::mpsc;
+    use std::thread;
+
+    use crate::{fstab_item, mount_one, watch_devices};
+
+    fn create_fstab_items() -> Vec<fstab_item::FSTabItem> {
+        // Create fstab_items and directories.
+        let src_path = Path::new("/tmp/fstab_test/src");
+        let dst_path = Path::new("/tmp/fstab_test/dst");
+        let fstab_str = vec![
+            src_path.to_str().unwrap(),
+            dst_path.to_str().unwrap(),
+            "ext4",
+            "bind",
+            "0",
+            "0",
+        ];
+        let fstab_items = vec![fstab_item::FSTabItem::new(fstab_str)];
+        assert_eq!(fstab_items.len(), 1);
+        return fstab_items;
+    }
+
+    fn clean() {
+        // Clean
+        if !Path::exists(Path::new("/tmp/fstab_test")) {
+            return;
+        }
+        if let Err(why) = fs::remove_dir_all("/tmp/fstab_test") {
+            panic!("Failed to remove {:?}: {:?}.", "/tmp/fstab_test", why);
+        }
+    }
+
+    #[test]
+    fn test_mount_one() {
+        let fstab_items = create_fstab_items();
+        assert_eq!(mount_one(&fstab_items[0]), -1);
+        if !getuid().is_root() {
+            println!("Mount must be run under superuser, skipping.");
+            return;
+        }
+        let src_path = Path::new(&fstab_items[0].device_spec);
+        let dst_path = Path::new(&fstab_items[0].mount_point);
+        if !(Path::exists(&src_path) && src_path.is_dir()) {
+            if let Err(why) = fs::create_dir_all(&src_path) {
+                clean();
+                panic!("Failed to create {:?}: {:?}", src_path, why);
+            }
+        }
+        if !(Path::exists(&dst_path) && dst_path.is_dir()) {
+            if let Err(why) = fs::create_dir_all(&dst_path) {
+                clean();
+                panic!("Failed to create {:?}: {:?}", dst_path, why);
+            }
+        }
+        assert_eq!(mount_one(&fstab_items[0]), 0);
+        clean();
+    }
+
+    #[test]
+    fn test_watch_devices() {
+        let fstab_items = create_fstab_items();
+        let src_path = String::from(&fstab_items[0].device_spec);
+        let dst_path = String::from(&fstab_items[0].mount_point);
+        if let Err(why) = fs::create_dir_all(&dst_path) {
+            clean();
+            panic!("Failed to create dir ({:?}): {:?}.", dst_path, why);
+        }
+
+        let (tx, rx) = mpsc::channel();
+        // Create
+        thread::spawn(move || {
+            if let Err(why) = rx.recv() {
+                clean();
+                panic!("Failed to receive ready message: {:?}", why);
+            }
+            if let Err(why) = fs::File::create(&src_path) {
+                clean();
+                panic!("Failed to create file ({:?}): {:?}.", src_path, why);
+            }
+        });
+
+        // use inotify to wait device ready.
+        let (mut inotify, watch_set) = watch_devices(&fstab_items);
+        let mut buffer = [0u8; 4096];
+        if let Err(why) = tx.send("ready") {
+            clean();
+            panic!("Failed to send ready message: {:?}", why);
+        }
+        let events = inotify
+            .read_events_blocking(&mut buffer)
+            .expect("Failed to read events.");
+        for event in events {
+            if event.mask == EventMask::CREATE
+                && watch_set.contains(event.name.unwrap().to_str().unwrap())
+            {
+                println!("Ok.");
+            }
+        }
+
+        clean();
     }
 }
