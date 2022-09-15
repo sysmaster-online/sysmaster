@@ -307,9 +307,9 @@ pub fn loop_write(file: &mut File, buf: &[u8]) -> bool {
 }
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 enum CreditEntropy {
-    CreditEntropyNoWay,
-    CreditEntropyYesPlease,
-    CreditEntropyYesForced,
+    NoWay,
+    YesPlease,
+    YesForced,
 }
 
 fn may_credit(file: &mut File) -> CreditEntropy {
@@ -317,38 +317,38 @@ fn may_credit(file: &mut File) -> CreditEntropy {
         Ok(str) => str,
         Err(_) => {
             log::error!("$SYSTEMD_RANDOM_SEED_CREDIT is not set, not crediting entropy");
-            return CreditEntropy::CreditEntropyNoWay;
+            return CreditEntropy::NoWay;
         }
     };
 
     if e.eq("force") {
         log::debug!("$SYSTEMD_RANDOM_SEED_CREDIT is set to 'force', crediting entropy");
-        return CreditEntropy::CreditEntropyYesForced;
+        return CreditEntropy::YesForced;
     }
 
     let bool_var = if let Ok(var) = parse_boolean(&e) {
         var
     } else {
         log::error!("Failed to parse $SYSTEMD_RANDOM_SEED_CREDIT, not crediting entropy");
-        return CreditEntropy::CreditEntropyNoWay;
+        return CreditEntropy::NoWay;
     };
 
     if !bool_var {
         log::debug!(
             "Crediting entropy is turned off via $SYSTEMD_RANDOM_SEED_CREDIT,not crediting entropy"
         );
-        return CreditEntropy::CreditEntropyNoWay;
+        return CreditEntropy::NoWay;
     }
 
     let mut str = String::new();
     match getxattr(file, &mut str) {
         Err(()) => {
             log::error!("Failed to read extended attribute, ignore.");
-            return CreditEntropy::CreditEntropyNoWay;
+            return CreditEntropy::NoWay;
         }
         Ok(false) => {
             log::error!("Seed file is not marked as credittable, not crediting.");
-            return CreditEntropy::CreditEntropyNoWay;
+            return CreditEntropy::NoWay;
         }
         Ok(true) => {}
     };
@@ -359,21 +359,21 @@ fn may_credit(file: &mut File) -> CreditEntropy {
                 "Failed  to parse user,random-seed-creditable extended attribute, ignoring: {}",
                 str
             );
-            return CreditEntropy::CreditEntropyNoWay;
+            return CreditEntropy::NoWay;
         }
         Ok(false) => {
             log::error!("Seed file is not marked as credittable, not crediting.");
-            return CreditEntropy::CreditEntropyNoWay;
+            return CreditEntropy::NoWay;
         }
         Ok(true) => {}
     };
 
     if Path::new("/run/systemd/first-boot").exists() {
         log::debug!("Not crediting entropy, since booted in first-boot mode.");
-        return CreditEntropy::CreditEntropyNoWay;
+        return CreditEntropy::NoWay;
     }
 
-    CreditEntropy::CreditEntropyYesPlease
+    CreditEntropy::YesPlease
 }
 
 fn get_file_path(file: &File) -> io::Result<PathBuf> {
@@ -520,8 +520,8 @@ pub fn run(arg: &str) -> Result<(), String> {
             Ok(()) => {
                 if !fsync_full(&mut seed_fd) {
                     log::error!("Failed to synchronize seed to disk, not crediting entropy");
-                    if lets_credit == CreditEntropy::CreditEntropyYesPlease {
-                        lets_credit = CreditEntropy::CreditEntropyNoWay;
+                    if lets_credit == CreditEntropy::YesPlease {
+                        lets_credit = CreditEntropy::NoWay;
                     }
                 }
             }
@@ -530,8 +530,8 @@ pub fn run(arg: &str) -> Result<(), String> {
             }
         };
 
-        let is_credit = lets_credit == CreditEntropy::CreditEntropyYesForced
-            || lets_credit == CreditEntropy::CreditEntropyYesPlease;
+        let is_credit =
+            lets_credit == CreditEntropy::YesForced || lets_credit == CreditEntropy::YesPlease;
         // let mut vec = buf.to_vec();
         // vec.resize(size_seed, 0);
         if !random_write_entropy(&mut random_fd, &mut buf, is_credit) {
@@ -604,6 +604,10 @@ mod test {
 
     use super::*;
 
+    fn is_root() -> bool {
+        let uid = unsafe { libc::geteuid() };
+        uid == 0
+    }
     #[test]
     fn loop_read_test() {
         let mut file = fs::OpenOptions::new()
@@ -624,6 +628,13 @@ mod test {
             [229, 116, 70, 248, 124, 63, 79, 151, 138, 126, 202, 48, 255, 113, 151, 211],
             sd_id128_from_string(buf).unwrap()
         );
+        let buf1 = b"E57446f8-7c3f-4f97-8a7e-ca30ff7197d3";
+        assert_eq!(
+            [229, 116, 70, 248, 124, 63, 79, 151, 138, 126, 202, 48, 255, 113, 151, 211],
+            sd_id128_from_string(buf1).unwrap()
+        );
+        let buf2 = b"e57446f8+7c3f-4f97-8a7e-ca30ff7197d3";
+        assert_eq!(Err(()), sd_id128_from_string(buf2));
     }
 
     #[test]
@@ -650,6 +661,7 @@ mod test {
     fn random_pool_size_test() {
         assert!(random_pool_size() >= RAMDOM_POOL_SIZE_MIN);
         assert!(random_pool_size() <= RANDOM_POOL_SIZE_MAX);
+        assert_eq!(read_one_line_file(""), Err(()));
     }
 
     #[test]
@@ -662,10 +674,7 @@ mod test {
         )
         .unwrap();
         env::set_var("SYSTEMD_RANDOM_SEED_CREDIT", "true");
-        assert_eq!(
-            CreditEntropy::CreditEntropyYesPlease,
-            may_credit(&mut seed_fd)
-        );
+        assert_eq!(CreditEntropy::YesPlease, may_credit(&mut seed_fd));
         fs::remove_file("seed_fd.txt").unwrap();
     }
 
@@ -681,7 +690,9 @@ mod test {
             .write(true)
             .open("/dev/urandom")
             .unwrap();
-        // assert!(random_write_entropy(&mut random_fd, &mut vecdata, true));
+        if is_root() {
+            assert!(random_write_entropy(&mut random_fd, &mut vecdata, true));
+        }
         chmod_and_chown(&mut writer);
         fs::remove_file("writer.txt").unwrap();
     }
@@ -709,5 +720,13 @@ mod test {
         xattr::remove("xattr_test.txt", "user.random-seed-credittable").unwrap();
         assert_eq!(getxattr(&mut file, &mut str).unwrap(), false);
         fs::remove_file("xattr_test.txt").unwrap();
+    }
+
+    #[test]
+    fn run_test() {
+        if is_root() {
+            assert_eq!(run("load"), Ok(()));
+            assert_eq!(run("save"), Ok(()));
+        }
     }
 }

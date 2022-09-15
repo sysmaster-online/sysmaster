@@ -1,6 +1,6 @@
 use std::{fs, io, os::linux::fs::MetadataExt};
 
-pub const SYSTEM_DATA_UNIT_DIR: &str = "/lib/systemd/system";
+pub const SYSTEM_DATA_UNIT_DIR: &str = "/etc/process1/";
 pub const RC_LOCAL_PATH: &str = "/etc/rc.local";
 pub const B_EXEC: u32 = 0o100; /*判断文件是否可执行 */
 
@@ -10,7 +10,7 @@ pub fn mkdir_parents_lable(path: &str) -> io::Result<()> {
         return e?;
     }
 
-    let size = path.rfind("/").unwrap_or(0);
+    let size = path.rfind('/').unwrap_or(0);
 
     /*没有解析出目录说明不用创建，直接返回成功*/
     if 0 == size {
@@ -36,21 +36,17 @@ pub fn add_symlink(from_service: &str, to_where: &str) -> io::Result<()> {
     let _ = mkdir_parents_lable(&to);
 
     let e = std::os::unix::fs::symlink(&from, &to);
-    match e {
-        Err(a) => {
-            if a.kind() == io::ErrorKind::AlreadyExists {
-                log::debug!("symlink already exists");
-                return Ok(());
-            }
-
-            log::debug!("Failed to create symlink {}", to);
-            return Err(a);
+    if let Err(a) = e {
+        if a.kind() == io::ErrorKind::AlreadyExists {
+            log::debug!("symlink already exists");
+            return Ok(());
         }
 
-        _ => {}
+        log::debug!("Failed to create symlink {}", to);
+        return Err(a);
     }
 
-    return Ok(());
+    Ok(())
 }
 
 pub fn check_executable(file: &str) -> io::Result<()> {
