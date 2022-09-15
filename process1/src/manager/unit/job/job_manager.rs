@@ -361,7 +361,7 @@ impl JobManagerData {
         self.stat
             .update_changes(&(&Vec::new(), &del_suspends, &Vec::new()));
         self.stat
-            .update_stage_run(del_trigger.is_none().into(), false); // remove-unit[run->end]: decrease 'run'
+            .update_stage_run(del_trigger.is_some().into(), false); // remove-unit[run->end]: decrease 'run'
         self.stat.update_stage_wait(del_suspends.len(), false); // remove-unit[wait->end]: decrease 'wait'
     }
 
@@ -624,23 +624,30 @@ mod tests {
     use utils::logger;
 
     #[test]
+    fn job_exec_input_check() {
+        let event = Rc::new(Events::new().unwrap());
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&db, &event);
+        let mut affect = JobAffect::new(true);
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStop);
+        let ret = jm.exec(&conf, JobMode::JobIsolate, &mut affect);
+        assert!(ret.is_err());
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = jm.exec(&conf, JobMode::JobTrigger, &mut affect);
+        assert!(ret.is_err());
+    }
+
+    #[test]
     fn job_exec_single() {
         let event = Rc::new(Events::new().unwrap());
-        let db = Rc::new(UnitDb::new());
-        let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
-        let name_test2 = String::from("test2.service");
-        let unit_test2 = create_unit(&name_test2);
-        db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
-        db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
         let jm = JobManager::new(&db, &event);
-
         let mut affect = JobAffect::new(true);
-        let ret = jm.exec(
-            &JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart),
-            JobMode::JobReplace,
-            &mut affect,
-        );
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
         assert!(ret.is_ok());
         assert_eq!(jm.data.jobs.len(), 1);
         assert_eq!(jm.data.jobs.ready_len(), 1);
@@ -656,30 +663,13 @@ mod tests {
     #[test]
     fn job_exec_multi() {
         let event = Rc::new(Events::new().unwrap());
-        let db = Rc::new(UnitDb::new());
-        let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
-        let name_test2 = String::from("test2.service");
-        let unit_test2 = create_unit(&name_test2);
-        let relation = UnitRelations::UnitRequires;
-        db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
-        db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
-        db.dep_insert(
-            Rc::clone(&unit_test1),
-            relation,
-            Rc::clone(&unit_test2),
-            true,
-            0,
-        )
-        .unwrap();
+        let relation = Some(UnitRelations::UnitRequires);
+        let (db, unit_test1, unit_test2) = prepare_unit_multi(relation);
         let jm = JobManager::new(&db, &event);
 
         let mut affect = JobAffect::new(true);
-        let ret = jm.exec(
-            &JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart),
-            JobMode::JobReplace,
-            &mut affect,
-        );
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
         assert!(ret.is_ok());
         assert_eq!(jm.data.jobs.len(), 2);
         assert_eq!(jm.data.jobs.ready_len(), 2);
@@ -702,23 +692,64 @@ mod tests {
     }
 
     #[test]
-    fn job_run_finish_single() {
+    fn job_notify() {
         let event = Rc::new(Events::new().unwrap());
-        let db = Rc::new(UnitDb::new());
-        let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
-        let name_test2 = String::from("test2.service");
-        let unit_test2 = create_unit(&name_test2);
-        db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
-        db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
         let jm = JobManager::new(&db, &event);
 
-        jm.exec(
-            &JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop),
-            JobMode::JobReplace,
-            &mut JobAffect::new(false),
-        )
-        .unwrap();
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = jm.notify(&conf, JobMode::JobReplace);
+        assert!(ret.is_err());
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobReload);
+        let ret = jm.notify(&conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+    }
+
+    #[test]
+    fn job_try_finish_async() {
+        let event = Rc::new(Events::new().unwrap());
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&db, &event);
+        let os = UnitActiveState::UnitInActive;
+        let ns = UnitActiveState::UnitActive;
+        let flags = UnitNotifyFlags::empty();
+
+        let ret = jm.try_finish(&unit_test1, os, ns, flags);
+        assert!(ret.is_ok());
+    }
+
+    #[test]
+    fn job_try_finish_sync() {
+        let event = Rc::new(Events::new().unwrap());
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&db, &event);
+        let os = UnitActiveState::UnitInActive;
+        let ns = UnitActiveState::UnitActive;
+        let flags = UnitNotifyFlags::empty();
+
+        *jm.data.text.borrow_mut() = None; // reset every time
+        *jm.data.running.borrow_mut() = true;
+        let ret = jm.try_finish(&unit_test1, os, ns, flags);
+        *jm.data.running.borrow_mut() = false;
+        assert!(ret.is_ok());
+        assert!(jm.data.text.borrow().is_some());
+        let (u, o, n, f) = jm.data.text.take().unwrap();
+        assert_eq!(u.get_id(), unit_test1.get_id());
+        assert_eq!(o, os);
+        assert_eq!(n, ns);
+        assert_eq!(f, flags);
+    }
+
+    #[test]
+    fn job_run_finish_single() {
+        let event = Rc::new(Events::new().unwrap());
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&db, &event);
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop);
+        jm.exec(&conf, JobMode::JobReplace, &mut JobAffect::new(false))
+            .unwrap();
         assert_eq!(jm.data.jobs.len(), 1);
         assert_eq!(jm.data.jobs.ready_len(), 1);
 
@@ -730,6 +761,125 @@ mod tests {
     #[test]
     fn job_run_finish_multi() {
         let event = Rc::new(Events::new().unwrap());
+        let (db, unit_test1, unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&db, &event);
+        let mode = JobMode::JobReplace;
+
+        let conf1 = JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop);
+        jm.exec(&conf1, mode, &mut JobAffect::new(false)).unwrap();
+        let conf2 = JobConf::new(Rc::clone(&unit_test2), JobKind::JobNop);
+        jm.exec(&conf2, mode, &mut JobAffect::new(false)).unwrap();
+        assert_eq!(jm.data.jobs.len(), 2);
+        assert_eq!(jm.data.jobs.ready_len(), 2);
+
+        jm.data.run();
+        assert_eq!(jm.data.jobs.len(), 0);
+        assert_eq!(jm.data.jobs.ready_len(), 0);
+    }
+
+    #[test]
+    fn job_remove() {
+        let event = Rc::new(Events::new().unwrap());
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&db, &event);
+        let mut affect = JobAffect::new(true);
+
+        // nothing exists
+        let ret = jm.remove(1);
+        assert!(ret.is_err());
+
+        // something exists
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        assert!(ret.is_ok());
+        assert_eq!(jm.data.jobs.len(), 1);
+        assert_eq!(affect.adds.len(), 1);
+        let job_info = affect.adds.pop().unwrap();
+        let ret = jm.remove(job_info.id);
+        assert!(ret.is_ok());
+    }
+
+    #[test]
+    fn job_get_jobinfo() {
+        let event = Rc::new(Events::new().unwrap());
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&db, &event);
+        let mut affect = JobAffect::new(true);
+
+        // nothing exists
+        let ret = jm.get_jobinfo(1);
+        assert!(ret.is_none());
+
+        // something exists
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        assert!(ret.is_ok());
+        assert_eq!(jm.data.jobs.len(), 1);
+        assert_eq!(affect.adds.len(), 1);
+        let job_info = affect.adds.pop().unwrap();
+        let ret = jm.get_jobinfo(job_info.id);
+        assert!(ret.is_some());
+        let lkup_info = ret.unwrap();
+        assert_eq!(lkup_info.id, job_info.id);
+        assert_eq!(lkup_info.unit.get_id(), job_info.unit.get_id());
+        assert_eq!(lkup_info.kind, job_info.kind);
+        assert_eq!(lkup_info.run_kind, job_info.run_kind);
+        assert_eq!(lkup_info.stage, job_info.stage);
+    }
+
+    #[test]
+    fn job_has_stop_job() {
+        let event = Rc::new(Events::new().unwrap());
+        let (db, unit_test1, unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&db, &event);
+        let mut affect = JobAffect::new(true);
+
+        // nothing exists
+        let ret = jm.has_stop_job(&unit_test1);
+        assert_eq!(ret, false);
+        let ret = jm.has_stop_job(&unit_test2);
+        assert_eq!(ret, false);
+
+        // something(non-stop) exists
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        assert!(ret.is_ok());
+        assert_eq!(jm.data.jobs.len(), 1);
+        let ret = jm.has_stop_job(&unit_test1);
+        assert_eq!(ret, false);
+
+        // something(stop) exists
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStop);
+        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        assert!(ret.is_ok());
+        assert_eq!(jm.data.jobs.len(), 1);
+        let ret = jm.has_stop_job(&unit_test1);
+        assert_eq!(ret, true);
+    }
+
+    #[test]
+    fn job_remove_unit() {
+        let event = Rc::new(Events::new().unwrap());
+        let (db, unit_test1, unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&db, &event);
+        let mut affect = JobAffect::new(true);
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        assert!(ret.is_ok());
+        assert_eq!(jm.data.jobs.len(), 1);
+        let conf = JobConf::new(Rc::clone(&unit_test2), JobKind::JobStart);
+        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        assert!(ret.is_ok());
+        assert_eq!(jm.data.jobs.len(), 2);
+
+        jm.data.remove_unit(&unit_test2);
+        assert_eq!(jm.data.jobs.len(), 1);
+        jm.data.remove_unit(&unit_test1);
+        assert_eq!(jm.data.jobs.len(), 0);
+    }
+
+    fn prepare_unit_multi(relation: Option<UnitRelations>) -> (Rc<UnitDb>, Rc<UnitX>, Rc<UnitX>) {
         let db = Rc::new(UnitDb::new());
         let name_test1 = String::from("test1.service");
         let unit_test1 = create_unit(&name_test1);
@@ -737,26 +887,12 @@ mod tests {
         let unit_test2 = create_unit(&name_test2);
         db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
         db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
-        let jm = JobManager::new(&db, &event);
-
-        jm.exec(
-            &JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop),
-            JobMode::JobReplace,
-            &mut JobAffect::new(false),
-        )
-        .unwrap();
-        jm.exec(
-            &JobConf::new(Rc::clone(&unit_test2), JobKind::JobNop),
-            JobMode::JobReplace,
-            &mut JobAffect::new(false),
-        )
-        .unwrap();
-        assert_eq!(jm.data.jobs.len(), 2);
-        assert_eq!(jm.data.jobs.ready_len(), 2);
-
-        jm.data.run();
-        assert_eq!(jm.data.jobs.len(), 0);
-        assert_eq!(jm.data.jobs.ready_len(), 0);
+        if let Some(r) = relation {
+            let u1 = Rc::clone(&unit_test1);
+            let u2 = Rc::clone(&unit_test2);
+            db.dep_insert(u1, r, u2, true, 0).unwrap();
+        }
+        (db, unit_test1, unit_test2)
     }
 
     fn create_unit(name: &str) -> Rc<UnitX> {

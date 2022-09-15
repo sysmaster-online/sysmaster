@@ -425,3 +425,232 @@ fn trans_fallback(
     }
     del_jobs
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::manager::data::{DataManager, UnitRelations};
+    use crate::manager::unit::uload_util::UnitFile;
+    use crate::manager::unit::unit_base::UnitType;
+    use crate::plugin::Plugin;
+    use utils::logger;
+
+    #[test]
+    fn jt_api_expand_check() {}
+
+    #[test]
+    fn jt_api_expand_start_multi() {
+        let relation = UnitRelations::UnitRequires;
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(relation);
+        let table = JobTable::new();
+        let ja = JobAlloc::new();
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+        assert_eq!(table.len(), 2);
+    }
+
+    #[test]
+    fn jt_api_expand_start_single() {
+        let (db, unit_test1) = prepare_unit_single();
+        let table = JobTable::new();
+        let ja = JobAlloc::new();
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+        assert_eq!(table.len(), 1);
+    }
+
+    #[test]
+    fn jt_api_expand_stop_multi() {
+        let relation = UnitRelations::UnitRequires;
+        let (db, _unit_test1, unit_test2) = prepare_unit_multi(relation);
+        let table = JobTable::new();
+        let ja = JobAlloc::new();
+
+        let conf = JobConf::new(Rc::clone(&unit_test2), JobKind::JobStop);
+        let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+        assert_eq!(table.len(), 2);
+    }
+
+    #[test]
+    fn jt_api_expand_stop_single() {
+        let (db, unit_test1) = prepare_unit_single();
+        let table = JobTable::new();
+        let ja = JobAlloc::new();
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStop);
+        let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+        assert_eq!(table.len(), 1);
+    }
+
+    #[test]
+    fn jt_api_expand_reload_multi() {
+        let relation = UnitRelations::UnitRequires;
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(relation);
+        let table = JobTable::new();
+        let ja = JobAlloc::new();
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobReload);
+        let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+        assert_eq!(table.len(), 1);
+    }
+
+    #[test]
+    fn jt_api_expand_reload_single() {
+        let (db, unit_test1) = prepare_unit_single();
+        let table = JobTable::new();
+        let ja = JobAlloc::new();
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobReload);
+        let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+        assert_eq!(table.len(), 1);
+    }
+
+    #[test]
+    fn jt_api_affect_isolate_multi() {
+        let relation = UnitRelations::UnitRequires;
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(relation);
+        let table = JobTable::new();
+        let ja = JobAlloc::new();
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+        let ret = job_trans_affect(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+    }
+
+    #[test]
+    fn jt_api_affect_isolate_single() {
+        let (db, unit_test1) = prepare_unit_single();
+        let table = JobTable::new();
+        let ja = JobAlloc::new();
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+        let ret = job_trans_affect(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+    }
+
+    #[test]
+    fn jt_api_affect_trigger_multi() {
+        let relation = UnitRelations::UnitTriggers;
+        let (db, unit_test1, _unit_test2) = prepare_unit_multi(relation);
+        let table = JobTable::new();
+        let ja = JobAlloc::new();
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStop);
+        let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+        let ret = job_trans_affect(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+    }
+
+    #[test]
+    fn jt_api_affect_trigger_single() {
+        let (db, unit_test1) = prepare_unit_single();
+        let table = JobTable::new();
+        let ja = JobAlloc::new();
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStop);
+        let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+        let ret = job_trans_affect(&table, &ja, &db, &conf, JobMode::JobReplace);
+        assert!(ret.is_ok());
+    }
+
+    #[test]
+    fn jt_api_fallback_start() {
+        let relation = UnitRelations::UnitRequires;
+        let (db, unit_test1, unit_test2) = prepare_unit_multi(relation);
+        let jobs = JobTable::new();
+        let stage = JobTable::new();
+        let ja = JobAlloc::new();
+        let mode = JobMode::JobReplace;
+
+        // nothing exists
+        let ret = job_trans_fallback(&stage, &db, &unit_test1, JobKind::JobStart);
+        assert_eq!(ret.len(), 0);
+
+        // something exists
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
+        let ret = job_trans_expand(&stage, &ja, &db, &conf, mode);
+        assert!(ret.is_ok());
+        let ret = jobs.commit(&stage, mode);
+        assert!(ret.is_ok());
+        assert_eq!(jobs.len(), 2);
+        let ret = job_trans_fallback(&jobs, &db, &unit_test2, JobKind::JobStart);
+        assert_eq!(ret.len(), 1);
+    }
+
+    #[test]
+    fn jt_api_fallback_stop() {
+        let relation = UnitRelations::UnitRequires;
+        let (db, unit_test1, unit_test2) = prepare_unit_multi(relation);
+        let jobs = JobTable::new();
+        let stage = JobTable::new();
+        let ja = JobAlloc::new();
+        let mode = JobMode::JobReplace;
+
+        // nothing exists
+        let ret = job_trans_fallback(&stage, &db, &unit_test1, JobKind::JobStop);
+        assert_eq!(ret.len(), 0);
+
+        // something exists
+        let conf = JobConf::new(Rc::clone(&unit_test2), JobKind::JobStop);
+        let ret = job_trans_expand(&stage, &ja, &db, &conf, mode);
+        assert!(ret.is_ok());
+        let ret = jobs.commit(&stage, mode);
+        assert!(ret.is_ok());
+        assert_eq!(jobs.len(), 2);
+        let ret = job_trans_fallback(&jobs, &db, &unit_test1, JobKind::JobStop);
+        assert_eq!(ret.len(), 0);
+    }
+
+    fn prepare_unit_multi(relation: UnitRelations) -> (Rc<UnitDb>, Rc<UnitX>, Rc<UnitX>) {
+        let db = Rc::new(UnitDb::new());
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        let name_test2 = String::from("test2.service");
+        let unit_test2 = create_unit(&name_test2);
+        db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
+        db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
+        let u1 = Rc::clone(&unit_test1);
+        let u2 = Rc::clone(&unit_test2);
+        db.dep_insert(u1, relation, u2, true, 0).unwrap();
+        (db, unit_test1, unit_test2)
+    }
+
+    fn prepare_unit_single() -> (Rc<UnitDb>, Rc<UnitX>) {
+        let db = Rc::new(UnitDb::new());
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&name_test1);
+        db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
+        (db, unit_test1)
+    }
+
+    fn create_unit(name: &str) -> Rc<UnitX> {
+        logger::init_log_with_console("test_unit_load", 4);
+        log::info!("test");
+        let dm = Rc::new(DataManager::new());
+        let file = Rc::new(UnitFile::new());
+        let unit_type = UnitType::UnitService;
+        let plugins = Plugin::get_instance();
+        let subclass = plugins.create_unit_obj(unit_type).unwrap();
+        Rc::new(UnitX::new(
+            &dm,
+            &file,
+            unit_type,
+            name,
+            subclass.into_unitobj(),
+        ))
+    }
+}
