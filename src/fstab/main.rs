@@ -156,6 +156,7 @@ mod tests {
     use nix::unistd::getuid;
     use std::fs;
     use std::path::Path;
+    use std::process::Command;
     use std::sync::mpsc;
     use std::thread;
 
@@ -211,6 +212,26 @@ mod tests {
             }
         }
         assert_eq!(mount_one(&fstab_items[0]), 0);
+        // cleanup: umount and delete
+        let status = Command::new("/usr/bin/umount")
+            .args([dst_path.as_os_str().to_str().unwrap()])
+            .status();
+        let status = match status {
+            Ok(status) => status,
+            Err(why) => {
+                panic!("Failed to execute /usr/bin/umount: {}", why);
+            }
+        };
+        let r = match status.code() {
+            Some(r) => r,
+            None => {
+                panic!(
+                    "Unexpected error when umount {}",
+                    dst_path.as_os_str().to_str().unwrap()
+                );
+            }
+        };
+        assert_eq!(r, 0);
         clean();
     }
 
