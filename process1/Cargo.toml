@@ -18,7 +18,6 @@ walkdir = "2"
 siphasher = { version = "0.3", features = ["serde"] }
 utils = { path = "../libutils" }
 event = { path = "../libevent" }
-proc_macro_utils = {path = "../libproc_macro_utils"}
 cgroup = { path = "../libcgroup" }
 strum = { version = "0.23", features = ["derive"] }
 nix = "0.24"

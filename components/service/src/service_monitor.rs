@@ -1,5 +1,4 @@
 use super::service_config::ServiceConfig;
-use process1::watchdog;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -72,11 +71,11 @@ impl ServiceMonitorData {
         if watchdog_usec == 0 || watchdog_usec == u64::MAX {
             self.stop_watchdog()
         }
-        watchdog::register_timer();
-        watchdog::event_source_set_enabled(true);
+        libwatchdog::register_timer();
+        libwatchdog::event_source_set_enabled(true);
     }
 
     fn stop_watchdog(self) {
-        watchdog::event_source_set_enabled(false);
+        libwatchdog::event_source_set_enabled(false);
     }
 }

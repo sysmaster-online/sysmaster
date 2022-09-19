@@ -15,6 +15,7 @@ utils = { path = "../../libutils" }
 cgroup = { path = "../../libcgroup" }
 process1 = { path = "../../process1" }
 event = { path = "../../libevent" }
+libwatchdog = { path = "../../libwatchdog" }
 strum = { version = "0.23", features = ["derive"] }
 nix = "0.24"
 log = "0.4"
