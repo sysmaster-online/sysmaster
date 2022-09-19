@@ -1,10 +1,7 @@
-/*
-* 关联unit对象
-* 需要通知Unit对象，方法变更
-* 获取unit对象的属性
-* 调用关系
-* mount_unit->mount_mng->mount_comm
-*/
+//! mount关联unit对象
+//! * 需要通知Unit对象，方法变更
+//! * 获取unit对象的属性
+//! * 调用关系: mount_unit->mount_mng->mount_comm
 
 use process1::manager::Unit;
 use std::{
