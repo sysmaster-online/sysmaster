@@ -1,7 +1,17 @@
+//! fstab_item封装了/etc/fstab的六个字段及挂载状态.
+
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
+/// FSTabItem结构体
+/// * device_spec: 挂载设备
+/// * mount_point: 挂载点
+/// * fs_type: 文件系统类型
+/// * options: 挂载选项
+/// * dump: 是否开启备份
+/// * pass: 检查优先级
+/// * state: 挂载状态: `0`-未挂载过,`1`-已挂载成功,`-1`-挂载失败
 pub struct FSTabItem {
     pub device_spec: String,
     pub mount_point: String,
@@ -39,6 +49,9 @@ where
     Ok(io::BufReader::new(file).lines())
 }
 
+/// 解析fstab文件
+/// * `输入` filename: 需要解析的文件名,如:`/etc/fstab`
+/// * `输出` fstab条目列表
 pub fn parse(filename: &str) -> Vec<FSTabItem> {
     let mut res: Vec<FSTabItem> = Vec::new();
     if let Ok(lines) = read_lines(filename) {

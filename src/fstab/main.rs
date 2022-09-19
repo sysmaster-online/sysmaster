@@ -1,3 +1,12 @@
+//! fstab用于在开机的早期阶段解析/etc/fstab,挂载相应的设备,swap分区.
+//! # 原理
+//! 1. fstab启动后会直接解析/etc/fstab,获取需要挂载的设备,挂载点,挂载属性.
+//! 2. 按照/etc/fstab的配置顺序,依次尝试挂载.
+//! 3. 如果能找到相应的设备目录,将直接挂载.
+//! 4. 如果无法找到相关目录,则创建inotify检测,在设备就绪后挂载.
+//! # 限制
+//! 1. 当前设备仅支持配置为完整目录或UUID.
+
 use inotify::{EventMask, Inotify, WatchMask};
 use std::collections::HashSet;
 use std::path::Path;
