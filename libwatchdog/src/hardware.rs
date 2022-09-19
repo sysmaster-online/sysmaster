@@ -102,6 +102,7 @@ impl HardwareWatchdog {
         Ok(self.file.as_ref().unwrap().as_raw_fd())
     }
 
+    #[allow(dead_code)]
     fn set_device(&mut self, device: String) {
         if self.device != device {
             self.device = device;
