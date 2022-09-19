@@ -1,14 +1,13 @@
 [package]
-name = "Process1"
-version = "0.1.0"
-authors = ["overweight <hexiaowen@huawei.com>"]
+name = "sysmaster"
+version = "0.2.2"
+authors = ["sysmaster"]
 edition = "2018"
-default-run = "process1"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
-name = "process1"
-path = "src/process1/main.rs"
+name = "sysmaster"
+path = "src/sysmaster/main.rs"
 
 [[bin]]
 name = "pctrl"
