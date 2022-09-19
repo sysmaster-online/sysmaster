@@ -47,6 +47,7 @@ cargo build --target x86_64-unknown-linux-musl || exit 1
 echo -e "\n\n\n---!!!DOCKER BUILD!!!---"
 docker stop prun
 docker rmi process1 -f > /dev/null 2>&1
+ln -s ../../target target
 docker build --no-cache --tag process1 `pwd` || exit 1
 
 #!.docker run
