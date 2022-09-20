@@ -1,0 +1,10 @@
+[book]
+authors = ["sysmasters"]
+language = "en"
+multilingual = false
+src = "src"
+title = "sysmaster: redesign and reimplement process1"
+
+[output.html]
+default-theme = "Rust"
+curly-quotes = true
