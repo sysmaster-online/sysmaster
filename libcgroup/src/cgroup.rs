@@ -24,6 +24,7 @@ const CG_BASE_DIR: &str = "/sys/fs/cgroup";
 const CG_UNIFIED_DIR: &str = "/sys/fs/cgroup/unified";
 const CG_V1_DIR: &str = "/sys/fs/cgroup/process1";
 
+// return the cgroup mounted type, if not support cgroup return CgroupErr.
 pub fn cg_type() -> Result<CgType, CgroupErr> {
     // 查询cgroup的版本类型
     let stat = if let Ok(s) = statfs(CG_BASE_DIR) {
@@ -97,6 +98,7 @@ pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<(), CgroupErr> {
     Ok(())
 }
 
+// create the cg_path which is relative to cg_abs_path.
 pub fn cg_create(cg_path: &PathBuf) -> Result<(), CgroupErr> {
     log::debug!("cgroup create path {:?}", cg_path);
     let abs_cg_path: PathBuf = cg_abs_path(cg_path, &PathBuf::from(""))?;
@@ -105,6 +107,7 @@ pub fn cg_create(cg_path: &PathBuf) -> Result<(), CgroupErr> {
     Ok(())
 }
 
+// escape the cg_path which is conflicts with controller name.
 pub fn cg_escape(id: &str) -> &str {
     // 系统默认的文件目录冲突时，添加前缀字符
     return id;
@@ -129,6 +132,7 @@ fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>, CgroupErr> {
     Ok(pids)
 }
 
+// return all the pids in the cg_path, read from cgroup.procs.
 pub fn cg_get_pids(cg_path: &PathBuf) -> Vec<Pid> {
     match get_pids(cg_path, "cgroup.procs") {
         Ok(pids) => pids,
@@ -212,6 +216,7 @@ fn cg_kill(
     Ok(())
 }
 
+// kill all the process in the cg_path, and remove the dir of the cg_path.
 pub fn cg_kill_recursive(
     cg_path: &PathBuf,
     signal: Signal,
@@ -234,6 +239,7 @@ pub fn cg_kill_recursive(
     Ok(())
 }
 
+// return the supported controllers, read from /proc/cgroups, if failed return the IOError.
 pub fn cg_controllers() -> Result<Vec<String>, IOError> {
     let file = match File::open("/proc/cgroups") {
         Err(why) => {
@@ -319,19 +325,20 @@ fn cg_is_empty(cg_path: &PathBuf) -> bool {
 
 fn is_dir(entry: &DirEntry) -> bool {
     if entry.file_type().is_dir() {
-        return true;
+        return false;
     }
 
-    return false;
+    return true;
 }
 
+// whether the cg_path cgroup is empty, return true if empty.
 pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
     if cg_path == &PathBuf::from("") || cg_path == &PathBuf::from("/") {
         return Ok(true);
     }
 
     let cg_type = cg_type()?;
-    if cg_type <= CgType::Legacy {
+    if cg_type < CgType::Legacy {
         return Ok(false);
     }
 
@@ -382,10 +389,14 @@ pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
 
 mod tests {
     #[test]
-    fn test_cg_create() {
+    fn test_cgroup() {
+        use crate::CgFlags;
+        use nix::sys::signal::Signal;
         use nix::unistd::Pid;
-        use std::io::ErrorKind;
+        use nix::unistd::{fork, ForkResult};
         use std::path::PathBuf;
+        use std::thread;
+        use std::{collections::HashSet, time::Duration};
 
         let cg_type = if let Ok(cg_type) = super::cg_type() {
             cg_type
@@ -395,54 +406,90 @@ mod tests {
         };
 
         let cg_path = PathBuf::from("system.slice");
-        if let Err(e) = super::cg_create(&cg_path) {
-            match e {
-                crate::CgroupErr::IoError(err) => {
-                    if err.kind() == ErrorKind::PermissionDenied {
-                        println!("no permission to create cgroup");
-                        return;
-                    }
-                }
-                _ => {}
-            }
-        }
+        let ret = super::cg_create(&cg_path);
+        assert_eq!(ret.is_err(), false);
 
         let base_path = super::cgtype_to_path(cg_type);
         let path_buf: PathBuf = PathBuf::from(base_path);
+
+        println!("base path is: {:?}", base_path);
         if let Ok(p) = super::cg_abs_path(&cg_path, &PathBuf::from("")) {
             assert_eq!(p, path_buf.join(&cg_path).join(&PathBuf::from("")),)
         }
 
-        if let Err(_e) = super::cg_attach(Pid::from_raw(1), &cg_path) {
-            println!("attach failed");
-            return;
+        let t_thread = unsafe { fork() };
+
+        let pid: Pid;
+        match t_thread {
+            Ok(ForkResult::Parent { child }) => {
+                println!("child pid is: {:?}", child);
+                let ret = super::cg_attach(child, &cg_path);
+                assert_eq!(ret.is_err(), false);
+                pid = child;
+            }
+            Ok(ForkResult::Child) => {
+                thread::sleep(Duration::from_secs(78));
+                std::process::exit(0);
+            }
+            Err(_e) => return,
         }
 
         let pids = super::cg_get_pids(&cg_path);
         assert_ne!(pids.len(), 0);
+        assert_eq!(pids.contains(&pid), true);
 
-        if let Err(_e) = super::cg_attach(Pid::from_raw(1), &PathBuf::from("")) {
-            println!("attach pid to root cgroup, error: {:?}", _e);
-            return;
-        }
+        let ret = super::cg_is_empty_recursive(&cg_path);
+        assert_eq!(ret.is_err(), false);
+        assert_eq!(ret.unwrap(), false);
+
+        let ret = super::cg_kill_recursive(
+            &cg_path,
+            Signal::SIGKILL,
+            CgFlags::IGNORE_SELF | CgFlags::REMOVE,
+            HashSet::new(),
+        );
+        assert_eq!(ret.is_err(), false);
+        println!("kill cgroup ret is: {:?}", ret);
+
+        thread::sleep(Duration::from_secs(1));
+
+        let ret = super::cg_is_empty_recursive(&cg_path);
+        assert_eq!(ret.is_err(), false);
+        assert_eq!(ret.unwrap(), true);
 
         let pids = super::cg_get_pids(&cg_path);
         assert_eq!(pids.len(), 0);
-    }
-
-    #[test]
-    fn test_cg_file_type() {
-        println!("file type is {:?}", super::cg_type());
+        assert_eq!(pids.contains(&pid), false);
     }
 
     #[test]
     fn test_cg_controllers() {
         let ret = super::cg_controllers();
-
         assert_ne!(ret.is_err(), true);
 
-        for c in ret.unwrap() {
-            println!("cgroup controller: {}", c);
+        let clist = ret.unwrap();
+        assert_ne!(clist.len(), 0);
+
+        println!("supported controllers: {:?}", clist);
+        let controllers = [
+            "cpuset",
+            "cpu",
+            "cpuacct",
+            "blkio",
+            "memory",
+            "devices",
+            "freezer",
+            "net_cls",
+            "perf_event",
+            "net_prio",
+            "hugetlb",
+            "pids",
+            "rdma",
+            "files",
+        ];
+
+        for c in clist {
+            assert_eq!(controllers.contains(&&c[..]), true);
         }
     }
 }
