@@ -6,6 +6,7 @@ Requires="test.service"
 [Service]
 Type="Simple"
 ExecCondition="/usr/bin/sleep 5"
+ExecStartPre="/usr/bin/echo test"
 ExecStart="/bin/echo 'test'"
 ExecStop="/bin/kill $MAINPID"
 WatchdogUSec=10

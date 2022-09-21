@@ -3,8 +3,11 @@ Description="CN"
 Documentation="192.168.1.1"
 
 [Socket]
-ExecStartPre="/usr/bin/sleep 5"
-ListenStream="31972"
+ExecStartPre="/usr/bin/echo test"
+ExecStopPre="/usr/bin/echo 'stop pre'"
+ListenStream="31972; /tmp/test.socket"
+ListenDatagram="127.0.0.1:31973"
+ListenNetlink="route 0"
 Accept = false
 ReceiveBuffer = 4096
 SendBuffer = 4096
@@ -12,6 +15,3 @@ PassPacketInfo = false
 PassCredentials = false
 PassSecurity = true
 SocketMode=600
-
-[Install]
-WantedBy="dbus.service"

@@ -179,9 +179,13 @@ impl SocketAddress {
         if let Some(path) = self.path() {
             let parent_path = path.as_path().parent();
             fs::create_dir_all(parent_path.unwrap()).map_err(|_e| Errno::EINVAL)?;
+            if let Err(Errno::EADDRINUSE) = socket::bind(fd, &*self.sock_addr) {
+                self.unlink();
+                socket::bind(fd, &*self.sock_addr)?;
+            }
+        } else {
+            socket::bind(fd, &*self.sock_addr)?;
         }
-
-        socket::bind(fd, &*self.sock_addr)?;
 
         if self.can_accept() {
             match socket::listen(fd, backlog) {
@@ -478,18 +482,23 @@ impl fmt::Display for SocketPort {
 
 #[cfg(test)]
 mod tests {
-    use nix::sys::socket::{SockType, SockaddrIn};
+    use nix::sys::socket::{
+        AddressFamily, NetlinkAddr, SockProtocol, SockType, SockaddrIn, UnixAddr,
+    };
+    use std::path::PathBuf;
     use std::{
         net::{Ipv4Addr, SocketAddrV4},
         rc::Rc,
     };
 
-    use crate::{socket_base::PortType, socket_config::SocketConfig};
-
     use super::{SocketAddress, SocketPort, SocketPorts};
+    use crate::socket_base::{NetlinkProtocol, PortType};
+    use nix::sys::socket::SockaddrLike;
+
+    use crate::socket_config::SocketConfig;
 
     #[test]
-    fn test_socket_ports() {
+    fn test_socket_addr_v4() {
         let ports = SocketPorts::new();
         let config = Rc::new(SocketConfig::new());
         let sock_addr = SockaddrIn::from(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 31457));
@@ -507,11 +516,88 @@ mod tests {
 
         assert_eq!(port.fd(), -1);
 
-        if let Err(_e) = port.open_port() {
-            return;
-        }
+        let ret = port.open_port();
+        assert_eq!(ret.is_err(), false);
 
         assert_ne!(port.fd(), -1);
+        assert_eq!(port.family(), AddressFamily::Inet);
+
+        port.flush_accept();
+        port.flush_fd();
+        port.close();
+        ports.clear_ports();
+
+        assert_eq!(ports.ports().len(), 0);
+    }
+
+    #[test]
+    fn test_socket_unix_addr() {
+        let ports = SocketPorts::new();
+        let config = Rc::new(SocketConfig::new());
+        let unix_path = PathBuf::from("/tmp/test.socket");
+        let unix_addr = UnixAddr::new(&unix_path).unwrap();
+
+        let socket_addr = SocketAddress::new(Box::new(unix_addr), SockType::Stream, None);
+        assert_eq!(socket_addr.path().unwrap(), unix_path);
+
+        let mut p = SocketPort::new(socket_addr, config.clone());
+        p.set_sc_type(PortType::Socket);
+
+        let port = Rc::new(p);
+        ports.push_port(port.clone());
+
+        assert_eq!(ports.ports().len(), 1);
+        assert_eq!(ports.no_accept_socket(), false);
+        assert_eq!(ports.collect_fds().len(), 0);
+
+        assert_eq!(port.fd(), -1);
+
+        let ret = port.open_port();
+        assert_eq!(ret.is_err(), false);
+
+        assert_ne!(port.fd(), -1);
+        assert_eq!(port.family(), AddressFamily::Unix);
+
+        port.flush_accept();
+        port.flush_fd();
+        port.close();
+        ports.clear_ports();
+
+        assert_eq!(ports.ports().len(), 0);
+    }
+
+    #[test]
+    fn test_socket_netlink() {
+        let ports = SocketPorts::new();
+        let config = Rc::new(SocketConfig::new());
+
+        let family = NetlinkProtocol::from("route".to_string());
+        assert_ne!(family, NetlinkProtocol::NetlinkInvalid);
+
+        let group = 0;
+        let net_link = NetlinkAddr::new(0, group);
+
+        let socket_addr = SocketAddress::new(
+            Box::new(net_link),
+            SockType::Raw,
+            Some(SockProtocol::from(family)),
+        );
+
+        let mut p = SocketPort::new(socket_addr, config.clone());
+        p.set_sc_type(PortType::Socket);
+        let port = Rc::new(p);
+        ports.push_port(port.clone());
+
+        assert_eq!(ports.ports().len(), 1);
+        assert_eq!(ports.no_accept_socket(), true);
+        assert_eq!(ports.collect_fds().len(), 0);
+        assert_eq!(port.fd(), -1);
+
+        let ret = port.open_port();
+        assert_eq!(ret.is_err(), false);
+
+        assert_ne!(port.fd(), -1);
+        assert_eq!(port.family(), AddressFamily::Netlink);
 
         port.flush_accept();
         port.flush_fd();

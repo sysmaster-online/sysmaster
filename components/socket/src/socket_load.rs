@@ -110,72 +110,64 @@ impl SocketLoad {
         // let sock_addr
         match item {
             ListeningItem::Stream => {
-                if let Some(listen_stream) = socket_conf.borrow().Socket.ListenStream.clone() {
-                    if listen_stream.is_empty() {
-                        return Ok(());
-                    }
-                    if let Ok(socket_addr) =
-                        self.parse_socket_address(&listen_stream, SockType::Stream)
-                    {
-                        let mut port = SocketPort::new(socket_addr, self.config.clone());
-                        port.set_sc_type(PortType::Socket);
+                if let Some(listen_stream) = socket_conf.borrow().listen_stream() {
+                    for v in &listen_stream {
+                        if v.is_empty() {
+                            continue;
+                        }
+                        if let Ok(socket_addr) = self.parse_socket_address(v, SockType::Stream) {
+                            let mut port = SocketPort::new(socket_addr, self.config.clone());
+                            port.set_sc_type(PortType::Socket);
 
-                        self.ports.push_port(Rc::new(port));
-                    } else {
-                        log::error!("create stream listening socket failed: {}", listen_stream);
-                        return Err(format!(
-                            "create stream listening socket failed: {}",
-                            listen_stream
-                        )
-                        .into());
+                            self.ports.push_port(Rc::new(port));
+                        } else {
+                            log::error!("create stream listening socket failed: {}", v);
+                            return Err(
+                                format!("create stream listening socket failed: {}", v).into()
+                            );
+                        }
                     }
                 };
             }
             ListeningItem::Datagram => {
-                if let Some(listen_datagram) = socket_conf.borrow().Socket.ListenDatagram.clone() {
-                    if listen_datagram.is_empty() {
-                        return Ok(());
-                    }
+                if let Some(listen_datagram) = socket_conf.borrow().listen_datagram() {
+                    for v in &listen_datagram {
+                        if v.is_empty() {
+                            continue;
+                        }
+                        if let Ok(socket_addr) = self.parse_socket_address(v, SockType::Datagram) {
+                            let mut port = SocketPort::new(socket_addr, self.config.clone());
+                            port.set_sc_type(PortType::Socket);
 
-                    if let Ok(socket_addr) =
-                        self.parse_socket_address(&listen_datagram, SockType::Datagram)
-                    {
-                        let mut port = SocketPort::new(socket_addr, self.config.clone());
-                        port.set_sc_type(PortType::Socket);
-                        self.ports.push_port(Rc::new(port));
-                    } else {
-                        log::error!("create stream listening socket failed: {}", listen_datagram);
-                        return Err(format!(
-                            "create stream listening socket failed: {}",
-                            listen_datagram
-                        )
-                        .into());
+                            self.ports.push_port(Rc::new(port));
+                        } else {
+                            log::error!("create datagram listening socket failed: {}", v);
+                            return Err(
+                                format!("create stream datagram socket failed: {}", v).into()
+                            );
+                        }
                     }
                 }
             }
             ListeningItem::Netlink => {
-                if let Some(listen_netlink) = socket_conf.borrow().Socket.ListenNetlink.clone() {
-                    if listen_netlink.is_empty() {
-                        return Ok(());
-                    }
+                if let Some(listen_netlink) = socket_conf.borrow().listen_netlink() {
+                    for v in &listen_netlink {
+                        if v.is_empty() {
+                            continue;
+                        }
 
-                    if let Err(e) = self.parse_netlink_address(&listen_netlink) {
-                        log::error!(
-                            "create stream listening socket: {}, failed: {:?}",
-                            listen_netlink,
-                            e
-                        );
-                        return Err(format!(
-                            "create stream listening socket failed: {}",
-                            listen_netlink
-                        )
-                        .into());
-                    }
+                        if let Err(e) = self.parse_netlink_address(v) {
+                            log::error!("create netlink listening socket: {}, failed: {:?}", v, e);
+                            return Err(
+                                format!("create netlink listening socket failed: {}", v).into()
+                            );
+                        }
 
-                    let socket_addr = self.parse_netlink_address(&listen_netlink).unwrap();
-                    let mut port = SocketPort::new(socket_addr, self.config.clone());
-                    port.set_sc_type(PortType::Socket);
-                    self.ports.push_port(Rc::new(port));
+                        let socket_addr = self.parse_netlink_address(&v).unwrap();
+                        let mut port = SocketPort::new(socket_addr, self.config.clone());
+                        port.set_sc_type(PortType::Socket);
+                        self.ports.push_port(Rc::new(port));
+                    }
                 }
             }
         }
@@ -258,5 +250,38 @@ impl SocketLoad {
         }
 
         return Err(format!("invalid listening config").into());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        socket_comm::SocketComm, socket_config::SocketConfig, socket_load::SocketLoad,
+        socket_mng::SocketMng, socket_port::SocketPorts,
+    };
+    use std::rc::Rc;
+    use tests::get_project_root;
+
+    use process1::manager::ExecContext;
+
+    #[test]
+    fn test_socket_load_parse() {
+        let context = Rc::new(ExecContext::new());
+        let comm = Rc::new(SocketComm::new());
+        let config = Rc::new(SocketConfig::new());
+        let ports = Rc::new(SocketPorts::new());
+        let load = SocketLoad::new(&config, &comm, &ports);
+        let mng = Rc::new(SocketMng::new(&comm, &config, &ports, &context));
+
+        let mut file_path = get_project_root().unwrap();
+        file_path.push("libutils/examples/test.socket.toml");
+
+        let mut paths = Vec::new();
+        paths.push(file_path);
+
+        let config = SocketConfig::new();
+        assert_eq!(config.load(&paths).is_ok(), true);
+
+        assert_eq!(load.parse(config.config_data(), &mng).is_ok(), true);
     }
 }

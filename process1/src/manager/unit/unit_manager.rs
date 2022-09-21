@@ -370,13 +370,14 @@ impl UnitManager {
                     if dead_mount_set.contains(unit_name.as_str()) {
                         dead_mount_set.remove(unit_name.as_str());
                     } else {
-                        let unit = self.load.load_unit(unit_name.as_str()).unwrap();
-                        match unit.start() {
-                            Ok(_) => {
-                                log::debug!("{} change to mounted.", unit_name)
-                            }
-                            Err(_) => {
-                                log::error!("Failed to start {}", unit_name)
+                        if let Some(unit) = self.load.load_unit(unit_name.as_str()) {
+                            match unit.start() {
+                                Ok(_) => {
+                                    log::debug!("{} change to mounted.", unit_name)
+                                }
+                                Err(_) => {
+                                    log::error!("Failed to start {}", unit_name)
+                                }
                             }
                         }
                     }
@@ -715,11 +716,15 @@ mod unit_load {
 
 #[cfg(test)]
 mod tests {
-    // use services::service::ServiceUnit;
-
     use super::*;
     use event::Events;
+    use nix::errno::Errno;
+    use nix::sys::signal::Signal;
+    use std::thread;
+    use std::time::Duration;
     use utils::logger;
+
+    use crate::mount::mount_setup;
 
     fn init_dm_for_test() -> (Rc<DataManager>, Rc<Events>, Rc<UnitManager>) {
         logger::init_log_with_console("manager test", 4);
@@ -728,6 +733,12 @@ mod tests {
         let configm = Rc::new(ManagerConfig::new());
         let um = UnitManager::new(&dm_manager, &_event, &configm);
         (dm_manager, _event, um)
+    }
+
+    fn setup_mount_point() -> Result<(), Errno> {
+        mount_setup::mount_setup()?;
+
+        Ok(())
     }
 
     #[test]
@@ -749,6 +760,11 @@ mod tests {
 
     #[test]
     fn test_service_unit_start() {
+        let ret = setup_mount_point();
+        if ret.is_err() {
+            return;
+        }
+
         logger::init_log_with_console("test_service_unit_start", 4);
         let configm = Rc::new(ManagerConfig::new());
         let dm_manager = Rc::new(DataManager::new());
@@ -758,15 +774,52 @@ mod tests {
         let unit_name = String::from("config.service");
         let unit = um.load_unit(&unit_name);
 
-        match unit {
-            Some(u) => {
-                u.start();
-                log::debug!("unit start end!");
-                u.stop();
-                log::debug!("unit stop end!");
-            }
-            None => println!("load unit failed"),
+        assert_eq!(unit.is_some(), true);
+        let u = unit.unwrap();
+
+        let ret = u.start();
+        assert_eq!(ret.is_err(), false);
+
+        log::debug!("unit start end!");
+        let ret = u.stop();
+        assert_eq!(ret.is_err(), false);
+        log::debug!("unit stop end!");
+    }
+
+    #[test]
+    fn test_socket_unit_start_and_stop() {
+        logger::init_log_with_console("test_socket_unit_start_stop", 4);
+
+        let ret = setup_mount_point();
+        if ret.is_err() {
+            return;
         }
+
+        let dm = init_dm_for_test();
+
+        let unit_name = String::from("test.socket");
+        let unit = dm.2.load_unit(&unit_name);
+
+        assert_eq!(unit.is_some(), true);
+        let u = unit.unwrap();
+
+        let ret = u.start();
+        log::debug!("socket start ret is: {:?}", ret);
+        assert_eq!(ret.is_err(), false);
+
+        thread::sleep(Duration::from_secs(4));
+        u.sigchld_events(Pid::from_raw(-1), 0, Signal::SIGCHLD);
+        assert_eq!(u.active_state(), UnitActiveState::UnitActive);
+
+        let ret = u.stop();
+        log::debug!("socket stop ret is: {:?}", ret);
+        assert_eq!(ret.is_err(), false);
+
+        thread::sleep(Duration::from_secs(4));
+        assert_eq!(u.active_state(), UnitActiveState::UnitDeActivating);
+        u.sigchld_events(Pid::from_raw(-1), 0, Signal::SIGCHLD);
+
+        assert_eq!(u.active_state(), UnitActiveState::UnitInActive);
     }
 
     #[test]
