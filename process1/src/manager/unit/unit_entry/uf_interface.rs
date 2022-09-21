@@ -5,7 +5,6 @@ use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
 use crate::manager::unit::UnitErrno;
 use nix::sys::signal::Signal;
-use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
 use std::error::Error;
 use std::ops::Deref;
@@ -26,8 +25,7 @@ impl UnitX {
         name: &str,
         subclass: Box<dyn UnitObj>,
     ) -> UnitX {
-        let unit = Rc::new(Unit::new(unit_type, name, dmr, filer, subclass));
-        unit.attach_unit(&unit);
+        let unit = Unit::new(unit_type, name, dmr, filer, subclass);
         UnitX(unit)
     }
 

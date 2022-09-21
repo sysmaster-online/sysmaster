@@ -1,5 +1,21 @@
 use bitflags::bitflags;
 
+/**Unit包含6种状态，Unit状态的转换关系如下：
+ A[UnitActive]:已启动;
+ B[UnitReloading]:重新加载;
+ C[UnitInActive]:未启动;
+ D[UnitFailed]:启动失败;
+ E[UnitActivating]:正在激活中，属于瞬时状态;
+ F[UnitDeActivating]:关闭过程中;
+ G[UnitMaintenance]:维护清理过程中;
+ ```graph LR
+C[UnitInActive] -> E[UnitActivating]
+E->A[UnitActive]
+B[UnitReloading] -> E
+E->F[UnitDeActivating]
+E->D[UnitFailed]
+```
+*/
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum UnitActiveState {
     UnitActive,

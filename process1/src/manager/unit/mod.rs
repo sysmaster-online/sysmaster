@@ -1,4 +1,13 @@
-use std::{collections::HashMap, path::Path};
+//! unit是process1对系统服务进行管理抽象的主要模块
+//! 该模块包含:
+//! [execute]：unit要执行的对象数据结构定义。
+//! [job]：unit对应的调度执行实体，每个unit在启动后，会通过job来驱动。
+//! [uload_util]：每个unit配置文件相关的属性定义。
+//! [unit_base]：unit相关对象基本属性的定义，如unit类型的枚举，unit依赖关系的定义
+//! [unit_datastore]: unit对象存储模块，负责对unit模块状态进行存储。
+//! [unit_entry]：unit相关对象的定义
+//!
+use std::path::Path;
 
 pub use execute::{ExecCmdError, ExecCommand, ExecContext, ExecFlags, ExecParameters};
 pub use unit_base::{

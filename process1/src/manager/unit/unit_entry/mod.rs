@@ -7,8 +7,6 @@
 //! ![avatar][../../../../doc/img/unit_c_diagram.jpg]
 //! 包含两个核心对象：UnitObj，Unit以及一个子Unit的实现。
 //! UnitObj是子类的接口抽象，包含子类必须实现的接口，在rust中使用trait表示,具体定义见['UnitObj']
-//! ```rust
-//! ```
 //! # 配置项说明
 //! unit配置包含三个部分，具体描述如下
 //! ```toml
@@ -28,7 +26,7 @@
 //! uu_child对 unit关联的父子进程的维护，unit关联的子服务可能会启动子进程，因此这里需要维护unit关联的进程有哪些。
 //! uu_cgroup cgroup相关配置
 //! uu_config 是unit的配置
-//! 
+//!
 pub use u_entry::{Unit, UnitObj, UnitRef};
 pub(in crate::manager) use uf_interface::UnitX;
 // pub(super) use uu_config::UnitConfigItem;

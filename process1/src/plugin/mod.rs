@@ -74,12 +74,17 @@ impl Plugin {
         let mut buf = String::with_capacity(256);
 
         let devel_path = || {
-            let out_dir = env!("OUT_DIR");
+            let out_dir = env::var("OUT_DIR").unwrap_or_else(|_x| {
+                let _tmp_str: Option<&'static str> = option_env!("OUT_DIR");
+                return _tmp_str.unwrap_or("").to_string();
+            });
+
             if out_dir.is_empty() {
                 let ld_path = env::var("PROCESS_LIB_LOAD_PATH").map_or("".to_string(), |_v| _v);
                 return ld_path;
+            } else {
+                out_dir
             }
-            out_dir.to_string()
         };
 
         let mut conf_file = format!("{}plugin.conf", LIB_PLUGIN_PATH);
@@ -420,7 +425,7 @@ mod tests {
 
     #[test]
     fn test_plugin_load_library() {
-        let t_p = init_test() ;
+        let t_p = init_test();
         let mf = env!("CARGO_MANIFEST_DIR");
         let out_dir = env!("OUT_DIR");
         log::info!("{},{}", out_dir, mf);
