@@ -1,10 +1,10 @@
 use std::{fs, io, os::linux::fs::MetadataExt};
 
-pub const SYSTEM_DATA_UNIT_DIR: &str = "/etc/process1/";
+const SYSTEM_DATA_UNIT_DIR: &str = "/etc/process1/";
 pub const RC_LOCAL_PATH: &str = "/etc/rc.local";
-pub const B_EXEC: u32 = 0o100; /*判断文件是否可执行 */
+const B_EXEC: u32 = 0o100; /*judge whether file can be executed */
 
-pub fn mkdir_parents_lable(path: &str) -> io::Result<()> {
+fn mkdir_parents_lable(path: &str) -> io::Result<()> {
     if path.is_empty() {
         let e = Result::Err(io::ErrorKind::NotFound);
         return e?;
@@ -12,7 +12,6 @@ pub fn mkdir_parents_lable(path: &str) -> io::Result<()> {
 
     let size = path.rfind('/').unwrap_or(0);
 
-    /*没有解析出目录说明不用创建，直接返回成功*/
     if 0 == size {
         return Ok(());
     }

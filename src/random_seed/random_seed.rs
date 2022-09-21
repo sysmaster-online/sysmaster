@@ -9,10 +9,10 @@ use std::{
     os::unix::prelude::AsRawFd,
 };
 
-pub const RAMDOM_POOL_SIZE_MIN: usize = 512;
-pub const RANDOM_SEED: &str = "/usr/lib/process1/random-seed";
-pub const RAMDOM_SEED_DIR: &str = "/usr/lib/process1";
-pub const RANDOM_POOL_SIZE_MAX: usize = 10 * 1024 * 1024;
+const RAMDOM_POOL_SIZE_MIN: usize = 512;
+const RANDOM_SEED: &str = "/usr/lib/process1/random-seed";
+const RAMDOM_SEED_DIR: &str = "/usr/lib/process1";
+const RANDOM_POOL_SIZE_MAX: usize = 10 * 1024 * 1024;
 
 fn read_one_line_file(path: &str) -> Result<String, ()> {
     let str = fs::read_to_string(path).unwrap_or_else(|_| String::new());
@@ -32,7 +32,7 @@ fn read_one_line_file(path: &str) -> Result<String, ()> {
     Result::Err(())
 }
 
-pub fn random_pool_size() -> usize {
+fn random_pool_size() -> usize {
     match read_one_line_file("/proc/sys/kernel/random/poolsize") {
         Err(_) => RAMDOM_POOL_SIZE_MIN,
         Ok(str) => match str.parse::<usize>() {
@@ -63,7 +63,7 @@ pub fn get_random(data: &mut Vec<u8>, flags: u32) -> Result<usize, ()> {
     Result::Ok(size as usize)
 }
 
-pub fn chmod_and_chown(file: &mut File) -> bool {
+fn chmod_and_chown(file: &mut File) -> bool {
     let file_path =
         read_link(PathBuf::from(format!("/proc/self/fd/{}", file.as_raw_fd()))).unwrap();
     let cstr = CString::new(file_path.to_str().unwrap()).unwrap();
@@ -95,7 +95,7 @@ ioctl_write_ptr!(
     ENTROPY_SETOPTIONS,
     rand_pool_info
 );
-pub fn random_write_entropy(random_fd: &mut File, data: &mut Vec<u8>, credit: bool) -> bool {
+fn random_write_entropy(random_fd: &mut File, data: &mut Vec<u8>, credit: bool) -> bool {
     assert!(!data.is_empty());
 
     if data.is_empty() {
@@ -131,7 +131,7 @@ pub fn random_write_entropy(random_fd: &mut File, data: &mut Vec<u8>, credit: bo
     }
 }
 
-pub fn fsync_full(file: &mut File) -> bool {
+fn fsync_full(file: &mut File) -> bool {
     let fd = file.as_raw_fd();
     assert_ne!(fd, 0);
 
@@ -165,7 +165,7 @@ pub fn fsync_full(file: &mut File) -> bool {
     true
 }
 
-pub fn loop_read(file: &mut File, buf: &mut [u8]) -> Result<usize, ()> {
+fn loop_read(file: &mut File, buf: &mut [u8]) -> Result<usize, ()> {
     let size = buf.len();
     let mut pos = 0;
     while pos < size {
@@ -249,7 +249,7 @@ fn unhexchar(c: u8) -> Result<u8, ()> {
     Err(())
 }
 
-pub fn sd_id128_get_machine() -> Result<[u8; 16], ()> {
+fn sd_id128_get_machine() -> Result<[u8; 16], ()> {
     let mut file = match fs::OpenOptions::new().read(true).open("/etc/machine-id") {
         Ok(file) => file,
         Err(_) => return Err(()),
@@ -291,7 +291,7 @@ pub fn sd_id128_get_machine() -> Result<[u8; 16], ()> {
     sd_id128_from_string(&buf[..size])
 }
 
-pub fn loop_write(file: &mut File, buf: &[u8]) -> bool {
+fn loop_write(file: &mut File, buf: &[u8]) -> bool {
     let mut write_size = 0;
 
     while write_size < buf.len() {
@@ -380,7 +380,7 @@ fn get_file_path(file: &File) -> io::Result<PathBuf> {
     read_link(PathBuf::from(format!("/proc/self/fd/{}", file.as_raw_fd())))
 }
 
-pub fn setxattr(file: &File) -> bool {
+fn setxattr(file: &File) -> bool {
     let path = match get_file_path(file) {
         Ok(path) => path,
         Err(_) => {
