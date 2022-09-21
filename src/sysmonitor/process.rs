@@ -104,7 +104,7 @@ impl ProcessMonitor {
 
     /// 只重复检查两次，若还超时则返回false
     fn check_service_exist(&mut self) -> bool {
-        for _ in 1..2 {
+        for _ in 0..2 {
             match self.check_process_exist() {
                 Ok(true) => return true,
                 Ok(false) => continue,

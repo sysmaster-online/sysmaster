@@ -1,7 +1,7 @@
 /// 硬件看门狗
 use std::cmp::min;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Error, Result};
+use std::io::{self, Error, ErrorKind, Result};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::time::{Duration, Instant};
 
@@ -11,8 +11,8 @@ use nix::{ioctl_read, ioctl_readwrite};
 /// 首先定义了一个trait，将看门狗的几个关键特性抽象出来
 /// config表示配置一个看门狗的属性，主要是超时时间timeout并打开看门狗；close表示关闭一个看门狗；feed表示喂狗。
 pub trait Watchdog {
-    fn config(self, timeout: Option<Duration>) -> io::Result<()>;
-    fn close(self) -> io::Result<i32>;
+    fn config(&mut self, timeout: Option<Duration>) -> io::Result<()>;
+    fn close(&mut self) -> io::Result<i32>;
     fn feed(&mut self) -> io::Result<()>;
 }
 
@@ -24,6 +24,7 @@ pub struct HardwareWatchdog {
     file: Option<File>,
     timeout: Option<Duration>,
     last_feed: Option<Instant>,
+    open: bool,
 }
 
 /// 由于涉及硬件操作，所以大部分函数需要通过ioctl来实现功能，这里用例nix包提供的两个宏ioctl_read, ioctl_readwrite，分别是读取和读写看门狗硬件，常量值定义参考<linux/watchdog.h>文件
@@ -34,6 +35,7 @@ const WATCHDOG_SETTIMEOUT: u8 = 6;
 const WATCHDOG_GETTIMEOUT: u8 = 7;
 const WDIOS_DISABLECARD: i32 = 0x0001;
 const WDIOS_ENABLECARD: i32 = 0x0002;
+const WATCHDOG_PATH: &str = "/dev/watchdog0";
 
 // 与C头文件中定义的宏函数等价
 // ```c
@@ -114,27 +116,37 @@ impl HardwareWatchdog {
 impl Default for HardwareWatchdog {
     fn default() -> Self {
         HardwareWatchdog {
-            device: "/dev/watchdog0".to_string(),
+            device: WATCHDOG_PATH.to_string(),
             file: None,
             timeout: Some(Duration::default()),
             last_feed: None,
+            open: false,
+        }
+    }
+}
+
+impl Drop for HardwareWatchdog {
+    fn drop(&mut self) {
+        if let Err(err) = self.close() {
+            println!("HardwareWatchdog drop close err: {err}");
         }
     }
 }
 
 impl Watchdog for HardwareWatchdog {
     /// 配置一个看门狗
-    fn config(mut self, timeout: Option<Duration>) -> io::Result<()> {
-        // 如果已经打开了设备且超时时间合法，返回OK
-        if self.file.is_some() && (self.timeout == timeout || timeout.is_none()) {
+    fn config(&mut self, timeout: Option<Duration>) -> io::Result<()> {
+        if self.open && self.timeout == timeout {
             return Ok(());
         }
+
         if let Some(time) = timeout {
-            // timeout为0表示关闭看门狗
+            // timeout为0不支持
             if time.is_zero() {
-                self.timeout = timeout;
-                let _ = self.close();
-                return Ok(());
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "Not Support Zero Timeout",
+                ));
             }
             let secs = min(time.as_secs() as i32, i32::MAX);
             match self.set_timeout(secs) {
@@ -167,20 +179,24 @@ impl Watchdog for HardwareWatchdog {
                 }
             }
         }
+        self.open = true;
         Ok(())
     }
 
-    fn close(mut self) -> io::Result<i32> {
+    fn close(&mut self) -> io::Result<i32> {
+        if !self.open {
+            return Ok(0);
+        }
+        self.open = false;
         self.timeout = Some(Duration::default());
         self.set_options(false).map_err(Error::from)
     }
 
     fn feed(&mut self) -> io::Result<()> {
-        if let Some(time) = self.timeout {
-            if time.is_zero() {
-                return Ok(());
-            }
+        if !self.open {
+            return Err(Error::new(ErrorKind::Other, "Not Config Or Closed"));
         }
+
         self.keepalive()?;
         self.last_feed = Some(Instant::now());
         Ok(())
@@ -208,6 +224,11 @@ fn errno_is_not_supported(errno: Errno) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
+
+    fn has_watchdog0() -> bool {
+        Path::new(WATCHDOG_PATH).exists()
+    }
 
     #[test]
     fn test_errno_is_not_supported() {
@@ -216,24 +237,39 @@ mod tests {
 
     #[test]
     fn test_feed() {
+        if !has_watchdog0() {
+            return;
+        }
         let mut watchdog = HardwareWatchdog::default();
-        let _ = watchdog.feed();
+        watchdog.config(Some(Duration::from_secs(10))).unwrap();
+        watchdog.feed().unwrap();
     }
 
     #[test]
     fn test_close() {
-        let watchdog = HardwareWatchdog::default();
-        let _ = watchdog.close();
+        if !has_watchdog0() {
+            return;
+        }
+        let mut watchdog = HardwareWatchdog::default();
+        watchdog.config(Some(Duration::from_secs(10))).unwrap();
+        watchdog.close().unwrap();
     }
 
     #[test]
     fn test_config() {
-        let watchdog = HardwareWatchdog::default();
-        let _ = watchdog.config(Some(Duration::from_secs(10)));
+        if !has_watchdog0() {
+            return;
+        }
+        let mut watchdog = HardwareWatchdog::default();
+        watchdog.config(Some(Duration::from_secs(10))).unwrap();
+        watchdog.config(None).unwrap();
     }
 
     #[test]
     fn test_set_device() {
+        if !has_watchdog0() {
+            return;
+        }
         let mut watchdog = HardwareWatchdog::default();
         let _ = watchdog.set_device("/dev/watchdog0".to_string());
     }
