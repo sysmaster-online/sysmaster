@@ -41,7 +41,7 @@ Linux系统还支持不同的启动模式，每种模式启动的Unit范围也�
 5. Unit对象是有生命周期的，因此需要有一个整体的管理模块，将所有模块串联起来。
 6. Unit对象每次启动，通过Job出发，因此需要划分出一个Job引擎。
 
-![avatar](../img/unitManger.jpg)
+![avatar](../res/unitManger.jpg)
 
 ### Unit接口定义
 
@@ -74,7 +74,7 @@ Unit配置定义包含三个部分，具体描述如下：
 
    unit对象加载是所有Unit执行后续的动作的前提，通过解析Unit的对应的配置文件，生成Unit对象，并加载到sysmaster内部，具体流程如下：
 
-   ![avatar](../img/unitManger.jpg)
+   ![avatar](../res/unitload.jpg)
 
 ### unit对象创建
 
