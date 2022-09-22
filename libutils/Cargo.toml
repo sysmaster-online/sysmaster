@@ -24,4 +24,4 @@ nix = "0.24"
 pathdiff = "0.2.1"
 
 [dev-dependencies]
-tests = { path = "../libtests" }
+tests = { path = "../libs/libtests" }

@@ -77,7 +77,7 @@ members = [
   "libevent",
   "process1",
   "libutils",
-  "libtests",
+  "libs/libtests",
   "libwatchdog",
   "components/service",
   "components/socket",

@@ -24,4 +24,4 @@ serde = "1.0.130"
 confique = { version = "0.1.3", default-features= false, features = [ 'toml' ] }
 
 [dev-dependencies]
-tests = { path = "../../libtests" }
+tests = { path = "../../libs/libtests" }
