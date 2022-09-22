@@ -115,9 +115,28 @@ systemd是为了解决启动时间长，启动脚本复杂问题而诞生的。�
 
 ## 代码目录结构说明
 源码仓库以workspaces方式管理，每一个目录是一个package，每个package包含一个crate（lib或bin形式），
-公共lib crate的目录带lib前缀，daemon类型的bin crate的目录以d结尾。
+公共lib crate的目录带lib前缀，使用cargo new --lib libtests创建,
+daemon类型的bin crate的目录以d结尾。
+
+/ (根目录)
+|__coms (组件库)
+|      |__service (unit type)
+|      |__socket  (unit type)
+|      |__target  (unit type)
+|__libs
+|      |__libtest (测试库)
+|      |__libcgroup (cgroup)
+|
+|__src
+|     |__sysmaster (daemon)
+|     |__udevd (daemon)
+|     |__random-seed (bin)
+|__tools
+|     |__musl_build
+|     |__run_with_sd
+|__docs
 
 如：
-  - lib crate: libevent, libutils
-  - bin crate: init, process1
-  - daemon crate: udevd, logind
+  - lib crate: libs/libevent, libs/libutils
+  - bin crate: src/init, src/process1
+  - daemon crate: src/udevd, src/logind
