@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn test_service_parse() {
         let mut file_path = get_project_root().unwrap();
-        file_path.push("libutils/examples/config.service.toml");
+        file_path.push("test_units/config.service.toml");
 
         let mut builder = UeConfigData::builder().env();
         builder = builder.file(&file_path);
