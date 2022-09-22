@@ -448,14 +448,15 @@ impl Source for SocketPort {
             return Ok(0);
         }
 
-        if let Some(accept) = self.config.config_data().borrow().Socket.Accept {
-            if accept && self.p_type() == PortType::Socket && self.can_accept() {
-                let afd = self
-                    .accept()
-                    .map_err(|_e| Error::Other { msg: "accept err" })?;
+        if self.config.config_data().borrow().Socket.Accept
+            && self.p_type() == PortType::Socket
+            && self.can_accept()
+        {
+            let afd = self
+                .accept()
+                .map_err(|_e| Error::Other { msg: "accept err" })?;
 
-                self.apply_sock_opt(afd)
-            }
+            self.apply_sock_opt(afd)
         }
 
         self.mng().enter_runing(afd);
@@ -493,8 +494,6 @@ mod tests {
 
     use super::{SocketAddress, SocketPort, SocketPorts};
     use crate::socket_base::{NetlinkProtocol, PortType};
-    use nix::sys::socket::SockaddrLike;
-
     use crate::socket_config::SocketConfig;
 
     #[test]

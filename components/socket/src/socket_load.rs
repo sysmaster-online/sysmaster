@@ -77,10 +77,8 @@ impl SocketLoad {
     }
 
     fn can_accept(&self) -> bool {
-        if let Some(accept) = self.config.config_data().borrow().Socket.Accept {
-            if !accept {
-                return true;
-            }
+        if !self.config.config_data().borrow().Socket.Accept {
+            return true;
         };
 
         self.ports.no_accept_socket()

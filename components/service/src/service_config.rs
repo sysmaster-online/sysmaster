@@ -114,7 +114,8 @@ pub(super) struct SectionService {
     pub MemoryHigh: Option<u64>,
     pub MemorySwapMax: Option<u64>,
     pub PIDFile: Option<String>,
-    pub RemainAfterExit: Option<bool>,
+    #[config(default = false)]
+    pub RemainAfterExit: bool,
     pub NotifyAccess: Option<NotifyAccess>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub Environment: Option<Vec<String>>,
@@ -156,6 +157,8 @@ mod tests {
         let config = ServiceConfig::new();
 
         let result = config.load(&paths);
+
+        println!("service data: {:?}", config.config_data());
 
         assert_eq!(result.is_err(), false);
     }

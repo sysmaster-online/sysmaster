@@ -196,13 +196,7 @@ impl ServiceUnit {
     }
 
     pub fn service_verify(&self) -> Result<(), Box<dyn Error>> {
-        if self
-            .config
-            .config_data()
-            .borrow()
-            .Service
-            .RemainAfterExit
-            .is_none()
+        if !self.config.config_data().borrow().Service.RemainAfterExit
             && self
                 .config
                 .config_data()
@@ -210,7 +204,11 @@ impl ServiceUnit {
                 .Service
                 .ExecStart
                 .is_none()
-        {}
+        {
+            return Err(Box::new(ServiceError::Other {
+                msg: "No ExecStart command is configured and RemainAfterExit if false",
+            }));
+        }
 
         if self.config.service_type() != ServiceType::Oneshot
             && self.config.get_exec_cmds(ServiceCommand::Start).is_none()
