@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn test_socket_parse() {
         let mut file_path = get_project_root().unwrap();
-        file_path.push("libutils/examples/test.socket.toml");
+        file_path.push("test_units/test.socket.toml");
         let mut paths = Vec::new();
         paths.push(file_path);
 
