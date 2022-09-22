@@ -43,7 +43,7 @@ libmount = "0.1.15"
 prost-build = "0.9" # 编译 protobuf
 
 [dev-dependencies]
-tests = { path = "../libtests" }
+tests = { path = "../libs/libtests" }
 
 [[example]]
 name = "signals"
