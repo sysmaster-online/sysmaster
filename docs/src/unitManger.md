@@ -1,4 +1,4 @@
-# Unit的设计
+# unitManager的设计
 
 ## 简介
 
@@ -11,7 +11,7 @@ Unit是SysMaster管理的基本单元，不同类型的Unit可以管理不同的
 
 ### 上下文
 
-Unit是SysMaster管理的基本单元，是SysMaster对系统管理的入口，SysMaster主要是对Linux操作系统中，重点管理随系统开/关机流程的服务，以及在日常运行过程中，管理员、其他应用对系统中的应用/资源进行生命周期管理。
+unit是SysMaster管理的基本单元，是SysMaster对系统管理的入口，SysMaster主要是对Linux操作系统中，重点管理随系统开/关机流程的服务，以及在日常运行过程中，管理员、其他应用对系统中的应用/资源进行生命周期管理。
 
 ## 场景分析
 
@@ -43,13 +43,13 @@ Linux系统还支持不同的启动模式，每种模式启动的Unit范围也�
 
 ![avatar](../res/unitManger.jpg)
 
-### Unit接口定义
+### unit接口定义
 
 Unit接口定义Unit子类的公共行为，每种子类必须实现这些接口，具体的接口包含
 
-### Unit加载
+### unit加载
 
-#### Unit的配置管理
+#### unit的配置管理
 
 每个unit都会包含配置文件，并且Unit的配置文件和Unit同名，并且以Unit的类型作为扩展名，如XXX.service, XXX.socket。
 
@@ -62,7 +62,7 @@ unit配置文件存储路径为：
 
 配置目录下可以存在同名的文件，同名的文件高优先级的会覆盖低优先级的的配置，Unit的配置文件和Unit的对应关系会在首次加载的时候完成缓存，只有在目录发生更新的时候才会刷新缓存的映射关系。
 
-Unit配置定义包含三个部分，具体描述如下：
+unit配置定义包含三个部分，具体描述如下：
 
  ```toml
 [Unit]：所有Unit都可以配置的配置项，具体见uu_config::UeConfigUnit
@@ -70,19 +70,16 @@ Unit配置定义包含三个部分，具体描述如下：
 [Install] Unit安装时（安装概念，见后续备注）的配置项
  ```
 
-#### Unit对象加载
+#### unit对象加载
 
    unit对象加载是所有Unit执行后续的动作的前提，通过解析Unit的对应的配置文件，生成Unit对象，并加载到sysmaster内部，具体流程如下：
 
-   ![avatar](../res/unitload.jpg)
+![unit加载流程](../res/unitload.jpg#pic_center)
 
-### unit对象创建
+##### unit对象创建
 
-process1参考systemd，初步规划包含9种类型的unit，每种类型的配置文件命名规则为*.XXX,XXX指具体的unit类型，如service，slice，target等。a
- 包含以下模块
- u_entry: unit的接口抽象实体，是所有unit—的父类，子类可以实现unitObj trait对象
- uf_interface是内部管理的实体对象，对Unit进行封装，在process1内部只看到UnitX对象，看不到Unit，对Unit进行隔离
-uu_load 对 unitload状态的封装
- uu_child对 unit关联的父子进程的维护，unit关联的子服务可能会启动子进程，因此这里需要维护unit关联的进程有哪些。
-uu_cgroup cgroup相关配置
- uu_config 是unit的配置
+unit对象包含unit以及子Unit，对象关系如下图：
+
+![unit对象关系](../res/unit_c_diagram.jpg#pic_center)
+
+unit为unitManger管理的单元，subUnit为子unit，每种类型都要求实现unitObj接口，不同类型有不同的的实现，通过Plugin框架来创建。
