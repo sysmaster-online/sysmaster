@@ -323,12 +323,8 @@ impl ServiceMng {
             } else {
                 self.set_state(ServiceState::Runing);
             }
-        } else if let Some(remain_after_exit) =
-            self.config.config_data().borrow().Service.RemainAfterExit
-        {
-            if remain_after_exit == true {
-                self.set_state(ServiceState::Exited);
-            }
+        } else if self.config.config_data().borrow().Service.RemainAfterExit {
+            self.set_state(ServiceState::Exited);
         } else {
             self.enter_stop(sr);
         }

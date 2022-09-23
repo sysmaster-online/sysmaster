@@ -323,10 +323,8 @@ impl SocketMng {
 
     fn enter_listening(&self) {
         log::debug!("enter start listening state");
-        if let Some(accept) = self.config.config_data().borrow().Socket.Accept {
-            if !accept {
-                self.flush_ports();
-            }
+        if !self.config.config_data().borrow().Socket.Accept {
+            self.flush_ports();
         }
 
         self.watch_fds();

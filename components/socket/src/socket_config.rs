@@ -74,7 +74,8 @@ pub(crate) struct SectionSocket {
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub ListenNetlink: Option<Vec<String>>,
     pub PassPacketInfo: Option<bool>,
-    pub Accept: Option<bool>,
+    #[config(default = false)]
+    pub Accept: bool,
     pub Service: Option<String>,
     pub ReceiveBuffer: Option<u64>,
     pub SendBuffer: Option<u64>,
