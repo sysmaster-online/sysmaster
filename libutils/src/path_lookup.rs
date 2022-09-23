@@ -26,13 +26,20 @@ impl LookupPaths {
 
     pub fn init_lookup_paths(&mut self) {
         let devel_path = || {
-            env::var("OUT_DIR").unwrap_or_else(|_x| {
-                env::var("LD_LIBRARY_PATH").map_or("".to_string(), |_v| {
-                    let _tmp = _v.split(':').collect::<Vec<_>>()[0];
+            let out_dir = env::var("OUT_DIR").unwrap_or_else(|_x| {
+                let _tmp_str: Option<&'static str> = option_env!("OUT_DIR");
+                return _tmp_str.unwrap_or("").to_string();
+            });
+            if out_dir.is_empty() {
+                let ld_path = env::var("LD_LIBRARY_PATH").map_or("".to_string(), |_v| {
+                    let _tmp = _v.split(":").collect::<Vec<_>>()[0];
                     let _tmp_path = _tmp.split("target").collect::<Vec<_>>()[0];
                     _tmp_path.to_string()
-                })
-            })
+                });
+                return ld_path;
+            } else {
+                out_dir
+            }
         };
 
         let out_dir = devel_path();

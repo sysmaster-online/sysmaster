@@ -95,7 +95,10 @@ impl Hash for Unit {
         self.id.hash(state);
     }
 }
-
+///The trait Defining Shared Behavior of sub unit
+///
+/// difference sub unit ref by dynamic trait
+///
 pub trait UnitObj {
     fn init(&self) {}
     fn done(&self) {}
@@ -103,6 +106,10 @@ pub trait UnitObj {
 
     fn coldplug(&self) {}
     fn dump(&self) {}
+
+    /// Start a Unit
+    /// Each Sub Unit need to implement its own start function
+    ///
     fn start(&self) -> Result<(), UnitActionError> {
         Ok(())
     }
@@ -119,6 +126,10 @@ pub trait UnitObj {
         Vec::new()
     }
 
+    ///Get the the unit state
+    ///
+    /// Every sub unit  can define self states and map to [`UnitActiveState`]
+    ///
     fn current_active_state(&self) -> UnitActiveState;
     fn attach_unit(&self, unit: Rc<Unit>);
 
@@ -139,9 +150,9 @@ impl Unit {
         dmr: &Rc<DataManager>,
         filer: &Rc<UnitFile>,
         sub: Box<dyn UnitObj>,
-    ) -> Self {
+    ) -> Rc<Self> {
         let _config = Rc::new(UeConfig::new());
-        Unit {
+        let _u = Rc::new(Unit {
             dm: Rc::clone(dmr),
             unit_type,
             id: String::from(name),
@@ -151,7 +162,9 @@ impl Unit {
             cgroup: UeCgroup::new(),
             conditions: Rc::new(UeCondition::new()),
             sub,
-        }
+        });
+        _u.sub.attach_unit(Rc::clone(&_u));
+        _u
     }
 
     fn conditions(&self) -> Rc<UeCondition> {
@@ -479,10 +492,6 @@ impl Unit {
         self.load.load_state()
     }
 
-    pub(super) fn attach_unit(&self, unit: &Rc<Unit>) {
-        self.sub.attach_unit(Rc::clone(unit))
-    }
-
     pub(super) fn unit_type(&self) -> UnitType {
         self.unit_type
     }
@@ -498,5 +507,52 @@ impl Unit {
         fds: &Vec<i32>,
     ) -> Result<(), ServiceError> {
         self.sub.notify_message(ucred, messages, fds)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use utils::logger;
+
+    use crate::{
+        manager::{data::DataManager, unit::uload_util::UnitFile, UnitActiveState, UnitType},
+        plugin::Plugin,
+    };
+
+    use super::Unit;
+
+    fn unit_init() -> Rc<Unit> {
+        logger::init_log_with_console("test_unit_entry", 4);
+        let unit_file = UnitFile::new();
+        let dm = DataManager::new();
+        let plugin = Plugin::get_instance();
+        let sub_obj = plugin.create_unit_obj(UnitType::UnitService);
+        let unit = Unit::new(
+            UnitType::UnitService,
+            "config.service",
+            &Rc::new(dm),
+            &Rc::new(unit_file),
+            sub_obj.unwrap().into_unitobj(),
+        );
+        unit
+    }
+
+    #[test]
+    fn test_unit_load() {
+        let _unit = unit_init();
+        let load_stat = _unit.load_unit();
+        assert!(load_stat.is_ok());
+        /*let stat = _unit.start();//sub unit依赖 UnitManger，依赖关系不太合适，后续需要优化
+        assert!(stat.is_ok());
+        assert_eq!(_unit.current_active_state(),UnitActiveState::UnitActive);*/
+    }
+
+    fn test_unit_condition() {
+        let _unit = unit_init();
+        let load_stat = _unit.load_unit();
+        assert!(load_stat.is_ok());
+        assert!(_unit.conditions().condtions_test());
     }
 }
