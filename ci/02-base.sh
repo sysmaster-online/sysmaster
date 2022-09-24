@@ -2,10 +2,10 @@
 set -e
 
 #开始检查
-cargo fmt --all -- --check -v
+#cargo fmt --all -- --check -v
 
 #cargo clippy --all-targets --all-features --tests --benches -- -D warnings
-cargo clippy --all-targets --all-features --tests --benches -- -v
+#cargo clippy --all-targets --all-features --tests --benches -- -v
 cargo clean
 
 #cargo check
