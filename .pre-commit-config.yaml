@@ -1,54 +1,77 @@
 fail_fast: true
 repos:
   - repo: "https://github.com/pre-commit/pre-commit-hooks.git"
-    rev: v4.1.0
+    rev: v4.3.0
     hooks:
       - id: check-byte-order-marker
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: check-symlinks
-      - id: check-yaml
-        # - id: end-of-file-fixer
+      - id: check-toml
+      - id: end-of-file-fixer
       - id: mixed-line-ending
       - id: trailing-whitespace
-  - repo: "https://github.com/psf/black.git"
-    rev: 22.1.0
+      - id: detect-private-key
+    #  - id: check-executables-have-shebangs
+    #  - id: check-shebang-scripts-are-executable
+  - repo: "https://github.com/codespell-project/codespell"
+    rev: v2.2.1
     hooks:
-      - id: black
+      - id: codespell
+        args: [-I, ci/codespell_ignore_words]
+        verbose: true
+#  - repo: "https://github.com/psf/black.git"
+#    rev: 22.8.0
+#    hooks:
+#      - id: black
+
+#  - repo: "https://github.com/markdownlint/markdownlint"
+#    rev: v0.11.0
+#    hooks:
+#      - id: markdownlint
+#        files: \.(md|mdown|markdown)$
   - repo: local
     hooks:
       - id: cargo-clippy
         name: cargo clippy
         description: Lint rust sources
-        entry: bash -c 'cargo clippy --all -- -v'
+        entry: bash -c 'cargo clippy -v -all --all-targets --all-features --tests --benches -- -v'
         language: rust
         files: \.rs$
         pass_filenames: false
+        verbose: true
       - id: cargo-fmt
         name: cargo fmt
         description: Format files with rustfmt.
-        entry: bash -c 'cargo fmt -- --check -v'
+        entry: bash -c 'cargo fmt -v --all -- --check -v'
         language: rust
         files: \.rs$
-        args: []
-      - id: cargo-check
-        name: cargo check
+        verbose: true
+      - id: cargo-fix
+        name: cargo fix
         description: Check the package for errors.
-        entry: bash -c 'cargo check --all'
+        entry: bash -c 'cargo fix -v --all --allow-dirty --allow-staged'
         language: rust
         files: \.rs$
-        pass_filenames: false
-      - id: cargo-test
-        name: cargo test
-        description: unit test for the project
-        entry: bash -c 'cargo test --all'
-        language: rust
-        files: \.rs$
-        pass_filenames: false
-      #- id: cargo-deny
-      #  name: cargo deny check
-      #  description: Check cargo depencencies
-      #  entry: bash -c 'cargo deny check'
-      #  language: rust
-      #  files: \.rs$
-      #  args: []
+        verbose: true
+#      - id: cargo-check
+#        name: cargo check
+#        description: Check the package for errors.
+#        entry: bash -c 'cargo check --all'
+#        language: rust
+#        files: \.rs$
+#        pass_filenames: false
+#     - id: cargo-test
+#       name: cargo test
+#       description: unit test for the project
+#       entry: bash -c 'cargo test --all'
+#       language: rust
+#       files: \.rs$
+#       pass_filenames: false
+#      - id: cargo-deny
+#        name: cargo deny check
+#        description: Check cargo depencencies
+#        entry: bash -c 'cargo deny check'
+#        language: rust
+#        files: \.rs$
+#        args: []
