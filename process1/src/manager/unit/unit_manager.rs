@@ -70,7 +70,7 @@ impl UnitManagerX {
         if let Some(_r) = register_result {
             log::info!("TableSubcribe for {} is already register", &self.sub_name);
         } else {
-            log::info!("register  TableSubcribe for {}  sucessfull", &self.sub_name);
+            log::info!("register  TableSubcribe for {}  successful", &self.sub_name);
         }
     }
 
@@ -161,7 +161,7 @@ impl UnitManager {
             return Err(UnitActionError::UnitActionENoent);
         }
 
-        if u.activeted() {
+        if u.activated() {
             return Err(UnitActionError::UnitActionEBusy);
         }
 
@@ -189,7 +189,7 @@ impl UnitManager {
         self.db.dep_is_dep_atom_with(&s_unit, atom, &t_unit)
     }
 
-    ///add a unit depenency to th unit deplist
+    ///add a unit dependency to th unit deplist
     /// can called by sub unit
     /// sub unit add some default dependency
     ///
@@ -272,7 +272,7 @@ impl UnitManager {
         fds
     }
 
-    // check the unit that will be triggerd by {name} is in active or activating state
+    // check the unit that will be triggered by {name} is in active or activating state
     pub fn relation_active_or_pending(&self, name: &str) -> bool {
         let deps = self.db.dep_gets(name, UnitRelations::UnitTriggers);
         let mut pending: bool = false;
@@ -492,7 +492,7 @@ pub trait UnitSubClass: UnitObj + UnitMngUtil {
 
 // #[macro_use]
 // use crate::unit_name_to_type;
-//unitManger composition of units with hash map
+//unitManager composition of units with hash map
 #[macro_export]
 macro_rules! declure_unitobj_plugin {
     ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {
@@ -552,7 +552,7 @@ mod unit_load {
             if let Some(_r) = ret {
                 log::info!("TableSubcribe for {} is already register", &self.sub_name);
             } else {
-                log::info!("register  TableSubcribe for {}  sucessfull", &self.sub_name);
+                log::info!("register  TableSubcribe for {}  successful", &self.sub_name);
             }
         }
     }
@@ -679,7 +679,7 @@ mod unit_load {
             let unit = match self.db.units_get(name) {
                 Some(u) => u,
                 None => {
-                    log::error!("create unit obj error in unit manger");
+                    log::error!("create unit obj error in unit manager");
                     return;
                 } // load
             };
@@ -692,7 +692,7 @@ mod unit_load {
                         //此处不能直接调用unit_load，会嵌套
                         tmp_unit = Rc::clone(&o_unit);
                     } else {
-                        log::error!("create unit obj error in unit manger");
+                        log::error!("create unit obj error in unit manager");
                         return;
                     }
 
@@ -754,7 +754,7 @@ mod tests {
 
         match unit {
             Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), "config.service"),
-            None => println!("test unit load, not fount unit: {}", unit_name),
+            None => println!("test unit load, not found unit: {}", unit_name),
         };
     }
 
@@ -829,7 +829,7 @@ mod tests {
         let confilict_unit = dm.2.start_unit(&conflict_unit_name);
         match confilict_unit {
             Ok(_v) => {
-                assert!(true, "conflict unit start sucessfull");
+                assert!(true, "conflict unit start successful");
             }
             Err(e) => {
                 assert!(false, "load unit failed {},{:?}", conflict_unit_name, e);
@@ -852,7 +852,7 @@ mod tests {
             let unit = um.load_unit(u_name);
             match unit {
                 Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), u_name),
-                None => println!("test unit load, not fount unit: {}", u_name),
+                None => println!("test unit load, not found unit: {}", u_name),
             };
         }
     }
@@ -877,7 +877,7 @@ mod tests {
                     );
                     assert_eq!(_unit_obj.get_id(), u_name);
                 }
-                None => println!("test unit load, not fount unit: {}", u_name),
+                None => println!("test unit load, not found unit: {}", u_name),
             };
         }
     }

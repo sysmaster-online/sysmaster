@@ -14,12 +14,11 @@ index 0ddd629..d0b1af0 100644
 @@ -2147,7 +2147,7 @@ static int initialize_runtime(
                  }
          }
- 
+
 -        if (!arg_system)
 +//        if (!arg_system)
                  /* Become reaper of our children */
                  if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0)
                          log_warning_errno(errno, "Failed to make us a subreaper: %m");
--- 
+--
 2.30.0
-

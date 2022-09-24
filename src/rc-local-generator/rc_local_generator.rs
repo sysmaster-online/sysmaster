@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn check_executable_test() {
-        let file = fs::File::create("test.exec").unwrap();
+        let _file = fs::File::create("test.exec").unwrap();
         unsafe {
             libc::chmod(CString::new("test.exec").unwrap().as_ptr(), 0o777);
         }

@@ -160,7 +160,7 @@ impl SocketAddress {
         self.sock_addr.family().unwrap()
     }
 
-    pub(super) fn socket_listen(&self, falgs: SockFlag, backlog: usize) -> Result<i32, Errno> {
+    pub(super) fn socket_listen(&self, flags: SockFlag, backlog: usize) -> Result<i32, Errno> {
         log::debug!(
             "create socket, family: {:?}, type: {:?}, protocol: {:?}",
             self.sock_addr.family().unwrap(),
@@ -170,7 +170,7 @@ impl SocketAddress {
         let fd = socket::socket(
             self.sock_addr.family().unwrap(),
             self.sa_type,
-            falgs,
+            flags,
             self.protocol,
         )?;
 
@@ -200,7 +200,7 @@ impl SocketAddress {
     }
 
     pub(super) fn unlink(&self) {
-        log::debug!("unlink socket, just usefull in unix mode");
+        log::debug!("unlink socket, just useful in unix mode");
         if let Some(AddressFamily::Unix) = self.sock_addr.family() {
             if let Some(path) = self.path() {
                 log::debug!("unlink path: {:?}", path);
@@ -459,7 +459,7 @@ impl Source for SocketPort {
             self.apply_sock_opt(afd)
         }
 
-        self.mng().enter_runing(afd);
+        self.mng().enter_running(afd);
 
         Ok(0)
     }

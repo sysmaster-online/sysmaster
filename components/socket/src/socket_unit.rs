@@ -1,6 +1,6 @@
 //! SocketUnit类型socket类型的总入口，需要实现UnitObj,UnitMngUtil,以及UnitSubClass三个trait,
 //! UnitObj是Unit的抽象，定义对process1提供的具体行为，
-//! UnitMngUtil是为了关联subUnit和Manger，由于rust不支持继承和多态，因此需要采用这种方式来间接支持
+//! UnitMngUtil是为了关联subUnit和Manager，由于rust不支持继承和多态，因此需要采用这种方式来间接支持
 //！ UnitSubClass为了实现SubUnit到UnitObj的转换，简介达成多态的目的
 
 use nix::{sys::signal::Signal, unistd::Pid};
@@ -28,7 +28,7 @@ struct SocketUnit {
 
 impl UnitObj for SocketUnit {
     fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
-        log::debug!("socket beigin to load conf file");
+        log::debug!("socket begin to load conf file");
         self.config.load(&paths)?;
 
         self.load.parse(self.config.config_data(), &self.mng)?;
@@ -54,8 +54,8 @@ impl UnitObj for SocketUnit {
     }
 
     fn stop(&self) -> Result<(), UnitActionError> {
-        let stoping = self.mng.stop_check()?;
-        if stoping {
+        let stopping = self.mng.stop_check()?;
+        if stopping {
             log::debug!("socket already in stop, return immediretly");
             return Ok(());
         }

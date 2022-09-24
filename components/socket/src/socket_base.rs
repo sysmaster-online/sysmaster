@@ -103,7 +103,7 @@ pub(super) enum SocketCommand {
 
 #[cfg(test)]
 mod tests {
-    use crate::socket_base::{NetlinkProtocol, PortType};
+    use crate::socket_base::NetlinkProtocol;
 
     #[test]
     fn test_netlink_from_string() {

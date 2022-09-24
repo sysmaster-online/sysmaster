@@ -16,14 +16,14 @@ void main() {
 		}
 
 		printf("get send buffer: %d\n", sendbuf);
-		
+
 		set_ret = getsockopt(i, SOL_SOCKET, SO_SNDBUF, (int *)&sendbuf, &opt_len);
 		if(set_ret < 0) {
 			continue;
 		}
 
 		printf("get send buffer: %d\n", sendbuf);
-	
+
 	}
 
 

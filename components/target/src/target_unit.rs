@@ -1,7 +1,7 @@
 // target unit是 target类型的入口，需要实现
 //UnitObj,UnitMngUtil,以及UnitSubClass三个trait
 // UnitObj是Unit的抽象，定义Unit的具体行为
-// UnitMngUtil是为了关联subUnit和Manger，由于rust不支持继承和多态，因此需要采用这种方式来间接支持
+// UnitMngUtil是为了关联subUnit和Manager，由于rust不支持继承和多态，因此需要采用这种方式来间接支持
 // UnitSubClass为了实现SubUnit到UnitObj的转换，简介达成多态的目的
 
 use std::{path::PathBuf, rc::Rc};
@@ -64,7 +64,7 @@ impl Target {
                     UnitDependencyMask::UnitDependencyDefault,
                 );
                 if e.is_err() {
-                    log::error!("add default dependencies erro {:?}", e);
+                    log::error!("add default dependencies error {:?}", e);
                     return;
                 }
             }
@@ -74,7 +74,7 @@ impl Target {
 
 impl UnitObj for Target {
     fn load(&self, _conf_str: &Vec<PathBuf>) -> utils::Result<(), Box<dyn std::error::Error>> {
-        //todo add default dependency funnction neeed add
+        //todo add default dependency funnction need add
         log::debug!("load for target");
         self.add_default_dependencies();
         Ok(())

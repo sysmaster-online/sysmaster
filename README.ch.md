@@ -66,5 +66,3 @@ daemon类型的bin crate的目录以d结尾。
   - lib crate: libs/libevent, libs/libutils
   - bin crate: src/init, src/process1
   - daemon crate: src/udevd, src/logind
-
-  

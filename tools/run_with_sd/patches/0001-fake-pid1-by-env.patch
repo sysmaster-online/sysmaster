@@ -16,24 +16,24 @@ index 7d4301e..b33813d 100644
 @@ -1147,7 +1147,7 @@ pid_t getpid_cached(void) {
          case CACHED_PID_UNSET: { /* Not initialized yet, then do so now */
                  pid_t new_pid;
- 
+
 -                new_pid = raw_getpid();
 +                new_pid = getpid();
- 
+
                  if (!installed) {
                          /* __register_atfork() either returns 0 or -ENOMEM, in its glibc implementation. Since it's
 @@ -1168,7 +1168,7 @@ pid_t getpid_cached(void) {
          }
- 
+
          case CACHED_PID_BUSY: /* Somebody else is currently initializing */
 -                return raw_getpid();
 +                return getpid();
- 
+
          default: /* Properly initialized */
                  return current_value;
 @@ -1646,3 +1646,51 @@ static const char* const sched_policy_table[] = {
  };
- 
+
  DEFINE_STRING_TABLE_LOOKUP_WITH_FALLBACK(sched_policy, int, INT_MAX);
 +
 +static pid_t systemd_pid = CACHED_PID_UNSET;
@@ -54,7 +54,7 @@ index 7d4301e..b33813d 100644
 +                systemd_pid = p;
 +        }
 +
-+        if (pid == 1 || pid == systemd_pid) 
++        if (pid == 1 || pid == systemd_pid)
 +                return 1;
 +out:
 +        return pid;
@@ -81,7 +81,7 @@ index 7d4301e..b33813d 100644
 +        if (ppid == systemd_pid)
 +                return 1;
 +out:
-+        return ppid; 
++        return ppid;
 +}
 \ No newline at end of file
 diff --git a/src/basic/process-util.h b/src/basic/process-util.h
@@ -90,7 +90,7 @@ index ddce7bd..b9293de 100644
 +++ b/src/basic/process-util.h
 @@ -202,3 +202,7 @@ int pidfd_get_pid(int fd, pid_t *ret);
  int setpriority_closest(int priority);
- 
+
  bool invoked_as(char *argv[], const char *token);
 +
 +pid_t getpid();
@@ -104,16 +104,16 @@ index 35aea2f..9f46e28 100644
 @@ -1795,7 +1795,7 @@ static int build_environment(
          assert(p);
          assert(ret);
- 
+
 -#define N_ENV_VARS 17
 +#define N_ENV_VARS 18
          our_env = new0(char*, N_ENV_VARS + _EXEC_DIRECTORY_TYPE_MAX);
          if (!our_env)
                  return -ENOMEM;
 @@ -1956,6 +1956,10 @@ static int build_environment(
- 
+
          our_env[n_env++] = x;
- 
+
 +        if (asprintf(&x, "SYSTEMD_MAINPID=%s", getenv("SYSTEMD_MAINPID")) < 0)
 +                return -ENOMEM;
 +        our_env[n_env++] = x;
@@ -121,6 +121,5 @@ index 35aea2f..9f46e28 100644
          our_env[n_env++] = NULL;
          assert(n_env <= N_ENV_VARS + _EXEC_DIRECTORY_TYPE_MAX);
  #undef N_ENV_VARS
--- 
+--
 2.30.0
-

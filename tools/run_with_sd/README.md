@@ -32,9 +32,9 @@
 5. 修改dracut，`/usr/lib/dracut/modules.d/00systemd/module-setup.sh`, 替换
 
 ```
-ln_r "$systemdutildir"/systemd "/init" 
+ln_r "$systemdutildir"/systemd "/init"
 ln_r "$systemdutildir"/systemd "/sbin/init"
-``` 
+```
 为
 
 ```
@@ -43,6 +43,3 @@ inst_multiple -o \
     /sbin/init
 ```
 6. 执行`dracut -f`覆盖更新initrd，reboot重启验证。
-
-
-

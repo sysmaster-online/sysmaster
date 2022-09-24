@@ -31,7 +31,7 @@ pub trait UnitObj;
 //由于rust不支持面向对象，此trait实现从子Unit到UnitObj的downgrade.
 pub trait UnitSubClass;
 
-//将UnitManger（UnitManger是所有子类管理父类，由于rust不支持多态，无法基于基类做转换，所以增加此trait） attach到子类实例上
+//将UnitManager（UnitManager是所有子类管理父类，由于rust不支持多态，无法基于基类做转换，所以增加此trait） attach到子类实例上
 pub trait UnitMngUtil;
 
 ```
@@ -65,7 +65,7 @@ unit作为所管理的系统资源在process1中的投影，unit在通过os接�
         if !vec![
             ServiceState::Start,
             ServiceState::StartPost,
-            ServiceState::Runing,
+            ServiceState::Running,
             ServiceState::Reload,
             ServiceState::Stop,
             ServiceState::StopWatchdog,

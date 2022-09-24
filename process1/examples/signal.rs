@@ -30,5 +30,5 @@ fn main() {
             }
         }
     }
-    log::debug!("event runing");
+    log::debug!("event running");
 }

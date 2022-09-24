@@ -509,7 +509,7 @@ impl JobUnitTableData {
 
             // t_data
             del_jobs.append(&mut uv.flush_suspends()); // flush job
-                                                       // the uv should be retained until 'reshuffle', keeping the 'dirty' infomation.
+                                                       // the uv should be retained until 'reshuffle', keeping the 'dirty' information.
 
             // t_ready: wait to sync in 'reshuffle', just remark it in unit-value
             assert!(uv.is_dirty());
@@ -923,7 +923,7 @@ impl JobUnitTableData {
     }
 
     fn get_mut_uv_pad(&mut self, unit: Rc<UnitX>) -> &Rc<JobUnit> {
-        // verify existance
+        // verify existence
         if let None = self.t_data.get(&unit) {
             // nothing exists, pad it.
             self.t_data

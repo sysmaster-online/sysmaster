@@ -40,7 +40,7 @@ pub(self) enum ServiceState {
     StartPre,
     Start,
     StartPost,
-    Runing,
+    Running,
     Exited,
     Reload,
     Stop,
@@ -318,10 +318,10 @@ impl ServiceMng {
         if self.result() != ServiceResult::Success {
             self.enter_signal(ServiceState::StopSigterm, sr);
         } else if self.service_alive() {
-            if self.rd.notify_state() == NotifyState::Stoping {
+            if self.rd.notify_state() == NotifyState::Stopping {
                 self.enter_stop_by_notify();
             } else {
-                self.set_state(ServiceState::Runing);
+                self.set_state(ServiceState::Running);
             }
         } else if self.config.config_data().borrow().Service.RemainAfterExit {
             self.set_state(ServiceState::Exited);
@@ -356,7 +356,7 @@ impl ServiceMng {
     }
 
     fn enter_stop_post(&self, res: ServiceResult) {
-        log::debug!("runing stop post, service result: {:?}", res);
+        log::debug!("running stop post, service result: {:?}", res);
         if self.result() == ServiceResult::Success {
             self.set_result(res);
         }
@@ -471,7 +471,7 @@ impl ServiceMng {
         if !vec![
             ServiceState::Start,
             ServiceState::StartPost,
-            ServiceState::Runing,
+            ServiceState::Running,
             ServiceState::Reload,
             ServiceState::Stop,
             ServiceState::StopWatchdog,
@@ -534,7 +534,7 @@ impl ServiceMng {
     }
 
     fn run_next_control(&self) {
-        log::debug!("runing next control command");
+        log::debug!("running next control command");
         if let Some(cmd) = self.control_command_pop() {
             match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                 Ok(pid) => self.pid.set_control(pid),
@@ -823,7 +823,7 @@ impl ServiceMng {
                     ServiceState::StartPost | ServiceState::Reload => {
                         self.enter_stop(res);
                     }
-                    ServiceState::Runing => {
+                    ServiceState::Running => {
                         self.enter_running(res);
                     }
                     ServiceState::Stop => {}
@@ -941,7 +941,7 @@ impl ServiceMng {
                     }
                     self.enter_running(ServiceResult::Success);
                 }
-                ServiceState::Runing => todo!(),
+                ServiceState::Running => todo!(),
                 ServiceState::Reload => {
                     self.enter_running(res);
                 }
@@ -977,7 +977,7 @@ impl ServiceMng {
                 self.state(),
                 ServiceState::Start,
                 ServiceState::StartPost,
-                ServiceState::Runing
+                ServiceState::Running
             ) {
                 let pid = pidr.parse::<i32>()?;
                 let main_pid = Pid::from_raw(pid);
@@ -1006,8 +1006,8 @@ impl ServiceMng {
             }
 
             if key == "STOPPING" && value == "1" {
-                self.rd.set_notify_state(NotifyState::Stoping);
-                if self.state() == ServiceState::Runing {
+                self.rd.set_notify_state(NotifyState::Stopping);
+                if self.state() == ServiceState::Running {
                     self.enter_stop_by_notify();
                 }
             }
@@ -1035,7 +1035,7 @@ impl ServiceState {
             | ServiceState::StartPre
             | ServiceState::Start
             | ServiceState::StartPost => UnitActiveState::UnitActivating,
-            ServiceState::Runing | ServiceState::Exited => UnitActiveState::UnitActive,
+            ServiceState::Running | ServiceState::Exited => UnitActiveState::UnitActive,
             ServiceState::Reload => UnitActiveState::UnitReloading,
             ServiceState::Stop
             | ServiceState::StopWatchdog
@@ -1058,7 +1058,7 @@ impl ServiceState {
             | ServiceState::StartPre
             | ServiceState::Start
             | ServiceState::StartPost
-            | ServiceState::Runing
+            | ServiceState::Running
             | ServiceState::Exited => UnitActiveState::UnitActive,
             ServiceState::Reload => UnitActiveState::UnitReloading,
             ServiceState::Stop
@@ -1272,7 +1272,7 @@ impl PathIntofy {
 
         if !exist {
             return Err(Error::Other {
-                msg: "watch on any of the ancester failed",
+                msg: "watch on any of the ancestor failed",
             });
         }
 

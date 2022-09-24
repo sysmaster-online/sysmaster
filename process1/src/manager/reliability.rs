@@ -632,7 +632,7 @@ where
             .collect::<_>()
     }
 
-    pub fn entrys(&self) -> Vec<(K, V)> {
+    pub fn entries(&self) -> Vec<(K, V)> {
         self.cache
             .borrow()
             .iter()
@@ -726,7 +726,7 @@ impl ReliStation {
             station.db_compensate_history();
         }
 
-        // last second, dealing with last words, which could produce histroy records.
+        // last second, dealing with last words, which could produce history records.
         if lframe.is_some() {
             let lf = lframe.unwrap();
             let lu = lunit.as_ref();
@@ -751,7 +751,7 @@ impl ReliStation {
     pub(self) fn make_consistent(&self, lframe: Option<ReliLastFrame>, lunit: Option<String>) {
         let lu = lunit.as_ref();
 
-        // last first, dealing with more untrusted infomation.
+        // last first, dealing with more untrusted information.
         if lframe.is_some() {
             let lf = lframe.unwrap();
             for (_, station) in self.t_name.borrow().iter() {
@@ -759,7 +759,7 @@ impl ReliStation {
             }
         }
 
-        // other secondj, dealing with less untrusted infomation.
+        // other secondj, dealing with less untrusted information.
         for (_, station) in self.t_name.borrow().iter() {
             station.do_compensate_others(lu);
         }

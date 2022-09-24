@@ -35,7 +35,7 @@ repos:
       - id: cargo-clippy
         name: cargo clippy
         description: Lint rust sources
-        entry: bash -c 'cargo clippy -v -all --all-targets --all-features --tests --benches -- -v'
+        entry: bash -c 'export RUSTC_WRAPPER="" ; cargo clippy -v --all-targets --all-features --tests --benches --examples -- -v'
         language: rust
         files: \.rs$
         pass_filenames: false
@@ -50,7 +50,7 @@ repos:
       - id: cargo-fix
         name: cargo fix
         description: Check the package for errors.
-        entry: bash -c 'cargo fix -v --all --allow-dirty --allow-staged'
+        entry: bash -c 'cargo fix -v --broken-code --all-targets --all-features --tests --benches --examples --allow-dirty --allow-staged'
         language: rust
         files: \.rs$
         verbose: true

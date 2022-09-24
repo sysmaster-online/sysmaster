@@ -121,5 +121,5 @@ pub(super) enum NotifyState {
     Unknown,
     Ready,
     Reloading,
-    Stoping,
+    Stopping,
 }
