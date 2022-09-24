@@ -458,8 +458,8 @@ impl Unit {
         if self.load_state() != UnitLoadState::UnitLoaded {
             return Err(UnitActionError::UnitActionEInval);
         }
-        if active_state != UnitActiveState::UnitActivating && !self.conditions().condtions_test() {
-            log::debug!("Starting failed because condtion test failed");
+        if active_state != UnitActiveState::UnitActivating && !self.conditions().conditions_test() {
+            log::debug!("Starting failed because condition test failed");
             return Err(UnitActionError::UnitActionEInval);
         }
         if active_state != UnitActiveState::UnitActivating && !self.conditions().asserts_test() {
@@ -517,7 +517,7 @@ mod tests {
     use utils::logger;
 
     use crate::{
-        manager::{data::DataManager, unit::uload_util::UnitFile, UnitActiveState, UnitType},
+        manager::{data::DataManager, unit::uload_util::UnitFile, UnitType},
         plugin::Plugin,
     };
 
@@ -544,7 +544,7 @@ mod tests {
         let _unit = unit_init();
         let load_stat = _unit.load_unit();
         assert!(load_stat.is_ok());
-        /*let stat = _unit.start();//sub unit依赖 UnitManger，依赖关系不太合适，后续需要优化
+        /*let stat = _unit.start();//sub unit依赖 UnitManager，依赖关系不太合适，后续需要优化
         assert!(stat.is_ok());
         assert_eq!(_unit.current_active_state(),UnitActiveState::UnitActive);*/
     }
@@ -553,6 +553,6 @@ mod tests {
         let _unit = unit_init();
         let load_stat = _unit.load_unit();
         assert!(load_stat.is_ok());
-        assert!(_unit.conditions().condtions_test());
+        assert!(_unit.conditions().conditions_test());
     }
 }

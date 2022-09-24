@@ -72,9 +72,9 @@ impl JobRe {
         self.trigger.keys()
     }
 
-    pub(super) fn trigger_entrys(&self) -> Vec<(String, ())> {
+    pub(super) fn trigger_entries(&self) -> Vec<(String, ())> {
         self.trigger
-            .entrys()
+            .entries()
             .iter()
             .map(|(unit_id, _jt_data)| (unit_id.clone(), ()))
             .collect::<_>()
@@ -100,9 +100,9 @@ impl JobRe {
         }
     }
 
-    pub(super) fn suspends_entrys(&self) -> Vec<(String, ())> {
+    pub(super) fn suspends_entries(&self) -> Vec<(String, ())> {
         self.suspends
-            .entrys()
+            .entries()
             .iter()
             .map(|(js_key, _js_kdata)| (js_key.unit_id.clone(), ()))
             .collect::<_>()

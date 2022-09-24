@@ -13,16 +13,16 @@ index d0b1af0..e53b225 100644
 +++ b/src/core/main.c
 @@ -104,6 +104,7 @@ static enum {
  } arg_action = ACTION_RUN;
- 
+
  static const char *arg_bus_introspect = NULL;
 +static Manager *g_m = NULL;
- 
+
  /* Those variables are initialized to 0 automatically, so we avoid uninitialized memory access.  Real
   * defaults are assigned in reset_arguments() below. */
 @@ -194,14 +195,31 @@ static int manager_find_user_config_paths(char ***ret_files, char ***ret_dirs) {
          return 0;
  }
- 
+
 +static int prepare_reexecute(
 +                Manager *m,
 +                FILE **ret_f,
@@ -40,22 +40,22 @@ index d0b1af0..e53b225 100644
 +                const char **ret_error_message);
 +
  _noreturn_ static void freeze_or_exit_or_reboot(void) {
- 
+
          /* If we are running in a container, let's prefer exiting, after all we can propagate an exit code to
 -         * the container manager, and thus inform it that something went wrong. */
-+         * the container manager, and thus inform it that something went wrong. 
++         * the container manager, and thus inform it that something went wrong.
          if (detect_container() > 0) {
                  log_emergency("Exiting PID 1...");
                  _exit(EXIT_EXCEPTION);
          }
 +        */
- 
+
          if (arg_crash_reboot) {
                  log_notice("Rebooting in 10s...");
 @@ -212,6 +230,28 @@ _noreturn_ static void freeze_or_exit_or_reboot(void) {
                  log_emergency_errno(errno, "Failed to reboot: %m");
          }
- 
+
 +        if(g_m && getpid_cached() == 1){
 +                _cleanup_fdset_free_ FDSet *fds = NULL;
 +                struct rlimit saved_rlimit_nofile = RLIMIT_MAKE_CONST(0),
@@ -75,7 +75,7 @@ index d0b1af0..e53b225 100644
 +                             NULL,
 +                             NULL,
 +                             &error_message);
-+                log_emergency("Fail to reexecute after crash"); 
++                log_emergency("Fail to reexecute after crash");
 +        }
 +
          log_emergency("Freezing execution.");
@@ -84,12 +84,11 @@ index d0b1af0..e53b225 100644
 @@ -2846,6 +2886,8 @@ int main(int argc, char *argv[]) {
                  goto finish;
          }
- 
+
 +        g_m = m;
 +
          m->timestamps[MANAGER_TIMESTAMP_KERNEL] = kernel_timestamp;
          m->timestamps[MANAGER_TIMESTAMP_INITRD] = initrd_timestamp;
          m->timestamps[MANAGER_TIMESTAMP_USERSPACE] = userspace_timestamp;
--- 
+--
 2.30.0
-

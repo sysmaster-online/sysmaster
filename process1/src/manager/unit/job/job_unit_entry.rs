@@ -55,7 +55,7 @@ impl JobUnit {
     pub(super) fn do_trigger(&self) -> (Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>) {
         let (cur_trigger, merge_trigger) = self.data.borrow_mut().do_next_trigger();
 
-        // record current infomation of the trigger first, which(run_kind + stage) could be changed after running.
+        // record current information of the trigger first, which(run_kind + stage) could be changed after running.
         let t_jinfo = JobInfo::map(&cur_trigger);
 
         // operate job

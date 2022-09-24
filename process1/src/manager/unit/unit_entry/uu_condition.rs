@@ -112,7 +112,7 @@ impl UeCondition {
         return ret;
     }
 
-    pub(super) fn condtions_test(&self) -> bool {
+    pub(super) fn conditions_test(&self) -> bool {
         let conditions = &self.conditions.borrow().0;
         Self::condition_vec_test(conditions)
     }

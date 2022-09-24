@@ -14,12 +14,11 @@ index 335f59d..0ab45f1 100644
 @@ -779,7 +779,7 @@ int running_in_chroot(void) {
          if (getenv_bool("SYSTEMD_IGNORE_CHROOT") > 0)
                  return 0;
- 
+
 -        r = files_same("/proc/1/root", "/", 0);
 +        r = files_same("/proc/self/root", "/", 0);
          if (r < 0)
                  return r;
- 
--- 
-2.30.0
 
+--
+2.30.0

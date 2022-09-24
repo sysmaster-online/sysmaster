@@ -205,7 +205,7 @@ impl Plugin {
         );
         for file_item in lib_path.iter() {
             log::debug!(
-                "begin loading  plugin library in libraray path [{:?}]",
+                "begin loading  plugin library in library path [{:?}]",
                 file_item
             );
             for entry in WalkDir::new(file_item)
@@ -222,10 +222,10 @@ impl Plugin {
                     let file_name = path.file_name();
                     let result = Self::load_plugin(self, file_name.unwrap(), &mut reload_handler);
                     if let Ok(_r) = result {
-                        log::info!("Plugin load unit plugin[{:?}] sucessfull", file_name);
+                        log::info!("Plugin load unit plugin[{:?}] l", file_name);
                     } else if let Err(_e) = result {
                         log::error!(
-                            "Plugin load unit plugin[{:?}] failed, deatil is {}",
+                            "Plugin load unit plugin[{:?}] failed, detail is {}",
                             file_name,
                             _e.to_string()
                         );
@@ -266,7 +266,7 @@ impl Plugin {
                         let mut wloadlibs = self.load_libs.write().unwrap();
                         (*wloadlibs).insert(unit_type, lib.clone());
                     }
-                    log::info!("loading dynamic lib sucessfully");
+                    log::info!("loading dynamic lib successfully");
                 }
                 Err(e) => error!("error loading Unable to load dynamic lib, err {:?}", e),
             }
@@ -332,7 +332,7 @@ impl Plugin {
                         let dir_str = new_libdir.to_str().unwrap();
                         let mut w = self.library_dir.write().unwrap();
                         (*w).push(dir_str.to_string());
-                        log::debug!("update_library_path set [{}] into library load path variable sucessful", dir_str);
+                        log::debug!("update_library_path set [{}] into library load path variable successful", dir_str);
                         set_flag = true;
                     }
                 }

@@ -18,7 +18,7 @@
 //!    load阶段将unit从配置文件中加载到process1内部，包括配置unit对象创建，配置文件解析，unit对象属性填充。
 //! ## unit对象创建
 //!    process1参考systemd，初步规划包含9种类型的unit，每种类型的配置文件命名规则为*.XXX,XXX指具体的unit类型，如service，slice，target等。
-//!    
+//!
 //! 包含以下模块
 //! u_entry: unit的接口抽象实体，是所有unit—的父类，子类可以实现unitObj trait对象
 //! uf_interface是内部管理的实体对象，对Unit进行封装，在process1内部只看到UnitX对象，看不到Unit，对Unit进行隔离

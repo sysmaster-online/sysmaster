@@ -116,8 +116,8 @@ impl UnitX {
         )
     }
 
-    pub(in crate::manager::unit) fn activeted(&self) -> bool {
-        // the unit is in activating or actived.
+    pub(in crate::manager::unit) fn activated(&self) -> bool {
+        // the unit is in activating or activated.
         if IN_SET!(
             self.0.current_active_state(),
             UnitActiveState::UnitInActive,

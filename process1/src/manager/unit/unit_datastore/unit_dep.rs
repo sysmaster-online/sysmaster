@@ -258,7 +258,7 @@ impl UnitDepData {
         &mut self,
         source: Rc<UnitX>,
     ) -> &mut HashMap<UnitRelations, HashMap<Rc<UnitX>, UnitDepMask>> {
-        // verify existance
+        // verify existence
         if let None = self.t.get(&source) {
             // nothing exists, pad it.
             self.t.insert(Rc::clone(&source), HashMap::new());
@@ -275,7 +275,7 @@ impl UnitDepData {
         source: Rc<UnitX>,
         relation: UnitRelations,
     ) -> &mut HashMap<Rc<UnitX>, UnitDepMask> {
-        // verify existance
+        // verify existence
         let sv = self.get_mut_sv_pad(source);
         if let None = sv.get(&relation) {
             // nothing exists, pad it.

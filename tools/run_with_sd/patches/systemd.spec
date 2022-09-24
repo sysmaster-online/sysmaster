@@ -11,5 +11,5 @@ Patch0101:	0001-fake-pid1-by-env.patch
 Patch0102:	0002-detect-virt.patch
 Patch0103:	0003-reap-child-by-systemd.patch
 Patch0104:	0004-add-signal.patch
-Patch0105:	0005-donot-wait-in-shutdown.patch
+Patch0105:	0005-do-not-wait-in-shutdown.patch
 Patch0106:	0006-reexec-when-crash.patch

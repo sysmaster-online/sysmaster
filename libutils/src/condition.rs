@@ -8,7 +8,7 @@ pub enum ConditionType {
     _MAX,
 }
 
-// condtion 判断条件是否满足，如果条件以|开头，表示触发条件，触发条件只要有一个满足，则可以了
+// condition 判断条件是否满足，如果条件以|开头，表示触发条件，触发条件只要有一个满足，则可以了
 //条件以!开始表示反转，
 //其他，表示普通条件
 pub struct Condition {
@@ -95,7 +95,7 @@ mod test {
             project_root.to_str().unwrap().to_string(),
         );
         let t_result = cond_path_exists.test();
-        assert!(t_result, "condtion_path exists is not true");
+        assert!(t_result, "condition_path exists is not true");
         let cond_path_exists_revert = Condition::new(
             ConditionType::PathExists,
             0,
@@ -103,7 +103,7 @@ mod test {
             project_root.to_str().unwrap().to_string(),
         );
         let f_result = cond_path_exists_revert.test();
-        assert!(f_result == false, "condtion test path exist revert error");
+        assert!(f_result == false, "condition test path exist revert error");
         let cond_file_not_empty = Condition::new(
             ConditionType::FileNotEmpty,
             0,

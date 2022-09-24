@@ -220,7 +220,7 @@ impl SocketMng {
         self.state().to_unit_active_state()
     }
 
-    pub(super) fn enter_runing(&self, fd: i32) {
+    pub(super) fn enter_running(&self, fd: i32) {
         if self.comm.um().has_stop_job(self.comm.unit().get_id()) {
             if fd >= 0 {
                 *self.refused.borrow_mut() += 1;
@@ -616,7 +616,7 @@ impl SocketMng {
                 }
                 _ => {
                     log::error!(
-                        "control commad should not exit， current state is : {:?}",
+                        "control command should not exit， current state is : {:?}",
                         self.state()
                     );
                     assert!(false);

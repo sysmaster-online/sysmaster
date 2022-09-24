@@ -1,4 +1,4 @@
-use super::{manager::Manager, MngErrno};
+use super::manager::Manager;
 
 use epoll;
 use event::{EventType, Events, Source};
@@ -109,7 +109,7 @@ impl Source for MountMonitor {
         0
     }
 
-    fn dispatch(&self, e: &Events) -> Result<i32, Error> {
+    fn dispatch(&self, _e: &Events) -> Result<i32, Error> {
         let epfd = self.mount_entry_monitor.borrow().epfd;
         // drain out all events.
         while epoll::wait(epfd, 0, &mut self.mount_entry_monitor.borrow_mut().events).unwrap() > 0 {
