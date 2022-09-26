@@ -20,15 +20,14 @@ const SWAP_BIN: &str = "/usr/sbin/swapon";
 const FSTAB_PATH: &str = "/etc/fstab";
 
 fn mount_one(fstab_item: &FSTabItem) -> i32 {
-    let mount_status;
     // -.mount is different. It has already been mounted before
     // fstab.service is started. We mount it as rw.
-    if fstab_item.mount_point == "/" {
-        mount_status = Command::new(MOUNT_BIN)
+    let mount_status = if fstab_item.mount_point == "/" {
+        Command::new(MOUNT_BIN)
             .args(["/", "--options", "remount", "-w"])
             .status()
     } else {
-        mount_status = Command::new(MOUNT_BIN)
+        Command::new(MOUNT_BIN)
             .args([
                 &fstab_item.device_spec,
                 &fstab_item.mount_point,
@@ -38,7 +37,7 @@ fn mount_one(fstab_item: &FSTabItem) -> i32 {
                 &fstab_item.fs_type,
             ])
             .status()
-    }
+    };
     let status = match mount_status {
         Ok(status) => status,
         Err(_) => {
@@ -62,7 +61,7 @@ fn mount_one(fstab_item: &FSTabItem) -> i32 {
         return -1;
     }
     log::info!("Mounted {}", &fstab_item.device_spec);
-    return 0;
+    0
 }
 
 fn swap_on(fstab_item: &FSTabItem) -> i32 {
@@ -92,13 +91,13 @@ fn swap_on(fstab_item: &FSTabItem) -> i32 {
         return -1;
     }
     log::info!("Swapped on {}", &fstab_item.device_spec);
-    return 0;
+    0
 }
 
 fn consume_one(fstab_item: &mut FSTabItem) {
     let r = match fstab_item.fs_type.as_str() {
-        "swap" => swap_on(&fstab_item),
-        _ => mount_one(&fstab_item),
+        "swap" => swap_on(fstab_item),
+        _ => mount_one(fstab_item),
     };
     // set state to 1 if succeeded, -1 if failed.
     fstab_item.state = if r == 0 { 1 } else { -1 };

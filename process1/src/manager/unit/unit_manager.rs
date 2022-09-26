@@ -96,7 +96,7 @@ pub struct UnitManager {
 }
 
 fn mount_point_to_unit_name(mount_point: &str) -> String {
-    let mut res = String::from(mount_point).replace("/", "-") + ".mount";
+    let mut res = String::from(mount_point).replace('/', "-") + ".mount";
     if res != "-.mount" {
         res = String::from(&res[1..])
     }
@@ -369,15 +369,13 @@ impl UnitManager {
                     let unit_name = mount_point_to_unit_name(mount.mount_point.to_str().unwrap());
                     if dead_mount_set.contains(unit_name.as_str()) {
                         dead_mount_set.remove(unit_name.as_str());
-                    } else {
-                        if let Some(unit) = self.load.load_unit(unit_name.as_str()) {
-                            match unit.start() {
-                                Ok(_) => {
-                                    log::debug!("{} change to mounted.", unit_name)
-                                }
-                                Err(_) => {
-                                    log::error!("Failed to start {}", unit_name)
-                                }
+                    } else if let Some(unit) = self.load.load_unit(unit_name.as_str()) {
+                        match unit.start() {
+                            Ok(_) => {
+                                log::debug!("{} change to mounted.", unit_name)
+                            }
+                            Err(_) => {
+                                log::error!("Failed to start {}", unit_name)
                             }
                         }
                     }

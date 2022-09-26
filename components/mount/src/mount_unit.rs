@@ -38,7 +38,7 @@ impl UnitObj for MountUnit {
     }
 
     fn current_active_state(&self) -> UnitActiveState {
-        self.mng.to_unit_state()
+        self.mng.mount_state_to_unit_state()
     }
 
     fn attach_unit(&self, unit: Rc<process1::manager::Unit>) {
@@ -81,9 +81,7 @@ impl UnitSubClass for MountUnit {
 }
 
 impl UnitMngUtil for MountUnit {
-    fn attach(&self, _um: Rc<process1::manager::UnitManager>) {
-        return;
-    }
+    fn attach(&self, _um: Rc<process1::manager::UnitManager>) {}
 }
 
 impl Default for MountUnit {

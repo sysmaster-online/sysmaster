@@ -423,6 +423,10 @@ mod tests {
         match t_thread {
             Ok(ForkResult::Parent { child }) => {
                 println!("child pid is: {:?}", child);
+                if !nix::unistd::getuid().is_root() {
+                    println!("Unprivileged users cannot attach process to system.slice, skipping.");
+                    return;
+                }
                 let ret = super::cg_attach(child, &cg_path);
                 assert_eq!(ret.is_err(), false);
                 pid = child;
