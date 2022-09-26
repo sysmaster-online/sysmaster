@@ -13,7 +13,7 @@ enum MountState {
 }
 
 impl MountState {
-    fn to_unit_state(&self) -> UnitActiveState {
+    fn mount_state_to_unit_state(&self) -> UnitActiveState {
         match *self {
             MountState::Dead => UnitActiveState::UnitInActive,
             MountState::Mounted => UnitActiveState::UnitActive,
@@ -59,8 +59,8 @@ impl MountMng {
             );
         }
 
-        let old_unit_state = old_state.to_unit_state();
-        let new_unit_state = new_state.to_unit_state();
+        let old_unit_state = old_state.mount_state_to_unit_state();
+        let new_unit_state = new_state.mount_state_to_unit_state();
         if let Some(_u) = self.comm.unit() {
             _u.notify(
                 old_unit_state,
@@ -73,8 +73,8 @@ impl MountMng {
         *self.state.borrow()
     }
 
-    pub fn to_unit_state(&self) -> UnitActiveState {
-        self.state().to_unit_state()
+    pub fn mount_state_to_unit_state(&self) -> UnitActiveState {
+        self.state().mount_state_to_unit_state()
     }
 }
 

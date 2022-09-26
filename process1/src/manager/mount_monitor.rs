@@ -11,8 +11,10 @@ use std::rc::Rc;
 use utils::{Error, Result};
 
 pub struct MountMonitorEntry {
+    #[allow(dead_code)]
     file: File,
     epfd: i32,
+    #[allow(dead_code)]
     epevent: epoll::Event,
     events: Vec<epoll::Event>,
 }
@@ -67,6 +69,7 @@ impl MountMonitor {
             mount_entry_monitor: RefCell::new(mount_entry_monitor),
         }
     }
+    #[allow(dead_code)]
     pub(super) fn parser(&self) -> Result<i32, Error> {
         let mut mount_data = String::new();
         File::open("/proc/self/mountinfo")
@@ -114,7 +117,9 @@ impl Source for MountMonitor {
         // drain out all events.
         while epoll::wait(epfd, 0, &mut self.mount_entry_monitor.borrow_mut().events).unwrap() > 0 {
         }
-        self.manager.dispatch_mountinfo();
+        if let Err(why) = self.manager.dispatch_mountinfo() {
+            log::error!("Failed to dispatch mountinfo, ignoring: {:?}", why);
+        }
         Ok(0)
     }
 

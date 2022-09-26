@@ -30,7 +30,7 @@ impl FSTabItem {
             real_path = String::from("/dev/disk/by-uuid/") + &uuid;
         }
         FSTabItem {
-            device_spec: String::from(real_path),
+            device_spec: real_path,
             mount_point: String::from(input[1]),
             fs_type: String::from(input[2]),
             options: String::from(input[3]),
@@ -55,16 +55,14 @@ where
 pub fn parse(filename: &str) -> Vec<FSTabItem> {
     let mut res: Vec<FSTabItem> = Vec::new();
     if let Ok(lines) = read_lines(filename) {
-        for line in lines {
-            if let Ok(item_raw) = line {
-                let item = item_raw.trim();
-                if item.starts_with("#") || item.len() == 0 {
-                    continue;
-                }
-                let mount: Vec<&str> = item.split_whitespace().collect();
-                let fstab_item = FSTabItem::new(mount);
-                res.push(fstab_item);
+        for item_raw in lines.flatten() {
+            let item = item_raw.trim();
+            if item.starts_with('#') || item.is_empty() {
+                continue;
             }
+            let mount: Vec<&str> = item.split_whitespace().collect();
+            let fstab_item = FSTabItem::new(mount);
+            res.push(fstab_item);
         }
     } else {
         log::error!("Failed to open {}", filename);

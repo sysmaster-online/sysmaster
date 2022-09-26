@@ -240,6 +240,10 @@ mod tests {
         if !has_watchdog0() {
             return;
         }
+        if !nix::unistd::getuid().is_root() {
+            println!("Unprivileged users cannot config watchdog, skipping.");
+            return;
+        }
         let mut watchdog = HardwareWatchdog::default();
         watchdog.config(Some(Duration::from_secs(10))).unwrap();
         watchdog.feed().unwrap();
@@ -250,6 +254,10 @@ mod tests {
         if !has_watchdog0() {
             return;
         }
+        if !nix::unistd::getuid().is_root() {
+            println!("Unprivileged users cannot config watchdog, skipping.");
+            return;
+        }
         let mut watchdog = HardwareWatchdog::default();
         watchdog.config(Some(Duration::from_secs(10))).unwrap();
         watchdog.close().unwrap();
@@ -258,6 +266,10 @@ mod tests {
     #[test]
     fn test_config() {
         if !has_watchdog0() {
+            return;
+        }
+        if !nix::unistd::getuid().is_root() {
+            println!("Unprivileged users cannot config watchdog, skipping.");
             return;
         }
         let mut watchdog = HardwareWatchdog::default();
