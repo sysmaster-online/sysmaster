@@ -70,7 +70,9 @@ unit配置定义包含三个部分，具体描述如下：
 [Install] Unit安装时（安装概念，见后续备注）的配置项
  ```
 
-#### unit对象加载
+unit配置使用toml格式，通过对toml文件解析，填充到具体unit对象中，unit加载流程见下一章节
+
+#### unit的加载
 
    unit对象加载是所有Unit执行后续的动作的前提，通过解析Unit的对应的配置文件，生成Unit对象，并加载到sysmaster内部，具体流程如下：
 
@@ -83,3 +85,7 @@ unit对象包含unit以及子Unit，对象关系如下图：
 ![unit对象关系](../res/unit_c_diagram.jpg#pic_center)
 
 unit为unitManger管理的单元，subUnit为子unit，每种类型都要求实现unitObj接口，不同类型有不同的的实现，通过Plugin框架来创建。
+
+#### unit对象的存储
+
+每个配置文件，解析完成之后，会生成一个unit对象，unit全局唯一，同一保存到datastore中，datastore使用hashmap，并且使用name作为key来保存unit对象。使用过程中，unit使用引用的方式更新数据，当前sysmater使用的是单线程，因此不考虑数据并发问题。

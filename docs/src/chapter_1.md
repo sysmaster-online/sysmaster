@@ -22,4 +22,9 @@ Sysmaster核心架构包含UnitManager，DataStore，JobEngine，EventEngine，P
 
 ![avatar](../res/architecture.jpg)
 
-UnitManager: 管理Unit，从配置文件到Unit对象的加载，以及subUnit类的加载
+sysmaster-init：1号进程，保持简单，只盲等待，并定期监听sysmaster-core的心跳，巡检core的状态。
+unitManager: 管理Unit，从配置文件到Unit对象的加载，以及subUnit类的加载
+dataStore：保存系统中所有加载的unit对象，实时更新状态
+eventEngine：事件驱动引擎，接收外部事件，驱动unit状态机
+jobEngine：工作任务引擎，unit状态的变化，通过job驱动，job支持事务的概念，支持会滚机制，保障unit状态迁移的原子性。
+potoServer：监听接收 pctrl的命令，执行对应的unit动作。
