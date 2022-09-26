@@ -52,7 +52,7 @@ pub fn proc_cmdline_get_bool(key: &str) -> Result<bool, Error> {
         return Ok(false);
     }
 
-    let r = conf_parser::parse_boolen(&val.unwrap())?;
+    let r = conf_parser::parse_boolean(&val.unwrap())?;
 
     Ok(r)
 }

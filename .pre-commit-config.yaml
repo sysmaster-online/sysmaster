@@ -54,6 +54,21 @@ repos:
         language: rust
         files: \.rs$
         verbose: true
+      - id: cargo-build
+        name: cargo build
+        description: build the package for errors.
+        entry: bash -c 'cargo build --release --all -v'
+        language: rust
+        files: \.(rs|toml|sh)$
+        pass_filenames: false
+      - id: cargo-test
+        name: cargo test
+        description: test the package for errors.
+        entry: bash -c 'RUST_BACKTRACE=1 cargo test --all --release -v -- --nocapture --test-threads=1'
+        language: rust
+        files: \.(rs|toml|sh)$
+        pass_filenames: false
+
 #      - id: cargo-check
 #        name: cargo check
 #        description: Check the package for errors.

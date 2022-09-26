@@ -137,7 +137,7 @@ impl UnitRTData {
             .db
             .dep_insert(source, relation, target, add_ref, 1 << 2)
         {
-            log::error!("dispatch_target_dep_queue add defalt dep err {:?}", _e);
+            log::error!("dispatch_target_dep_queue add default dep err {:?}", _e);
             return;
         }
     }
@@ -164,7 +164,7 @@ impl UnitRTData {
                             continue;
                         }
                         if !unit.default_dependencies() || !dep_target.default_dependencies() {
-                            log::debug!("default dependecies option is false");
+                            log::debug!("default dependencies option is false");
                             continue;
                         }
                         if self.db.dep_is_dep_atom_with(

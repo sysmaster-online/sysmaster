@@ -33,7 +33,7 @@ pub fn init_log_with_default(app_name: &str, log_level: u32) {
     set_logger(logger);
 }
 
-/// Init logger whith config yaml file.
+/// Init logger with config yaml file.
 ///
 /// [`path`] the config file path
 /// example

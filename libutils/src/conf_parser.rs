@@ -7,12 +7,12 @@ pub enum Base {
     Decimal,
 }
 
-pub fn parse_boolen(item: &str) -> Result<bool> {
+pub fn parse_boolean(item: &str) -> Result<bool> {
     match &item.to_lowercase() as &str {
         "1" | "yes" | "y" | "true" | "t" | "on" => Ok(true),
         "0" | "no" | "n" | "false" | "f" | "off" => Ok(false),
         _ => Err(Error::ParseBoolError(
-            "invalid string to boolen".to_string(),
+            "invalid string to boolean".to_string(),
         )),
     }
 }
@@ -140,30 +140,30 @@ mod test {
     }
 
     #[test]
-    fn test_parse_boolen() {
-        use crate::conf_parser::parse_boolen;
+    fn test_parse_boolean() {
+        use crate::conf_parser::parse_boolean;
 
-        assert_eq!(parse_boolen("1").unwrap(), true);
-        assert_eq!(parse_boolen("y").unwrap(), true);
-        assert_eq!(parse_boolen("Y").unwrap(), true);
-        assert_eq!(parse_boolen("yes").unwrap(), true);
-        assert_eq!(parse_boolen("YES").unwrap(), true);
-        assert_eq!(parse_boolen("true").unwrap(), true);
-        assert_eq!(parse_boolen("TRUE").unwrap(), true);
-        assert_eq!(parse_boolen("on").unwrap(), true);
-        assert_eq!(parse_boolen("ON").unwrap(), true);
+        assert_eq!(parse_boolean("1").unwrap(), true);
+        assert_eq!(parse_boolean("y").unwrap(), true);
+        assert_eq!(parse_boolean("Y").unwrap(), true);
+        assert_eq!(parse_boolean("yes").unwrap(), true);
+        assert_eq!(parse_boolean("YES").unwrap(), true);
+        assert_eq!(parse_boolean("true").unwrap(), true);
+        assert_eq!(parse_boolean("TRUE").unwrap(), true);
+        assert_eq!(parse_boolean("on").unwrap(), true);
+        assert_eq!(parse_boolean("ON").unwrap(), true);
 
-        assert_eq!(parse_boolen("0").unwrap(), false);
-        assert_eq!(parse_boolen("n").unwrap(), false);
-        assert_eq!(parse_boolen("N").unwrap(), false);
-        assert_eq!(parse_boolen("no").unwrap(), false);
-        assert_eq!(parse_boolen("NO").unwrap(), false);
-        assert_eq!(parse_boolen("false").unwrap(), false);
-        assert_eq!(parse_boolen("FALSE").unwrap(), false);
-        assert_eq!(parse_boolen("off").unwrap(), false);
-        assert_eq!(parse_boolen("OFF").unwrap(), false);
+        assert_eq!(parse_boolean("0").unwrap(), false);
+        assert_eq!(parse_boolean("n").unwrap(), false);
+        assert_eq!(parse_boolean("N").unwrap(), false);
+        assert_eq!(parse_boolean("no").unwrap(), false);
+        assert_eq!(parse_boolean("NO").unwrap(), false);
+        assert_eq!(parse_boolean("false").unwrap(), false);
+        assert_eq!(parse_boolean("FALSE").unwrap(), false);
+        assert_eq!(parse_boolean("off").unwrap(), false);
+        assert_eq!(parse_boolean("OFF").unwrap(), false);
 
-        assert_eq!(parse_boolen("process").is_err(), true);
-        assert_eq!(parse_boolen("in").is_err(), true);
+        assert_eq!(parse_boolean("process").is_err(), true);
+        assert_eq!(parse_boolean("in").is_err(), true);
     }
 }
