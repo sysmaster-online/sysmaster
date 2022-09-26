@@ -4,7 +4,7 @@
 //! 2.执行阶段：创建unit实例，执行unit定义的具体动作。
 //! # 整体抽象
 //! Unit为process1管理的基本单元抽象，systemd原来包含了9中类型，process1支持Unit扩展成多种类型，整体架构如下：
-//! ![avatar][../../../../doc/img/unit_c_diagram.jpg]
+//! ![avatar][../../../../docs/res/unit_c_diagram.jpg]
 //! 包含两个核心对象：UnitObj，Unit以及一个子Unit的实现。
 //! UnitObj是子类的接口抽象，包含子类必须实现的接口，在rust中使用trait表示,具体定义见['UnitObj']
 //! # 配置项说明
