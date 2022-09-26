@@ -171,7 +171,7 @@ impl MountPoint {
 
     fn mount(&self) -> Result<(), Errno> {
         if self.callback.is_some() && !self.callback.unwrap()() {
-            log::debug!("callback is not satified");
+            log::debug!("callback is not satisfied");
             return Ok(());
         }
 

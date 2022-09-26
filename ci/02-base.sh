@@ -6,7 +6,7 @@ set -e
 
 #cargo clippy --all-targets --all-features --tests --benches -- -D warnings
 #cargo clippy --all-targets --all-features --tests --benches -- -v
-cargo clean
+#cargo clean
 
 #cargo check
 #cargo clean
@@ -19,6 +19,6 @@ cargo clean
 #cargo rustc --bin $bin_name -- -D warnings -v
 #done
 
-cargo build --release --all -v
-RUST_BACKTRACE=1 cargo test --all --release -v -- --nocapture --test-threads=1
+#cargo build --release --all -v
+#RUST_BACKTRACE=1 cargo test --all --release -v -- --nocapture --test-threads=1
 #RUST_BACKTRACE=1 cargo test --all  --release -v -- --nocapture

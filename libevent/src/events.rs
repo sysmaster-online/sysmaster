@@ -323,7 +323,7 @@ impl EventsData {
 
     /// move the event out of the listening queue
     pub(self) fn source_offline(&mut self, source: &Rc<dyn Source>) -> Result<i32> {
-        // unneed unregister when source is allready Offline
+        // unneed unregister when source is already Offline
         if let Some(event_state) = self.state.get(&source.token()) {
             if *event_state == EventState::Off {
                 return Ok(0);

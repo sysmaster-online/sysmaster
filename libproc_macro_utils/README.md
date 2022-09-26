@@ -72,5 +72,3 @@ let _service = sp.conf_file_parse(service_str).unwrap();
 assert_eq!(_service.get_service_type(), ServiceType::ServiceForking);
 assert_eq!(_service.get_exec_stop().unwrap(),vec!["/usr/bin/kill $MAINPID"]);
 ```
-
-
