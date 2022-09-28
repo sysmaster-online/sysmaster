@@ -1,3 +1,4 @@
+//! This crate provides common, functions for unit tests
 use std::{
     env,
     fs::read_dir,
@@ -5,6 +6,7 @@ use std::{
     path::PathBuf,
 };
 
+/// get the source project root path
 pub fn get_project_root() -> io::Result<PathBuf> {
     let path = env::current_dir()?;
 
