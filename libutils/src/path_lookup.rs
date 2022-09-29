@@ -4,16 +4,23 @@ const ETC_SYSTEM_PATH: &str = "/etc/process1";
 const RUN_SYSTEM_PATH: &str = "/run/process1";
 const LIB_SYSTEM_PATH: &str = "/usr/lib/process1";
 
+/// struct LookupPaths
 #[derive(Debug, Clone)]
 pub struct LookupPaths {
+    /// Used to search fragment, dropin, updated
     pub search_path: Vec<String>,
+    /// generator paths
     pub generator: String,
+    /// generator early paths
     pub generator_early: String,
+    /// generator late paths
     pub generator_late: String,
+    /// transient paths
     pub transient: String,
 }
 
 impl LookupPaths {
+    /// new
     pub fn new() -> Self {
         LookupPaths {
             generator: String::from(""),
@@ -24,19 +31,19 @@ impl LookupPaths {
         }
     }
 
+    /// init lookup paths
     pub fn init_lookup_paths(&mut self) {
         let devel_path = || {
             let out_dir = env::var("OUT_DIR").unwrap_or_else(|_x| {
                 let _tmp_str: Option<&'static str> = option_env!("OUT_DIR");
-                return _tmp_str.unwrap_or("").to_string();
+                _tmp_str.unwrap_or("").to_string()
             });
             if out_dir.is_empty() {
-                let ld_path = env::var("LD_LIBRARY_PATH").map_or("".to_string(), |_v| {
-                    let _tmp = _v.split(":").collect::<Vec<_>>()[0];
+                env::var("LD_LIBRARY_PATH").map_or("".to_string(), |_v| {
+                    let _tmp = _v.split(':').collect::<Vec<_>>()[0];
                     let _tmp_path = _tmp.split("target").collect::<Vec<_>>()[0];
                     _tmp_path.to_string()
-                });
-                return ld_path;
+                })
             } else {
                 out_dir
             }

@@ -1,3 +1,5 @@
+//! Daemon Process1 or Systemd, restart the process when it exits
+
 use std::collections::VecDeque;
 use std::io::Error;
 use std::mem::MaybeUninit;
