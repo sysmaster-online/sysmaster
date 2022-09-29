@@ -32,12 +32,3 @@ done
 filelist=`git diff --name-only HEAD~$changenum HEAD | tr '\n' ' '`
 export PATH="$PATH:/home/jenkins/.local/bin"
 pre-commit run -vvv --files ${filelist}
-
-
-# remove tmp
-for rustlist in `git diff --name-only HEAD~$changenum | grep \.rs$ | tr '\n' ' '`
-do
-sed -i '/#!\[deny(missing_docs)]/d' $rustlist 2>/dev/null || true
-sed -i '/#!\[deny(clippy::all)]/d' $rustlist 2>/dev/null || true
-sed -i '/#!\[deny(warnings)]/d' $rustlist 2>/dev/null || true
-done
