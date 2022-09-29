@@ -10,7 +10,7 @@ newnum=`git rev-list HEAD --count`
 changenum=$[newnum - oldnum]
 
 # add doc for src code
-for rustlist in `git diff --name-only HEAD~$changenum HEAD | grep \.rs$ | tr '\n' ' '`
+for rustlist in `git diff --name-only HEAD~$changenum | grep \.rs$ | tr '\n' ' '`
 do
 egrep '#!\[deny\(missing_docs\)\]' $rustlist || sed -i '1i\#![deny(missing_docs)]' $rustlist 2>/dev/null || true
 egrep '#!\[deny\(clippy::all\)\]' $rustlist || sed -i '1i\#![deny(clippy::all)]' $rustlist 2>/dev/null || true

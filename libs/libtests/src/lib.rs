@@ -1,19 +1,19 @@
+//! This crate provides common, functions for unit tests
 use std::{
     env,
-    ffi::OsString,
     fs::read_dir,
     io::{self, ErrorKind},
     path::PathBuf,
 };
 
+/// get the source project root path
 pub fn get_project_root() -> io::Result<PathBuf> {
     let path = env::current_dir()?;
-    let mut path_ancestors = path.as_path().ancestors();
 
-    while let Some(p) = path_ancestors.next() {
+    for p in path.as_path().ancestors() {
         let has_cargo = read_dir(p)?
             .into_iter()
-            .any(|p| p.unwrap().file_name() == OsString::from("Cargo.lock"));
+            .any(|p| p.unwrap().file_name().eq("Cargo.lock"));
         if has_cargo {
             return Ok(PathBuf::from(p));
         }
