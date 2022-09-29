@@ -195,7 +195,10 @@ impl ServiceMng {
             Some(cmd) => {
                 match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
-                    Err(_e) => self.enter_dead(ServiceResult::FailureResources),
+                    Err(_e) => {
+                        self.enter_dead(ServiceResult::FailureResources);
+                        return;
+                    }
                 }
                 self.set_state(ServiceState::Condition);
             }
@@ -213,7 +216,10 @@ impl ServiceMng {
             Some(cmd) => {
                 match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
-                    Err(_e) => self.enter_dead(ServiceResult::FailureResources),
+                    Err(_e) => {
+                        self.enter_dead(ServiceResult::FailureResources);
+                        return;
+                    }
                 }
                 self.set_state(ServiceState::StartPre);
             }
@@ -296,6 +302,7 @@ impl ServiceMng {
                             "Failed to run start post service: {}",
                             self.comm.unit().get_id()
                         );
+                        return;
                     }
                 }
                 self.set_state(ServiceState::StartPost);
@@ -338,6 +345,11 @@ impl ServiceMng {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
                         log::error!("Failed to run stop service: {}", self.comm.unit().get_id());
+                        self.enter_signal(
+                            ServiceState::StopSigterm,
+                            ServiceResult::FailureResources,
+                        );
+                        return;
                     }
                 }
                 self.set_state(ServiceState::Stop);
@@ -347,6 +359,8 @@ impl ServiceMng {
     }
 
     fn enter_stop_by_notify(&self) {
+        // todo
+        // start a timer
         self.set_state(ServiceState::StopSigterm);
     }
 
@@ -367,6 +381,7 @@ impl ServiceMng {
                             ServiceResult::FailureResources,
                         );
                         log::error!("Failed to run stop service: {}", self.comm.unit().get_id());
+                        return;
                     }
                 }
                 self.set_state(ServiceState::StopPost);
@@ -402,6 +417,7 @@ impl ServiceMng {
                     Err(_e) => {
                         log::error!("failed to start service: {}", self.comm.unit().get_id());
                         self.enter_running(ServiceResult::Success);
+                        return;
                     }
                 }
                 self.set_state(ServiceState::Reload);
