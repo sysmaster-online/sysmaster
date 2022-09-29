@@ -468,6 +468,10 @@ mod tests {
 
     #[test]
     fn test_cg_controllers() {
+        if !nix::unistd::getuid().is_root() {
+            println!("Unprivileged users cannot cg_controllers, skipping.");
+            return;
+        }
         let ret = super::cg_controllers();
         assert_ne!(ret.is_err(), true);
 
