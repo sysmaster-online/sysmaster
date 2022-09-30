@@ -1,8 +1,7 @@
 //! # rc-local-generator
 //!
-//! rc-local-generator is a generator that checks whether /etc/rc.local exists and is executable,
-//! and if it is, pulls the rc-local.service unit into the boot process.
-//!  This unit is responsible for running this script during late boot.
+//! When /etc/rc.local exists and is executable, it will be encapsulated as rc-local.service service
+//! and added to the end of the system startup process
 
 mod rc_local_generator;
 use rc_local_generator::*;
@@ -11,7 +10,7 @@ use utils::logger;
 fn main() {
     logger::init_log_with_console("rc_local_generator", 4);
 
-    /*judge whether /etc/rc.local can be executed*/
+    // Determine if rc.local exists and is executable
     let e = check_executable(RC_LOCAL_PATH);
     match e {
         Ok(_) => {

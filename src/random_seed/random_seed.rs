@@ -705,7 +705,7 @@ mod test {
         println!("get_random_size:{:?}", data1);
         assert!(get_size >= 512);
         let mut file = fs::File::create("random-seed").unwrap();
-        assert_eq!(loop_write(&mut file, &mut data1), true);
+        assert!(loop_write(&mut file, &data1));
         fs::remove_file("random-seed").unwrap();
         // assert_eq!(data1, data.to_vec());
     }
@@ -718,7 +718,7 @@ mod test {
         assert!(getxattr(&mut file, &mut str).unwrap());
         assert_eq!(str, "1");
         xattr::remove("xattr_test.txt", "user.random-seed-credittable").unwrap();
-        assert_eq!(getxattr(&mut file, &mut str).unwrap(), false);
+        assert!(!getxattr(&mut file, &mut str).unwrap());
         fs::remove_file("xattr_test.txt").unwrap();
     }
 
