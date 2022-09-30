@@ -32,8 +32,7 @@ impl UnitX {
     pub(in crate::manager::unit) fn init(&self) {}
     pub(in crate::manager::unit) fn done(&self) {}
     pub(in crate::manager::unit) fn load(&self) -> Result<(), Box<dyn Error>> {
-        let ret = self.0.load_unit();
-        ret
+        self.0.load_unit()
     }
     pub(in crate::manager::unit) fn try_load(&self) -> Result<(), UnitActionError> {
         // transaction_add_job_and_dependencies: bus_unit_validate_load_state + manager_unit_cache_should_retry_load + unit_load + bus_unit_validate_load_state

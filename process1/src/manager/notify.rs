@@ -124,12 +124,12 @@ impl Source for NotifyEvent {
             });
         }
 
-        let contents = String::from_utf8(buffer.to_vec()).map_err(|e| Error::from(e))?;
+        let contents = String::from_utf8(buffer.to_vec()).map_err(Error::from)?;
         let mut messages = HashMap::new();
 
         for line in contents.lines() {
             let content: Vec<&str> = line
-                .split("=")
+                .split('=')
                 .map(|s| s.trim_end_matches(char::from(0)))
                 .collect();
             if content.len() != 2 {

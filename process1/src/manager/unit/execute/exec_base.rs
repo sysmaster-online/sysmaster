@@ -1,6 +1,7 @@
 use bitflags::bitflags;
 use std::{cell::RefCell, collections::HashMap, ffi::CString, path::PathBuf, rc::Rc};
 
+/// the exec command that was parsed from the unit file
 #[derive(PartialEq, Clone, Eq, Debug)]
 pub struct ExecCommand {
     path: String,
@@ -8,42 +9,61 @@ pub struct ExecCommand {
 }
 
 impl ExecCommand {
+    /// create a new instance of the command
     pub fn new(path: String, argv: Vec<String>) -> ExecCommand {
         ExecCommand { path, argv }
     }
 
+    /// return the path of the command
     pub fn path(&self) -> &String {
         &self.path
     }
 
+    /// return the arguments of the command
     pub fn argv(&self) -> Vec<&String> {
-        self.argv.iter().map(|argr| argr).collect::<Vec<_>>()
+        self.argv.iter().collect::<Vec<_>>()
     }
 }
 
+/// the error
 #[derive(Debug)]
 pub enum ExecCmdError {
+    /// exec command error for timeout
     Timeout,
+    /// exec error for not found command
     NoCmdFound,
+    /// exec error for fork child error
     SpawnError,
+    /// exec error for create cgroup error
     CgroupError(String),
 }
 
+/// the exec context that was parse from the unit file.
+/// like parsed from Environment field.
 pub struct ExecContext {
     envs: RefCell<HashMap<String, String>>,
 }
 
+impl Default for ExecContext {
+    fn default() -> Self {
+        ExecContext::new()
+    }
+}
+
 impl ExecContext {
+    /// create a new instance of exec context
     pub fn new() -> ExecContext {
         ExecContext {
             envs: RefCell::new(HashMap::new()),
         }
     }
 
+    /// insert to the context with key and value
     pub fn insert_env(&self, key: String, value: String) {
         self.envs.borrow_mut().insert(key, value);
     }
 
+    /// return all the environment with hashMap
     pub fn envs(&self) -> HashMap<String, String> {
         let mut tmp = HashMap::new();
 
@@ -54,6 +74,7 @@ impl ExecContext {
     }
 }
 
+/// the environment that will be set when start a new command
 pub struct ExecParameters {
     environment: Rc<EnvData>,
     fds: Vec<i32>,
@@ -90,7 +111,14 @@ impl EnvData {
     }
 }
 
+impl Default for ExecParameters {
+    fn default() -> Self {
+        ExecParameters::new()
+    }
+}
+
 impl ExecParameters {
+    /// create  a new instance of ExecParameters
     pub fn new() -> ExecParameters {
         ExecParameters {
             environment: Rc::new(EnvData::new()),
@@ -99,36 +127,43 @@ impl ExecParameters {
         }
     }
 
+    /// add a new environment with key and value
     pub fn add_env(&self, key: &str, value: String) {
         self.environment.add_env(key, value);
     }
 
+    /// return the value correspond to the key
     pub fn get_env(&self, key: &str) -> Option<String> {
         self.environment.get(key)
     }
 
+    /// return all environments that will be passed to child
     pub fn envs(&self) -> Vec<CString> {
         self.environment.envs()
     }
 
+    /// insert fds that will be passed to child
     pub fn insert_fds(&mut self, fds: Vec<i32>) {
         self.fds = fds
     }
 
+    /// return all the fds that will be passed to child
     pub fn fds(&self) -> Vec<i32> {
-        self.fds.iter().map(|v| *v).collect()
+        self.fds.to_vec()
     }
 
+    /// set the NOTIFY_SOCKET value
     pub fn set_notify_sock(&mut self, notify_sock: PathBuf) {
         self.notify_sock = Some(notify_sock)
     }
 }
 
 bitflags! {
+    /// the for exec the child command
     pub struct ExecFlags: u16 {
-        const APPLY_SANDBOX = 1 << 0;
+        /// the command is a control command
         const CONTROL = 1 << 1;
-
+        /// need pass fds to the command
         const PASS_FDS = 1 << 2;
     }
 }

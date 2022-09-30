@@ -26,7 +26,7 @@ impl UeCgroup {
     pub(super) fn cg_path(&self) -> PathBuf {
         let cg_path = self.data.borrow().cg_path();
 
-        return cg_path;
+        cg_path
     }
 }
 
@@ -65,6 +65,6 @@ impl UnitCgroupData {
     }
 
     pub(self) fn cg_path(&self) -> PathBuf {
-        return self.cg_path.clone();
+        self.cg_path.clone()
     }
 }

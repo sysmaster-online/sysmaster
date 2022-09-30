@@ -59,7 +59,7 @@ impl UeLoad {
     }
 
     pub(super) fn in_load_queue(&self) -> bool {
-        *self.in_load_queue.borrow() == true
+        *self.in_load_queue.borrow()
     }
 
     pub(super) fn load_unit_confs(&self) -> Result<(), Box<dyn stdError>> {
@@ -77,7 +77,7 @@ impl UeLoad {
     }
 
     pub(super) fn in_target_dep_queue(&self) -> bool {
-        *self.in_target_dep_queue.borrow() == true
+        *self.in_target_dep_queue.borrow()
     }
 
     fn parse(&self) {

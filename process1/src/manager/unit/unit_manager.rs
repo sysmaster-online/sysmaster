@@ -84,7 +84,7 @@ impl UnitManagerX {
     }
 }
 
-//#[derive(Debug)]
+/// the struct for manager the unit instance
 pub struct UnitManager {
     db: Rc<UnitDb>,
     rt: Rc<UnitRT>,
@@ -103,20 +103,24 @@ fn mount_point_to_unit_name(mount_point: &str) -> String {
     res
 }
 
-// the declaration "pub(self)" is for identification only.
+/// the declaration "pub(self)" is for identification only.
 impl UnitManager {
+    /// add pid and its correspond unit to
     pub fn child_watch_pid(&self, pid: Pid, id: &str) {
         self.db.child_add_watch_pid(pid, id)
     }
 
+    /// add all the pid of unit id, read pids from cgroup path.
     pub fn child_watch_all_pids(&self, id: &str) {
         self.db.child_watch_all_pids(id)
     }
 
+    /// delete the pid from the db
     pub fn child_unwatch_pid(&self, pid: Pid) {
         self.db.child_unwatch_pid(pid)
     }
 
+    /// call the exec spawn to start the child service
     pub fn exec_spawn(
         &self,
         unit: &Unit,
@@ -124,19 +128,19 @@ impl UnitManager {
         params: &ExecParameters,
         ctx: Rc<ExecContext>,
     ) -> Result<Pid, ExecCmdError> {
-        self.exec.spawn(unit, cmdline, params, ctx.clone())
+        self.exec.spawn(unit, cmdline, params, ctx)
     }
 
-    // load the unit for reference name
+    /// load the unit for reference name
     pub fn load_unit_success(&self, name: &str) -> bool {
         if let Some(_unit) = self.load_unit(name) {
             return true;
         }
 
-        return false;
+        false
     }
 
-    // load the unit of the dependency UnitType
+    /// load the unit of the dependency UnitType
     pub fn load_related_unit_success(&self, name: &str, unit_type: UnitType) -> bool {
         let stem_name = Path::new(name).file_stem().unwrap().to_str().unwrap();
         let relate_name = format!("{}.{}", stem_name, String::from(unit_type));
@@ -145,10 +149,10 @@ impl UnitManager {
             return true;
         }
 
-        return false;
+        false
     }
 
-    // check the unit active state of of reference name
+    /// check the unit active state of of reference name
     pub fn unit_enabled(&self, name: &str) -> Result<(), UnitActionError> {
         let u = if let Some(unit) = self.db.units_get(name) {
             unit
@@ -165,9 +169,10 @@ impl UnitManager {
             return Err(UnitActionError::UnitActionEBusy);
         }
 
-        return Ok(());
+        Ok(())
     }
 
+    /// check the unit s_u_name and t_u_name have atom relation
     pub fn unit_has_dependecy(
         &self,
         s_u_name: &str,
@@ -217,6 +222,7 @@ impl UnitManager {
         Ok(())
     }
 
+    /// get the unit the has atom relation with the unit
     pub fn get_dependency_list(&self, unit_name: &str, atom: UnitRelationAtom) -> Vec<Rc<Unit>> {
         let mut ret_list: Vec<Rc<Unit>> = Vec::new();
         let s_unit = if let Some(unit) = self.db.units_get(unit_name) {
@@ -234,19 +240,22 @@ impl UnitManager {
         ret_list
     }
 
+    /// register the source to the event
     pub fn register(&self, source: Rc<dyn Source>) {
         self.events.add_source(source).unwrap();
     }
 
+    /// set the source to state
     pub fn enable(&self, source: Rc<dyn Source>, state: EventState) {
         self.events.set_enabled(source, state).unwrap();
     }
 
+    /// unregister the source from the event
     pub fn unregister(&self, source: Rc<dyn Source>) {
         self.events.del_source(source).unwrap();
     }
 
-    // check if there is already a stop job in process
+    /// check if there is already a stop job in process
     pub fn has_stop_job(&self, name: &str) -> bool {
         let u = if let Some(unit) = self.db.units_get(name) {
             unit
@@ -257,7 +266,7 @@ impl UnitManager {
         self.jm.has_stop_job(&u)
     }
 
-    // return the fds that trigger the unit {name};
+    /// return the fds that trigger the unit {name};
     pub fn collect_socket_fds(&self, name: &str) -> Vec<i32> {
         let deps = self.db.dep_gets(name, UnitRelations::UnitTriggeredBy);
         let mut fds = Vec::new();
@@ -272,7 +281,7 @@ impl UnitManager {
         fds
     }
 
-    // check the unit that will be triggered by {name} is in active or activating state
+    /// check the unit that will be triggered by {name} is in active or activating state
     pub fn relation_active_or_pending(&self, name: &str) -> bool {
         let deps = self.db.dep_gets(name, UnitRelations::UnitTriggers);
         let mut pending: bool = false;
@@ -286,7 +295,7 @@ impl UnitManager {
         pending
     }
 
-    // check the pid corresponding unit is the same with the unit
+    /// check the pid corresponding unit is the same with the unit
     pub fn same_unit_with_pid(&self, unit: &str, pid: Pid) -> bool {
         if !process_util::valid_pid(pid) {
             return false;
@@ -304,6 +313,7 @@ impl UnitManager {
         false
     }
 
+    /// start the unit
     pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         if let Some(unit) = self.load_unit(name) {
             log::debug!("load unit success, send to job manager");
@@ -315,10 +325,11 @@ impl UnitManager {
             log::debug!("job exec success");
             Ok(())
         } else {
-            return Err(MngErrno::MngErrInternel);
+            Err(MngErrno::MngErrInternel)
         }
     }
 
+    /// return the notify path
     pub fn notify_socket(&self) -> Option<PathBuf> {
         self.config.notify_sock()
     }
@@ -336,7 +347,7 @@ impl UnitManager {
             )?;
             Ok(())
         } else {
-            return Err(MngErrno::MngErrInternel);
+            Err(MngErrno::MngErrInternel)
         }
     }
 
@@ -480,21 +491,24 @@ impl UnitManager {
     }
 }
 
+/// the trait used for attach UnitManager to sub unit
 pub trait UnitMngUtil {
+    /// the method of attach to UnitManager to sub unit
     fn attach(&self, um: Rc<UnitManager>);
 }
 
+/// the trait used for translate to UnitObj
 pub trait UnitSubClass: UnitObj + UnitMngUtil {
+    /// the method of translate to UnitObj
     fn into_unitobj(self: Box<Self>) -> Box<dyn UnitObj>;
 }
 
-// #[macro_use]
-// use crate::unit_name_to_type;
-//unitManager composition of units with hash map
+/// #[macro_use]
+/// the macro for create a sub unit instance
 #[macro_export]
 macro_rules! declure_unitobj_plugin {
     ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {
-        // method for create the unit instance
+        /// method for create the unit instance
         #[no_mangle]
         pub fn __unit_obj_create() -> *mut dyn $crate::manager::UnitSubClass {
             logger::init_log_with_default($name, $level);
@@ -598,7 +612,7 @@ mod unit_load {
                         name,
                         Rc::strong_count(&self.db)
                     );
-                    return None;
+                    None
                 }
             }
         }
@@ -607,23 +621,19 @@ mod unit_load {
             if let Some(unit) = self.db.units_get(name) {
                 return Some(Rc::clone(&unit));
             };
-            let unit = self.prepare_unit(name);
-            unit
+
+            self.prepare_unit(name)
         }
 
         pub(self) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
             if let Some(unit) = self.db.units_get(name) {
                 return Some(Rc::clone(&unit));
             };
-            let unit = self.prepare_unit(name);
-            let u = if let Some(u) = unit {
-                u
-            } else {
-                return None;
-            };
+            let unit = self.prepare_unit(name)?;
+
             log::info!("begin dispatch unit in  load queue");
             self.rt.dispatch_load_queue();
-            Some(Rc::clone(&u))
+            Some(Rc::clone(&unit))
         }
 
         pub(self) fn set_um(&self, um: &Rc<UnitManager>) {
@@ -687,7 +697,7 @@ mod unit_load {
                 for o_name in list {
                     let tmp_unit: Rc<UnitX>;
                     if let Some(o_unit) = self.push_dep_unit_into_load_queue(o_name) {
-                        //此处不能直接调用unit_load，会嵌套
+                        //can not call unit_load directly，will be nested.
                         tmp_unit = Rc::clone(&o_unit);
                     } else {
                         log::error!("create unit obj error in unit manager");
@@ -697,7 +707,7 @@ mod unit_load {
                     if let Err(_e) =
                         self.db
                             .dep_insert(Rc::clone(&unit), *relation, tmp_unit, true, 0)
-                    //依赖关系插入，但是未判断是否load成功，如果unit无法load，是否应该记录依赖关系
+                    //insert the dependency，but not judge loaded success, if loaded failed, whether record the dependency.
                     {
                         log::debug!("add dependency relation failed for source unit is {},dependency unit is {}",unit.get_id(),o_name);
                         return;
@@ -772,15 +782,15 @@ mod tests {
         let unit_name = String::from("config.service");
         let unit = um.load_unit(&unit_name);
 
-        assert_eq!(unit.is_some(), true);
+        assert!(unit.is_some());
         let u = unit.unwrap();
 
         let ret = u.start();
-        assert_eq!(ret.is_err(), false);
+        assert!(ret.is_ok());
 
         log::debug!("unit start end!");
         let ret = u.stop();
-        assert_eq!(ret.is_err(), false);
+        assert!(ret.is_ok());
         log::debug!("unit stop end!");
     }
 
@@ -798,12 +808,12 @@ mod tests {
         let unit_name = String::from("test.socket");
         let unit = dm.2.load_unit(&unit_name);
 
-        assert_eq!(unit.is_some(), true);
+        assert!(unit.is_some());
         let u = unit.unwrap();
 
         let ret = u.start();
         log::debug!("socket start ret is: {:?}", ret);
-        assert_eq!(ret.is_err(), false);
+        assert!(ret.is_ok());
 
         thread::sleep(Duration::from_secs(4));
         u.sigchld_events(Pid::from_raw(-1), 0, Signal::SIGCHLD);
@@ -811,7 +821,7 @@ mod tests {
 
         let ret = u.stop();
         log::debug!("socket stop ret is: {:?}", ret);
-        assert_eq!(ret.is_err(), false);
+        assert!(ret.is_ok());
 
         thread::sleep(Duration::from_secs(4));
         assert_eq!(u.active_state(), UnitActiveState::UnitDeActivating);
@@ -825,14 +835,8 @@ mod tests {
         let dm = init_dm_for_test();
         let conflict_unit_name = String::from("conflict.service");
         let confilict_unit = dm.2.start_unit(&conflict_unit_name);
-        match confilict_unit {
-            Ok(_v) => {
-                assert!(true, "conflict unit start successful");
-            }
-            Err(e) => {
-                assert!(false, "load unit failed {},{:?}", conflict_unit_name, e);
-            }
-        }
+
+        assert!(confilict_unit.is_ok());
     }
 
     #[test]
