@@ -1,5 +1,8 @@
+//! the utils of the path operation
+//!
 use std::path::Path;
 
+/// return true if the path of a and b equaled.
 pub fn path_equal(a: &str, b: &str) -> bool {
     let p_a = Path::new(a);
     let p_b = Path::new(b);
@@ -12,12 +15,12 @@ mod tests {
 
     #[test]
     fn test_path_equal() {
-        assert_eq!(path_equal("/etc", "/etc"), true);
-        assert_eq!(path_equal("//etc", "/etc"), true);
-        assert_eq!(path_equal("/etc//", "/etc"), true);
-        assert_eq!(path_equal("/etc", "./etc"), false);
-        assert_eq!(path_equal("/x/./y", "/x/y"), true);
-        assert_eq!(path_equal("/x/././y", "/x/y/./."), true);
-        assert_eq!(path_equal("/etc", "/var"), false);
+        assert!(path_equal("/etc", "/etc"));
+        assert!(path_equal("//etc", "/etc"));
+        assert!(path_equal("/etc//", "/etc"));
+        assert!(!path_equal("/etc", "./etc"));
+        assert!(path_equal("/x/./y", "/x/y"));
+        assert!(path_equal("/x/././y", "/x/y/./."));
+        assert!(!path_equal("/etc", "/var"));
     }
 }

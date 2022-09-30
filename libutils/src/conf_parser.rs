@@ -1,12 +1,19 @@
+//! the utils can be used to parse unit conf file
+//!
 use crate::Error;
 use crate::Result;
 
+/// the base that will be translate from str
 #[derive(Debug, Eq, PartialEq)]
 pub enum Base {
+    /// binary number
     Binary,
+    /// Decimal number
     Decimal,
 }
 
+/// return true if item is 1, yes, y, true, t or on
+/// return false if item is 0, no, n, false, f, or off
 pub fn parse_boolean(item: &str) -> Result<bool> {
     match &item.to_lowercase() as &str {
         "1" | "yes" | "y" | "true" | "t" | "on" => Ok(true),
@@ -17,6 +24,8 @@ pub fn parse_boolean(item: &str) -> Result<bool> {
     }
 }
 
+/// parse the item from string to u64
+/// the item can be end with E, P， T， G， M， K and B
 pub fn parse_size(item: &str, base: Base) -> Result<u64> {
     let item = item.trim();
     if item.is_empty() {
@@ -115,7 +124,7 @@ mod test {
     fn test_parse_size() {
         use crate::conf_parser::{parse_size, Base};
         let ret1 = parse_size("", Base::Binary);
-        assert_eq!(ret1.is_err(), true);
+        assert!(ret1.is_err());
 
         let ret1 = parse_size("100G", Base::Binary).unwrap();
         assert_eq!(ret1, 100 * 1024 * 1024 * 1024);
@@ -136,34 +145,34 @@ mod test {
         );
 
         let ret1 = parse_size("4.5C", Base::Binary);
-        assert_eq!(ret1.is_err(), true);
+        assert!(ret1.is_err());
     }
 
     #[test]
     fn test_parse_boolean() {
         use crate::conf_parser::parse_boolean;
 
-        assert_eq!(parse_boolean("1").unwrap(), true);
-        assert_eq!(parse_boolean("y").unwrap(), true);
-        assert_eq!(parse_boolean("Y").unwrap(), true);
-        assert_eq!(parse_boolean("yes").unwrap(), true);
-        assert_eq!(parse_boolean("YES").unwrap(), true);
-        assert_eq!(parse_boolean("true").unwrap(), true);
-        assert_eq!(parse_boolean("TRUE").unwrap(), true);
-        assert_eq!(parse_boolean("on").unwrap(), true);
-        assert_eq!(parse_boolean("ON").unwrap(), true);
+        assert!(parse_boolean("1").unwrap());
+        assert!(parse_boolean("y").unwrap());
+        assert!(parse_boolean("Y").unwrap());
+        assert!(parse_boolean("yes").unwrap());
+        assert!(parse_boolean("YES").unwrap());
+        assert!(parse_boolean("true").unwrap());
+        assert!(parse_boolean("TRUE").unwrap());
+        assert!(parse_boolean("on").unwrap());
+        assert!(parse_boolean("ON").unwrap());
 
-        assert_eq!(parse_boolean("0").unwrap(), false);
-        assert_eq!(parse_boolean("n").unwrap(), false);
-        assert_eq!(parse_boolean("N").unwrap(), false);
-        assert_eq!(parse_boolean("no").unwrap(), false);
-        assert_eq!(parse_boolean("NO").unwrap(), false);
-        assert_eq!(parse_boolean("false").unwrap(), false);
-        assert_eq!(parse_boolean("FALSE").unwrap(), false);
-        assert_eq!(parse_boolean("off").unwrap(), false);
-        assert_eq!(parse_boolean("OFF").unwrap(), false);
+        assert!(!parse_boolean("0").unwrap());
+        assert!(!parse_boolean("n").unwrap());
+        assert!(!parse_boolean("N").unwrap());
+        assert!(!parse_boolean("no").unwrap());
+        assert!(!parse_boolean("NO").unwrap());
+        assert!(!parse_boolean("false").unwrap());
+        assert!(!parse_boolean("FALSE").unwrap());
+        assert!(!parse_boolean("off").unwrap());
+        assert!(!parse_boolean("OFF").unwrap());
 
-        assert_eq!(parse_boolean("process").is_err(), true);
-        assert_eq!(parse_boolean("in").is_err(), true);
+        assert!(parse_boolean("process").is_err());
+        assert!(parse_boolean("in").is_err());
     }
 }

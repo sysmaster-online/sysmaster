@@ -24,9 +24,8 @@ const CG_BASE_DIR: &str = "/sys/fs/cgroup";
 const CG_UNIFIED_DIR: &str = "/sys/fs/cgroup/unified";
 const CG_V1_DIR: &str = "/sys/fs/cgroup/process1";
 
-// return the cgroup mounted type, if not support cgroup return CgroupErr.
+/// return the cgroup mounted type, if not support cgroup return CgroupErr.
 pub fn cg_type() -> Result<CgType, CgroupErr> {
-    // 查询cgroup的版本类型
     let stat = if let Ok(s) = statfs(CG_BASE_DIR) {
         s
     } else {
@@ -38,13 +37,10 @@ pub fn cg_type() -> Result<CgType, CgroupErr> {
     }
 
     if stat.filesystem_type() == TMPFS_MAGIC {
-        match statfs(CG_UNIFIED_DIR) {
-            Ok(s) => {
-                if s.filesystem_type() == CGROUP2_SUPER_MAGIC {
-                    return Ok(CgType::UnifiedV1);
-                }
+        if let Ok(s) = statfs(CG_UNIFIED_DIR) {
+            if s.filesystem_type() == CGROUP2_SUPER_MAGIC {
+                return Ok(CgType::UnifiedV1);
             }
-            Err(_) => {}
         }
 
         match statfs(CG_V1_DIR) {
@@ -64,7 +60,7 @@ pub fn cg_type() -> Result<CgType, CgroupErr> {
         }
     }
 
-    return Err(CgroupErr::NotSupported);
+    Err(CgroupErr::NotSupported)
 }
 
 fn cgtype_to_path(cg_type: CgType) -> &'static str {
@@ -80,9 +76,10 @@ fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf, CgroupErr
     let cg_type = cg_type()?;
     let base_path = cgtype_to_path(cg_type);
     let path_buf: PathBuf = PathBuf::from(base_path);
-    return Ok(path_buf.join(cg_path).join(suffix));
+    Ok(path_buf.join(cg_path).join(suffix))
 }
 
+/// attach the pid to the controller which is depend the cg_path
 pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<(), CgroupErr> {
     log::debug!("attach pid {} to path {:?}", pid, cg_path);
     let cg_procs = cg_abs_path(cg_path, &PathBuf::from("cgroup.procs"))?;
@@ -93,24 +90,23 @@ pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<(), CgroupErr> {
         )));
     }
 
-    fs::write(cg_procs, format!("{}\n", pid.to_string())).map_err(|e| CgroupErr::IoError(e))?;
+    fs::write(cg_procs, format!("{}\n", pid)).map_err(CgroupErr::IoError)?;
 
     Ok(())
 }
 
-// create the cg_path which is relative to cg_abs_path.
+/// create the cg_path which is relative to cg_abs_path.
 pub fn cg_create(cg_path: &PathBuf) -> Result<(), CgroupErr> {
     log::debug!("cgroup create path {:?}", cg_path);
     let abs_cg_path: PathBuf = cg_abs_path(cg_path, &PathBuf::from(""))?;
-    fs::create_dir_all(abs_cg_path.clone()).map_err(|e| CgroupErr::IoError(e))?;
+    fs::create_dir_all(abs_cg_path).map_err(CgroupErr::IoError)?;
 
     Ok(())
 }
 
-// escape the cg_path which is conflicts with controller name.
+/// escape the cg_path which is conflicts with controller name.
 pub fn cg_escape(id: &str) -> &str {
-    // 系统默认的文件目录冲突时，添加前缀字符
-    return id;
+    id
 }
 
 fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>, CgroupErr> {
@@ -118,12 +114,12 @@ fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>, CgroupErr> {
     let file = fs::OpenOptions::new()
         .read(true)
         .open(path)
-        .map_err(|e| CgroupErr::IoError(e))?;
+        .map_err(CgroupErr::IoError)?;
 
     let reader = BufReader::new(file);
     let mut pids = Vec::new();
     for line in reader.lines() {
-        let line = line.map_err(|e| CgroupErr::IoError(e))?;
+        let line = line.map_err(CgroupErr::IoError)?;
         let pid = Pid::from_raw(line.parse::<i32>().unwrap());
 
         pids.push(pid);
@@ -132,7 +128,7 @@ fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>, CgroupErr> {
     Ok(pids)
 }
 
-// return all the pids in the cg_path, read from cgroup.procs.
+/// return all the pids in the cg_path, read from cgroup.procs.
 pub fn cg_get_pids(cg_path: &PathBuf) -> Vec<Pid> {
     match get_pids(cg_path, "cgroup.procs") {
         Ok(pids) => pids,
@@ -172,11 +168,11 @@ fn cg_kill_process(
     let file = fs::OpenOptions::new()
         .read(true)
         .open(path)
-        .map_err(|e| CgroupErr::IoError(e))?;
+        .map_err(CgroupErr::IoError)?;
 
     let reader = BufReader::new(file);
     for line in reader.lines() {
-        let line = line.map_err(|e| CgroupErr::IoError(e))?;
+        let line = line.map_err(CgroupErr::IoError)?;
         let pid = Pid::from_raw(line.parse::<i32>().unwrap());
 
         if pids.contains(&pid) {
@@ -216,7 +212,11 @@ fn cg_kill(
     Ok(())
 }
 
-// kill all the process in the cg_path, and remove the dir of the cg_path.
+/// kill all the process in the cg_path, and remove the dir of the cg_path.
+/// cg_path: the controller that will be killed.
+/// signal: send signal to the process in the cgroup.
+/// flags: the flags that will be operated on the controller.
+/// pids: not kill the process which is in the pids.
 pub fn cg_kill_recursive(
     cg_path: &PathBuf,
     signal: Signal,
@@ -239,7 +239,7 @@ pub fn cg_kill_recursive(
     Ok(())
 }
 
-// return the supported controllers, read from /proc/cgroups, if failed return the IOError.
+/// return the supported controllers, read from /proc/cgroups, if failed return the IOError.
 pub fn cg_controllers() -> Result<Vec<String>, IOError> {
     let file = match File::open("/proc/cgroups") {
         Err(why) => {
@@ -259,13 +259,7 @@ pub fn cg_controllers() -> Result<Vec<String>, IOError> {
         if let Ok(line) = tmp {
             let cap = var_regex.captures(&line);
             if let Some(cap) = cap {
-                let match_result = {
-                    if let Some(mat) = cap.get(1) {
-                        Some(mat.as_str())
-                    } else {
-                        None
-                    }
-                };
+                let match_result = { cap.get(1).map(|mat| mat.as_str()) };
 
                 if let Some(val) = match_result {
                     controllers.push(val.to_string());
@@ -279,16 +273,12 @@ pub fn cg_controllers() -> Result<Vec<String>, IOError> {
 
 fn cg_read_event(cg_path: &PathBuf, event: &str) -> Result<String, CgroupErr> {
     let events_path = cg_abs_path(cg_path, &PathBuf::from("cgroup.events"))?;
-    let file = File::open(events_path).map_err(|e| CgroupErr::IoError(e))?;
+    let file = File::open(events_path).map_err(CgroupErr::IoError)?;
     let reader = BufReader::new(file);
 
     for line in reader.lines() {
-        let content = line.map_err(|e| CgroupErr::IoError(e))?;
-        let words: Vec<String> = content
-            .trim()
-            .split_whitespace()
-            .map(|c| c.to_string())
-            .collect();
+        let content = line.map_err(CgroupErr::IoError)?;
+        let words: Vec<String> = content.split_whitespace().map(|c| c.to_string()).collect();
 
         if words.len() != 2 {
             continue;
@@ -315,12 +305,12 @@ fn cg_is_empty(cg_path: &PathBuf) -> bool {
     }
 
     if let Ok(pids) = get_pids(cg_path, "cgroup.procs") {
-        if pids.len() == 0 {
+        if pids.is_empty() {
             return true;
         }
     }
 
-    return false;
+    false
 }
 
 fn is_dir(entry: &DirEntry) -> bool {
@@ -328,10 +318,10 @@ fn is_dir(entry: &DirEntry) -> bool {
         return false;
     }
 
-    return true;
+    true
 }
 
-// whether the cg_path cgroup is empty, return true if empty.
+/// whether the cg_path cgroup is empty, return true if empty.
 pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
     if cg_path == &PathBuf::from("") || cg_path == &PathBuf::from("/") {
         return Ok(true);
@@ -345,7 +335,7 @@ pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
     if cg_type == CgType::UnifiedV2 || cg_type == CgType::UnifiedV1 {
         match cg_read_event(cg_path, "populated") {
             Ok(v) => {
-                log::debug!("cg read event value:{}", v.to_string());
+                log::debug!("cg read event value:{}", v);
                 return Ok(v == "0");
             }
             Err(e) => match e {
@@ -392,7 +382,6 @@ mod tests {
     fn test_cgroup() {
         use crate::CgFlags;
         use nix::sys::signal::Signal;
-        use nix::unistd::Pid;
         use nix::unistd::{fork, ForkResult};
         use std::path::PathBuf;
         use std::thread;
@@ -407,7 +396,7 @@ mod tests {
 
         let cg_path = PathBuf::from("system.slice");
         let ret = super::cg_create(&cg_path);
-        assert_eq!(ret.is_err(), false);
+        assert!(ret.is_ok());
 
         let base_path = super::cgtype_to_path(cg_type);
         let path_buf: PathBuf = PathBuf::from(base_path);
@@ -419,8 +408,7 @@ mod tests {
 
         let t_thread = unsafe { fork() };
 
-        let pid: Pid;
-        match t_thread {
+        let pid = match t_thread {
             Ok(ForkResult::Parent { child }) => {
                 println!("child pid is: {:?}", child);
                 if !nix::unistd::getuid().is_root() {
@@ -428,23 +416,23 @@ mod tests {
                     return;
                 }
                 let ret = super::cg_attach(child, &cg_path);
-                assert_eq!(ret.is_err(), false);
-                pid = child;
+                assert!(ret.is_ok());
+                child
             }
             Ok(ForkResult::Child) => {
                 thread::sleep(Duration::from_secs(78));
                 std::process::exit(0);
             }
             Err(_e) => return,
-        }
+        };
 
         let pids = super::cg_get_pids(&cg_path);
         assert_ne!(pids.len(), 0);
-        assert_eq!(pids.contains(&pid), true);
+        assert!(pids.contains(&pid));
 
         let ret = super::cg_is_empty_recursive(&cg_path);
-        assert_eq!(ret.is_err(), false);
-        assert_eq!(ret.unwrap(), false);
+        assert!(ret.is_ok());
+        assert!(!ret.unwrap());
 
         let ret = super::cg_kill_recursive(
             &cg_path,
@@ -452,18 +440,18 @@ mod tests {
             CgFlags::IGNORE_SELF | CgFlags::REMOVE,
             HashSet::new(),
         );
-        assert_eq!(ret.is_err(), false);
+        assert!(ret.is_ok());
         println!("kill cgroup ret is: {:?}", ret);
 
         thread::sleep(Duration::from_secs(1));
 
         let ret = super::cg_is_empty_recursive(&cg_path);
-        assert_eq!(ret.is_err(), false);
-        assert_eq!(ret.unwrap(), true);
+        assert!(ret.is_ok());
+        assert!(ret.unwrap());
 
         let pids = super::cg_get_pids(&cg_path);
         assert_eq!(pids.len(), 0);
-        assert_eq!(pids.contains(&pid), false);
+        assert!(!pids.contains(&pid));
     }
 
     #[test]
@@ -473,7 +461,7 @@ mod tests {
             return;
         }
         let ret = super::cg_controllers();
-        assert_ne!(ret.is_err(), true);
+        assert!(ret.is_ok());
 
         let clist = ret.unwrap();
         assert_ne!(clist.len(), 0);
@@ -497,7 +485,7 @@ mod tests {
         ];
 
         for c in clist {
-            assert_eq!(controllers.contains(&&c[..]), true);
+            assert!(controllers.contains(&&c[..]));
         }
     }
 }
