@@ -1,16 +1,23 @@
+//! the utils to test the conditions
+//!
 use std::path::Path;
 
+/// the type of the condition
 #[derive(Eq, PartialEq)]
 pub enum ConditionType {
+    /// check path exist
     PathExists,
+    /// check file is empty
     FileNotEmpty,
+    /// check need update
     NeedsUpdate,
     _MAX,
 }
 
-// condition 判断条件是否满足，如果条件以|开头，表示触发条件，触发条件只要有一个满足，则可以了
-//条件以!开始表示反转，
-//其他，表示普通条件
+/// check whether the condition is met.
+/// if the condition start with '|'， trigger it and as long as one condition is met, return ok.
+/// if the condition start with '!', indicate reverse condition.
+/// others indicate usual condition
 pub struct Condition {
     c_type: ConditionType,
     trigger: i8,
@@ -19,6 +26,7 @@ pub struct Condition {
 }
 
 impl Condition {
+    /// create the condition instance
     pub fn new(c_type: ConditionType, trigger: i8, revert: i8, params: String) -> Self {
         Condition {
             c_type,
@@ -27,14 +35,18 @@ impl Condition {
             params,
         }
     }
+
+    /// return the trigger
     pub fn trigger(&self) -> i8 {
         self.trigger
     }
 
+    /// return the revert
     pub fn revert(&self) -> i8 {
         self.revert
     }
 
+    /// runing the condition test
     pub fn test(&self) -> bool {
         if self.params.is_empty() {
             return false;
@@ -86,7 +98,7 @@ mod test {
         let cond_path_not_exists =
             Condition::new(ConditionType::PathExists, 0, 0, "/home/test".to_string());
         let f_result = cond_path_not_exists.test();
-        assert!(f_result == false);
+        assert!(!f_result);
         log::debug!("project root {:?}", project_root);
         let cond_path_exists = Condition::new(
             ConditionType::PathExists,
@@ -103,7 +115,7 @@ mod test {
             project_root.to_str().unwrap().to_string(),
         );
         let f_result = cond_path_exists_revert.test();
-        assert!(f_result == false, "condition test path exist revert error");
+        assert!(!f_result, "condition test path exist revert error");
         let cond_file_not_empty = Condition::new(
             ConditionType::FileNotEmpty,
             0,

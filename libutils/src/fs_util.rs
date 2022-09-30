@@ -1,8 +1,10 @@
+//! the utils of the file operation
+//!
 use nix::{errno::Errno, fcntl::OFlag, sys::stat::Mode};
 use pathdiff::diff_paths;
 use std::path::Path;
 
-// open the parent directory of path
+/// open the parent directory of path
 pub fn open_parent(path: &Path, flags: OFlag, mode: Mode) -> Result<i32, Errno> {
     let parent = path.parent();
 
@@ -15,7 +17,7 @@ pub fn open_parent(path: &Path, flags: OFlag, mode: Mode) -> Result<i32, Errno> 
     Ok(fd)
 }
 
-// create symlink {from} source to {target}
+/// create symlink {from} source to {target}
 pub fn symlink(source: &str, target: &str, relative: bool) -> Result<(), Errno> {
     let t_path = Path::new(&target);
     let f_path = Path::new(&source);
@@ -44,6 +46,6 @@ mod tests {
     #[test]
     fn test_symlink() {
         let ret = symlink("/dev/null", "/tmp/test", false);
-        assert_eq!(ret.is_err(), false);
+        assert!(ret.is_ok());
     }
 }
