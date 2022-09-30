@@ -78,7 +78,7 @@ pub fn check_executable(file: &str) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::ffi::CString;
+    use std::os::unix::prelude::PermissionsExt;
     #[test]
     fn mkdir_parents_lable_test() {
         let path = "/tmp/a/";
@@ -106,20 +106,16 @@ mod tests {
 
     #[test]
     fn add_symlink_test() {
-        let str_from = "/tmp".to_string() + &"/".to_string() + &"multi-user.target".to_string();
-        let e = add_symlink("rc-local.service", &str_from);
-        match e {
-            Err(a) => {
-                if a.kind() == io::ErrorKind::NotFound {
-                    panic!("{} does not exist!", RC_LOCAL_PATH);
-                }
-
-                panic!(
-                    "Couldn't determine if {} exists and is executable, skipping",
-                    RC_LOCAL_PATH
-                );
+        let str_from = "/tmp".to_string() + "/" + "multi-user.target";
+        if let Err(e) = add_symlink("rc-local.service", &str_from) {
+            if e.kind() == io::ErrorKind::NotFound {
+                panic!("{} does not exist!", RC_LOCAL_PATH);
             }
-            Ok(_) => {}
+
+            panic!(
+                "Couldn't determine if {} exists and is executable, skipping",
+                RC_LOCAL_PATH
+            );
         }
     }
 
@@ -142,9 +138,11 @@ mod tests {
 
     #[test]
     fn check_executable_test() {
-        let _file = fs::File::create("test.exec").unwrap();
-        unsafe {
-            libc::chmod(CString::new("test.exec").unwrap().as_ptr(), 0o777);
+        fs::File::create("test.exec").unwrap();
+        if let Err(e) =
+            std::fs::set_permissions("test.exec", std::fs::Permissions::from_mode(0o777))
+        {
+            println!("Failed to chmod: {}", e);
         }
         let is_exec = match check_executable("test.exec") {
             Ok(()) => true,

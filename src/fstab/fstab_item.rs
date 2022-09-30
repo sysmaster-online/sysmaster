@@ -1,28 +1,29 @@
-//! fstab_item封装了/etc/fstab的六个字段及挂载状态.
+//! fstab_item encapsulates six fields and status of /etc/fstab.
 
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
-/// FSTabItem结构体
-/// * device_spec: 挂载设备
-/// * mount_point: 挂载点
-/// * fs_type: 文件系统类型
-/// * options: 挂载选项
-/// * dump: 是否开启备份
-/// * pass: 检查优先级
-/// * state: 挂载状态: `0`-未挂载过,`1`-已挂载成功,`-1`-挂载失败
+/// FSTabItem structure
 pub struct FSTabItem {
+    /// * device_spec: mount device
     pub device_spec: String,
+    /// * mount_point: mount point
     pub mount_point: String,
+    /// * fs_type: filesystem type
     pub fs_type: String,
+    /// * options: mount options
     pub options: String,
+    /// * dump: whether to enable backup
     pub dump: i8,
+    /// * pass: check priority
     pub pass: i8,
+    /// * state: Mount status: `0`- not mounted, `1`- mounted successfully, `-1`- failed to mount
     pub state: i8,
 }
 
 impl FSTabItem {
+    /// create
     pub fn new(input: Vec<&str>) -> Self {
         let mut real_path = String::from(input[0]);
         if real_path.starts_with("UUID") {
@@ -49,9 +50,9 @@ where
     Ok(io::BufReader::new(file).lines())
 }
 
-/// 解析fstab文件
-/// * `输入` filename: 需要解析的文件名,如:`/etc/fstab`
-/// * `输出` fstab条目列表
+/// Parse the fstab file
+/// * `input` : The file name to be parsed, such as: `/etc/fstab`
+/// * `output` : a list of fstab entries
 pub fn parse(filename: &str) -> Vec<FSTabItem> {
     let mut res: Vec<FSTabItem> = Vec::new();
     if let Ok(lines) = read_lines(filename) {

@@ -1,4 +1,4 @@
-/// 硬件看门狗
+//! Hardware watchdog
 use std::cmp::min;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Error, ErrorKind, Result};
@@ -7,27 +7,34 @@ use std::time::{Duration, Instant};
 
 use nix::errno::Errno;
 use nix::{ioctl_read, ioctl_readwrite};
-
-/// 首先定义了一个trait，将看门狗的几个关键特性抽象出来
-/// config表示配置一个看门狗的属性，主要是超时时间timeout并打开看门狗；close表示关闭一个看门狗；feed表示喂狗。
+/// First define a trait to abstract several key features
 pub trait Watchdog {
+    /// config() means to configure the properties of a watchdog, mainly set the timeout and turn on/off
     fn config(&mut self, timeout: Option<Duration>) -> io::Result<()>;
+    /// means to close
     fn close(&mut self) -> io::Result<i32>;
+    /// feed the dog.
     fn feed(&mut self) -> io::Result<()>;
 }
 
-/// 然后定义了一个结构体来实现这个trait。硬件看门狗的实现要依赖相应的硬件。device表示设备的路径，默认为"/dev/watchdog0"，
-/// file保存设备打开后的File结构体，timeout表示超时时间，last_feed表示上一次喂狗的时间
+/// Then define a structure to implement this trait. The implementation of the hardware watchdog depends on the corresponding hardware.
 #[derive(Debug)]
 pub struct HardwareWatchdog {
+    /// represents the path of the device, the default is "/dev/watchdog0"
     device: String,
+    /// saves the File structure after the device is opened
     file: Option<File>,
+    /// timeout time
     timeout: Option<Duration>,
+    /// the last time the dog was fed
     last_feed: Option<Instant>,
+    /// status
     open: bool,
 }
 
-/// 由于涉及硬件操作，所以大部分函数需要通过ioctl来实现功能，这里用例nix包提供的两个宏ioctl_read, ioctl_readwrite，分别是读取和读写看门狗硬件，常量值定义参考<linux/watchdog.h>文件
+/// Since it involves hardware operations, most functions need to be implemented through ioctl.
+/// Here, the two macros ioctl_read and ioctl_readwrite provided by the nix package are used to read and write watchdog, respectively.
+/// For the definition of constant values, refer to <linux /watchdog.h> file
 const WATCHDOG_IOCTL_BASE: u8 = b'W';
 const WATCHDOG_SETOPTIONS: u8 = 4;
 const WATCHDOG_KEEPALIVE: u8 = 5;
@@ -37,30 +44,32 @@ const WDIOS_DISABLECARD: i32 = 0x0001;
 const WDIOS_ENABLECARD: i32 = 0x0002;
 const WATCHDOG_PATH: &str = "/dev/watchdog0";
 
-// 与C头文件中定义的宏函数等价
-// ```c
-// #define WDIOC_SETOPTIONS    _IOR(WATCHDOG_IOCTL_BASE, 4, int)
-// ```
-// 表示一个IOCTL的读操作，函数名称为watchdog_setoptions,传递的参数为WATCHDOG_IOCTL_BASE和4和1一个32位int
 ioctl_read!(
+    /// watchdog setoptions
     watchdog_setoptions,
     WATCHDOG_IOCTL_BASE,
     WATCHDOG_SETOPTIONS,
     i32
 );
+
 ioctl_read!(
+    /// watchdog keepalive
     watchdog_keepalive,
     WATCHDOG_IOCTL_BASE,
     WATCHDOG_KEEPALIVE,
     i32
 );
+
 ioctl_readwrite!(
+    /// watchdog settimeout
     watchdog_settimeout,
     WATCHDOG_IOCTL_BASE,
     WATCHDOG_SETTIMEOUT,
     i32
 );
+
 ioctl_read!(
+    /// watchdog gettimeout
     watchdog_gettimeout,
     WATCHDOG_IOCTL_BASE,
     WATCHDOG_GETTIMEOUT,
@@ -81,7 +90,7 @@ impl HardwareWatchdog {
         unsafe { watchdog_settimeout(self.fd()?, &mut secs as *mut i32).map_err(Error::from) }
     }
 
-    /// 采用了函数式编程的map和map_err方法，将获取的超时时间返回
+    // The map and map_err methods are used to obtained timeout seconds
     fn obtain_timeout(&mut self) -> io::Result<i32> {
         let mut sec = 0;
         unsafe {
@@ -96,7 +105,8 @@ impl HardwareWatchdog {
         unsafe { watchdog_keepalive(self.fd()?, &mut c as *mut i32).map_err(Error::from) }
     }
 
-    /// 文件采用option表示，使用lazy加载的方式，如果访问时为空的话会自动打开对应的设备
+    // The file is loaded in a lazy way.
+    // If empty, the corresponding device will be automatically opened.
     fn fd(&mut self) -> io::Result<RawFd> {
         if self.file.is_none() {
             self.file = Some(OpenOptions::new().write(true).open(self.device.clone())?)
@@ -134,14 +144,13 @@ impl Drop for HardwareWatchdog {
 }
 
 impl Watchdog for HardwareWatchdog {
-    /// 配置一个看门狗
+    /// config watchdog
     fn config(&mut self, timeout: Option<Duration>) -> io::Result<()> {
         if self.open && self.timeout == timeout {
             return Ok(());
         }
 
         if let Some(time) = timeout {
-            // timeout为0不支持
             if time.is_zero() {
                 return Err(Error::new(
                     ErrorKind::InvalidData,
@@ -152,7 +161,7 @@ impl Watchdog for HardwareWatchdog {
             match self.set_timeout(secs) {
                 Ok(_) => {
                     self.timeout = Some(Duration::from_secs(secs as u64));
-                    // 设置完超时时间后，打开看门狗并喂一次狗
+                    // After setting timeout, turn on the watchdog and feed the dog one time.
                     self.set_options(true)?;
                     self.feed()?;
                 }
@@ -164,12 +173,12 @@ impl Watchdog for HardwareWatchdog {
                     } else {
                         return Err(err);
                     }
-                    // 出错的情况下将timeout置为空
+                    // Set timeout to null in case of error
                     self.timeout = None;
                 }
             }
         }
-        // 如果timeout为空，尝试从设备读取timeout值，是否设备默认值不支持修改
+        // If timeout is empty, try to read the value from the device,
         if self.timeout.is_none() {
             match self.obtain_timeout() {
                 Ok(secs) => self.timeout = Some(Duration::from_secs(secs as u64)),
@@ -203,7 +212,7 @@ impl Watchdog for HardwareWatchdog {
     }
 }
 
-/// 不支持的错误列表，参考ERRNO_IS_NOT_SUPPORTED
+/// ERRNO_IS_NOT_SUPPORTED
 fn errno_is_not_supported(errno: Errno) -> bool {
     for e in [
         Errno::EOPNOTSUPP,
@@ -283,6 +292,6 @@ mod tests {
             return;
         }
         let mut watchdog = HardwareWatchdog::default();
-        let _ = watchdog.set_device("/dev/watchdog0".to_string());
+        watchdog.set_device("/dev/watchdog0".to_string());
     }
 }

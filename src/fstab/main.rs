@@ -1,11 +1,11 @@
-//! fstab用于在开机的早期阶段解析/etc/fstab,挂载相应的设备,swap分区.
-//! # 原理
-//! 1. fstab启动后会直接解析/etc/fstab,获取需要挂载的设备,挂载点,挂载属性.
-//! 2. 按照/etc/fstab的配置顺序,依次尝试挂载.
-//! 3. 如果能找到相应的设备目录,将直接挂载.
-//! 4. 如果无法找到相关目录,则创建inotify检测,在设备就绪后挂载.
-//! # 限制
-//! 1. 当前设备仅支持配置为完整目录或UUID.
+//! fstab is used to parse /etc/fstab in the early stage of boot.
+//! # Principle
+//! 1. After fstab is started, it will directly parse /etc/fstab to obtain the device, mount point, and mount attributes that need to be mounted.
+//! 2. According to the configuration order of /etc/fstab, try to mount in turn.
+//! 3. If the corresponding device directory can be found, it will be mounted directly.
+//! 4. If the relevant directory cannot be found, create an inotify detection and mount it after the device is ready.
+//! # limit
+//! 1. The current device only supports configuration as full directory or UUID.
 
 use inotify::{EventMask, Inotify, WatchMask};
 use std::collections::HashSet;
@@ -184,7 +184,7 @@ mod tests {
         ];
         let fstab_items = vec![fstab_item::FSTabItem::new(fstab_str)];
         assert_eq!(fstab_items.len(), 1);
-        return fstab_items;
+        fstab_items
     }
 
     fn clean() {
@@ -207,13 +207,13 @@ mod tests {
         }
         let src_path = Path::new(&fstab_items[0].device_spec);
         let dst_path = Path::new(&fstab_items[0].mount_point);
-        if !(Path::exists(&src_path) && src_path.is_dir()) {
+        if !(Path::exists(src_path) && src_path.is_dir()) {
             if let Err(why) = fs::create_dir_all(&src_path) {
                 clean();
                 panic!("Failed to create {:?}: {:?}", src_path, why);
             }
         }
-        if !(Path::exists(&dst_path) && dst_path.is_dir()) {
+        if !(Path::exists(dst_path) && dst_path.is_dir()) {
             if let Err(why) = fs::create_dir_all(&dst_path) {
                 clean();
                 panic!("Failed to create {:?}: {:?}", dst_path, why);

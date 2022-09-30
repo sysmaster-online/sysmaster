@@ -1,12 +1,12 @@
 #!/bin/bash
 
 ## one PR ? Commit
-oldnum=`git rev-list origin/master --count`
-newnum=`git rev-list HEAD --count`
-changenum=$[newnum - oldnum]
+# oldnum=`git rev-list origin/master --no-merges --count`
+# newnum=`git rev-list HEAD --no-merges --count`
+# changenum=$[newnum - oldnum]
 
 # do not use chinese in source code
-rustlist=`git diff --name-only HEAD~$changenum HEAD | grep \.rs$ | tr '\n' ' '`
+rustlist=`git diff master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
 grep -P '[\p{Han}]' $rustlist && echo "rust 源码文件中禁用中文字符" && exit 1
 
 # install needed tools
