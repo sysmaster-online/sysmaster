@@ -1,4 +1,4 @@
-//! socket_load模块实现socket配置文件的加载解析。
+//! socket_load mod parse the field of section Socket and add the extra dependency。
 //!
 
 use nix::sys::socket::{
@@ -39,10 +39,8 @@ impl SocketLoad {
     pub(super) fn socket_add_extras(&self, mng: &Rc<SocketMng>) -> bool {
         log::debug!("socket add extras");
         if self.can_accept() {
-            if mng.unit_ref_target().is_none() {
-                if !mng.load_related_unit(UnitType::UnitService) {
-                    return false;
-                }
+            if mng.unit_ref_target().is_none() && !mng.load_related_unit(UnitType::UnitService) {
+                return false;
             }
 
             self.comm.unit().insert_two_deps(
@@ -69,7 +67,7 @@ impl SocketLoad {
 
         self.parse_listen_socket(ListeningItem::Datagram, socket_conf.clone())?;
 
-        self.parse_listen_socket(ListeningItem::Netlink, socket_conf.clone())?;
+        self.parse_listen_socket(ListeningItem::Netlink, socket_conf)?;
 
         self.parse_socket_service(mng)?;
 
@@ -87,7 +85,9 @@ impl SocketLoad {
     fn parse_socket_service(&self, mng: &Rc<SocketMng>) -> Result<(), Box<dyn Error>> {
         if let Some(service) = self.config.config_data().borrow().Socket.Service.clone() {
             if !service.ends_with(".service") {
-                return Err(format!("socket service must be end with .service").into());
+                return Err("socket service must be end with .service"
+                    .to_string()
+                    .into());
             }
 
             if !self.comm.um().load_unit_success(&service) {
@@ -161,7 +161,7 @@ impl SocketLoad {
                             );
                         }
 
-                        let socket_addr = self.parse_netlink_address(&v).unwrap();
+                        let socket_addr = self.parse_netlink_address(v).unwrap();
                         let mut port = SocketPort::new(socket_addr, self.config.clone());
                         port.set_sc_type(PortType::Socket);
                         self.ports.push_port(Rc::new(port));
@@ -174,33 +174,29 @@ impl SocketLoad {
     }
 
     fn parse_netlink_address(&self, item: &str) -> Result<SocketAddress, Box<dyn Error>> {
-        let words: Vec<String> = item
-            .trim_end()
-            .split_whitespace()
-            .map(|s| s.to_string())
-            .collect();
+        let words: Vec<String> = item.split_whitespace().map(|s| s.to_string()).collect();
         if words.len() != 2 {
             return Err(format!("Netlink configuration format is not correct: {}", item).into());
         }
 
         let family = NetlinkProtocol::from(words[0].to_string());
         if family == NetlinkProtocol::NetlinkInvalid {
-            return Err(format!("Netlink family is invalid").into());
+            return Err("Netlink family is invalid".to_string().into());
         }
 
         let group = if let Ok(g) = words[1].parse::<u32>() {
             g
         } else {
-            return Err(format!("Netlink group is invalid").into());
+            return Err("Netlink group is invalid".to_string().into());
         };
 
         let net_link = NetlinkAddr::new(0, group);
 
-        return Ok(SocketAddress::new(
+        Ok(SocketAddress::new(
             Box::new(net_link),
             SockType::Raw,
             Some(SockProtocol::from(family)),
-        ));
+        ))
     }
 
     fn parse_socket_address(
@@ -208,12 +204,12 @@ impl SocketLoad {
         item: &str,
         socket_type: SockType,
     ) -> Result<SocketAddress, Box<dyn Error>> {
-        if item.starts_with("/") {
+        if item.starts_with('/') {
             let unix_addr = UnixAddr::new(&PathBuf::from(item))?;
             return Ok(SocketAddress::new(Box::new(unix_addr), socket_type, None));
         }
 
-        if item.starts_with("@") {
+        if item.starts_with('@') {
             let unix_addr = UnixAddr::new_abstract(item.as_bytes())?;
 
             return Ok(SocketAddress::new(Box::new(unix_addr), socket_type, None));
@@ -221,7 +217,7 @@ impl SocketLoad {
 
         if let Ok(port) = item.parse::<u16>() {
             if port == 0 {
-                return Err(format!("invalid port number").into());
+                return Err("invalid port number".to_string().into());
             }
 
             if socket_util::ipv6_is_supported() {
@@ -247,7 +243,7 @@ impl SocketLoad {
             return Ok(SocketAddress::new(sock_addr, socket_type, None));
         }
 
-        return Err(format!("invalid listening config").into());
+        Err("invalid listening config".to_string().into())
     }
 }
 
@@ -274,12 +270,11 @@ mod tests {
         let mut file_path = get_project_root().unwrap();
         file_path.push("test_units/test.socket.toml");
 
-        let mut paths = Vec::new();
-        paths.push(file_path);
+        let paths = vec![file_path];
 
         let config = SocketConfig::new();
-        assert_eq!(config.load(&paths).is_ok(), true);
+        assert!(config.load(&paths).is_ok());
 
-        assert_eq!(load.parse(config.config_data(), &mng).is_ok(), true);
+        assert!(load.parse(config.config_data(), &mng).is_ok());
     }
 }

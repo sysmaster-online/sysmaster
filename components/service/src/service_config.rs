@@ -52,17 +52,21 @@ impl ServiceConfig {
     }
 
     pub(super) fn environments(&self) -> Option<Vec<String>> {
-        match &self.data.borrow().Service.Environment {
-            Some(v) => Some(v.iter().map(|v| v.to_string()).collect()),
-            None => None,
-        }
+        self.data
+            .borrow()
+            .Service
+            .Environment
+            .as_ref()
+            .map(|v| v.iter().map(|v| v.to_string()).collect())
     }
 
     pub(super) fn sockets(&self) -> Option<Vec<String>> {
-        match &self.data.borrow().Service.Sockets {
-            Some(v) => Some(v.iter().map(|v| v.to_string()).collect()),
-            None => None,
-        }
+        self.data
+            .borrow()
+            .Service
+            .Sockets
+            .as_ref()
+            .map(|v| v.iter().map(|v| v.to_string()).collect())
     }
 }
 
@@ -99,20 +103,7 @@ pub(super) struct SectionService {
     pub ExecCondition: Option<Vec<ExecCommand>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub Sockets: Option<Vec<String>>,
-    // #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
-    // pub Restart: Option<Vec<ExecCommand>>,
-    pub RestrictRealtime: Option<String>,
-    pub RebootArgument: Option<String>,
-    pub OOMScoreAdjust: Option<String>,
-    pub RestartSec: Option<u64>,
     pub WatchdogUSec: Option<u64>,
-    pub Slice: Option<String>,
-    pub MemoryLimit: Option<u64>,
-    pub MemoryLow: Option<u64>,
-    pub MemoryMin: Option<u64>,
-    pub MemoryMax: Option<u64>,
-    pub MemoryHigh: Option<u64>,
-    pub MemorySwapMax: Option<u64>,
     pub PIDFile: Option<String>,
     #[config(default = false)]
     pub RemainAfterExit: bool,
@@ -137,7 +128,6 @@ impl ServiceConfigData {
             ServiceCommand::Reload => self.Service.ExecReload.clone(),
             ServiceCommand::Stop => self.Service.ExecStop.clone(),
             ServiceCommand::StopPost => self.Service.ExecStopPost.clone(),
-            ServiceCommand::CommandMax => todo!(),
         }
     }
 }
@@ -151,15 +141,13 @@ mod tests {
     fn test_service_parse() {
         let mut file_path = get_project_root().unwrap();
         file_path.push("test_units/config.service.toml");
-        let mut paths = Vec::new();
-        paths.push(file_path);
-
+        let paths = vec![file_path];
         let config = ServiceConfig::new();
 
         let result = config.load(&paths);
 
         println!("service data: {:?}", config.config_data());
 
-        assert_eq!(result.is_err(), false);
+        assert!(result.is_ok());
     }
 }

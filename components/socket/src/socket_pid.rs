@@ -1,4 +1,4 @@
-//! socket_pid模块实现子进程pid的管理。
+//! socket_pid implement the management of pid。
 //!
 
 use super::socket_comm::SocketComm;
@@ -20,12 +20,9 @@ impl SocketPid {
     }
 
     pub(super) fn unwatch_control(&self) {
-        match self.control() {
-            Some(pid) => {
-                self.comm.um().child_unwatch_pid(pid);
-                self.data.borrow_mut().reset_control();
-            }
-            None => {}
+        if let Some(pid) = self.control() {
+            self.comm.um().child_unwatch_pid(pid);
+            self.data.borrow_mut().reset_control();
         }
     }
 

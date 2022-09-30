@@ -1,4 +1,4 @@
-//! socket_port模块实现port的管理。实现socket套接字的创建等管理操作。
+//! socket_port implement the management of configured ports, create , open and close the socket。
 //!
 
 use nix::{
@@ -41,7 +41,7 @@ impl SocketPorts {
     }
 
     pub(super) fn push_port(&self, port: Rc<SocketPort>) {
-        self.data.borrow_mut().push_port(port.clone());
+        self.data.borrow_mut().push_port(port);
     }
 
     #[allow(dead_code)]
@@ -83,7 +83,7 @@ impl SocketPortsData {
     }
 
     pub(super) fn push_port(&mut self, port: Rc<SocketPort>) {
-        self.ports.push(port.clone());
+        self.ports.push(port);
     }
 
     pub(super) fn clear_ports(&mut self) {
@@ -91,7 +91,7 @@ impl SocketPortsData {
     }
 
     pub(self) fn ports(&self) -> Vec<Rc<SocketPort>> {
-        self.ports.iter().map(|p| p.clone()).collect::<_>()
+        self.ports.to_vec()
     }
 
     pub(self) fn no_accept_socket(&self) -> bool {
@@ -115,7 +115,6 @@ impl SocketPortsData {
     }
 }
 
-#[allow(dead_code)]
 pub(super) struct SocketAddress {
     sock_addr: Box<dyn SockaddrLike>,
     sa_type: SockType,
@@ -226,7 +225,6 @@ impl fmt::Display for SocketAddress {
     }
 }
 
-#[allow(dead_code)]
 pub(super) struct SocketPort {
     mng: RefCell<Weak<SocketMng>>,
     config: Rc<SocketConfig>,
@@ -243,7 +241,7 @@ impl SocketPort {
             fd: RefCell::new(-1),
             sa: RefCell::new(socket_addr),
             mng: RefCell::new(Weak::new()),
-            config: configr.clone(),
+            config: configr,
         }
     }
 
@@ -273,12 +271,8 @@ impl SocketPort {
 
     pub(super) fn accept(&self) -> Result<i32, Errno> {
         match socket::accept4(self.fd(), SockFlag::SOCK_NONBLOCK | SockFlag::SOCK_CLOEXEC) {
-            Ok(fd) => {
-                return Ok(fd);
-            }
-            Err(e) => {
-                return Err(e);
-            }
+            Ok(fd) => Ok(fd),
+            Err(e) => Err(e),
         }
     }
 
@@ -503,20 +497,20 @@ mod tests {
         let sock_addr = SockaddrIn::from(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 31457));
         let socket_addr = SocketAddress::new(Box::new(sock_addr), SockType::Stream, None);
 
-        let mut p = SocketPort::new(socket_addr, config.clone());
+        let mut p = SocketPort::new(socket_addr, config);
         p.set_sc_type(PortType::Socket);
 
         let port = Rc::new(p);
         ports.push_port(port.clone());
 
         assert_eq!(ports.ports().len(), 1);
-        assert_eq!(ports.no_accept_socket(), false);
+        assert!(!ports.no_accept_socket());
         assert_eq!(ports.collect_fds().len(), 0);
 
         assert_eq!(port.fd(), -1);
 
         let ret = port.open_port();
-        assert_eq!(ret.is_err(), false);
+        assert!(ret.is_ok());
 
         assert_ne!(port.fd(), -1);
         assert_eq!(port.family(), AddressFamily::Inet);
@@ -539,20 +533,20 @@ mod tests {
         let socket_addr = SocketAddress::new(Box::new(unix_addr), SockType::Stream, None);
         assert_eq!(socket_addr.path().unwrap(), unix_path);
 
-        let mut p = SocketPort::new(socket_addr, config.clone());
+        let mut p = SocketPort::new(socket_addr, config);
         p.set_sc_type(PortType::Socket);
 
         let port = Rc::new(p);
         ports.push_port(port.clone());
 
         assert_eq!(ports.ports().len(), 1);
-        assert_eq!(ports.no_accept_socket(), false);
+        assert!(!ports.no_accept_socket());
         assert_eq!(ports.collect_fds().len(), 0);
 
         assert_eq!(port.fd(), -1);
 
         let ret = port.open_port();
-        assert_eq!(ret.is_err(), false);
+        assert!(ret.is_ok());
 
         assert_ne!(port.fd(), -1);
         assert_eq!(port.family(), AddressFamily::Unix);
@@ -582,18 +576,18 @@ mod tests {
             Some(SockProtocol::from(family)),
         );
 
-        let mut p = SocketPort::new(socket_addr, config.clone());
+        let mut p = SocketPort::new(socket_addr, config);
         p.set_sc_type(PortType::Socket);
         let port = Rc::new(p);
         ports.push_port(port.clone());
 
         assert_eq!(ports.ports().len(), 1);
-        assert_eq!(ports.no_accept_socket(), true);
+        assert!(ports.no_accept_socket());
         assert_eq!(ports.collect_fds().len(), 0);
         assert_eq!(port.fd(), -1);
 
         let ret = port.open_port();
-        assert_eq!(ret.is_err(), false);
+        assert!(ret.is_ok());
 
         assert_ne!(port.fd(), -1);
         assert_eq!(port.family(), AddressFamily::Netlink);

@@ -1,8 +1,7 @@
-// target unit是 target类型的入口，需要实现
-//UnitObj,UnitMngUtil,以及UnitSubClass三个trait
-// UnitObj是Unit的抽象，定义Unit的具体行为
-// UnitMngUtil是为了关联subUnit和Manager，由于rust不支持继承和多态，因此需要采用这种方式来间接支持
-// UnitSubClass为了实现SubUnit到UnitObj的转换，简介达成多态的目的
+//! TargetUnit is the entrance of the sub unit，implement the trait UnitObj,UnitMngUtil and UnitSubClass.
+//! Trait UnitObj defines the behavior of the sub unit.
+//! Trait UnitMngUtil is used to attach the Unitmanager to the sub unit.
+//! Trait UnitSubClass implement the convert from sub unit to UnitObj.
 
 use std::{path::PathBuf, rc::Rc};
 
@@ -96,7 +95,7 @@ impl UnitObj for Target {
     fn dump(&self) {}
 
     fn start(&self) -> utils::Result<(), process1::manager::UnitActionError> {
-        //如果状态不对，直接返回失败
+        //if current state is not valid, just return.
         self.mng.start_check()?;
 
         self.mng.start_action();
@@ -136,7 +135,6 @@ impl UnitSubClass for Target {
 impl UnitMngUtil for Target {
     fn attach(&self, _um: Rc<process1::manager::UnitManager>) {
         self.comm.attach_um(_um);
-        return;
     }
 }
 

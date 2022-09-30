@@ -27,12 +27,9 @@ impl ServicePid {
     }
 
     pub(super) fn unwatch_main(&self) {
-        match self.main() {
-            Some(pid) => {
-                self.comm.um().child_unwatch_pid(pid);
-                self.data.borrow_mut().reset_main();
-            }
-            None => {}
+        if let Some(pid) = self.main() {
+            self.comm.um().child_unwatch_pid(pid);
+            self.data.borrow_mut().reset_main();
         }
     }
 
@@ -45,12 +42,9 @@ impl ServicePid {
     }
 
     pub(super) fn unwatch_control(&self) {
-        match self.control() {
-            Some(pid) => {
-                self.comm.um().child_unwatch_pid(pid);
-                self.data.borrow_mut().reset_control();
-            }
-            None => {}
+        if let Some(pid) = self.control() {
+            self.comm.um().child_unwatch_pid(pid);
+            self.data.borrow_mut().reset_control();
         }
     }
 

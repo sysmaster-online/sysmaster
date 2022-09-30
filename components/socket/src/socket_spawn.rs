@@ -5,7 +5,6 @@ use process1::manager::{ExecCommand, ExecContext, ExecParameters};
 
 use crate::socket_comm::SocketComm;
 
-#[allow(dead_code)]
 pub(super) struct SocketSpawn {
     comm: Rc<SocketComm>,
     exec_ctx: Rc<ExecContext>,
@@ -19,7 +18,6 @@ impl SocketSpawn {
         }
     }
 
-    #[allow(dead_code)]
     pub(super) fn start_socket(&self, cmdline: &ExecCommand) -> Result<Pid, Box<dyn Error>> {
         let params = ExecParameters::new();
 
@@ -33,7 +31,7 @@ impl SocketSpawn {
             }
             Err(_e) => {
                 log::error!("failed to start socket: {}", unit.get_id());
-                Err(format!("spawn exec return error").into())
+                Err("spawn exec return error".to_string().into())
             }
         }
     }

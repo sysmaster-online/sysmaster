@@ -1,4 +1,4 @@
-//! socket_config模块socket类型配置文件的定义，以及保存配置文件解析之后的内容
+//! socket_config mod load the conf file list and convert it to structure which is defined in this mod.
 //!
 #![allow(non_snake_case)]
 use std::cell::RefCell;
@@ -56,6 +56,7 @@ pub(crate) struct SocketConfigData {
 }
 
 #[derive(Config, Default, Debug)]
+#[allow(dead_code)]
 pub(crate) struct SectionSocket {
     #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
     pub ExecStartPre: Option<Vec<ExecCommand>>,
@@ -90,7 +91,6 @@ impl SocketConfigData {
     pub(super) fn get_exec_cmds(&self, cmd_type: SocketCommand) -> Option<Vec<ExecCommand>> {
         match cmd_type {
             SocketCommand::StartPre => self.Socket.ExecStartPre.clone(),
-            SocketCommand::StartChown => self.Socket.ExecStartChown.clone(),
             SocketCommand::StartPost => self.Socket.ExecStartPost.clone(),
             SocketCommand::StopPre => self.Socket.ExecStopPre.clone(),
             SocketCommand::StopPost => self.Socket.ExecStopPost.clone(),
@@ -98,24 +98,24 @@ impl SocketConfigData {
     }
 
     pub(super) fn listen_stream(&self) -> Option<Vec<String>> {
-        match &self.Socket.ListenStream {
-            Some(v) => Some(v.iter().map(|v| v.to_string()).collect()),
-            None => None,
-        }
+        self.Socket
+            .ListenStream
+            .as_ref()
+            .map(|v| v.iter().map(|v| v.to_string()).collect())
     }
 
     pub(super) fn listen_datagram(&self) -> Option<Vec<String>> {
-        match &self.Socket.ListenDatagram {
-            Some(v) => Some(v.iter().map(|v| v.to_string()).collect()),
-            None => None,
-        }
+        self.Socket
+            .ListenDatagram
+            .as_ref()
+            .map(|v| v.iter().map(|v| v.to_string()).collect())
     }
 
     pub(super) fn listen_netlink(&self) -> Option<Vec<String>> {
-        match &self.Socket.ListenNetlink {
-            Some(v) => Some(v.iter().map(|v| v.to_string()).collect()),
-            None => None,
-        }
+        self.Socket
+            .ListenNetlink
+            .as_ref()
+            .map(|v| v.iter().map(|v| v.to_string()).collect())
     }
 }
 
@@ -128,12 +128,11 @@ mod tests {
     fn test_socket_parse() {
         let mut file_path = get_project_root().unwrap();
         file_path.push("test_units/test.socket.toml");
-        let mut paths = Vec::new();
-        paths.push(file_path);
+        let paths = vec![file_path];
 
         let config = SocketConfig::new();
         let result = config.load(&paths);
 
-        assert_eq!(result.is_err(), false);
+        assert!(result.is_ok());
     }
 }
