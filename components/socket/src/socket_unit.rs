@@ -1,7 +1,7 @@
-//! SocketUnit类型socket类型的总入口，需要实现UnitObj,UnitMngUtil,以及UnitSubClass三个trait,
-//! UnitObj是Unit的抽象，定义对process1提供的具体行为，
-//! UnitMngUtil是为了关联subUnit和Manager，由于rust不支持继承和多态，因此需要采用这种方式来间接支持
-//！ UnitSubClass为了实现SubUnit到UnitObj的转换，简介达成多态的目的
+//! SocketUnit is the entrance of the sub unit，implement the trait UnitObj,UnitMngUtil and UnitSubClass.
+//! Trait UnitObj defines the behavior of the sub unit.
+//! Trait UnitMngUtil is used to attach the Unitmanager to the sub unit.
+//! Trait UnitSubClass implement the convert from sub unit to UnitObj.
 
 use nix::{sys::signal::Signal, unistd::Pid};
 use process1::manager::{
@@ -16,7 +16,6 @@ use crate::{
 };
 use utils::logger;
 
-#[allow(dead_code)]
 // the structuer of the socket unit type
 struct SocketUnit {
     comm: Rc<SocketComm>,
@@ -29,13 +28,13 @@ struct SocketUnit {
 impl UnitObj for SocketUnit {
     fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
         log::debug!("socket begin to load conf file");
-        self.config.load(&paths)?;
+        self.config.load(paths)?;
 
         self.load.parse(self.config.config_data(), &self.mng)?;
 
         self.load.socket_add_extras(&self.mng);
 
-        return self.load.socket_verify();
+        self.load.socket_verify()
     }
 
     // the function entrance to start the unit
@@ -107,7 +106,7 @@ impl SocketUnit {
         SocketUnit {
             comm: Rc::clone(&_comm),
             config: Rc::clone(&_config),
-            mng: mng.clone(),
+            mng,
             ports: ports.clone(),
             load: SocketLoad::new(&_config, &_comm, &ports),
         }

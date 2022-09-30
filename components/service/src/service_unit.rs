@@ -5,7 +5,6 @@ use super::service_comm::ServiceComm;
 use super::service_config::ServiceConfig;
 use super::service_mng::ServiceMng;
 use super::service_monitor::ServiceMonitor;
-use log;
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
@@ -46,7 +45,7 @@ impl UnitObj for ServiceUnit {
 
         self.service_add_extras()?;
 
-        return self.service_verify();
+        self.service_verify()
     }
 
     fn coldplug(&self) {
@@ -145,43 +144,37 @@ impl ServiceUnit {
         ServiceUnit {
             comm: Rc::clone(&comm),
             config: Rc::clone(&config),
-            mng: mng.clone(),
+            mng,
             monitor: ServiceMonitor::new(&config),
-            exec_ctx: context.clone(),
+            exec_ctx: context,
         }
     }
 
     pub(super) fn parse(&self) -> Result<(), Box<dyn Error>> {
-        match self.config.environments() {
-            Some(envs) => {
-                for env in envs {
-                    let content: Vec<&str> = env.split("=").map(|s| s.trim()).collect();
-                    if content.len() != 2 {
-                        continue;
-                    }
-
-                    self.exec_ctx
-                        .insert_env(content[0].to_string(), content[1].to_string());
+        if let Some(envs) = self.config.environments() {
+            for env in envs {
+                let content: Vec<&str> = env.split('=').map(|s| s.trim()).collect();
+                if content.len() != 2 {
+                    continue;
                 }
+
+                self.exec_ctx
+                    .insert_env(content[0].to_string(), content[1].to_string());
             }
-            None => {}
         }
 
-        match self.config.sockets() {
-            Some(sockets) => {
-                for socket in sockets {
-                    self.comm.unit().insert_two_deps(
-                        UnitRelations::UnitWants,
-                        UnitRelations::UnitAfter,
-                        socket.to_string(),
-                    );
+        if let Some(sockets) = self.config.sockets() {
+            for socket in sockets {
+                self.comm.unit().insert_two_deps(
+                    UnitRelations::UnitWants,
+                    UnitRelations::UnitAfter,
+                    socket.to_string(),
+                );
 
-                    self.comm
-                        .unit()
-                        .insert_dep(UnitRelations::UnitTriggeredBy, socket.clone());
-                }
+                self.comm
+                    .unit()
+                    .insert_dep(UnitRelations::UnitTriggeredBy, socket.clone());
             }
-            None => {}
         }
 
         Ok(())

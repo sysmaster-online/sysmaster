@@ -1,4 +1,4 @@
-//! target 子类的核心逻辑
+//! is the core of the target unit
 //!
 use std::{cell::RefCell, rc::Rc};
 
@@ -7,7 +7,7 @@ use utils::IN_SET;
 
 use crate::target_comm::TargetComm;
 
-// target 包含两个状态，Dead和Active，对应到unit状态为inactive和 active
+// target contain Dead and Active state，correspond the inactive and active of the unit
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 enum TargetState {
     Dead,
@@ -16,8 +16,8 @@ enum TargetState {
 }
 
 impl TargetState {
-    fn to_unit_state(&self) -> UnitActiveState {
-        match *self {
+    fn to_unit_state(self) -> UnitActiveState {
+        match self {
             TargetState::Dead | TargetState::StateMax => UnitActiveState::UnitInActive,
             TargetState::Active => UnitActiveState::UnitActive,
         }
@@ -45,7 +45,7 @@ impl TargetMng {
     }
 
     pub(super) fn start_action(&self) {
-        //todo notify dbus功能暂时未实现
+        //todo notify dbus is not implemented
         self.set_state(TargetState::Active);
     }
 

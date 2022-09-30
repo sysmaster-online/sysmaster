@@ -1,51 +1,6 @@
 use process1::manager::DeserializeWith;
 use serde::{Deserialize, Deserializer, Serialize};
 
-#[derive(PartialEq, EnumString, Display, Debug)]
-pub(super) enum ServiceTimeoutFailureMode {
-    #[strum(serialize = "terminate")]
-    TimeoutTerminate,
-    #[strum(serialize = "abort")]
-    TimeoutAbort,
-    #[strum(serialize = "kill")]
-    TimeoutKill,
-    TimeoutFailureModeMax,
-    TimeoutFailureModeInvalid = -1,
-}
-
-impl Default for ServiceTimeoutFailureMode {
-    fn default() -> Self {
-        ServiceTimeoutFailureMode::TimeoutTerminate
-    }
-}
-
-#[derive(PartialEq, Default, Debug)]
-pub(super) struct ExitStatusSet {}
-
-#[derive(PartialEq, EnumString, Display, Debug)]
-pub(super) enum ServiceRestart {
-    #[strum(serialize = "no")]
-    RestartNo,
-    #[strum(serialize = "on-success")]
-    RestartOnSuccess,
-    #[strum(serialize = "on-failure")]
-    RestartOnFailure,
-    #[strum(serialize = "on-abnormal")]
-    RestartOnAbnormal,
-    #[strum(serialize = "on-abort")]
-    RestartOnAbort,
-    #[strum(serialize = "always")]
-    RestartAlways,
-    RestartMax,
-    RestartInvalid = -1,
-}
-
-impl Default for ServiceRestart {
-    fn default() -> Self {
-        ServiceRestart::RestartNo
-    }
-}
-
 #[derive(PartialEq, Eq, Serialize, Deserialize, EnumString, Display, Debug, Clone, Copy)]
 pub(super) enum ServiceType {
     #[strum(serialize = "simple")]
@@ -100,7 +55,6 @@ pub(super) enum ServiceCommand {
     Reload,
     Stop,
     StopPost,
-    CommandMax,
 }
 
 #[derive(PartialEq, Default, Debug)]
@@ -120,6 +74,5 @@ pub(super) enum NotifyAccess {
 pub(super) enum NotifyState {
     Unknown,
     Ready,
-    Reloading,
     Stopping,
 }

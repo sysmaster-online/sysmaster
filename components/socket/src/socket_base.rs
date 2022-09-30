@@ -90,12 +90,10 @@ impl From<NetlinkProtocol> for SockProtocol {
     }
 }
 
-/// command对应的启动阶段
-#[allow(dead_code)]
+/// the command that running in different stage.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Copy, Clone)]
 pub(super) enum SocketCommand {
     StartPre,
-    StartChown,
     StartPost,
     StopPre,
     StopPost,

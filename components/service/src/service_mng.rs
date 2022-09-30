@@ -5,7 +5,7 @@ use super::service_comm::ServiceComm;
 use super::service_config::ServiceConfig;
 use super::service_pid::ServicePid;
 use super::service_spawn::ServiceSpawn;
-use log;
+
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
@@ -52,7 +52,6 @@ pub(self) enum ServiceState {
     FinalSigterm,
     FinalSigkill,
     Failed,
-    AutoRestart,
     Cleaning,
 }
 
@@ -67,9 +66,7 @@ pub(self) enum ServiceResult {
     Success,
     FailureProtocol,
     FailureResources,
-    FailureTimeout,
     FailureSignal,
-    FailureKill,
     ResultInvalid,
 }
 
@@ -284,8 +281,6 @@ impl ServiceMng {
             ServiceType::Exec => todo!(),
             _ => {}
         }
-
-        return;
     }
 
     fn enter_start_post(&self) {
@@ -625,7 +620,7 @@ impl ServiceMng {
             });
         }
 
-        let pid = match file_util::read_first_line(&pid_file_path) {
+        let pid = match file_util::read_first_line(pid_file_path) {
             Ok(line) => line.trim().parse::<i32>(),
             Err(e) => return Err(Error::from(e)),
         };
@@ -642,7 +637,7 @@ impl ServiceMng {
         }
 
         let pid = Pid::from_raw(pid.unwrap());
-        if !self.pid.main().is_none() && self.pid.main().unwrap() == pid {
+        if self.pid.main().is_some() && self.pid.main().unwrap() == pid {
             return Ok(false);
         }
 
@@ -664,7 +659,7 @@ impl ServiceMng {
             });
         }
 
-        if !self.pid.control().is_none() && self.pid.control().unwrap() == pid {
+        if self.pid.control().is_some() && self.pid.control().unwrap() == pid {
             return Err(Error::Other {
                 msg: "main pid is the control process",
             });
@@ -699,7 +694,7 @@ impl ServiceMng {
 
         self.rd.attach_inotify(Rc::new(pid_file_inotify));
 
-        return self.watch_pid_file();
+        self.watch_pid_file()
     }
 
     pub fn watch_pid_file(&self) -> Result<(), Error> {
@@ -714,7 +709,7 @@ impl ServiceMng {
                 if let Err(e) = self.retry_pid_file() {
                     log::warn!("retry load pid file error: {}, Ignore and Continue", e);
                 }
-                return Ok(());
+                Ok(())
             }
 
             Err(e) => {
@@ -725,7 +720,7 @@ impl ServiceMng {
                 );
                 self.unwatch_pid_file();
 
-                return Err(e);
+                Err(e)
             }
         }
     }
@@ -875,11 +870,11 @@ impl ServiceMng {
                                 .get_exec_cmds(ServiceCommand::StartPost)
                                 .is_some()
                             {
-                                self.config
+                                !self
+                                    .config
                                     .get_exec_cmds(ServiceCommand::StartPost)
                                     .unwrap()
-                                    .len()
-                                    != 0
+                                    .is_empty()
                             } else {
                                 false
                             };
@@ -970,7 +965,7 @@ impl ServiceMng {
         &self,
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
-        _fds: &Vec<i32>,
+        _fds: &[i32],
     ) -> Result<(), Error> {
         if let Some(&pidr) = messages.get("MAINPID") {
             if IN_SET!(
@@ -1028,8 +1023,8 @@ impl ServiceMng {
 }
 
 impl ServiceState {
-    fn to_unit_active_state(&self) -> UnitActiveState {
-        match *self {
+    fn to_unit_active_state(self) -> UnitActiveState {
+        match self {
             ServiceState::Dead => UnitActiveState::UnitInActive,
             ServiceState::Condition
             | ServiceState::StartPre
@@ -1046,13 +1041,12 @@ impl ServiceState {
             | ServiceState::FinalSigkill
             | ServiceState::FinalWatchdog => UnitActiveState::UnitDeActivating,
             ServiceState::Failed => UnitActiveState::UnitFailed,
-            ServiceState::AutoRestart => UnitActiveState::UnitActivating,
             ServiceState::Cleaning => UnitActiveState::UnitMaintenance,
         }
     }
 
-    fn to_unit_active_state_idle(&self) -> UnitActiveState {
-        match *self {
+    fn to_unit_active_state_idle(self) -> UnitActiveState {
+        match self {
             ServiceState::Dead => UnitActiveState::UnitInActive,
             ServiceState::Condition
             | ServiceState::StartPre
@@ -1070,12 +1064,11 @@ impl ServiceState {
             | ServiceState::FinalSigkill
             | ServiceState::FinalWatchdog => UnitActiveState::UnitDeActivating,
             ServiceState::Failed => UnitActiveState::UnitFailed,
-            ServiceState::AutoRestart => UnitActiveState::UnitActivating,
             ServiceState::Cleaning => UnitActiveState::UnitMaintenance,
         }
     }
 
-    fn to_kill_operation(&self) -> KillOperation {
+    fn to_kill_operation(self) -> KillOperation {
         match self {
             ServiceState::StopWatchdog => KillOperation::KillWatchdog,
             ServiceState::StopSigterm | ServiceState::FinalSigterm => KillOperation::KillTerminate,
@@ -1159,6 +1152,7 @@ impl Rtdata {
         self.errno = errno;
     }
 
+    #[allow(dead_code)]
     pub(self) fn errno(&mut self) -> i32 {
         self.errno
     }
@@ -1281,7 +1275,7 @@ impl PathIntofy {
 
     fn unwatch(&self) {
         fd_util::close(*self.inotify.borrow());
-        *self.inotify.borrow_mut() = RawFd::from(-1);
+        *self.inotify.borrow_mut() = -1;
     }
 
     fn read_fd_event(&self) -> Result<bool, Error> {

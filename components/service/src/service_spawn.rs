@@ -41,9 +41,9 @@ impl ServiceSpawn {
 
         params.add_env(
             "PATH",
-            env::var("PATH").unwrap_or(
-                "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".to_string(),
-            ),
+            env::var("PATH").unwrap_or_else(|_| {
+                "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".to_string()
+            }),
         );
 
         if let Some(pid) = self.pid.main() {
@@ -61,10 +61,7 @@ impl ServiceSpawn {
         if self.config.service_type() == ServiceType::Notify {
             let notify_sock = um.notify_socket().unwrap();
             log::debug!("add NOTIFY_SOCKET env: {}", notify_sock.to_str().unwrap());
-            params.add_env(
-                "NOTIFY_SOCKET",
-                format!("{}", notify_sock.to_str().unwrap()),
-            );
+            params.add_env("NOTIFY_SOCKET", notify_sock.to_str().unwrap().to_string());
             params.set_notify_sock(notify_sock);
         }
 
@@ -76,7 +73,7 @@ impl ServiceSpawn {
             }
             Err(e) => {
                 log::error!("failed to start service: {}, error:{:?}", unit.get_id(), e);
-                Err(format!("spawn exec return error").into())
+                Err("spawn exec return error".to_string().into())
             }
         }
     }

@@ -1,4 +1,4 @@
-//! socket_mng模块是socket类型的核心逻辑，主要实现socket端口的管理，子进程的拉起及子类型的状态管理。
+//! socket_mng is the core of the socket unit，implement the state transition, ports management and sub child management.
 //!
 
 use std::{cell::RefCell, path::Path, rc::Rc};
@@ -16,7 +16,6 @@ use crate::{
     socket_pid::SocketPid, socket_port::SocketPorts, socket_spawn::SocketSpawn,
 };
 
-#[allow(dead_code)]
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub(super) enum SocketState {
     Dead,
@@ -37,8 +36,8 @@ pub(super) enum SocketState {
 }
 
 impl SocketState {
-    pub(super) fn to_unit_active_state(&self) -> UnitActiveState {
-        match *self {
+    pub(super) fn to_unit_active_state(self) -> UnitActiveState {
+        match self {
             SocketState::Dead => UnitActiveState::UnitInActive,
             SocketState::StartPre | SocketState::StartChown | SocketState::StartPost => {
                 UnitActiveState::UnitActivating
@@ -56,7 +55,7 @@ impl SocketState {
         }
     }
 
-    fn to_kill_operation(&self) -> KillOperation {
+    fn to_kill_operation(self) -> KillOperation {
         match self {
             SocketState::StopPreSigterm => {
                 // todo!() check has a restart job
@@ -83,7 +82,6 @@ enum SocketResult {
     ResultInvalid,
 }
 
-#[allow(dead_code)]
 pub(super) struct SocketMng {
     comm: Rc<SocketComm>,
     config: Rc<SocketConfig>,
@@ -114,7 +112,7 @@ impl SocketMng {
             state: Rc::new(RefCell::new(SocketState::StateMax)),
             result: RefCell::new(SocketResult::Success),
             control_command: RefCell::new(Vec::new()),
-            pid: pid.clone(),
+            pid,
             refused: RefCell::new(0),
             service: RefCell::new(UnitRef::new()),
         }
@@ -129,7 +127,7 @@ impl SocketMng {
         let stem_name = Path::new(&unit_name).file_stem().unwrap().to_str().unwrap();
 
         let suffix = String::from(related_type);
-        if suffix.len() == 0 {
+        if suffix.is_empty() {
             return false;
         }
 
@@ -144,10 +142,7 @@ impl SocketMng {
     }
 
     pub(super) fn unit_ref_target(&self) -> Option<String> {
-        self.service
-            .borrow()
-            .target()
-            .map_or(None, |v| Some(v.to_string()))
+        self.service.borrow().target().map(|v| v.to_string())
     }
 
     pub(super) fn start_check(&self) -> Result<bool, UnitActionError> {
@@ -251,7 +246,6 @@ impl SocketMng {
             }
 
             self.set_state(SocketState::Running);
-            return;
         } else {
             // template support
             todo!()
@@ -455,7 +449,7 @@ impl SocketMng {
         for port in ports.iter() {
             port.open_port().map_err(|_e| {
                 log::error!("open port error: {}", _e);
-                return UnitActionError::UnitActionEFailed;
+                UnitActionError::UnitActionEFailed
             })?;
 
             port.apply_sock_opt(port.fd());
@@ -619,7 +613,7 @@ impl SocketMng {
                         "control command should not exit， current state is : {:?}",
                         self.state()
                     );
-                    assert!(false);
+                    unreachable!();
                 }
             }
         }

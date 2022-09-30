@@ -29,6 +29,7 @@ struct ServiceMonitorData {
 }
 
 // the declaration "pub(self)" is for identification only.
+#[allow(dead_code)]
 impl ServiceMonitorData {
     pub(self) fn new(configr: &Rc<ServiceConfig>) -> ServiceMonitorData {
         ServiceMonitorData {
@@ -55,19 +56,18 @@ impl ServiceMonitorData {
         self.watchdog_override_enable = false;
         self.watchdog_override_usec = u64::MAX;
     }
-
-    /// 软件看门狗，在service中的watchdog主要是定期接收服务进程发来的READY=1的消息，如果没收到则执行杀死或重启操作。
-    /// 打开看门狗，需要比较原有的超时时间和复写的超时时间，并判断如果是非法值则要关闭看门狗
-    /// 直接调用recvmsg系统调用从socket文件中读取字符串，再判断是否是看门狗相关的字段，如READY=1
-    /// 功能未完全实现，依赖timer sd-event的实现
+    /// software watchdog, if the watchdog not receive the READY=1 message within the timeout period, the kill the servcie.
+    /// start the watchdog, compare the original and override timeout value, if it's invalid value then stop the watchdog.
+    /// call recvmsg and read messages from the socket, and judge if it is the expected value, like READY=1.
+    /// not implemented all function, depend on the timer and sd-event.
     fn start_watchdog(self) {
-        // 允许覆盖timeout则使用覆盖值
+        // if watchdog_override_enable is enabled, the override the timeout with the watchdog_override_usec
         let watchdog_usec = if self.watchdog_override_enable {
             self.watchdog_override_usec
         } else {
             self.watchdog_original_usec
         };
-        // timeout为0则关闭看门狗
+        // if timeout is 0 then stop the watchdog
         if watchdog_usec == 0 || watchdog_usec == u64::MAX {
             self.stop_watchdog()
         }
