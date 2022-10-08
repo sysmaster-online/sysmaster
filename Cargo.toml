@@ -78,7 +78,7 @@ members = [
   "process1",
   "libutils",
   "libs/libtests",
-  "libwatchdog",
+  "libs/libwatchdog",
   "components/service",
   "components/socket",
   "components/target",
