@@ -1,9 +1,10 @@
+//! 1. Generate code based on abi.proto
+//! 2. Actions required for other tests
 use std::{env, process::Command};
 
 fn main() {
     let mut config = prost_build::Config::new();
     config.bytes(&["."]);
-    // config.type_attribute(".", "#[derive(PartialOrd)]");
     config.type_attribute(".", "#[rustfmt::skip]");
     config
         .out_dir("src/proto")

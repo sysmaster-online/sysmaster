@@ -1,4 +1,4 @@
-/// 来自客户端的命令请求
+/// Command request from client
 #[rustfmt::skip]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandRequest {
@@ -16,7 +16,7 @@ pub mod command_request {
         ///unit file commands
         #[prost(message, tag="2")]
         Ufile(super::UnitFile),
-        ///job管理
+        ///job management
         #[prost(message, tag="3")]
         Jcomm(super::JobComm),
         ///manager commands
@@ -27,14 +27,14 @@ pub mod command_request {
         Syscomm(super::SysComm),
     }
 }
-/// 服务端的响应
+/// Command Response from server
 #[rustfmt::skip]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandResponse {
-    /// 状态码；复用 HTTP 2xx/4xx/5xx 状态码
+    /// stat code; HTTP 2xx/4xx/5xx
     #[prost(uint32, tag="1")]
     pub status: u32,
-    /// 如果不是 2xx，message 里包含详细的信息
+    /// if not 2xx，message include more information
     #[prost(string, tag="2")]
     pub message: ::prost::alloc::string::String,
 }

@@ -2,14 +2,14 @@ syntax = "proto3";
 
 package abi;
 
-// 来自客户端的命令请求
+// Command request from client
 message CommandRequest {
   oneof request_data {
     //unit lifecycle
     UnitComm ucomm = 1;
     //unit file commands
     UnitFile ufile = 2;
-    //job管理
+    //job management
     JobComm jcomm = 3;
     //manager commands
     MngrComm mcomm = 4;
@@ -18,11 +18,11 @@ message CommandRequest {
   }
 }
 
-// 服务端的响应
+// Command Response from server
 message CommandResponse {
-  // 状态码；复用 HTTP 2xx/4xx/5xx 状态码
+  // stat code; HTTP 2xx/4xx/5xx
   uint32 status = 1;
-  // 如果不是 2xx，message 里包含详细的信息
+  // if not 2xx，message include more information
   string message = 2;
 }
 
