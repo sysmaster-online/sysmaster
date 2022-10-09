@@ -34,6 +34,6 @@ impl ManagerConfigData {
     }
 
     pub(super) fn notify_sock(&self) -> Option<PathBuf> {
-        self.notify_sock.as_ref().map(|p| p.clone())
+        self.notify_sock.as_ref().cloned()
     }
 }

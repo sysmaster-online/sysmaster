@@ -1,3 +1,5 @@
+//! mount the cgroup systems
+
 use bitflags::bitflags;
 use nix::{
     errno::Errno,
@@ -18,7 +20,7 @@ type Callback = fn() -> bool;
 
 lazy_static! {
     static ref MOUNT_TABLE: Vec<MountPoint> = {
-        let mut table: Vec<MountPoint> = Vec::new();
+        let table: Vec<MountPoint> = vec![
         // table.push(MountPoint {
         //     source: String::from("proc"),
         //     target: String::from("/test"),
@@ -58,7 +60,7 @@ lazy_static! {
         // });
 
         // the first remount only for test, will be delete later.
-        table.push(MountPoint {
+        MountPoint {
             source: String::from("tmpfs"),
             target: String::from("/sys/fs/cgroup"),
             fs_type: String::from("tmpfs"),
@@ -66,9 +68,9 @@ lazy_static! {
             flags: MsFlags::MS_REMOUNT | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_legacy_wanted),
             mode: MountMode::MNT_WRITABLE,
-        });
+        },
 
-        table.push(MountPoint {
+        MountPoint {
             source: String::from("cgroup2"),
             target: String::from("/sys/fs/cgroup"),
             fs_type: String::from("cgroup2"),
@@ -76,8 +78,9 @@ lazy_static! {
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_unified_wanted),
             mode: MountMode::MNT_WRITABLE,
-        });
-        table.push(MountPoint {
+        },
+
+        MountPoint {
             source: String::from("cgroup2"),
             target: String::from("/sys/fs/cgroup"),
             fs_type: String::from("cgroup2"),
@@ -85,9 +88,9 @@ lazy_static! {
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_unified_wanted),
             mode: MountMode::MNT_WRITABLE,
-        });
+        },
 
-        table.push(MountPoint {
+        MountPoint {
             source: String::from("tmpfs"),
             target: String::from("/sys/fs/cgroup"),
             fs_type: String::from("tmpfs"),
@@ -95,8 +98,9 @@ lazy_static! {
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV| MsFlags::MS_STRICTATIME,
             callback: Some(cg_legacy_wanted),
             mode: MountMode::MNT_FATAL,
-        });
-        table.push(MountPoint {
+        },
+
+        MountPoint {
             source: String::from("cgroup2"),
             target: String::from("/sys/fs/cgroup/unified"),
             fs_type: String::from("cgroup2"),
@@ -104,8 +108,9 @@ lazy_static! {
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_unifiedv1_wanted),
             mode: MountMode::MNT_WRITABLE,
-        });
-        table.push(MountPoint {
+        },
+
+        MountPoint {
             source: String::from("cgroup2"),
             target: String::from("/sys/fs/cgroup/unified"),
             fs_type: String::from("cgroup2"),
@@ -113,8 +118,9 @@ lazy_static! {
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_unifiedv1_wanted),
             mode: MountMode::MNT_WRITABLE,
-        });
-        table.push(MountPoint {
+        },
+
+        MountPoint {
             source: String::from("cgroup"),
             target: String::from("/sys/fs/cgroup/process1"),
             fs_type: String::from("cgroup"),
@@ -122,16 +128,20 @@ lazy_static! {
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_legacy_wanted),
             mode: MountMode::MNT_WRITABLE,
-        });
-
+        }
+        ];
         table
     };
 }
 
 bitflags! {
+    /// the mode of the mount directory
     pub struct MountMode: u8 {
+        /// None Mount mode
         const MNT_NONE = 0;
+        /// if the flag enabled, the mount will return error for mount failed
         const MNT_FATAL = 1 << 0;
+        /// check the mount dir is writable
         const MNT_WRITABLE = 1 << 1;
     }
 }
@@ -202,7 +212,7 @@ impl MountPoint {
         }
 
         log::debug!("create target dir: {}", self.target.to_string());
-        fs::create_dir_all(self.target.to_string()).map_err(|_e| Errno::EINVAL)?;
+        fs::create_dir_all(&self.target).map_err(|_e| Errno::EINVAL)?;
 
         let source = self.source.as_str();
         let target = self.target.as_str();
@@ -257,7 +267,7 @@ impl MountPoint {
     }
 }
 
-// mount the minimal mount point for enable the most basic function
+/// mount the minimal mount point for enable the most basic function
 pub fn mount_setup_early() -> Result<(), Errno> {
     for i in 0..EARLY_MOUNT_NUM {
         MOUNT_TABLE[i as usize].mount()?;
@@ -266,7 +276,7 @@ pub fn mount_setup_early() -> Result<(), Errno> {
     Ok(())
 }
 
-// mount the point of all the mount_table
+/// mount the point of all the mount_table
 pub fn mount_setup() -> Result<(), Errno> {
     for i in 0..MOUNT_TABLE.len() {
         MOUNT_TABLE[i as usize].mount()?;
@@ -275,14 +285,14 @@ pub fn mount_setup() -> Result<(), Errno> {
     Ok(())
 }
 
-// mount all the cgroup controller subsystem
+/// mount all the cgroup controller subsystem
 pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
     if !cg_legacy_wanted() {
         return Ok(());
     }
 
     let mut controllers = cgroup::cg_controllers()?;
-    let mut index = 0 as usize;
+    let mut index = 0_usize;
 
     while index < controllers.len() {
         let mut m_point = MountPoint::new(
@@ -315,26 +325,19 @@ pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
 
         if pair {
             symlink_controller(target.to_string(), other.to_string()).map_err(|e| {
-                format!(
-                    "create symlink  from {} to {} error: {}",
-                    target.to_string(),
-                    other,
-                    e
-                )
+                format!("create symlink  from {} to {} error: {}", target, other, e)
             })?;
             symlink_controller(target.to_string(), controllers[index].to_string()).map_err(
                 |e| {
                     format!(
                         "create symlink  from {} to {} error: {}",
-                        target.to_string(),
-                        controllers[index].to_string(),
-                        e
+                        target, controllers[index], e
                     )
                 },
             )?;
         }
 
-        index = index + 1;
+        index += 1;
     }
 
     nix::mount::mount(
@@ -381,19 +384,18 @@ fn symlink_controller(source: String, alias: String) -> Result<(), Errno> {
 fn cg_unified_wanted() -> bool {
     let cg_ver = cgroup::cg_type();
 
-    if cg_ver.is_ok() {
-        return cg_ver.unwrap() == CgType::UnifiedV2;
+    if let Ok(v) = cg_ver {
+        return v == CgType::UnifiedV2;
     }
 
     let ret = proc_cmdline::proc_cmdline_get_bool("process1.unified_cgroup_hierarchy");
-    if ret.is_ok() {
-        return ret.unwrap();
+    if let Ok(v) = ret {
+        return v;
     }
 
     let ret = proc_cmdline::cmdline_get_value("cgroup_no_v1");
-    if ret.is_ok() {
-        let val = ret.unwrap();
-        if val.is_some() && val.unwrap() == "all" {
+    if let Ok(v) = ret {
+        if v.is_some() && v.unwrap() == "all" {
             return true;
         }
     }
@@ -404,8 +406,8 @@ fn cg_unified_wanted() -> bool {
 fn cg_legacy_wanted() -> bool {
     let cg_ver = cgroup::cg_type();
 
-    if cg_ver.is_ok() {
-        return cg_ver.unwrap() != CgType::UnifiedV2;
+    if let Ok(v) = cg_ver {
+        return v != CgType::UnifiedV2;
     }
 
     true
@@ -414,13 +416,13 @@ fn cg_legacy_wanted() -> bool {
 fn cg_unifiedv1_wanted() -> bool {
     let cg_ver = cgroup::cg_type();
 
-    if cg_ver.is_ok() {
-        return cg_ver.unwrap() != CgType::UnifiedV2;
+    if let Ok(v) = cg_ver {
+        return v != CgType::UnifiedV2;
     }
 
     let ret = proc_cmdline::proc_cmdline_get_bool("process1.unified_v1_controller");
-    if ret.is_ok() {
-        return ret.unwrap();
+    if let Ok(v) = ret {
+        return v;
     }
 
     false

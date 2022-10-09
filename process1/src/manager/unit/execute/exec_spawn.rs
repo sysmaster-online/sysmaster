@@ -6,7 +6,6 @@ use log;
 use nix::fcntl::FcntlArg;
 use nix::unistd::{self, ForkResult, Pid};
 use regex::Regex;
-use std::convert::TryInto;
 use std::path::PathBuf;
 use std::process;
 use std::rc::Rc;
@@ -31,22 +30,22 @@ impl ExecSpawn {
         params: &ExecParameters,
         ctx: Rc<ExecContext>,
     ) -> Result<Pid, ExecCmdError> {
-        unsafe {
-            match unistd::fork() {
-                Ok(ForkResult::Parent { child }) => {
-                    log::debug!("child pid is :{}", child);
-                    cgroup::cg_attach(child, &unit.cg_path())
-                        .map_err(|e| ExecCmdError::CgroupError(e.to_string()))?;
-                    return Ok(child);
-                }
-                Ok(ForkResult::Child) => {
-                    thread::sleep(Duration::from_secs(2));
-                    exec_child(unit, cmdline, params, ctx.clone());
-                    process::exit(0);
-                }
-                Err(_e) => return Err(ExecCmdError::SpawnError),
+        let ret = unsafe { unistd::fork() };
+
+        match ret {
+            Ok(ForkResult::Parent { child }) => {
+                log::debug!("child pid is :{}", child);
+                cgroup::cg_attach(child, &unit.cg_path())
+                    .map_err(|e| ExecCmdError::CgroupError(e.to_string()))?;
+                Ok(child)
             }
-        };
+            Ok(ForkResult::Child) => {
+                thread::sleep(Duration::from_secs(2));
+                exec_child(unit, cmdline, params, ctx);
+                process::exit(0);
+            }
+            Err(_e) => Err(ExecCmdError::SpawnError),
+        }
     }
 }
 
@@ -124,10 +123,8 @@ fn build_run_args(
             let match_result = {
                 if let Some(mat) = cap.get(1) {
                     Some(mat.as_str())
-                } else if let Some(mat) = cap.get(2) {
-                    Some(mat.as_str())
                 } else {
-                    None
+                    cap.get(2).map(|mat| mat.as_str())
                 }
             };
 
@@ -186,7 +183,6 @@ fn close_all_fds(fds: Vec<i32>) -> bool {
         entry.map_or_else(
             |_e| {
                 log::error!("walf dir error {:?}", _e);
-                return;
             },
             |_e| {
                 let file_name = _e.file_name().to_str().unwrap();
@@ -204,7 +200,6 @@ fn close_all_fds(fds: Vec<i32>) -> bool {
 
                 log::debug!("socket fds: {:?}, close fd {}", fds, fd);
                 fd_util::close(fd);
-                return;
             },
         );
     }
@@ -221,10 +216,7 @@ fn shift_fds(fds: &mut Vec<i32>) -> bool {
                 continue;
             }
 
-            let nfd = if let Ok(fd) = nix::fcntl::fcntl(
-                fds[i as usize],
-                FcntlArg::F_DUPFD((i + 3).try_into().unwrap()),
-            ) {
+            let nfd = if let Ok(fd) = nix::fcntl::fcntl(fds[i as usize], FcntlArg::F_DUPFD(i + 3)) {
                 fd
             } else {
                 return false;
@@ -250,12 +242,12 @@ fn shift_fds(fds: &mut Vec<i32>) -> bool {
 }
 
 fn flags_fds(fds: &mut Vec<i32>) -> bool {
-    for i in 0..fds.len() {
-        if let Err(_e) = fd_util::fd_nonblock(fds[i], false) {
+    for fd in fds {
+        if let Err(_e) = fd_util::fd_nonblock(*fd, false) {
             return false;
         }
 
-        if let Err(_e) = fd_util::fd_cloexec(fds[i]) {
+        if let Err(_e) = fd_util::fd_cloexec(*fd) {
             return false;
         }
     }
