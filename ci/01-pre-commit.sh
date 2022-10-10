@@ -34,7 +34,7 @@ egrep '#!\[deny\(warnings\)\]' $rustlist || sed -i '1i\#![deny(warnings)]' $rust
 done
 
 #fix cargo clippy fail in pre-commit when build.rs is changed
-RUSTC_WRAPPER="" cargo clippy -v --all-targets --all-features --tests --benches --examples
+RUSTC_WRAPPER="" cargo clippy -v --all-targets --all-features --tests --benches --examples || exit 1
 
 # run base check
 filelist=`git diff master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`
