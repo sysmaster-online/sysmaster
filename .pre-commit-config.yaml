@@ -14,37 +14,62 @@ repos:
       - id: detect-private-key
     #  - id: check-executables-have-shebangs
     #  - id: check-shebang-scripts-are-executable
-  - repo: "https://github.com/codespell-project/codespell"
-    rev: v2.2.1
-    hooks:
-      - id: codespell
-        args: [-I, ci/codespell_ignore_words]
-        verbose: true
-#  - repo: "https://github.com/psf/black.git"
-#    rev: 22.8.0
-#    hooks:
-#      - id: black
+  # - repo: "https://github.com/codespell-project/codespell"
+  #   rev: v2.2.1
+  #   hooks:
+  #     - id: codespell
+  #       args: [-I, ci/codespell_ignore_words]
+  #       verbose: true
+  # - repo: "https://github.com/psf/black.git"
+  #   rev: 22.8.0
+  #   hooks:
+  #     - id: black
+  # - repo: https://github.com/jumanjihouse/pre-commit-hooks
+  #   rev: master  # or specific git tag
+  #   hooks:
+  #     - id: bundler-audit
+  #     # - id: check-mailmap
+  #     - id: fasterer
+  #     # - id: forbid-binary
+  #     # - id: forbid-space-in-indent
+  #     # - id: git-check  # Configure in .gitattributes
+  #     # - id: git-dirty  # Configure in .gitignore
+  #     # - id: markdownlint # Configure in .mdlrc
+  #     - id: reek
+  #     # - id: require-ascii
+  #     - id: rubocop
+  #     # - id: script-must-have-extension
+  #     # - id: script-must-not-have-extension
+  #     # - id: shellcheck
+  #     # - id: shfmt
 
-#  - repo: "https://github.com/markdownlint/markdownlint"
-#    rev: v0.11.0
-#    hooks:
-#      - id: markdownlint
-#        files: \.(md|mdown|markdown)$
+  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+    rev: master
+    hooks:
+    - id: pretty-format-rust
+      args: [--autofix]
+
+  # - repo: https://github.com/doublify/pre-commit-rust
+  #   rev: master
+  #   hooks:
+  #     - id: clippy
+
   - repo: local
     hooks:
-      - id: cargo-clippy
-        name: cargo clippy
-        description: Lint rust sources
-        entry: bash -c 'export RUSTC_WRAPPER="" ; cargo clippy -v --all-targets --all-features --tests --benches --examples -- -v'
-        language: rust
-        files: \.rs$
-        pass_filenames: false
-        verbose: true
+      # - id: cargo-clippy
+      #   name: cargo clippy
+      #   description: Lint rust sources
+      #   entry: bash -c 'RUSTC_WRAPPER="" cargo clippy --all-targets --all-features --tests --benches --examples -- -v'
+      #   language: rust
+      #   pass_filenames: false
+      #   files: \.rs$
+      #   verbose: true
       - id: cargo-fmt
         name: cargo fmt
         description: Format files with rustfmt.
         entry: bash -c 'cargo fmt -v --all -- --check -v'
         language: rust
+        pass_filenames: false
         files: \.rs$
         verbose: true
       - id: cargo-fix
@@ -52,6 +77,7 @@ repos:
         description: Check the package for errors.
         entry: bash -c 'cargo fix -v --broken-code --all-targets --all-features --tests --benches --examples --allow-dirty --allow-staged'
         language: rust
+        pass_filenames: false
         files: \.rs$
         verbose: true
       - id: cargo-build
@@ -59,30 +85,16 @@ repos:
         description: build the package for errors.
         entry: bash -c 'cargo build --release --all -v'
         language: rust
-        files: \.(rs|toml|sh|toml)$
         pass_filenames: false
+        files: \.(rs|toml|sh)$
       - id: cargo-test
         name: cargo test
         description: test the package for errors.
         entry: bash -c 'RUST_BACKTRACE=1 cargo test --all --release -v -- --nocapture --test-threads=1'
         language: rust
-        files: \.(rs|toml|sh|toml)$
         pass_filenames: false
+        files: \.(rs|toml|sh)$
 
-#      - id: cargo-check
-#        name: cargo check
-#        description: Check the package for errors.
-#        entry: bash -c 'cargo check --all'
-#        language: rust
-#        files: \.rs$
-#        pass_filenames: false
-#     - id: cargo-test
-#       name: cargo test
-#       description: unit test for the project
-#       entry: bash -c 'cargo test --all'
-#       language: rust
-#       files: \.rs$
-#       pass_filenames: false
 #      - id: cargo-deny
 #        name: cargo deny check
 #        description: Check cargo depencencies

@@ -1,3 +1,4 @@
+//! Encapsulate the command request into a frame
 use prost::bytes::{BufMut, BytesMut};
 use prost::Message;
 use std::{
@@ -10,12 +11,12 @@ use super::{execute, CommandRequest, CommandResponse, Manager};
 /// const MAX_FRAME: usize = 1436;
 const MAX_FRAME: usize = 1436;
 
-/// 处理 Frame 的 encode/decode
+/// Frame : encode/decode
 pub trait FrameCoder
 where
     Self: Message + Sized + Default,
 {
-    /// 把一个 Message encode 成一个 frame
+    /// Encode message into frame
     fn encode_frame(&self, buf: &mut BytesMut) -> Result<(), Error> {
         let size = self.encoded_len();
 
@@ -27,7 +28,7 @@ where
         Ok(())
     }
 
-    /// 把一个完整的 frame decode 成一个 Message
+    /// frame decode frame into Message
     fn decode_frame(buf: &mut BytesMut) -> Result<Self, Error> {
         let msg = Self::decode(&buf[..])?;
         Ok(msg)
@@ -37,6 +38,7 @@ where
 impl FrameCoder for CommandRequest {}
 impl FrameCoder for CommandResponse {}
 
+/// read frame from stream
 pub fn read_frame<S>(stream: &mut S, buf: &mut BytesMut) -> Result<(), Error>
 where
     S: Read + Unpin + Send,
@@ -47,13 +49,13 @@ where
     Ok(())
 }
 
-/// 处理服务器端 socket 的读写
+/// Handle read and write of server-side socket
 pub struct ProstServerStream<S> {
     inner: S,
     manager: Rc<Manager>,
 }
 
-/// 处理客户端 socket 的读写
+/// Handle read and write of client-side socket
 pub struct ProstClientStream<S> {
     inner: S,
 }
@@ -62,6 +64,7 @@ impl<S> ProstServerStream<S>
 where
     S: Read + Write + Unpin + Send,
 {
+    /// new ProstServerStream
     pub(crate) fn new(stream: S, manager: Rc<Manager>) -> Self {
         Self {
             inner: stream,
@@ -69,6 +72,7 @@ where
         }
     }
 
+    /// process frame in server-side
     pub fn process(mut self) -> Result<(), Error> {
         if let Ok(cmd) = self.recv() {
             let res = execute::dispatch(cmd, self.manager.clone());
@@ -77,7 +81,7 @@ where
         Ok(())
     }
 
-    pub fn send(&mut self, msg: CommandResponse) -> Result<(), Error> {
+    fn send(&mut self, msg: CommandResponse) -> Result<(), Error> {
         let mut buf = BytesMut::new();
         msg.encode_frame(&mut buf)?;
         let encoded = buf.freeze();
@@ -86,7 +90,7 @@ where
         Ok(())
     }
 
-    pub fn recv(&mut self) -> Result<CommandRequest, Error> {
+    fn recv(&mut self) -> Result<CommandRequest, Error> {
         let mut buf = BytesMut::new();
         let stream = &mut self.inner;
         read_frame(stream, &mut buf)?;
@@ -98,13 +102,16 @@ impl<S> ProstClientStream<S>
 where
     S: Read + Write + Unpin + Send,
 {
+    /// new ProstClientStream
+    #[allow(dead_code)]
     pub fn new(stream: S) -> Self {
         Self { inner: stream }
     }
 
+    /// process frame in client-side
     pub fn execute(&mut self, cmd: CommandRequest) -> Result<CommandResponse, Error> {
         self.send(cmd)?;
-        Ok(self.recv()?)
+        self.recv()
     }
 
     fn send(&mut self, msg: CommandRequest) -> Result<(), Error> {

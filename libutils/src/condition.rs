@@ -11,6 +11,7 @@ pub enum ConditionType {
     FileNotEmpty,
     /// check need update
     NeedsUpdate,
+    /// boundary detection
     _MAX,
 }
 
@@ -46,7 +47,7 @@ impl Condition {
         self.revert
     }
 
-    /// runing the condition test
+    /// running the condition test
     pub fn test(&self) -> bool {
         if self.params.is_empty() {
             return false;

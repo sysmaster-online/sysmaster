@@ -1,3 +1,5 @@
+//! Convert the command request into the corresponding execution action
+
 use super::{
     sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
 };
@@ -7,10 +9,11 @@ use nix::sys::reboot::RebootMode;
 use std::rc::Rc;
 
 pub(crate) trait Executer {
-    /// 处理 Command，返回 Response
+    /// deal Command，return Response
     fn execute(self, manager: Rc<Manager>) -> CommandResponse;
 }
 
+/// Depending on the type of request
 pub(crate) fn dispatch(cmd: CommandRequest, manager: Rc<Manager>) -> CommandResponse {
     println!("commandRequest :{:?}", cmd);
     let res = match cmd.request_data {
@@ -58,7 +61,6 @@ impl Executer for SysComm {
             sys_comm::Action::Poweroff => manager.reboot(RebootMode::RB_POWER_OFF),
             sys_comm::Action::Shutdown => manager.reboot(RebootMode::RB_POWER_OFF),
             sys_comm::Action::Reboot => manager.reboot(RebootMode::RB_AUTOBOOT),
-            _ => todo!(),
         };
         match ret {
             Ok(_) => CommandResponse {

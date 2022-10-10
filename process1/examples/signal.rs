@@ -1,3 +1,4 @@
+//! test unit signal
 use process1::manager::{Action, ManagerX, Mode};
 use std::env;
 
@@ -7,7 +8,7 @@ fn main() {
     logger::init_log_with_console("test_unit_signal", 4);
     let out_dir = env::var("LD_LIBRARY_PATH");
     let _tmp_str = out_dir.unwrap();
-    let _tmp_str_v = _tmp_str.split(":").collect::<Vec<_>>()[0];
+    let _tmp_str_v = _tmp_str.split(':').collect::<Vec<_>>()[0];
     let _tmp_path = _tmp_str_v.split("target").collect::<Vec<_>>()[0];
     let mut r_s: String = String::new();
     r_s.push_str(_tmp_path);
