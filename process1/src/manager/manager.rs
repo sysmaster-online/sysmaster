@@ -215,7 +215,7 @@ impl Manager {
         &self,
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
-        fds: &Vec<i32>,
+        fds: Vec<i32>,
     ) -> Result<(), ServiceError> {
         self.um.notify_message(ucred, messages, fds)
     }
@@ -247,7 +247,7 @@ mod tests {
         let ucred = UnixCredentials::new();
         let messages = HashMap::new();
         let fds = Vec::new();
-        let ret = manager.data.notify_message(&ucred, &messages, &fds);
+        let ret = manager.data.notify_message(&ucred, &messages, fds);
         assert!(ret.is_ok());
     }
 }

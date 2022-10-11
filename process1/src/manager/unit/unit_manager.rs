@@ -78,7 +78,7 @@ impl UnitManagerX {
         &self,
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
-        fds: &Vec<i32>,
+        fds: Vec<i32>,
     ) -> Result<(), ServiceError> {
         self.data.notify_message(ucred, messages, fds)
     }
@@ -441,7 +441,7 @@ impl UnitManager {
         &self,
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
-        fds: &Vec<i32>,
+        fds: Vec<i32>,
     ) -> Result<(), ServiceError> {
         let unit = self.get_unit_by_pid(Pid::from_raw(ucred.pid()));
         log::debug!("get unit by ucred pid: {}", ucred.pid());

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[allow(missing_docs)]
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum UnitRelations {
     UnitRequires,
@@ -46,6 +47,7 @@ pub enum UnitRelations {
     UnitSliceOf,
 }
 
+#[derive(Default)]
 pub struct UnitDepConf {
     pub deps: HashMap<UnitRelations, Vec<String>>,
 }

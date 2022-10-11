@@ -6,8 +6,10 @@
 # changenum=$[newnum - oldnum]
 
 # do not use chinese in source code
-rustlist=`git diff master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
-grep -P '[\p{Han}]' $rustlist && echo "rust 源码文件中禁用中文字符" && exit 1
+for rustlist in `git diff master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
+do
+    grep -P '[\p{Han}]' $rustlist  && exit 1
+done
 
 # install needed tools
 sudo yum clean all

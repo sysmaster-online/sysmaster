@@ -126,6 +126,7 @@ struct UnitDepMask {
     dest: u16,
 }
 
+#[allow(clippy::type_complexity)]
 struct UnitDepData {
     // key: unit-source + UnitRelations, value: (unit-destination : mask)-list
     t: HashMap<Rc<UnitX>, HashMap<UnitRelations, HashMap<Rc<UnitX>, UnitDepMask>>>,
@@ -259,7 +260,7 @@ impl UnitDepData {
         source: Rc<UnitX>,
     ) -> &mut HashMap<UnitRelations, HashMap<Rc<UnitX>, UnitDepMask>> {
         // verify existence
-        if let None = self.t.get(&source) {
+        if self.t.get(&source).is_none() {
             // nothing exists, pad it.
             self.t.insert(Rc::clone(&source), HashMap::new());
         }
@@ -277,7 +278,7 @@ impl UnitDepData {
     ) -> &mut HashMap<Rc<UnitX>, UnitDepMask> {
         // verify existence
         let sv = self.get_mut_sv_pad(source);
-        if let None = sv.get(&relation) {
+        if sv.get(&relation).is_none() {
             // nothing exists, pad it.
             sv.insert(relation, HashMap::new());
         }
@@ -406,17 +407,17 @@ mod tests {
         let atom = UnitRelationAtom::UnitAtomAddStopWhenUnneededQueue; // + require, + want
 
         let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test2);
-        assert_eq!(value, false);
+        assert!(!value);
         let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test2);
-        assert_eq!(value, false);
+        assert!(!value);
         let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test2);
-        assert_eq!(value, false);
+        assert!(!value);
         let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test3);
-        assert_eq!(value, false);
+        assert!(!value);
         let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test3);
-        assert_eq!(value, false);
+        assert!(!value);
         let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test3);
-        assert_eq!(value, false);
+        assert!(!value);
 
         dep.insert(
             Rc::clone(&unit_test1),
@@ -427,17 +428,17 @@ mod tests {
         )
         .unwrap();
         let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test2);
-        assert_eq!(value, true);
+        assert!(value);
         let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test2);
-        assert_eq!(value, false);
+        assert!(!value);
         let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test2);
-        assert_eq!(value, true);
+        assert!(value);
         let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test3);
-        assert_eq!(value, false);
+        assert!(!value);
         let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test3);
-        assert_eq!(value, false);
+        assert!(!value);
         let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test3);
-        assert_eq!(value, false);
+        assert!(!value);
 
         dep.insert(
             Rc::clone(&unit_test1),
@@ -448,17 +449,17 @@ mod tests {
         )
         .unwrap();
         let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test2);
-        assert_eq!(value, true);
+        assert!(value);
         let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test2);
-        assert_eq!(value, false);
+        assert!(!value);
         let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test2);
-        assert_eq!(value, true);
+        assert!(value);
         let value = dep.is_dep_atom_with(&unit_test1, atom2, &unit_test3);
-        assert_eq!(value, false);
+        assert!(!value);
         let value = dep.is_dep_atom_with(&unit_test1, atom3, &unit_test3);
-        assert_eq!(value, true);
+        assert!(value);
         let value = dep.is_dep_atom_with(&unit_test1, atom, &unit_test3);
-        assert_eq!(value, true);
+        assert!(value);
     }
 
     fn create_unit(name: &str) -> Rc<UnitX> {
@@ -478,7 +479,7 @@ mod tests {
         ))
     }
 
-    fn contain_unit(units: &Vec<Rc<UnitX>>, unit: &Rc<UnitX>) -> bool {
+    fn contain_unit(units: &[Rc<UnitX>], unit: &Rc<UnitX>) -> bool {
         for u in units.iter() {
             if Rc::ptr_eq(u, unit) {
                 return true;

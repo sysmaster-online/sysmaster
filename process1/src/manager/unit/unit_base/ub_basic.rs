@@ -4,6 +4,7 @@ use core::fmt::{Display, Formatter, Result as FmtResult};
 use nix::sys::signal::Signal;
 use std::{num::ParseIntError, str::FromStr};
 
+#[allow(missing_docs)]
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
 pub enum UnitType {
     UnitService = 0,
@@ -29,6 +30,7 @@ impl FromStr for UnitType {
         Ok(ret)
     }
 }
+
 impl From<UnitType> for String {
     fn from(u_t: UnitType) -> Self {
         match u_t {
@@ -36,12 +38,13 @@ impl From<UnitType> for String {
             UnitType::UnitTarget => "target".into(),
             UnitType::UnitSocket => "socket".into(),
             UnitType::UnitMount => "mount".into(),
-            UnitType::UnitTypeMax => null_str!("").into(),
-            UnitType::UnitTypeInvalid => null_str!("").into(),
-            UnitType::UnitTypeErrnoMax => null_str!("").into(),
+            UnitType::UnitTypeMax => null_str!(""),
+            UnitType::UnitTypeInvalid => null_str!(""),
+            UnitType::UnitTypeErrnoMax => null_str!(""),
         }
     }
 }
+
 impl Display for UnitType {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
@@ -56,6 +59,7 @@ impl Display for UnitType {
     }
 }
 
+#[allow(missing_docs)]
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum UnitDependencyMask {
     UnitDependencyDefault = 1 << 2,
@@ -73,7 +77,7 @@ pub enum UnitDependencyMask {
 // }
 
 pub(in crate::manager::unit) fn unit_name_to_type(unit_name: &str) -> UnitType {
-    let words: Vec<&str> = unit_name.split(".").collect();
+    let words: Vec<&str> = unit_name.split('.').collect();
     match words[words.len() - 1] {
         "service" => UnitType::UnitService,
         "target" => UnitType::UnitTarget,
@@ -83,6 +87,7 @@ pub(in crate::manager::unit) fn unit_name_to_type(unit_name: &str) -> UnitType {
     }
 }
 
+#[allow(missing_docs)]
 #[macro_export]
 macro_rules! null_str {
     ($name:expr) => {
@@ -90,6 +95,7 @@ macro_rules! null_str {
     };
 }
 
+#[allow(missing_docs)]
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum UnitActionError {
     UnitActionEAgain,
@@ -107,6 +113,7 @@ pub enum UnitActionError {
     UnitActionENoent,
 }
 
+#[allow(missing_docs)]
 pub enum KillOperation {
     KillTerminate,
     KillTerminateAndLog,
@@ -117,6 +124,7 @@ pub enum KillOperation {
 }
 
 impl KillOperation {
+    ///
     pub fn to_signal(&self) -> Signal {
         match *self {
             KillOperation::KillTerminate

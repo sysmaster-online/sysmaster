@@ -26,7 +26,7 @@ struct SocketUnit {
 }
 
 impl UnitObj for SocketUnit {
-    fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
+    fn load(&self, paths: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
         log::debug!("socket begin to load conf file");
         self.config.load(paths)?;
 

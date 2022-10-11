@@ -28,7 +28,7 @@ impl SocketConfig {
         }
     }
 
-    pub(super) fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Error> {
+    pub(super) fn load(&self, paths: Vec<PathBuf>) -> Result<(), Error> {
         let mut builder = SocketConfigData::builder().env();
 
         // fragment
@@ -131,7 +131,7 @@ mod tests {
         let paths = vec![file_path];
 
         let config = SocketConfig::new();
-        let result = config.load(&paths);
+        let result = config.load(paths);
 
         assert!(result.is_ok());
     }

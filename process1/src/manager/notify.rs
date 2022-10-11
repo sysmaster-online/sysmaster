@@ -146,7 +146,7 @@ impl Source for NotifyEvent {
         log::debug!("read messages from notify listening socket: {:?}", messages);
 
         self.manager
-            .notify_message(&received_cred.unwrap(), &messages, &received_fds)?;
+            .notify_message(&received_cred.unwrap(), &messages, received_fds)?;
 
         Ok(0)
     }

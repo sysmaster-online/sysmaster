@@ -31,21 +31,21 @@ impl UeCondition {
         let mut revert = 0;
 
         let mut param_str = params.as_str();
-        let mut _s_params = params.strip_prefix("|");
+        let mut _s_params = params.strip_prefix('|');
         if let Some(s) = _s_params {
             trigger = 1;
             param_str = s;
-            _s_params = param_str.strip_prefix("!");
+            _s_params = param_str.strip_prefix('!');
         } else {
-            _s_params = params.strip_prefix("!");
+            _s_params = params.strip_prefix('!');
         }
 
         if let Some(s) = _s_params {
             revert = 1;
             param_str = s;
         }
-        let condition = Condition::new(c_type, trigger, revert, param_str.to_string());
-        condition
+
+        Condition::new(c_type, trigger, revert, param_str.to_string())
     }
 
     pub(super) fn set_init_flag(&self, flag: i8) {
@@ -109,7 +109,7 @@ impl UeCondition {
                 };
             }
         }
-        return ret;
+        ret
     }
 
     pub(super) fn conditions_test(&self) -> bool {

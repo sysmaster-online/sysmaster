@@ -133,12 +133,11 @@ impl UnitRTData {
         add_ref: bool,
         _mask: UnitDependencyMask,
     ) {
-        if let Err(_e) = self
+        if let Err(e) = self
             .db
             .dep_insert(source, relation, target, add_ref, 1 << 2)
         {
-            log::error!("dispatch_target_dep_queue add default dep err {:?}", _e);
-            return;
+            log::error!("dispatch_target_dep_queue add default dep err {:?}", e);
         }
     }
 
@@ -221,7 +220,7 @@ mod tests {
 
     fn init_rt() -> UnitRT {
         let db = Rc::new(UnitDb::new());
-        return UnitRT::new(&db);
+        UnitRT::new(&db)
     }
 
     #[test]
@@ -255,7 +254,7 @@ mod tests {
         rt.push_load_queue(Rc::clone(&service_unit));
         rt.data
             .db
-            .units_insert((&service_name).to_string(), service_unit);
+            .units_insert(service_name.to_string(), service_unit);
         rt.dispatch_load_queue(); // do not register dep notify so cannot parse dependency
         let unit = rt.data.db.units_get(&service_name);
         assert_eq!(unit.unwrap().load_state(), UnitLoadState::UnitLoaded);
@@ -266,22 +265,21 @@ mod tests {
         let rt = init_rt();
         let test_service_name = String::from("test.service");
         let test_service_unit = create_unit(&test_service_name);
-        rt.data.db.units_insert(
-            (&test_service_name).to_string(),
-            Rc::clone(&test_service_unit),
-        );
+        rt.data
+            .db
+            .units_insert(test_service_name, Rc::clone(&test_service_unit));
         rt.push_load_queue(Rc::clone(&test_service_unit));
         let service_name = String::from("config.service");
         let service_unit = create_unit(&service_name);
         rt.data
             .db
-            .units_insert((&service_name).to_string(), Rc::clone(&service_unit));
+            .units_insert(service_name, Rc::clone(&service_unit));
         rt.push_load_queue(Rc::clone(&service_unit));
         let target_name = String::from("testsunit.target");
         let target_unit = create_unit(&target_name);
         rt.data
             .db
-            .units_insert((&target_name).to_string(), Rc::clone(&target_unit));
+            .units_insert(target_name, Rc::clone(&target_unit));
         rt.push_load_queue(Rc::clone(&target_unit));
         rt.dispatch_load_queue();
     }

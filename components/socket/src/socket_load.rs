@@ -273,7 +273,7 @@ mod tests {
         let paths = vec![file_path];
 
         let config = SocketConfig::new();
-        assert!(config.load(&paths).is_ok());
+        assert!(config.load(paths).is_ok());
 
         assert!(load.parse(config.config_data(), &mng).is_ok());
     }

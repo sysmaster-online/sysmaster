@@ -22,7 +22,7 @@ impl ServiceConfig {
         }
     }
 
-    pub(super) fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Error> {
+    pub(super) fn load(&self, paths: Vec<PathBuf>) -> Result<(), Error> {
         let mut builder = ServiceConfigData::builder().env();
 
         log::debug!("service load path: {:?}", paths);
@@ -144,7 +144,7 @@ mod tests {
         let paths = vec![file_path];
         let config = ServiceConfig::new();
 
-        let result = config.load(&paths);
+        let result = config.load(paths);
 
         println!("service data: {:?}", config.config_data());
 

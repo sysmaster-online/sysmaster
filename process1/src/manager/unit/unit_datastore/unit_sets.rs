@@ -66,10 +66,10 @@ mod tests {
         let old = sets.insert(name_test1.clone(), Rc::clone(&unit_test1));
         assert!(old.is_none());
 
-        let old = sets.insert(name_test1.clone(), Rc::clone(&unit_test2));
+        let old = sets.insert(name_test1, Rc::clone(&unit_test2));
         assert!(Rc::ptr_eq(&old.unwrap(), &unit_test1));
 
-        let old = sets.insert(name_test2.clone(), Rc::clone(&unit_test2));
+        let old = sets.insert(name_test2, Rc::clone(&unit_test2));
         assert!(old.is_none());
     }
 
@@ -89,7 +89,7 @@ mod tests {
         let old = sets.remove(&name_test1);
         assert!(Rc::ptr_eq(&old.unwrap(), &unit_test1));
 
-        sets.insert(name_test1.clone(), Rc::clone(&unit_test1));
+        sets.insert(name_test1, Rc::clone(&unit_test1));
         sets.insert(name_test2.clone(), Rc::clone(&unit_test2));
         let old = sets.remove(&name_test3);
         assert!(old.is_none());
@@ -138,8 +138,8 @@ mod tests {
         let units = sets.get_all();
         assert_eq!(units.len(), 0);
 
-        sets.insert(name_test1.clone(), Rc::clone(&unit_test1));
-        sets.insert(name_test2.clone(), Rc::clone(&unit_test2));
+        sets.insert(name_test1, Rc::clone(&unit_test1));
+        sets.insert(name_test2, Rc::clone(&unit_test2));
         let units = sets.get_all();
         assert_eq!(units.len(), 2);
         assert!(contain_unit(&units, &unit_test1));
@@ -163,7 +163,7 @@ mod tests {
         ))
     }
 
-    fn contain_unit(units: &Vec<Rc<UnitX>>, unit: &Rc<UnitX>) -> bool {
+    fn contain_unit(units: &[Rc<UnitX>], unit: &Rc<UnitX>) -> bool {
         for u in units.iter() {
             if Rc::ptr_eq(u, unit) {
                 return true;

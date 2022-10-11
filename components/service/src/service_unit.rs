@@ -38,7 +38,7 @@ impl UnitObj for ServiceUnit {
         todo!()
     }
 
-    fn load(&self, paths: &Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
+    fn load(&self, paths: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
         self.config.load(paths)?;
 
         self.parse()?;
@@ -108,7 +108,7 @@ impl UnitObj for ServiceUnit {
         &self,
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
-        fds: &Vec<i32>,
+        fds: Vec<i32>,
     ) -> Result<(), ServiceError> {
         log::debug!(
             "begin to start service notify message, ucred: {:?}, pids: {:?}, messages: {:?}",
