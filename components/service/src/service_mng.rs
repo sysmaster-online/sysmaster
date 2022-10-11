@@ -981,7 +981,7 @@ impl ServiceMng {
         &self,
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
-        _fds: &[i32],
+        _fds: Vec<i32>,
     ) -> Result<(), Error> {
         if let Some(&pidr) = messages.get("MAINPID") {
             if IN_SET!(

@@ -128,7 +128,7 @@ impl UnitChildData {
     }
 
     pub(self) fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {
-        self.watch_pids.borrow().get(&pid).map(|u| u.clone())
+        self.watch_pids.borrow().get(&pid).cloned()
     }
 
     fn remove_unit(&self, _unit: &UnitX) {

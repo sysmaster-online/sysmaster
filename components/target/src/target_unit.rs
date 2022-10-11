@@ -72,7 +72,7 @@ impl Target {
 }
 
 impl UnitObj for Target {
-    fn load(&self, _conf_str: &Vec<PathBuf>) -> utils::Result<(), Box<dyn std::error::Error>> {
+    fn load(&self, _conf_str: Vec<PathBuf>) -> utils::Result<(), Box<dyn std::error::Error>> {
         //todo add default dependency funnction need add
         log::debug!("load for target");
         self.add_default_dependencies();

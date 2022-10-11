@@ -26,12 +26,15 @@ use utils::Result;
 
 use utils::error::Error as ServiceError;
 
+///
+#[derive(Default)]
 pub struct UnitRef {
     source: Option<String>,
     target: Option<String>,
 }
 
 impl UnitRef {
+    ///
     pub fn new() -> Self {
         UnitRef {
             source: None,
@@ -39,21 +42,25 @@ impl UnitRef {
         }
     }
 
+    ///
     pub fn set_ref(&mut self, source: String, target: String) {
         self.source = Some(source);
         self.target = Some(target);
     }
 
+    ///
     pub fn unset_ref(&mut self) {
         self.source = None;
         self.target = None;
     }
 
+    ///
     pub fn target(&self) -> Option<&String> {
         self.target.as_ref()
     }
 }
 
+///
 pub struct Unit {
     // associated objects
     dm: Rc<DataManager>,
@@ -100,11 +107,19 @@ impl Hash for Unit {
 /// difference sub unit ref by dynamic trait
 ///
 pub trait UnitObj {
+    ///
     fn init(&self) {}
-    fn done(&self) {}
-    fn load(&self, conf: &Vec<PathBuf>) -> Result<(), Box<dyn Error>>;
 
+    ///
+    fn done(&self) {}
+
+    ///
+    fn load(&self, conf: Vec<PathBuf>) -> Result<(), Box<dyn Error>>;
+
+    ///
     fn coldplug(&self) {}
+
+    ///
     fn dump(&self) {}
 
     /// Start a Unit
@@ -113,15 +128,28 @@ pub trait UnitObj {
     fn start(&self) -> Result<(), UnitActionError> {
         Ok(())
     }
+
+    ///
     fn stop(&self) -> Result<(), UnitActionError> {
         Ok(())
     }
+
+    ///
     fn reload(&self) {}
 
+    ///
     fn kill(&self) {}
+
+    ///
     fn release_resources(&self) {}
+
+    ///
     fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {}
+
+    ///
     fn reset_failed(&self) {}
+
+    ///
     fn collect_fds(&self) -> Vec<i32> {
         Vec::new()
     }
@@ -131,13 +159,16 @@ pub trait UnitObj {
     /// Every sub unit  can define self states and map to [`UnitActiveState`]
     ///
     fn current_active_state(&self) -> UnitActiveState;
+
+    ///
     fn attach_unit(&self, unit: Rc<Unit>);
 
+    ///
     fn notify_message(
         &self,
         _ucred: &UnixCredentials,
         _events: &HashMap<&str, &str>,
-        _fds: &Vec<i32>,
+        _fds: Vec<i32>,
     ) -> Result<(), ServiceError> {
         Ok(())
     }
@@ -229,6 +260,7 @@ impl Unit {
         Rc::clone(&self.conditions)
     }
 
+    ///
     pub fn notify(
         &self,
         original_state: UnitActiveState,
@@ -246,10 +278,12 @@ impl Unit {
         self.dm.insert_unit_state(self.id.clone(), u_state);
     }
 
+    ///
     pub fn get_id(&self) -> &str {
         &self.id
     }
 
+    ///
     pub fn prepare_exec(&self) -> Result<()> {
         log::debug!("prepare exec cgroup");
         self.cgroup.setup_cg_path(&self.id);
@@ -257,10 +291,12 @@ impl Unit {
         self.cgroup.prepare_cg_exec()
     }
 
+    ///
     pub fn cg_path(&self) -> PathBuf {
         self.cgroup.cg_path()
     }
 
+    ///
     pub fn kill_context(
         &self,
         m_pid: Option<Pid>,
@@ -268,14 +304,14 @@ impl Unit {
         ko: KillOperation,
     ) -> Result<(), Box<dyn Error>> {
         let sig = ko.to_signal();
-        if m_pid.is_some() {
-            match nix::sys::signal::kill(m_pid.unwrap(), sig) {
+        if let Some(pid) = m_pid {
+            match nix::sys::signal::kill(pid, sig) {
                 Ok(_) => {
                     if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
-                        match nix::sys::signal::kill(m_pid.unwrap(), Signal::SIGCONT) {
+                        match nix::sys::signal::kill(pid, Signal::SIGCONT) {
                             Ok(_) => {}
                             Err(e) => {
-                                log::debug!("kill pid {} errno: {}", m_pid.unwrap(), e)
+                                log::debug!("kill pid {} errno: {}", pid, e)
                             }
                         }
                     }
@@ -285,14 +321,14 @@ impl Unit {
                 }
             }
         }
-        if c_pid.is_some() {
-            match nix::sys::signal::kill(c_pid.unwrap(), sig) {
+        if let Some(pid) = c_pid {
+            match nix::sys::signal::kill(pid, sig) {
                 Ok(_) => {
                     if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
-                        match nix::sys::signal::kill(c_pid.unwrap(), Signal::SIGCONT) {
+                        match nix::sys::signal::kill(pid, Signal::SIGCONT) {
                             Ok(_) => {}
                             Err(e) => {
-                                log::debug!("kill pid {} errno: {}", c_pid.unwrap(), e)
+                                log::debug!("kill pid {} errno: {}", pid, e)
                             }
                         }
                     }
@@ -322,6 +358,7 @@ impl Unit {
         Ok(())
     }
 
+    ///
     pub fn default_dependencies(&self) -> bool {
         self.get_config()
             .config_data()
@@ -330,6 +367,7 @@ impl Unit {
             .DefaultDependencies
     }
 
+    ///
     pub fn ignore_on_isolate(&self) -> bool {
         self.get_config()
             .config_data()
@@ -338,6 +376,7 @@ impl Unit {
             .IgnoreOnIsolate
     }
 
+    ///
     pub fn set_ignore_on_isolate(&self, ignore_on_isolate: bool) {
         self.get_config()
             .config_data()
@@ -349,17 +388,18 @@ impl Unit {
     fn pids_set(&self, m_pid: Option<Pid>, c_pid: Option<Pid>) -> HashSet<Pid> {
         let mut pids = HashSet::new();
 
-        if m_pid.is_some() {
-            pids.insert(m_pid.unwrap());
+        if let Some(pid) = m_pid {
+            pids.insert(pid);
         }
 
-        if c_pid.is_some() {
-            pids.insert(c_pid.unwrap());
+        if let Some(pid) = c_pid {
+            pids.insert(pid);
         }
 
         pids
     }
 
+    ///
     pub fn insert_two_deps(
         &self,
         ra: UnitRelations,
@@ -370,7 +410,7 @@ impl Unit {
             "insert two relations {:?} and {:?} to unit {}",
             ra,
             rb,
-            u_name.to_string()
+            u_name
         );
         let mut ud_conf = UnitDepConf::new();
 
@@ -381,14 +421,16 @@ impl Unit {
         self.dm.insert_ud_config(self.get_id().to_string(), ud_conf)
     }
 
+    ///
     pub fn insert_dep(&self, ra: UnitRelations, u_name: String) -> Option<UnitDepConf> {
-        log::debug!("insert relation {:?} to unit {}", ra, u_name.to_string());
+        log::debug!("insert relation {:?} to unit {}", ra, u_name);
         let mut ud_conf = UnitDepConf::new();
-        ud_conf.deps.insert(ra, vec![u_name.clone()]);
+        ud_conf.deps.insert(ra, vec![u_name]);
 
         self.dm.insert_ud_config(self.get_id().to_string(), ud_conf)
     }
 
+    ///
     pub(super) fn get_config(&self) -> Rc<UeConfig> {
         self.config.clone()
     }
@@ -418,20 +460,23 @@ impl Unit {
             return Ok(());
         }
         match self.load.load_unit_confs() {
-            Ok(_) => Ok({
-                let paths = self.load.get_unit_id_fragment_pathbuf();
-                log::debug!("begin exec sub class load");
-                let ret = self.sub.load(&paths);
+            Ok(_) => {
+                {
+                    let paths = self.load.get_unit_id_fragment_pathbuf();
+                    log::debug!("begin exec sub class load");
+                    let ret = self.sub.load(paths);
 
-                if let Err(e) = ret {
-                    return Err(format!("load Unit {} failed, error: {}", self.id, e).into());
-                }
+                    if let Err(e) = ret {
+                        return Err(format!("load Unit {} failed, error: {}", self.id, e).into());
+                    }
 
-                self.load.set_load_state(UnitLoadState::UnitLoaded);
-            }),
+                    self.load.set_load_state(UnitLoadState::UnitLoaded);
+                };
+                Ok(())
+            }
             Err(e) => {
                 self.load.set_load_state(UnitLoadState::UnitNotFound);
-                return Err(e);
+                Err(e)
             }
         }
     }
@@ -442,10 +487,10 @@ impl Unit {
 
     pub(super) fn start(&self) -> Result<(), UnitActionError> {
         let active_state = self.current_active_state();
-        let us_is_active_or_reloading = match active_state {
-            UnitActiveState::UnitActive | UnitActiveState::UnitReloading => true,
-            _ => false,
-        };
+        let us_is_active_or_reloading = matches!(
+            active_state,
+            UnitActiveState::UnitActive | UnitActiveState::UnitReloading
+        );
 
         if us_is_active_or_reloading {
             return Err(UnitActionError::UnitActionEAlready);
@@ -472,10 +517,10 @@ impl Unit {
 
     pub(super) fn stop(&self) -> Result<(), UnitActionError> {
         let active_state = self.current_active_state();
-        let inactive_or_failed = match active_state {
-            UnitActiveState::UnitInActive | UnitActiveState::UnitFailed => true,
-            _ => false,
-        };
+        let inactive_or_failed = matches!(
+            active_state,
+            UnitActiveState::UnitInActive | UnitActiveState::UnitFailed
+        );
 
         if inactive_or_failed {
             return Err(UnitActionError::UnitActionEAlready);
@@ -504,7 +549,7 @@ impl Unit {
         &self,
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
-        fds: &Vec<i32>,
+        fds: Vec<i32>,
     ) -> Result<(), ServiceError> {
         self.sub.notify_message(ucred, messages, fds)
     }
@@ -544,7 +589,7 @@ mod tests {
         let _unit = unit_init();
         let load_stat = _unit.load_unit();
         assert!(load_stat.is_ok());
-        /*let stat = _unit.start();//sub unit依赖 UnitManager，依赖关系不太合适，后续需要优化
+        /*let stat = _unit.start();
         assert!(stat.is_ok());
         assert_eq!(_unit.current_active_state(),UnitActiveState::UnitActive);*/
     }

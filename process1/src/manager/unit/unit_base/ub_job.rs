@@ -4,6 +4,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::manager::unit::DeserializeWith;
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum JobMode {
     #[serde(alias = "fail")]

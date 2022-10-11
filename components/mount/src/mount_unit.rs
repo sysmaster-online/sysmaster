@@ -1,8 +1,5 @@
-//! mount unit是 mount类型的入口，需要实现
-//! UnitObj,UnitMngUtil,以及UnitSubClass三个trait
-//! * UnitObj是Unit的抽象，定义Unit的具体行为
-//! * UnitMngUtil是为了关联subUnit和Manager，由于rust不支持继承和多态，因此需要采用这种方式来间接支持
-//! * UnitSubClass为了实现SubUnit到UnitObj的转换，简介达成多态的目的
+//! mount unit is entry of mount type of unit，need impl
+//! UnitObj,UnitMngUtil, UnitSubClass trait
 
 use nix::{sys::signal::Signal, unistd::Pid};
 use std::path::PathBuf;
@@ -29,7 +26,7 @@ impl MountUnit {
 }
 
 impl UnitObj for MountUnit {
-    fn load(&self, _paths: &Vec<PathBuf>) -> utils::Result<(), Box<dyn std::error::Error>> {
+    fn load(&self, _paths: Vec<PathBuf>) -> utils::Result<(), Box<dyn std::error::Error>> {
         if self.comm.unit().is_some() {
             self.comm.unit().unwrap().set_ignore_on_isolate(true);
         }

@@ -7,7 +7,7 @@ use crate::manager::reliability::{
 use bitflags::bitflags;
 use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -26,9 +26,9 @@ struct UnitReLoad {
 }
 
 impl UnitReLoad {
-    fn new(cf_pathr: &String, cf_mtime: u128) -> UnitReLoad {
+    fn new(cf_pathr: &str, cf_mtime: u128) -> UnitReLoad {
         UnitReLoad {
-            cf_path: cf_pathr.clone(),
+            cf_path: cf_pathr.to_owned(),
             cf_mtime,
         }
     }
@@ -49,9 +49,9 @@ struct UnitReCgroup {
 }
 
 impl UnitReCgroup {
-    fn new(cg_pathr: &PathBuf) -> UnitReCgroup {
+    fn new(cg_pathr: &Path) -> UnitReCgroup {
         UnitReCgroup {
-            cg_path: cg_pathr.clone(),
+            cg_path: cg_pathr.to_path_buf(),
         }
     }
 }
@@ -132,9 +132,9 @@ impl UnitRe {
         rentry
     }
 
-    pub(super) fn base_insert(&self, unit_id: &String) {
+    pub(super) fn base_insert(&self, unit_id: &str) {
         let u_base = UnitReBase::new();
-        self.base.insert(unit_id.clone(), u_base);
+        self.base.insert(unit_id.to_owned(), u_base);
     }
 
     pub(super) fn base_remove(&self, unit_id: &String) {
@@ -150,7 +150,7 @@ impl UnitRe {
         self.base.keys()
     }
 
-    pub(super) fn load_insert(&self, unit_id: &String, cf_pathr: &String, cf_mtime: u128) {
+    pub(super) fn load_insert(&self, unit_id: &String, cf_pathr: &str, cf_mtime: u128) {
         assert!(self.base_contains(unit_id));
 
         let u_load = UnitReLoad::new(cf_pathr, cf_mtime);
@@ -182,7 +182,7 @@ impl UnitRe {
         u_conf.map(|_c| ())
     }
 
-    pub(super) fn cgroup_insert(&self, unit_id: &String, cg_path: &PathBuf) {
+    pub(super) fn cgroup_insert(&self, unit_id: &String, cg_path: &Path) {
         assert!(self.base_contains(unit_id));
 
         let u_cgroup = UnitReCgroup::new(cg_path);
@@ -198,7 +198,7 @@ impl UnitRe {
         u_cgroup.map(|c| c.cg_path)
     }
 
-    pub(super) fn child_insert(&self, unit_id: &String, pids: &Vec<Pid>) {
+    pub(super) fn child_insert(&self, unit_id: &String, pids: &[Pid]) {
         assert!(self.base_contains(unit_id));
 
         let u_child = UnitReChild::new(pids.iter().map(|x| x.as_raw() as i32).collect::<_>());
@@ -259,11 +259,11 @@ impl UnitRe {
         self.pps.keys()
     }
 
-    pub(super) fn dep_insert(&self, unit_id: &String, deps: &Vec<(UnitRelations, String)>) {
+    pub(super) fn dep_insert(&self, unit_id: &String, deps: &[(UnitRelations, String)]) {
         assert!(self.base_contains(unit_id));
 
         let mut ud_config = UnitReDep::new();
-        ud_config.deps = deps.clone();
+        ud_config.deps = deps.to_vec();
         self.dep.insert(unit_id.clone(), ud_config);
     }
 

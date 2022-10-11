@@ -7,16 +7,18 @@ function finish() {
     set +x
     for rustlist in `git diff master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
     do
-    sed -i '/#!\[deny(missing_docs)]/d' $rustlist 2>/dev/null || true
-    sed -i '/#!\[deny(clippy::all)]/d' $rustlist 2>/dev/null || true
-    sed -i '/#!\[deny(warnings)]/d' $rustlist 2>/dev/null || true
+        sed -i '/#!\[deny(missing_docs)]/d' $rustlist 2>/dev/null || true
+        sed -i '/#!\[deny(clippy::all)]/d' $rustlist 2>/dev/null || true
+        sed -i '/#!\[deny(warnings)]/d' $rustlist 2>/dev/null || true
     done
 }
 
 trap finish EXIT
 
-rustlist=`git diff master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
-grep -P '[\p{Han}]' $rustlist && echo "rust 源码文件中禁用中文字符" && exit 1
+for rustlist in `git diff master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
+do
+    grep -P '[\p{Han}]' $rustlist  && exit 1
+done
 
 pip3 install pre-commit -i http://mirrors.aliyun.com/pypi/simple/ || pip3 install  -i https://pypi.tuna.tsinghua.edu.cn/simple/ pre-commit || pip3 install pre-commit
 
@@ -28,9 +30,9 @@ pip3 install pre-commit -i http://mirrors.aliyun.com/pypi/simple/ || pip3 instal
 # add doc for src code
 for rustlist in `git diff master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
 do
-egrep '#!\[deny\(missing_docs\)\]' $rustlist || sed -i '1i\#![deny(missing_docs)]' $rustlist 2>/dev/null || true
-egrep '#!\[deny\(clippy::all\)\]' $rustlist || sed -i '1i\#![deny(clippy::all)]' $rustlist 2>/dev/null || true
-egrep '#!\[deny\(warnings\)\]' $rustlist || sed -i '1i\#![deny(warnings)]' $rustlist 2>/dev/null || true
+    egrep '#!\[deny\(missing_docs\)\]' $rustlist || sed -i '1i\#![deny(missing_docs)]' $rustlist 2>/dev/null || true
+    egrep '#!\[deny\(clippy::all\)\]' $rustlist || sed -i '1i\#![deny(clippy::all)]' $rustlist 2>/dev/null || true
+    egrep '#!\[deny\(warnings\)\]' $rustlist || sed -i '1i\#![deny(warnings)]' $rustlist 2>/dev/null || true
 done
 
 #fix cargo clippy fail in pre-commit when build.rs is changed
