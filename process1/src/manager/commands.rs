@@ -31,7 +31,7 @@ impl Source for Commands {
 
     fn dispatch(&self, _e: &Events) -> Result<i32, Error> {
         println!("Dispatching Command!");
-        match self.fd.incoming().nth(0) {
+        match self.fd.incoming().next() {
             None => println!("None CommandRequest!"),
             Some(stream) => {
                 println!("{:?}", stream);

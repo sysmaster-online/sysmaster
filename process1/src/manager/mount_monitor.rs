@@ -157,7 +157,7 @@ mod test {
         let mount_source = Rc::new(MountMonitor::new(&manager));
 
         e.add_source(mount_source.clone()).unwrap();
-        e.set_enabled(mount_source.clone(), EventState::On).unwrap();
+        e.set_enabled(mount_source, EventState::On).unwrap();
 
         e.run(10).unwrap();
     }

@@ -533,7 +533,7 @@ pub struct ReDbRwTxn<'e, 'p>(RwTxn<'e, 'p>);
 
 impl<'e, 'p> ReDbRwTxn<'e, 'p> {
     fn new(env: &'e Env) -> heed::Result<ReDbRwTxn> {
-        env.write_txn().map(|w| ReDbRwTxn(w))
+        env.write_txn().map(ReDbRwTxn)
     }
 }
 
@@ -541,7 +541,7 @@ pub struct ReDbRoTxn<'e>(RoTxn<'e>);
 
 impl<'e> ReDbRoTxn<'e> {
     fn new(env: &'e Env) -> heed::Result<ReDbRoTxn> {
-        env.read_txn().map(|r| ReDbRoTxn(r))
+        env.read_txn().map(ReDbRoTxn)
     }
 }
 
@@ -707,9 +707,14 @@ impl ReliStation {
         station: Rc<dyn ReStation>,
     ) {
         let sta = Rc::clone(&station);
-        if let None = self.t_name.borrow_mut().insert(name.to_string(), station) {
+        if self
+            .t_name
+            .borrow_mut()
+            .insert(name.to_string(), station)
+            .is_none()
+        {
             // new, update kind-table
-            let mut stations = self.t_kind.borrow_mut().remove(&kind).unwrap_or(Vec::new());
+            let mut stations = self.t_kind.borrow_mut().remove(&kind).unwrap_or_default();
             stations.push(sta);
         }
     }
@@ -727,8 +732,7 @@ impl ReliStation {
         }
 
         // last second, dealing with last words, which could produce history records.
-        if lframe.is_some() {
-            let lf = lframe.unwrap();
+        if let Some(lf) = lframe {
             let lu = lunit.as_ref();
             for (_, station) in self.t_name.borrow().iter() {
                 station.db_compensate_last(lf, lu);
@@ -752,8 +756,7 @@ impl ReliStation {
         let lu = lunit.as_ref();
 
         // last first, dealing with more untrusted information.
-        if lframe.is_some() {
-            let lf = lframe.unwrap();
+        if let Some(lf) = lframe {
             for (_, station) in self.t_name.borrow().iter() {
                 station.do_compensate_last(lf, lu);
             }
@@ -766,11 +769,7 @@ impl ReliStation {
     }
 
     fn get_kind(&self, kind: ReStationKind) -> Vec<Rc<dyn ReStation>> {
-        self.t_kind
-            .borrow()
-            .get(&kind)
-            .cloned()
-            .unwrap_or(Vec::new())
+        self.t_kind.borrow().get(&kind).cloned().unwrap_or_default()
     }
 }
 

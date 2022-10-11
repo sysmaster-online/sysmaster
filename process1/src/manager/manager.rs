@@ -1,3 +1,4 @@
+#![allow(clippy::module_inception)]
 use super::commands::Commands;
 use super::data::DataManager;
 use super::manager_config::ManagerConfig;
@@ -15,17 +16,24 @@ use std::io::Error;
 use std::rc::Rc;
 use utils::error::Error as ServiceError;
 use utils::{process_util, Result};
+
+/// manager running mode
+#[allow(missing_docs)]
 pub enum Mode {
     SYSTEM,
     USER,
 }
 
+/// manager action mode
+#[allow(missing_docs)]
 pub enum Action {
     RUN,
     HELP,
     TEST,
 }
 
+/// manager running states
+#[allow(missing_docs)]
 pub enum Stats {
     INIT,
     OK,
@@ -39,6 +47,7 @@ pub enum Stats {
     SWITCHROOT,
 }
 
+/// Encapsulate manager and expose api to the outside
 pub struct ManagerX {
     event: Rc<Events>,
     commands: Rc<Commands>,
@@ -50,6 +59,7 @@ pub struct ManagerX {
 }
 
 impl ManagerX {
+    /// ^v^
     pub fn new(mode: Mode, action: Action) -> ManagerX {
         let configm = Rc::new(ManagerConfig::new());
         let _event = Rc::new(Events::new().unwrap());
@@ -69,53 +79,59 @@ impl ManagerX {
         m
     }
 
+    /// ^v^
     pub fn startup(&self) -> Result<i32> {
         log::debug!("Adding signals source to event loop.");
         let signal_source = Rc::clone(&self.signal);
         self.event.add_source(signal_source.clone())?;
-        self.event
-            .set_enabled(signal_source.clone(), EventState::On)?;
+        self.event.set_enabled(signal_source, EventState::On)?;
 
         log::debug!("Adding mount source to event loop.");
         let mount_source = Rc::clone(&self.mount_monitor);
         self.event.add_source(mount_source.clone())?;
-        self.event
-            .set_enabled(mount_source.clone(), EventState::On)?;
+        self.event.set_enabled(mount_source, EventState::On)?;
 
         log::debug!("Setup notify socket event.");
         let notify = Rc::clone(&self.notify);
-        notify.open_socket().map_err(|e| Error::from(e))?;
+        notify.open_socket().map_err(Error::from)?;
         self.event.add_source(notify.clone())?;
-        self.event.set_enabled(notify.clone(), EventState::On)?;
+        self.event.set_enabled(notify, EventState::On)?;
 
         Ok(0)
     }
 
+    /// ^v^
     pub fn add_job(&self, job: JobId) -> Result<(), Error> {
         self.data.add_job(job)
     }
 
+    /// ^v^
     pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.data.start_unit(name)
     }
 
+    /// ^v^
     pub fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.data.stop_unit(name)
     }
 
+    /// daemon reload , sig hub
     pub fn rloop(&self) -> Result<Stats> {
         self.data.rloop()
     }
 
+    /// daemon reexec, for rerun manager
     pub fn reexec(&self) -> Result<(), Error> {
         todo!()
     }
 
+    /// registe the manager to event
     fn register(&self, event: &Rc<Events>) {
         let source = Rc::clone(&self.commands);
         event.add_source(source).unwrap();
     }
 
+    /// enable event loop
     fn enable(&self, event: &Rc<Events>) {
         let source = Rc::clone(&self.commands);
         event.set_enabled(source, EventState::On).unwrap();
