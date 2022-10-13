@@ -8,6 +8,7 @@ use crate::reliability::Reliability;
 use event::{EventState, Events};
 use nix::sys::reboot::{self, RebootMode};
 use nix::sys::signal::Signal;
+use utils::path_lookup::LookupPaths;
 use std::cell::RefCell;
 use std::io::Error;
 use std::rc::Rc;
@@ -16,6 +17,7 @@ use utils::Result;
 
 /// maximal size of process's arguments
 pub const MANAGER_ARGS_SIZE_MAX: usize = 5; // 6 - 1
+
 
 /// Encapsulate manager and expose api to the outside
 pub struct ManagerX {
@@ -212,6 +214,7 @@ pub(crate) struct Manager {
     state: RefCell<State>,
 
     um: UnitManagerX,
+    lookup_path: Rc<LookupPaths>,
 }
 
 impl Drop for Manager {
@@ -300,13 +303,18 @@ impl Manager {
         mode: Mode,
         action: Action,
     ) -> Manager {
+        let mut l_path = LookupPaths::new();
+        l_path.init_lookup_paths();
+        let lookup_path = Rc::new(l_path);
+
         Manager {
             event: Rc::clone(eventr),
             reli: Rc::clone(relir),
             mode,
             action,
             state: RefCell::new(State::Init),
-            um: UnitManagerX::new(eventr, relir),
+            um: UnitManagerX::new(eventr, relir, &lookup_path),
+            lookup_path,
         }
     }
 
@@ -396,6 +404,8 @@ impl Manager {
     fn state(&self) -> State {
         *self.state.borrow()
     }
+
+    pub(crate) fn preset_all(&self) {}
 }
 
 #[cfg(test)]
