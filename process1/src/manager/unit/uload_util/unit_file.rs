@@ -23,10 +23,7 @@ impl UnitFile {
     }
 
     pub fn get_unit_id_fragment_pathbuf(&self, name: &String) -> Vec<PathBuf> {
-        self.data
-            .borrow()
-            .get_unit_id_fragment_pathbuf(name)
-            .clone()
+        self.data.borrow().get_unit_id_fragment_pathbuf(name)
     }
 
     pub fn get_unit_id_dropin_wants(&self, name: &String) -> Vec<PathBuf> {
@@ -107,26 +104,46 @@ impl UnitFileData {
                     if fragment.is_file() {
                         let file_name =
                             String::from(fragment.file_name().unwrap().to_str().unwrap());
-                        if file_name.starts_with(".") || file_name.ends_with(".toml") {
+                        if file_name.starts_with('.') || file_name.ends_with(".toml") {
                             continue;
                         }
-                        let path = format!("{}.toml", fragment.to_string_lossy().to_string());
-                        std::fs::copy(fragment, &path);
-                        pathbuf_fragment.push(Path::new(&path).to_path_buf());
+                        let path = format!("{}.toml", fragment.to_string_lossy());
+                        match std::fs::copy(fragment, &path).map(|ret| {
+                            pathbuf_fragment.push(Path::new(&path).to_path_buf());
+                            ret
+                        }) {
+                            Ok(_ret) => {
+                                continue;
+                            }
+                            Err(e) => {
+                                log::error!("{}", e.to_string());
+                                continue;
+                            }
+                        }
                     }
                 }
             }
-            let path = if v.ends_with("/") {
+            let path = if v.ends_with('/') {
                 format!("{}{}", v, name)
             } else {
                 format!("{}/{}", v, name)
             };
             let tmp = Path::new(&path);
             if tmp.exists() && !tmp.is_symlink() {
-                let path = format!("{}.toml", tmp.to_string_lossy().to_string());
-                std::fs::copy(tmp, &path);
-                let to = Path::new(&path);
-                pathbuf_fragment.push(to.to_path_buf());
+                let path = format!("{}.toml", tmp.to_string_lossy());
+                match std::fs::copy(tmp, &path).map(|ret| {
+                    let to = Path::new(&path);
+                    pathbuf_fragment.push(to.to_path_buf());
+                    ret
+                }) {
+                    Ok(_ret) => {
+                        continue;
+                    }
+                    Err(e) => {
+                        log::error!("{}", e.to_string());
+                        continue;
+                    }
+                }
             }
         }
 
@@ -162,12 +179,9 @@ impl UnitFileData {
                 .insert(name.to_string(), pathbuf_dropin),
             _ => unimplemented!(),
         };
-        ()
     }
 
     pub(self) fn lookup_paths_updated(&mut self) -> bool {
-        let updated: u64;
-        let mut path_updated = true;
         let mut siphash24 = SipHasher24::new_with_keys(0, 0);
         for dir in &self.lookup_path.search_path {
             match fs::metadata(&dir) {
@@ -186,10 +200,10 @@ impl UnitFileData {
             }
         }
 
-        updated = siphash24.finish();
+        let updated: u64 = siphash24.finish();
 
-        path_updated = updated != self.last_updated_timestamp_hash;
+        let path_updated = updated != self.last_updated_timestamp_hash;
         self.last_updated_timestamp_hash = updated;
-        return path_updated;
+        path_updated
     }
 }

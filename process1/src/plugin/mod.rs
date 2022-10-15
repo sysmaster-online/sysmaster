@@ -1,32 +1,35 @@
-//!plugin 支持对子unit的component 的so进行动态加载
-//! 对unit的实现动态库进行加载需要满足以下条件
-//! 1. 子类实现的动态库（*.so）的查找路径为以下优先级
-//!  a.优先查找/usr/lib/process1/plugin/路径下的动态库
-//!  b.查找rust cargo构建的输出目录如target/debug/或者target/release
-//!  c.PROCESS_LIB_LOAD_PATH环境变量指定的路径。
-//! 在使用cargo开发阶段，b和c两种方式实际上都是指向process1工程checkout目录下的/target/debug或者release目录，例如
-//! process1被克隆到/home/test目录下，这输出目录为/home/test/target/debug或者release目录
-//! 2.子类类型和对应so的映射关系配置文件，默认查找路径同 子类动态库的查找路径。该文件在源码树下的路径为process1/conf/plugin.conf
-//! 在开发阶段会通过build脚本默认发布到/target/debug或者release目录下，该阶段 无需关系，如果需要单独运行process1，
-//! 需要将该配置文件从构建发布目录(target/debug/conf)拷贝到/usr/lib/process1/plugin目录下，否则process1无法加载对应的so文件。
-//! 改文件的配置格式为unitType:soname,如：
-//! ```text
-//! Service:libservice
-//! Target:libtarget
-//! Socket:libsocket
-//! ```
-//! 3.子类的实现导入如下的宏定义
-//! ```macro_rules
-//! const LOG_LEVEL: u32 = 4;
-//! const PLUGIN_NAME: &str = "TargetUnit";
-//! use process1::declure_unitobj_plugin;
-//! declure_unitobj_plugin!(Target, Target::default, PLUGIN_NAME, LOG_LEVEL);
-//! ```
-//! plugin或根据对对应unit配置文件的名字找到对应的so，并动态加载，如XXX.service这查找libservice.so,XXX.socket 则会查找libsocket.so
+//!Plugin provides a plug-in management mechanism, completes the dynamic loading of unit subclasses,
+//! and loads the so files in the specified directory. The priority of the specified directory is as follows:
+//!a. First find the dynamic library under the /usr/lib/process1/plugin/ path
+//!b. Find the output directory of the rust cargo build such as target/debug/ or target/release
+//!c. The path specified by the PROCESS_LIB_LOAD_PATH environment variable.
+//!In the development stage of using cargo, the two methods b and c actually point to the /target/debug or release directory
+//! under the checkout directory of the process1 project, for example
+//!process1 is cloned into the /home/test directory, the output directory is /home/test/target/debug or release directory
+//!2. The subclass type and the corresponding so mapping relationship configuration file, the default search path is the same as
+//! the search path of the subclass dynamic library. The path of the file under the source tree is process1/conf/plugin.conf
+//!In the development stage, it will be released to the /target/debug or release directory by default through the build script.
+//! This stage does not need to be concerned. If you need to run process1 separately,
+//!The configuration file needs to be copied from the build release directory (target/debug/conf) to the
+//! /usr/lib/process1/plugin directory, otherwise process1 cannot load the corresponding so file.
+//!Change the configuration format of the file to unitType:soname, such as:
+//!````text
+//!Service:libservice
+//!Target:libtarget
+//!Socket: libsocket
+//!````
+//!3. The implementation of the subclass imports the following macro definitions
+//!```macro_rules
+//!const LOG_LEVEL: u32 = 4;
+//!const PLUGIN_NAME: &str = "TargetUnit";
+//!use process1::declure_unitobj_plugin;
+//!declure_unitobj_plugin!(Target, Target::default, PLUGIN_NAME, LOG_LEVEL);
+//!````
+//!plugin or find the corresponding so according to the name of the corresponding unit configuration file, and load it dynamically, such as XXX.service to find libservice.so, XXX.socket to find libsocket.so
 //!
-
 use super::manager::{UnitSubClass, UnitType};
 use dy_re::Lib;
+use dy_re::Symbol;
 use dynamic_reload as dy_re;
 use log::*;
 use once_cell::sync::Lazy;
@@ -51,6 +54,11 @@ static INSTANCE: Lazy<Arc<Plugin>> = Lazy::new(|| {
     Arc::new(plugin)
 });
 
+/// Plugin provides a plug-in management mechanism, completes the dynamic loading of unit subclasses,
+/// and loads the so files in the specified directory. The priority of the specified directory is as follows:
+//a. First find the dynamic library under the /usr/lib/process1/plugin/ path
+///b. Find the output directory of the rust cargo build such as target/debug/ or target/release
+///c. The path specified by the PROCESS_LIB_LOAD_PATH environment variable.
 pub struct Plugin {
     /*unitobj_lists: RefCell<Vec<Arc<Box<dyn UnitSubClass>>>>,//hide unit obj mut use refcell*/
     lib_type: RwLock<Vec<(String, String)>>,
@@ -76,12 +84,11 @@ impl Plugin {
         let devel_path = || {
             let out_dir = env::var("OUT_DIR").unwrap_or_else(|_x| {
                 let _tmp_str: Option<&'static str> = option_env!("OUT_DIR");
-                return _tmp_str.unwrap_or("").to_string();
+                _tmp_str.unwrap_or("").to_string()
             });
 
             if out_dir.is_empty() {
-                let ld_path = env::var("PROCESS_LIB_LOAD_PATH").map_or("".to_string(), |_v| _v);
-                return ld_path;
+                env::var("PROCESS_LIB_LOAD_PATH").map_or("".to_string(), |_v| _v)
             } else {
                 out_dir
             }
@@ -123,7 +130,7 @@ impl Plugin {
                 );
             }
         }
-        return buf;
+        buf
     }
 
     fn get_default_libpath() -> String {
@@ -131,10 +138,10 @@ impl Plugin {
         let devel_path = |out_dir: &str| {
             if out_dir.contains("build") {
                 let _tmp: Vec<_> = out_dir.split("build").collect();
-                return String::from(_tmp[0]);
+                String::from(_tmp[0])
             } else {
-                return out_dir.to_string();
-            };
+                out_dir.to_string()
+            }
         };
         let lib_path_devel = devel_path(env!("OUT_DIR"));
         let lib_path_env = env::var("PROCESS_LIB_LOAD_PATH").map_or("".to_string(), |_v| _v);
@@ -158,6 +165,16 @@ impl Plugin {
         ret
     }
 
+    /// Get a instance of plugin
+    /// Plugin is a singleton instance
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use process1::plugin::Plugin;
+    ///
+    /// Plugin::get_instance();
+    /// ```
     pub fn get_instance() -> Arc<Plugin> {
         INSTANCE.clone()
     }
@@ -176,6 +193,16 @@ impl Plugin {
                 return false;
             }
             true
+        };
+
+        let is_dynamic_lib = |entry: &DirEntry| {
+            let file_type = entry.file_type();
+            let file_name = entry.file_name();
+            file_type.is_file()
+                && file_name
+                    .to_str()
+                    .map(|s| s.ends_with(".so"))
+                    .unwrap_or(false)
         };
 
         if *(self._loaded.read().unwrap()) {
@@ -203,6 +230,7 @@ impl Plugin {
             Some(shadow_dir),
             dynamic_reload::Search::Default,
         );
+
         for file_item in lib_path.iter() {
             log::debug!(
                 "begin loading  plugin library in library path [{:?}]",
@@ -212,7 +240,7 @@ impl Plugin {
                 .min_depth(1)
                 .follow_links(true)
                 .into_iter()
-                .filter_entry(|e| Self::is_dynamic_lib(e))
+                .filter_entry(|e| is_dynamic_lib(e))
             {
                 let entry = entry.unwrap();
                 let path = entry.path();
@@ -222,7 +250,7 @@ impl Plugin {
                     let file_name = path.file_name();
                     let result = Self::load_plugin(self, file_name.unwrap(), &mut reload_handler);
                     if let Ok(_r) = result {
-                        log::info!("Plugin load unit plugin[{:?}] l", file_name);
+                        log::info!("Plugin load unit plugin[{:?}] sucessful", file_name);
                     } else if let Err(_e) = result {
                         log::error!(
                             "Plugin load unit plugin[{:?}] failed, detail is {}",
@@ -252,23 +280,26 @@ impl Plugin {
 
             match reload_handler.add_library(v, dynamic_reload::PlatformName::No) {
                 Ok(lib) => {
-                    let _sym: Result<dy_re::Symbol<fn() -> *mut dyn UnitSubClass>, _> =
-                        unsafe { lib.lib.get(b"__unit_obj_create") };
+                    #[allow(clippy::type_complexity)]
+                    let _sym: Result<
+                        Symbol<fn() -> *mut dyn UnitSubClass>,
+                        &str,
+                    > = unsafe { lib.lib.get(b"__unit_obj_create").map_err(|_e| "Invalid") };
                     if _sym.is_err() {
-                        log::error!("lib {} not contain __unit_obj_create  sym skip it", v);
+                        log::error!("Lib {} not contain __unit_obj_create sym skip it", v);
                         return Ok(());
                     }
                     log::debug!(
-                        "insert unit {} dynamic lib into libs",
+                        "Insert unit {} dynamic lib into libs",
                         unit_type.to_string()
                     );
                     {
                         let mut wloadlibs = self.load_libs.write().unwrap();
                         (*wloadlibs).insert(unit_type, lib.clone());
                     }
-                    log::info!("loading dynamic lib successfully");
+                    log::info!("loading dynamic lib successful");
                 }
-                Err(e) => error!("error loading Unable to load dynamic lib, err {:?}", e),
+                Err(e) => error!("Unable to loading dynamic lib, err {:?}", e),
             }
         }
         Ok(())
@@ -281,12 +312,12 @@ impl Plugin {
                 return UnitType::from_str(&line.0).unwrap();
             }
         }
-        return UnitType::UnitTypeInvalid;
+        UnitType::UnitTypeInvalid
     }
 
     pub(self) fn init_unit_type_lib_map(&self, unit_type_lib_map: &str) {
         for line in unit_type_lib_map.lines() {
-            let _v_s: Vec<_> = line.split(":").collect();
+            let _v_s: Vec<_> = line.split(':').collect();
             let mut _lib_w = self.lib_type.write().unwrap();
             (*_lib_w).push((_v_s[0].to_string(), _v_s[1].to_string()));
         }
@@ -298,7 +329,7 @@ impl Plugin {
     /// add lib will reload
     pub fn update_library_dir(&self, library_dir: &str) {
         let update_dir = || {
-            let _tmp_str: Vec<_> = library_dir.split(";").collect();
+            let _tmp_str: Vec<_> = library_dir.split(';').collect();
             let mut _new_dir: Vec<PathBuf> = Vec::new();
             let mut set_flag = false;
 
@@ -341,7 +372,7 @@ impl Plugin {
                 let mut _load = self._loaded.write().unwrap();
                 (*_load) = false;
             }
-            return set_flag;
+            set_flag
         };
         log::debug!("begain update library load path [{}]", library_dir);
         if update_dir() {
@@ -349,37 +380,27 @@ impl Plugin {
         }
     }
 
-    fn is_dynamic_lib(entry: &DirEntry) -> bool {
-        let file_type = entry.file_type();
-        let file_name = entry.file_name();
-        if file_type.is_file()
-            && file_name
-                .to_str()
-                .map(|s| s.ends_with(".so"))
-                .unwrap_or(false)
-        {
-            true
-        } else {
-            false
-        }
-    }
-
+    /// Create a  obj for subclasses of unit
+    /// each sub unit need reference of declure_unitobj_plugin
+    ///
     pub fn create_unit_obj(
         &self,
         unit_type: UnitType,
     ) -> Result<Box<dyn UnitSubClass>, Box<dyn Error>> {
         if !(*(self._loaded.read().unwrap())) {
             log::info!("plugin is not loaded");
-            return Err(format!("plugin is not loaded").into());
+            return Err("plugin is not loaded".to_string().into());
         }
         let mut retry_count = 0;
         let dy_lib = loop {
-            let dy_lib: Result<Arc<Lib>, String> = match (*self.load_libs.read().unwrap())
-                .get(&unit_type)
-            {
-                Some(lib) => Ok(lib.clone()),
-                None => Err(format!("the {:?} plugin is not exist", unit_type.to_string()).into()),
-            };
+            let dy_lib: Result<Arc<Lib>, String> =
+                match (*self.load_libs.read().unwrap()).get(&unit_type) {
+                    Some(lib) => Ok(lib.clone()),
+                    None => Err(format!(
+                        "the {:?} plugin is not exist",
+                        unit_type.to_string()
+                    )),
+                };
             if dy_lib.is_err() {
                 if retry_count < 2 {
                     retry_count += 1;
@@ -395,13 +416,23 @@ impl Plugin {
         };
 
         if let Ok(_dy_lib) = dy_lib {
-            let _sym = unsafe { _dy_lib.lib.get(b"__unit_obj_create") };
-            if _sym.is_ok() {
-                let fun: dynamic_reload::Symbol<fn() -> *mut dyn UnitSubClass> = _sym.unwrap();
+            #[allow(clippy::type_complexity)]
+            let _sym: Result<Symbol<fn() -> *mut dyn UnitSubClass>, &str> = unsafe {
+                _dy_lib
+                    .lib
+                    .get(b"__unit_obj_create")
+                    .map_err(|_e| "Invalid")
+            };
+            if let Ok(fun) = _sym {
                 let boxed_raw = fun();
                 Ok(unsafe { Box::from_raw(boxed_raw) })
             } else {
-                Err(format!("the library of {:?} is invalid", unit_type.to_string()).into())
+                Err(format!(
+                    "The library of {:?} is {:?}",
+                    unit_type.to_string(),
+                    _sym.err()
+                )
+                .into())
             }
         } else {
             Err(format!("the {:?} plugin is not exist", unit_type.to_string()).into())
