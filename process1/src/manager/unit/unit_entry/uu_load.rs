@@ -132,21 +132,6 @@ impl UeLoad {
             UnitRelations::UnitRequires,
             self.config.config_data().borrow().Unit.Requires.clone(),
         );
-
-        ud_conf.deps.insert(
-            UnitRelations::UnitWantsBy,
-            self.config.config_data().borrow().Install.WantedBy.clone(),
-        );
-        ud_conf.deps.insert(
-            UnitRelations::UnitRequiresBy,
-            self.config
-                .config_data()
-                .borrow()
-                .Install
-                .RequiredBy
-                .clone(),
-        );
-
         ud_conf.deps.insert(
             UnitRelations::UnitConflicts,
             self.config.config_data().borrow().Unit.Conflicts.clone(),

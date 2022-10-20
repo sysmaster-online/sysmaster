@@ -1,3 +1,5 @@
+//! the management of the unit file lookup path
+//!
 use std::env;
 
 const ETC_SYSTEM_PATH: &str = "/etc/process1";
@@ -17,6 +19,8 @@ pub struct LookupPaths {
     pub generator_late: String,
     /// transient paths
     pub transient: String,
+    /// transient paths
+    pub persistent_path: String,
 }
 
 impl LookupPaths {
@@ -28,6 +32,7 @@ impl LookupPaths {
             generator_late: String::from(""),
             transient: String::from(""),
             search_path: Vec::new(),
+            persistent_path: String::from(""),
         }
     }
 
@@ -57,6 +62,8 @@ impl LookupPaths {
         self.search_path.push(LIB_SYSTEM_PATH.to_string());
         self.search_path.push(RUN_SYSTEM_PATH.to_string());
         self.search_path.push(ETC_SYSTEM_PATH.to_string());
+
+        self.persistent_path = "/etc/process1".to_string();
     }
 }
 

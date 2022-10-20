@@ -1,13 +1,6 @@
 use bitflags::bitflags;
 
-/**Unit包含6种状态，Unit状态的转换关系如下：
- A[UnitActive]:已启动;
- B[UnitReloading]:重新加载;
- C[UnitInActive]:未启动;
- D[UnitFailed]:启动失败;
- E[UnitActivating]:正在激活中，属于瞬时状态;
- F[UnitDeActivating]:关闭过程中;
- G[UnitMaintenance]:维护清理过程中;
+/**
  ```graph LR
 C[UnitInActive] -> E[UnitActivating]
 E->A[UnitActive]
@@ -20,28 +13,28 @@ E->D[UnitFailed]
 ///
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum UnitActiveState {
-    ///
+    /// unit is actived
     UnitActive,
-    ///
+    /// unit is in reloading
     UnitReloading,
-    ///
+    /// unit is not active
     UnitInActive,
-    ///
+    /// unit action is failed
     UnitFailed,
-    ///
+    /// unit is in starting
     UnitActivating,
-    ///
+    /// unit is in stopping
     UnitDeActivating,
-    ///
+    /// unit is in maintenance
     UnitMaintenance,
 }
 
 bitflags! {
-    ///
+    /// notify unit state to manager
     pub struct UnitNotifyFlags: u8 {
-        ///
+        /// notify reload failure to manager
         const UNIT_NOTIFY_RELOAD_FAILURE = 1 << 0;
-        ///
+        /// notify auto restart to manager
         const UNIT_NOTIFY_WILL_AUTO_RESTART = 1 << 1;
     }
 }

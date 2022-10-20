@@ -10,3 +10,4 @@ ExecStop ="/bin/kill $MAINPID"
 
 [Install]
 WantedBy="dbus.service"
+Also="test.socket"

@@ -190,7 +190,6 @@ mod tests {
         let lookup_path = Rc::new(l_path);
         let file = Rc::new(UnitFile::new(&lookup_path));
 
-
         let unit_type = UnitType::UnitService;
         let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();

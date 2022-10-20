@@ -1,5 +1,6 @@
 #![allow(clippy::module_inception)]
 use super::commands::Commands;
+use super::pre_install::{Install, PresetMode};
 use super::rentry::{ReliLastFrame, RELI_HISTORY_MAX_DBS};
 use super::signals::Signals;
 use super::unit::UnitManagerX;
@@ -8,16 +9,15 @@ use crate::reliability::Reliability;
 use event::{EventState, Events};
 use nix::sys::reboot::{self, RebootMode};
 use nix::sys::signal::Signal;
-use utils::path_lookup::LookupPaths;
 use std::cell::RefCell;
 use std::io::Error;
 use std::rc::Rc;
+use utils::path_lookup::LookupPaths;
 use utils::process_util::{self};
 use utils::Result;
 
 /// maximal size of process's arguments
 pub const MANAGER_ARGS_SIZE_MAX: usize = 5; // 6 - 1
-
 
 /// Encapsulate manager and expose api to the outside
 pub struct ManagerX {
@@ -81,6 +81,8 @@ impl ManagerX {
         // it's ok now
         self.data.ok();
         self.reli.clear_last_frame();
+
+        self.data.preset_all()?;
 
         Ok(0)
     }
@@ -173,6 +175,7 @@ impl ManagerX {
 
 /// manager running mode
 #[allow(missing_docs)]
+#[derive(PartialEq, Eq)]
 pub enum Mode {
     System,
     User,
@@ -405,7 +408,14 @@ impl Manager {
         *self.state.borrow()
     }
 
-    pub(crate) fn preset_all(&self) {}
+    pub(crate) fn preset_all(&self) -> Result<(), Error> {
+        if self.mode != Mode::System {
+            let install = Install::new(PresetMode::Enable, self.lookup_path.clone());
+            install.preset_all()?;
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

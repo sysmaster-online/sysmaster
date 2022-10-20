@@ -25,6 +25,7 @@ pub enum MngErrno {
 mod commands;
 #[allow(dead_code)]
 mod manager;
+mod pre_install;
 #[allow(dead_code)]
 mod rentry;
 mod signals;

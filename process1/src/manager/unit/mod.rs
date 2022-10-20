@@ -7,15 +7,20 @@
 //!  [unit_datastore]: the unit object storage module is responsible for storing the unit module status.
 //!  [unit_entry]: Definition of unit related objects
 //!
+
 pub use data::{UnitActiveState, UnitNotifyFlags};
 pub use execute::{ExecCmdError, ExecContext, ExecFlags, ExecParameters};
+
 pub use unit_base::{
     DeserializeWith, KillOperation, UnitActionError, UnitDependencyMask, UnitRef, UnitRelationAtom,
 };
 pub use unit_entry::{Unit, UnitObj};
 pub(super) use unit_manager::UnitManagerX;
 pub use unit_manager::{UnitManager, UnitManagerObj, UnitMngUtil, UnitSubClass};
+pub(crate) use unit_rentry::unit_name_to_type;
 pub use unit_rentry::{ExecCommand, UnitRelations, UnitType};
+
+pub use unit_rentry::UeConfigInstall;
 
 ///
 #[allow(clippy::enum_variant_names)]

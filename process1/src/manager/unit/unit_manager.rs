@@ -42,7 +42,11 @@ impl Drop for UnitManagerX {
 }
 
 impl UnitManagerX {
-    pub(in crate::manager) fn new(eventr: &Rc<Events>, relir: &Rc<Reliability>, lookup_path: &Rc<LookupPaths>) -> UnitManagerX {
+    pub(in crate::manager) fn new(
+        eventr: &Rc<Events>,
+        relir: &Rc<Reliability>,
+        lookup_path: &Rc<LookupPaths>,
+    ) -> UnitManagerX {
         let _dm = Rc::new(DataManager::new());
         let umx = UnitManagerX {
             dm: Rc::clone(&_dm),

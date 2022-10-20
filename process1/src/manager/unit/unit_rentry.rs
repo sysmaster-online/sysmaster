@@ -133,7 +133,7 @@ impl TryFrom<u32> for UnitType {
     }
 }
 
-pub(super) fn unit_name_to_type(unit_name: &str) -> UnitType {
+pub(crate) fn unit_name_to_type(unit_name: &str) -> UnitType {
     let words: Vec<&str> = unit_name.split('.').collect();
     match words[words.len() - 1] {
         "service" => UnitType::UnitService,
@@ -269,25 +269,19 @@ pub(crate) struct UeConfigUnit {
 }
 
 #[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct UeConfigInstall {
+pub struct UeConfigInstall {
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
-    pub Alias: String,
+    pub Alias: Vec<String>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
     pub WantedBy: Vec<String>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
     pub RequiredBy: Vec<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
-    pub Also: String,
-    #[config(default = "")]
-    pub DefaultInstance: String,
-    // #[config(default = "")]
-    // pub install_alias: String,
-    // #[config(default = "")]
-    // pub install_also: String,
-    // #[config(default = "")]
-    // pub install_default_install: String,
+    pub Also: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
