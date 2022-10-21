@@ -395,8 +395,7 @@ total 6884
 
 ## 参考资料
 
-1. [Rust程序设计语言 简体中文版 —— 编写自动化测试]: https://kaisery.github.io/trpl-zh-cn/ch11-00-testing.html	"Rust程序设计语言 简体中文版 —— 编写自动化测试"
-
-2. [Rust语言圣经 —— 自动化测试]: https://course.rs/test/intro.html	"Rust语言圣经 —— 自动化测试"
+1. [Rust程序设计语言 简体中文版 —— 编写自动化测试](http://kaisery.github.io/trpl-zh-cn/ch11-00-testing.html)
+2. [Rust语言圣经 —— 自动化测试](http://course.rs/test/intro.html)
 
     
