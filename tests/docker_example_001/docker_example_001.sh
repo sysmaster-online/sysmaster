@@ -12,11 +12,11 @@ source "${TEST_PATH}"/common/test_frame_docker.sh
 function test_run() {
     local ret
     mkdir -p "${TMP_DIR}"/opt
-    cp -arf "${TEST_SCRIPT_PATH}"/aaa.sh "${TMP_DIR}"/opt
-    chmod 777 "${TMP_DIR}"/opt/aaa.sh
-    docker run --rm -v "${TMP_DIR}"/opt:/opt "${SYSMST_BASE_IMG}" sh -c "sh -x /opt/aaa.sh &> /opt/aaa.log"
+    cp -arf "${TEST_SCRIPT_PATH}"/check.sh "${TMP_DIR}"/opt
+    chmod 777 "${TMP_DIR}"/opt/check.sh
+    docker run --rm -v "${TMP_DIR}"/opt:/opt "${SYSMST_BASE_IMG}" sh -c "sh -x /opt/check.sh &> /opt/check.log"
     ret=$?
-    cat "${TMP_DIR}"/opt/aaa.log
+    cat "${TMP_DIR}"/opt/check.log
     return "${ret}"
 }
 
