@@ -88,7 +88,7 @@ test docker_example_001 ... ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
 ```
 
-如上所示，当我们使用```--test```参数指定执行某个用例时，cargo会打印用例路径、执行结果（ok代表执行成功）、耗时时长等信息，但不会打印用例日志。默认情况下，cargo只会打印失败用例的详细日志，例如：
+如上所示，当我们使用```--test```参数指定执行某个用例时，cargo会打印用例路径、执行结果、耗时时长等信息，但不会打印用例日志。默认情况下，cargo只会打印失败用例的详细日志，例如：
 
 ```
 [root@localhost tests]# cargo test --test docker_example_002 -- --test-threads=1
