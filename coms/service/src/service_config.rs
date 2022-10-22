@@ -2,10 +2,10 @@
 use super::service_comm::ServiceUnitComm;
 use super::service_rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
 use confique::Config;
-use confique::Error;
-use libsysmaster::manager::ExecCommand;
+use libsysmaster::manager::{ExecCommand, KillContext};
 use libsysmaster::ReStation;
 use std::cell::RefCell;
+use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -15,6 +15,9 @@ pub(super) struct ServiceConfig {
 
     // owned objects
     data: Rc<RefCell<ServiceConfigData>>,
+
+    // resolved from ServiceConfigData
+    kill_context: Rc<KillContext>,
 }
 
 impl ReStation for ServiceConfig {
@@ -39,10 +42,11 @@ impl ServiceConfig {
         ServiceConfig {
             comm: Rc::clone(commr),
             data: Rc::new(RefCell::new(ServiceConfigData::default())),
+            kill_context: Rc::new(KillContext::default()),
         }
     }
 
-    pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<(), Error> {
+    pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<(), Box<dyn Error>> {
         let mut builder = ServiceConfigData::builder().env();
 
         log::debug!("service load path: {:?}", paths);
@@ -52,9 +56,13 @@ impl ServiceConfig {
         }
 
         *self.data.borrow_mut() = builder.load()?;
+
         if update {
             self.db_update();
         }
+
+        self.parse_kill_context();
+
         Ok(())
     }
 
@@ -91,6 +99,15 @@ impl ServiceConfig {
             .Sockets
             .as_ref()
             .map(|v| v.iter().map(|v| v.to_string()).collect())
+    }
+
+    pub(super) fn kill_context(&self) -> Rc<KillContext> {
+        self.kill_context.clone()
+    }
+
+    fn parse_kill_context(&self) {
+        self.kill_context
+            .set_kill_mode(self.config_data().borrow().Service.kill_mode);
     }
 }
 

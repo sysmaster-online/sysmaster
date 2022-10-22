@@ -446,11 +446,12 @@ impl ServiceMng {
         self.comm.um().child_watch_all_pids(self.comm.unit().id());
 
         let op = state.to_kill_operation();
-        match self
-            .comm
-            .unit()
-            .kill_context(self.pid.main(), self.pid.control(), op)
-        {
+        match self.comm.unit().kill_context(
+            self.config.kill_context(),
+            self.pid.main(),
+            self.pid.control(),
+            op,
+        ) {
             Ok(_) => {}
             Err(_e) => {
                 if IN_SET!(

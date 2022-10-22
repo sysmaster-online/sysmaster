@@ -14,6 +14,8 @@ pub use execute::{ExecCmdError, ExecContext, ExecFlags, ExecParameters};
 pub use unit_base::{
     DeserializeWith, KillOperation, UnitActionError, UnitDependencyMask, UnitRef, UnitRelationAtom,
 };
+
+pub use unit_entry::{KillContext, KillMode};
 pub use unit_entry::{Unit, UnitObj};
 pub(super) use unit_manager::UnitManagerX;
 pub use unit_manager::{UnitManager, UnitManagerObj, UnitMngUtil, UnitSubClass};

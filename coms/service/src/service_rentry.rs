@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 use confique::Config;
-use libsysmaster::manager::{DeserializeWith, ExecCommand};
+use libsysmaster::manager::{DeserializeWith, ExecCommand, KillMode};
 use libsysmaster::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use nix::unistd::Pid;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -94,6 +94,9 @@ pub(super) struct SectionService {
     pub NotifyAccess: Option<NotifyAccess>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub Environment: Option<Vec<String>>,
+    #[config(deserialize_with = KillMode::deserialize_with)]
+    #[config(default = "none")]
+    pub kill_mode: KillMode,
 }
 
 impl SectionService {
