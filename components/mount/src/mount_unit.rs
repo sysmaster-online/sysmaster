@@ -73,7 +73,14 @@ impl UnitObj for MountUnit {
     fn dump(&self) {}
 
     fn start(&self) -> utils::Result<(), process1::manager::UnitActionError> {
+        let started = self.mng.start_check()?;
+        if started {
+            log::debug!("mount already in starting, just return immediately");
+            return Ok(());
+        }
+
         self.mng.enter_mounted(true);
+
         Ok(())
     }
 
