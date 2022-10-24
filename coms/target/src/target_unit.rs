@@ -7,7 +7,7 @@ use super::target_comm::TargetUnitComm;
 use super::target_mng::TargetMng;
 use libsysmaster::manager::Unit;
 use libsysmaster::manager::{
-    SubUnit, UmIf, UnitActiveState, UnitDependencyMask, UnitManager, UnitMngUtil, UnitRelationAtom,
+    SubUnit, UmIf, UnitActiveState, UnitDependencyMask, UnitMngUtil, UnitRelationAtom,
     UnitRelations,
 };
 use libsysmaster::{ReStation, Reliability};
@@ -57,9 +57,9 @@ impl Target {
     }
 
     pub(self) fn owner(&self) -> Option<Rc<Unit>> {
-        if let Some(ref unit) = *self.owner.borrow(){
+        if let Some(ref unit) = *self.owner.borrow() {
             Some(Rc::clone(unit))
-        }else{
+        } else {
             None
         }
     }

@@ -7,7 +7,10 @@ use nix::{
 
 use libutils::error::Error as ServiceError;
 
-use crate::{manager::{UnitActionError, UnitActiveState, UnitMngUtil}, ReStation};
+use crate::{
+    manager::{UnitActionError, UnitActiveState, UnitMngUtil},
+    ReStation,
+};
 
 use super::Unit;
 
@@ -81,7 +84,6 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     }
 }
 
-
 /// #[macro_use]
 /// the macro for create a sub unit instance
 #[macro_export]
@@ -108,7 +110,9 @@ macro_rules! declure_unitobj_plugin_with_param {
     ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {
         /// method for create the unit instance
         #[no_mangle]
-        pub fn __unit_obj_create_with_params(um: Rc<dyn $crate::manager::UmIf>) -> *mut dyn $crate::manager::SubUnit {
+        pub fn __unit_obj_create_with_params(
+            um: Rc<dyn $crate::manager::UmIf>,
+        ) -> *mut dyn $crate::manager::SubUnit {
             logger::init_log_with_default($name, $level);
             let construcotr: fn(um: Rc<dyn $crate::manager::UmIf>) -> $unit_type = $constructor;
 

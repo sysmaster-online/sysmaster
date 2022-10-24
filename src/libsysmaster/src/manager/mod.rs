@@ -3,9 +3,9 @@ pub use manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 pub use rentry::ReliLastFrame;
 pub use unit::{
     DeserializeWith, ExecCmdError, ExecCommand, ExecContext, ExecFlags, ExecParameters,
-    KillOperation, Unit, UnitActionError, UnitActiveState, UnitDependencyMask, UnitManager,
-    UnitManagerObj, UnitMngUtil, UnitNotifyFlags, SubUnit, UnitRef, UnitRelationAtom,
-    UnitRelations, UnitType,UmIf
+    KillOperation, SubUnit, UmIf, Unit, UnitActionError, UnitActiveState, UnitDependencyMask,
+    UnitManager, UnitManagerObj, UnitMngUtil, UnitNotifyFlags, UnitRef, UnitRelationAtom,
+    UnitRelations, UnitType,
 };
 
 /// error number of manager

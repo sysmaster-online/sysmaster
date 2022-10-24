@@ -4,7 +4,7 @@ use super::mount_rentry::{MountRe, MountReFrame};
 use libevent::{EventState, EventType, Events, Source};
 use libmount::mountinfo;
 use libsysmaster::manager::{
-    ReliLastFrame, UnitActiveState, UnitManager, UnitManagerObj, UnitMngUtil, UnitType, UmIf,
+    ReliLastFrame, UmIf, UnitActiveState, UnitManagerObj, UnitMngUtil, UnitType,
 };
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;

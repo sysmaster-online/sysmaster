@@ -6,8 +6,7 @@ use super::service_mng::ServiceMng;
 use super::service_monitor::ServiceMonitor;
 use super::service_rentry::{NotifyAccess, ServiceCommand, ServiceType};
 use libsysmaster::manager::{
-    ExecContext, Unit, UnitActionError, UnitActiveState, UnitMngUtil, SubUnit,
-    UnitRelations, UmIf,
+    ExecContext, SubUnit, UmIf, Unit, UnitActionError, UnitActiveState, UnitMngUtil, UnitRelations,
 };
 use libsysmaster::{ReStation, Reliability};
 use libutils::error::Error as ServiceError;
@@ -156,7 +155,6 @@ impl UnitMngUtil for ServiceUnit {
         self.comm.attach_reli(reli);
     }
 }
-
 
 impl ServiceUnit {
     fn new(_um: Rc<dyn UmIf>) -> ServiceUnit {

@@ -49,6 +49,10 @@ use walkdir::{DirEntry, WalkDir};
 
 const LIB_PLUGIN_PATH: &str = "/usr/lib/sysmaster/plugin/";
 
+const CONSTRUCTOR_NAME_DEFAULT: &[u8; 25] = b"__unit_obj_create_default";
+
+const CONSTRUCTOR_NAME_WITH_PARAM: &[u8; 29] = b"__unit_obj_create_with_params";
+
 static INSTANCE: Lazy<Arc<Plugin>> = Lazy::new(|| {
     let plugin = Plugin::new();
     let default_lib_path = Plugin::get_default_libpath();
@@ -291,17 +295,16 @@ impl Plugin {
                         &str,
                     > = unsafe {
                         lib.lib
-                            .get(b"__unit_obj_create_default")
+                            .get(CONSTRUCTOR_NAME_DEFAULT)
                             .map_err(|_e| "Invalid")
                     };
                     if _symunit.is_err() {
-                        log::error!("Lib {} not contain __unit_obj_create_default try  __unit_obj_create_with_params", v);
-                        let _symunit: Result<
-                            Symbol<fn(um: Rc<dyn crate::manager::UmIf>) -> *mut dyn SubUnit>,
-                            &str,
-                        > = unsafe {
+                        log::warn!("Lib {} not contain __unit_obj_create_default try  __unit_obj_create_with_params", v);
+                        type SymType = fn(um: Rc<dyn crate::manager::UmIf>) -> *mut dyn SubUnit;
+                        #[allow(clippy::type_complexity)]
+                        let _symunit: Result<Symbol<SymType>, &str> = unsafe {
                             lib.lib
-                                .get(b"__unit_obj_create_with_params")
+                                .get(CONSTRUCTOR_NAME_WITH_PARAM)
                                 .map_err(|_e| "Invalid")
                         };
                         if _symunit.is_err() {
@@ -405,7 +408,7 @@ impl Plugin {
     }
 
     /// Create a  obj for subclasses of unit
-    /// each sub unit need reference of declure_unitobj_plugin
+    /// each sub unit need reference of declure_unitobj_plugin_default
     ///
     pub fn create_unit_obj(&self, unit_type: UnitType) -> Result<Box<dyn SubUnit>, Box<dyn Error>> {
         let ret = self.get_lib(unit_type);
@@ -418,7 +421,7 @@ impl Plugin {
         let _sym: Result<Symbol<fn() -> *mut dyn SubUnit>, &str> = unsafe {
             dy_lib
                 .lib
-                .get(b"__unit_obj_create_default")
+                .get(CONSTRUCTOR_NAME_DEFAULT)
                 .map_err(|_e| "Invalid")
         };
         if let Ok(fun) = _sym {
@@ -429,6 +432,9 @@ impl Plugin {
         }
     }
 
+    /// Create a  obj for subclasses of unit
+    /// each sub unit need reference of declure_unitobj_plugin_with_param
+    ///
     pub fn create_unit_obj_with_um(
         &self,
         unit_type: UnitType,
@@ -439,11 +445,12 @@ impl Plugin {
             return Err(format!("create unit, the {:?} plugin is not exist", unit_type).into());
         }
 
+        type SymType = fn(um: Rc<dyn crate::manager::UmIf>) -> *mut dyn SubUnit;
         let dy_lib = ret.unwrap();
-        let _sym: Result<Symbol<fn(um: Rc<dyn crate::manager::UmIf>) -> *mut dyn SubUnit>, &str> = unsafe {
+        let _sym: Result<Symbol<SymType>, &str> = unsafe {
             dy_lib
                 .lib
-                .get(b"__unit_obj_create_with_params")
+                .get(CONSTRUCTOR_NAME_WITH_PARAM)
                 .map_err(|_e| "Invalid")
         };
         if let Ok(fun) = _sym {
@@ -507,10 +514,14 @@ impl Plugin {
 #[cfg(test)]
 mod tests {
 
+    use crate::manager::UmIf;
     use libutils::logger;
 
     use super::*;
     // use services::service::ServiceUnit;
+
+    struct UmIfD;
+    impl UmIf for UmIfD {}
 
     fn init_test() -> Arc<Plugin> {
         logger::init_log_with_console("test_plugin_log_init", 4);
@@ -534,7 +545,8 @@ mod tests {
     fn test_plugin_create_unit() {
         logger::init_log_with_console("test_unit_load", 4);
         let plugin = init_test();
-        let unitobj = plugin.create_unit_obj(UnitType::UnitService);
+        let umifd = Rc::new(UmIfD);
+        let unitobj = plugin.create_unit_obj_with_um(UnitType::UnitService, umifd);
         assert!(
             unitobj.is_ok(),
             "create unit [{:?}] failed",

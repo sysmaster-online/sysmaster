@@ -11,12 +11,12 @@
 pub use data::{UnitActiveState, UnitNotifyFlags};
 pub use execute::{ExecCmdError, ExecContext, ExecFlags, ExecParameters};
 
+pub use um_interface::UmIf;
 pub use unit_base::{
     DeserializeWith, KillOperation, UnitActionError, UnitDependencyMask, UnitRef, UnitRelationAtom,
 };
-pub use unit_entry::{Unit, SubUnit};
+pub use unit_entry::{SubUnit, Unit};
 pub(super) use unit_manager::UnitManagerX;
-pub use um_interface::{UmIf};
 pub use unit_manager::{UnitManager, UnitManagerObj, UnitMngUtil};
 pub(crate) use unit_rentry::unit_name_to_type;
 pub use unit_rentry::{ExecCommand, UnitRelations, UnitType};
@@ -47,11 +47,13 @@ mod execute;
 mod job;
 mod notify;
 mod sigchld;
+#[cfg(test)]
+mod test;
 mod uload_util;
+mod um_interface;
 mod unit_base;
 mod unit_datastore;
 mod unit_entry;
-mod um_interface;
 mod unit_manager;
 mod unit_rentry;
 mod unit_runtime;

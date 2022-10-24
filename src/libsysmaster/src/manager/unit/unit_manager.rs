@@ -22,7 +22,7 @@ use libutils::Result;
 use nix::unistd::Pid;
 use std::convert::TryFrom;
 use std::io::Error;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 use unit_load::UnitLoad;
@@ -170,7 +170,6 @@ impl UmIf for UnitManager {
         self.load_unit_success(name)
     }
 
-    /// check the unit active state of of reference name
     fn unit_enabled(&self, name: &str) -> Result<(), UnitActionError> {
         let u = if let Some(unit) = self.db.units_get(name) {
             unit
@@ -189,7 +188,7 @@ impl UmIf for UnitManager {
 
         Ok(())
     }
-    /// check if there is already a stop job in process
+
     fn has_stop_job(&self, name: &str) -> bool {
         self.has_stop_job(name)
     }
@@ -197,8 +196,8 @@ impl UmIf for UnitManager {
     fn relation_active_or_pending(&self, name: &str) -> bool {
         self.relation_active_or_pending(name)
     }
-    
-/// start the unit
+
+    /// start the unit
     fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.start_unit(name)
     }
@@ -211,7 +210,7 @@ impl UmIf for UnitManager {
         self.child_unwatch_pid(id, pid)
     }
 
-    fn rentry_trigger_merge(&self, unit_id: &String, force: bool) {
+    fn rentry_trigger_merge(&self, unit_id: &str, force: bool) {
         self.jm.rentry_trigger_merge(unit_id, force)
     }
 
@@ -377,7 +376,7 @@ impl UnitManager {
     }
 
     /// return the fds that trigger the unit {name};
-   fn collect_socket_fds(&self, name: &str) -> Vec<i32> {
+    fn collect_socket_fds(&self, name: &str) -> Vec<i32> {
         let deps = self.db.dep_gets(name, UnitRelations::UnitTriggeredBy);
         let mut fds = Vec::new();
         for dep in deps.iter() {
@@ -972,7 +971,8 @@ mod unit_load {
                 name
             );
             let um = self.um();
-            let subclass = match um.plugins.create_unit_obj(unit_type) {
+            let um_rc = Rc::clone(&um);
+            let subclass = match um.plugins.create_unit_obj_with_um(unit_type, um_rc) {
                 Ok(sub) => sub,
                 Err(_e) => {
                     log::error!("Failed to create unit_obj!{}", _e);

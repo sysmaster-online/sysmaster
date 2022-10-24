@@ -124,8 +124,8 @@ impl JobRe {
         self.trigger.remove(unit_id);
     }
 
-    pub(super) fn trigger_get(&self, unit_id: &String) -> Option<(JobKind, JobAttr)> {
-        if let Some(jt_data) = self.trigger.get(unit_id) {
+    pub(super) fn trigger_get(&self, unit_id: &str) -> Option<(JobKind, JobAttr)> {
+        if let Some(jt_data) = self.trigger.get(&unit_id.to_string()) {
             Some((jt_data.kind, jt_data.attr))
         } else {
             None

@@ -1,4 +1,3 @@
-use super::SubUnit;
 use super::uu_base::UeBase;
 use super::uu_cgroup::UeCgroup;
 use super::uu_child::UeChild;
@@ -9,6 +8,7 @@ use super::uu_condition::{
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use super::uu_ratelimit::StartLimit;
+use super::SubUnit;
 use crate::manager::unit::data::{DataManager, UnitActiveState, UnitDepConf, UnitState};
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{KillOperation, UnitActionError};
@@ -527,6 +527,7 @@ mod tests {
     use super::Unit;
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::manager::unit::unit_rentry::{UnitRe, UnitType};
+    use crate::manager::UmIf;
     use crate::reliability::Reliability;
     use libutils::{logger, path_lookup::LookupPaths};
     use std::rc::Rc;
@@ -535,7 +536,8 @@ mod tests {
         manager::{unit::data::DataManager, unit::uload_util::UnitFile},
         plugin::Plugin,
     };
-
+    struct UmIfD;
+    impl UmIf for UmIfD {}
     fn unit_init() -> Rc<Unit> {
         logger::init_log_with_console("test_unit_entry", 4);
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
@@ -548,7 +550,10 @@ mod tests {
 
         let dm = DataManager::new();
         let plugin = Plugin::get_instance();
-        let sub_obj = plugin.create_unit_obj(UnitType::UnitService).unwrap();
+        let umifd = Rc::new(UmIfD);
+        let sub_obj = plugin
+            .create_unit_obj_with_um(UnitType::UnitService, umifd)
+            .unwrap();
         sub_obj.attach_reli(Rc::clone(&reli));
         let unit = Unit::new(
             UnitType::UnitService,

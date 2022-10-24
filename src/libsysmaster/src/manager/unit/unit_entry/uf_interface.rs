@@ -1,5 +1,5 @@
-use super::u_entry::{Unit};
-use super::u_interface::{SubUnit};
+use super::u_entry::Unit;
+use super::u_interface::SubUnit;
 use super::uu_config::UeConfig;
 use crate::manager::unit::data::{DataManager, UnitActiveState};
 use crate::manager::unit::uload_util::UnitFile;

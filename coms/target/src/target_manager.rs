@@ -1,6 +1,6 @@
 use super::target_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::target_comm::TargetUmComm;
-use libsysmaster::manager::{UnitManagerObj, UnitMngUtil, UmIf};
+use libsysmaster::manager::{UmIf, UnitManagerObj, UnitMngUtil};
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use std::rc::Rc;
@@ -42,11 +42,5 @@ impl UnitMngUtil for TargetManager {
     }
 }
 
-
 use libsysmaster::declure_umobj_plugin;
-declure_umobj_plugin!(
-    TargetManager,
-    TargetManager::new,
-    PLUGIN_NAME,
-    LOG_LEVEL
-);
+declure_umobj_plugin!(TargetManager, TargetManager::new, PLUGIN_NAME, LOG_LEVEL);

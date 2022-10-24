@@ -11,7 +11,7 @@ use crate::{
     socket_mng::SocketMng,
 };
 use libsysmaster::manager::{
-    ExecContext, Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, SubUnit, UmIf,
+    ExecContext, SubUnit, UmIf, Unit, UnitActionError, UnitActiveState, UnitMngUtil,
 };
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
@@ -140,13 +140,6 @@ impl SocketUnit {
     }
 }
 
-/*impl Default for SocketUnit {
-    fn default() -> Self {
-        SocketUnit::new()
-    }
-}*/
-
 // define the method to create the instance of the unit
 use libsysmaster::declure_unitobj_plugin_with_param;
 declure_unitobj_plugin_with_param!(SocketUnit, SocketUnit::new, PLUGIN_NAME, LOG_LEVEL);
-

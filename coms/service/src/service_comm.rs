@@ -1,7 +1,7 @@
 use super::service_rentry::{
     NotifyState, SectionService, ServiceCommand, ServiceRe, ServiceResult, ServiceState,
 };
-use libsysmaster::manager::{Unit, UnitManager, UmIf};
+use libsysmaster::manager::{UmIf, Unit};
 use libsysmaster::Reliability;
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
@@ -204,7 +204,7 @@ impl ServiceUmCommData {
     pub(self) fn um(&self) -> Option<Rc<dyn UmIf>> {
         if let Some(ref um) = self.um {
             Some(Rc::clone(um))
-        }else{
+        } else {
             None
         }
     }

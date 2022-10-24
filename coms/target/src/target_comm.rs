@@ -5,7 +5,7 @@
 *target_ unit->target_ mng->target_ comm
 */
 use super::target_rentry::{TargetRe, TargetState};
-use libsysmaster::manager::{Unit, UmIf};
+use libsysmaster::manager::{UmIf, Unit};
 use libsysmaster::Reliability;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
@@ -25,13 +25,8 @@ impl TargetUnitComm {
         }
     }
 
-
     pub(super) fn attach_um(&self, um: Rc<dyn UmIf>) {
         self.umcomm.attach_um(um)
-    }
-
-    pub(super) fn um(&self) -> Rc<dyn UmIf> {
-        self.umcomm.um()
     }
 
     pub(super) fn attach_unit(&self, unit: Rc<libsysmaster::manager::Unit>) {
@@ -39,12 +34,13 @@ impl TargetUnitComm {
     }
 
     pub(super) fn owner(&self) -> Option<Rc<Unit>> {
-        if let Some(ref unit) = *self.owner.borrow(){
+        if let Some(ref unit) = *self.owner.borrow() {
             Some(Rc::clone(unit))
-        }else{
+        } else {
             None
         }
     }
+
     pub(super) fn attach_reli(&self, reli: Rc<Reliability>) {
         self.umcomm.attach_reli(reli);
     }
@@ -61,23 +57,6 @@ impl TargetUnitComm {
 
     pub(super) fn rentry(&self) -> Rc<TargetRe> {
         self.umcomm.rentry()
-    }
-}
-struct TargetUnitCommData {
-    unit: Weak<Unit>,
-}
-
-impl TargetUnitCommData {
-    pub(self) fn new() -> TargetUnitCommData {
-        TargetUnitCommData { unit: Weak::new() }
-    }
-
-    pub(self) fn attach_unit(&mut self, unit: Rc<Unit>) {
-        self.unit = Rc::downgrade(&unit);
-    }
-
-    pub(self) fn unit(&self) -> Rc<Unit> {
-        self.unit.clone().upgrade().unwrap()
     }
 }
 
@@ -124,12 +103,6 @@ impl TargetUmComm {
         let mut wdata = self.data.write().unwrap();
         wdata.attach_um(um);
     }
-
-    pub(super) fn um(&self) -> Rc<dyn UmIf> {
-        let rdata = self.data.read().unwrap();
-        rdata.um().unwrap()
-    }
-
 }
 
 struct TargetUmCommData {
@@ -162,14 +135,6 @@ impl TargetUmCommData {
         if self.um.is_none() {
             log::debug!("TargetUmComm attach_um action.");
             self.um = Some(um)
-        }
-    }
-
-    pub(self) fn um(&self) -> Option<Rc<dyn UmIf>> {
-        if let Some(ref um) = self.um {
-            Some(Rc::clone(um))
-        }else{
-            None
         }
     }
 

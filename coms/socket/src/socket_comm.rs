@@ -2,7 +2,7 @@
 //!  The method provided by the public object needs to be called.
 //!
 use super::socket_rentry::{SectionSocket, SocketCommand, SocketRe, SocketResult, SocketState};
-use libsysmaster::manager::{Unit, UmIf};
+use libsysmaster::manager::{UmIf, Unit};
 use libsysmaster::Reliability;
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
@@ -203,7 +203,7 @@ impl SocketUmCommData {
     pub(self) fn um(&self) -> Option<Rc<dyn UmIf>> {
         if let Some(ref um) = self.um {
             Some(Rc::clone(um))
-        }else{
+        } else {
             None
         }
     }
