@@ -1,23 +1,48 @@
 #![allow(non_snake_case)]
+use super::uu_base::UeBase;
+use crate::manager::unit::uload_util::UnitFile;
+use crate::manager::unit::unit_rentry::{UeConfigInstall, UeConfigUnit};
+use crate::reliability::ReStation;
+use confique::Config;
 use std::cell::RefCell;
+use std::error::Error as stdError;
 use std::rc::Rc;
 
-use confique::Config;
-use std::error::Error as stdError;
-
-use crate::manager::unit::uload_util::UnitFile;
-use crate::manager::unit::unit_base::JobMode;
-use crate::manager::unit::DeserializeWith;
-
 pub(crate) struct UeConfig {
+    // associated objects
+    base: Rc<UeBase>,
+
+    // owned objects
     data: Rc<RefCell<UeConfigData>>,
 }
 
-impl UeConfig {
-    pub(crate) fn new() -> Self {
-        UeConfig {
-            data: Rc::new(RefCell::new(UeConfigData::default())),
+impl ReStation for UeConfig {
+    // no input, no compensate
+
+    // data
+    fn db_map(&self) {
+        if let Some((unit, install)) = self.base.rentry_conf_get() {
+            let conf = UeConfigData::new(unit, install);
+            *self.data.borrow_mut() = conf;
         }
+    }
+
+    fn db_insert(&self) {
+        self.base
+            .rentry_conf_insert(&self.data.borrow().Unit, &self.data.borrow().Install);
+    }
+
+    // reload: no external connections, no entry
+}
+
+impl UeConfig {
+    pub(super) fn new(baser: &Rc<UeBase>) -> UeConfig {
+        let conf = UeConfig {
+            base: Rc::clone(baser),
+            data: Rc::new(RefCell::new(UeConfigData::default())),
+        };
+        conf.db_insert();
+        conf
     }
 
     pub(super) fn load_fragment_and_dropin(
@@ -55,6 +80,7 @@ impl UeConfig {
         }
 
         *self.data.borrow_mut() = configer;
+        self.db_update();
 
         Ok(())
     }
@@ -72,70 +98,14 @@ pub(crate) struct UeConfigData {
     pub Install: UeConfigInstall,
 }
 
-#[derive(Config, Default, Debug)]
-pub(crate) struct UeConfigUnit {
-    #[config(default = "")]
-    pub Description: String,
-    #[config(default = "")]
-    pub Documentation: String,
-    #[config(default = false)]
-    pub AllowIsolate: bool,
-    //设置为true时，执行systemctl isolate时，此单元不会被停止,对于service,target,socket timer,path来说，默认为false,对于其他单元，默认为true
-    #[config(default = false)]
-    pub IgnoreOnIsolate: bool,
-    #[config(default = true)]
-    pub DefaultDependencies: bool,
-    // #[config(deserialize_with = JobMode::deserialize_with)]
-    // #[config(default = "replace")]
-    // pub on_success_job_mode: JobMode,
-    #[config(deserialize_with = JobMode::deserialize_with)]
-    #[config(default = "replace")]
-    pub OnFailureJobMode: JobMode,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
-    pub Wants: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
-    pub Requires: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
-    pub Before: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
-    pub After: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
-    pub Conflicts: Vec<String>,
-    #[config(default = "")]
-    pub ConditionFileNotEmpty: String,
-    #[config(default = "")]
-    pub ConditionNeedsUpdate: String,
-    #[config(default = "")]
-    pub ConditionPathExists: String,
-    #[config(default = "")]
-    pub AssertPathExists: String,
-}
-
-#[derive(Config, Default, Debug)]
-pub(crate) struct UeConfigInstall {
-    #[config(default = "")]
-    pub Alias: String,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
-    pub WantedBy: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
-    pub RequiredBy: Vec<String>,
-    #[config(default = "")]
-    pub Also: String,
-    #[config(default = "")]
-    pub DefaultInstance: String,
-    // #[config(default = "")]
-    // pub install_alias: String,
-    // #[config(default = "")]
-    // pub install_also: String,
-    // #[config(default = "")]
-    // pub install_default_install: String,
+// the declaration "pub(self)" is for identification only.
+impl UeConfigData {
+    pub(self) fn new(unit: UeConfigUnit, install: UeConfigInstall) -> UeConfigData {
+        UeConfigData {
+            Unit: unit,
+            Install: install,
+        }
+    }
 }
 
 #[cfg(test)]

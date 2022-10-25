@@ -5,7 +5,6 @@ use super::{
 };
 use crate::manager::Manager;
 use http::StatusCode;
-use nix::sys::reboot::RebootMode;
 use std::rc::Rc;
 
 pub(crate) trait Executer {
@@ -55,12 +54,12 @@ impl Executer for MngrComm {
 impl Executer for SysComm {
     fn execute(self, manager: Rc<Manager>) -> CommandResponse {
         let ret = match self.action() {
-            sys_comm::Action::Hibernate => manager.reboot(RebootMode::RB_SW_SUSPEND),
-            sys_comm::Action::Suspend => manager.reboot(RebootMode::RB_SW_SUSPEND),
-            sys_comm::Action::Halt => manager.reboot(RebootMode::RB_HALT_SYSTEM),
-            sys_comm::Action::Poweroff => manager.reboot(RebootMode::RB_POWER_OFF),
-            sys_comm::Action::Shutdown => manager.reboot(RebootMode::RB_POWER_OFF),
-            sys_comm::Action::Reboot => manager.reboot(RebootMode::RB_AUTOBOOT),
+            sys_comm::Action::Hibernate => manager.suspend(),
+            sys_comm::Action::Suspend => manager.suspend(),
+            sys_comm::Action::Halt => manager.halt(),
+            sys_comm::Action::Poweroff => manager.poweroff(),
+            sys_comm::Action::Shutdown => manager.poweroff(),
+            sys_comm::Action::Reboot => manager.reboot(),
         };
         match ret {
             Ok(_) => CommandResponse {

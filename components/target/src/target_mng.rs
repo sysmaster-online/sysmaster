@@ -1,19 +1,11 @@
 //! is the core of the target unit
 //!
-use std::{cell::RefCell, rc::Rc};
-
+use super::target_comm::TargetUnitComm;
+use super::target_rentry::TargetState;
 use process1::manager::{UnitActionError, UnitActiveState, UnitNotifyFlags};
+use process1::ReStation;
+use std::{cell::RefCell, rc::Rc};
 use utils::IN_SET;
-
-use crate::target_comm::TargetComm;
-
-// target contain Dead and Active state，correspond the inactive and active of the unit
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-enum TargetState {
-    Dead,
-    Active,
-    StateMax,
-}
 
 impl TargetState {
     fn to_unit_state(self) -> UnitActiveState {
@@ -25,12 +17,29 @@ impl TargetState {
 }
 
 pub(super) struct TargetMng {
-    comm: Rc<TargetComm>,
+    comm: Rc<TargetUnitComm>,
     state: RefCell<TargetState>,
 }
 
+impl ReStation for TargetMng {
+    // no input, no compensate
+
+    // data
+    fn db_map(&self) {
+        if let Some(state) = self.comm.rentry_mng_get() {
+            *self.state.borrow_mut() = state;
+        }
+    }
+
+    fn db_insert(&self) {
+        self.comm.rentry_mng_insert(self.state());
+    }
+
+    // reload: no external connections, no entry
+}
+
 impl TargetMng {
-    pub(super) fn new(_comm: &Rc<TargetComm>) -> Self {
+    pub(super) fn new(_comm: &Rc<TargetUnitComm>) -> Self {
         TargetMng {
             comm: Rc::clone(_comm),
             state: RefCell::new(TargetState::StateMax),
@@ -44,9 +53,9 @@ impl TargetMng {
         Ok(())
     }
 
-    pub(super) fn start_action(&self) {
+    pub(super) fn start_action(&self, notify: bool) {
         //todo notify dbus is not implemented
-        self.set_state(TargetState::Active);
+        self.set_state(TargetState::Active, notify);
     }
 
     pub(super) fn stop_check(&self) -> Result<(), UnitActionError> {
@@ -56,34 +65,40 @@ impl TargetMng {
         Ok(())
     }
 
-    pub(super) fn stop_action(&self) {
-        self.set_state(TargetState::Dead);
+    pub(super) fn stop_action(&self, notify: bool) {
+        self.set_state(TargetState::Dead, notify);
     }
 
-    fn set_state(&self, state: TargetState) {
-        let o_state = self.state();
-        self.state.replace(state);
-        if state != o_state {
+    fn set_state(&self, new_state: TargetState, notify: bool) {
+        let old_state = self.state();
+        self.state.replace(new_state);
+
+        if notify {
+            self.state_notify(new_state, old_state);
+        }
+    }
+
+    fn state_notify(&self, new_state: TargetState, old_state: TargetState) {
+        if new_state != old_state {
             log::debug!(
                 "{} original state[{:?}] ->new state[{:?}]",
-                self.comm
-                    .unit()
-                    .map_or_else(|| "0".to_string(), |u| u.get_id().to_string()),
-                o_state,
-                state,
+                self.comm.unit().id(),
+                old_state,
+                new_state,
             );
         }
 
-        let old_unit_state = o_state.to_unit_state();
-        let new_unit_state = state.to_unit_state();
-        if let Some(_u) = self.comm.unit() {
-            _u.notify(
-                old_unit_state,
-                new_unit_state,
-                UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
-            );
-        }
+        let old_unit_state = old_state.to_unit_state();
+        let new_unit_state = new_state.to_unit_state();
+        self.comm.unit().notify(
+            old_unit_state,
+            new_unit_state,
+            UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
+        );
+
+        self.db_update();
     }
+
     fn state(&self) -> TargetState {
         *self.state.borrow()
     }
@@ -95,30 +110,24 @@ impl TargetMng {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
-    use super::TargetComm;
     use super::TargetMng;
     use super::TargetState;
+    use super::TargetUnitComm;
+    use std::rc::Rc;
+
     #[test]
     fn test_target_set_state() {
-        let _comm = Rc::new(TargetComm::new());
+        let _comm = Rc::new(TargetUnitComm::new());
         let tm = TargetMng::new(&_comm);
-        tm.set_state(TargetState::Active);
+        tm.set_state(TargetState::Active, false);
         assert_eq!(tm.state(), TargetState::Active)
     }
 
     #[test]
     fn test_target_stop_action() {
-        let _comm = Rc::new(TargetComm::new());
+        let _comm = Rc::new(TargetUnitComm::new());
         let tm = TargetMng::new(&_comm);
-        tm.stop_action();
+        tm.stop_action(false);
         assert_eq!(tm.state(), TargetState::Dead)
-    }
-
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
     }
 }

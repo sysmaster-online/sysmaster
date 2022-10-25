@@ -1,23 +1,27 @@
 #![allow(unused_imports)]
 pub(super) use job_entry::JobConf;
-pub(in crate::manager) use job_entry::{JobInfo, JobKind, JobResult, JobStage};
+pub(in crate::manager) use job_entry::{JobInfo, JobResult, JobStage};
 pub(super) use job_manager::{JobAffect, JobManager};
+pub(in crate::manager) use job_rentry::JobKind;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum JobErrno {
-    JobErrInput,
-    JobErrConflict,
-    JobErrNotExisted,
-    JobErrInternel,
-    JobErrNotSupported,
-    JobErrBadRequest,
+    Input,
+    Conflict,
+    NotExisted,
+    Internel,
+    NotSupported,
+    BadRequest,
 }
 
 use crate::manager::MngErrno;
 impl From<JobErrno> for MngErrno {
     fn from(err: JobErrno) -> Self {
         match err {
-            _ => MngErrno::MngErrInternel,
+            JobErrno::Input => MngErrno::Input,
+            JobErrno::NotExisted => MngErrno::NotExisted,
+            JobErrno::NotSupported => MngErrno::NotSupported,
+            _ => MngErrno::Internel,
         }
     }
 }

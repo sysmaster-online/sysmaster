@@ -1,23 +1,48 @@
 //! mount unit is entry of mount type of unit，need impl
 //! UnitObj,UnitMngUtil, UnitSubClass trait
 
+use super::mount_base::{LOG_LEVEL, PLUGIN_NAME};
+use super::mount_comm::MountUnitComm;
+use super::mount_mng::MountMng;
 use nix::{sys::signal::Signal, unistd::Pid};
+use process1::manager::{UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass};
+use process1::{ReStation, Reliability};
 use std::path::PathBuf;
 use std::rc::Rc;
-
-use super::mount_comm::MountComm;
-use super::mount_mng::MountMng;
-use process1::manager::{UnitActiveState, UnitMngUtil, UnitObj, UnitSubClass};
 use utils::logger;
 
 struct MountUnit {
-    comm: Rc<MountComm>,
+    comm: Rc<MountUnitComm>,
     mng: Rc<MountMng>,
+}
+
+impl ReStation for MountUnit {
+    // no input, no compensate
+
+    // data
+    fn db_map(&self) {
+        self.mng.db_map();
+    }
+
+    fn db_insert(&self) {
+        self.mng.db_insert();
+    }
+
+    // reload: no external connections, entry-only
+    fn entry_coldplug(&self) {
+        // rebuild external connections, like: timer, ...
+        // do nothing now
+    }
+
+    fn entry_clear(&self) {
+        // release external connection, like: timer, ...
+        // do nothing now
+    }
 }
 
 impl MountUnit {
     fn new() -> MountUnit {
-        let _comm = Rc::new(MountComm::new());
+        let _comm = Rc::new(MountUnitComm::new());
         MountUnit {
             comm: Rc::clone(&_comm),
             mng: Rc::new(MountMng::new(&_comm)),
@@ -27,9 +52,7 @@ impl MountUnit {
 
 impl UnitObj for MountUnit {
     fn load(&self, _paths: Vec<PathBuf>) -> utils::Result<(), Box<dyn std::error::Error>> {
-        if self.comm.unit().is_some() {
-            self.comm.unit().unwrap().set_ignore_on_isolate(true);
-        }
+        self.comm.unit().set_ignore_on_isolate(true);
 
         Ok(())
     }
@@ -40,23 +63,22 @@ impl UnitObj for MountUnit {
 
     fn attach_unit(&self, unit: Rc<process1::manager::Unit>) {
         self.comm.attach_unit(unit);
+        self.db_insert();
     }
 
     fn init(&self) {}
 
     fn done(&self) {}
 
-    fn coldplug(&self) {}
-
     fn dump(&self) {}
 
     fn start(&self) -> utils::Result<(), process1::manager::UnitActionError> {
-        self.mng.enter_mounted();
+        self.mng.enter_mounted(true);
         Ok(())
     }
 
-    fn stop(&self) -> utils::Result<(), process1::manager::UnitActionError> {
-        self.mng.enter_dead();
+    fn stop(&self, _force: bool) -> utils::Result<(), process1::manager::UnitActionError> {
+        self.mng.enter_dead(true);
         Ok(())
     }
 
@@ -78,7 +100,13 @@ impl UnitSubClass for MountUnit {
 }
 
 impl UnitMngUtil for MountUnit {
-    fn attach(&self, _um: Rc<process1::manager::UnitManager>) {}
+    fn attach_um(&self, um: Rc<UnitManager>) {
+        self.comm.attach_um(um);
+    }
+
+    fn attach_reli(&self, reli: Rc<Reliability>) {
+        self.comm.attach_reli(reli);
+    }
 }
 
 impl Default for MountUnit {
@@ -87,13 +115,5 @@ impl Default for MountUnit {
     }
 }
 
-const LOG_LEVEL: u32 = 4;
-const PLUGIN_NAME: &str = "MountUnit";
 use process1::declure_unitobj_plugin;
 declure_unitobj_plugin!(MountUnit, MountUnit::default, PLUGIN_NAME, LOG_LEVEL);
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test() {}
-}

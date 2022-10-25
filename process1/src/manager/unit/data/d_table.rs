@@ -1,14 +1,35 @@
 use super::unit_dep_conf::UnitDepConf;
 use super::unit_state::UnitState;
 use crate::manager::table::{Table, TableSubscribe};
+use crate::reliability::ReStation;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+#[allow(clippy::type_complexity)]
 pub struct DataManager {
     tables: (
-        RefCell<Table<String, UnitDepConf>>, // unit-dep-config
-        RefCell<Table<String, UnitState>>,   // unit-state
+        RefCell<Table<String, UnitDepConf>>, // [0]unit-dep-config
+        RefCell<Table<String, UnitState>>,   // [1]unit-state
     ),
+}
+
+impl ReStation for DataManager {
+    // no input, no compensate
+    // no data
+
+    // reload
+    fn entry_clear(&self) {
+        self.tables.0.borrow_mut().data_clear();
+        self.tables.1.borrow_mut().data_clear();
+    }
+}
+
+impl Drop for DataManager {
+    fn drop(&mut self) {
+        log::debug!("DataManager drop, clear.");
+        // repeating protection
+        self.clear();
+    }
 }
 
 impl DataManager {
@@ -55,13 +76,19 @@ impl DataManager {
         let mut table = self.tables.1.borrow_mut();
         table.subscribe(name.to_string(), subscriber)
     }
+
+    // repeating protection
+    pub(in crate::manager) fn clear(&self) {
+        self.tables.0.borrow_mut().clear();
+        self.tables.1.borrow_mut().clear();
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::{UnitActiveState, UnitNotifyFlags};
     use crate::manager::table::TableOp;
+    use crate::manager::unit::data::{UnitActiveState, UnitNotifyFlags};
     use crate::manager::UnitRelations;
 
     #[test]

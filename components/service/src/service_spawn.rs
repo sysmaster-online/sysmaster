@@ -1,8 +1,7 @@
-use crate::service_base::ServiceType;
-use crate::service_config::ServiceConfig;
-
-use super::service_comm::ServiceComm;
+use super::service_comm::ServiceUnitComm;
+use super::service_config::ServiceConfig;
 use super::service_pid::ServicePid;
+use super::service_rentry::ServiceType;
 use nix::unistd::Pid;
 use process1::manager::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
 use std::env;
@@ -10,7 +9,7 @@ use std::error::Error;
 use std::rc::Rc;
 
 pub(super) struct ServiceSpawn {
-    comm: Rc<ServiceComm>,
+    comm: Rc<ServiceUnitComm>,
     pid: Rc<ServicePid>,
     config: Rc<ServiceConfig>,
     exec_ctx: Rc<ExecContext>,
@@ -18,7 +17,7 @@ pub(super) struct ServiceSpawn {
 
 impl ServiceSpawn {
     pub(super) fn new(
-        commr: &Rc<ServiceComm>,
+        commr: &Rc<ServiceUnitComm>,
         pidr: &Rc<ServicePid>,
         configr: &Rc<ServiceConfig>,
         exec_ctx: &Rc<ExecContext>,
@@ -68,17 +67,17 @@ impl ServiceSpawn {
         log::debug!("begin to exec spawn");
         match um.exec_spawn(&unit, cmdline, &params, self.exec_ctx.clone()) {
             Ok(pid) => {
-                um.child_watch_pid(pid, unit.get_id());
+                um.child_watch_pid(unit.id(), pid);
                 Ok(pid)
             }
             Err(e) => {
-                log::error!("failed to start service: {}, error:{:?}", unit.get_id(), e);
+                log::error!("failed to start service: {}, error:{:?}", unit.id(), e);
                 Err("spawn exec return error".to_string().into())
             }
         }
     }
 
     fn collect_socket_fds(&self) -> Vec<i32> {
-        self.comm.um().collect_socket_fds(self.comm.unit().get_id())
+        self.comm.um().collect_socket_fds(self.comm.unit().id())
     }
 }

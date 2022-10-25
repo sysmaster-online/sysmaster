@@ -1,10 +1,11 @@
-use clap::Parser;
-use std::net::TcpStream;
+//!
 
+use clap::Parser;
 use process1::proto::{
     abi::{sys_comm, unit_comm, CommandRequest},
     ProstClientStream,
 };
+use std::net::{SocketAddr, TcpStream};
 use utils::Error;
 use utils::Result;
 
@@ -62,9 +63,11 @@ fn main() -> Result<(), Error> {
         _ => unreachable!(),
     };
 
-    let addr = "127.0.0.1:9527";
-    // 连接服务器
-    let stream = TcpStream::connect(addr).unwrap();
+    let addrs = [
+        SocketAddr::from(([127, 0, 0, 1], 9526)),
+        SocketAddr::from(([127, 0, 0, 1], 9527)),
+    ];
+    let stream = TcpStream::connect(&addrs[..]).unwrap();
 
     let mut client = ProstClientStream::new(stream);
 

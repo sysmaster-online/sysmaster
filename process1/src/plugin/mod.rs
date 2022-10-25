@@ -27,7 +27,7 @@
 //!````
 //!plugin or find the corresponding so according to the name of the corresponding unit configuration file, and load it dynamically, such as XXX.service to find libservice.so, XXX.socket to find libsocket.so
 //!
-use super::manager::{UnitSubClass, UnitType};
+use super::manager::{UnitManagerObj, UnitSubClass, UnitType};
 use dy_re::Lib;
 use dy_re::Symbol;
 use dynamic_reload as dy_re;
@@ -281,18 +281,24 @@ impl Plugin {
             match reload_handler.add_library(v, dynamic_reload::PlatformName::No) {
                 Ok(lib) => {
                     #[allow(clippy::type_complexity)]
-                    let _sym: Result<
+                    let _symunit: Result<
                         Symbol<fn() -> *mut dyn UnitSubClass>,
                         &str,
                     > = unsafe { lib.lib.get(b"__unit_obj_create").map_err(|_e| "Invalid") };
-                    if _sym.is_err() {
-                        log::error!("Lib {} not contain __unit_obj_create sym skip it", v);
+                    if _symunit.is_err() {
+                        log::error!("Lib {} not contain __unit_obj_create sym unit skip it", v);
                         return Ok(());
                     }
-                    log::debug!(
-                        "Insert unit {} dynamic lib into libs",
-                        unit_type.to_string()
-                    );
+                    #[allow(clippy::type_complexity)]
+                    let _symum: Result<
+                        Symbol<fn() -> *mut dyn UnitSubClass>,
+                        &str,
+                    > = unsafe { lib.lib.get(b"__um_obj_create").map_err(|_e| "Invalid") };
+                    if _symum.is_err() {
+                        log::error!("Lib {} not contain __um_obj_create sym um skip it", v);
+                        return Ok(());
+                    }
+                    log::debug!("Insert unit {:?} dynamic lib into libs", unit_type);
                     {
                         let mut wloadlibs = self.load_libs.write().unwrap();
                         (*wloadlibs).insert(unit_type, lib.clone());
@@ -387,19 +393,57 @@ impl Plugin {
         &self,
         unit_type: UnitType,
     ) -> Result<Box<dyn UnitSubClass>, Box<dyn Error>> {
+        let ret = self.get_lib(unit_type);
+        if ret.is_err() {
+            return Err(format!("create unit, the {:?} plugin is not exist", unit_type).into());
+        }
+
+        let dy_lib = ret.unwrap();
+        #[allow(clippy::type_complexity)]
+        let _sym: Result<Symbol<fn() -> *mut dyn UnitSubClass>, &str> =
+            unsafe { dy_lib.lib.get(b"__unit_obj_create").map_err(|_e| "Invalid") };
+        if let Ok(fun) = _sym {
+            let boxed_raw = fun();
+            Ok(unsafe { Box::from_raw(boxed_raw) })
+        } else {
+            Err(format!("The library of {:?} is {:?}", unit_type, _sym.err()).into())
+        }
+    }
+
+    /// Create a  obj for subclasses of unit manager
+    /// each sub unit manager need reference of declure_umobj_plugin
+    pub fn create_um_obj(
+        &self,
+        unit_type: UnitType,
+    ) -> Result<Box<dyn UnitManagerObj>, Box<dyn Error>> {
+        let ret = self.get_lib(unit_type);
+        if ret.is_err() {
+            return Err(format!("create um, the {:?} plugin is not exist", unit_type).into());
+        }
+
+        let dy_lib = ret.unwrap();
+        #[allow(clippy::type_complexity)]
+        let _sym: Result<Symbol<fn() -> *mut dyn UnitManagerObj>, &str> =
+            unsafe { dy_lib.lib.get(b"__um_obj_create").map_err(|_e| "Invalid") };
+        if let Ok(fun) = _sym {
+            let boxed_raw = fun();
+            Ok(unsafe { Box::from_raw(boxed_raw) })
+        } else {
+            Err(format!("The library of {:?} is {:?}", unit_type, _sym.err()).into())
+        }
+    }
+
+    fn get_lib(&self, unit_type: UnitType) -> Result<Arc<Lib>, String> {
         if !(*(self._loaded.read().unwrap())) {
             log::info!("plugin is not loaded");
-            return Err("plugin is not loaded".to_string().into());
+            return Err("plugin is not loaded".to_string());
         }
         let mut retry_count = 0;
         let dy_lib = loop {
             let dy_lib: Result<Arc<Lib>, String> =
                 match (*self.load_libs.read().unwrap()).get(&unit_type) {
                     Some(lib) => Ok(lib.clone()),
-                    None => Err(format!(
-                        "the {:?} plugin is not exist",
-                        unit_type.to_string()
-                    )),
+                    None => Err(format!("the {:?} plugin is not exist", unit_type)),
                 };
             if dy_lib.is_err() {
                 if retry_count < 2 {
@@ -407,36 +451,13 @@ impl Plugin {
                     self.load_lib();
                     continue;
                 } else {
-                    return Err(
-                        format!("the {:?} plugin is not exist", unit_type.to_string()).into(),
-                    );
+                    return Err(format!("the {:?} plugin is not exist", unit_type));
                 }
             }
             break dy_lib;
         };
 
-        if let Ok(_dy_lib) = dy_lib {
-            #[allow(clippy::type_complexity)]
-            let _sym: Result<Symbol<fn() -> *mut dyn UnitSubClass>, &str> = unsafe {
-                _dy_lib
-                    .lib
-                    .get(b"__unit_obj_create")
-                    .map_err(|_e| "Invalid")
-            };
-            if let Ok(fun) = _sym {
-                let boxed_raw = fun();
-                Ok(unsafe { Box::from_raw(boxed_raw) })
-            } else {
-                Err(format!(
-                    "The library of {:?} is {:?}",
-                    unit_type.to_string(),
-                    _sym.err()
-                )
-                .into())
-            }
-        } else {
-            Err(format!("the {:?} plugin is not exist", unit_type.to_string()).into())
-        }
+        dy_lib
     }
 }
 
@@ -463,8 +484,7 @@ mod tests {
         for key in (*t_p.load_libs.read().unwrap()).keys() {
             // let service_unit = u_box.as_any().downcast_ref::<ServiceUnit>().unwrap();
             // assert_eq!(service_unit.get_unit_name(),"");
-            let unittype = UnitType::from_str(key.to_string().as_str()).unwrap();
-            assert_ne!(unittype.to_string(), UnitType::UnitTypeInvalid.to_string());
+            assert_ne!(*key, UnitType::UnitTypeInvalid);
         }
     }
 
@@ -475,7 +495,7 @@ mod tests {
         let unitobj = plugin.create_unit_obj(UnitType::UnitService);
         assert!(
             unitobj.is_ok(),
-            "create unit [{}] failed",
+            "create unit [{:?}] failed",
             UnitType::UnitService
         );
     }

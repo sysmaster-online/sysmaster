@@ -1,6 +1,7 @@
 #![warn(unused_imports)]
-use crate::manager::data::UnitRelations;
+use crate::manager::unit::unit_rentry::UnitRelations;
 
+#[allow(missing_docs)]
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 #[repr(u64)]
 pub enum UnitRelationAtom {

@@ -15,3 +15,9 @@ utils = { path = "../../libutils" }
 process1 = { path = "../../process1" }
 nix = "0.24"
 log = "0.4"
+epoll = "4.3.1"
+event = { path = "../../libevent" }
+libmount = "0.1.15"
+libc = "0.2.*"
+serde = "1.0.130"
+once_cell = { version = "1.5.2"}

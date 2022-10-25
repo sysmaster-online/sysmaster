@@ -1,28 +1,48 @@
 #![allow(non_snake_case)]
+use super::service_comm::ServiceUnitComm;
+use super::service_rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
+use confique::Config;
+use confique::Error;
+use process1::manager::ExecCommand;
+use process1::ReStation;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use super::service_base::ServiceType;
-use crate::service_base::NotifyAccess;
-use crate::service_base::ServiceCommand;
-use confique::Config;
-use confique::Error;
-use process1::manager::DeserializeWith;
-use process1::manager::ExecCommand;
-
 pub(super) struct ServiceConfig {
+    // associated objects
+    comm: Rc<ServiceUnitComm>,
+
+    // owned objects
     data: Rc<RefCell<ServiceConfigData>>,
 }
 
+impl ReStation for ServiceConfig {
+    // no input, no compensate
+
+    // data
+    fn db_map(&self) {
+        if let Some(conf) = self.comm.rentry_conf_get() {
+            self.data.replace(ServiceConfigData::new(conf));
+        }
+    }
+
+    fn db_insert(&self) {
+        self.comm.rentry_conf_insert(&self.data.borrow().Service);
+    }
+
+    // reload: no external connections, no entry
+}
+
 impl ServiceConfig {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(commr: &Rc<ServiceUnitComm>) -> Self {
         ServiceConfig {
+            comm: Rc::clone(commr),
             data: Rc::new(RefCell::new(ServiceConfigData::default())),
         }
     }
 
-    pub(super) fn load(&self, paths: Vec<PathBuf>) -> Result<(), Error> {
+    pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<(), Error> {
         let mut builder = ServiceConfigData::builder().env();
 
         log::debug!("service load path: {:?}", paths);
@@ -32,6 +52,9 @@ impl ServiceConfig {
         }
 
         *self.data.borrow_mut() = builder.load()?;
+        if update {
+            self.db_update();
+        }
         Ok(())
     }
 
@@ -48,7 +71,8 @@ impl ServiceConfig {
     }
 
     pub(super) fn set_notify_access(&self, v: NotifyAccess) {
-        self.data.borrow_mut().set_notify_access(v)
+        self.data.borrow_mut().set_notify_access(v);
+        self.db_update();
     }
 
     pub(super) fn environments(&self) -> Option<Vec<String>> {
@@ -77,49 +101,15 @@ pub(super) struct ServiceConfigData {
 }
 
 impl ServiceConfigData {
-    pub(super) fn set_notify_access(&mut self, v: NotifyAccess) {
+    pub(self) fn new(Service: SectionService) -> ServiceConfigData {
+        ServiceConfigData { Service }
+    }
+
+    pub(self) fn set_notify_access(&mut self, v: NotifyAccess) {
         self.Service.set_notify_access(v)
     }
-}
 
-#[derive(Config, Default, Debug)]
-pub(super) struct SectionService {
-    #[config(deserialize_with = ServiceType::deserialize_with)]
-    #[config(default = "simple")]
-    pub Type: ServiceType,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
-    pub ExecStart: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
-    pub ExecStartPre: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
-    pub ExecStartPost: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
-    pub ExecStop: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
-    pub ExecStopPost: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
-    pub ExecReload: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
-    pub ExecCondition: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub Sockets: Option<Vec<String>>,
-    pub WatchdogUSec: Option<u64>,
-    pub PIDFile: Option<String>,
-    #[config(default = false)]
-    pub RemainAfterExit: bool,
-    pub NotifyAccess: Option<NotifyAccess>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub Environment: Option<Vec<String>>,
-}
-
-impl SectionService {
-    pub(super) fn set_notify_access(&mut self, v: NotifyAccess) {
-        self.NotifyAccess = Some(v);
-    }
-}
-
-impl ServiceConfigData {
-    pub fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Option<Vec<ExecCommand>> {
+    pub(self) fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Option<Vec<ExecCommand>> {
         match cmd_type {
             ServiceCommand::Condition => self.Service.ExecCondition.clone(),
             ServiceCommand::StartPre => self.Service.ExecStartPre.clone(),
@@ -134,7 +124,9 @@ impl ServiceConfigData {
 
 #[cfg(test)]
 mod tests {
+    use crate::service_comm::ServiceUnitComm;
     use crate::service_config::ServiceConfig;
+    use std::rc::Rc;
     use tests::get_project_root;
 
     #[test]
@@ -142,9 +134,11 @@ mod tests {
         let mut file_path = get_project_root().unwrap();
         file_path.push("test_units/config.service.toml");
         let paths = vec![file_path];
-        let config = ServiceConfig::new();
 
-        let result = config.load(paths);
+        let comm = Rc::new(ServiceUnitComm::new());
+        let config = ServiceConfig::new(&comm);
+
+        let result = config.load(paths, false);
 
         println!("service data: {:?}", config.config_data());
 

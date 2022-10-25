@@ -1,8 +1,8 @@
-//! service是sysmaster中支持的unit类型的一种，通过service拉起服务， 进行服务的管理。
-//! service配置文件包含Unit、Socket、Install三个Section。
+//! Service is one of the unit types supported in sysmaster. Service is used to pull up services and manage them.
+//! The service configuration file contains three sections: Unit, Socket, and Install.
 //!
 //! # Example:
-//! ```toml
+//! ``` toml
 //! [Unit]
 //! Description="test service"
 //! Documentation="test.service"
@@ -18,63 +18,59 @@
 //! [Install]
 //! WantedBy="dbus.service"
 //! ```
-//! [Service] section相关的配置
+//! [Service] section related configuration
 //!
 //! Type
 //!
-//! service类型的配置字段，当前支持simple、forking、oneshot、notify. 未配置时默认值为simple。
+//! The service type configuration field currently supports simple, forking, oneshot, and notify The default value is simple when not configured.
 //!
-//!     simple模式表示fork子进程成功之后即代表服务启动完成。
-//!     forking模式表示fork子进程退出即代表服务启动完成，子进程的pid需通过PIDFile获取。
-//!     oneshot模式等待服务执行完之后退出。
-//!     notify模式服务启动完成后通告状态消息给sysmaster。
-//!         支持的通告消息 MAINPID=$val, READY=$val, STOPPING=$val, ERRNO=$val.
+//! The simple mode indicates that the service startup is completed when the fork sub process succeeds.
+//! The forking mode indicates that when the fork sub process exits, the service startup is completed. The pid of the sub process needs to be obtained through PIDFile.
+//! The oneshot mode exits after the service is executed.
+//! Notify the status message to the sysmaster after the notify mode service is started.
+//! Supported notification messages MAINPID=$val, READY=$val, STOPPING=$val, ERRNO=$val
 //!
 //!
 //! ExecCondition、ExecStartPre、ExecStart、ExecStop、ExecStartPost
 //!
-//! service在不同的启动阶段需要执行的命令， 支持配置多条命令，多条命令以“；”分割。如 “/usr/bin/sleep 5; /bin/echo 'test'”。
+//! The commands that a service needs to execute at different startup stages support configuring multiple commands division. For example, "/usr/bin/sleep 5;/bin/echo 'test'".
 //!
 //! PIDFile
 //!
-//! 当Type字段为forking时， 需要配置此字段，用来获取子进程的PID.
+//! When the Type field is forking, you need to configure this field to obtain the PID of the child process
 //!
 //! RemainAfterExit
 //!
-//! 支持配置为true、false, 当配置为true时，当服务退出后仍认为服务为active状态。默认配置为false。
+//! Support the configuration of true and false. When the configuration is true, the service is still considered as active after exiting. The default configuration is false.
 //!
 //! NotifyAccess
 //!
-//! 支持配置为main, 表示支持MAINPID进程发送的通告。
+//! The support configuration is main, which means that the notification sent by the MAINPID process is supported.
 //!
 //! Environment
 //!
-//! 传递给子进程的环境变量参数，可配置多条，配置多条时以“；”分割，配置格式为“key=value”的形式。
+//! The environment variable parameter passed to the child process can be configured with more than one The configuration format is "key=value".
 //!
 //! Sockets
 //!
-//! 表示当前service依赖的socket服务。依赖关系为Wants。支持配置多条，配置多条时以“；”分割。
+//! Indicates the socket service that the current service depends on. The dependency is Wants. Support multiple configurations, and use ";" when configuring multiple division.
 //!
-
-// dependency:
-// socket_base -> {socket_comm | socket_config}
-// {socket_pid | socket_spawn} ->
-// {socket_mng | socket_load}
-// {socket_port} -> socket_unit
 
 #[macro_use]
 extern crate strum;
 
 // dependency:
-// service_base -> {service_comm | service_config}
+// service_base -> service_rentry -> {service_comm | service_config}
 // {service_pid | service_spawn} ->
-// {service_mng | service_load} ->
-// {service_monitor} -> service_unit
+// {service_mng} ->
+// {service_monitor} -> service_unit -> service_manager
 mod service_base;
 mod service_comm;
 mod service_config;
+mod service_manager;
 mod service_mng;
 mod service_monitor;
 mod service_pid;
+mod service_rentry;
 mod service_spawn;
 mod service_unit;

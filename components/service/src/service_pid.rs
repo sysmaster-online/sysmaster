@@ -1,4 +1,4 @@
-use super::service_comm::ServiceComm;
+use super::service_comm::ServiceUnitComm;
 use nix::unistd::Pid;
 use process1::manager::UnitActionError;
 use std::cell::RefCell;
@@ -6,12 +6,12 @@ use std::rc::Rc;
 use utils::process_util;
 
 pub(super) struct ServicePid {
-    comm: Rc<ServiceComm>,
+    comm: Rc<ServiceUnitComm>,
     data: RefCell<ServicePidData>,
 }
 
 impl ServicePid {
-    pub(super) fn new(commr: &Rc<ServiceComm>) -> ServicePid {
+    pub(super) fn new(commr: &Rc<ServiceUnitComm>) -> ServicePid {
         ServicePid {
             comm: Rc::clone(commr),
             data: RefCell::new(ServicePidData::new()),
@@ -26,9 +26,17 @@ impl ServicePid {
         self.data.borrow_mut().reset_main()
     }
 
+    pub(super) fn update_main(&self, pid: Option<Pid>) {
+        if let Some(id) = pid {
+            self.set_main(id);
+        } else {
+            self.reset_main();
+        }
+    }
+
     pub(super) fn unwatch_main(&self) {
         if let Some(pid) = self.main() {
-            self.comm.um().child_unwatch_pid(pid);
+            self.comm.um().child_unwatch_pid(self.comm.unit().id(), pid);
             self.data.borrow_mut().reset_main();
         }
     }
@@ -41,9 +49,17 @@ impl ServicePid {
         self.data.borrow_mut().reset_control()
     }
 
+    pub(super) fn update_control(&self, pid: Option<Pid>) {
+        if let Some(id) = pid {
+            self.set_control(id);
+        } else {
+            self.reset_control();
+        }
+    }
+
     pub(super) fn unwatch_control(&self) {
         if let Some(pid) = self.control() {
-            self.comm.um().child_unwatch_pid(pid);
+            self.comm.um().child_unwatch_pid(self.comm.unit().id(), pid);
             self.data.borrow_mut().reset_control();
         }
     }

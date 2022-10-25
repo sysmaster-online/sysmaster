@@ -1,8 +1,9 @@
 use std::fmt::Debug;
 use std::mem;
+use std::ops::Neg;
 use std::ptr::null_mut;
 
-/// 为signal处理添加的辅助数据结构
+///Auxiliary data structure added for signal processing
 pub(crate) struct SigSet {
     sigset: libc::sigset_t,
 }
@@ -74,7 +75,7 @@ impl Signals {
             self.fd = libc::signalfd(
                 -1,
                 &mut self.set.sigset as *const libc::sigset_t,
-                libc::SIG_BLOCK,
+                libc::SFD_NONBLOCK, // SIG_BLOCK
             );
         }
     }
@@ -93,8 +94,8 @@ impl Signals {
         let res = unsafe { libc::read(self.fd, buffer.as_mut_ptr() as *mut libc::c_void, size) };
         match res {
             x if x == size as isize => Ok(Some(unsafe { buffer.assume_init() })),
-            x if x == 0 => Ok(None),
-            _ => unreachable!("partial read on signalfd"),
+            x if x >= 0 => Ok(None),
+            x => Err(std::io::Error::from_raw_os_error(x.neg() as i32)), //unreachable!("partial read on signalfd, x = {}", x),
         }
     }
 }

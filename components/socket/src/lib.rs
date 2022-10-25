@@ -1,91 +1,83 @@
-//! socket是process1启动类型的一种，通过先创建socket套接字，socket套接字收到请求时再拉起对应的service服务，达到加速启动的目的。
-//! socket配置文件包含Unit、Socket、Install三个Section。
+//!  Socket is a kind of process1 startup type. It can accelerate startup by creating a socket socket first, and then pulling the corresponding service when the socket socket receives a request.
+//!  The socket configuration file contains three sections: Unit, Socket, and Install.
 //!
-//! # Example:
-//! ```toml
-//! [Unit]
-//! Description="test service Socket"
-//! Documentation="test.service"
+//! #  Example:
+//! ``` toml
+//!  [Unit]
+//!  Description="test service Socket"
+//!  Documentation="test.service"
 //!
-//! [Socket]
-//! ExecStartPre=["/usr/bin/sleep 5"]
-//! ListenStream="31972"
-//! ReceiveBuffer = "4K"
-//! SendBuffer = "4K"
-//! PassPacketInfo = "off"
-//! PassCredentials = "off"
-//! PassSecurity = "on"
-//! SocketMode="0600"
+//!  [Socket]
+//!  ExecStartPre=["/usr/bin/sleep 5"]
+//!  ListenStream="31972"
+//!  ReceiveBuffer = "4K"
+//!  SendBuffer = "4K"
+//!  PassPacketInfo = "off"
+//!  PassCredentials = "off"
+//!  PassSecurity = "on"
+//!  SocketMode="0600"
 //!
-//! [Install]
-//! WantedBy="dbus.service"
+//!  [Install]
+//!  WantedBy="dbus.service"
 //! ```
-
-//! [Socket] section相关的配置
+//!  [Socket] section related configuration
 //!
-//! [ExecStartPre]
+//!  [ExecStartPre]
 //!
-//! socket启动前需要执行的命令行，相似的配置还有ExecStartChown、ExecStartPost、ExecStopPre、 ExecStopPost，分别在对应的启动阶段执行。
+//!  The command line that needs to be executed before the socket starts. Similar configurations include ExecStartChown, ExecStartPost, ExecStopPre, and ExecStopPost, which are executed in the corresponding startup phase.
 //!
-//! ListenStream、ListenDatagram
+//!  ListenStream、ListenDatagram
 //!
-//! 分别配置 SOCK_STREAM、SOCK_DGRAM 类型的套接字， 配置格式如下：
+//!  Configure SOCK separately_ STREAM、SOCK_ The configuration format of sockets of DGRAM type is as follows:
 //!
-//! 以 / 开头的则默认创建unix套接字。
+//!  Unix sockets that start with/are created by default.
 //!
-//! 以 @ 开头的则默认创建抽象名字空间的unix套接字。
+//!  Unix sockets starting with @ will be created as abstract namespaces by default.
 //!
-//! 若为数字类型， 则默认创建IPv6类型的套接字， 若不支持IPv6类型， 则创建IPv4类型的套接字。
+//!  If it is a number type, it will create a socket of IPv6 type by default. If it does not support IPv6 type, it will create a socket of IPv4 type.
 //!
-//! 若格式为a.b.c.d:x格式， 则创建IPv4类型的套接字，IP地址为“a.b.c.d”, 端口为x。
+//!  If the format is a.b.c.d: x, create an IPv4 socket with the IP address of "a.b.c.d" and port of x.
 //!
-//! 若格式为[a]:x格式， 则创建IPv6类型的套接字，IP地址为“a", 端口为x。
+//!  If the format is [a]: x, create a socket of IPv6 type with IP address of "a" and port of x.
 //!
-//! ListenNetlink
+//!  ListenNetlink
 //!
-//! 设置一个要监听的 Netlink 套接字。 格式为 {名称} + {组ID}
-//! 当前支持的协议名为route、inet-diag、selinux、iscsi、audit、fib-lookup、 netfilter、ip6-fw、dnrtmsg、kobject_uevent、scsitransport、rdma
+//!  Set a Netlink socket to listen to. The format is {name}+{group ID}
+//!  The currently supported protocols are named route, inet diag, selinux, iscsi, audit, fib lookup, netfilter, ip6 fw, dnrtmsg, kobject_ uevent、scsitransport、rdma
 //!
-//! ReceiveBuffer 、SendBuffer
+//!  ReceiveBuffer 、SendBuffer
 //!
-//! 设置套接字的接受和发送缓冲区的大小， 配置的类型为数值型。
+//!  Set the size of the socket's receive and send buffers. The configured type is numeric.
 //!
-//! PassPacketInfo
+//!  PassPacketInfo
 //!
-//! 可设为 true 或 false(默认), 是否获取接收报文的相关信息，也可在发送报文时指定报文的相关控制信息。
+//!  It can be set to true or false (default) to determine whether to obtain the relevant information of the received message, or specify the relevant control information of the message when sending the message.
 //!
-//! PassCredentials
+//!  PassCredentials
 //!
-//! 可设为 true 或 false(默认), 是否允许套接字接收对端进程在辅助消息中发送的证书。
+//!  Can be set to true or false (default), whether to allow the socket to receive the certificate sent by the peer process in the auxiliary message.
 //!
-//! PassSecurity
+//!  PassSecurity
 //!
-//! 可设为 true 或 false(默认), 是否允许套接字接收对端进程在辅助消息中发送的安全上下文。
+//!  Can be set to true or false (default), whether to allow the socket to receive the security context sent by the peer process in the auxiliary message.
 //!
-//! SocketMode
+//!  SocketMode
 //!
-//! 设置创建文件节点时的访问模式，适用于unix套接字时创建的文件。
+//!  Set the access mode when creating a file node, which is applicable to files created when unix sockets are used.
 
 // dependency:
-// socket_base -> {socket_comm | socket_config}
-// {socket_pid | socket_spawn} ->
-// {socket_mng | socket_load}
-// {socket_port} -> socket_unit
+// socket_base -> service_rentry -> {socket_comm | socket_config}
+// {socket_pid | socket_spawn | socket_port} ->
+// {socket_mng | socket_load} -> socket_unit -> socket_manager
 
 mod socket_base;
-
 mod socket_comm;
-
 mod socket_config;
-
-mod socket_mng;
-
 mod socket_load;
-
-mod socket_spawn;
-
+mod socket_manager;
+mod socket_mng;
 mod socket_pid;
-
 mod socket_port;
-
+mod socket_rentry;
+mod socket_spawn;
 mod socket_unit;

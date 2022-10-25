@@ -1,28 +1,38 @@
 use super::unit_sets::UnitSets;
-use crate::manager::data::UnitRelations;
 use crate::manager::table::{TableOp, TableSubscribe};
 use crate::manager::unit::unit_base::{self, UnitRelationAtom};
 use crate::manager::unit::unit_entry::UnitX;
+use crate::manager::unit::unit_rentry::{UnitRe, UnitRelations};
 use crate::manager::unit::UnitErrno;
+use crate::reliability::ReStation;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub(super) struct UnitDep {
-    // associated objects
-    units: Rc<UnitSets>,
-
-    // owned objects
     sub_name: String, // key for table-subscriber: UnitSets
     sub: Rc<UnitDepSub>,
 }
 
+impl ReStation for UnitDep {
+    // no input, no compensate
+
+    // data
+    fn db_map(&self) {
+        self.sub.data.borrow_mut().db_map();
+    }
+
+    // reload
+    fn entry_clear(&self) {
+        self.sub.data.borrow_mut().clear();
+    }
+}
+
 impl UnitDep {
-    pub(super) fn new(unitsr: &Rc<UnitSets>) -> UnitDep {
+    pub(super) fn new(rentryr: &Rc<UnitRe>, unitsr: &Rc<UnitSets>) -> UnitDep {
         let ud = UnitDep {
-            units: Rc::clone(unitsr),
             sub_name: String::from("UnitDep"),
-            sub: Rc::new(UnitDepSub::new()),
+            sub: Rc::new(UnitDepSub::new(rentryr, unitsr)),
         };
         ud.register(unitsr);
         ud
@@ -109,9 +119,9 @@ impl TableSubscribe<String, Rc<UnitX>> for UnitDepSub {
 
 // the declaration "pub(self)" is for identification only.
 impl UnitDepSub {
-    pub(self) fn new() -> UnitDepSub {
+    pub(self) fn new(rentryr: &Rc<UnitRe>, unitsr: &Rc<UnitSets>) -> UnitDepSub {
         UnitDepSub {
-            data: RefCell::new(UnitDepData::new()),
+            data: RefCell::new(UnitDepData::new(rentryr, unitsr)),
         }
     }
 
@@ -126,16 +136,52 @@ struct UnitDepMask {
     dest: u16,
 }
 
+impl UnitDepMask {
+    fn new(s_mask: u16, d_mask: u16) -> UnitDepMask {
+        UnitDepMask {
+            source: s_mask,
+            dest: d_mask,
+        }
+    }
+}
+
 #[allow(clippy::type_complexity)]
 struct UnitDepData {
+    // associated objects
+    units: Rc<UnitSets>,
+    rentry: Rc<UnitRe>,
+
+    // owned objects
     // key: unit-source + UnitRelations, value: (unit-destination : mask)-list
     t: HashMap<Rc<UnitX>, HashMap<UnitRelations, HashMap<Rc<UnitX>, UnitDepMask>>>,
 }
 
 // the declaration "pub(self)" is for identification only.
 impl UnitDepData {
-    pub(self) fn new() -> UnitDepData {
-        UnitDepData { t: HashMap::new() }
+    pub(self) fn new(rentryr: &Rc<UnitRe>, unitsr: &Rc<UnitSets>) -> UnitDepData {
+        UnitDepData {
+            units: Rc::clone(unitsr),
+            rentry: Rc::clone(rentryr),
+            t: HashMap::new(),
+        }
+    }
+
+    pub(self) fn clear(&mut self) {
+        self.t.clear();
+    }
+
+    pub(self) fn db_map(&mut self) {
+        for source in self.rentry.dep_keys().iter() {
+            let src = self.units.get(source).unwrap();
+            let mask = UnitDepMask::new(0, 0);
+            for (relation, dest) in self.rentry.dep_get(source).iter() {
+                let r_src = *relation;
+                let r_dst = unit_base::unit_relation_to_inverse(r_src);
+                let dst = self.units.get(dest).unwrap();
+                self.insert_one_way(Rc::clone(&src), r_src, Rc::clone(&dst), mask);
+                self.insert_one_way(Rc::clone(&dst), r_dst, Rc::clone(&src), mask);
+            }
+        }
     }
 
     pub(self) fn insert(
@@ -153,14 +199,8 @@ impl UnitDepData {
             return;
         }
 
-        let mask = UnitDepMask {
-            source: source_mask,
-            dest: 0,
-        };
-        let mask_inverse = UnitDepMask {
-            source: 0,
-            dest: source_mask,
-        };
+        let mask = UnitDepMask::new(source_mask, 0);
+        let mask_inverse = UnitDepMask::new(0, source_mask);
         let relation_inverse = unit_base::unit_relation_to_inverse(relation);
 
         // insert in two-directions way
@@ -184,6 +224,10 @@ impl UnitDepData {
                 mask_inverse,
             );
         }
+
+        // update rentry
+        self.db_update(&source);
+        self.db_update(&dest);
     }
 
     pub(self) fn remove(&mut self, source: &UnitX, relation: UnitRelations, dest: &UnitX) {
@@ -191,6 +235,10 @@ impl UnitDepData {
         let relation_inverse = unit_base::unit_relation_to_inverse(relation);
         self.remove_one_way(source, relation, dest);
         self.remove_one_way(dest, relation_inverse, source);
+
+        // update rentry
+        self.db_update(source);
+        self.db_update(dest);
     }
 
     pub(self) fn remove_unit(&mut self, source: &UnitX) {
@@ -287,27 +335,47 @@ impl UnitDepData {
         sv.get_mut(&relation)
             .expect("something inserted is not found.")
     }
+
+    fn db_update(&self, unit: &UnitX) {
+        let mut deps = Vec::new();
+        let sv_empty = HashMap::new();
+        let sv = self.t.get(unit).unwrap_or(&sv_empty);
+        for (relation, dv) in sv.iter() {
+            deps.append(
+                &mut dv
+                    .iter()
+                    .map(|(destr, _)| (*relation, destr.id().clone()))
+                    .collect::<Vec<_>>(),
+            );
+        }
+        self.rentry.dep_insert(unit.id(), &deps);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::DataManager;
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::manager::unit::data::DataManager;
     use crate::manager::unit::uload_util::UnitFile;
-    use crate::manager::unit::unit_base::UnitType;
+    use crate::manager::unit::unit_rentry::UnitType;
     use crate::plugin::Plugin;
+    use crate::reliability::Reliability;
     use utils::logger;
 
     #[test]
     fn dep_insert() {
+        let dm = Rc::new(DataManager::new());
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let rentry = Rc::new(UnitRe::new(&reli));
         let sets = UnitSets::new();
-        let dep = UnitDep::new(&Rc::new(sets));
+        let dep = UnitDep::new(&rentry, &Rc::new(sets));
         let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
+        let unit_test1 = create_unit(&dm, &reli, &rentry, &name_test1);
         let name_test2 = String::from("test2.service");
-        let unit_test2 = create_unit(&name_test2);
+        let unit_test2 = create_unit(&dm, &reli, &rentry, &name_test2);
         let name_test3 = String::from("test3.service");
-        let unit_test3 = create_unit(&name_test3);
+        let unit_test3 = create_unit(&dm, &reli, &rentry, &name_test3);
         let relation = UnitRelations::UnitRequires;
 
         let old = dep.insert(
@@ -340,14 +408,17 @@ mod tests {
 
     #[test]
     fn dep_gets_atom() {
+        let dm = Rc::new(DataManager::new());
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let rentry = Rc::new(UnitRe::new(&reli));
         let sets = UnitSets::new();
-        let dep = UnitDep::new(&Rc::new(sets));
+        let dep = UnitDep::new(&rentry, &Rc::new(sets));
         let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
+        let unit_test1 = create_unit(&dm, &reli, &rentry, &name_test1);
         let name_test2 = String::from("test2.service");
-        let unit_test2 = create_unit(&name_test2);
+        let unit_test2 = create_unit(&dm, &reli, &rentry, &name_test2);
         let name_test3 = String::from("test3.service");
-        let unit_test3 = create_unit(&name_test3);
+        let unit_test3 = create_unit(&dm, &reli, &rentry, &name_test3);
         let relation2 = UnitRelations::UnitRequires;
         let relation3 = UnitRelations::UnitWants;
         let atom2 = UnitRelationAtom::UnitAtomPullInStart; // + require, - want
@@ -392,14 +463,17 @@ mod tests {
 
     #[test]
     fn dep_is_dep_atom_with() {
+        let dm = Rc::new(DataManager::new());
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let rentry = Rc::new(UnitRe::new(&reli));
         let sets = UnitSets::new();
-        let dep = UnitDep::new(&Rc::new(sets));
+        let dep = UnitDep::new(&rentry, &Rc::new(sets));
         let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
+        let unit_test1 = create_unit(&dm, &reli, &rentry, &name_test1);
         let name_test2 = String::from("test2.service");
-        let unit_test2 = create_unit(&name_test2);
+        let unit_test2 = create_unit(&dm, &reli, &rentry, &name_test2);
         let name_test3 = String::from("test3.service");
-        let unit_test3 = create_unit(&name_test3);
+        let unit_test3 = create_unit(&dm, &reli, &rentry, &name_test3);
         let relation2 = UnitRelations::UnitRequires;
         let relation3 = UnitRelations::UnitWants;
         let atom2 = UnitRelationAtom::UnitAtomPullInStart; // + require, - want
@@ -462,16 +536,22 @@ mod tests {
         assert!(value);
     }
 
-    fn create_unit(name: &str) -> Rc<UnitX> {
+    fn create_unit(
+        dmr: &Rc<DataManager>,
+        relir: &Rc<Reliability>,
+        rentryr: &Rc<UnitRe>,
+        name: &str,
+    ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-        let dm = Rc::new(DataManager::new());
         let file = Rc::new(UnitFile::new());
         let unit_type = UnitType::UnitService;
         let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();
+        subclass.attach_reli(Rc::clone(relir));
         Rc::new(UnitX::new(
-            &dm,
+            dmr,
+            rentryr,
             &file,
             unit_type,
             name,

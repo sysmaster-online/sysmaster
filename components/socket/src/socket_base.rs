@@ -1,6 +1,9 @@
 use nix::{libc, sys::socket::SockProtocol};
 use serde::{Deserialize, Serialize};
 
+pub(super) const LOG_LEVEL: u32 = 4;
+pub(super) const PLUGIN_NAME: &str = "SocketUnit";
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub(super) enum PortType {
     Socket,
@@ -88,15 +91,6 @@ impl From<NetlinkProtocol> for SockProtocol {
             NetlinkProtocol::NetlinkInvalid => todo!(),
         }
     }
-}
-
-/// the command that running in different stage.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Copy, Clone)]
-pub(super) enum SocketCommand {
-    StartPre,
-    StartPost,
-    StopPre,
-    StopPost,
 }
 
 #[cfg(test)]

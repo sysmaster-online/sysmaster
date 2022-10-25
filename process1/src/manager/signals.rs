@@ -1,20 +1,21 @@
 use super::manager::Manager;
+use super::rentry::ReliLastFrame;
+use crate::reliability::Reliability;
 use event::{EventType, Events, Source};
-use nix::{sys::signal::Signal, unistd::Pid};
+use nix::sys::signal::Signal;
 use std::{convert::TryFrom, rc::Rc};
-use utils::{Error, Result};
+use utils::Result;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub(super) enum ProcessExit {
-    Status(Pid, i32, nix::sys::signal::Signal),
-}
 pub(super) struct Signals {
+    // associated objects
+    reli: Rc<Reliability>,
     manager: Rc<Manager>,
 }
 
 impl Signals {
-    pub(super) fn new(mr: &Rc<Manager>) -> Signals {
+    pub(super) fn new(relir: &Rc<Reliability>, mr: &Rc<Manager>) -> Signals {
         Signals {
+            reli: Rc::clone(relir),
             manager: Rc::clone(mr),
         }
     }
@@ -33,60 +34,28 @@ impl Source for Signals {
         (libc::EPOLLIN) as u32
     }
 
-    fn priority(&self) -> i8 {
-        0i8
-    }
-
-    fn dispatch(&self, e: &Events) -> Result<i32, Error> {
+    fn dispatch(&self, e: &Events) -> Result<i32> {
         log::debug!("Dispatching signals!");
 
-        #[allow(clippy::never_loop)]
-        loop {
-            match e.read_signals() {
-                Ok(Some(info)) => {
-                    let signal = Signal::try_from(info.si_signo).unwrap();
-                    log::debug!("read signal from event: {}", signal);
-                    match signal {
-                        Signal::SIGCHLD => match self.manager.dispatch_sigchld() {
-                            Err(e) => {
-                                log::error!("dispatch sigchld error: {}", e)
-                            }
-                            Ok(_) => break,
-                        },
-                        Signal::SIGHUP => todo!(),
-                        Signal::SIGINT => todo!(),
-
-                        Signal::SIGKILL => todo!(),
-                        Signal::SIGUSR1 => todo!(),
-                        Signal::SIGUSR2 => todo!(),
-                        _ => todo!(),
-                    }
-                    break;
-                }
-                Ok(None) => {
-                    log::debug!("read signals none");
-                    break;
-                }
-                Err(e) => {
-                    log::debug!("read signals error");
-                    println!("{:?}", e);
-                    break;
+        self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);
+        match e.read_signals() {
+            Ok(Some(info)) => {
+                let signal = Signal::try_from(info.si_signo).unwrap();
+                log::debug!("read signal from event: {}", signal);
+                if let Err(e) = self.manager.dispatch_signal(&signal) {
+                    log::error!("dispatch signal{:?} error: {}", signal, e);
                 }
             }
+            Ok(None) => log::debug!("read signals none"),
+            Err(e) => log::debug!("read signals error, {:?}", e),
         }
+        self.reli.clear_last_frame();
+
         Ok(0)
     }
 
     fn token(&self) -> u64 {
         let data: u64 = unsafe { std::mem::transmute(self) };
         data
-    }
-
-    fn fd(&self) -> std::os::unix::prelude::RawFd {
-        todo!()
-    }
-
-    fn pid(&self) -> libc::pid_t {
-        0
     }
 }

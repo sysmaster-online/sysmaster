@@ -1,33 +1,34 @@
-pub use data::{UnitActiveState, UnitNotifyFlags, UnitRelations};
+//!
 pub(super) use manager::Manager;
-pub use manager::{Action, ManagerX, Mode, Stats};
+pub use manager::{Action, ManagerX, Mode, MANAGER_ARGS_SIZE_MAX};
+pub use rentry::ReliLastFrame;
 pub use unit::{
     DeserializeWith, ExecCmdError, ExecCommand, ExecContext, ExecFlags, ExecParameters,
-    KillOperation, Unit, UnitActionError, UnitDependencyMask, UnitManager, UnitMngUtil, UnitObj,
-    UnitRef, UnitRelationAtom, UnitSubClass, UnitType,
+    KillOperation, Unit, UnitActionError, UnitActiveState, UnitDependencyMask, UnitManager,
+    UnitManagerObj, UnitMngUtil, UnitNotifyFlags, UnitObj, UnitRef, UnitRelationAtom,
+    UnitRelations, UnitSubClass, UnitType,
 };
 
+/// error number of manager
 #[derive(Debug)]
 pub enum MngErrno {
-    MngErrInput,
-    MngErrNotExisted,
-    MngErrInternel,
-    MngErrNotSupported,
+    /// invalid input
+    Input,
+    /// not existed
+    NotExisted,
+    /// internel error
+    Internel,
+    /// not supported
+    NotSupported,
 }
 
 mod commands;
 #[allow(dead_code)]
-mod data;
-#[allow(dead_code)]
 mod manager;
-mod mount_monitor;
 #[allow(dead_code)]
-mod reliability;
+mod rentry;
 mod signals;
 #[allow(dead_code)]
 mod table;
 #[allow(dead_code)]
 mod unit;
-
-mod manager_config;
-mod notify;

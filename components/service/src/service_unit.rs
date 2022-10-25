@@ -1,10 +1,10 @@
-use crate::service_base::{NotifyAccess, ServiceCommand, ServiceType};
-use crate::service_mng::RunningData;
-
-use super::service_comm::ServiceComm;
+use super::service_base::{LOG_LEVEL, PLUGIN_NAME};
+use super::service_comm::ServiceUnitComm;
 use super::service_config::ServiceConfig;
+use super::service_mng::RunningData;
 use super::service_mng::ServiceMng;
 use super::service_monitor::ServiceMonitor;
+use super::service_rentry::{NotifyAccess, ServiceCommand, ServiceType};
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
@@ -12,21 +12,48 @@ use process1::manager::{
     ExecContext, Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj,
     UnitRelations, UnitSubClass,
 };
-
+use process1::{ReStation, Reliability};
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
-
 use utils::error::Error as ServiceError;
 use utils::logger;
 
 struct ServiceUnit {
-    comm: Rc<ServiceComm>,
+    comm: Rc<ServiceUnitComm>,
     config: Rc<ServiceConfig>,
     mng: Rc<ServiceMng>,
     monitor: ServiceMonitor,
     exec_ctx: Rc<ExecContext>,
+}
+
+impl ReStation for ServiceUnit {
+    // input: do nothing
+
+    // compensate: do nothing
+
+    // data
+    fn db_map(&self) {
+        self.config.db_map();
+        self.mng.db_map();
+    }
+
+    fn db_insert(&self) {
+        self.config.db_insert();
+        self.mng.db_insert();
+    }
+
+    // reload: no external connections, entry-only
+    fn entry_coldplug(&self) {
+        // rebuild external connections, like: timer, ...
+        // do nothing now
+    }
+
+    fn entry_clear(&self) {
+        // release external connection, like: timer, ...
+        // do nothing now
+    }
 }
 
 impl UnitObj for ServiceUnit {
@@ -39,7 +66,7 @@ impl UnitObj for ServiceUnit {
     }
 
     fn load(&self, paths: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
-        self.config.load(paths)?;
+        self.config.load(paths, true)?;
 
         self.parse()?;
 
@@ -48,12 +75,8 @@ impl UnitObj for ServiceUnit {
         self.service_verify()
     }
 
-    fn coldplug(&self) {
-        todo!()
-    }
-
     fn start(&self) -> Result<(), UnitActionError> {
-        log::debug!("begin to start the service unit");
+        log::debug!("begin to start the service unit.");
         let started = self.mng.start_check()?;
         if started {
             log::debug!("service already in starting, just return immediately");
@@ -70,8 +93,11 @@ impl UnitObj for ServiceUnit {
         todo!()
     }
 
-    fn stop(&self) -> Result<(), UnitActionError> {
-        self.mng.stop_check()?;
+    fn stop(&self, force: bool) -> Result<(), UnitActionError> {
+        log::debug!("begin to stop the service unit, force: {}.", force);
+        if !force {
+            self.mng.stop_check()?;
+        }
         self.mng.stop_action();
         Ok(())
     }
@@ -102,6 +128,7 @@ impl UnitObj for ServiceUnit {
 
     fn attach_unit(&self, unit: Rc<Unit>) {
         self.comm.attach_unit(unit);
+        self.db_insert();
     }
 
     fn notify_message(
@@ -121,8 +148,12 @@ impl UnitObj for ServiceUnit {
 }
 
 impl UnitMngUtil for ServiceUnit {
-    fn attach(&self, um: Rc<UnitManager>) {
+    fn attach_um(&self, um: Rc<UnitManager>) {
         self.comm.attach_um(um);
+    }
+
+    fn attach_reli(&self, reli: Rc<Reliability>) {
+        self.comm.attach_reli(reli);
     }
 }
 
@@ -134,23 +165,23 @@ impl UnitSubClass for ServiceUnit {
 
 impl ServiceUnit {
     fn new() -> ServiceUnit {
-        let comm = Rc::new(ServiceComm::new());
-        let config = Rc::new(ServiceConfig::new());
+        let comm = Rc::new(ServiceUnitComm::new());
+        let config = Rc::new(ServiceConfig::new(&comm));
         let context = Rc::new(ExecContext::new());
 
         let rt = Rc::new(RunningData::new());
-        let mng = Rc::new(ServiceMng::new(&comm, &config, &rt, &context));
-        rt.attach_mng(mng.clone());
+        let _mng = Rc::new(ServiceMng::new(&comm, &config, &rt, &context));
+        rt.attach_mng(_mng.clone());
         ServiceUnit {
             comm: Rc::clone(&comm),
             config: Rc::clone(&config),
-            mng,
+            mng: Rc::clone(&_mng),
             monitor: ServiceMonitor::new(&config),
-            exec_ctx: context,
+            exec_ctx: Rc::clone(&context),
         }
     }
 
-    pub(super) fn parse(&self) -> Result<(), Box<dyn Error>> {
+    fn parse(&self) -> Result<(), Box<dyn Error>> {
         if let Some(envs) = self.config.environments() {
             for env in envs {
                 let content: Vec<&str> = env.split('=').map(|s| s.trim()).collect();
@@ -180,7 +211,7 @@ impl ServiceUnit {
         Ok(())
     }
 
-    pub fn service_add_extras(&self) -> Result<(), Box<dyn Error>> {
+    fn service_add_extras(&self) -> Result<(), Box<dyn Error>> {
         if self.config.service_type() == ServiceType::Notify {
             self.config.set_notify_access(NotifyAccess::Main);
         }
@@ -188,7 +219,7 @@ impl ServiceUnit {
         Ok(())
     }
 
-    pub fn service_verify(&self) -> Result<(), Box<dyn Error>> {
+    fn service_verify(&self) -> Result<(), Box<dyn Error>> {
         if !self.config.config_data().borrow().Service.RemainAfterExit
             && self
                 .config
@@ -235,7 +266,5 @@ impl Default for ServiceUnit {
     }
 }
 
-const LOG_LEVEL: u32 = 4;
-const PLUGIN_NAME: &str = "ServiceUnit";
 use process1::declure_unitobj_plugin;
 declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default, PLUGIN_NAME, LOG_LEVEL);

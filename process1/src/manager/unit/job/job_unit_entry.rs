@@ -1,6 +1,8 @@
 #![warn(unused_imports)]
-use super::job_entry::{Job, JobAttrKind, JobInfo, JobKind, JobResult, JobStage};
-use crate::manager::data::UnitActiveState;
+#![allow(clippy::type_complexity)]
+use super::job_entry::{Job, JobInfo, JobResult};
+use super::job_rentry::JobKind;
+use crate::manager::unit::data::UnitActiveState;
 use crate::manager::unit::unit_base::UnitRelationAtom;
 use crate::manager::unit::unit_entry::UnitX;
 use std::cell::RefCell;
@@ -21,8 +23,8 @@ impl JobUnit {
         }
     }
 
-    pub(super) fn insert_suspend(&self, job: Rc<Job>, operate: bool) {
-        self.data.borrow_mut().insert_suspend(job, operate)
+    pub(super) fn insert_suspend(&self, job: Rc<Job>) -> Option<Rc<Job>> {
+        self.data.borrow_mut().insert_suspend(job, false)
     }
 
     pub(super) fn remove_suspend(&self, kind: JobKind, result: JobResult) -> Option<Rc<Job>> {
@@ -58,8 +60,14 @@ impl JobUnit {
         // record current information of the trigger first, which(run_kind + stage) could be changed after running.
         let t_jinfo = JobInfo::map(&cur_trigger);
 
-        // operate job
-        let tfinish_result = match cur_trigger.run() {
+        // finish old first
+        if let Some(job) = &merge_trigger {
+            // finish merged job
+            job.finish(JobResult::Merged);
+        }
+
+        // operate new second
+        let tend_result = match cur_trigger.run() {
             // run the trigger
             Ok(_) => None, // trigger successful
             Err(None) => {
@@ -67,15 +75,14 @@ impl JobUnit {
                 self.data.borrow_mut().retrigger_trigger();
                 None
             } // trigger failed, but need to be retriggered again
-            Err(Some(tfinish_r)) => Some(tfinish_r), // trigger failed, and need to be finished
+            Err(Some(tend_r)) => Some(tend_r), // trigger failed, and need to be ended
         };
 
-        if let Some(job) = &merge_trigger {
-            // finish merged job
-            job.finish(JobResult::JobMerged);
-        }
+        (Some((t_jinfo, tend_result)), merge_trigger)
+    }
 
-        (Some((t_jinfo, tfinish_result)), merge_trigger)
+    pub(super) fn insert_trigger(&self, job: Rc<Job>) -> Option<Rc<Job>> {
+        self.data.borrow_mut().insert_trigger(job)
     }
 
     pub(super) fn finish_trigger(&self, result: JobResult) -> Option<Rc<Job>> {
@@ -190,7 +197,7 @@ impl JobUnitData {
             suspends: HashMap::new(),
             trigger: None,
 
-            order: false,
+            order: true,
             sq: LinkedList::new(),
             interrupt: false,
             retrigger: false,
@@ -201,9 +208,8 @@ impl JobUnitData {
         }
     }
 
-    pub(self) fn insert_suspend(&mut self, job: Rc<Job>, operate: bool) {
+    pub(self) fn insert_suspend(&mut self, job: Rc<Job>, operate: bool) -> Option<Rc<Job>> {
         assert!(job.is_basic_op());
-        assert_eq!(job.get_stage(), JobStage::JobInit);
         assert!(!self.is_trigger(&job));
 
         // suspends
@@ -222,6 +228,8 @@ impl JobUnitData {
         if operate {
             job.wait(); // wait suspended job
         }
+
+        old
     }
 
     pub(self) fn remove_suspend(&mut self, kind: JobKind, result: JobResult) -> Option<Rc<Job>> {
@@ -248,11 +256,7 @@ impl JobUnitData {
     pub(self) fn flush_suspends(&mut self) -> Vec<Rc<Job>> {
         // suspends
         /* data */
-        let del_jobs = self
-            .suspends
-            .values()
-            .map(|jr| Rc::clone(jr))
-            .collect::<Vec<_>>();
+        let del_jobs = self.suspends.values().map(Rc::clone).collect::<Vec<_>>();
         self.suspends.clear();
         /* status */
         self.order = false;
@@ -265,7 +269,7 @@ impl JobUnitData {
         // operate job
         for job in del_jobs.iter() {
             // finish deleted job
-            job.finish(JobResult::JobCancelled);
+            job.finish(JobResult::Cancelled);
         }
 
         del_jobs
@@ -293,8 +297,8 @@ impl JobUnitData {
                 update_jobs.push(job);
             } else {
                 // add other-job
-                self.insert_suspend(Rc::clone(&o_job), true);
-                add_jobs.push(Rc::clone(&o_job));
+                self.insert_suspend(Rc::clone(o_job), true);
+                add_jobs.push(Rc::clone(o_job));
             }
         }
 
@@ -325,7 +329,7 @@ impl JobUnitData {
         // operate job
         for job in merge_jobs.iter() {
             // finish merged job
-            job.finish(JobResult::JobMerged);
+            job.finish(JobResult::Merged);
         }
 
         merge_jobs
@@ -363,19 +367,41 @@ impl JobUnitData {
     pub(self) fn retrigger_trigger(&mut self) {
         assert!(self.trigger.is_some());
 
+        // suspends: do nothing
+        assert!(self.order);
+
         // trigger: status-only
         self.retrigger = true;
 
         // the entire entry: status-only
         self.dirty = true;
         self.update_ready();
+    }
+
+    pub(self) fn insert_trigger(&mut self, job: Rc<Job>) -> Option<Rc<Job>> {
+        assert!(self.trigger.is_none());
+        assert!(self.suspends.is_empty());
+        assert!(job.is_basic_op());
 
         // suspends: do nothing
         assert!(self.order);
+
+        // trigger: data + status
+        let old = self.trigger.replace(job);
+        self.retrigger_trigger();
+
+        // the entire entry: status-only
+        self.dirty = true;
+        self.update_ready();
+
+        old
     }
 
     pub(self) fn finish_trigger(&mut self, result: JobResult) -> Option<Rc<Job>> {
         assert!(self.trigger.is_some());
+
+        // suspends: do nothing
+        assert!(self.order);
 
         // trigger: data + status
         let del_trigger = match self.trigger.as_ref().cloned().unwrap().finish(result) {
@@ -393,9 +419,6 @@ impl JobUnitData {
         // the entire entry: status-only
         self.dirty = true;
         self.update_ready();
-
-        // suspends: do nothing
-        assert!(self.order);
 
         del_trigger
     }
@@ -459,34 +482,30 @@ impl JobUnitData {
 
     pub(self) fn is_suspends_conflict(&self) -> bool {
         // 'stop' can be not conflicting with 'nop' only
-        let num_stop = self.suspends_kind_len(JobKind::JobStop);
-        let num_others = self.suspends.len() - num_stop - self.suspends_kind_len(JobKind::JobNop);
-        match (num_stop, num_others) {
-            (s, o) if s > 0 && o > 0 => true, // 'stop' exists, and others except 'nop' exist
-            _ => false,                       // no 'stop' exists, or no others except 'nop' exist
-        }
+        let num_stop = self.suspends_kind_len(JobKind::Stop);
+        let num_others = self.suspends.len() - num_stop - self.suspends_kind_len(JobKind::Nop);
+        // 'stop' exists, and others except 'nop' exist. no 'stop' exists, or no others except 'nop' exist.
+        matches!((num_stop, num_others), (s, o) if s > 0 && o > 0)
     }
 
     pub(self) fn is_suspends_conflict_with(&self, other: &Self) -> bool {
         // 'stop' can be not conflicting with 'nop' only
-        let stop_s = self.suspends_kind_len(JobKind::JobStop);
-        let others_s = self.suspends.len() - stop_s - self.suspends_kind_len(JobKind::JobNop);
-        let stop_o = other.suspends_kind_len(JobKind::JobStop);
-        let others_o = other.suspends.len() - stop_o - other.suspends_kind_len(JobKind::JobNop);
-        match (stop_s + stop_o, others_s + others_o) {
-            (s, o) if s > 0 && o > 0 => true, // 'stop' exists, and others except 'nop' exist
-            _ => false,                       // no 'stop' exists, or no others except 'nop' exist
-        }
+        let stop_s = self.suspends_kind_len(JobKind::Stop);
+        let others_s = self.suspends.len() - stop_s - self.suspends_kind_len(JobKind::Nop);
+        let stop_o = other.suspends_kind_len(JobKind::Stop);
+        let others_o = other.suspends.len() - stop_o - other.suspends_kind_len(JobKind::Nop);
+        // 'stop' exists, and others except 'nop' exist. no 'stop' exists, or no others except 'nop' exist.
+        matches!((stop_s + stop_o, others_s + others_o), (s, o) if s > 0 && o > 0)
     }
 
     pub(self) fn is_suspends_replace_with(&self, other: &Self) -> bool {
         assert!(!self.is_suspends_conflict() && !other.is_suspends_conflict()); // both sides are not conflicting
 
         // can 'other' replace 'self'?
-        let stop_s = self.suspends_kind_len(JobKind::JobStop);
-        let others_s = self.suspends.len() - stop_s - self.suspends_kind_len(JobKind::JobNop);
-        let stop_o = other.suspends_kind_len(JobKind::JobStop);
-        let others_o = other.suspends.len() - stop_o - other.suspends_kind_len(JobKind::JobNop);
+        let stop_s = self.suspends_kind_len(JobKind::Stop);
+        let others_s = self.suspends.len() - stop_s - self.suspends_kind_len(JobKind::Nop);
+        let stop_o = other.suspends_kind_len(JobKind::Stop);
+        let others_o = other.suspends.len() - stop_o - other.suspends_kind_len(JobKind::Nop);
         match (stop_s, others_s, stop_o, others_o) {
             (_, os, so, _) if os > 0 && so > 0 => !self.is_suspends_irreversible(),
             (ss, _, _, oo) if ss > 0 && oo > 0 => !self.is_suspends_irreversible(),
@@ -498,11 +517,11 @@ impl JobUnitData {
         assert!(self.ready && other.order);
 
         let job = self.get_next_trigger();
-        if job.get_attr(JobAttrKind::JobIgnoreOrder) {
+        if job.attr().ignore_order {
             return true;
         }
 
-        if job.get_kind() == JobKind::JobNop {
+        if job.get_kind() == JobKind::Nop {
             return true;
         }
 
@@ -526,6 +545,9 @@ impl JobUnitData {
     fn do_next_trigger_retrigger(&mut self) -> (Rc<Job>, Option<Rc<Job>>) {
         assert!(self.trigger.is_some() && self.retrigger);
 
+        // suspends: do nothing
+        assert!(self.order);
+
         // trigger: status-only
         let next_trigger = self.trigger.as_ref().cloned().unwrap(); // trigger again
         assert!(!self.interrupt);
@@ -534,9 +556,6 @@ impl JobUnitData {
         // the entire entry: status-only
         self.dirty = true; // make it simple
         self.update_ready();
-
-        // suspends: do nothing
-        assert!(self.order);
 
         (next_trigger, None)
     }
@@ -548,6 +567,9 @@ impl JobUnitData {
 
     fn do_next_trigger_suspend(&mut self) -> (Rc<Job>, Option<Rc<Job>>) {
         assert!(!self.sq.is_empty());
+
+        // suspends: status-only
+        assert!(self.order);
 
         // trigger: data + status(interrupt)
         let merge_trigger = match self.interrupt {
@@ -564,9 +586,6 @@ impl JobUnitData {
         self.dirty = true; // make it simple
         self.update_ready();
 
-        // suspends: status-only
-        assert!(self.order);
-
         (next_trigger, merge_trigger)
     }
 
@@ -579,11 +598,11 @@ impl JobUnitData {
         assert!(!self.order); // the suspends can only be merged before ordering
 
         // merge jobs between suspends
-        if !self.suspends.contains_key(&JobKind::JobStop) {
+        if !self.suspends.contains_key(&JobKind::Stop) {
             // no 'stop' exists
-            let restart = self.suspends.contains_key(&JobKind::JobRestart);
-            let start = self.suspends.contains_key(&JobKind::JobStart);
-            let reload = self.suspends.contains_key(&JobKind::JobReload);
+            let restart = self.suspends.contains_key(&JobKind::Restart);
+            let start = self.suspends.contains_key(&JobKind::Start);
+            let reload = self.suspends.contains_key(&JobKind::Reload);
             match (restart, start, reload) {
                 (true, _, _) => self.jobs_ms_start_and_reload(del_jobs), // 'restart' exists, ('reload' | 'start') => 'restart'
                 (false, true, true) => self.jobs_ms_start_or_reload(del_jobs), // no 'restart' exists, 'start' <=or=> 'reload'
@@ -598,26 +617,26 @@ impl JobUnitData {
         // order: [stop] | [(restart|start|reload)->verify->nop]
         self.sq.clear();
 
-        if !self.suspends.contains_key(&JobKind::JobStop) {
+        if !self.suspends.contains_key(&JobKind::Stop) {
             // no 'stop' exists
             // (restart|start|reload)->verify->nop
-            self.sq_order_pushback(JobKind::JobRestart);
-            self.sq_order_pushback(JobKind::JobStart);
-            self.sq_order_pushback(JobKind::JobReload);
+            self.sq_order_pushback(JobKind::Restart);
+            self.sq_order_pushback(JobKind::Start);
+            self.sq_order_pushback(JobKind::Reload);
             assert!(
                 self.sq.len() <= JOBUNIT_SQ_MUTOP_MAX_NUM,
                 "The merge mechanism is not working properly."
             );
 
-            self.sq_order_pushback(JobKind::JobVerify);
-            self.sq_order_pushback(JobKind::JobNop);
+            self.sq_order_pushback(JobKind::Verify);
+            self.sq_order_pushback(JobKind::Nop);
             assert!(
                 self.sq.len() <= JOBUNIT_SQ_MAX_NUM,
                 "The merge mechanism is not working properly."
             );
         } else {
             // 'stop' exists
-            self.sq_order_pushback(JobKind::JobStop);
+            self.sq_order_pushback(JobKind::Stop);
         }
     }
 
@@ -628,31 +647,32 @@ impl JobUnitData {
         // status-only: the triggered job could be interrupted at next trigger time only, so we remark it now.
         if self.trigger.is_some() && self.sq.front().is_some() {
             // both jobs involved exist
-            self.interrupt = match self.sq.front().unwrap().get_kind() {
-                JobKind::JobStop | JobKind::JobRestart => true, // the first(ready) suspend one has 'stop' ability, it's allowed.
-                _ => false,                                     // other kinds are not allowed
-            };
+            // the first(ready) suspend one has 'stop' ability, it's allowed. other kinds are not allowed.
+            self.interrupt = matches!(
+                self.sq.front().unwrap().get_kind(),
+                JobKind::Stop | JobKind::Restart
+            );
         }
     }
 
     fn jobs_ms_start_and_reload(&mut self, del_jobs: &mut Vec<Rc<Job>>) {
         // ('reload' | 'start') => 'restart'
-        self.jobs_suspends_remove(JobKind::JobStart, del_jobs);
-        self.jobs_suspends_remove(JobKind::JobReload, del_jobs);
+        self.jobs_suspends_remove(JobKind::Start, del_jobs);
+        self.jobs_suspends_remove(JobKind::Reload, del_jobs);
     }
 
     fn jobs_ms_start_or_reload(&mut self, del_jobs: &mut Vec<Rc<Job>>) {
         // 'start' <=or=> 'reload'
-        let us_is_active_or_reloading = match self.unit.active_state() {
-            UnitActiveState::UnitActive | UnitActiveState::UnitReloading => true,
-            _ => false,
-        };
+        let us_is_active_or_reloading = matches!(
+            self.unit.active_state(),
+            UnitActiveState::UnitActive | UnitActiveState::UnitReloading
+        );
         if us_is_active_or_reloading {
             // 'start' => 'reload'
-            self.jobs_suspends_remove(JobKind::JobStart, del_jobs);
+            self.jobs_suspends_remove(JobKind::Start, del_jobs);
         } else {
             // 'reload' => 'start'
-            self.jobs_suspends_remove(JobKind::JobReload, del_jobs);
+            self.jobs_suspends_remove(JobKind::Reload, del_jobs);
         }
     }
 
@@ -675,17 +695,18 @@ impl JobUnitData {
     }
 
     fn update_ready(&mut self) {
-        self.ready = match self.calc_ready() {
-            Some(_) => true,
-            None => false,
-        };
+        self.ready = self.calc_ready().is_some();
     }
 
     fn get_next_trigger(&self) -> Rc<Job> {
-        match self.calc_ready() {
-            Some(s) if s => self.get_next_trigger_suspend(),
-            Some(s) if !s => self.get_next_trigger_retrigger(),
-            _ => unreachable!("the non-ready entry is triggered."),
+        if let Some(s) = self.calc_ready() {
+            if s {
+                self.get_next_trigger_suspend()
+            } else {
+                self.get_next_trigger_retrigger()
+            }
+        } else {
+            unreachable!("the non-ready entry is triggered.");
         }
     }
 
@@ -702,7 +723,7 @@ impl JobUnitData {
     fn calc_natural_ready(&self) -> Option<bool> {
         if self.order {
             // the things waiting to be triggered have been ordered
-            match (!self.trigger.is_none(), !self.sq.is_empty()) {
+            match (self.trigger.is_some(), !self.sq.is_empty()) {
                 (true, true) => self.calc_natural_ready_ts(),
                 (true, false) => self.calc_natural_ready_t(),
                 (false, true) => self.calc_natural_ready_s(),
@@ -740,7 +761,7 @@ impl JobUnitData {
 
     fn is_suspends_irreversible(&self) -> bool {
         for (_, job) in self.suspends.iter() {
-            if job.get_attr(JobAttrKind::JobIrreversible) {
+            if job.attr().irreversible {
                 return true;
             }
         }
@@ -756,44 +777,59 @@ impl JobUnitData {
     }
 }
 
+pub(super) fn job_merge_trigger(old: JobKind) -> JobKind {
+    match old {
+        JobKind::Start | JobKind::Reload | JobKind::Restart => JobKind::Restart,
+        JobKind::Stop => JobKind::Stop,
+        JobKind::Verify => JobKind::Verify,
+        JobKind::Nop => JobKind::Nop,
+        _ => unreachable!("only the basic kind can be mergerd."),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::DataManager;
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::manager::unit::data::DataManager;
+    use crate::manager::unit::job::job_rentry::JobRe;
     use crate::manager::unit::uload_util::UnitFile;
-    use crate::manager::unit::unit_base::{JobMode, UnitType};
     use crate::manager::unit::unit_entry::UnitX;
+    use crate::manager::unit::unit_rentry::{JobMode, UnitRe, UnitType};
     use crate::plugin::Plugin;
+    use crate::reliability::Reliability;
     use utils::logger;
 
     #[test]
     fn juv_api_len() {
-        let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let rentry = Rc::new(JobRe::new(&reli));
+        let unit_test1 = prepare_unit(&reli);
         let mut id: u32 = 0;
         id = id.wrapping_add(1); // ++
-        let job = Rc::new(Job::new(id, Rc::clone(&unit_test1), JobKind::JobStart));
+        let kind = JobKind::Start;
+        let job = Rc::new(Job::new(&reli, &rentry, id, Rc::clone(&unit_test1), kind));
         let uv = JobUnit::new(Rc::clone(&unit_test1));
 
         // nothing exists
         assert_eq!(uv.len(), 0);
 
         // something exists
-        uv.insert_suspend(job, false);
+        uv.insert_suspend(job);
         assert_eq!(uv.len(), 1);
     }
 
     #[test]
     fn juv_api_merge() {
-        let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
-        let (_, job_start, _, _, _) = prepare_jobs(&unit_test1, JobMode::JobReplace);
-        let (_, stage_start, _, _, _) = prepare_jobs(&unit_test1, JobMode::JobReplace);
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let unit_test1 = prepare_unit(&reli);
+        let (_, job_start, _, _, _) = prepare_jobs(&reli, &unit_test1, JobMode::Replace);
+        let (_, stage_start, _, _, _) = prepare_jobs(&reli, &unit_test1, JobMode::Replace);
         let jobs = JobUnit::new(Rc::clone(&unit_test1));
 
         // merge nothing
         let stage = JobUnit::new(Rc::clone(&unit_test1));
-        stage.insert_suspend(Rc::clone(&job_start), false);
+        stage.insert_suspend(Rc::clone(&job_start));
         assert_eq!(stage.len(), 1);
         let (add_jobs, del_jobs, update_jobs) = jobs.merge_suspends(&stage);
         let ret = jobs.reshuffle();
@@ -805,7 +841,7 @@ mod tests {
 
         // merge something
         let stage = JobUnit::new(Rc::clone(&unit_test1));
-        stage.insert_suspend(Rc::clone(&stage_start), false);
+        stage.insert_suspend(Rc::clone(&stage_start));
         assert_eq!(stage.len(), 1);
         let (add_jobs, del_jobs, update_jobs) = jobs.merge_suspends(&stage);
         let ret = jobs.reshuffle();
@@ -818,10 +854,10 @@ mod tests {
 
     #[test]
     fn juv_api_reshuffle() {
-        let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let unit_test1 = prepare_unit(&reli);
         let (job_nop, job_start, job_reload, job_restart, _) =
-            prepare_jobs(&unit_test1, JobMode::JobReplace);
+            prepare_jobs(&reli, &unit_test1, JobMode::Replace);
         let uv = JobUnit::new(Rc::clone(&unit_test1));
 
         // nothing
@@ -829,8 +865,10 @@ mod tests {
         assert_eq!(ret.len(), 0);
 
         // reload+nop
-        uv.insert_suspend(Rc::clone(&job_nop), true);
-        uv.insert_suspend(Rc::clone(&job_reload), true);
+        uv.insert_suspend(Rc::clone(&job_nop));
+        job_nop.wait();
+        uv.insert_suspend(Rc::clone(&job_reload));
+        job_reload.wait();
         let ret = uv.reshuffle();
         assert_eq!(ret.len(), 0);
         assert_eq!(uv.len(), 2);
@@ -838,7 +876,8 @@ mod tests {
         assert_eq!(job.get_id(), job_reload.get_id());
 
         // start+reload
-        uv.insert_suspend(Rc::clone(&job_start), true);
+        uv.insert_suspend(Rc::clone(&job_start));
+        job_start.wait();
         let ret = uv.reshuffle();
         assert_eq!(ret.len(), 1);
         assert_eq!(uv.len(), 2);
@@ -846,7 +885,8 @@ mod tests {
         assert_eq!(job.get_id(), job_start.get_id());
 
         // restart+start
-        uv.insert_suspend(Rc::clone(&job_restart), true);
+        uv.insert_suspend(Rc::clone(&job_restart));
+        job_restart.wait();
         let ret = uv.reshuffle();
         assert_eq!(ret.len(), 1);
         assert_eq!(uv.len(), 2);
@@ -856,11 +896,11 @@ mod tests {
 
     #[test]
     fn juv_api_replace_with_unirreversible() {
-        let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
-        let mode = JobMode::JobReplace;
-        let (_, uv_start, _, _, uv_stop) = prepare_jobs(&unit_test1, mode);
-        let (_, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let unit_test1 = prepare_unit(&reli);
+        let mode = JobMode::Replace;
+        let (_, uv_start, _, _, uv_stop) = prepare_jobs(&reli, &unit_test1, mode);
+        let (_, o_start, _, _, o_stop) = prepare_jobs(&reli, &unit_test1, mode);
         let uv = JobUnit::new(Rc::clone(&unit_test1));
         let other = JobUnit::new(Rc::clone(&unit_test1));
 
@@ -868,16 +908,16 @@ mod tests {
         assert_eq!(uv.is_suspends_replace_with(&other), true);
 
         // stop vs nothing
-        uv.insert_suspend(Rc::clone(&uv_stop), true);
+        uv.insert_suspend(Rc::clone(&uv_stop));
         assert_eq!(uv.is_suspends_replace_with(&other), true);
 
         // stop vs stop
-        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.insert_suspend(Rc::clone(&o_stop));
         assert_eq!(uv.is_suspends_replace_with(&other), true);
 
         // non-stop vs stop
         let uv = JobUnit::new(Rc::clone(&unit_test1));
-        uv.insert_suspend(Rc::clone(&uv_start), true);
+        uv.insert_suspend(Rc::clone(&uv_start));
         assert_eq!(uv.is_suspends_replace_with(&other), true);
 
         // non-stop vs nothing
@@ -885,17 +925,17 @@ mod tests {
         assert_eq!(uv.is_suspends_replace_with(&other), true);
 
         // non-stop vs non-stop
-        other.insert_suspend(Rc::clone(&o_start), true);
+        other.insert_suspend(Rc::clone(&o_start));
         assert_eq!(uv.is_suspends_replace_with(&other), true);
     }
 
     #[test]
     fn juv_api_replace_with_irreversible() {
-        let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
-        let mode = JobMode::JobReplaceIrreversible;
-        let (_, uv_start, _, _, uv_stop) = prepare_jobs(&unit_test1, mode);
-        let (_, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let unit_test1 = prepare_unit(&reli);
+        let mode = JobMode::ReplaceIrreversible;
+        let (_, uv_start, _, _, uv_stop) = prepare_jobs(&reli, &unit_test1, mode);
+        let (_, o_start, _, _, o_stop) = prepare_jobs(&reli, &unit_test1, mode);
         let uv = JobUnit::new(Rc::clone(&unit_test1));
         let other = JobUnit::new(Rc::clone(&unit_test1));
 
@@ -903,16 +943,16 @@ mod tests {
         assert_eq!(uv.is_suspends_replace_with(&other), true);
 
         // stop vs nothing
-        uv.insert_suspend(Rc::clone(&uv_stop), true);
+        uv.insert_suspend(Rc::clone(&uv_stop));
         assert_eq!(uv.is_suspends_replace_with(&other), true);
 
         // stop vs stop
-        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.insert_suspend(Rc::clone(&o_stop));
         assert_eq!(uv.is_suspends_replace_with(&other), true);
 
         // non-stop vs stop
         let uv = JobUnit::new(Rc::clone(&unit_test1));
-        uv.insert_suspend(Rc::clone(&uv_start), true);
+        uv.insert_suspend(Rc::clone(&uv_start));
         assert_eq!(uv.is_suspends_replace_with(&other), false);
 
         // non-stop vs nothing
@@ -920,93 +960,105 @@ mod tests {
         assert_eq!(uv.is_suspends_replace_with(&other), true);
 
         // non-stop vs non-stop
-        other.insert_suspend(Rc::clone(&o_start), true);
+        other.insert_suspend(Rc::clone(&o_start));
         assert_eq!(uv.is_suspends_replace_with(&other), true);
     }
 
     #[test]
     fn juv_api_order_with_unignore() {
-        let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
-        let mode = JobMode::JobReplace;
-        let (uv_nop, uv_start, _, _, uv_stop) = prepare_jobs(&unit_test1, mode);
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let unit_test1 = prepare_unit(&reli);
+        let mode = JobMode::Replace;
+        let (uv_nop, uv_start, _, _, uv_stop) = prepare_jobs(&reli, &unit_test1, mode);
         let uv = JobUnit::new(Rc::clone(&unit_test1));
         let other = JobUnit::new(Rc::clone(&unit_test1));
         let before = UnitRelationAtom::UnitAtomBefore;
         let after = UnitRelationAtom::UnitAtomAfter;
 
         // nop
-        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&reli, &unit_test1, mode);
 
         /* nop vs nop */
-        uv.insert_suspend(Rc::clone(&uv_nop), true);
+        uv.insert_suspend(Rc::clone(&uv_nop));
+        uv_nop.wait();
         uv.reshuffle();
-        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.insert_suspend(Rc::clone(&o_nop));
+        o_nop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         /* nop vs start */
-        other.insert_suspend(Rc::clone(&o_start), true);
+        other.insert_suspend(Rc::clone(&o_start));
+        o_start.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         /* nop vs stop */
         let other = JobUnit::new(Rc::clone(&unit_test1));
-        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.insert_suspend(Rc::clone(&o_stop));
+        o_stop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         // start
-        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&reli, &unit_test1, mode);
 
         /* start vs nop */
         let uv = JobUnit::new(Rc::clone(&unit_test1));
-        uv.insert_suspend(Rc::clone(&uv_start), true);
+        uv.insert_suspend(Rc::clone(&uv_start));
+        uv_start.wait();
         uv.reshuffle();
         let other = JobUnit::new(Rc::clone(&unit_test1));
-        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.insert_suspend(Rc::clone(&o_nop));
+        o_nop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         /* start vs start */
-        other.insert_suspend(Rc::clone(&o_start), true);
+        other.insert_suspend(Rc::clone(&o_start));
+        o_start.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), false);
 
         /* start vs stop */
         let other = JobUnit::new(Rc::clone(&unit_test1));
-        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.insert_suspend(Rc::clone(&o_stop));
+        o_stop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), false);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), false);
 
         // stop
-        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&reli, &unit_test1, mode);
 
         /* stop vs nop */
         let uv = JobUnit::new(Rc::clone(&unit_test1));
-        uv.insert_suspend(Rc::clone(&uv_stop), true);
+        uv.insert_suspend(Rc::clone(&uv_stop));
+        uv_stop.wait();
         uv.reshuffle();
         let other = JobUnit::new(Rc::clone(&unit_test1));
-        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.insert_suspend(Rc::clone(&o_nop));
+        o_nop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         /* stop vs start */
-        other.insert_suspend(Rc::clone(&o_start), true);
+        other.insert_suspend(Rc::clone(&o_start));
+        o_start.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         /* stop vs stop */
         let other = JobUnit::new(Rc::clone(&unit_test1));
-        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.insert_suspend(Rc::clone(&o_stop));
+        o_stop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), false);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
@@ -1014,86 +1066,98 @@ mod tests {
 
     #[test]
     fn juv_api_order_with_ignore() {
-        let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
-        let mode = JobMode::JobIgnoreDependencies;
-        let (uv_nop, uv_start, _, _, uv_stop) = prepare_jobs(&unit_test1, mode);
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let unit_test1 = prepare_unit(&reli);
+        let mode = JobMode::IgnoreDependencies;
+        let (uv_nop, uv_start, _, _, uv_stop) = prepare_jobs(&reli, &unit_test1, mode);
         let uv = JobUnit::new(Rc::clone(&unit_test1));
         let other = JobUnit::new(Rc::clone(&unit_test1));
         let before = UnitRelationAtom::UnitAtomBefore;
         let after = UnitRelationAtom::UnitAtomAfter;
 
         // nop
-        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&reli, &unit_test1, mode);
 
         /* nop vs nop */
-        uv.insert_suspend(Rc::clone(&uv_nop), true);
+        uv.insert_suspend(Rc::clone(&uv_nop));
+        uv_nop.wait();
         uv.reshuffle();
-        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.insert_suspend(Rc::clone(&o_nop));
+        o_nop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         /* nop vs start */
-        other.insert_suspend(Rc::clone(&o_start), true);
+        other.insert_suspend(Rc::clone(&o_start));
+        o_start.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         /* nop vs stop */
         let other = JobUnit::new(Rc::clone(&unit_test1));
-        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.insert_suspend(Rc::clone(&o_stop));
+        o_stop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         // start
-        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&reli, &unit_test1, mode);
 
         /* start vs nop */
         let uv = JobUnit::new(Rc::clone(&unit_test1));
-        uv.insert_suspend(Rc::clone(&uv_start), true);
+        uv.insert_suspend(Rc::clone(&uv_start));
+        uv_start.wait();
         uv.reshuffle();
         let other = JobUnit::new(Rc::clone(&unit_test1));
-        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.insert_suspend(Rc::clone(&o_nop));
+        o_nop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         /* start vs start */
-        other.insert_suspend(Rc::clone(&o_start), true);
+        other.insert_suspend(Rc::clone(&o_start));
+        o_start.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         /* start vs stop */
         let other = JobUnit::new(Rc::clone(&unit_test1));
-        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.insert_suspend(Rc::clone(&o_stop));
+        o_stop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
-        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&unit_test1, mode);
+        let (o_nop, o_start, _, _, o_stop) = prepare_jobs(&reli, &unit_test1, mode);
 
         /* stop vs nop */
         let uv = JobUnit::new(Rc::clone(&unit_test1));
-        uv.insert_suspend(Rc::clone(&uv_stop), true);
+        uv.insert_suspend(Rc::clone(&uv_stop));
+        uv_stop.wait();
         uv.reshuffle();
         let other = JobUnit::new(Rc::clone(&unit_test1));
-        other.insert_suspend(Rc::clone(&o_nop), true);
+        other.insert_suspend(Rc::clone(&o_nop));
+        o_nop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         /* stop vs start */
-        other.insert_suspend(Rc::clone(&o_start), true);
+        other.insert_suspend(Rc::clone(&o_start));
+        o_start.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
 
         /* stop vs stop */
         let other = JobUnit::new(Rc::clone(&unit_test1));
-        other.insert_suspend(Rc::clone(&o_stop), true);
+        other.insert_suspend(Rc::clone(&o_stop));
+        o_stop.wait();
         other.reshuffle();
         assert_eq!(uv.is_next_trigger_order_with(&other, before), true);
         assert_eq!(uv.is_next_trigger_order_with(&other, after), true);
@@ -1101,16 +1165,17 @@ mod tests {
 
     #[test]
     fn juv_calc_ready() {
-        let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
-        let (job_nop, job_start, _, _, _) = prepare_jobs(&unit_test1, JobMode::JobReplace);
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let unit_test1 = prepare_unit(&reli);
+        let (job_nop, job_start, _, _, _) = prepare_jobs(&reli, &unit_test1, JobMode::Replace);
         let uv = JobUnit::new(Rc::clone(&unit_test1));
 
         // nothing
         assert_eq!(uv.data.borrow().calc_ready(), None);
 
         // suspend
-        uv.insert_suspend(Rc::clone(&job_nop), true);
+        uv.insert_suspend(Rc::clone(&job_nop));
+        job_nop.wait();
         let ret = uv.reshuffle();
         assert_eq!(uv.len(), 1);
         assert_eq!(ret.len(), 0);
@@ -1138,7 +1203,8 @@ mod tests {
 
         // trigger + suspend
         /* trigger */
-        uv.insert_suspend(Rc::clone(&job_start), true);
+        uv.insert_suspend(Rc::clone(&job_start));
+        job_start.wait();
         let ret = uv.reshuffle();
         assert_eq!(uv.len(), 2);
         assert_eq!(ret.len(), 0);
@@ -1154,44 +1220,65 @@ mod tests {
     }
 
     fn prepare_jobs(
+        relir: &Rc<Reliability>,
         unit: &Rc<UnitX>,
         mode: JobMode,
     ) -> (Rc<Job>, Rc<Job>, Rc<Job>, Rc<Job>, Rc<Job>) {
+        let rentry = Rc::new(JobRe::new(relir));
         let mut id: u32 = 0;
 
         id = id.wrapping_add(1); // ++
-        let job_nop = Rc::new(Job::new(id, Rc::clone(unit), JobKind::JobNop));
+        let kind = JobKind::Nop;
+        let job_nop = Rc::new(Job::new(relir, &rentry, id, Rc::clone(unit), kind));
         job_nop.init_attr(mode);
 
         id = id.wrapping_add(1); // ++
-        let job_start = Rc::new(Job::new(id, Rc::clone(unit), JobKind::JobStart));
+        let kind = JobKind::Start;
+        let job_start = Rc::new(Job::new(relir, &rentry, id, Rc::clone(unit), kind));
         job_start.init_attr(mode);
 
         id = id.wrapping_add(1); // ++
-        let job_reload = Rc::new(Job::new(id, Rc::clone(unit), JobKind::JobReload));
+        let kind = JobKind::Reload;
+        let job_reload = Rc::new(Job::new(relir, &rentry, id, Rc::clone(unit), kind));
         job_reload.init_attr(mode);
 
         id = id.wrapping_add(1); // ++
-        let job_restart = Rc::new(Job::new(id, Rc::clone(unit), JobKind::JobRestart));
+        let kind = JobKind::Restart;
+        let job_restart = Rc::new(Job::new(relir, &rentry, id, Rc::clone(unit), kind));
         job_restart.init_attr(mode);
 
         id = id.wrapping_add(1); // ++
-        let job_stop = Rc::new(Job::new(id, Rc::clone(unit), JobKind::JobStop));
+        let kind = JobKind::Stop;
+        let job_stop = Rc::new(Job::new(relir, &rentry, id, Rc::clone(unit), kind));
         job_stop.init_attr(mode);
 
         (job_nop, job_start, job_reload, job_restart, job_stop)
     }
 
-    fn create_unit(name: &str) -> Rc<UnitX> {
+    fn prepare_unit(relir: &Rc<Reliability>) -> Rc<UnitX> {
+        let dm = Rc::new(DataManager::new());
+        let rentry = Rc::new(UnitRe::new(relir));
+        let name_test1 = String::from("test1.service");
+        let unit_test1 = create_unit(&dm, relir, &rentry, &name_test1);
+        unit_test1
+    }
+
+    fn create_unit(
+        dmr: &Rc<DataManager>,
+        relir: &Rc<Reliability>,
+        rentryr: &Rc<UnitRe>,
+        name: &str,
+    ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-        let dm = Rc::new(DataManager::new());
         let file = Rc::new(UnitFile::new());
         let unit_type = UnitType::UnitService;
         let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();
+        subclass.attach_reli(Rc::clone(relir));
         Rc::new(UnitX::new(
-            &dm,
+            dmr,
+            rentryr,
             &file,
             unit_type,
             name,

@@ -1,18 +1,18 @@
 //! socket_pid implement the management of pid。
 //!
 
-use super::socket_comm::SocketComm;
+use super::socket_comm::SocketUnitComm;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 pub(super) struct SocketPid {
-    comm: Rc<SocketComm>,
+    comm: Rc<SocketUnitComm>,
     data: RefCell<SocketPidData>,
 }
 
 impl SocketPid {
-    pub(super) fn new(comm: &Rc<SocketComm>) -> SocketPid {
+    pub(super) fn new(comm: &Rc<SocketUnitComm>) -> SocketPid {
         SocketPid {
             comm: comm.clone(),
             data: RefCell::new(SocketPidData::new()),
@@ -21,8 +21,8 @@ impl SocketPid {
 
     pub(super) fn unwatch_control(&self) {
         if let Some(pid) = self.control() {
-            self.comm.um().child_unwatch_pid(pid);
-            self.data.borrow_mut().reset_control();
+            self.comm.um().child_unwatch_pid(self.comm.unit().id(), pid);
+            self.reset_control();
         }
     }
 
@@ -32,6 +32,18 @@ impl SocketPid {
 
     pub(super) fn set_control(&self, pid: Pid) {
         self.data.borrow_mut().set_control(pid)
+    }
+
+    pub(super) fn update_control(&self, pid: Option<Pid>) {
+        if let Some(id) = pid {
+            self.set_control(id);
+        } else {
+            self.reset_control();
+        }
+    }
+
+    fn reset_control(&self) {
+        self.data.borrow_mut().reset_control()
     }
 }
 
@@ -60,13 +72,13 @@ impl SocketPidData {
 #[cfg(test)]
 mod tests {
     use super::SocketPid;
-    use crate::socket_comm::SocketComm;
+    use crate::socket_comm::SocketUnitComm;
     use nix::unistd::Pid;
     use std::rc::Rc;
 
     #[test]
     fn test_socket_pid() {
-        let _comm = Rc::new(SocketComm::new());
+        let _comm = Rc::new(SocketUnitComm::new());
         let pid = Rc::new(SocketPid::new(&_comm));
 
         pid.set_control(Pid::from_raw(5));

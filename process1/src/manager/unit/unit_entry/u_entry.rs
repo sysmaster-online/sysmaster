@@ -1,3 +1,4 @@
+use super::uu_base::UeBase;
 use super::uu_cgroup::UeCgroup;
 use super::uu_child::UeChild;
 use super::uu_condition::{
@@ -6,10 +7,12 @@ use super::uu_condition::{
 };
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
-use crate::manager::data::{DataManager, UnitActiveState, UnitDepConf, UnitState};
+use crate::manager::unit::data::{DataManager, UnitActiveState, UnitDepConf, UnitState};
 use crate::manager::unit::uload_util::UnitFile;
-use crate::manager::unit::unit_base::{KillOperation, UnitActionError, UnitLoadState, UnitType};
+use crate::manager::unit::unit_base::{KillOperation, UnitActionError};
+use crate::manager::unit::unit_rentry::{UnitLoadState, UnitRe, UnitType};
 use crate::manager::{UnitNotifyFlags, UnitRelations};
+use crate::reliability::ReStation;
 use cgroup::{self, CgFlags};
 use log;
 use nix::sys::signal::Signal;
@@ -22,43 +25,8 @@ use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::rc::Rc;
-use utils::Result;
-
 use utils::error::Error as ServiceError;
-
-///
-#[derive(Default)]
-pub struct UnitRef {
-    source: Option<String>,
-    target: Option<String>,
-}
-
-impl UnitRef {
-    ///
-    pub fn new() -> Self {
-        UnitRef {
-            source: None,
-            target: None,
-        }
-    }
-
-    ///
-    pub fn set_ref(&mut self, source: String, target: String) {
-        self.source = Some(source);
-        self.target = Some(target);
-    }
-
-    ///
-    pub fn unset_ref(&mut self) {
-        self.source = None;
-        self.target = None;
-    }
-
-    ///
-    pub fn target(&self) -> Option<&String> {
-        self.target.as_ref()
-    }
-}
+use utils::Result;
 
 ///
 pub struct Unit {
@@ -66,8 +34,7 @@ pub struct Unit {
     dm: Rc<DataManager>,
 
     // owned objects
-    unit_type: UnitType,
-    id: String,
+    base: Rc<UeBase>,
 
     config: Rc<UeConfig>,
     load: UeLoad,
@@ -79,7 +46,7 @@ pub struct Unit {
 
 impl PartialEq for Unit {
     fn eq(&self, other: &Self) -> bool {
-        self.unit_type == other.unit_type && self.id == other.id
+        self.base.unit_type() == other.base.unit_type() && self.base.id() == other.base.id()
     }
 }
 
@@ -93,20 +60,20 @@ impl PartialOrd for Unit {
 
 impl Ord for Unit {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id)
+        self.base.id().cmp(other.base.id())
     }
 }
 
 impl Hash for Unit {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
+        self.base.id().hash(state);
     }
 }
 ///The trait Defining Shared Behavior of sub unit
 ///
 /// difference sub unit ref by dynamic trait
 ///
-pub trait UnitObj {
+pub trait UnitObj: ReStation {
     ///
     fn init(&self) {}
 
@@ -115,9 +82,6 @@ pub trait UnitObj {
 
     ///
     fn load(&self, conf: Vec<PathBuf>) -> Result<(), Box<dyn Error>>;
-
-    ///
-    fn coldplug(&self) {}
 
     ///
     fn dump(&self) {}
@@ -130,7 +94,8 @@ pub trait UnitObj {
     }
 
     ///
-    fn stop(&self) -> Result<(), UnitActionError> {
+    // process reentrant with force
+    fn stop(&self, _force: bool) -> Result<(), UnitActionError> {
         Ok(())
     }
 
@@ -174,23 +139,55 @@ pub trait UnitObj {
     }
 }
 
+impl ReStation for Unit {
+    // no input, no compensate
+
+    // data
+    fn db_map(&self) {
+        self.base.db_map();
+        self.config.db_map();
+        self.cgroup.db_map();
+        self.load.db_map();
+        self.child.db_map();
+
+        self.sub.db_map();
+    }
+
+    // reload: entry-only
+    fn entry_coldplug(&self) {
+        // rebuild external connections, like: timer, ...
+        // unit-frame: do nothing now
+
+        // sub
+        self.sub.entry_coldplug();
+    }
+
+    fn entry_clear(&self) {
+        // release external connection, like: timer, ...
+        // do nothing now
+
+        self.sub.entry_clear();
+    }
+}
+
 impl Unit {
     pub(super) fn new(
         unit_type: UnitType,
         name: &str,
         dmr: &Rc<DataManager>,
+        rentryr: &Rc<UnitRe>,
         filer: &Rc<UnitFile>,
         sub: Box<dyn UnitObj>,
-    ) -> Rc<Self> {
-        let _config = Rc::new(UeConfig::new());
+    ) -> Rc<Unit> {
+        let _base = Rc::new(UeBase::new(rentryr, String::from(name), unit_type));
+        let _config = Rc::new(UeConfig::new(&_base));
         let _u = Rc::new(Unit {
             dm: Rc::clone(dmr),
-            unit_type,
-            id: String::from(name),
+            base: Rc::clone(&_base),
             config: Rc::clone(&_config),
-            load: UeLoad::new(dmr, filer, &_config, String::from(name)),
-            child: UeChild::new(),
-            cgroup: UeCgroup::new(),
+            load: UeLoad::new(dmr, filer, &_base, &_config),
+            child: UeChild::new(&_base),
+            cgroup: UeCgroup::new(&_base),
             conditions: Rc::new(UeCondition::new()),
             sub,
         });
@@ -275,18 +272,18 @@ impl Unit {
             );
         }
         let u_state = UnitState::new(original_state, new_state, flags);
-        self.dm.insert_unit_state(self.id.clone(), u_state);
+        self.dm.insert_unit_state(self.id().clone(), u_state);
     }
 
     ///
-    pub fn get_id(&self) -> &str {
-        &self.id
+    pub fn id(&self) -> &String {
+        self.base.id()
     }
 
     ///
     pub fn prepare_exec(&self) -> Result<()> {
         log::debug!("prepare exec cgroup");
-        self.cgroup.setup_cg_path(&self.id);
+        self.cgroup.setup_cg_path();
 
         self.cgroup.prepare_cg_exec()
     }
@@ -418,7 +415,7 @@ impl Unit {
             ud_conf.deps.insert(rl, vec![u_name.clone()]);
         }
 
-        self.dm.insert_ud_config(self.get_id().to_string(), ud_conf)
+        self.dm.insert_ud_config(self.id().to_string(), ud_conf)
     }
 
     ///
@@ -427,7 +424,12 @@ impl Unit {
         let mut ud_conf = UnitDepConf::new();
         ud_conf.deps.insert(ra, vec![u_name]);
 
-        self.dm.insert_ud_config(self.get_id().to_string(), ud_conf)
+        self.dm.insert_ud_config(self.id().to_string(), ud_conf)
+    }
+
+    ///
+    pub fn current_active_state(&self) -> UnitActiveState {
+        self.sub.current_active_state()
     }
 
     ///
@@ -467,7 +469,7 @@ impl Unit {
                     let ret = self.sub.load(paths);
 
                     if let Err(e) = ret {
-                        return Err(format!("load Unit {} failed, error: {}", self.id, e).into());
+                        return Err(format!("load Unit {} failed, error: {}", self.id(), e).into());
                     }
 
                     self.load.set_load_state(UnitLoadState::UnitLoaded);
@@ -481,11 +483,8 @@ impl Unit {
         }
     }
 
-    pub(super) fn current_active_state(&self) -> UnitActiveState {
-        self.sub.current_active_state()
-    }
-
-    pub(super) fn start(&self) -> Result<(), UnitActionError> {
+    ///
+    pub fn start(&self) -> Result<(), UnitActionError> {
         let active_state = self.current_active_state();
         let us_is_active_or_reloading = matches!(
             active_state,
@@ -515,18 +514,21 @@ impl Unit {
         self.sub.start()
     }
 
-    pub(super) fn stop(&self) -> Result<(), UnitActionError> {
-        let active_state = self.current_active_state();
-        let inactive_or_failed = matches!(
-            active_state,
-            UnitActiveState::UnitInActive | UnitActiveState::UnitFailed
-        );
+    ///
+    pub fn stop(&self, force: bool) -> Result<(), UnitActionError> {
+        if !force {
+            let active_state = self.current_active_state();
+            let inactive_or_failed = matches!(
+                active_state,
+                UnitActiveState::UnitInActive | UnitActiveState::UnitFailed
+            );
 
-        if inactive_or_failed {
-            return Err(UnitActionError::UnitActionEAlready);
+            if inactive_or_failed {
+                return Err(UnitActionError::UnitActionEAlready);
+            }
         }
 
-        self.sub.stop()
+        self.sub.stop(force)
     }
 
     pub(super) fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
@@ -537,8 +539,16 @@ impl Unit {
         self.load.load_state()
     }
 
+    pub(super) fn child_add_pids(&self, pid: Pid) {
+        self.child.add_pids(pid);
+    }
+
+    pub(super) fn child_remove_pids(&self, pid: Pid) {
+        self.child.remove_pids(pid);
+    }
+
     pub(super) fn unit_type(&self) -> UnitType {
-        self.unit_type
+        self.base.unit_type()
     }
 
     pub(super) fn collect_fds(&self) -> Vec<i32> {
@@ -557,29 +567,33 @@ impl Unit {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
-    use utils::logger;
-
+    use super::Unit;
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::manager::unit::unit_rentry::{UnitRe, UnitType};
+    use crate::reliability::Reliability;
     use crate::{
-        manager::{data::DataManager, unit::uload_util::UnitFile, UnitType},
+        manager::{unit::data::DataManager, unit::uload_util::UnitFile},
         plugin::Plugin,
     };
-
-    use super::Unit;
+    use std::rc::Rc;
+    use utils::logger;
 
     fn unit_init() -> Rc<Unit> {
         logger::init_log_with_console("test_unit_entry", 4);
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let rentry = Rc::new(UnitRe::new(&reli));
         let unit_file = UnitFile::new();
         let dm = DataManager::new();
         let plugin = Plugin::get_instance();
-        let sub_obj = plugin.create_unit_obj(UnitType::UnitService);
+        let sub_obj = plugin.create_unit_obj(UnitType::UnitService).unwrap();
+        sub_obj.attach_reli(Rc::clone(&reli));
         let unit = Unit::new(
             UnitType::UnitService,
             "config.service",
             &Rc::new(dm),
+            &rentry,
             &Rc::new(unit_file),
-            sub_obj.unwrap().into_unitobj(),
+            sub_obj.into_unitobj(),
         );
         unit
     }
