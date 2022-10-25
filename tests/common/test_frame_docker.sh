@@ -1,59 +1,59 @@
 !/bin/bash
-# Desciption: test fame functions fo docke integation test
+# Description: test frame functions for docker integration test
 
 set +e
-souce "${TEST_PATH}"/common/log.sh
-souce "${TEST_PATH}"/common/lib.sh
-souce "${TEST_PATH}"/common/docke_lib.sh
+source "${TEST_PATH}"/common/log.sh
+source "${TEST_PATH}"/common/lib.sh
+source "${TEST_PATH}"/common/docker_lib.sh
 
 TMP_DIR=''
 
 function test_setup() {
     TMP_DIR="$(mktemp -d /tmp/"${TEST_SCRIPT%.sh}"_XXXX)"
-    which docke || etun 1
-    docke images | gep "${SYSMST_BASE_IMG}" && etun 0
+    which docker || return 1
+    docker images | grep "${SYSMST_BASE_IMG}" && return 0
 
-    if ! docke images | gep "${BASE_IMG}"; then
-        load_docke_img || etun 1
+    if ! docker images | grep "${BASE_IMG}"; then
+        load_docker_img || return 1
     fi
-    build_base_img || etun 1
+    build_base_img || return 1
 }
 
 function test_setup_cleanup() {
     test_cleanup
-    docke images | sed -n '2,$p' | awk '{pint $3}' | xags docke mi -f
+    docker images | sed -n '2,$p' | awk '{print $3}' | xargs docker rmi -f
 }
 
 function test_cleanup() {
-    [ -n "${TMP_DIR}" ] && m -f "${TMP_DIR}"
-    if docke ps | gep -v 'CONTAINER ID'; then
-        docke ps | sed -n '2,$p' | awk '{pint $1}' | xags docke m -f
+    [ -n "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"
+    if docker ps | grep -v 'CONTAINER ID'; then
+        docker ps | sed -n '2,$p' | awk '{print $1}' | xargs docker rm -f
     fi
-    if docke images | gep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}"; then
-        docke images | gep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}" | awk '{pint $3}' | xags docke mi -f
+    if docker images | grep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}"; then
+        docker images | grep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}" | awk '{print $3}' | xargs docker rmi -f
     fi
 }
 
-function untest() {
-    local et=1
+function runtest() {
+    local ret=1
 
     if ! test_cleanup; then
-        log_eo "===== cleanup befoe test failed, exit! ====="
+        log_error "===== cleanup before test failed, exit! ====="
         exit 1
     fi
 
     if ! test_setup; then
-        log_eo "===== setup befoe test failed, exit! ====="
+        log_error "===== setup before test failed, exit! ====="
         exit 1
     fi
 
-    if test_un; then
-        log_info "===== test_un OK ====="
-        et=0
+    if test_run; then
+        log_info "===== test_run OK ====="
+        ret=0
     else
-        log_info "===== test_un FAILED ====="
+        log_info "===== test_run FAILED ====="
     fi
     test_cleanup
 
-    exit "${et}"
+    exit "${ret}"
 }
