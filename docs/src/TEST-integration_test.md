@@ -67,7 +67,7 @@ ARGS:
 cargo test -- --ignored
 ```
 
-默认情况下，cargo会多线程并发执行用例，这会有资源竞争的风险。建议在执行集成用例时使用```--test-threads```参数，限制后台线程数量以达到串行执行的效果（在串行执行模式下，当有一个用例执>行失败，后续用例就不会再执行）：
+默认情况下，cargo会多线程并发执行用例，这会有资源竞争的风险。建议在执行集成用例时使用```--test-threads```参数，限制后台线程数量以达到串行执行的效果（在串行执行模式下，当有一个用例执行失败，后续用例就不会再执行）：
 
 ```
 cargo test -- --test-threads=1
@@ -233,7 +233,7 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; 
 error: test failed, to rerun pass '--test docker_example_002'
 ```
 
-如上所示，你会看到冗长的输出。这是因为cargo会全局搜索包含”example“字符串的用例名，那些不符>合的用例虽然有打印信息，但并不会真正执行。你可以看到，除了```docker_example_001```和```docker_example_002```之外，其他所有用例都是```filtered out```状态，也都有```running 0 tests```打印。
+如上所示，你会看到冗长的输出。这是因为cargo会全局搜索包含”example“字符串的用例名，那些不符合的用例虽然有打印信息，但并不会真正执行。你可以看到，除了```docker_example_001```和```docker_example_002```之外，其他所有用例都是```filtered out```状态，也都有```running 0 tests```打印。
 
 细心的你可能会疑惑，为什么有的rs文件会包含多个用例？这常见于```unittests```，也就是单元测试用例。实际上，每个被```[test]```关键字标注的函数都可以成为一个用例。当一个rs文件包含多个标注过的测试函数时，cargo就会识别到多个用例。理论上，```tests```目录下的rs文件也可以设置多个测试函数，但本项目的测试框架规定一个集成用例rs文件只能提供一个测试函数，且函数名必须与rs文件名相同。其实，```unittests```和```tests```还有很多微妙的区别，比如后者不需要配置```[cfg(test)]```关键字等，篇幅限制，本文档不做展开。
 
@@ -333,7 +333,7 @@ function runtest() {
 }
 ```
 
-若环境中没有执行过容器场景的用例，`test_setup`会从openEuler官网下载标准容器镜像并导入，再将sysmaster编译出的二进制和lib库文件拷贝至标准容器镜像，由此构建基础镜像，用作后续测试。若环>境中已经执行过容器场景的用例，`test_setup`检测到可用的基础镜像，就不会再重复构建。`test_setup`还会在`/tmp`目录下创建一个以用例名命名的临时目录，用于存放一些临时文件。
+若环境中没有执行过容器场景的用例，`test_setup`会从openEuler官网下载标准容器镜像并导入，再将sysmaster编译出的二进制和lib库文件拷贝至标准容器镜像，由此构建基础镜像，用作后续测试。若环境中已经执行过容器场景的用例，`test_setup`检测到可用的基础镜像，就不会再重复构建。`test_setup`还会在`/tmp`目录下创建一个以用例名命名的临时目录，用于存放一些临时文件。
 
 `test_cleanup`会在测试前后清理环境中的残留容器和镜像，但不会删除归档的基础镜像和标准镜像。值得注意的是，测试后的`test_cleanup`会删除`test_setup`创建的`/tmp`临时目录，测试前的`test_cleanup`不会。
 
@@ -353,11 +353,11 @@ ls -l /usr/bin/pctrl || exit 1
 + test_run
 + local ret
 + mkdir -p /tmp/docker_example_001_mTTo/opt
-+ cp -arf /root/sysmaster/tests/docker_example_001/aaa.sh /tmp/docker_example_001_mTTo/opt
-+ chmod 777 /tmp/docker_example_001_mTTo/opt/aaa.sh
-+ docker run --rm -v /tmp/docker_example_001_mTTo/opt:/opt sysmaster_base-openeuler-22.09 sh -c 'sh -x /opt/aaa.sh &> /opt/aaa.log'
++ cp -arf /root/sysmaster/tests/docker_example_001/check.sh /tmp/docker_example_001_mTTo/opt
++ chmod 777 /tmp/docker_example_001_mTTo/opt/check.sh
++ docker run --rm -v /tmp/docker_example_001_mTTo/opt:/opt sysmaster_base-openeuler-22.09 sh -c 'sh -x /opt/check.sh &> /opt/check.log'
 + ret=0
-+ cat /tmp/docker_example_001_mTTo/opt/aaa.log
++ cat /tmp/docker_example_001_mTTo/opt/check.log
 + ls -l /usr/lib/process1
 total 28344
 -rwxr-xr-x. 1 root root 3994760 Oct 20 20:30 fstab
