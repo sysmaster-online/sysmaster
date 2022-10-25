@@ -73,7 +73,7 @@ cargo test -- --ignored
 cargo test -- --test-threads=1
 ```
 
-现在，我们来看一下用例执行的输出。
+现在，我们来看一下用例执行的输出（注意！需要先删除docker_example_001.rs文件中的[ignore]标记！）。
 
 ```
 [root@localhost tests]# cargo test --test docker_example_001 -- --test-threads=1
