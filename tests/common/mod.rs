@@ -1,5 +1,5 @@
 use std::{env, process::Command};
-
+  
 pub fn run_script(name: &str) {
     let m_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let testpath = format!("{}/tests/{}/{}.sh", m_dir, name, name);
