@@ -10,7 +10,7 @@ SYSMST_BASE_IMG="sysmaster_base-${BASE_IMG}"
 function load_docker_img() {
     if ! wget -P "${TMP_DIR}" "${DOCKER_IMG_URL}/${DOCKER_TAR}".xz &> "${TMP_DIR}"/wget.log; then
         cat "${TMP_DIR}"/wget.log
-	return 1
+        return 1
     fi
     xz -d "${TMP_DIR}"/"${DOCKER_TAR}".xz
     if ! docker load --input "${TMP_DIR}"/"${DOCKER_TAR}" &> "${TMP_DIR}"/load.log; then
