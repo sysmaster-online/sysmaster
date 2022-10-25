@@ -1,4 +1,4 @@
-#!/bin/bash
+!/bin/bash
 # Description: test frame functions for docker integration test
 
 set +e
