@@ -5,7 +5,7 @@ function finish() {
     echo "--- PLEASE RUN sh -x ci/01-pre-commit.sh FIRST IN YOUR LOCALHOST!!! ---"
     # remove tmp
     set +x
-    for rustlist in `git diff master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
+    for rustlist in `git diff origin/master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
     do
         sed -i '/#!\[deny(missing_docs)]/d' $rustlist 2>/dev/null || true
         sed -i '/#!\[deny(clippy::all)]/d' $rustlist 2>/dev/null || true
@@ -15,7 +15,7 @@ function finish() {
 
 trap finish EXIT
 
-for rustlist in `git diff master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
+for rustlist in `git diff origin/master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
 do
     grep -P '[\p{Han}]' $rustlist  && exit 1
 done
@@ -28,7 +28,7 @@ pip3 install pre-commit -i http://mirrors.aliyun.com/pypi/simple/ || pip3 instal
 # changenum=$[newnum - oldnum]
 
 # add doc for src code
-for rustlist in `git diff master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
+for rustlist in `git diff origin/master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
 do
     egrep '#!\[deny\(missing_docs\)\]' $rustlist || sed -i '1i\#![deny(missing_docs)]' $rustlist 2>/dev/null || true
     egrep '#!\[deny\(clippy::all\)\]' $rustlist || sed -i '1i\#![deny(clippy::all)]' $rustlist 2>/dev/null || true
@@ -39,6 +39,6 @@ done
 RUSTC_WRAPPER="" cargo clippy -v --all-targets --all-features --tests --benches --examples || exit 1
 
 # run base check
-filelist=`git diff master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`
+filelist=`git diff origin/master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`
 export PATH="$PATH:/home/jenkins/.local/bin"
 pre-commit run -vvv --files ${filelist}

@@ -6,7 +6,7 @@
 # changenum=$[newnum - oldnum]
 
 # do not use chinese in source code
-for rustlist in `git diff master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
+for rustlist in `git diff origin/master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
 do
     grep -P '[\p{Han}]' $rustlist  && exit 1
 done
