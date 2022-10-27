@@ -64,6 +64,13 @@ repos:
       #   pass_filenames: false
       #   files: \.rs$
       #   verbose: true
+      - id: commit-msg
+        name: commit-msg
+        description: use commit-msg for commit.
+        entry: bash -c '\cp -ar ci/commit-msg .git/hooks/'
+        language: system
+        pass_filenames: false
+        verbose: true
       - id: cargo-fmt
         name: cargo fmt
         description: Format files with rustfmt.
