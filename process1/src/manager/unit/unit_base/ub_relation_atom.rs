@@ -1,5 +1,10 @@
 #![warn(unused_imports)]
+<<<<<<< HEAD
 use crate::manager::unit::unit_rentry::UnitRelations;
+=======
+
+use super::UnitRelations;
+>>>>>>> optimized the code structure
 
 #[allow(missing_docs)]
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]

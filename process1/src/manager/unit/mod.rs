@@ -10,15 +10,23 @@
 pub use data::{UnitActiveState, UnitNotifyFlags};
 pub use execute::{ExecCmdError, ExecContext, ExecFlags, ExecParameters};
 pub use unit_base::{
+<<<<<<< HEAD
     DeserializeWith, KillOperation, UnitActionError, UnitDependencyMask, UnitRef, UnitRelationAtom,
+=======
+    KillOperation, UnitActionError, UnitDependencyMask, UnitRelationAtom, UnitType,UnitRelations
+>>>>>>> optimized the code structure
 };
 pub use unit_entry::{Unit, UnitObj};
 pub(super) use unit_manager::UnitManagerX;
+<<<<<<< HEAD
 pub use unit_manager::{UnitManager, UnitManagerObj, UnitMngUtil, UnitSubClass};
 pub use unit_rentry::{ExecCommand, UnitRelations, UnitType};
 
 ///
 #[allow(clippy::enum_variant_names)]
+=======
+pub use unit_manager::{UnitManager, UnitMngUtil, UnitSubClass};
+>>>>>>> optimized the code structure
 #[derive(Debug)]
 pub enum UnitErrno {
     ///

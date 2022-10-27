@@ -211,6 +211,7 @@ pub(crate) struct Manager {
     action: Action,
     state: RefCell<State>,
 
+    stat: Stats,
     um: UnitManagerX,
 }
 

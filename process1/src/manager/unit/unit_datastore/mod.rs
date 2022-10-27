@@ -1,4 +1,5 @@
 use super::unit_base::UnitRelationAtom;
+use super::unit_base::UnitRelations;
 use crate::manager::table::TableSubscribe;
 use crate::manager::unit::unit_entry::UnitX;
 use crate::manager::unit::unit_rentry::{UnitRe, UnitRelations, UnitType};
