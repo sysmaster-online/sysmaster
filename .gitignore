@@ -2,3 +2,5 @@ target
 !components/target/
 .vscode
 Cargo.lock
+tests/*.log
+tests/*/*.log

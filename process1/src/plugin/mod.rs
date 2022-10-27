@@ -471,8 +471,7 @@ mod tests {
 
     fn init_test() -> Arc<Plugin> {
         logger::init_log_with_console("test_plugin_log_init", 4);
-        let plugins = Arc::clone(&Plugin::get_instance());
-        return plugins;
+        Arc::clone(&Plugin::get_instance())
     }
 
     #[test]
