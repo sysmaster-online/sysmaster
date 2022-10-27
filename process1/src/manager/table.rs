@@ -33,6 +33,17 @@ where
         }
     }
 
+    pub(super) fn data_clear(&mut self) {
+        // clear all data without notifying subscribers
+        self.data.clear();
+    }
+
+    pub(super) fn clear(&mut self) {
+        // clear all, including data and subscribers
+        self.subscribers.clear();
+        self.data.clear();
+    }
+
     pub(super) fn insert(&mut self, k: K, v: V) -> Option<V> {
         let key = k.clone();
         let ret = self.data.insert(k, v);

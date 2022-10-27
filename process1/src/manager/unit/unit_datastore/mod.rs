@@ -1,16 +1,17 @@
 use super::unit_base::UnitRelationAtom;
-use crate::manager::data::UnitRelations;
 use crate::manager::table::TableSubscribe;
 use crate::manager::unit::unit_entry::UnitX;
+use crate::manager::unit::unit_rentry::{UnitRe, UnitRelations, UnitType};
 use crate::manager::unit::UnitErrno;
+use crate::reliability::ReStation;
 use cgroup;
 use nix::unistd::Pid;
 use nix::NixPath;
-use std::error::Error;
 use std::rc::Rc;
 use unit_child::UnitChild;
 use unit_dep::UnitDep;
 use unit_sets::UnitSets;
+use utils::Result;
 
 //#[derive(Debug)]
 pub(super) struct UnitDb {
@@ -19,14 +20,43 @@ pub(super) struct UnitDb {
     child: UnitChild,
 }
 
+impl ReStation for UnitDb {
+    // no input, no compensate
+
+    // data: special map
+
+    // reload: entry-only
+    fn entry_clear(&self) {
+        self.child.entry_clear();
+        self.dep.entry_clear();
+        self.units.entry_clear();
+    }
+}
+
+impl Drop for UnitDb {
+    fn drop(&mut self) {
+        log::debug!("UnitDb drop, clear.");
+        // repeating protection
+        self.clear();
+    }
+}
+
 impl UnitDb {
-    pub(super) fn new() -> UnitDb {
+    pub(super) fn new(rentryr: &Rc<UnitRe>) -> UnitDb {
         let _units = Rc::new(UnitSets::new());
         UnitDb {
             units: Rc::clone(&_units),
-            dep: UnitDep::new(&_units),
-            child: UnitChild::new(&_units),
+            dep: UnitDep::new(rentryr, &_units),
+            child: UnitChild::new(rentryr, &_units),
         }
+    }
+
+    pub(super) fn db_map_excl_units(&self) {
+        // dep
+        self.dep.db_map();
+
+        // child
+        self.child.db_map();
     }
 
     pub(super) fn units_insert(&self, name: String, unit: Rc<UnitX>) -> Option<Rc<UnitX>> {
@@ -41,8 +71,16 @@ impl UnitDb {
         self.units.get(name)
     }
 
-    pub(super) fn units_get_all(&self) -> Vec<Rc<UnitX>> {
-        self.units.get_all()
+    pub(super) fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<Rc<UnitX>> {
+        let mut units = self.units.get_all();
+        units.retain(|ur| {
+            if let Some(ut) = unit_type {
+                ur.unit_type() == ut
+            } else {
+                true
+            }
+        });
+        units
     }
 
     pub(super) fn units_register(
@@ -88,16 +126,12 @@ impl UnitDb {
         self.dep.is_dep_atom_with(source, atom, dest)
     }
 
-    pub(super) fn child_dispatch_sigchld(&self) -> Result<(), Box<dyn Error>> {
-        self.child.dispatch_sigchld()
+    pub(super) fn child_add_watch_pid(&self, id: &str, pid: Pid) {
+        self.child.add_watch_pid(id, pid)
     }
 
-    pub(super) fn child_add_watch_pid(&self, pid: Pid, id: &str) {
-        self.child.add_watch_pid(pid, id)
-    }
-
-    pub(super) fn child_unwatch_pid(&self, pid: Pid) {
-        self.child.unwatch_pid(pid)
+    pub(super) fn child_unwatch_pid(&self, id: &str, pid: Pid) {
+        self.child.unwatch_pid(id, pid)
     }
 
     pub(super) fn child_watch_all_pids(&self, id: &str) {
@@ -110,12 +144,19 @@ impl UnitDb {
         let pids = cgroup::cg_get_pids(&cg_path);
         for pid in pids {
             log::debug!("watch all cgroup pids: {}", pid);
-            self.child.add_watch_pid(pid, id)
+            self.child.add_watch_pid(id, pid)
         }
     }
 
     pub(super) fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {
         self.child.get_unit_by_pid(pid)
+    }
+
+    // repeating protection
+    pub(super) fn clear(&self) {
+        self.child.entry_clear();
+        self.dep.entry_clear();
+        self.units.clear();
     }
 }
 

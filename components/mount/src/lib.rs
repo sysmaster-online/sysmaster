@@ -1,23 +1,18 @@
-//! mount 是process1的挂载点监控的入口，process1参考systemd，但不完全相同。
-//! process1主要提供监控功能，不主动挂载/卸载挂载点，这由其他进程实现。
-//! mount不支持配置文件。
+//! Mount is the entry for the mount point monitoring of process1. process1 refers to systemd, but it is not the same.
+//! Process1 mainly provides the monitoring function and does not actively mount/unmount the mount point, which is implemented by other processes.
+//! Mount does not support configuration files.
 //!
-//! ## 自动依赖
-//! 无。
-//! ### 隐含依赖
-//! 无。
-//! ### 默认依赖
-//! 无。
+//! ## Automatic dependency
+//! NA
+//! ### Implicit dependency
+//! NA
+//! ### Default Dependency
+//! NA
 
+// dependency: mount_base -> mount_rentry -> mount_comm -> {mount_mng -> mount_unit} -> mount_manager
+mod mount_base;
 mod mount_comm;
+mod mount_manager;
 mod mount_mng;
+mod mount_rentry;
 mod mount_unit;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
-}

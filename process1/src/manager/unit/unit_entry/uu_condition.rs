@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-
 use utils::condition::{Condition, ConditionType};
 
 pub(super) const CONDITION_PATH_EXISTS: &str = "ConditionPathExists";
@@ -18,6 +17,7 @@ pub(super) struct UeCondition {
 struct Conditions(Vec<Condition>);
 
 struct Asserts(Vec<Condition>);
+
 impl UeCondition {
     pub fn new() -> UeCondition {
         Self {

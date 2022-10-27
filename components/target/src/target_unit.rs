@@ -2,25 +2,49 @@
 //! Trait UnitObj defines the behavior of the sub unit.
 //! Trait UnitMngUtil is used to attach the Unitmanager to the sub unit.
 //! Trait UnitSubClass implement the convert from sub unit to UnitObj.
-
-use std::{path::PathBuf, rc::Rc};
-
-use super::target_comm::TargetComm;
+use super::target_base::{LOG_LEVEL, PLUGIN_NAME};
+use super::target_comm::TargetUnitComm;
 use super::target_mng::TargetMng;
 use process1::manager::{
-    UnitActiveState, UnitDependencyMask, UnitMngUtil, UnitObj, UnitRelationAtom, UnitRelations,
-    UnitSubClass,
+    UnitActiveState, UnitDependencyMask, UnitManager, UnitMngUtil, UnitObj, UnitRelationAtom,
+    UnitRelations, UnitSubClass,
 };
+use process1::{ReStation, Reliability};
+use std::{path::PathBuf, rc::Rc};
 use utils::logger;
 
 struct Target {
-    comm: Rc<TargetComm>,
+    comm: Rc<TargetUnitComm>,
     mng: Rc<TargetMng>,
+}
+
+impl ReStation for Target {
+    // no input, no compensate
+
+    // data
+    fn db_map(&self) {
+        self.mng.db_map();
+    }
+
+    fn db_insert(&self) {
+        self.mng.db_insert();
+    }
+
+    // reload: entry-only
+    fn entry_coldplug(&self) {
+        // rebuild external connections, like: timer, ...
+        // do nothing now
+    }
+
+    fn entry_clear(&self) {
+        // release external connection, like: timer, ...
+        // do nothing now
+    }
 }
 
 impl Target {
     fn new() -> Target {
-        let _comm = Rc::new(TargetComm::new());
+        let _comm = Rc::new(TargetUnitComm::new());
         Target {
             comm: Rc::clone(&_comm),
             mng: Rc::new(TargetMng::new(&_comm)),
@@ -28,44 +52,35 @@ impl Target {
     }
 
     pub(self) fn add_default_dependencies(&self) {
-        if self.comm.um().is_none() {
+        let unit = self.comm.unit();
+        log::debug!("add default dependencies for target[{}]", unit.id());
+        if !unit.default_dependencies() {
             return;
         }
-
-        if let Some(unit) = self.comm.unit() {
-            log::debug!("add default dependencies for target[{}]", unit.get_id());
-            if !unit.default_dependencies() {
-                return;
+        let um = self.comm.um();
+        let deps = um.get_dependency_list(
+            unit.id(),
+            UnitRelationAtom::UnitAtomAddDefaultTargetDependencyQueue,
+        );
+        for _u in deps {
+            if !_u.default_dependencies() {
+                continue;
             }
-            let um = self.comm.um().unwrap();
-            let deps = um.get_dependency_list(
-                unit.get_id(),
-                UnitRelationAtom::UnitAtomAddDefaultTargetDependencyQueue,
+
+            if um.unit_has_dependecy(unit.id(), UnitRelationAtom::UnitAtomBefore, _u.id()) {
+                continue;
+            }
+
+            let e = um.unit_add_dependency(
+                unit.id(),
+                UnitRelations::UnitAfter,
+                _u.id(),
+                true,
+                UnitDependencyMask::UnitDependencyDefault,
             );
-            for _u in deps {
-                if !_u.default_dependencies() {
-                    continue;
-                }
-
-                if um.unit_has_dependecy(
-                    unit.get_id(),
-                    UnitRelationAtom::UnitAtomBefore,
-                    _u.get_id(),
-                ) {
-                    continue;
-                }
-
-                let e = um.unit_add_dependency(
-                    unit.get_id(),
-                    UnitRelations::UnitAfter,
-                    _u.get_id(),
-                    true,
-                    UnitDependencyMask::UnitDependencyDefault,
-                );
-                if e.is_err() {
-                    log::error!("add default dependencies error {:?}", e);
-                    return;
-                }
+            if e.is_err() {
+                log::error!("add default dependencies error {:?}", e);
+                return;
             }
         }
     }
@@ -78,19 +93,19 @@ impl UnitObj for Target {
         self.add_default_dependencies();
         Ok(())
     }
+
     fn current_active_state(&self) -> UnitActiveState {
         self.mng.to_unit_state()
     }
 
     fn attach_unit(&self, unit: Rc<process1::manager::Unit>) {
         self.comm.attach_unit(unit);
+        self.db_insert();
     }
 
     fn init(&self) {}
 
     fn done(&self) {}
-
-    fn coldplug(&self) {}
 
     fn dump(&self) {}
 
@@ -98,14 +113,16 @@ impl UnitObj for Target {
         //if current state is not valid, just return.
         self.mng.start_check()?;
 
-        self.mng.start_action();
+        self.mng.start_action(true);
         Ok(())
     }
 
-    fn stop(&self) -> utils::Result<(), process1::manager::UnitActionError> {
-        self.mng.stop_check()?;
+    fn stop(&self, force: bool) -> utils::Result<(), process1::manager::UnitActionError> {
+        if !force {
+            self.mng.stop_check()?;
+        }
 
-        self.mng.stop_action();
+        self.mng.stop_action(true);
         Ok(())
     }
 
@@ -133,8 +150,12 @@ impl UnitSubClass for Target {
 }
 
 impl UnitMngUtil for Target {
-    fn attach(&self, _um: Rc<process1::manager::UnitManager>) {
+    fn attach_um(&self, _um: Rc<UnitManager>) {
         self.comm.attach_um(_um);
+    }
+
+    fn attach_reli(&self, reli: Rc<Reliability>) {
+        self.comm.attach_reli(reli);
     }
 }
 
@@ -144,13 +165,5 @@ impl Default for Target {
     }
 }
 
-const LOG_LEVEL: u32 = 4;
-const PLUGIN_NAME: &str = "TargetUnit";
 use process1::declure_unitobj_plugin;
 declure_unitobj_plugin!(Target, Target::default, PLUGIN_NAME, LOG_LEVEL);
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test() {}
-}

@@ -1,67 +1,91 @@
 #![warn(unused_imports)]
+#![allow(clippy::type_complexity)]
 use super::job_alloc::JobAlloc;
-use super::job_entry::{Job, JobConf, JobInfo, JobKind, JobResult};
+use super::job_entry::{Job, JobConf, JobInfo, JobResult};
+use super::job_rentry::JobKind;
 use super::job_unit_entry::JobUnit;
 use super::JobErrno;
-use crate::manager::unit::unit_base::{JobMode, UnitRelationAtom};
+use crate::manager::unit::unit_base::UnitRelationAtom;
 use crate::manager::unit::unit_datastore::UnitDb;
 use crate::manager::unit::unit_entry::UnitX;
+use crate::manager::unit::unit_rentry::JobMode;
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
 pub(super) struct JobTable {
+    // associated objects
+    db: Rc<UnitDb>,
+
+    // owned objects
     // key: job-id | unit, value: job
-    // data
     t_id: RefCell<HashMap<u32, Rc<Job>>>, // guarantee the uniqueness of job-id
-    t_unit: JobUnitTable,                 // the running time of job is organized by unit
+    t_unit: RefCell<JobUnitTable>,        // the running time of job is organized by unit
 }
 
 impl JobTable {
-    pub(super) fn new() -> JobTable {
+    pub(super) fn new(dbr: &Rc<UnitDb>) -> JobTable {
         JobTable {
+            db: Rc::clone(dbr),
             t_id: RefCell::new(HashMap::new()),
-            t_unit: JobUnitTable::new(),
+            t_unit: RefCell::new(JobUnitTable::new()),
         }
     }
 
-    pub(super) fn record_suspend(
-        &self,
-        ja: &JobAlloc,
-        config: JobConf,
-        mode: JobMode,
-        operate: bool,
-    ) -> bool {
+    pub(super) fn clear(&self) {
+        // job_entry
+        for (_, job) in self.t_id.borrow().iter() {
+            job.clear();
+        }
+
+        // table
+        // table-id
+        self.t_id.borrow_mut().clear();
+
+        // table-unit
+        self.t_unit.borrow_mut().clear();
+    }
+
+    pub(super) fn rentry_map_suspend(&self, ja: &JobAlloc, config: &JobConf) -> Rc<Job> {
+        let job = ja.alloc(config);
+        job.rentry_map_suspend();
+        self.insert_suspend(Rc::clone(&job)).unwrap();
+        job
+    }
+
+    pub(super) fn rentry_map_trigger(&self, ja: &JobAlloc, config: &JobConf) -> Rc<Job> {
+        let job = ja.alloc(config);
+        job.rentry_map_trigger();
+        self.insert_trigger(Rc::clone(&job)).unwrap();
+        job
+    }
+
+    pub(super) fn coldplug_suspend(&self, unit: &UnitX) {
+        for job in self.t_unit.borrow().get_suspends(unit).iter() {
+            job.coldplug_suspend();
+        }
+    }
+
+    pub(super) fn coldplug_trigger(&self, unit: &UnitX) {
+        if let Some((job, _)) = self.t_unit.borrow().get_trigger_info(unit) {
+            job.coldplug_trigger();
+        }
+    }
+
+    pub(super) fn record_suspend(&self, ja: &JobAlloc, config: &JobConf, mode: JobMode) -> bool {
         let unit = config.get_unit();
         let kind = config.get_kind();
 
         // add job only when nothing with the same 'unit'+'kind' exists
-        if let None = self.t_unit.get_suspend(unit, kind) {
-            self.insert_suspend(ja.alloc(Rc::clone(unit), kind, mode), operate)
-                .expect("insert a new job failed.");
+        let empty = self.t_unit.borrow().get_suspend(unit, kind).is_none();
+        if empty {
+            let job = ja.alloc(config);
+            job.init_attr(mode);
+            self.insert_suspend(job).expect("insert a new job failed.");
             true
         } else {
             false
         }
-    }
-
-    pub(super) fn remove_suspends(
-        &self,
-        db: &UnitDb,
-        unit: &UnitX,
-        kind1: JobKind,
-        kind2: Option<JobKind>,
-        result: JobResult,
-    ) -> Vec<Rc<Job>> {
-        // table-unit
-        let del_jobs = self.t_unit.remove_suspends(db, unit, kind1, kind2, result);
-
-        // synchronize table-id
-        for job in del_jobs.iter() {
-            self.t_id.borrow_mut().remove(&job.get_id());
-        }
-
-        del_jobs
     }
 
     pub(super) fn commit(
@@ -71,30 +95,69 @@ impl JobTable {
     ) -> Result<(Vec<Rc<Job>>, Vec<Rc<Job>>, Vec<Rc<Job>>), JobErrno> {
         // check other-jobs-id first: make rollback simple
         for (o_id, _) in other.t_id.borrow().iter() {
-            if let Some(_) = self.t_id.borrow().get(o_id) {
-                return Err(JobErrno::JobErrInternel);
+            if self.t_id.borrow().get(o_id).is_some() {
+                return Err(JobErrno::Internel);
             }
         }
 
         // isolate
-        let mut del_jobs = self.isolate_suspends(other, mode);
+        let mut iso_jobs = self.isolate_suspends(other, mode);
 
         // merge
         let (add_jobs, mut flush_jobs, update_jobs) = self.merge_suspends(other);
-        del_jobs.append(&mut flush_jobs);
 
         // reshuffle
-        del_jobs.append(&mut self.reshuffle());
+        let mut merge_jobs = self.reshuffle();
 
+        // relation processing if something is isolated or flushed
+        if !iso_jobs.is_empty() || !flush_jobs.is_empty() {
+            for unit in jobs_2_units(&iso_jobs).iter() {
+                self.process_relation(unit);
+            }
+            for unit in jobs_2_units(&flush_jobs).iter() {
+                self.process_relation(unit);
+            }
+        }
+
+        let mut del_jobs = Vec::new();
+        del_jobs.append(&mut iso_jobs);
+        del_jobs.append(&mut flush_jobs);
+        del_jobs.append(&mut merge_jobs);
         Ok((add_jobs, del_jobs, update_jobs))
+    }
+
+    pub(super) fn remove_suspends(
+        &self,
+        unit: &UnitX,
+        kind1: JobKind,
+        kind2: Option<JobKind>,
+        result: JobResult,
+    ) -> Vec<Rc<Job>> {
+        // table-unit
+        let del_jobs = self
+            .t_unit
+            .borrow_mut()
+            .remove_suspends(unit, kind1, kind2, result);
+
+        // synchronize table-id
+        for job in del_jobs.iter() {
+            self.t_id.borrow_mut().remove(&job.get_id());
+        }
+
+        // relation processing if something is deleted
+        if !del_jobs.is_empty() {
+            self.process_relation(unit);
+        }
+
+        del_jobs
     }
 
     pub(super) fn try_trigger(
         &self,
-        db: &UnitDb,
+        unit: Option<&UnitX>,
     ) -> Option<(Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>)> {
         // try trigger table-unit
-        let trigger_ret = self.t_unit.try_trigger(db);
+        let trigger_ret = self.do_try_trigger(&self.db, unit);
 
         // synchronize table-id
         if let Some((_, Some(job))) = &trigger_ret {
@@ -104,18 +167,18 @@ impl JobTable {
         trigger_ret
     }
 
-    pub(super) fn finish_trigger(
-        &self,
-        db: &UnitDb,
-        unit: &UnitX,
-        result: JobResult,
-    ) -> Option<Rc<Job>> {
+    pub(super) fn finish_trigger(&self, unit: &UnitX, result: JobResult) -> Option<Rc<Job>> {
         // finish table-unit
-        let del_trigger = self.t_unit.finish_trigger(db, unit, result);
+        let del_trigger = self.t_unit.borrow_mut().finish_trigger(unit, result);
 
         // synchronize table-id
         if let Some(job) = &del_trigger {
             self.t_id.borrow_mut().remove(&job.get_id());
+        }
+
+        // relation processing if something is deleted
+        if del_trigger.is_some() {
+            self.process_relation(unit);
         }
 
         del_trigger
@@ -123,18 +186,19 @@ impl JobTable {
 
     pub(super) fn resume_unit(&self, unit: &UnitX) {
         // resume table-unit
-        self.t_unit.resume_unit(unit);
+        self.t_unit.borrow_mut().resume_unit(unit);
 
         // synchronize table-id: nothing changed
     }
 
     pub(super) fn remove_unit(&self, unit: &UnitX) -> (Option<Rc<Job>>, Vec<Rc<Job>>) {
         // get jobs
-        let del_trigger = match self.t_unit.get_trigger_info(unit) {
-            Some((job, _)) => Some(job),
-            None => None,
-        };
-        let del_suspends = self.t_unit.get_suspends(unit);
+        let del_trigger = self
+            .t_unit
+            .borrow()
+            .get_trigger_info(unit)
+            .map(|(job, _)| job);
+        let del_suspends = self.t_unit.borrow().get_suspends(unit);
 
         // table-id
         if del_trigger.is_some() {
@@ -147,17 +211,25 @@ impl JobTable {
         }
 
         // table-unit
-        self.t_unit.remove_unit(unit);
+        self.t_unit.borrow_mut().remove_unit(unit);
 
         (del_trigger, del_suspends)
     }
 
-    pub(super) fn clear(&self) {
-        // table-id
-        self.t_id.borrow_mut().clear();
+    pub(super) fn reshuffle(&self) -> Vec<Rc<Job>> {
+        // reshuffle table-unit
+        let merge_jobs = self.t_unit.borrow_mut().reshuffle();
 
-        // table-unit
-        self.t_unit.clear();
+        // synchronize table-id
+        for job in merge_jobs.iter() {
+            self.t_id.borrow_mut().remove(&job.get_id());
+        }
+
+        merge_jobs
+    }
+
+    pub(super) fn update_up_ready(&self) {
+        self.t_unit.borrow_mut().update_up_ready()
     }
 
     pub(super) fn len(&self) -> usize {
@@ -165,36 +237,33 @@ impl JobTable {
     }
 
     pub(super) fn ready_len(&self) -> usize {
-        self.t_unit.ready_len()
+        self.t_unit.borrow().ready_len()
     }
 
     pub(super) fn get(&self, id: u32) -> Option<JobInfo> {
-        match self.t_id.borrow().get(&id) {
-            Some(job) => Some(JobInfo::map(job)),
-            None => None,
-        }
+        self.t_id.borrow().get(&id).map(|job| JobInfo::map(job))
     }
 
     pub(super) fn get_suspend(&self, unit: &UnitX, kind: JobKind) -> Option<JobInfo> {
-        match self.t_unit.get_suspend(unit, kind) {
-            Some(job) => Some(JobInfo::map(&job)),
-            None => None,
-        }
+        self.t_unit
+            .borrow()
+            .get_suspend(unit, kind)
+            .map(|job| JobInfo::map(&job))
     }
 
     pub(super) fn get_trigger_info(&self, unit: &UnitX) -> Option<(JobInfo, bool)> {
-        match self.t_unit.get_trigger_info(unit) {
-            Some((job, pause)) => Some((JobInfo::map(&job), pause)),
-            None => None,
-        }
+        self.t_unit
+            .borrow()
+            .get_trigger_info(unit)
+            .map(|(job, pause)| (JobInfo::map(&job), pause))
     }
 
     pub(super) fn is_empty(&self) -> bool {
-        self.t_unit.is_empty()
+        self.t_unit.borrow().is_empty()
     }
 
     pub(super) fn is_unit_empty(&self, unit: &UnitX) -> bool {
-        self.t_unit.is_unit_empty(unit)
+        self.t_unit.borrow().is_unit_empty(unit)
     }
 
     pub(super) fn is_trigger(&self, id: u32) -> bool {
@@ -216,25 +285,103 @@ impl JobTable {
     }
 
     pub(super) fn is_suspends_conflict(&self) -> bool {
-        self.t_unit.is_suspends_conflict()
+        self.t_unit.borrow().is_suspends_conflict()
     }
 
     pub(super) fn is_suspends_conflict_with(&self, other: &Self) -> bool {
-        self.t_unit.is_suspends_conflict_with(&other.t_unit)
+        self.t_unit
+            .borrow()
+            .is_suspends_conflict_with(&other.t_unit.borrow())
     }
 
     pub(super) fn is_suspends_replace_with(&self, other: &Self) -> bool {
-        self.t_unit.is_suspends_replace_with(&other.t_unit)
+        self.t_unit
+            .borrow()
+            .is_suspends_replace_with(&other.t_unit.borrow())
     }
 
-    pub(super) fn is_ready(&self) -> bool {
-        self.t_unit.is_ready()
+    pub(super) fn up_ready(&self) -> bool {
+        self.t_unit.borrow().up_ready()
+    }
+
+    pub(super) fn calc_ready(&self) -> bool {
+        self.t_unit.borrow().calc_ready()
+    }
+
+    fn do_try_trigger(
+        &self,
+        db: &UnitDb,
+        unit: Option<&UnitX>,
+    ) -> Option<(Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>)> {
+        assert!(self.t_unit.borrow().is_sync());
+
+        // table-ready: "pop_last + trigger_last" or "pop_all + trigger_all"
+        // the single 'last' operation is better, but 'pop_last' is not currently supported.
+        // we select the batch 'all' operation to simulate the 'single' operation now.
+        let uv_try = self.t_unit.borrow_mut().ready_pop(unit);
+        if let Some(uv) = uv_try {
+            let (trigger_info, merge_trigger) = self.try_trigger_entry(db, Rc::clone(&uv)); // status(sync): not changed
+            assert!(!uv.is_empty());
+            Some((trigger_info, merge_trigger))
+        } else {
+            None
+        }
+    }
+
+    fn try_trigger_entry(
+        &self,
+        db: &UnitDb,
+        value: Rc<JobUnit>,
+    ) -> (Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>) {
+        let uv = value;
+
+        assert!(!uv.is_dirty());
+
+        // try to trigger unit: trigger (order-allowed)it or pause (order-non-allowed)it
+        let is_runnable = self.t_unit.borrow().is_uv_runnable(db, Rc::clone(&uv));
+        let (trigger_info, merge_trigger) = match is_runnable {
+            true => uv.do_trigger(),
+            false => {
+                uv.pause();
+                (None, None)
+            }
+        };
+
+        // synchronize t_ready: the value has been removed from 't_ready', and it's not ready now, which are corresponding with each other.
+        assert!(!uv.is_ready()); // something has just been triggered or paused above
+
+        // t_data: do nothing
+        // dirty
+        uv.clear_dirty(); // the 'dirty' entry has been synced(corresponding), it's not dirty now.
+
+        (trigger_info, merge_trigger)
+    }
+
+    fn process_relation(&self, unit: &UnitX) {
+        // trigger-notify
+        let atom = UnitRelationAtom::UnitAtomTriggeredBy;
+        for other in self.db.dep_gets_atom(unit, atom) {
+            other.trigger(unit);
+        }
+
+        // resume order-related units
+        let atom = UnitRelationAtom::UnitAtomAfter;
+        for other in self.db.dep_gets_atom(unit, atom).iter() {
+            self.resume_unit(other);
+        }
+        let atom = UnitRelationAtom::UnitAtomBefore;
+        for other in self.db.dep_gets_atom(unit, atom).iter() {
+            self.resume_unit(other);
+        }
     }
 
     fn isolate_suspends(&self, other: &Self, mode: JobMode) -> Vec<Rc<Job>> {
         // isolate table-unit
         let del_jobs = match mode {
-            JobMode::JobIsolate | JobMode::JobFlush => self.t_unit.isolate_suspends(&other.t_unit),
+            JobMode::Isolate | JobMode::Flush => self
+                .t_unit
+                .borrow_mut()
+                .isolate_suspends(&other.t_unit.borrow()),
             _ => Vec::new(), // empty
         };
 
@@ -248,7 +395,10 @@ impl JobTable {
 
     fn merge_suspends(&self, other: &Self) -> (Vec<Rc<Job>>, Vec<Rc<Job>>, Vec<Rc<Job>>) {
         // merge table-unit
-        let (add_jobs, del_jobs, update_jobs) = self.t_unit.merge_suspends(&other.t_unit);
+        let (add_jobs, del_jobs, update_jobs) = self
+            .t_unit
+            .borrow_mut()
+            .merge_suspends(&other.t_unit.borrow());
 
         // synchronize table-id
         for job in add_jobs.iter() {
@@ -261,27 +411,37 @@ impl JobTable {
         (add_jobs, del_jobs, update_jobs)
     }
 
-    fn reshuffle(&self) -> Vec<Rc<Job>> {
-        // reshuffle table-unit
-        let merge_jobs = self.t_unit.reshuffle();
-
-        // synchronize table-id
-        for job in merge_jobs.iter() {
-            self.t_id.borrow_mut().remove(&job.get_id());
-        }
-
-        merge_jobs
-    }
-
-    fn insert_suspend(&self, job: Rc<Job>, operate: bool) -> Result<(), JobErrno> {
+    fn insert_suspend(&self, job: Rc<Job>) -> Result<(), JobErrno> {
         // check job-id
         let id = job.get_id();
-        if let Some(_) = self.t_id.borrow().get(&id) {
-            return Err(JobErrno::JobErrInternel);
+        if self.t_id.borrow().get(&id).is_some() {
+            return Err(JobErrno::Internel);
         }
 
         // table-unit
-        self.t_unit.insert_suspend(Rc::clone(&job), operate);
+        let old = self.t_unit.borrow_mut().insert_suspend(Rc::clone(&job));
+        if old.is_some() {
+            return Err(JobErrno::Input);
+        }
+
+        // table-id
+        self.t_id.borrow_mut().insert(id, job);
+
+        Ok(())
+    }
+
+    fn insert_trigger(&self, job: Rc<Job>) -> Result<(), JobErrno> {
+        // check job-id
+        let id = job.get_id();
+        if self.t_id.borrow().get(&id).is_some() {
+            return Err(JobErrno::Internel);
+        }
+
+        // table-unit
+        let old = self.t_unit.borrow_mut().insert_trigger(Rc::clone(&job));
+        if old.is_some() {
+            return Err(JobErrno::Input);
+        }
 
         // table-id
         self.t_id.borrow_mut().insert(id, job);
@@ -290,168 +450,8 @@ impl JobTable {
     }
 }
 
-struct JobUnitTable {
-    data: RefCell<JobUnitTableData>,
-}
-
-// the declaration "pub(self)" is for identification only.
-impl JobUnitTable {
-    pub(self) fn new() -> JobUnitTable {
-        JobUnitTable {
-            data: RefCell::new(JobUnitTableData::new()),
-        }
-    }
-
-    pub(self) fn insert_suspend(&self, job: Rc<Job>, operate: bool) {
-        self.data.borrow_mut().insert_suspend(job, operate)
-    }
-
-    pub(self) fn isolate_suspends(&self, other: &Self) -> Vec<Rc<Job>> {
-        self.data
-            .borrow_mut()
-            .isolate_suspends(&other.data.borrow())
-    }
-
-    pub(self) fn merge_suspends(&self, other: &Self) -> (Vec<Rc<Job>>, Vec<Rc<Job>>, Vec<Rc<Job>>) {
-        self.data.borrow_mut().merge_suspends(&other.data.borrow())
-    }
-
-    pub(self) fn reshuffle(&self) -> Vec<Rc<Job>> {
-        self.data.borrow_mut().reshuffle()
-    }
-
-    pub(self) fn try_trigger(
-        &self,
-        db: &UnitDb,
-    ) -> Option<(Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>)> {
-        assert!(self.data.borrow().is_sync());
-
-        // table-ready: "pop_last + trigger_last" or "pop_all + trigger_all"
-        // the single 'last' operation is better, but 'pop_last' is not currently supported.
-        // we select the batch 'all' operation to simulate the 'single' operation now.
-        self.data.borrow_mut().readys_fill();
-
-        let uv_try = self.data.borrow_mut().readys_pop();
-        if uv_try.is_some() {
-            let uv = uv_try.unwrap();
-            let (trigger_info, merge_trigger) = self.try_trigger_entry(db, Rc::clone(&uv)); // status(sync): not changed
-            assert!(!uv.is_empty());
-            return Some((trigger_info, merge_trigger));
-        } else {
-            return None;
-        }
-    }
-
-    pub(self) fn finish_trigger(
-        &self,
-        db: &UnitDb,
-        unit: &UnitX,
-        result: JobResult,
-    ) -> Option<Rc<Job>> {
-        self.data.borrow_mut().finish_trigger(db, unit, result)
-    }
-
-    pub(self) fn remove_suspends(
-        &self,
-        db: &UnitDb,
-        unit: &UnitX,
-        kind1: JobKind,
-        kind2: Option<JobKind>,
-        result: JobResult,
-    ) -> Vec<Rc<Job>> {
-        self.data
-            .borrow_mut()
-            .remove_suspends(db, unit, kind1, kind2, result)
-    }
-
-    pub(self) fn resume_unit(&self, unit: &UnitX) {
-        self.data.borrow_mut().resume_unit(unit)
-    }
-
-    pub(self) fn remove_unit(&self, unit: &UnitX) {
-        self.data.borrow_mut().remove_unit(unit)
-    }
-
-    pub(self) fn clear(&self) {
-        self.data.borrow_mut().clear()
-    }
-
-    pub(self) fn ready_len(&self) -> usize {
-        self.data.borrow().ready_len()
-    }
-
-    pub(self) fn get_suspend(&self, unit: &UnitX, kind: JobKind) -> Option<Rc<Job>> {
-        self.data.borrow().get_suspend(unit, kind)
-    }
-
-    pub(self) fn get_suspends(&self, unit: &UnitX) -> Vec<Rc<Job>> {
-        self.data.borrow().get_suspends(unit)
-    }
-
-    pub(self) fn get_trigger_info(&self, unit: &UnitX) -> Option<(Rc<Job>, bool)> {
-        self.data.borrow().get_trigger_info(unit)
-    }
-
-    pub(self) fn is_empty(&self) -> bool {
-        self.data.borrow().is_empty()
-    }
-
-    pub(self) fn is_unit_empty(&self, unit: &UnitX) -> bool {
-        self.data.borrow().is_unit_empty(unit)
-    }
-
-    pub(self) fn is_suspends_conflict(&self) -> bool {
-        self.data.borrow().is_suspends_conflict()
-    }
-
-    pub(self) fn is_suspends_conflict_with(&self, other: &Self) -> bool {
-        self.data
-            .borrow()
-            .is_suspends_conflict_with(&other.data.borrow())
-    }
-
-    pub(self) fn is_suspends_replace_with(&self, other: &Self) -> bool {
-        self.data
-            .borrow()
-            .is_suspends_replace_with(&other.data.borrow())
-    }
-
-    pub(self) fn is_ready(&self) -> bool {
-        self.data.borrow().is_ready()
-    }
-
-    fn try_trigger_entry(
-        &self,
-        db: &UnitDb,
-        value: Rc<JobUnit>,
-    ) -> (Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>) {
-        let uv = value;
-
-        assert!(!uv.is_dirty());
-
-        // try to trigger unit: trigger (order-allowed)it or pause (order-non-allowed)it
-        let (trigger_info, merge_trigger) =
-            match self.data.borrow().is_uv_runnable(Rc::clone(&uv), db) {
-                true => uv.do_trigger(),
-                false => {
-                    uv.pause();
-                    (None, None)
-                }
-            };
-
-        // synchronize t_ready: the value has been removed from 't_ready', and it's not ready now, which are corresponding with each other.
-        assert!(!uv.is_ready()); // something has just been triggered or paused above
-
-        // t_data: do nothing
-        // dirty
-        uv.clear_dirty(); // the 'dirty' entry has been synced(corresponding), it's not dirty now.
-
-        (trigger_info, merge_trigger)
-    }
-}
-
 //#[derive(Debug)]
-struct JobUnitTableData {
+struct JobUnitTable {
     // key: unit, value: jobs with order
     // data
     t_data: HashMap<Rc<UnitX>, Rc<JobUnit>>,   // quick search
@@ -460,32 +460,47 @@ struct JobUnitTableData {
     // status
     /* t_ready */
     readys: Vec<Rc<JobUnit>>, // simulate 'BTreeMap->pop_last'
+    up_ready: bool,           // 'ready' status in up-level
     /* the entire entry */
     sync: bool, // sync flag of the entire table, including data and ready.
 }
 
 // the declaration "pub(self)" is for identification only.
-impl JobUnitTableData {
-    pub(self) fn new() -> JobUnitTableData {
-        JobUnitTableData {
+impl JobUnitTable {
+    pub(self) fn new() -> JobUnitTable {
+        JobUnitTable {
             t_data: HashMap::new(),
             t_ready: BTreeMap::new(),
 
             readys: Vec::new(),
+            up_ready: false,
             sync: true,
         }
     }
 
-    pub(self) fn insert_suspend(&mut self, job: Rc<Job>, operate: bool) {
+    pub(self) fn clear(&mut self) {
+        // data
+        self.t_data.clear();
+        self.t_ready.clear();
+
+        // status
+        self.readys.clear();
+        self.up_ready = false;
+        self.sync = true;
+    }
+
+    pub(self) fn insert_suspend(&mut self, job: Rc<Job>) -> Option<Rc<Job>> {
         // t_data
-        let uv = self.get_mut_uv_pad(Rc::clone(job.get_unit()));
-        uv.insert_suspend(Rc::clone(&job), operate);
+        let uv = self.get_mut_uv_pad(Rc::clone(job.unit()));
+        let old = uv.insert_suspend(Rc::clone(&job));
 
         // t_ready: wait to sync in 'reshuffle', just remark it in unit-value
         assert!(uv.is_dirty());
 
         // status
         self.sync = false;
+
+        old
     }
 
     pub(self) fn isolate_suspends(&mut self, other: &Self) -> Vec<Rc<Job>> {
@@ -503,7 +518,7 @@ impl JobUnitTableData {
                 continue;
             }
 
-            if let Some(_) = other.t_data.get(unit) {
+            if other.t_data.get(unit).is_some() {
                 continue;
             }
 
@@ -567,12 +582,21 @@ impl JobUnitTableData {
         merge_jobs
     }
 
-    pub(self) fn finish_trigger(
-        &mut self,
-        db: &UnitDb,
-        unit: &UnitX,
-        result: JobResult,
-    ) -> Option<Rc<Job>> {
+    pub(self) fn insert_trigger(&mut self, job: Rc<Job>) -> Option<Rc<Job>> {
+        // t_data
+        let uv = self.get_mut_uv_pad(Rc::clone(job.unit()));
+        let old = uv.insert_trigger(Rc::clone(&job));
+
+        // t_ready: wait to sync in 'reshuffle', just remark it in unit-value
+        assert!(uv.is_dirty());
+
+        // status
+        self.sync = false;
+
+        old
+    }
+
+    pub(self) fn finish_trigger(&mut self, unit: &UnitX, result: JobResult) -> Option<Rc<Job>> {
         assert!(self.sync);
 
         let (ur, uvr) = self
@@ -581,7 +605,7 @@ impl JobUnitTableData {
             .expect("guaranteed by caller.");
         let (u, uv) = (Rc::clone(ur), Rc::clone(uvr));
         assert!(uv.get_trigger().is_some(), "guaranteed by caller.");
-        let del_trigger = self.finish_entry(db, &(&u, &uv), result); // status(sync): not changed
+        let del_trigger = self.finish_entry(&(&u, &uv), result); // status(sync): not changed
         self.try_gc_empty_unit(&(&u, &uv));
 
         del_trigger
@@ -589,7 +613,6 @@ impl JobUnitTableData {
 
     pub(self) fn remove_suspends(
         &mut self,
-        db: &UnitDb,
         unit: &UnitX,
         kind1: JobKind,
         kind2: Option<JobKind>,
@@ -600,7 +623,7 @@ impl JobUnitTableData {
         let mut del_jobs = Vec::new();
         if let Some((ur, uvr)) = self.t_data.get_key_value(unit) {
             let (u, uv) = (Rc::clone(ur), Rc::clone(uvr));
-            del_jobs.append(&mut self.remove_entry(db, &(&u, &uv), kind1, kind2, result));
+            del_jobs.append(&mut self.remove_entry(&(&u, &uv), kind1, kind2, result));
             self.try_gc_empty_unit(&(&u, &uv));
 
             // status(sync): nothing changed
@@ -624,32 +647,29 @@ impl JobUnitTableData {
         // status(sync): nothing changed
     }
 
-    pub(self) fn clear(&mut self) {
+    pub(self) fn ready_pop(&mut self, unit: Option<&UnitX>) -> Option<Rc<JobUnit>> {
+        // something changes, data + status
         // data
-        self.t_data.clear();
-        self.t_ready.clear();
+        let uv_ret = match unit {
+            Some(u) => {
+                self.readys_backfill();
+                self.t_ready.remove(u)
+            }
+            None => {
+                self.readys_fill();
+                self.readys.pop()
+            }
+        };
 
         // status
-        self.sync = true;
+        uv_ret.map(|uv| {
+            uv.clear_up_ready();
+            uv
+        })
     }
 
-    pub(self) fn readys_fill(&mut self) {
-        if self.readys.is_empty() {
-            // t_ready -> readys: data + status
-            self.readys = self
-                .t_ready
-                .values()
-                .map(|uvr| Rc::clone(uvr))
-                .collect::<Vec<_>>();
-            self.t_ready.clear();
-            for uv in self.readys.iter() {
-                uv.clear_up_ready();
-            }
-        }
-    }
-
-    pub(self) fn readys_pop(&mut self) -> Option<Rc<JobUnit>> {
-        self.readys.pop()
+    pub(self) fn update_up_ready(&mut self) {
+        self.up_ready = self.calc_ready();
     }
 
     pub(self) fn ready_len(&self) -> usize {
@@ -674,13 +694,24 @@ impl JobUnitTableData {
 
     pub(self) fn get_trigger_info(&self, unit: &UnitX) -> Option<(Rc<Job>, bool)> {
         if let Some(uv) = self.t_data.get(unit) {
-            if let Some(trigger) = uv.get_trigger() {
-                Some((Rc::clone(&trigger), uv.is_pause()))
-            } else {
-                None
-            }
+            uv.get_trigger()
+                .map(|trigger| (Rc::clone(&trigger), uv.is_pause()))
         } else {
             None
+        }
+    }
+
+    pub(self) fn calc_ready(&self) -> bool {
+        if self.sync {
+            // the data has been synchronized
+            // nothing -> not ready, something -> ready
+            !matches!(
+                (self.t_ready.is_empty(), self.readys.is_empty()),
+                (true, true)
+            )
+        } else {
+            // the data has not been synchronized, not ready
+            false
         }
     }
 
@@ -730,31 +761,26 @@ impl JobUnitTableData {
         true
     }
 
-    pub(self) fn is_ready(&self) -> bool {
-        match (self.sync, self.t_ready.is_empty()) {
-            (false, _) => false,     // the data has not been synchronized, not ready
-            (true, empty) => !empty, // the data has been synchronized, nothing -> not ready and something -> ready
-        }
+    pub(self) fn up_ready(&self) -> bool {
+        self.up_ready
     }
 
-    pub(self) fn is_uv_runnable(&self, uv: Rc<JobUnit>, db: &UnitDb) -> bool {
+    pub(self) fn is_uv_runnable(&self, db: &UnitDb, uv: Rc<JobUnit>) -> bool {
         let unit = uv.get_unit();
-        for other in db
-            .dep_gets_atom(&unit, UnitRelationAtom::UnitAtomAfter)
-            .iter()
-        {
+
+        let atom = UnitRelationAtom::UnitAtomAfter;
+        for other in db.dep_gets_atom(&unit, atom).iter() {
             if let Some(other_uv) = self.t_data.get(other) {
-                if !uv.is_next_trigger_order_with(other_uv, UnitRelationAtom::UnitAtomAfter) {
+                if !uv.is_next_trigger_order_with(other_uv, atom) {
                     return false;
                 }
             }
         }
-        for other in db
-            .dep_gets_atom(&unit, UnitRelationAtom::UnitAtomBefore)
-            .iter()
-        {
+
+        let atom = UnitRelationAtom::UnitAtomBefore;
+        for other in db.dep_gets_atom(&unit, atom).iter() {
             if let Some(other_uv) = self.t_data.get(other) {
-                if !uv.is_next_trigger_order_with(other_uv, UnitRelationAtom::UnitAtomBefore) {
+                if !uv.is_next_trigger_order_with(other_uv, atom) {
                     return false;
                 }
             }
@@ -784,7 +810,6 @@ impl JobUnitTableData {
 
     fn finish_entry(
         &mut self,
-        db: &UnitDb,
         entry: &(&Rc<UnitX>, &Rc<JobUnit>),
         result: JobResult,
     ) -> Option<Rc<Job>> {
@@ -801,26 +826,17 @@ impl JobUnitTableData {
         // dirty
         uv.clear_dirty(); // the 'dirty' entry has been synced, it's not dirty now.
 
-        // resume order-related units
-        for other in db.dep_gets_atom(u, UnitRelationAtom::UnitAtomAfter).iter() {
-            self.resume_unit(other);
-        }
-        for other in db.dep_gets_atom(u, UnitRelationAtom::UnitAtomBefore).iter() {
-            self.resume_unit(other);
-        }
-
         del_trigger
     }
 
     fn remove_entry(
         &mut self,
-        db: &UnitDb,
         entry: &(&Rc<UnitX>, &Rc<JobUnit>),
         kind1: JobKind,
         kind2: Option<JobKind>,
         result: JobResult,
     ) -> Vec<Rc<Job>> {
-        let (u, uv) = entry;
+        let (_, uv) = entry;
 
         assert!(!uv.is_dirty());
 
@@ -837,14 +853,6 @@ impl JobUnitTableData {
 
         // reshuffle itself
         self.reshuffle_entry(entry);
-
-        // resume order-related units
-        for other in db.dep_gets_atom(u, UnitRelationAtom::UnitAtomAfter).iter() {
-            self.resume_unit(other);
-        }
-        for other in db.dep_gets_atom(u, UnitRelationAtom::UnitAtomBefore).iter() {
-            self.resume_unit(other);
-        }
 
         del_jobs
     }
@@ -867,21 +875,6 @@ impl JobUnitTableData {
         }
     }
 
-    fn readys_backfill(&mut self) {
-        if !self.readys.is_empty() {
-            // readys -> t_ready: data + status
-            let readys = self
-                .readys
-                .iter()
-                .map(|uvr| Rc::clone(uvr))
-                .collect::<Vec<_>>();
-            self.readys.clear();
-            for uv in readys.iter() {
-                self.ready_sync(uv.get_unit(), Rc::clone(uv));
-            }
-        }
-    }
-
     fn ready_sync(&mut self, unit: Rc<UnitX>, uv: Rc<JobUnit>) {
         if uv.is_ready() {
             self.ready_insert(unit, uv);
@@ -892,7 +885,8 @@ impl JobUnitTableData {
 
     fn ready_insert(&mut self, unit: Rc<UnitX>, uv: Rc<JobUnit>) {
         if !uv.is_up_ready() {
-            self.readys_backfill(); // something changes
+            // something changes
+            self.readys_backfill();
 
             // data
             self.t_ready.insert(unit, Rc::clone(&uv));
@@ -904,7 +898,8 @@ impl JobUnitTableData {
 
     fn ready_remove(&mut self, unit: Rc<UnitX>, uv: Rc<JobUnit>) {
         if uv.is_up_ready() {
-            self.readys_backfill(); // something changes
+            // something changes
+            self.readys_backfill();
 
             // data
             self.t_ready.remove(&unit);
@@ -914,9 +909,30 @@ impl JobUnitTableData {
         }
     }
 
+    fn readys_backfill(&mut self) {
+        // readys -> t_ready
+        if !self.readys.is_empty() {
+            let readys = self.readys.iter().map(Rc::clone).collect::<Vec<_>>();
+            self.readys.clear();
+            for uv in readys.iter() {
+                self.t_ready.insert(uv.get_unit(), Rc::clone(uv));
+            }
+        }
+    }
+
+    fn readys_fill(&mut self) {
+        // t_ready -> readys: data
+        if self.readys.is_empty() {
+            self.readys = self.t_ready.values().map(Rc::clone).collect::<Vec<_>>();
+            self.t_ready.clear();
+        }
+    }
+
     fn try_gc_empty_unit(&mut self, entry: &(&Rc<UnitX>, &Rc<JobUnit>)) {
         let (u, uv) = entry;
         if uv.is_empty() {
+            assert!(!uv.is_ready());
+            assert!(!uv.is_up_ready());
             self.t_data.remove(*u);
             self.t_ready.remove(*u);
         }
@@ -924,7 +940,7 @@ impl JobUnitTableData {
 
     fn get_mut_uv_pad(&mut self, unit: Rc<UnitX>) -> &Rc<JobUnit> {
         // verify existence
-        if let None = self.t_data.get(&unit) {
+        if self.t_data.get(&unit).is_none() {
             // nothing exists, pad it.
             self.t_data
                 .insert(Rc::clone(&unit), Rc::new(JobUnit::new(Rc::clone(&unit))));
@@ -937,37 +953,59 @@ impl JobUnitTableData {
     }
 }
 
+pub(super) fn jobs_2_units(jobs: &[Rc<Job>]) -> Vec<Rc<UnitX>> {
+    let mut units = HashSet::new();
+    for job in jobs.iter() {
+        units.insert(Rc::clone(job.unit()));
+    }
+    units.iter().map(Rc::clone).collect::<_>()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::DataManager;
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::manager::unit::data::DataManager;
+    use crate::manager::unit::job::job_rentry::JobRe;
     use crate::manager::unit::uload_util::UnitFile;
-    use crate::manager::unit::unit_base::UnitType;
+    use crate::manager::unit::unit_rentry::{UnitRe, UnitType};
     use crate::plugin::Plugin;
+    use crate::reliability::Reliability;
     use utils::logger;
 
     #[test]
     fn job_table_record_suspend() {
+        let dm = Rc::new(DataManager::new());
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let rentry = Rc::new(UnitRe::new(&reli));
+        let db = Rc::new(UnitDb::new(&rentry));
+        let job_rentry = Rc::new(JobRe::new(&reli));
         let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
-        let mut ja = JobAlloc::new();
-        let table = JobTable::new();
+        let unit_test1 = create_unit(&dm, &reli, &rentry, &name_test1);
+        let mut ja = JobAlloc::new(&reli, &job_rentry);
+        let table = JobTable::new(&db);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop);
-        let new = table.record_suspend(&mut ja, conf, JobMode::JobReplace, false);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Nop);
+        let new = table.record_suspend(&mut ja, &conf, JobMode::Replace);
         assert_eq!(new, true);
     }
 
-    fn create_unit(name: &str) -> Rc<UnitX> {
+    fn create_unit(
+        dmr: &Rc<DataManager>,
+        relir: &Rc<Reliability>,
+        rentryr: &Rc<UnitRe>,
+        name: &str,
+    ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-        let dm = Rc::new(DataManager::new());
         let file = Rc::new(UnitFile::new());
         let unit_type = UnitType::UnitService;
         let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();
+        subclass.attach_reli(Rc::clone(relir));
         Rc::new(UnitX::new(
-            &dm,
+            dmr,
+            rentryr,
             &file,
             unit_type,
             name,

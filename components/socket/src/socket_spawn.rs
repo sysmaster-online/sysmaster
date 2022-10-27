@@ -3,15 +3,15 @@ use std::{error::Error, rc::Rc};
 use nix::unistd::Pid;
 use process1::manager::{ExecCommand, ExecContext, ExecParameters};
 
-use crate::socket_comm::SocketComm;
+use crate::socket_comm::SocketUnitComm;
 
 pub(super) struct SocketSpawn {
-    comm: Rc<SocketComm>,
+    comm: Rc<SocketUnitComm>,
     exec_ctx: Rc<ExecContext>,
 }
 
 impl SocketSpawn {
-    pub(super) fn new(comm: &Rc<SocketComm>, exec_ctx: &Rc<ExecContext>) -> SocketSpawn {
+    pub(super) fn new(comm: &Rc<SocketUnitComm>, exec_ctx: &Rc<ExecContext>) -> SocketSpawn {
         SocketSpawn {
             comm: comm.clone(),
             exec_ctx: exec_ctx.clone(),
@@ -26,11 +26,11 @@ impl SocketSpawn {
         unit.prepare_exec()?;
         match um.exec_spawn(&unit, cmdline, &params, self.exec_ctx.clone()) {
             Ok(pid) => {
-                um.child_watch_pid(pid, unit.get_id());
+                um.child_watch_pid(unit.id(), pid);
                 Ok(pid)
             }
             Err(_e) => {
-                log::error!("failed to start socket: {}", unit.get_id());
+                log::error!("failed to start socket: {}", unit.id());
                 Err("spawn exec return error".to_string().into())
             }
         }

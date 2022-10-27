@@ -1,38 +1,46 @@
-//! unit是process1对系统服务进行管理抽象的主要模块
-//! 该模块包含:
-//! [execute]：unit要执行的对象数据结构定义。
-//! [job]：unit对应的调度执行实体，每个unit在启动后，会通过job来驱动。
-//! [uload_util]：每个unit配置文件相关的属性定义。
-//! [unit_base]：unit相关对象基本属性的定义，如unit类型的枚举，unit依赖关系的定义
-//! [unit_datastore]: unit对象存储模块，负责对unit模块状态进行存储。
-//! [unit_entry]：unit相关对象的定义
+//!  Unit is the main module for process 1 to manage and abstract system services
+//!  The module contains:
+//!  [execute]: unit Object data structure definition to be executed.
+//!  [job]: The scheduling execution entity corresponding to the unit. After each unit is started, it will be driven by the job.
+//!  [uload_util]: Attribute definitions related to each unit configuration file.
+//!  [unit_base]: Definition of basic attributes of unit related objects, such as enumeration of unit type and definition of unit dependency
+//!  [unit_datastore]: the unit object storage module is responsible for storing the unit module status.
+//!  [unit_entry]: Definition of unit related objects
 //!
-use std::path::Path;
-
-pub use execute::{ExecCmdError, ExecCommand, ExecContext, ExecFlags, ExecParameters};
+pub use data::{UnitActiveState, UnitNotifyFlags};
+pub use execute::{ExecCmdError, ExecContext, ExecFlags, ExecParameters};
 pub use unit_base::{
-    KillOperation, UnitActionError, UnitDependencyMask, UnitRelationAtom, UnitType,
+    DeserializeWith, KillOperation, UnitActionError, UnitDependencyMask, UnitRef, UnitRelationAtom,
 };
-pub use unit_entry::{Unit, UnitObj, UnitRef};
+pub use unit_entry::{Unit, UnitObj};
 pub(super) use unit_manager::UnitManagerX;
-pub use unit_manager::{UnitManager, UnitMngUtil, UnitSubClass};
+pub use unit_manager::{UnitManager, UnitManagerObj, UnitMngUtil, UnitSubClass};
+pub use unit_rentry::{ExecCommand, UnitRelations, UnitType};
 
+///
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug)]
 pub enum UnitErrno {
+    ///
     UnitErrInput,
+    ///
     UnitErrNotExisted,
+    ///
     UnitErrInternel,
+    ///
     UnitErrNotSupported,
 }
 
 // dependency:
-// unit_base -> {uload_util} ->
-// unit_rentry -> unit_entry ->
-// {unit_datastore -> unit_runtime} ->
-// {job | execute} -> unit_manager
+// unit_rentry -> data -> unit_base -> {uload_util} ->
+// unit_entry -> {unit_datastore -> unit_runtime} -> job ->
+// {execute | sigchld | notify} -> unit_manager
 
+mod data;
 mod execute;
 mod job;
+mod notify;
+mod sigchld;
 mod uload_util;
 mod unit_base;
 mod unit_datastore;
@@ -40,65 +48,3 @@ mod unit_entry;
 mod unit_manager;
 mod unit_rentry;
 mod unit_runtime;
-
-pub use serde::{Deserialize, Deserializer};
-
-pub trait DeserializeWith: Sized {
-    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>;
-}
-
-impl DeserializeWith for Vec<String> {
-    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(de)?;
-        let mut vec = Vec::new();
-
-        for l in s.split_terminator(';') {
-            vec.push(l.trim().to_string());
-        }
-
-        Ok(vec)
-    }
-}
-
-impl DeserializeWith for Vec<ExecCommand> {
-    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(de)?;
-
-        let mut vec = vec![];
-
-        for cmd in s.trim().split_terminator(';') {
-            if cmd.is_empty() {
-                continue;
-            }
-
-            let mut command: Vec<String> = cmd
-                .trim()
-                .split_whitespace()
-                .map(|s| s.to_string())
-                .collect();
-
-            // get the command and leave the command args
-            let exec_cmd = command.remove(0);
-            let path = Path::new(&exec_cmd);
-
-            if path.is_absolute() && !path.exists() {
-                log::debug!("{:?} is not exist in parse!", path);
-                continue;
-            }
-
-            let cmd = path.to_str().unwrap().to_string();
-            let new_command = ExecCommand::new(cmd, command);
-            vec.push(new_command);
-        }
-
-        Ok(vec)
-    }
-}

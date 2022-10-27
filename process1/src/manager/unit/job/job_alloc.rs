@@ -1,24 +1,40 @@
 #![warn(unused_imports)]
-use super::job_entry::{Job, JobKind};
-use crate::manager::unit::unit_base::JobMode;
+use super::job_entry::{Job, JobConf};
+use super::job_rentry::{JobKind, JobRe};
 use crate::manager::unit::unit_entry::UnitX;
+use crate::reliability::Reliability;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
 pub(super) struct JobAlloc {
+    // associated objects
+    reli: Rc<Reliability>,
+    rentry: Rc<JobRe>,
+
+    // owned objects
     data: RefCell<JobAllocData>,
 }
 
 impl JobAlloc {
-    pub(super) fn new() -> JobAlloc {
+    pub(super) fn new(relir: &Rc<Reliability>, rentryr: &Rc<JobRe>) -> JobAlloc {
         JobAlloc {
+            reli: Rc::clone(relir),
+            rentry: Rc::clone(rentryr),
             data: RefCell::new(JobAllocData::new()),
         }
     }
 
-    pub(super) fn alloc(&self, unit: Rc<UnitX>, kind: JobKind, mode: JobMode) -> Rc<Job> {
-        self.data.borrow_mut().alloc(unit, kind, mode)
+    pub(super) fn clear(&self) {
+        self.data.borrow_mut().clear();
+    }
+
+    pub(super) fn alloc(&self, config: &JobConf) -> Rc<Job> {
+        let unit = config.get_unit();
+        let kind = config.get_kind();
+        self.data
+            .borrow_mut()
+            .alloc(&self.reli, &self.rentry, Rc::clone(unit), kind)
     }
 }
 
@@ -40,10 +56,19 @@ impl JobAllocData {
         }
     }
 
-    pub(self) fn alloc(&mut self, unit: Rc<UnitX>, kind: JobKind, mode: JobMode) -> Rc<Job> {
-        let job = Rc::new(Job::new(self.alloc_id(), unit, kind));
-        job.init_attr(mode);
-        job
+    pub(self) fn clear(&mut self) {
+        self.ids.clear();
+        self.last_id = 0;
+    }
+
+    pub(self) fn alloc(
+        &mut self,
+        relir: &Rc<Reliability>,
+        rentryr: &Rc<JobRe>,
+        unit: Rc<UnitX>,
+        kind: JobKind,
+    ) -> Rc<Job> {
+        Rc::new(Job::new(relir, rentryr, self.alloc_id(), unit, kind))
     }
 
     fn alloc_id(&mut self) -> u32 {

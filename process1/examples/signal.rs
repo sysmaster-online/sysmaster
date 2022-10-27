@@ -17,19 +17,11 @@ fn main() {
     r_s.push_str("target/release;");
     env::set_var("PROCESS_LIB_LOAD_PATH", r_s.as_str());
 
-    const MODE: Mode = Mode::SYSTEM;
-    const ACTION: Action = Action::RUN;
+    const MODE: Mode = Mode::System;
+    const ACTION: Action = Action::Run;
     let manager = ManagerX::new(MODE, ACTION);
 
-    let unit_name = String::from("config.service");
+    manager.startup().unwrap();
 
-    {
-        match manager.start_unit(&unit_name) {
-            Ok(_) => {}
-            Err(e) => {
-                println!("start error: {:?}", e)
-            }
-        }
-    }
     log::debug!("event running");
 }

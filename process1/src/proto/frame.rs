@@ -135,29 +135,35 @@ where
 mod tests {
     use super::super::abi::unit_comm::Action as UnitAction;
     use super::*;
-    use std::net::TcpStream;
+    use std::net::{SocketAddr, TcpStream};
     use std::thread;
     use std::time::Duration;
 
     #[test]
-    #[should_panic]
     fn test_send_and_recv() {
         thread::spawn(move || {
             thread::sleep(Duration::from_secs(1));
-            let addr = "127.0.0.1:9527";
-            let stream = TcpStream::connect(addr).unwrap();
+            let addrs = [
+                SocketAddr::from(([127, 0, 0, 1], 9528)),
+                SocketAddr::from(([127, 0, 0, 1], 9529)),
+            ];
+            let stream = TcpStream::connect(&addrs[..]).unwrap();
             let mut client = ProstClientStream::new(stream);
             let cmd = CommandRequest::new_unitcomm(UnitAction::Start, "test.service");
             let _ = client.execute(cmd).unwrap();
         });
 
-        let fd = std::net::TcpListener::bind("127.0.0.1:9527").unwrap();
+        let addrs = [
+            SocketAddr::from(([127, 0, 0, 1], 9528)),
+            SocketAddr::from(([127, 0, 0, 1], 9529)),
+        ];
+        let fd = std::net::TcpListener::bind(&addrs[..]).unwrap();
         loop {
             for stream in fd.incoming() {
                 match stream {
-                    Err(e) => eprintln!("failed: {}", e),
+                    Err(e) => assert!(false, "failed: {}", e),
                     Ok(_stream) => {
-                        panic!("has receive a command request");
+                        return;
                     }
                 }
             }

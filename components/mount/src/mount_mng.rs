@@ -1,16 +1,10 @@
-//! mount子类的核心逻辑
+//!  The core logic of the mount subclass
 
-use std::{cell::RefCell, rc::Rc};
-
-use crate::mount_comm::MountComm;
+use super::mount_comm::MountUnitComm;
+use super::mount_rentry::MountState;
 use process1::manager::{UnitActiveState, UnitNotifyFlags};
-
-// Mount包含两个状态，未挂载Dead，已挂载Mounted。对应到unit状态为inactive和active
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-enum MountState {
-    Dead,
-    Mounted,
-}
+use process1::ReStation;
+use std::{cell::RefCell, rc::Rc};
 
 impl MountState {
     fn mount_state_to_unit_state(&self) -> UnitActiveState {
@@ -22,12 +16,29 @@ impl MountState {
 }
 
 pub(super) struct MountMng {
-    comm: Rc<MountComm>,
+    comm: Rc<MountUnitComm>,
     state: RefCell<MountState>,
 }
 
+impl ReStation for MountMng {
+    // no input, no compensate
+
+    // data
+    fn db_map(&self) {
+        if let Some(state) = self.comm.rentry_mng_get() {
+            *self.state.borrow_mut() = state;
+        }
+    }
+
+    fn db_insert(&self) {
+        self.comm.rentry_mng_insert(self.state());
+    }
+
+    // reload: no external connections, no entry
+}
+
 impl MountMng {
-    pub(super) fn new(_comm: &Rc<MountComm>) -> Self {
+    pub(super) fn new(_comm: &Rc<MountUnitComm>) -> Self {
         MountMng {
             comm: Rc::clone(_comm),
             state: RefCell::new(MountState::Dead),
@@ -37,23 +48,28 @@ impl MountMng {
     // process doesn't support manually mount/umount like systemd.
     // We only monitor the state of mountpoint.
 
-    pub(super) fn enter_dead(&self) {
-        self.set_state(MountState::Dead);
+    pub(super) fn enter_dead(&self, notify: bool) {
+        self.set_state(MountState::Dead, notify);
     }
 
-    pub(super) fn enter_mounted(&self) {
-        self.set_state(MountState::Mounted);
+    pub(super) fn enter_mounted(&self, notify: bool) {
+        self.set_state(MountState::Mounted, notify);
     }
 
-    fn set_state(&self, new_state: MountState) {
+    fn set_state(&self, new_state: MountState, notify: bool) {
         let old_state = self.state();
-        self.state.replace(new_state);
+        self.change_state(new_state);
+
+        if notify {
+            self.state_notify(new_state, old_state);
+        }
+    }
+
+    fn state_notify(&self, new_state: MountState, old_state: MountState) {
         if new_state != old_state {
             log::debug!(
                 "{} original state[{:?}] -> new state[{:?}]",
-                self.comm
-                    .unit()
-                    .map_or_else(|| "0".to_string(), |u| u.get_id().to_string()),
+                self.comm.unit().id(),
                 old_state,
                 new_state,
             );
@@ -61,57 +77,56 @@ impl MountMng {
 
         let old_unit_state = old_state.mount_state_to_unit_state();
         let new_unit_state = new_state.mount_state_to_unit_state();
-        if let Some(_u) = self.comm.unit() {
-            _u.notify(
-                old_unit_state,
-                new_unit_state,
-                UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
-            );
-        }
+        self.comm.unit().notify(
+            old_unit_state,
+            new_unit_state,
+            UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
+        );
+
+        self.db_update();
     }
+
+    fn change_state(&self, new_state: MountState) {
+        self.state.replace(new_state);
+    }
+
     fn state(&self) -> MountState {
         *self.state.borrow()
     }
 
-    pub fn mount_state_to_unit_state(&self) -> UnitActiveState {
+    pub(super) fn mount_state_to_unit_state(&self) -> UnitActiveState {
         self.state().mount_state_to_unit_state()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
-    use super::MountComm;
     use super::MountMng;
     use super::MountState;
+    use super::MountUnitComm;
+    use std::rc::Rc;
+
     #[test]
     fn test_mount_set_state() {
-        let _comm = Rc::new(MountComm::new());
+        let _comm = Rc::new(MountUnitComm::new());
         let tm = MountMng::new(&_comm);
-        tm.set_state(MountState::Mounted);
+        tm.set_state(MountState::Mounted, false);
         assert_eq!(tm.state(), MountState::Mounted)
     }
 
     #[test]
     fn test_mount_enter_dead() {
-        let _comm = Rc::new(MountComm::new());
+        let _comm = Rc::new(MountUnitComm::new());
         let tm = MountMng::new(&_comm);
-        tm.enter_dead();
+        tm.enter_dead(false);
         assert_eq!(tm.state(), MountState::Dead)
     }
 
     #[test]
     fn test_mount_enter_mounted() {
-        let _comm = Rc::new(MountComm::new());
+        let _comm = Rc::new(MountUnitComm::new());
         let tm = MountMng::new(&_comm);
-        tm.enter_mounted();
+        tm.enter_mounted(false);
         assert_eq!(tm.state(), MountState::Mounted)
-    }
-
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
     }
 }

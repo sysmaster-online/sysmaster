@@ -71,6 +71,12 @@ xattr = "0.2.3"
 [build-dependencies]
 prost-build = "0.9" # 编译 protobuf
 
+[profile.dev]
+panic = 'abort'
+
+[profile.release]
+panic = 'abort'
+
 [workspace]
 members = [
   "libcgroup",

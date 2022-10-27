@@ -1,47 +1,72 @@
-use super::execute::{ExecCmdError, ExecCommand, ExecParameters, ExecSpawn};
+use super::execute::{ExecCmdError, ExecParameters, ExecSpawn};
 use super::job::{JobAffect, JobConf, JobKind, JobManager};
-use super::unit_base::{JobMode, UnitDependencyMask, UnitLoadState, UnitRelationAtom};
+use super::notify::NotifyManager;
+use super::sigchld::Sigchld;
+use super::unit_base::{UnitDependencyMask, UnitRelationAtom};
 use super::unit_datastore::UnitDb;
 use super::unit_entry::{Unit, UnitObj, UnitX};
+use super::unit_rentry::{ExecCommand, JobMode, UnitLoadState, UnitRe, UnitType};
 use super::unit_runtime::UnitRT;
-use super::{ExecContext, UnitActionError, UnitType};
-use crate::manager::data::{DataManager, UnitState};
-use crate::manager::manager_config::ManagerConfig;
+use super::{ExecContext, UnitActionError};
+use crate::manager::rentry::ReliLastFrame;
 use crate::manager::table::{TableOp, TableSubscribe};
-use crate::manager::{MngErrno, UnitActiveState, UnitRelations};
-use event::{EventState, Events, Source};
-use libmount::mountinfo;
-use nix::sys::socket::UnixCredentials;
+use crate::manager::unit::data::{DataManager, UnitState};
+use crate::manager::{MngErrno, UnitRelations};
+use crate::plugin::Plugin;
+use crate::reliability::{ReStation, ReStationKind, Reliability};
+use event::Events;
 use nix::unistd::Pid;
-use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::fs::File;
-use std::io::Read;
+use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
 use unit_load::UnitLoad;
-
-use utils::error::Error as ServiceError;
+use unit_submanager::UnitSubManagers;
 use utils::process_util;
+use utils::Result;
 
 //#[derive(Debug)]
 pub(in crate::manager) struct UnitManagerX {
+    dm: Rc<DataManager>,
     sub_name: String, // key for table-subscriber: UnitState
     data: Rc<UnitManager>,
 }
 
+impl Drop for UnitManagerX {
+    fn drop(&mut self) {
+        log::debug!("UnitManagerX drop, clear.");
+        // repeating protection
+        self.dm.clear();
+    }
+}
+
 impl UnitManagerX {
-    pub(in crate::manager) fn new(
-        dmr: &Rc<DataManager>,
-        eventr: &Rc<Events>,
-        configm: &Rc<ManagerConfig>,
-    ) -> UnitManagerX {
+    pub(in crate::manager) fn new(eventr: &Rc<Events>, relir: &Rc<Reliability>) -> UnitManagerX {
+        let _dm = Rc::new(DataManager::new());
         let umx = UnitManagerX {
+            dm: Rc::clone(&_dm),
             sub_name: String::from("UnitManagerX"),
-            data: UnitManager::new(dmr, eventr, configm),
+            data: UnitManager::new(eventr, relir, &_dm),
         };
-        umx.register(dmr);
+        umx.register(&_dm, relir);
         umx
+    }
+
+    pub(in crate::manager) fn register_ex(&self) {
+        self.data.register_ex();
+    }
+
+    pub(in crate::manager) fn entry_clear(&self) {
+        self.dm.entry_clear();
+        self.data.entry_clear();
+    }
+
+    pub(in crate::manager) fn entry_coldplug(&self) {
+        self.data.entry_coldplug();
+    }
+
+    pub(in crate::manager) fn enumerate(&self) {
+        self.data.sms.enumerate()
     }
 
     pub(in crate::manager) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
@@ -52,62 +77,63 @@ impl UnitManagerX {
         self.data.stop_unit(name)
     }
 
-    pub(in crate::manager) fn child_dispatch_sigchld(&self) -> Result<(), Box<dyn Error>> {
-        self.data.db.child_dispatch_sigchld()
-    }
-
-    pub(in crate::manager) fn dispatch_mountinfo(&self) -> Result<(), MngErrno> {
-        self.data.dispatch_mountinfo()
+    pub(in crate::manager) fn child_sigchld_enable(&self, enable: bool) -> Result<i32> {
+        self.data.sigchld.enable(enable)
     }
 
     pub(in crate::manager) fn dispatch_load_queue(&self) {
         self.data.rt.dispatch_load_queue()
     }
 
-    fn register(&self, dm: &DataManager) {
+    fn register(&self, dm: &DataManager, relir: &Reliability) {
+        // dm-unit_state
         let subscriber = Rc::clone(&self.data);
-        let register_result = dm.register_unit_state(&self.sub_name, subscriber);
-        if let Some(_r) = register_result {
-            log::info!("TableSubcribe for {} is already register", &self.sub_name);
-        } else {
-            log::info!("register  TableSubcribe for {}  successful", &self.sub_name);
-        }
-    }
+        let ret = dm.register_unit_state(&self.sub_name, subscriber);
+        assert!(ret.is_none());
 
-    pub(crate) fn notify_message(
-        &self,
-        ucred: &UnixCredentials,
-        messages: &HashMap<&str, &str>,
-        fds: Vec<i32>,
-    ) -> Result<(), ServiceError> {
-        self.data.notify_message(ucred, messages, fds)
+        // reliability-station
+        let station = Rc::clone(&self.data);
+        let kind = ReStationKind::Level2;
+        relir.station_register(&String::from("UnitManager"), kind, station);
     }
 }
 
 /// the struct for manager the unit instance
 pub struct UnitManager {
+    // associated objects
+    events: Rc<Events>,
+    reli: Rc<Reliability>,
+    plugins: Arc<Plugin>,
+
+    // owned objects
+    rentry: Rc<UnitRe>,
+    sms: UnitSubManagers,
     db: Rc<UnitDb>,
     rt: Rc<UnitRT>,
     load: UnitLoad,
-    jm: JobManager,
+    jm: Rc<JobManager>,
     exec: ExecSpawn,
-    events: Rc<Events>,
-    config: Rc<ManagerConfig>,
-}
-
-fn mount_point_to_unit_name(mount_point: &str) -> String {
-    let mut res = String::from(mount_point).replace('/', "-") + ".mount";
-    if res != "-.mount" {
-        res = String::from(&res[1..])
-    }
-    res
+    sigchld: Sigchld,
+    notify: NotifyManager,
 }
 
 /// the declaration "pub(self)" is for identification only.
 impl UnitManager {
+    ///
+    pub fn rentry_trigger_merge(&self, unit_id: &String, force: bool) {
+        self.jm.rentry_trigger_merge(unit_id, force)
+    }
+
+    ///
+    pub fn trigger_unit(&self, lunit: &str) {
+        let unit = self.db.units_get(lunit).unwrap();
+        let cnt = self.jm.run(Some(&unit));
+        assert_ne!(cnt, 0); // something must be triggered
+    }
+
     /// add pid and its correspond unit to
-    pub fn child_watch_pid(&self, pid: Pid, id: &str) {
-        self.db.child_add_watch_pid(pid, id)
+    pub fn child_watch_pid(&self, id: &str, pid: Pid) {
+        self.db.child_add_watch_pid(id, pid)
     }
 
     /// add all the pid of unit id, read pids from cgroup path.
@@ -116,8 +142,19 @@ impl UnitManager {
     }
 
     /// delete the pid from the db
-    pub fn child_unwatch_pid(&self, pid: Pid) {
-        self.db.child_unwatch_pid(pid)
+    pub fn child_unwatch_pid(&self, id: &str, pid: Pid) {
+        self.db.child_unwatch_pid(id, pid)
+    }
+
+    ///
+    pub fn units_get(&self, name: &str) -> Option<Rc<Unit>> {
+        self.db.units_get(name).map(|uxr| uxr.unit())
+    }
+
+    ///
+    pub fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<Rc<Unit>> {
+        let units = self.db.units_get_all(unit_type);
+        units.iter().map(|uxr| uxr.unit()).collect::<Vec<_>>()
     }
 
     /// call the exec spawn to start the child service
@@ -131,9 +168,14 @@ impl UnitManager {
         self.exec.spawn(unit, cmdline, params, ctx)
     }
 
+    ///
+    pub fn load_unit(&self, name: &str) -> Option<Rc<Unit>> {
+        self.load_unitx(name).map(|uxr| uxr.unit())
+    }
+
     /// load the unit for reference name
     pub fn load_unit_success(&self, name: &str) -> bool {
-        if let Some(_unit) = self.load_unit(name) {
+        if let Some(_unit) = self.load_unitx(name) {
             return true;
         }
 
@@ -145,7 +187,7 @@ impl UnitManager {
         let stem_name = Path::new(name).file_stem().unwrap().to_str().unwrap();
         let relate_name = format!("{}.{}", stem_name, String::from(unit_type));
 
-        if let Some(_unit) = self.load_unit(&relate_name) {
+        if let Some(_unit) = self.load_unitx(&relate_name) {
             return true;
         }
 
@@ -224,35 +266,15 @@ impl UnitManager {
 
     /// get the unit the has atom relation with the unit
     pub fn get_dependency_list(&self, unit_name: &str, atom: UnitRelationAtom) -> Vec<Rc<Unit>> {
-        let mut ret_list: Vec<Rc<Unit>> = Vec::new();
         let s_unit = if let Some(unit) = self.db.units_get(unit_name) {
             unit
         } else {
             log::error!("unit [{}] not found!!!!!", unit_name);
-            return ret_list;
+            return Vec::new();
         };
 
         let dep_units = self.rt.get_dependency_list(&s_unit, atom);
-        for unit_x in dep_units {
-            let a = Rc::clone(&*(*unit_x));
-            ret_list.push(a);
-        }
-        ret_list
-    }
-
-    /// register the source to the event
-    pub fn register(&self, source: Rc<dyn Source>) {
-        self.events.add_source(source).unwrap();
-    }
-
-    /// set the source to state
-    pub fn enable(&self, source: Rc<dyn Source>, state: EventState) {
-        self.events.set_enabled(source, state).unwrap();
-    }
-
-    /// unregister the source from the event
-    pub fn unregister(&self, source: Rc<dyn Source>) {
-        self.events.del_source(source).unwrap();
+        dep_units.iter().map(|uxr| uxr.unit()).collect::<Vec<_>>()
     }
 
     /// check if there is already a stop job in process
@@ -306,7 +328,7 @@ impl UnitManager {
             return false;
         }
 
-        if p_unit.unwrap().get_id() == unit {
+        if p_unit.unwrap().id() == unit {
             return true;
         }
 
@@ -315,23 +337,33 @@ impl UnitManager {
 
     /// start the unit
     pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
-        if let Some(unit) = self.load_unit(name) {
+        if let Some(unit) = self.load_unitx(name) {
             log::debug!("load unit success, send to job manager");
             self.jm.exec(
-                &JobConf::new(Rc::clone(&unit), JobKind::JobStart),
-                JobMode::JobReplace,
+                &JobConf::new(Rc::clone(&unit), JobKind::Start),
+                JobMode::Replace,
                 &mut JobAffect::new(false),
             )?;
             log::debug!("job exec success");
             Ok(())
         } else {
-            Err(MngErrno::MngErrInternel)
+            Err(MngErrno::Internel)
         }
     }
 
     /// return the notify path
     pub fn notify_socket(&self) -> Option<PathBuf> {
-        self.config.notify_sock()
+        self.notify.notify_sock()
+    }
+
+    ///
+    pub fn events(&self) -> Rc<Events> {
+        Rc::clone(&self.events)
+    }
+
+    ///
+    pub fn reliability(&self) -> Rc<Reliability> {
+        Rc::clone(&self.reli)
     }
 
     pub(in crate::manager) fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {
@@ -339,120 +371,48 @@ impl UnitManager {
     }
 
     pub(self) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
-        if let Some(unit) = self.load_unit(name) {
+        if let Some(unit) = self.load_unitx(name) {
             self.jm.exec(
-                &JobConf::new(Rc::clone(&unit), JobKind::JobStop),
-                JobMode::JobReplace,
+                &JobConf::new(Rc::clone(&unit), JobKind::Stop),
+                JobMode::Replace,
                 &mut JobAffect::new(false),
             )?;
             Ok(())
         } else {
-            Err(MngErrno::MngErrInternel)
+            Err(MngErrno::Internel)
         }
-    }
-
-    pub(self) fn dispatch_mountinfo(&self) -> Result<(), MngErrno> {
-        // First mark all active mount point we have as dead.
-        let mut dead_mount_set: HashSet<String> = HashSet::new();
-        for unit in self.db.units_get_all().iter() {
-            if unit.unit_type() == UnitType::UnitMount
-                && unit.active_state() == UnitActiveState::UnitActive
-            {
-                dead_mount_set.insert(String::from(unit.get_id()));
-            }
-        }
-
-        // Then start mount point we don't know.
-        let mut mountinfo_content = String::new();
-        File::open("/proc/self/mountinfo")
-            .unwrap()
-            .read_to_string(&mut mountinfo_content)
-            .unwrap();
-        let parser = mountinfo::Parser::new(mountinfo_content.as_bytes());
-        for mount_result in parser {
-            match mount_result {
-                Ok(mount) => {
-                    // We don't process autofs for now, because it is not
-                    // .mount but .automount in systemd.
-                    if mount.fstype.to_str() == Some("autofs") {
-                        continue;
-                    }
-                    let unit_name = mount_point_to_unit_name(mount.mount_point.to_str().unwrap());
-                    if dead_mount_set.contains(unit_name.as_str()) {
-                        dead_mount_set.remove(unit_name.as_str());
-                    } else if let Some(unit) = self.load.load_unit(unit_name.as_str()) {
-                        match unit.start() {
-                            Ok(_) => {
-                                log::debug!("{} change to mounted.", unit_name)
-                            }
-                            Err(_) => {
-                                log::error!("Failed to start {}", unit_name)
-                            }
-                        }
-                    }
-                }
-                Err(err) => {
-                    log::error!("Failed to parse /proc/self/mountinfo: {}", err);
-                }
-            }
-        }
-
-        // Finally stop mount point in dead_mount_set.
-        for unit_name in dead_mount_set.into_iter() {
-            if let Some(unit) = self.db.units_get(unit_name.as_str()) {
-                match unit.stop() {
-                    Ok(_) => {
-                        log::debug!("{} change to dead.", unit_name)
-                    }
-                    Err(_) => {
-                        log::error!("Failed to stop {}.", unit_name)
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 
     pub(self) fn new(
-        dmr: &Rc<DataManager>,
         eventr: &Rc<Events>,
-        configm: &Rc<ManagerConfig>,
+        relir: &Rc<Reliability>,
+        dmr: &Rc<DataManager>,
     ) -> Rc<UnitManager> {
-        let _db = Rc::new(UnitDb::new());
-        let _rt = Rc::new(UnitRT::new(&_db));
+        let _rentry = Rc::new(UnitRe::new(relir));
+        let _db = Rc::new(UnitDb::new(&_rentry));
+        let _rt = Rc::new(UnitRT::new(relir, &_rentry, &_db));
+        let _jm = Rc::new(JobManager::new(eventr, relir, &_db));
         let um = Rc::new(UnitManager {
-            load: UnitLoad::new(dmr, &_db, &_rt),
+            events: Rc::clone(eventr),
+            reli: Rc::clone(relir),
+            plugins: Plugin::get_instance(),
+            sms: UnitSubManagers::new(relir),
+            rentry: Rc::clone(&_rentry),
+            load: UnitLoad::new(dmr, &_rentry, &_db, &_rt),
             db: Rc::clone(&_db),
             rt: Rc::clone(&_rt),
-            jm: JobManager::new(&_db, eventr),
+            jm: Rc::clone(&_jm),
             exec: ExecSpawn::new(),
-            events: eventr.clone(),
-            config: configm.clone(),
+            sigchld: Sigchld::new(eventr, relir, &_db, &_jm),
+            notify: NotifyManager::new(eventr, relir, &_rentry, &_db, &_jm),
         });
+        um.sms.set_um(&um);
         um.load.set_um(&um);
         um
     }
 
-    fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
+    fn load_unitx(&self, name: &str) -> Option<Rc<UnitX>> {
         self.load.load_unit(name)
-    }
-
-    fn notify_message(
-        &self,
-        ucred: &UnixCredentials,
-        messages: &HashMap<&str, &str>,
-        fds: Vec<i32>,
-    ) -> Result<(), ServiceError> {
-        let unit = self.get_unit_by_pid(Pid::from_raw(ucred.pid()));
-        log::debug!("get unit by ucred pid: {}", ucred.pid());
-
-        if unit.is_some() {
-            unit.unwrap().notify_message(ucred, messages, fds)?;
-            return Ok(());
-        }
-
-        log::warn!("Not found the unit for pid: {}", ucred.pid());
-        Ok(())
     }
 }
 
@@ -478,10 +438,8 @@ impl UnitManager {
             // debug
         }
 
-        for other in self
-            .db
-            .dep_gets_atom(&unitx, UnitRelationAtom::UnitAtomTriggeredBy)
-        {
+        let atom = UnitRelationAtom::UnitAtomTriggeredBy;
+        for other in self.db.dep_gets_atom(&unitx, atom) {
             other.trigger(&unitx);
         }
     }
@@ -491,10 +449,163 @@ impl UnitManager {
     }
 }
 
+impl ReStation for UnitManager {
+    // input
+    fn input_rebuild(&self) {
+        // sigchld
+        self.sigchld.input_rebuild();
+
+        // sub-manager
+        self.sms.input_rebuild();
+    }
+
+    // compensate
+    fn db_compensate_last(&self, lframe: (u32, Option<u32>, Option<u32>), lunit: Option<&String>) {
+        let (frame, _, _) = lframe;
+        if let Ok(f) = ReliLastFrame::try_from(frame) {
+            match f {
+                ReliLastFrame::Queue => self.rt.db_compensate_last(lframe, lunit),
+                ReliLastFrame::JobManager => self.jm.db_compensate_last(lframe, lunit),
+                ReliLastFrame::SigChld => self.sigchld.db_compensate_last(lframe, lunit),
+                ReliLastFrame::CgEvent => todo!(),
+                ReliLastFrame::Notify => self.notify.db_compensate_last(lframe, lunit),
+                ReliLastFrame::SubManager => self.sms.db_compensate_last(lframe, lunit),
+                _ => {} // not concerned, do nothing
+            };
+        }
+    }
+
+    fn db_compensate_history(&self) {
+        // queue: do nothing
+
+        // job
+        self.jm.db_compensate_history();
+
+        // sig-child: do nothing
+
+        // cg-event: do nothing
+
+        // notify: do nothing
+    }
+
+    fn do_compensate_last(&self, lframe: (u32, Option<u32>, Option<u32>), lunit: Option<&String>) {
+        let (frame, _, _) = lframe;
+        if let Ok(f) = ReliLastFrame::try_from(frame) {
+            match f {
+                ReliLastFrame::Queue => self.rt.do_compensate_last(lframe, lunit),
+                ReliLastFrame::JobManager => self.jm.do_compensate_last(lframe, lunit),
+                ReliLastFrame::SigChld => self.sigchld.do_compensate_last(lframe, lunit),
+                ReliLastFrame::CgEvent => todo!(),
+                ReliLastFrame::Notify => self.notify.do_compensate_last(lframe, lunit),
+                ReliLastFrame::SubManager => self.sms.do_compensate_last(lframe, lunit),
+                _ => {} // not concerned, do nothing
+            };
+        }
+    }
+
+    fn do_compensate_others(&self, lunit: Option<&String>) {
+        // queue: do nothing
+
+        // job
+        self.jm.do_compensate_others(lunit);
+
+        // sig-child: do nothing
+
+        // cg-event: do nothing
+
+        // notify: do nothing
+    }
+
+    // data
+    fn db_map(&self) {
+        // unit_datastore(with unit_entry)
+        /* unit-sets with unit_entry */
+        for unit_id in self.rentry.base_keys().iter() {
+            let unit = self.load.try_new_unit(unit_id).unwrap();
+            unit.db_map();
+            self.db.units_insert(unit_id.clone(), unit);
+        }
+        /* others: unit-dep and unit-child */
+        self.db.db_map_excl_units();
+
+        // rt
+        self.rt.db_map();
+
+        // job
+        self.jm.db_map();
+
+        // notify
+        self.notify.db_map();
+
+        // sub-manager
+        self.sms.db_map();
+    }
+
+    // reload
+    fn register_ex(&self) {
+        // notify
+        self.notify.register_ex();
+    }
+
+    fn entry_coldplug(&self) {
+        for unit in self.db.units_get_all(None).iter() {
+            // unit
+            unit.entry_coldplug();
+
+            // job
+            self.jm.coldplug_unit(unit);
+        }
+    }
+
+    fn entry_clear(&self) {
+        // job
+        self.jm.entry_clear();
+
+        // rt
+        self.rt.entry_clear();
+
+        // db
+        self.db.entry_clear();
+    }
+}
+
 /// the trait used for attach UnitManager to sub unit
 pub trait UnitMngUtil {
     /// the method of attach to UnitManager to sub unit
-    fn attach(&self, um: Rc<UnitManager>);
+    fn attach_um(&self, um: Rc<UnitManager>);
+
+    /// the method of attach to Reliability to sub unit
+    fn attach_reli(&self, reli: Rc<Reliability>);
+}
+
+///The trait Defining Shared Behavior of sub unit-manager
+pub trait UnitManagerObj: UnitMngUtil + ReStation {
+    ///
+    /* repeatable */
+    fn enumerate_perpetual(&self) {}
+    ///
+    /* repeatable */
+    fn enumerate(&self) {}
+    ///
+    fn shutdown(&self) {}
+}
+
+/// #[macro_use]
+/// the macro for create a sub unit-manager instance
+#[macro_export]
+macro_rules! declure_umobj_plugin {
+    ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {
+        // method for create the sub-unit-manager instance
+        #[no_mangle]
+        pub fn __um_obj_create() -> *mut dyn $crate::manager::UnitManagerObj {
+            logger::init_log_with_default($name, $level);
+            let construcotr: fn() -> $unit_type = $constructor;
+
+            let obj = construcotr();
+            let boxed: Box<dyn $crate::manager::UnitManagerObj> = Box::new(obj);
+            Box::into_raw(boxed)
+        }
+    };
 }
 
 /// the trait used for translate to UnitObj
@@ -521,16 +632,142 @@ macro_rules! declure_unitobj_plugin {
     };
 }
 
+mod unit_submanager {
+    use super::{UnitManager, UnitManagerObj};
+    use crate::manager::unit::unit_rentry::UnitType;
+    use crate::reliability::Reliability;
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+    use std::convert::TryFrom;
+    use std::rc::{Rc, Weak};
+
+    pub(super) struct UnitSubManagers {
+        reli: Rc<Reliability>,
+        um: RefCell<Weak<UnitManager>>,
+        db: RefCell<HashMap<UnitType, Box<dyn UnitManagerObj>>>,
+    }
+
+    impl UnitSubManagers {
+        pub(super) fn new(relir: &Rc<Reliability>) -> UnitSubManagers {
+            UnitSubManagers {
+                reli: Rc::clone(relir),
+                um: RefCell::new(Weak::new()),
+                db: RefCell::new(HashMap::new()),
+            }
+        }
+
+        pub(super) fn set_um(&self, um: &Rc<UnitManager>) {
+            // update um
+            self.um.replace(Rc::downgrade(um));
+
+            // fill all unit-types
+            for ut in 0..UnitType::UnitTypeMax as u32 {
+                self.add_sub(UnitType::try_from(ut).ok().unwrap());
+            }
+        }
+
+        pub(super) fn enumerate(&self) {
+            for (_, sub) in self.db.borrow().iter() {
+                sub.enumerate();
+            }
+        }
+
+        pub(super) fn input_rebuild(&self) {
+            for (_, sub) in self.db.borrow().iter() {
+                sub.input_rebuild();
+            }
+        }
+
+        pub(super) fn db_map(&self) {
+            for (_, sub) in self.db.borrow().iter() {
+                sub.db_map();
+            }
+        }
+
+        pub(super) fn db_compensate_last(
+            &self,
+            lframe: (u32, Option<u32>, Option<u32>),
+            lunit: Option<&String>,
+        ) {
+            let utype = self.last_unittype(lframe);
+            if utype.is_none() {
+                return;
+            }
+
+            let unit_type = utype.unwrap();
+            if let Some(sub) = self.db.borrow().get(&unit_type) {
+                sub.db_compensate_last(lframe, lunit);
+            }
+        }
+
+        pub(super) fn do_compensate_last(
+            &self,
+            lframe: (u32, Option<u32>, Option<u32>),
+            lunit: Option<&String>,
+        ) {
+            let utype = self.last_unittype(lframe);
+            if utype.is_none() {
+                return;
+            }
+
+            let unit_type = utype.unwrap();
+            if let Some(sub) = self.db.borrow().get(&unit_type) {
+                sub.do_compensate_last(lframe, lunit);
+            }
+        }
+
+        fn add_sub(&self, unit_type: UnitType) {
+            assert!(!self.db.borrow().contains_key(&unit_type));
+
+            let sub = self.new_sub(unit_type);
+            if let Some(s) = sub {
+                self.db.borrow_mut().insert(unit_type, s);
+            }
+        }
+
+        fn new_sub(&self, unit_type: UnitType) -> Option<Box<dyn UnitManagerObj>> {
+            let um = self.um();
+            let ret = um.plugins.create_um_obj(unit_type);
+            if ret.is_err() {
+                log::info!("create um_obj is not found, type {:?}!", unit_type);
+                return None;
+            }
+
+            let sub = ret.unwrap();
+            let reli = um.reliability();
+            sub.attach_um(um);
+            sub.attach_reli(reli);
+            Some(sub)
+        }
+
+        fn last_unittype(&self, lframe: (u32, Option<u32>, Option<u32>)) -> Option<UnitType> {
+            let (_, utype, _) = lframe;
+            utype?;
+
+            let ut = utype.unwrap();
+            if ut > UnitType::UnitTypeMax as u32 {
+                // error
+                return None;
+            }
+
+            Some(UnitType::try_from(ut).ok().unwrap())
+        }
+
+        fn um(&self) -> Rc<UnitManager> {
+            self.um.clone().into_inner().upgrade().unwrap()
+        }
+    }
+}
+
 mod unit_load {
     use super::UnitManager;
-    use crate::manager::data::{DataManager, UnitDepConf};
     use crate::manager::table::{TableOp, TableSubscribe};
+    use crate::manager::unit::data::{DataManager, UnitDepConf};
     use crate::manager::unit::uload_util::UnitFile;
-    use crate::manager::unit::unit_base::{self, UnitType};
     use crate::manager::unit::unit_datastore::UnitDb;
     use crate::manager::unit::unit_entry::UnitX;
+    use crate::manager::unit::unit_rentry::{self, UnitRe, UnitType};
     use crate::manager::unit::unit_runtime::UnitRT;
-    use crate::plugin::Plugin;
     use std::cell::RefCell;
     use std::rc::{Rc, Weak};
 
@@ -541,10 +778,15 @@ mod unit_load {
     }
 
     impl UnitLoad {
-        pub(super) fn new(dmr: &Rc<DataManager>, dbr: &Rc<UnitDb>, rtr: &Rc<UnitRT>) -> UnitLoad {
+        pub(super) fn new(
+            dmr: &Rc<DataManager>,
+            rentryr: &Rc<UnitRe>,
+            dbr: &Rc<UnitDb>,
+            rtr: &Rc<UnitRT>,
+        ) -> UnitLoad {
             let load = UnitLoad {
                 sub_name: String::from("UnitLoad"),
-                data: Rc::new(UnitLoadData::new(dmr, dbr, rtr)),
+                data: Rc::new(UnitLoadData::new(dmr, rentryr, dbr, rtr)),
             };
             load.register(dmr);
             load
@@ -558,14 +800,14 @@ mod unit_load {
             self.data.set_um(um);
         }
 
+        pub(super) fn try_new_unit(&self, name: &str) -> Option<Rc<UnitX>> {
+            self.data.try_new_unit(name)
+        }
+
         fn register(&self, dm: &DataManager) {
             let subscriber = Rc::clone(&self.data);
             let ret = dm.register_ud_config(&self.sub_name, subscriber);
-            if let Some(_r) = ret {
-                log::info!("TableSubcribe for {} is already register", &self.sub_name);
-            } else {
-                log::info!("register  TableSubcribe for {}  successful", &self.sub_name);
-            }
+            assert!(ret.is_none())
         }
     }
 
@@ -573,6 +815,7 @@ mod unit_load {
     struct UnitLoadData {
         // associated objects
         dm: Rc<DataManager>,
+        rentry: Rc<UnitRe>,
         um: RefCell<Weak<UnitManager>>,
         db: Rc<UnitDb>,
         rt: Rc<UnitRT>,
@@ -585,6 +828,7 @@ mod unit_load {
     impl UnitLoadData {
         pub(self) fn new(
             dmr: &Rc<DataManager>,
+            rentryr: &Rc<UnitRe>,
             dbr: &Rc<UnitDb>,
             rtr: &Rc<UnitRT>,
         ) -> UnitLoadData {
@@ -592,6 +836,7 @@ mod unit_load {
             let file = Rc::new(UnitFile::new());
             UnitLoadData {
                 dm: Rc::clone(dmr),
+                rentry: Rc::clone(rentryr),
                 um: RefCell::new(Weak::new()),
                 db: Rc::clone(dbr),
                 rt: Rc::clone(rtr),
@@ -630,7 +875,6 @@ mod unit_load {
                 return Some(Rc::clone(&unit));
             };
             let unit = self.prepare_unit(name)?;
-
             log::info!("begin dispatch unit in  load queue");
             self.rt.dispatch_load_queue();
             Some(Rc::clone(&unit))
@@ -640,19 +884,19 @@ mod unit_load {
             self.um.replace(Rc::downgrade(um));
         }
 
-        fn try_new_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-            let unit_type = unit_base::unit_name_to_type(name);
+        pub(self) fn try_new_unit(&self, name: &str) -> Option<Rc<UnitX>> {
+            let unit_type = unit_rentry::unit_name_to_type(name);
             if unit_type == UnitType::UnitTypeInvalid {
                 return None;
             }
 
             log::info!(
-                "begin create obj for type {}, name {} by plugin",
-                unit_type.to_string(),
+                "begin create obj for type {:?}, name {} by plugin",
+                unit_type,
                 name
             );
-            let plugins = Plugin::get_instance();
-            let subclass = match plugins.create_unit_obj(unit_type) {
+            let um = self.um();
+            let subclass = match um.plugins.create_unit_obj(unit_type) {
                 Ok(sub) => sub,
                 Err(_e) => {
                     log::error!("Failed to create unit_obj!");
@@ -660,15 +904,22 @@ mod unit_load {
                 }
             };
 
-            subclass.attach(self.um.clone().into_inner().upgrade().unwrap());
+            let reli = um.reliability();
+            subclass.attach_um(um);
+            subclass.attach_reli(reli);
 
             Some(Rc::new(UnitX::new(
                 &self.dm,
+                &self.rentry,
                 &self.file,
                 unit_type,
                 name,
                 subclass.into_unitobj(),
             )))
+        }
+
+        fn um(&self) -> Rc<UnitManager> {
+            self.um.clone().into_inner().upgrade().unwrap()
         }
     }
 
@@ -697,7 +948,7 @@ mod unit_load {
                 for o_name in list {
                     let tmp_unit: Rc<UnitX>;
                     if let Some(o_unit) = self.push_dep_unit_into_load_queue(o_name) {
-                        //can not call unit_load directly，will be nested.
+                        //can not call unit_load directly, will be nested.
                         tmp_unit = Rc::clone(&o_unit);
                     } else {
                         log::error!("create unit obj error in unit manager");
@@ -707,9 +958,9 @@ mod unit_load {
                     if let Err(_e) =
                         self.db
                             .dep_insert(Rc::clone(&unit), *relation, tmp_unit, true, 0)
-                    //insert the dependency，but not judge loaded success, if loaded failed, whether record the dependency.
+                    //insert the dependency, but not judge loaded success, if loaded failed, whether record the dependency.
                     {
-                        log::debug!("add dependency relation failed for source unit is {},dependency unit is {}",unit.get_id(),o_name);
+                        log::debug!("add dependency relation failed for source unit is {},dependency unit is {}",unit.id(),o_name);
                         return;
                     }
                 }
@@ -725,6 +976,9 @@ mod unit_load {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::manager::unit::data::UnitActiveState;
+    use crate::mount::mount_setup;
     use event::Events;
     use nix::errno::Errno;
     use nix::sys::signal::Signal;
@@ -732,15 +986,13 @@ mod tests {
     use std::time::Duration;
     use utils::logger;
 
-    use crate::mount::mount_setup;
-
     fn init_dm_for_test() -> (Rc<DataManager>, Rc<Events>, Rc<UnitManager>) {
         logger::init_log_with_console("manager test", 4);
-        let dm_manager = Rc::new(DataManager::new());
-        let _event = Rc::new(Events::new().unwrap());
-        let configm = Rc::new(ManagerConfig::new());
-        let um = UnitManager::new(&dm_manager, &_event, &configm);
-        (dm_manager, _event, um)
+        let event = Rc::new(Events::new().unwrap());
+        let dm = Rc::new(DataManager::new());
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let um = UnitManager::new(&event, &reli, &dm);
+        (dm, event, um)
     }
 
     fn setup_mount_point() -> Result<(), Errno> {
@@ -752,16 +1004,16 @@ mod tests {
     #[test]
     fn test_service_unit_load() {
         logger::init_log_with_console("test_service_unit_load", 4);
-        let configm = Rc::new(ManagerConfig::new());
-        let dm_manager = Rc::new(DataManager::new());
-        let _event = Rc::new(Events::new().unwrap());
-        let um = UnitManager::new(&dm_manager, &_event, &configm);
+        let event = Rc::new(Events::new().unwrap());
+        let dm = Rc::new(DataManager::new());
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let um = UnitManager::new(&event, &reli, &dm);
 
         let unit_name = String::from("config.service");
-        let unit = um.load_unit(&unit_name);
+        let unit = um.load_unitx(&unit_name);
 
         match unit {
-            Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), "config.service"),
+            Some(_unit_obj) => assert_eq!(_unit_obj.id(), "config.service"),
             None => println!("test unit load, not found unit: {}", unit_name),
         };
     }
@@ -774,13 +1026,13 @@ mod tests {
         }
 
         logger::init_log_with_console("test_service_unit_start", 4);
-        let configm = Rc::new(ManagerConfig::new());
-        let dm_manager = Rc::new(DataManager::new());
-        let _event = Rc::new(Events::new().unwrap());
-        let um = UnitManager::new(&dm_manager, &_event, &configm);
+        let event = Rc::new(Events::new().unwrap());
+        let dm = Rc::new(DataManager::new());
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let um = UnitManager::new(&event, &reli, &dm);
 
         let unit_name = String::from("config.service");
-        let unit = um.load_unit(&unit_name);
+        let unit = um.load_unitx(&unit_name);
 
         assert!(unit.is_some());
         let u = unit.unwrap();
@@ -789,7 +1041,7 @@ mod tests {
         assert!(ret.is_ok());
 
         log::debug!("unit start end!");
-        let ret = u.stop();
+        let ret = u.stop(false);
         assert!(ret.is_ok());
         log::debug!("unit stop end!");
     }
@@ -806,7 +1058,7 @@ mod tests {
         let dm = init_dm_for_test();
 
         let unit_name = String::from("test.socket");
-        let unit = dm.2.load_unit(&unit_name);
+        let unit = dm.2.load_unitx(&unit_name);
 
         assert!(unit.is_some());
         let u = unit.unwrap();
@@ -819,7 +1071,7 @@ mod tests {
         u.sigchld_events(Pid::from_raw(-1), 0, Signal::SIGCHLD);
         assert_eq!(u.active_state(), UnitActiveState::UnitActive);
 
-        let ret = u.stop();
+        let ret = u.stop(false);
         log::debug!("socket stop ret is: {:?}", ret);
         assert!(ret.is_ok());
 
@@ -843,17 +1095,17 @@ mod tests {
     fn test_units_load() {
         logger::init_log_with_console("test_units_load", 4);
         let mut unit_name_lists: Vec<String> = Vec::new();
-        let configm = Rc::new(ManagerConfig::new());
-        let dm_manager = Rc::new(DataManager::new());
-        let _event = Rc::new(Events::new().unwrap());
-        let um = UnitManager::new(&dm_manager, &_event, &configm);
+        let event = Rc::new(Events::new().unwrap());
+        let dm = Rc::new(DataManager::new());
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let um = UnitManager::new(&event, &reli, &dm);
 
         unit_name_lists.push("config.service".to_string());
         // unit_name_lists.push("testsunit.target".to_string());
         for u_name in unit_name_lists.iter() {
-            let unit = um.load_unit(u_name);
+            let unit = um.load_unitx(u_name);
             match unit {
-                Some(_unit_obj) => assert_eq!(_unit_obj.get_id(), u_name),
+                Some(_unit_obj) => assert_eq!(_unit_obj.id(), u_name),
                 None => println!("test unit load, not found unit: {}", u_name),
             };
         }
@@ -861,23 +1113,23 @@ mod tests {
     #[test]
     fn test_target_unit_load() {
         logger::init_log_with_console("test_target_unit_load", 4);
-        let configm = Rc::new(ManagerConfig::new());
         let mut unit_name_lists: Vec<String> = Vec::new();
-        let dm_manager = Rc::new(DataManager::new());
-        let _event = Rc::new(Events::new().unwrap());
-        let um = UnitManager::new(&dm_manager, &_event, &configm);
+        let event = Rc::new(Events::new().unwrap());
+        let dm = Rc::new(DataManager::new());
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let um = UnitManager::new(&event, &reli, &dm);
 
         unit_name_lists.push("testsunit.target".to_string());
         // unit_name_lists.push("testsunit.target".to_string());
         for u_name in unit_name_lists.iter() {
-            let unit = um.load_unit(u_name);
+            let unit = um.load_unitx(u_name);
             match unit {
                 Some(_unit_obj) => {
                     println!(
                         "{:?}",
                         _unit_obj.get_config().config_data().borrow().Unit.Requires
                     );
-                    assert_eq!(_unit_obj.get_id(), u_name);
+                    assert_eq!(_unit_obj.id(), u_name);
                 }
                 None => println!("test unit load, not found unit: {}", u_name),
             };

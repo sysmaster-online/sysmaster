@@ -1,30 +1,6 @@
 use bitflags::bitflags;
 use std::{cell::RefCell, collections::HashMap, ffi::CString, path::PathBuf, rc::Rc};
 
-/// the exec command that was parsed from the unit file
-#[derive(PartialEq, Clone, Eq, Debug)]
-pub struct ExecCommand {
-    path: String,
-    argv: Vec<String>,
-}
-
-impl ExecCommand {
-    /// create a new instance of the command
-    pub fn new(path: String, argv: Vec<String>) -> ExecCommand {
-        ExecCommand { path, argv }
-    }
-
-    /// return the path of the command
-    pub fn path(&self) -> &String {
-        &self.path
-    }
-
-    /// return the arguments of the command
-    pub fn argv(&self) -> Vec<&String> {
-        self.argv.iter().collect::<Vec<_>>()
-    }
-}
-
 /// the error
 #[derive(Debug)]
 pub enum ExecCmdError {
@@ -64,11 +40,11 @@ impl ExecContext {
     }
 
     /// return all the environment with hashMap
-    pub fn envs(&self) -> HashMap<String, String> {
-        let mut tmp = HashMap::new();
+    pub fn envs(&self) -> Vec<(String, String)> {
+        let mut tmp = Vec::new();
 
         for (key, value) in &*self.envs.borrow() {
-            tmp.insert(key.to_string(), value.to_string());
+            tmp.push((key.to_string(), value.to_string()));
         }
         tmp
     }

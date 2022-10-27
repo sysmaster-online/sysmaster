@@ -3,44 +3,74 @@
 //! Trait UnitMngUtil is used to attach the Unitmanager to the sub unit.
 //! Trait UnitSubClass implement the convert from sub unit to UnitObj.
 
+use crate::{
+    socket_base::{LOG_LEVEL, PLUGIN_NAME},
+    socket_comm::SocketUnitComm,
+    socket_config::SocketConfig,
+    socket_load::SocketLoad,
+    socket_mng::SocketMng,
+};
 use nix::{sys::signal::Signal, unistd::Pid};
 use process1::manager::{
     ExecContext, Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj,
     UnitSubClass,
 };
+use process1::{ReStation, Reliability};
 use std::{error::Error, path::PathBuf, rc::Rc};
-
-use crate::{
-    socket_comm::SocketComm, socket_config::SocketConfig, socket_load::SocketLoad,
-    socket_mng::SocketMng, socket_port::SocketPorts,
-};
 use utils::logger;
 
 // the structuer of the socket unit type
 struct SocketUnit {
-    comm: Rc<SocketComm>,
+    comm: Rc<SocketUnitComm>,
     config: Rc<SocketConfig>,
-    mng: Rc<SocketMng>,
-    ports: Rc<SocketPorts>,
+    mng: SocketMng,
     load: SocketLoad,
+}
+
+impl ReStation for SocketUnit {
+    // input: do nothing
+
+    // compensate: do nothing
+
+    // data
+    fn db_map(&self) {
+        self.config.db_map();
+        self.mng.db_map();
+    }
+
+    fn db_insert(&self) {
+        self.config.db_insert();
+        self.mng.db_insert();
+    }
+
+    // reload: entry-only
+    fn entry_coldplug(&self) {
+        // rebuild external connections, like: timer, ...
+        self.mng.entry_coldplug();
+    }
+
+    fn entry_clear(&self) {
+        // release external connection, like: timer, ...
+        self.mng.entry_clear();
+    }
 }
 
 impl UnitObj for SocketUnit {
     fn load(&self, paths: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
         log::debug!("socket begin to load conf file");
-        self.config.load(paths)?;
+        self.config.load(paths, true)?;
 
-        self.load.parse(self.config.config_data(), &self.mng)?;
-
-        self.load.socket_add_extras(&self.mng);
+        let ret = self.load.socket_add_extras();
+        if ret.is_err() {
+            self.config.reset();
+            return ret;
+        }
 
         self.load.socket_verify()
     }
 
     // the function entrance to start the unit
     fn start(&self) -> Result<(), UnitActionError> {
-        self.ports.attach(self.mng.clone());
-
         let starting = self.mng.start_check()?;
         if starting {
             log::debug!("socket already in start");
@@ -52,11 +82,13 @@ impl UnitObj for SocketUnit {
         Ok(())
     }
 
-    fn stop(&self) -> Result<(), UnitActionError> {
-        let stopping = self.mng.stop_check()?;
-        if stopping {
-            log::debug!("socket already in stop, return immediretly");
-            return Ok(());
+    fn stop(&self, force: bool) -> Result<(), UnitActionError> {
+        if !force {
+            let stopping = self.mng.stop_check()?;
+            if stopping {
+                log::debug!("socket already in stop, return immediretly");
+                return Ok(());
+            }
         }
 
         self.mng.stop_action();
@@ -75,18 +107,23 @@ impl UnitObj for SocketUnit {
     }
 
     fn collect_fds(&self) -> Vec<i32> {
-        self.ports.collect_fds()
+        self.mng.collect_fds()
     }
 
     fn attach_unit(&self, unit: Rc<Unit>) {
         self.comm.attach_unit(unit);
+        self.db_insert();
     }
 }
 
 // attach the UnitManager for weak reference
 impl UnitMngUtil for SocketUnit {
-    fn attach(&self, um: Rc<UnitManager>) {
+    fn attach_um(&self, um: Rc<UnitManager>) {
         self.comm.attach_um(um);
+    }
+
+    fn attach_reli(&self, reli: Rc<Reliability>) {
+        self.comm.attach_reli(reli);
     }
 }
 
@@ -99,16 +136,13 @@ impl UnitSubClass for SocketUnit {
 impl SocketUnit {
     fn new() -> SocketUnit {
         let context = Rc::new(ExecContext::new());
-        let _comm = Rc::new(SocketComm::new());
-        let _config = Rc::new(SocketConfig::new());
-        let ports = Rc::new(SocketPorts::new());
-        let mng = Rc::new(SocketMng::new(&_comm, &_config, &ports, &context));
+        let _comm = Rc::new(SocketUnitComm::new());
+        let _config = Rc::new(SocketConfig::new(&_comm));
         SocketUnit {
             comm: Rc::clone(&_comm),
             config: Rc::clone(&_config),
-            mng,
-            ports: ports.clone(),
-            load: SocketLoad::new(&_config, &_comm, &ports),
+            mng: SocketMng::new(&_comm, &_config, &context),
+            load: SocketLoad::new(&_config, &_comm),
         }
     }
 }
@@ -119,10 +153,6 @@ impl Default for SocketUnit {
     }
 }
 
-const LOG_LEVEL: u32 = 4;
-const PLUGIN_NAME: &str = "SocketUnit";
-
-use process1::declure_unitobj_plugin;
-
 // define the method to create the instance of the unit
+use process1::declure_unitobj_plugin;
 declure_unitobj_plugin!(SocketUnit, SocketUnit::default, PLUGIN_NAME, LOG_LEVEL);

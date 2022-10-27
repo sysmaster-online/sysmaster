@@ -1,6 +1,7 @@
-use super::exec_base::{ExecCmdError, ExecCommand, ExecParameters};
+use super::exec_base::{ExecCmdError, ExecParameters};
 use super::ExecContext;
-use crate::manager::unit::Unit;
+use crate::manager::unit::unit_entry::Unit;
+use crate::manager::unit::unit_rentry::ExecCommand;
 use cgroup;
 use log;
 use nix::fcntl::FcntlArg;
@@ -247,7 +248,7 @@ fn flags_fds(fds: &mut Vec<i32>) -> bool {
             return false;
         }
 
-        if let Err(_e) = fd_util::fd_cloexec(*fd) {
+        if let Err(_e) = fd_util::fd_cloexec(*fd, false) {
             return false;
         }
     }

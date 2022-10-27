@@ -1,9 +1,11 @@
 use super::u_entry::{Unit, UnitObj};
 use super::uu_config::UeConfig;
-use crate::manager::data::{DataManager, UnitActiveState, UnitRelations};
+use crate::manager::unit::data::{DataManager, UnitActiveState};
 use crate::manager::unit::uload_util::UnitFile;
-use crate::manager::unit::unit_base::{UnitActionError, UnitLoadState, UnitType};
+use crate::manager::unit::unit_base::UnitActionError;
+use crate::manager::unit::unit_rentry::{UnitLoadState, UnitRe, UnitRelations, UnitType};
 use crate::manager::unit::UnitErrno;
+use crate::reliability::ReStation;
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use std::error::Error;
@@ -15,17 +17,36 @@ use utils::IN_SET;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(in crate::manager) struct UnitX(Rc<Unit>);
 
+impl ReStation for UnitX {
+    // no input, no compensate
+
+    // data
+    fn db_map(&self) {
+        self.0.db_map();
+    }
+
+    // reload: entry-only
+    fn entry_coldplug(&self) {
+        self.0.entry_coldplug();
+    }
+
+    fn entry_clear(&self) {
+        self.0.entry_clear();
+    }
+}
+
 impl UnitX {
     pub(in crate::manager) fn dump(&self) {}
 
     pub(in crate::manager::unit) fn new(
         dmr: &Rc<DataManager>,
+        rentryr: &Rc<UnitRe>,
         filer: &Rc<UnitFile>,
         unit_type: UnitType,
         name: &str,
         subclass: Box<dyn UnitObj>,
     ) -> UnitX {
-        let unit = Unit::new(unit_type, name, dmr, filer, subclass);
+        let unit = Unit::new(unit_type, name, dmr, rentryr, filer, subclass);
         UnitX(unit)
     }
 
@@ -38,23 +59,13 @@ impl UnitX {
         // transaction_add_job_and_dependencies: bus_unit_validate_load_state + manager_unit_cache_should_retry_load + unit_load + bus_unit_validate_load_state
         todo!();
     }
-    pub(in crate::manager::unit) fn coldplug(&self) {}
     pub(in crate::manager::unit) fn start(&self) -> Result<(), UnitActionError> {
-        log::debug!("unitx start the unit {}", self.get_id());
+        log::debug!("unitx start the unit {}", self.id());
         self.0.start()
     }
-    pub(in crate::manager::unit) fn stop(&self) -> Result<(), UnitActionError> {
-        let state = self.0.current_active_state();
 
-        if IN_SET!(
-            state,
-            UnitActiveState::UnitInActive,
-            UnitActiveState::UnitFailed
-        ) {
-            return Err(UnitActionError::UnitActionEAlready);
-        }
-
-        self.0.stop()
+    pub(in crate::manager::unit) fn stop(&self, force: bool) -> Result<(), UnitActionError> {
+        self.0.stop(force)
     }
     pub(in crate::manager::unit) fn reload(&self) -> Result<(), UnitActionError> {
         todo!();
@@ -93,8 +104,8 @@ impl UnitX {
         Ok(())
     }
 
-    pub(in crate::manager::unit) fn get_id(&self) -> &str {
-        self.0.get_id()
+    pub(in crate::manager::unit) fn id(&self) -> &String {
+        self.0.id()
     }
 
     // pub(in crate::manager::unit) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
@@ -167,6 +178,18 @@ impl UnitX {
 
     pub(in crate::manager::unit) fn default_dependencies(&self) -> bool {
         self.0.default_dependencies()
+    }
+
+    pub(in crate::manager::unit) fn child_add_pids(&self, pid: Pid) {
+        self.0.child_add_pids(pid);
+    }
+
+    pub(in crate::manager::unit) fn child_remove_pids(&self, pid: Pid) {
+        self.0.child_remove_pids(pid);
+    }
+
+    pub(in crate::manager::unit) fn unit(&self) -> Rc<Unit> {
+        Rc::clone(&self.0)
     }
 }
 

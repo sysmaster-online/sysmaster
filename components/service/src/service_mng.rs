@@ -1,12 +1,14 @@
-use crate::service_base::NotifyState;
-
-use super::service_base::{ServiceCommand, ServiceType};
-use super::service_comm::ServiceComm;
+use super::service_comm::ServiceUnitComm;
 use super::service_config::ServiceConfig;
 use super::service_pid::ServicePid;
+use super::service_rentry::{
+    NotifyState, ServiceCommand, ServiceResult, ServiceState, ServiceType,
+};
 use super::service_spawn::ServiceSpawn;
-
+use event::{EventState, EventType, Events, Source};
 use nix::errno::Errno;
+use nix::libc;
+use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
@@ -14,71 +16,24 @@ use process1::manager::{
     ExecCommand, ExecContext, ExecFlags, KillOperation, UnitActionError, UnitActiveState,
     UnitNotifyFlags,
 };
+use process1::ReStation;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
 use std::rc::Rc;
-use utils::{fd_util, Error, IN_SET};
-use utils::{file_util, process_util};
-
 use std::{
     os::unix::prelude::{FromRawFd, RawFd},
     path::PathBuf,
     rc::Weak,
 };
-
-use event::{EventState, EventType, Events, Source};
-use nix::libc;
-use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};
-
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub(self) enum ServiceState {
-    Dead,
-    Condition,
-    StartPre,
-    Start,
-    StartPost,
-    Running,
-    Exited,
-    Reload,
-    Stop,
-    StopWatchdog,
-    StopPost,
-    StopSigterm,
-    StopSigkill,
-    FinalWatchdog,
-    FinalSigterm,
-    FinalSigkill,
-    Failed,
-    Cleaning,
-}
-
-impl Default for ServiceState {
-    fn default() -> Self {
-        ServiceState::Dead
-    }
-}
-
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub(self) enum ServiceResult {
-    Success,
-    FailureProtocol,
-    FailureResources,
-    FailureSignal,
-    ResultInvalid,
-}
-
-impl Default for ServiceResult {
-    fn default() -> Self {
-        ServiceResult::ResultInvalid
-    }
-}
+use utils::{fd_util, Error, IN_SET};
+use utils::{file_util, process_util};
 
 pub(super) struct ServiceMng {
     // associated objects
-    comm: Rc<ServiceComm>,
+    comm: Rc<ServiceUnitComm>,
     config: Rc<ServiceConfig>,
 
     // owned objects
@@ -87,13 +42,58 @@ pub(super) struct ServiceMng {
     state: RefCell<ServiceState>,
     result: RefCell<ServiceResult>,
     main_command: RefCell<Vec<ExecCommand>>,
+    control_cmd_type: RefCell<Option<ServiceCommand>>,
     control_command: RefCell<Vec<ExecCommand>>,
     rd: Rc<RunningData>,
 }
 
+impl ReStation for ServiceMng {
+    // input: do nothing
+
+    // compensate: do nothing
+
+    // data
+    fn db_map(&self) {
+        if let Some((
+            state,
+            result,
+            m_pid,
+            c_pid,
+            main_cmd_len,
+            control_cmd_type,
+            control_cmd_len,
+            notify_state,
+        )) = self.comm.rentry_mng_get()
+        {
+            *self.state.borrow_mut() = state;
+            *self.result.borrow_mut() = result;
+            self.pid.update_main(m_pid);
+            self.pid.update_control(c_pid);
+            self.main_command_update(main_cmd_len);
+            self.control_command_update(control_cmd_type, control_cmd_len);
+            self.rd.set_notify_state(notify_state);
+        }
+    }
+
+    fn db_insert(&self) {
+        self.comm.rentry_mng_insert(
+            self.state(),
+            self.result(),
+            self.pid.main(),
+            self.pid.control(),
+            self.main_command.borrow().len(),
+            *self.control_cmd_type.borrow(),
+            self.control_command.borrow().len(),
+            self.rd.notify_state(),
+        );
+    }
+
+    // reload: no external connections, no entry
+}
+
 impl ServiceMng {
     pub(super) fn new(
-        commr: &Rc<ServiceComm>,
+        commr: &Rc<ServiceUnitComm>,
         configr: &Rc<ServiceConfig>,
         rd: &Rc<RunningData>,
         exec_ctx: &Rc<ExecContext>,
@@ -107,6 +107,7 @@ impl ServiceMng {
             state: RefCell::new(ServiceState::Dead),
             result: RefCell::new(ServiceResult::Success),
             main_command: RefCell::new(Vec::new()),
+            control_cmd_type: RefCell::new(None),
             control_command: RefCell::new(Vec::new()),
             rd: rd.clone(),
         }
@@ -145,6 +146,7 @@ impl ServiceMng {
     pub(super) fn start_action(&self) {
         self.set_result(ServiceResult::Success);
         self.enter_contion();
+        self.db_update();
     }
 
     pub(super) fn stop_check(&self) -> Result<(), UnitActionError> {
@@ -174,14 +176,17 @@ impl ServiceMng {
         ];
         if starting_state.contains(&self.state()) {
             self.enter_signal(ServiceState::StopSigterm, ServiceResult::Success);
+            self.db_update();
             return;
         }
 
         self.enter_stop(ServiceResult::Success);
+        self.db_update();
     }
 
     pub(super) fn reload_action(&self) {
         self.enter_reload();
+        self.db_update();
     }
 
     pub(super) fn current_active_state(&self) -> UnitActiveState {
@@ -232,7 +237,7 @@ impl ServiceMng {
         self.control_command.borrow_mut().clear();
         self.pid.unwatch_control();
         self.pid.unwatch_main();
-        self.main_command_fill(ServiceCommand::Start);
+        self.main_command_fill();
 
         let service_type = self.config.service_type();
 
@@ -240,7 +245,7 @@ impl ServiceMng {
             self.control_command_fill(ServiceCommand::Start);
             self.control_command_pop()
         } else {
-            self.main_command_fill(ServiceCommand::Start);
+            self.main_command_fill();
             self.main_command_pop()
         };
 
@@ -260,7 +265,7 @@ impl ServiceMng {
             .start_service(&cmd.unwrap(), 0, ExecFlags::PASS_FDS);
 
         if ret.is_err() {
-            log::error!("failed to start service: {}", self.comm.unit().get_id());
+            log::error!("failed to start service: {}", self.comm.unit().id());
             self.enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
         }
 
@@ -300,7 +305,7 @@ impl ServiceMng {
                     Err(_e) => {
                         log::error!(
                             "Failed to run start post service: {}",
-                            self.comm.unit().get_id()
+                            self.comm.unit().id()
                         );
                         return;
                     }
@@ -344,7 +349,7 @@ impl ServiceMng {
                 match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
-                        log::error!("Failed to run stop service: {}", self.comm.unit().get_id());
+                        log::error!("Failed to run stop service: {}", self.comm.unit().id());
                         self.enter_signal(
                             ServiceState::StopSigterm,
                             ServiceResult::FailureResources,
@@ -365,7 +370,7 @@ impl ServiceMng {
     }
 
     fn enter_stop_post(&self, res: ServiceResult) {
-        log::debug!("running stop post, service result: {:?}", res);
+        log::debug!("runring stop post, service result: {:?}", res);
         if self.result() == ServiceResult::Success {
             self.set_result(res);
         }
@@ -380,7 +385,7 @@ impl ServiceMng {
                             ServiceState::FinalSigterm,
                             ServiceResult::FailureResources,
                         );
-                        log::error!("Failed to run stop service: {}", self.comm.unit().get_id());
+                        log::error!("Failed to run stop service: {}", self.comm.unit().id());
                         return;
                     }
                 }
@@ -415,7 +420,7 @@ impl ServiceMng {
                 match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
-                        log::error!("failed to start service: {}", self.comm.unit().get_id());
+                        log::error!("failed to start service: {}", self.comm.unit().id());
                         self.enter_running(ServiceResult::Success);
                         return;
                     }
@@ -433,9 +438,7 @@ impl ServiceMng {
             res
         );
 
-        self.comm
-            .um()
-            .child_watch_all_pids(self.comm.unit().get_id());
+        self.comm.um().child_watch_all_pids(self.comm.unit().id());
 
         let op = state.to_kill_operation();
         match self
@@ -522,7 +525,8 @@ impl ServiceMng {
         }
 
         log::debug!(
-            "original state: {:?}, change to: {:?}",
+            "unit: {}, original state: {:?}, change to: {:?}",
+            self.comm.unit().id(),
             original_state,
             state
         );
@@ -545,12 +549,12 @@ impl ServiceMng {
     }
 
     fn run_next_control(&self) {
-        log::debug!("running next control command");
+        log::debug!("runring next control command");
         if let Some(cmd) = self.control_command_pop() {
             match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                 Ok(pid) => self.pid.set_control(pid),
                 Err(_e) => {
-                    log::error!("failed to start service: {}", self.comm.unit().get_id());
+                    log::error!("failed to start service: {}", self.comm.unit().id());
                 }
             }
         }
@@ -561,7 +565,7 @@ impl ServiceMng {
             match self.spawn.start_service(&cmd, 0, ExecFlags::PASS_FDS) {
                 Ok(pid) => self.pid.set_main(pid),
                 Err(_e) => {
-                    log::error!("failed to run main command: {}", self.comm.unit().get_id());
+                    log::error!("failed to run main command: {}", self.comm.unit().id());
                 }
             }
         }
@@ -579,7 +583,8 @@ impl ServiceMng {
         *self.result.borrow()
     }
 
-    fn main_command_fill(&self, cmd_type: ServiceCommand) {
+    fn main_command_fill(&self) {
+        let cmd_type = ServiceCommand::Start;
         if let Some(cmds) = self.config.get_exec_cmds(cmd_type) {
             *self.main_command.borrow_mut() = cmds
         }
@@ -587,6 +592,15 @@ impl ServiceMng {
 
     fn main_command_pop(&self) -> Option<ExecCommand> {
         self.main_command.borrow_mut().pop()
+    }
+
+    fn main_command_update(&self, len: usize) {
+        self.main_command.borrow_mut().clear();
+        self.main_command_fill();
+        let max = self.main_command.borrow().len();
+        for _i in len..max {
+            self.main_command_pop();
+        }
     }
 
     fn control_command_fill(&self, cmd_type: ServiceCommand) {
@@ -599,7 +613,20 @@ impl ServiceMng {
         self.control_command.borrow_mut().pop()
     }
 
-    // pub fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Vec<ExecCommand> {
+    fn control_command_update(&self, cmd_type: Option<ServiceCommand>, len: usize) {
+        if let Some(c_type) = cmd_type {
+            self.control_command.borrow_mut().clear();
+            self.control_command_fill(c_type);
+            let max = self.control_command.borrow().len();
+            for _i in len..max {
+                self.control_command_pop();
+            }
+        } else {
+            assert_eq!(len, 0);
+        }
+    }
+
+    // fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Vec<ExecCommand> {
     //     if let Some(cmds) = self.exec_commands.borrow_mut().get(&cmd_type) {
     //         cmds.as_slice()
     //     } else {
@@ -607,7 +634,7 @@ impl ServiceMng {
     //     }
     // }
 
-    // pub fn insert_exec_cmds(&mut self, cmd_type: ServiceCommand, cmds: Vec<ExecCommand>) {
+    // fn insert_exec_cmds(&mut self, cmd_type: ServiceCommand, cmds: Vec<ExecCommand>) {
     //     self.exec_commands
     //         .borrow_mut()
     //         .insert(cmd_type, cmds.clone());
@@ -661,9 +688,7 @@ impl ServiceMng {
 
         self.pid.unwatch_main();
         self.pid.set_main(pid);
-        self.comm
-            .um()
-            .child_watch_pid(pid, self.comm.unit().get_id());
+        self.comm.um().child_watch_pid(self.comm.unit().id(), pid);
 
         Ok(true)
     }
@@ -689,7 +714,7 @@ impl ServiceMng {
         if self
             .comm
             .um()
-            .same_unit_with_pid(self.comm.unit().get_id(), pid)
+            .same_unit_with_pid(self.comm.unit().id(), pid)
         {
             return Ok(true);
         }
@@ -697,7 +722,7 @@ impl ServiceMng {
         Ok(false)
     }
 
-    pub fn demand_pid_file(&self) -> Result<(), Error> {
+    fn demand_pid_file(&self) -> Result<(), Error> {
         let pid_file_inotify = PathIntofy::new(PathBuf::from(
             self.config
                 .config_data()
@@ -713,15 +738,17 @@ impl ServiceMng {
         self.watch_pid_file()
     }
 
-    pub fn watch_pid_file(&self) -> Result<(), Error> {
+    fn watch_pid_file(&self) -> Result<(), Error> {
         let pid_file_inotify = self.rd.path_inotify();
         log::debug!("watch pid file: {}", pid_file_inotify);
         match pid_file_inotify.add_watch_path() {
             Ok(_) => {
-                self.comm.um().register(pid_file_inotify.clone());
-                self.comm
-                    .um()
-                    .enable(pid_file_inotify.clone(), EventState::On);
+                let events = self.comm.um().events();
+                let source = Rc::clone(&pid_file_inotify);
+                events.add_source(source).unwrap();
+                let source = Rc::clone(&pid_file_inotify);
+                events.set_enabled(source, EventState::On).unwrap();
+
                 if let Err(e) = self.retry_pid_file() {
                     log::warn!("retry load pid file error: {}, Ignore and Continue", e);
                 }
@@ -741,12 +768,12 @@ impl ServiceMng {
         }
     }
 
-    pub(super) fn unwatch_pid_file(&self) {
+    fn unwatch_pid_file(&self) {
         log::debug!("unwatch pid file {}", self.rd.path_inotify());
         self.rd.path_inotify().unwatch();
     }
 
-    pub(super) fn retry_pid_file(&self) -> Result<bool, Error> {
+    fn retry_pid_file(&self) -> Result<bool, Error> {
         log::debug!("retry loading pid file: {}", self.rd.path_inotify());
         self.load_pid_file()?;
 
@@ -767,6 +794,11 @@ impl ServiceMng {
 
 impl ServiceMng {
     pub(super) fn sigchld_event(&self, pid: Pid, code: i32, status: Signal) {
+        self.do_sigchld_event(pid, code, status);
+        self.db_update();
+    }
+
+    fn do_sigchld_event(&self, pid: Pid, code: i32, status: Signal) {
         log::debug!(
             "ServiceUnit sigchld exit, pid: {:?} code:{}, status:{}",
             pid,
@@ -983,6 +1015,17 @@ impl ServiceMng {
         messages: &HashMap<&str, &str>,
         _fds: Vec<i32>,
     ) -> Result<(), Error> {
+        let ret = self.do_notify_message(ucred, messages, _fds);
+        self.db_update();
+        ret
+    }
+
+    fn do_notify_message(
+        &self,
+        ucred: &UnixCredentials,
+        messages: &HashMap<&str, &str>,
+        _fds: Vec<i32>,
+    ) -> Result<(), Error> {
         if let Some(&pidr) = messages.get("MAINPID") {
             if IN_SET!(
                 self.state(),
@@ -999,7 +1042,7 @@ impl ServiceMng {
                         self.pid.set_main(main_pid);
                         self.comm
                             .um()
-                            .child_watch_pid(main_pid, self.comm.unit().get_id());
+                            .child_watch_pid(self.comm.unit().id(), main_pid);
                     }
                 }
             }
@@ -1108,11 +1151,15 @@ pub(super) struct RunningData {
 }
 
 impl RunningData {
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         RunningData {
             mng: RefCell::new(Weak::new()),
             data: RefCell::new(Rtdata::new()),
         }
+    }
+
+    pub(super) fn attach_mng(&self, mng: Rc<ServiceMng>) {
+        *self.mng.borrow_mut() = Rc::downgrade(&mng);
     }
 
     pub(self) fn attach_inotify(&self, path_inotify: Rc<PathIntofy>) {
@@ -1124,19 +1171,15 @@ impl RunningData {
         self.data.borrow().path_inotify()
     }
 
-    pub(super) fn attach_mng(&self, mng: Rc<ServiceMng>) {
-        *self.mng.borrow_mut() = Rc::downgrade(&mng);
-    }
-
-    pub(super) fn set_errno(&self, errno: i32) {
+    pub(self) fn set_errno(&self, errno: i32) {
         self.data.borrow_mut().set_errno(errno);
     }
 
-    pub(super) fn set_notify_state(&self, notify_state: NotifyState) {
+    pub(self) fn set_notify_state(&self, notify_state: NotifyState) {
         self.data.borrow_mut().set_notify_state(notify_state);
     }
 
-    pub(super) fn notify_state(&self) -> NotifyState {
+    pub(self) fn notify_state(&self) -> NotifyState {
         self.data.borrow().notify_state()
     }
 }
@@ -1219,7 +1262,7 @@ impl PathIntofy {
         }
     }
 
-    pub(super) fn attach(&self, mng: Weak<ServiceMng>) {
+    pub(self) fn attach(&self, mng: Weak<ServiceMng>) {
         log::debug!("attach service mng to path inotify");
         *self.mng.borrow_mut() = mng;
     }
@@ -1322,8 +1365,31 @@ impl PathIntofy {
         Ok(false)
     }
 
-    pub(super) fn mng(&self) -> Rc<ServiceMng> {
+    pub(self) fn mng(&self) -> Rc<ServiceMng> {
         self.mng.borrow().clone().upgrade().unwrap()
+    }
+
+    fn do_dispatch(&self) -> Result<i32, Error> {
+        log::debug!("dispatch initify pid file: {:?}", self.path);
+        match self.read_fd_event() {
+            Ok(_) => {
+                if let Ok(_v) = self.mng().retry_pid_file() {
+                    return Ok(0);
+                }
+
+                if let Ok(_v) = self.mng().watch_pid_file() {
+                    return Ok(0);
+                }
+            }
+            Err(e) => {
+                log::error!("in inotify dispatch, read event error: {}", e);
+            }
+        }
+
+        self.mng().unwatch_pid_file();
+        self.mng()
+            .enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
+        Ok(0)
     }
 }
 
@@ -1345,26 +1411,9 @@ impl Source for PathIntofy {
     }
 
     fn dispatch(&self, _: &Events) -> Result<i32, Error> {
-        log::debug!("dispatch initify pid file: {:?}", self.path);
-        match self.read_fd_event() {
-            Ok(_) => {
-                if let Ok(_v) = self.mng().retry_pid_file() {
-                    return Ok(0);
-                }
-
-                if let Ok(_v) = self.mng().watch_pid_file() {
-                    return Ok(0);
-                }
-            }
-            Err(e) => {
-                log::error!("in inotify dispatch, read event error: {}", e);
-            }
-        }
-
-        self.mng().unwatch_pid_file();
-        self.mng()
-            .enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
-        Ok(0)
+        let ret = self.do_dispatch();
+        self.mng().db_update();
+        ret
     }
 
     fn token(&self) -> u64 {

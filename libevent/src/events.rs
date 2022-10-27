@@ -1,4 +1,3 @@
-//! # 一种基于epoll的事件调度框架
 //! An event scheduling framework based on epoll
 use crate::timer::Timer;
 use crate::{EventState, EventType, Poll, Signals, Source};
@@ -15,11 +14,19 @@ use std::mem::MaybeUninit;
 use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::rc::Rc;
 
-/// 一种基于epoll的事件调度框架
 /// An event scheduling framework based on epoll
 #[derive(Debug)]
 pub struct Events {
     data: RefCell<EventsData>,
+}
+
+impl Drop for Events {
+    fn drop(&mut self) {
+        println!("Events drop, clear.");
+        log::debug!("Events drop, clear.");
+        // repeating protection
+        self.clear();
+    }
 }
 
 impl Events {
@@ -130,6 +137,12 @@ impl Events {
     /// for inotify: read the inotify event when dispatch
     pub fn read_events(&self) -> Vec<InotifyEvent> {
         self.data.borrow_mut().read_events()
+    }
+
+    /// for test: clear all events to release resource
+    // repeating protection
+    pub fn clear(&self) {
+        self.data.borrow_mut().clear();
     }
 }
 
@@ -498,5 +511,16 @@ impl EventsData {
 
     pub(self) fn pending_is_empty(&self) -> bool {
         self.pending.is_empty()
+    }
+
+    fn clear(&mut self) {
+        self.sources.clear();
+        self.defer_sources.clear();
+        self.post_sources.clear();
+        self.exit_sources.clear();
+        self.pending.clear();
+        self.state.clear();
+        self.children.clear();
+        self.timerfd.clear();
     }
 }

@@ -1,16 +1,22 @@
 #![warn(unused_imports)]
+#![allow(clippy::type_complexity)]
 use super::job_alloc::JobAlloc;
-use super::job_entry::{self, Job, JobConf, JobInfo, JobKind, JobResult};
+use super::job_entry::{self, Job, JobConf, JobInfo, JobResult};
 use super::job_notify::{self};
+use super::job_rentry::{JobAttr, JobKind, JobRe};
 use super::job_stat::JobStat;
-use super::job_table::JobTable;
+use super::job_table::{self, JobTable};
 use super::job_transaction::{self};
+use super::job_unit_entry::{self};
 use super::JobErrno;
-use crate::manager::data::{UnitActiveState, UnitNotifyFlags};
+use crate::manager::rentry::ReliLastFrame;
 use crate::manager::table::{TableOp, TableSubscribe};
-use crate::manager::unit::unit_base::{JobMode, UnitRelationAtom};
+use crate::manager::unit::data::{UnitActiveState, UnitNotifyFlags};
+use crate::manager::unit::unit_base::UnitRelationAtom;
 use crate::manager::unit::unit_datastore::UnitDb;
 use crate::manager::unit::unit_entry::UnitX;
+use crate::manager::unit::unit_rentry::JobMode;
+use crate::reliability::{ReStation, Reliability};
 use event::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -53,19 +59,96 @@ pub(in crate::manager::unit) struct JobManager {
     event: Rc<Events>,
 
     // owned objects
+    // data
     sub_name: String, // key for table-subscriber: UnitSets
     data: Rc<JobManagerData>,
 }
 
+impl ReStation for JobManager {
+    // input: do nothing
+
+    // compensate
+    fn db_compensate_last(&self, _lframe: (u32, Option<u32>, Option<u32>), lunit: Option<&String>) {
+        if let Some(unit_id) = lunit {
+            // merge to trigger
+            self.rentry_trigger_merge(unit_id, true);
+        }
+    }
+
+    fn db_compensate_history(&self) {
+        // merge all triggers
+        for unit_id in self.data.rentry_trigger_keys().iter() {
+            self.rentry_trigger_merge(unit_id, false);
+        }
+    }
+
+    fn do_compensate_last(&self, _lframe: (u32, Option<u32>, Option<u32>), lunit: Option<&String>) {
+        if let Some(unit_id) = lunit {
+            // re-run
+            self.trigger_unit(unit_id);
+        }
+    }
+
+    fn do_compensate_others(&self, lunit: Option<&String>) {
+        // run all triggers
+        for unit_id in self.data.rentry_trigger_keys().iter() {
+            if Some(unit_id) != lunit {
+                // other: all excluding the last
+                self.trigger_unit(unit_id);
+            }
+        }
+    }
+
+    // data
+    fn db_map(&self) {
+        self.data.db_map();
+    }
+
+    // reload: special entry_coldplug
+    // repeating protection
+    fn entry_clear(&self) {
+        self.data.entry_clear();
+    }
+}
+
+impl Drop for JobManager {
+    fn drop(&mut self) {
+        log::debug!("JobManager drop, clear.");
+        // repeating protection
+        self.entry_clear();
+        self.data.db.clear();
+        self.data.reli.clear();
+        self.event.clear();
+    }
+}
+
 impl JobManager {
-    pub(in crate::manager::unit) fn new(dbr: &Rc<UnitDb>, eventr: &Rc<Events>) -> JobManager {
+    pub(in crate::manager::unit) fn new(
+        eventr: &Rc<Events>,
+        relir: &Rc<Reliability>,
+        dbr: &Rc<UnitDb>,
+    ) -> JobManager {
         let jm = JobManager {
             event: Rc::clone(eventr),
             sub_name: String::from("JobManager"),
-            data: Rc::new(JobManagerData::new(dbr)),
+            data: Rc::new(JobManagerData::new(relir, dbr)),
         };
         jm.register(eventr, dbr);
         jm
+    }
+
+    pub(in crate::manager::unit) fn coldplug_unit(&self, unit: &UnitX) {
+        self.data.coldplug_unit(unit);
+    }
+
+    pub(in crate::manager::unit) fn rentry_trigger_merge(&self, unit_id: &String, force: bool) {
+        self.data.rentry_trigger_merge(unit_id, force);
+    }
+
+    pub(in crate::manager::unit) fn trigger_unit(&self, lunit: &str) {
+        let unit = self.data.db.units_get(lunit).unwrap();
+        let cnt = self.run(Some(&unit));
+        assert_ne!(cnt, 0); // something must be triggered
     }
 
     pub(in crate::manager::unit) fn exec(
@@ -87,6 +170,12 @@ impl JobManager {
         self.data.notify(config, mode)?;
         self.try_enable();
         Ok(())
+    }
+
+    pub(in crate::manager::unit) fn run(&self, unit: Option<&UnitX>) -> usize {
+        let cnt = self.data.run(unit);
+        self.try_enable();
+        cnt
     }
 
     pub(in crate::manager::unit) fn try_finish(
@@ -112,17 +201,18 @@ impl JobManager {
     }
 
     pub(in crate::manager::unit) fn has_stop_job(&self, unit: &Rc<UnitX>) -> bool {
-        match self.data.get_suspends(unit) {
-            Some(_) => true,
-            None => false,
-        }
+        self.data.get_suspends(unit).is_some()
     }
 
     fn try_enable(&self) {
         // prepare for async-running
-        if self.data.is_jobs_ready() {
+        if self.data.calc_jobs_ready() && !self.data.up_ready() {
+            // somethings new comes in, it should be enabled again.
             self.enable(&self.event);
         }
+
+        // update up_ready
+        self.data.update_up_ready();
     }
 
     fn register(&self, eventr: &Rc<Events>, dbr: &Rc<UnitDb>) {
@@ -161,7 +251,14 @@ impl Source for JobManagerData {
 
     fn dispatch(&self, _event: &Events) -> Result<i32, Error> {
         log::debug!("job manager data dispatch");
-        self.run();
+
+        self.reli.set_last_frame1(ReliLastFrame::JobManager as u32);
+        self.run(None);
+        self.reli.clear_last_frame();
+
+        self.update_up_ready();
+        assert!(!self.calc_jobs_ready());
+
         Ok(0)
     }
 }
@@ -178,10 +275,12 @@ impl TableSubscribe<String, Rc<UnitX>> for JobManagerData {
 //#[derive(Debug)]
 struct JobManagerData {
     // associated objects
+    reli: Rc<Reliability>,
     db: Rc<UnitDb>,
 
     // owned objects
     // control
+    rentry: Rc<JobRe>,
     ja: JobAlloc,
 
     // data
@@ -199,20 +298,85 @@ struct JobManagerData {
 
 // the declaration "pub(self)" is for identification only.
 impl JobManagerData {
-    pub(self) fn new(dbr: &Rc<UnitDb>) -> JobManagerData {
+    pub(self) fn new(relir: &Rc<Reliability>, dbr: &Rc<UnitDb>) -> JobManagerData {
+        let _rentry = Rc::new(JobRe::new(relir));
         JobManagerData {
+            reli: Rc::clone(relir),
             db: Rc::clone(dbr),
 
-            ja: JobAlloc::new(),
+            rentry: Rc::clone(&_rentry),
+            ja: JobAlloc::new(relir, &_rentry),
 
-            jobs: JobTable::new(),
-            stage: JobTable::new(),
+            jobs: JobTable::new(dbr),
+            stage: JobTable::new(dbr),
 
             running: RefCell::new(false),
             text: RefCell::new(None),
 
             stat: JobStat::new(),
         }
+    }
+
+    pub(self) fn entry_clear(&self) {
+        self.jobs.clear();
+        self.stage.clear();
+        self.ja.clear();
+        *self.running.borrow_mut() = false;
+        *self.text.borrow_mut() = None;
+        self.stat.clear();
+    }
+
+    pub(self) fn rentry_trigger_merge(&self, unit_id: &String, force: bool) {
+        // get old
+        let (k_d, a_d) = (JobKind::Restart, JobAttr::new(true, true, force)); // default
+        let (k_o, a_o) = self
+            .rentry
+            .trigger_get(unit_id)
+            .unwrap_or((k_d, a_d.clone()));
+
+        // build new
+        let k_n = job_unit_entry::job_merge_trigger(k_o);
+        let mut a_n = a_d;
+        a_n.or(&a_o);
+
+        // insert rentry
+        self.rentry.trigger_insert(unit_id, k_n, &a_n);
+    }
+
+    pub(self) fn db_map(&self) {
+        // table(with job_entry)
+        /* trigger */
+        let mut triggers = Vec::new();
+        for (unit_id, kind, _) in self.rentry.trigger_entries().iter() {
+            let unit = self.db.units_get(unit_id).unwrap();
+            let config = JobConf::new(unit, *kind);
+            triggers.push(self.jobs.rentry_map_trigger(&self.ja, &config));
+        }
+        /* suspends */
+        let mut suspends = Vec::new();
+        for (unit_id, kind, _) in self.rentry.suspends_entries().iter() {
+            let unit = self.db.units_get(unit_id).unwrap();
+            let config = JobConf::new(unit, *kind);
+            suspends.push(self.jobs.rentry_map_suspend(&self.ja, &config));
+        }
+        self.jobs.reshuffle();
+
+        // stat
+        self.stat
+            .update_changes(&(&triggers, &Vec::new(), &Vec::new()));
+        self.stat
+            .update_changes(&(&suspends, &Vec::new(), &Vec::new()));
+        self.stat.update_stage_run(triggers.len(), true); // trigger-add[init->run]: increase 'run'
+        self.stat.update_stage_wait(suspends.len(), true); // suspend-add[init->wait]: increase 'wait'
+        self.stat.clear_cnt(); // no history
+    }
+
+    pub(self) fn coldplug_unit(&self, unit: &UnitX) {
+        // trigger
+        self.jobs.coldplug_trigger(unit);
+
+        // suspends
+        self.jobs.coldplug_suspend(unit);
     }
 
     pub(self) fn exec(
@@ -250,49 +414,59 @@ impl JobManagerData {
     }
 
     pub(self) fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
-        if config.get_kind() != JobKind::JobReload {
-            return Err(JobErrno::JobErrInput);
+        if config.get_kind() != JobKind::Reload {
+            return Err(JobErrno::Input);
         }
 
         self.do_notify(config, Some(mode));
         Ok(())
     }
 
-    pub(self) fn run(&self) {
+    pub(self) fn run(&self, unit: Option<&UnitX>) -> usize {
+        let mut cnt: usize = 0;
         loop {
+            // pop(JobTable.try_trigger()) + {record + action}(Job.run())
             // try to trigger something to run
             *self.text.borrow_mut() = None; // reset every time
             *self.running.borrow_mut() = true;
-            let trigger_ret = self.jobs.try_trigger(&self.db);
+            let trigger_ret = self.jobs.try_trigger(unit);
             *self.running.borrow_mut() = false;
 
             if let Some((trigger_info, merge_trigger)) = trigger_ret {
                 // something is triggered in this round
+                (cnt, _) = cnt.overflowing_add(1); // ++
+
                 // update statistics
                 self.stat.update_change(&(&None, &merge_trigger, &None));
-                self.stat
-                    .update_stage_wait(trigger_info.is_some().into(), false); // trigger-someone[wait->run]: decrease 'wait'
-                self.stat
-                    .update_stage_run(trigger_info.is_some().into(), true); // trigger-someone[wait->run]: increase 'run'
+                if trigger_info.is_some() {
+                    let t_jinfo = trigger_info.as_ref().cloned().unwrap().0;
+                    let not_retrigger = t_jinfo.kind == t_jinfo.run_kind;
+                    self.stat.update_stage_wait(not_retrigger.into(), false); // trigger-non-retrigger[wait->run]: decrease 'wait'
+                    self.stat.update_stage_run(not_retrigger.into(), true); // trigger-non-retrigger[wait->run]: increase 'run'
+                }
 
                 // try to finish it now in two case, and the case coming from unit has higher priority
-                // case 1. the job has been finished synchronously in context;
-                // case 2. the trigger is finished(failed or over);
+                // case 1. the job has been finished synchronously in context, which is derived from outside('unit') directly.
+                // case 2. the trigger is ended(failed or over), which is derived from 'job' mechanism itself.
                 if let Some((unit, os, ns, flags)) = self.text.take() {
-                    // case 1
+                    // case 1: finish it
                     self.do_try_finish(&unit, os, ns, flags);
                     *self.text.borrow_mut() = None;
                 }
 
-                if let Some((t_jinfo, Some(tfinish_r))) = trigger_info {
-                    // case 2
-                    self.do_remove(&t_jinfo, tfinish_r, false);
+                if let Some((t_jinfo, Some(tend_r))) = trigger_info {
+                    // case 2: remove it
+                    self.do_remove(&t_jinfo, tend_r, true);
                 }
             } else {
                 // nothing is triggered in this round
                 break;
             }
+
+            self.reli.clear_last_unit();
         }
+
+        cnt
     }
 
     pub(self) fn try_finish(
@@ -307,10 +481,10 @@ impl JobManagerData {
             // (synchronous)finish in context
             if self.text.borrow().is_some() {
                 // the unit has been finished already
-                return Err(JobErrno::JobErrInput);
+                return Err(JobErrno::Input);
             }
 
-            *self.text.borrow_mut() = Some((Rc::clone(unit), os.clone(), ns.clone(), flags));
+            *self.text.borrow_mut() = Some((Rc::clone(unit), os, ns, flags));
         // update and record it.
         } else {
             // (asynchronous)finish not in context
@@ -323,33 +497,49 @@ impl JobManagerData {
     pub(self) fn remove(&self, id: u32) -> Result<(), JobErrno> {
         assert!(!*self.running.borrow());
 
-        let job_info = self.jobs.get(id);
-        if job_info.is_none() {
-            return Err(JobErrno::JobErrNotExisted);
+        let jinfo = self.jobs.get(id);
+        if jinfo.is_none() {
+            return Err(JobErrno::NotExisted);
         }
+        let job_info = jinfo.unwrap();
 
         if self.jobs.is_trigger(id) {
-            return Err(JobErrno::JobErrNotSupported);
+            return Err(JobErrno::NotSupported);
         }
 
         if !self.jobs.is_suspend(id) {
-            return Err(JobErrno::JobErrInternel);
+            return Err(JobErrno::Internel);
         }
 
-        self.do_remove(&job_info.unwrap(), JobResult::JobCancelled, true);
+        // remove it from outside(command) directly
+        self.do_remove(&job_info, JobResult::Cancelled, false);
+        // mandatory removement is not considered a failure
+
         Ok(())
+    }
+
+    pub(self) fn update_up_ready(&self) {
+        self.jobs.update_up_ready();
     }
 
     pub(self) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
         self.jobs.get(id)
     }
 
-    pub(self) fn is_jobs_ready(&self) -> bool {
-        self.jobs.is_ready()
+    pub(self) fn up_ready(&self) -> bool {
+        self.jobs.up_ready()
+    }
+
+    pub(self) fn rentry_trigger_keys(&self) -> Vec<String> {
+        self.rentry.trigger_keys()
+    }
+
+    pub(self) fn calc_jobs_ready(&self) -> bool {
+        self.jobs.calc_ready()
     }
 
     pub(self) fn get_suspends(&self, unit: &Rc<UnitX>) -> Option<JobInfo> {
-        self.jobs.get_suspend(unit, JobKind::JobStop)
+        self.jobs.get_suspend(unit, JobKind::Stop)
     }
 
     fn remove_unit(&self, unit: &UnitX) {
@@ -373,6 +563,7 @@ impl JobManagerData {
         flags: UnitNotifyFlags,
     ) {
         let mut generated = false;
+        let mut del_one = false;
         if let Some((trigger, pause)) = self.jobs.get_trigger_info(unit) {
             generated = match pause {
                 true => {
@@ -383,8 +574,8 @@ impl JobManagerData {
                     let (suggest_r, suggest_g) =
                         job_entry::job_process_unit(trigger.run_kind, ns, flags);
                     if let Some(result) = suggest_r {
-                        // finish it when 'finish' is suggested
-                        self.del_trigger(&trigger, result);
+                        // remove it when 'finish' is suggested from outside('unit') directly
+                        del_one = self.do_remove(&trigger, result, false);
                     }
                     suggest_g
                 }
@@ -398,71 +589,84 @@ impl JobManagerData {
 
         // start on previous result
         self.unit_start_on(unit, os, ns, flags);
+
+        // compensate trigger-notify when no job is deleted
+        if !del_one {
+            let atom = UnitRelationAtom::UnitAtomTriggeredBy;
+            for other in self.db.dep_gets_atom(unit, atom) {
+                other.trigger(unit);
+            }
+        }
     }
 
-    fn do_remove(&self, job_info: &JobInfo, result: JobResult, force: bool) {
-        // delete itself
-        if self.jobs.is_trigger(job_info.id) {
-            self.del_trigger(job_info, result);
-        } else {
-            self.del_suspends(job_info, result);
+    fn do_remove(&self, job_info: &JobInfo, result: JobResult, inside: bool) -> bool {
+        // delete itself unconditionly
+        let del_one = self.do_remove_one(job_info, result, inside);
+        if !del_one {
+            return del_one; // false
         }
 
-        // simulate and notify unit events, which are not generated by the unit.
-        self.simulate_unit_notify(&job_info.unit, result, force);
+        // delete its relations in failure only
+        if result != JobResult::Done {
+            self.do_remove_relation(job_info);
+        }
+
+        del_one // true
     }
 
-    fn del_trigger(&self, job_info: &JobInfo, result: JobResult) {
-        // delete itself
-        let del_trigger = self.jobs.finish_trigger(&self.db, &job_info.unit, result);
+    fn do_remove_one(&self, job_info: &JobInfo, result: JobResult, inside: bool) -> bool {
+        let unit = &job_info.unit;
+        let kind = job_info.kind;
 
-        // remove relational jobs on failure
-        let remove_jobs = match result {
-            JobResult::JobDone => Vec::new(),
-            _ => job_transaction::job_trans_fallback(
-                &self.jobs,
-                &self.db,
-                &job_info.unit,
-                job_info.run_kind,
-            ),
-        };
+        // delete itself: trigger or suspend
+        let mut del_trigger = None;
+        let mut del_suspend = None;
+        if self.jobs.is_trigger(job_info.id) {
+            del_trigger = self.jobs.finish_trigger(unit, result);
+        } else {
+            let mut del_s = self.jobs.remove_suspends(unit, kind, None, result);
+            assert_eq!(del_s.len(), 1); // only one input
+            del_suspend = del_s.pop();
+        }
+        let del_one = del_trigger.is_some() || del_suspend.is_some();
+
+        // simulate and notify unit events, which are not generated by the unit.
+        if del_one {
+            self.simulate_unit_notify(unit, result, inside);
+        }
 
         // update statistics
         self.stat.update_change(&(&None, &del_trigger, &None));
+        self.stat.update_change(&(&None, &del_suspend, &None));
         self.stat
-            .update_changes(&(&Vec::new(), &remove_jobs, &Vec::new()));
+            .update_stage_run(del_trigger.is_some().into(), false); // finish-non-retrigger(the trigger has not been deleted)[run->end]: decrease 'run'
         self.stat
-            .update_stage_wait(del_trigger.is_none().into(), true); // finish-retrigger(the trigger has not been deleted)[run->wait]: increase 'wait'
-        self.stat.update_stage_wait(remove_jobs.len(), false); // finish-remove[wait->end]: decrease 'wait'
-        self.stat.update_stage_run(1, false); // finish-someone[run->wait|end]: decrease 'run'
+            .update_stage_wait(del_suspend.is_some().into(), false); // finish-remove[wait->end]: decrease 'wait'
+
+        del_one
     }
 
-    fn del_suspends(&self, job_info: &JobInfo, result: JobResult) {
-        let mut del_jobs = Vec::new();
+    fn do_remove_relation(&self, job_info: &JobInfo) {
+        let unit = &job_info.unit;
+        let run_kind = job_info.run_kind;
 
-        // delete itself
-        del_jobs.append(&mut self.jobs.remove_suspends(
-            &self.db,
-            &job_info.unit,
-            job_info.kind,
-            None,
-            result,
-        ));
+        // delete its relations: suspends
+        let result_rel = JobResult::Dependency;
+        let del_rel =
+            job_transaction::job_trans_fallback(&self.jobs, &self.db, unit, run_kind, result_rel);
 
-        // remove relational jobs on failure
-        if result != JobResult::JobDone {
-            del_jobs.append(&mut job_transaction::job_trans_fallback(
-                &self.jobs,
-                &self.db,
-                &job_info.unit,
-                job_info.run_kind,
-            ));
+        // simulate and notify unit events, which are not generated by the unit.
+        for u in job_table::jobs_2_units(&del_rel).iter() {
+            if u != unit {
+                // the removement is derived from 'job' mechanism itself
+                self.simulate_unit_notify(u, result_rel, true);
+            }
         }
 
         // update statistics
         self.stat
-            .update_changes(&(&Vec::new(), &del_jobs, &Vec::new()));
-        self.stat.update_stage_wait(del_jobs.len(), false); // remove-del[wait->end]: decrease 'wait'
+            .update_changes(&(&Vec::new(), &del_rel, &Vec::new()));
+        self.stat.update_stage_wait(del_rel.len(), false); // finish-remove[wait->end]: decrease 'wait'
     }
 
     fn simulate_job_notify(&self, unit: &Rc<UnitX>, os: UnitActiveState, ns: UnitActiveState) {
@@ -470,42 +674,31 @@ impl JobManagerData {
             (
                 UnitActiveState::UnitInActive | UnitActiveState::UnitFailed,
                 UnitActiveState::UnitActive | UnitActiveState::UnitActivating,
-            ) => self.do_notify(&JobConf::new(Rc::clone(unit), JobKind::JobStart), None),
+            ) => self.do_notify(&JobConf::new(Rc::clone(unit), JobKind::Start), None),
             (
                 UnitActiveState::UnitActive | UnitActiveState::UnitActivating,
                 UnitActiveState::UnitInActive | UnitActiveState::UnitDeActivating,
-            ) => self.do_notify(&JobConf::new(Rc::clone(unit), JobKind::JobStop), None),
+            ) => self.do_notify(&JobConf::new(Rc::clone(unit), JobKind::Stop), None),
             _ => {} // do nothing
         }
     }
 
-    fn simulate_unit_notify(&self, unit: &Rc<UnitX>, result: JobResult, force: bool) {
+    fn simulate_unit_notify(&self, unit: &Rc<UnitX>, result: JobResult, inside: bool) {
         // OnFailure=
-        if !force {
-            // is forced removement a failure?
-            if result != JobResult::JobDone {
-                if let JobMode::JobFail = unit
-                    .get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .OnFailureJobMode
-                {
-                    self.exec_on(
-                        Rc::clone(unit),
-                        UnitRelationAtom::UnitAtomOnFailure,
-                        JobMode::JobFail,
-                    );
-                }
+        if inside && result != JobResult::Done {
+            if let JobMode::Fail = unit
+                .get_config()
+                .config_data()
+                .borrow()
+                .Unit
+                .OnFailureJobMode
+            {
+                self.exec_on(
+                    Rc::clone(unit),
+                    UnitRelationAtom::UnitAtomOnFailure,
+                    JobMode::Fail,
+                );
             }
-        }
-
-        // trigger-notify
-        for other in self
-            .db
-            .dep_gets_atom(unit, UnitRelationAtom::UnitAtomTriggeredBy)
-        {
-            other.trigger(unit);
         }
     }
 
@@ -517,30 +710,26 @@ impl JobManagerData {
         flags: UnitNotifyFlags,
     ) {
         // OnFailure=
-        if ns != os && !flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART) {
-            match ns {
-                UnitActiveState::UnitFailed => {
-                    if let JobMode::JobFail = unit
-                        .get_config()
-                        .config_data()
-                        .borrow()
-                        .Unit
-                        .OnFailureJobMode
-                    {
-                        self.exec_on(
-                            Rc::clone(unit),
-                            UnitRelationAtom::UnitAtomOnFailure,
-                            JobMode::JobFail,
-                        );
-                    }
-                }
-                _ => {}
-            };
+        if ns != os
+            && !flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART)
+            && ns == UnitActiveState::UnitFailed
+        {
+            if let JobMode::Fail = unit
+                .get_config()
+                .config_data()
+                .borrow()
+                .Unit
+                .OnFailureJobMode
+            {
+                self.exec_on(
+                    Rc::clone(unit),
+                    UnitRelationAtom::UnitAtomOnFailure,
+                    JobMode::Fail,
+                );
+            }
         }
 
         // OnSuccess=
-        // if ns == UnitActiveState::UnitInActive
-        //     && flags & UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART == 0
         if ns == UnitActiveState::UnitInActive
             && !flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART)
         {
@@ -549,7 +738,7 @@ impl JobManagerData {
                 | UnitActiveState::UnitInActive
                 | UnitActiveState::UnitMaintenance => {}
                 _ => {
-                    if let JobMode::JobFail = unit
+                    if let JobMode::Fail = unit
                         .get_config()
                         .config_data()
                         .borrow()
@@ -559,7 +748,7 @@ impl JobManagerData {
                         self.exec_on(
                             Rc::clone(unit),
                             UnitRelationAtom::UnitAtomOnSuccess,
-                            JobMode::JobFail,
+                            JobMode::Fail,
                         );
                     }
                 }
@@ -586,7 +775,7 @@ impl JobManagerData {
     }
 }
 
-fn jobs_2_jobinfo(jobs: &Vec<Rc<Job>>) -> Vec<JobInfo> {
+fn jobs_2_jobinfo(jobs: &[Rc<Job>]) -> Vec<JobInfo> {
     jobs.iter().map(|jr| JobInfo::map(jr)).collect::<Vec<_>>()
 }
 
@@ -594,20 +783,18 @@ fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno
     let kind = config.get_kind();
     let unit = config.get_unit();
 
-    if mode == JobMode::JobIsolate {
-        if kind != JobKind::JobStart {
-            return Err(JobErrno::JobErrInput);
+    if mode == JobMode::Isolate {
+        if kind != JobKind::Start {
+            return Err(JobErrno::Input);
         }
 
         if let false = unit.get_config().config_data().borrow().Unit.AllowIsolate {
-            return Err(JobErrno::JobErrInput);
+            return Err(JobErrno::Input);
         }
     }
 
-    if mode == JobMode::JobTrigger {
-        if kind != JobKind::JobStop {
-            return Err(JobErrno::JobErrInput);
-        }
+    if mode == JobMode::Trigger && kind != JobKind::Stop {
+        return Err(JobErrno::Input);
     }
 
     Ok(())
@@ -616,38 +803,68 @@ fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::data::{DataManager, UnitRelations};
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::manager::unit::data::DataManager;
     use crate::manager::unit::job::JobStage;
     use crate::manager::unit::uload_util::UnitFile;
-    use crate::manager::unit::unit_base::UnitType;
+    use crate::manager::unit::unit_rentry::{UnitRe, UnitRelations, UnitType};
     use crate::plugin::Plugin;
     use utils::logger;
 
+    //#[test]
+    fn job_reli() {
+        logger::init_log_with_console("test_unit_load", 4);
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let event = Rc::new(Events::new().unwrap());
+        let rentry = Rc::new(UnitRe::new(&reli));
+        let db = Rc::new(UnitDb::new(&rentry));
+        let jm = JobManager::new(&event, &reli, &db);
+
+        log::debug!("job_reli, reli:{}.", Rc::strong_count(&reli)); // 3
+        log::debug!("job_reli, event:{}.", Rc::strong_count(&event)); // 2
+        log::debug!("job_reli, rentry:{}.", Rc::strong_count(&rentry)); // 3
+        log::debug!("job_reli, db:{}.", Rc::strong_count(&db)); // 4
+
+        drop(jm);
+
+        log::debug!("job_reli, reli:{}.", Rc::strong_count(&reli)); // 1
+        log::debug!("job_reli, event:{}.", Rc::strong_count(&event)); // 1
+        log::debug!("job_reli, rentry:{}.", Rc::strong_count(&rentry)); // 3
+        log::debug!("job_reli, db:{}.", Rc::strong_count(&db)); // 1
+
+        drop(event);
+
+        log::debug!("job_reli, reli:{}.", Rc::strong_count(&reli)); // 1
+        log::debug!("job_reli, rentry:{}.", Rc::strong_count(&rentry)); // 3
+        log::debug!("job_reli, db:{}.", Rc::strong_count(&db)); // 1
+
+        drop(db);
+        log::debug!("job_reli, rentry:{}.", Rc::strong_count(&rentry)); // 1
+    }
+
     #[test]
     fn job_exec_input_check() {
-        let event = Rc::new(Events::new().unwrap());
-        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&db, &event);
+        let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
         let mut affect = JobAffect::new(true);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStop);
-        let ret = jm.exec(&conf, JobMode::JobIsolate, &mut affect);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Stop);
+        let ret = jm.exec(&conf, JobMode::Isolate, &mut affect);
         assert!(ret.is_err());
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
-        let ret = jm.exec(&conf, JobMode::JobTrigger, &mut affect);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let ret = jm.exec(&conf, JobMode::Trigger, &mut affect);
         assert!(ret.is_err());
     }
 
     #[test]
     fn job_exec_single() {
-        let event = Rc::new(Events::new().unwrap());
-        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&db, &event);
-        let mut affect = JobAffect::new(true);
+        let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
-        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        let mut affect = JobAffect::new(true);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let ret = jm.exec(&conf, JobMode::Replace, &mut affect);
         assert!(ret.is_ok());
         assert_eq!(jm.data.jobs.len(), 1);
         assert_eq!(jm.data.jobs.ready_len(), 1);
@@ -655,21 +872,20 @@ mod tests {
         assert_eq!(affect.adds.len(), 1);
         let job_info = affect.adds.pop().unwrap();
         assert!(Rc::ptr_eq(&job_info.unit, &unit_test1));
-        assert_eq!(job_info.kind, JobKind::JobStart);
-        assert_eq!(job_info.run_kind, JobKind::JobStart);
-        assert_eq!(job_info.stage, JobStage::JobWait);
+        assert_eq!(job_info.kind, JobKind::Start);
+        assert_eq!(job_info.run_kind, JobKind::Start);
+        assert_eq!(job_info.stage, JobStage::Wait);
     }
 
     #[test]
     fn job_exec_multi() {
-        let event = Rc::new(Events::new().unwrap());
         let relation = Some(UnitRelations::UnitRequires);
-        let (db, unit_test1, unit_test2) = prepare_unit_multi(relation);
-        let jm = JobManager::new(&db, &event);
+        let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(relation);
+        let jm = JobManager::new(&event, &reli, &db);
 
         let mut affect = JobAffect::new(true);
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
-        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let ret = jm.exec(&conf, JobMode::Replace, &mut affect);
         assert!(ret.is_ok());
         assert_eq!(jm.data.jobs.len(), 2);
         assert_eq!(jm.data.jobs.ready_len(), 2);
@@ -678,39 +894,37 @@ mod tests {
         assert!(
             Rc::ptr_eq(&job_info1.unit, &unit_test1) || Rc::ptr_eq(&job_info1.unit, &unit_test2)
         );
-        assert_eq!(job_info1.kind, JobKind::JobStart);
-        assert_eq!(job_info1.run_kind, JobKind::JobStart);
-        assert_eq!(job_info1.stage, JobStage::JobWait);
+        assert_eq!(job_info1.kind, JobKind::Start);
+        assert_eq!(job_info1.run_kind, JobKind::Start);
+        assert_eq!(job_info1.stage, JobStage::Wait);
         let job_info2 = affect.adds.pop().unwrap();
         assert!(!Rc::ptr_eq(&job_info1.unit, &job_info2.unit));
         assert!(
             Rc::ptr_eq(&job_info2.unit, &unit_test1) || Rc::ptr_eq(&job_info2.unit, &unit_test2)
         );
-        assert_eq!(job_info2.kind, JobKind::JobStart);
-        assert_eq!(job_info2.run_kind, JobKind::JobStart);
-        assert_eq!(job_info2.stage, JobStage::JobWait);
+        assert_eq!(job_info2.kind, JobKind::Start);
+        assert_eq!(job_info2.run_kind, JobKind::Start);
+        assert_eq!(job_info2.stage, JobStage::Wait);
     }
 
     #[test]
     fn job_notify() {
-        let event = Rc::new(Events::new().unwrap());
-        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&db, &event);
+        let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
-        let ret = jm.notify(&conf, JobMode::JobReplace);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let ret = jm.notify(&conf, JobMode::Replace);
         assert!(ret.is_err());
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobReload);
-        let ret = jm.notify(&conf, JobMode::JobReplace);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Reload);
+        let ret = jm.notify(&conf, JobMode::Replace);
         assert!(ret.is_ok());
     }
 
     #[test]
     fn job_try_finish_async() {
-        let event = Rc::new(Events::new().unwrap());
-        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&db, &event);
+        let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
         let os = UnitActiveState::UnitInActive;
         let ns = UnitActiveState::UnitActive;
         let flags = UnitNotifyFlags::empty();
@@ -721,9 +935,8 @@ mod tests {
 
     #[test]
     fn job_try_finish_sync() {
-        let event = Rc::new(Events::new().unwrap());
-        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&db, &event);
+        let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
         let os = UnitActiveState::UnitInActive;
         let ns = UnitActiveState::UnitActive;
         let flags = UnitNotifyFlags::empty();
@@ -735,7 +948,7 @@ mod tests {
         assert!(ret.is_ok());
         assert!(jm.data.text.borrow().is_some());
         let (u, o, n, f) = jm.data.text.take().unwrap();
-        assert_eq!(u.get_id(), unit_test1.get_id());
+        assert_eq!(u.id(), unit_test1.id());
         assert_eq!(o, os);
         assert_eq!(n, ns);
         assert_eq!(f, flags);
@@ -743,45 +956,86 @@ mod tests {
 
     #[test]
     fn job_run_finish_single() {
-        let event = Rc::new(Events::new().unwrap());
-        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&db, &event);
+        let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop);
-        jm.exec(&conf, JobMode::JobReplace, &mut JobAffect::new(false))
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Nop);
+        jm.exec(&conf, JobMode::Replace, &mut JobAffect::new(false))
             .unwrap();
         assert_eq!(jm.data.jobs.len(), 1);
         assert_eq!(jm.data.jobs.ready_len(), 1);
 
-        jm.data.run();
+        jm.data.run(None);
         assert_eq!(jm.data.jobs.len(), 0);
         assert_eq!(jm.data.jobs.ready_len(), 0);
     }
 
     #[test]
     fn job_run_finish_multi() {
-        let event = Rc::new(Events::new().unwrap());
-        let (db, unit_test1, unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&db, &event);
-        let mode = JobMode::JobReplace;
+        let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
 
-        let conf1 = JobConf::new(Rc::clone(&unit_test1), JobKind::JobNop);
-        jm.exec(&conf1, mode, &mut JobAffect::new(false)).unwrap();
-        let conf2 = JobConf::new(Rc::clone(&unit_test2), JobKind::JobNop);
-        jm.exec(&conf2, mode, &mut JobAffect::new(false)).unwrap();
+        let conf1 = JobConf::new(Rc::clone(&unit_test1), JobKind::Nop);
+        jm.exec(&conf1, JobMode::Replace, &mut JobAffect::new(false))
+            .unwrap();
+        let conf2 = JobConf::new(Rc::clone(&unit_test2), JobKind::Nop);
+        jm.exec(&conf2, JobMode::Replace, &mut JobAffect::new(false))
+            .unwrap();
         assert_eq!(jm.data.jobs.len(), 2);
         assert_eq!(jm.data.jobs.ready_len(), 2);
 
-        jm.data.run();
+        jm.data.run(None);
+        assert_eq!(jm.data.jobs.len(), 0);
+        assert_eq!(jm.data.jobs.ready_len(), 0);
+    }
+
+    #[test]
+    fn job_run_unit_finish_single() {
+        let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
+
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Nop);
+        jm.exec(&conf, JobMode::Replace, &mut JobAffect::new(false))
+            .unwrap();
+        assert_eq!(jm.data.jobs.len(), 1);
+        assert_eq!(jm.data.jobs.ready_len(), 1);
+
+        jm.data.run(Some(&unit_test2));
+        assert_eq!(jm.data.jobs.len(), 1);
+        assert_eq!(jm.data.jobs.ready_len(), 1);
+
+        jm.data.run(Some(&unit_test1));
+        assert_eq!(jm.data.jobs.len(), 0);
+        assert_eq!(jm.data.jobs.ready_len(), 0);
+    }
+
+    #[test]
+    fn job_run_unit_finish_multi() {
+        let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
+
+        let conf1 = JobConf::new(Rc::clone(&unit_test1), JobKind::Nop);
+        jm.exec(&conf1, JobMode::Replace, &mut JobAffect::new(false))
+            .unwrap();
+        let conf2 = JobConf::new(Rc::clone(&unit_test2), JobKind::Nop);
+        jm.exec(&conf2, JobMode::Replace, &mut JobAffect::new(false))
+            .unwrap();
+        assert_eq!(jm.data.jobs.len(), 2);
+        assert_eq!(jm.data.jobs.ready_len(), 2);
+
+        jm.data.run(Some(&unit_test2));
+        assert_eq!(jm.data.jobs.len(), 1);
+        assert_eq!(jm.data.jobs.ready_len(), 1);
+
+        jm.data.run(Some(&unit_test1));
         assert_eq!(jm.data.jobs.len(), 0);
         assert_eq!(jm.data.jobs.ready_len(), 0);
     }
 
     #[test]
     fn job_remove() {
-        let event = Rc::new(Events::new().unwrap());
-        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&db, &event);
+        let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
         let mut affect = JobAffect::new(true);
 
         // nothing exists
@@ -789,8 +1043,8 @@ mod tests {
         assert!(ret.is_err());
 
         // something exists
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
-        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let ret = jm.exec(&conf, JobMode::Replace, &mut affect);
         assert!(ret.is_ok());
         assert_eq!(jm.data.jobs.len(), 1);
         assert_eq!(affect.adds.len(), 1);
@@ -801,9 +1055,8 @@ mod tests {
 
     #[test]
     fn job_get_jobinfo() {
-        let event = Rc::new(Events::new().unwrap());
-        let (db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&db, &event);
+        let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
         let mut affect = JobAffect::new(true);
 
         // nothing exists
@@ -811,8 +1064,8 @@ mod tests {
         assert!(ret.is_none());
 
         // something exists
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
-        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let ret = jm.exec(&conf, JobMode::Replace, &mut affect);
         assert!(ret.is_ok());
         assert_eq!(jm.data.jobs.len(), 1);
         assert_eq!(affect.adds.len(), 1);
@@ -821,7 +1074,7 @@ mod tests {
         assert!(ret.is_some());
         let lkup_info = ret.unwrap();
         assert_eq!(lkup_info.id, job_info.id);
-        assert_eq!(lkup_info.unit.get_id(), job_info.unit.get_id());
+        assert_eq!(lkup_info.unit.id(), job_info.unit.id());
         assert_eq!(lkup_info.kind, job_info.kind);
         assert_eq!(lkup_info.run_kind, job_info.run_kind);
         assert_eq!(lkup_info.stage, job_info.stage);
@@ -829,9 +1082,8 @@ mod tests {
 
     #[test]
     fn job_has_stop_job() {
-        let event = Rc::new(Events::new().unwrap());
-        let (db, unit_test1, unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&db, &event);
+        let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
         let mut affect = JobAffect::new(true);
 
         // nothing exists
@@ -841,16 +1093,16 @@ mod tests {
         assert_eq!(ret, false);
 
         // something(non-stop) exists
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
-        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let ret = jm.exec(&conf, JobMode::Replace, &mut affect);
         assert!(ret.is_ok());
         assert_eq!(jm.data.jobs.len(), 1);
         let ret = jm.has_stop_job(&unit_test1);
         assert_eq!(ret, false);
 
         // something(stop) exists
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStop);
-        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Stop);
+        let ret = jm.exec(&conf, JobMode::Replace, &mut affect);
         assert!(ret.is_ok());
         assert_eq!(jm.data.jobs.len(), 1);
         let ret = jm.has_stop_job(&unit_test1);
@@ -859,17 +1111,16 @@ mod tests {
 
     #[test]
     fn job_remove_unit() {
-        let event = Rc::new(Events::new().unwrap());
-        let (db, unit_test1, unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&db, &event);
+        let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(None);
+        let jm = JobManager::new(&event, &reli, &db);
         let mut affect = JobAffect::new(true);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::JobStart);
-        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let ret = jm.exec(&conf, JobMode::Replace, &mut affect);
         assert!(ret.is_ok());
         assert_eq!(jm.data.jobs.len(), 1);
-        let conf = JobConf::new(Rc::clone(&unit_test2), JobKind::JobStart);
-        let ret = jm.exec(&conf, JobMode::JobReplace, &mut affect);
+        let conf = JobConf::new(Rc::clone(&unit_test2), JobKind::Start);
+        let ret = jm.exec(&conf, JobMode::Replace, &mut affect);
         assert!(ret.is_ok());
         assert_eq!(jm.data.jobs.len(), 2);
 
@@ -879,12 +1130,24 @@ mod tests {
         assert_eq!(jm.data.jobs.len(), 0);
     }
 
-    fn prepare_unit_multi(relation: Option<UnitRelations>) -> (Rc<UnitDb>, Rc<UnitX>, Rc<UnitX>) {
-        let db = Rc::new(UnitDb::new());
+    fn prepare_unit_multi(
+        relation: Option<UnitRelations>,
+    ) -> (
+        Rc<Events>,
+        Rc<Reliability>,
+        Rc<UnitDb>,
+        Rc<UnitX>,
+        Rc<UnitX>,
+    ) {
+        let event = Rc::new(Events::new().unwrap());
+        let dm = Rc::new(DataManager::new());
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let rentry = Rc::new(UnitRe::new(&reli));
+        let db = Rc::new(UnitDb::new(&rentry));
         let name_test1 = String::from("test1.service");
-        let unit_test1 = create_unit(&name_test1);
+        let unit_test1 = create_unit(&dm, &reli, &rentry, &name_test1);
         let name_test2 = String::from("test2.service");
-        let unit_test2 = create_unit(&name_test2);
+        let unit_test2 = create_unit(&dm, &reli, &rentry, &name_test2);
         db.units_insert(name_test1.clone(), Rc::clone(&unit_test1));
         db.units_insert(name_test2.clone(), Rc::clone(&unit_test2));
         if let Some(r) = relation {
@@ -892,19 +1155,25 @@ mod tests {
             let u2 = Rc::clone(&unit_test2);
             db.dep_insert(u1, r, u2, true, 0).unwrap();
         }
-        (db, unit_test1, unit_test2)
+        (event, reli, db, unit_test1, unit_test2)
     }
 
-    fn create_unit(name: &str) -> Rc<UnitX> {
+    fn create_unit(
+        dmr: &Rc<DataManager>,
+        relir: &Rc<Reliability>,
+        rentryr: &Rc<UnitRe>,
+        name: &str,
+    ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-        let dm = Rc::new(DataManager::new());
         let file = Rc::new(UnitFile::new());
         let unit_type = UnitType::UnitService;
         let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();
+        subclass.attach_reli(Rc::clone(relir));
         Rc::new(UnitX::new(
-            &dm,
+            dmr,
+            rentryr,
             &file,
             unit_type,
             name,

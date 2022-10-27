@@ -1,90 +1,11 @@
 #![warn(unused_imports)]
-use crate::null_str;
-use core::fmt::{Display, Formatter, Result as FmtResult};
 use nix::sys::signal::Signal;
-use std::{num::ParseIntError, str::FromStr};
-
-#[allow(missing_docs)]
-#[derive(PartialEq, Eq, Hash, Copy, Clone)]
-pub enum UnitType {
-    UnitService = 0,
-    UnitTarget,
-    UnitSocket,
-    UnitMount,
-    UnitTypeMax,
-    UnitTypeInvalid,
-    UnitTypeErrnoMax,
-}
-
-impl FromStr for UnitType {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let ret = match s {
-            "Service" => UnitType::UnitService,
-            "Target" => UnitType::UnitTarget,
-            "Socket" => UnitType::UnitSocket,
-            "Mount" => UnitType::UnitMount,
-            _ => UnitType::UnitTypeInvalid,
-        };
-        Ok(ret)
-    }
-}
-
-impl From<UnitType> for String {
-    fn from(u_t: UnitType) -> Self {
-        match u_t {
-            UnitType::UnitService => "service".into(),
-            UnitType::UnitTarget => "target".into(),
-            UnitType::UnitSocket => "socket".into(),
-            UnitType::UnitMount => "mount".into(),
-            UnitType::UnitTypeMax => null_str!(""),
-            UnitType::UnitTypeInvalid => null_str!(""),
-            UnitType::UnitTypeErrnoMax => null_str!(""),
-        }
-    }
-}
-
-impl Display for UnitType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        match self {
-            UnitType::UnitService => write!(f, "Service"),
-            UnitType::UnitTarget => write!(f, "Target"),
-            UnitType::UnitSocket => write!(f, "Socket"),
-            UnitType::UnitMount => write!(f, "Mount"),
-            UnitType::UnitTypeMax => write!(f, "Max"),
-            UnitType::UnitTypeInvalid => write!(f, ""),
-            UnitType::UnitTypeErrnoMax => write!(f, ""),
-        }
-    }
-}
+use serde::{Deserialize, Deserializer};
 
 #[allow(missing_docs)]
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum UnitDependencyMask {
     UnitDependencyDefault = 1 << 2,
-}
-
-// #[macro_export]
-// macro_rules! unit_name_to_type{
-//     ($name:expr) => {
-//         match $name{
-//             "*.service" => UnitType::UnitService,
-//             "*.target" => UnitType::UnitTarget,
-//             _ => UnitType::UnitTypeInvalid,
-//         }
-//     };
-// }
-
-pub(in crate::manager::unit) fn unit_name_to_type(unit_name: &str) -> UnitType {
-    let words: Vec<&str> = unit_name.split('.').collect();
-    match words[words.len() - 1] {
-        "service" => UnitType::UnitService,
-        "target" => UnitType::UnitTarget,
-        "socket" => UnitType::UnitSocket,
-        "mount" => UnitType::UnitMount,
-        _ => UnitType::UnitTypeInvalid,
-    }
 }
 
 #[allow(missing_docs)]
@@ -134,5 +55,63 @@ impl KillOperation {
             KillOperation::KillWatchdog => Signal::SIGABRT,
             _ => Signal::SIGTERM,
         }
+    }
+}
+
+///
+pub trait DeserializeWith: Sized {
+    ///
+    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>;
+}
+
+impl DeserializeWith for Vec<String> {
+    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(de)?;
+        let mut vec = Vec::new();
+
+        for l in s.split_terminator(';') {
+            vec.push(l.trim().to_string());
+        }
+
+        Ok(vec)
+    }
+}
+
+///
+#[derive(Default)]
+pub struct UnitRef {
+    source: Option<String>,
+    target: Option<String>,
+}
+
+impl UnitRef {
+    ///
+    pub fn new() -> Self {
+        UnitRef {
+            source: None,
+            target: None,
+        }
+    }
+
+    ///
+    pub fn set_ref(&mut self, source: String, target: String) {
+        self.source = Some(source);
+        self.target = Some(target);
+    }
+
+    ///
+    pub fn unset_ref(&mut self) {
+        self.source = None;
+        self.target = None;
+    }
+
+    ///
+    pub fn target(&self) -> Option<&String> {
+        self.target.as_ref()
     }
 }

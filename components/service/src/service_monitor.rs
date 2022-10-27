@@ -56,11 +56,12 @@ impl ServiceMonitorData {
         self.watchdog_override_enable = false;
         self.watchdog_override_usec = u64::MAX;
     }
+
     /// software watchdog, if the watchdog not receive the READY=1 message within the timeout period, the kill the servcie.
     /// start the watchdog, compare the original and override timeout value, if it's invalid value then stop the watchdog.
     /// call recvmsg and read messages from the socket, and judge if it is the expected value, like READY=1.
     /// not implemented all function, depend on the timer and sd-event.
-    fn start_watchdog(self) {
+    fn _start_watchdog(self) {
         // if watchdog_override_enable is enabled, the override the timeout with the watchdog_override_usec
         let watchdog_usec = if self.watchdog_override_enable {
             self.watchdog_override_usec
@@ -69,13 +70,13 @@ impl ServiceMonitorData {
         };
         // if timeout is 0 then stop the watchdog
         if watchdog_usec == 0 || watchdog_usec == u64::MAX {
-            self.stop_watchdog()
+            self._stop_watchdog()
         }
         libwatchdog::register_timer();
         libwatchdog::event_source_set_enabled(true);
     }
 
-    fn stop_watchdog(self) {
+    fn _stop_watchdog(self) {
         libwatchdog::event_source_set_enabled(false);
     }
 }
