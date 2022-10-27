@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     fs::{self, File},
     io::{self, BufRead, Error, ErrorKind},
     path::{Path, PathBuf},
@@ -12,9 +12,8 @@ use std::{
 use bitflags::bitflags;
 use nix::unistd::UnlinkatFlags;
 
-use crate::manager::{DeserializeWith, UnitType};
+use crate::manager::UnitType;
 use confique::Config;
-use serde::{Deserialize, Serialize};
 use utils::path_lookup::LookupPaths;
 use walkdir::{DirEntry, WalkDir};
 
@@ -180,14 +179,14 @@ impl UnitInstall {
 
 struct InstallContext {
     processed: RefCell<HashMap<String, Rc<UnitInstall>>>,
-    will_process: RefCell<BTreeMap<String, Rc<UnitInstall>>>,
+    will_process: RefCell<HashMap<String, Rc<UnitInstall>>>,
 }
 
 impl InstallContext {
     fn new() -> Self {
         InstallContext {
             processed: RefCell::new(HashMap::new()),
-            will_process: RefCell::new(BTreeMap::new()),
+            will_process: RefCell::new(HashMap::new()),
         }
     }
 
@@ -227,7 +226,8 @@ impl InstallContext {
             let i = unit_install.unwrap();
             if i.u_type() != UnitFileType::Regular {
                 println!(
-                    "apply unit install is symlink, skip it*****************: {:?}",
+                    "apply unit install type is: {:?}, skip it: {:?}",
+                    i.u_type(),
                     i.name()
                 );
                 continue;
@@ -422,6 +422,30 @@ impl Install {
         Ok(())
     }
 
+    /// enable one unit file
+    pub fn unit_enable_files(&self, file: &str) -> Result<(), Error> {
+        log::debug!("unit enable file: {}", file);
+        let target_path = &self.lookup_path.persistent_path;
+
+        self.unit_install_discover(file, self.enable_ctx.clone())?;
+
+        self.install_symlinks(target_path);
+        Ok(())
+    }
+
+    /// disable one unit file
+    pub fn unit_disable_files(&self, file: &str) -> Result<(), Error> {
+        let target_path = &self.lookup_path.persistent_path;
+        let _ = self.prepare_unit_install(file, self.disable_ctx.clone());
+        let mut removal_symlinks = HashSet::new();
+        self.disable_ctx
+            .collect_disable_install(&mut removal_symlinks);
+
+        self.remove_symlinks(&mut removal_symlinks, target_path);
+
+        Ok(())
+    }
+
     fn preset_one_file(&self, unit: &str, presets: &Presets) -> Result<(), Error> {
         log::debug!("preset one unit file {}", unit);
         if self.installed_unit(unit) {
@@ -429,7 +453,7 @@ impl Install {
         }
 
         let action = presets.unit_preset_action(unit.to_string());
-        println!("unit: {}, action is: {:?}", unit, action);
+
         match action {
             PresetAction::Enable | PresetAction::Unknown => {
                 self.unit_install_discover(unit, self.enable_ctx.clone())?;
@@ -498,6 +522,7 @@ impl Install {
         unit_install: Rc<UnitInstall>,
         ctx: Rc<InstallContext>,
     ) -> Result<(), Error> {
+        log::debug!("unit enable function file load: {}", path);
         let path = Path::new(&path);
 
         let meta = path.metadata()?;
@@ -591,7 +616,7 @@ impl Install {
                 continue;
             }
 
-            if let Err(e) = nix::unistd::unlinkat(None, entry.path(), UnlinkatFlags::RemoveDir) {
+            if let Err(e) = nix::unistd::unlinkat(None, entry.path(), UnlinkatFlags::NoRemoveDir) {
                 log::warn!("unlink path: {:?}, error: {}", entry.path(), e);
             }
         }
@@ -754,7 +779,7 @@ mod test {
 
         assert_eq!(
             presets.unit_preset_action("basic.target".to_string()),
-            PresetAction::Disable
+            PresetAction::Enable
         );
         assert_eq!(
             presets.unit_preset_action("tmp.service".to_string()),

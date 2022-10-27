@@ -3,7 +3,7 @@
 use clap::Parser;
 use process1::proto::{
     abi::{sys_comm, unit_comm, CommandRequest},
-    ProstClientStream,
+    unit_file, ProstClientStream,
 };
 use std::net::{SocketAddr, TcpStream};
 use utils::Error;
@@ -41,25 +41,30 @@ enum SubCmd {
 
     /// manager command
     DaemonReload {},
+
+    /// enable one unit file
+    Enable { unit_file: Option<String> },
+
+    /// enable one unit file
+    Disable { unit_file: Option<String> },
 }
 
 enum CommAction {
-    UnitAction(unit_comm::Action),
-    SysAction(sys_comm::Action),
+    Unit(unit_comm::Action),
+    Sys(sys_comm::Action),
+    File(unit_file::Action),
 }
 
 fn main() -> Result<(), Error> {
     let args = Args::parse();
 
     let (action, unit_name) = match args.subcmd {
-        SubCmd::Start { unit_name } => {
-            (CommAction::UnitAction(unit_comm::Action::Start), unit_name)
-        }
-        SubCmd::Stop { unit_name } => (CommAction::UnitAction(unit_comm::Action::Stop), unit_name),
-        SubCmd::Status { unit_name } => {
-            (CommAction::UnitAction(unit_comm::Action::Status), unit_name)
-        }
-        SubCmd::Shutdown {} => (CommAction::SysAction(sys_comm::Action::Shutdown), None),
+        SubCmd::Start { unit_name } => (CommAction::Unit(unit_comm::Action::Start), unit_name),
+        SubCmd::Stop { unit_name } => (CommAction::Unit(unit_comm::Action::Stop), unit_name),
+        SubCmd::Status { unit_name } => (CommAction::Unit(unit_comm::Action::Status), unit_name),
+        SubCmd::Shutdown {} => (CommAction::Sys(sys_comm::Action::Shutdown), None),
+        SubCmd::Enable { unit_file } => (CommAction::File(unit_file::Action::Enable), unit_file),
+        SubCmd::Disable { unit_file } => (CommAction::File(unit_file::Action::Disable), unit_file),
         _ => unreachable!(),
     };
 
@@ -72,14 +77,20 @@ fn main() -> Result<(), Error> {
     let mut client = ProstClientStream::new(stream);
 
     match action {
-        CommAction::UnitAction(a) => {
+        CommAction::Unit(a) => {
             let cmd = CommandRequest::new_unitcomm(a, unit_name.unwrap());
             println!("{:?}", cmd);
             let data = client.execute(cmd).unwrap();
             println!("{:?}", data);
         }
-        CommAction::SysAction(a) => {
+        CommAction::Sys(a) => {
             let cmd = CommandRequest::new_syscomm(a);
+            println!("{:?}", cmd);
+            let data = client.execute(cmd).unwrap();
+            println!("{:?}", data);
+        }
+        CommAction::File(a) => {
+            let cmd = CommandRequest::new_unitfile(a, unit_name.unwrap());
             println!("{:?}", cmd);
             let data = client.execute(cmd).unwrap();
             println!("{:?}", data);

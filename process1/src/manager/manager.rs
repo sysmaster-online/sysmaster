@@ -175,7 +175,7 @@ impl ManagerX {
 
 /// manager running mode
 #[allow(missing_docs)]
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum Mode {
     System,
     User,
@@ -413,6 +413,24 @@ impl Manager {
             let install = Install::new(PresetMode::Enable, self.lookup_path.clone());
             install.preset_all()?;
         }
+
+        Ok(())
+    }
+
+    pub(crate) fn unit_files_enable(&self, unit_file: &str) -> Result<(), Error> {
+        log::debug!("unit enable file {}, mode: {:?}", unit_file, self.mode);
+
+        let install = Install::new(PresetMode::Enable, self.lookup_path.clone());
+        install.unit_enable_files(unit_file)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn unit_files_disable(&self, unit_file: &str) -> Result<(), Error> {
+        log::debug!("unit disable file {}", unit_file);
+
+        let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
+        install.unit_disable_files(unit_file)?;
 
         Ok(())
     }
