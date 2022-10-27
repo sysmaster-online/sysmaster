@@ -1,0 +1,44 @@
+#!/bin/bash
+
+commit_msg=`cat $1`
+msg_re="^(feature|fix|docs|style|refactor|perf|test|workflow|build|ci|chore|release|workflow|typo)(\(.+\))?: .{1,72}"
+
+if [[ ! $commit_msg =~ $msg_re ]]
+then
+	cat <<EOF
+Invalid commit message submission format, please use the correct format:
+-------- title
+<type>(<scope>): <short summary>   (Up to 72 characters)
+  │       │             │
+  │       │             └─⫸ Summary in present tense. Not capitalized. No period at the end.
+  │       │
+  │       └─⫸ Commit Scope: Optional, can be anything specifying the scope of the commit change.
+  |                          For example \$location|\$browser|\$compile|\$rootScope|ngHref|ngClick|ngView, etc.
+  |                          In App Development, scope can be a page, a module or a component.
+  │
+  └─⫸ Commit Type: feature|fix|docs|style|refactor|perf|test|workflow|build|ci|chore|release|typo
+                    feature: new feature
+                    fix: bugfix
+                    docs: documentation
+                    style: format (does not affect functionality)
+                    refactor: refactoring (that is rework, not a new feature, nor a code change that fixes a bug)
+                    test: add test
+                    chore: changes to the build process or auxiliary tools
+                    typo: a minor change
+
+-------- body (optional)
+
+A detailed description of the commit. Blank lines are required at the beginning and end,
+also pay attention to indentation.
+
+-------- footer (optional)
+
+Break Changes: Incompatible changes; BREAKING CHANGE begins, followed by a description of the change,
+        the reason for the change and the migration method.
+Closes: Close the issue; if the current commit is for an issue, you can close the issue in the Footer section;
+        for example: Closes #123, #245, #992
+
+EOF
+
+	exit 1
+fi
