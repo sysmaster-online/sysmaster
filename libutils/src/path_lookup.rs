@@ -11,6 +11,8 @@ const LIB_SYSTEM_PATH: &str = "/usr/lib/process1";
 pub struct LookupPaths {
     /// Used to search fragment, dropin, updated
     pub search_path: Vec<String>,
+    /// Used to search preset file
+    pub preset_path: Vec<String>,
     /// generator paths
     pub generator: String,
     /// generator early paths
@@ -33,6 +35,7 @@ impl LookupPaths {
             transient: String::from(""),
             search_path: Vec::new(),
             persistent_path: String::from(""),
+            preset_path: Vec::new(),
         }
     }
 
@@ -58,10 +61,16 @@ impl LookupPaths {
         if !out_dir.is_empty() && out_dir.contains("build") {
             let tmp_str: Vec<_> = out_dir.split("build").collect();
             self.search_path.push(tmp_str[0].to_string());
+            self.preset_path.push(tmp_str[0].to_string());
         }
         self.search_path.push(LIB_SYSTEM_PATH.to_string());
         self.search_path.push(RUN_SYSTEM_PATH.to_string());
         self.search_path.push(ETC_SYSTEM_PATH.to_string());
+
+        self.preset_path
+            .push(format!("{}/{}", ETC_SYSTEM_PATH, "system-preset"));
+        self.preset_path
+            .push(format!("{}/{}", LIB_SYSTEM_PATH, "system-preset"));
 
         self.persistent_path = "/etc/process1".to_string();
     }

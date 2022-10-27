@@ -667,14 +667,9 @@ impl Install {
     }
 
     fn preset_config_files(&self) -> Vec<PathBuf> {
-        let search_dirs = vec![
-            "/etc/process1/system-preset",
-            "/usr/lib/process1/system-preset",
-            "/lib/process1/system-preset",
-        ];
-
         let mut files_hash = HashMap::new();
-        for dir in search_dirs.iter() {
+
+        for dir in &self.lookup_path.preset_path {
             self.add_preset_file(dir, &mut files_hash)
         }
 
