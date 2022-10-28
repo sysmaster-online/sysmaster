@@ -147,7 +147,10 @@ impl Manager {
         let lookup_path = Rc::new(l_path);
         let umx = Rc::new(UnitManagerX::new(&_event, &_reli, &lookup_path));
         let _signal = Rc::new(Signals::new(&_reli, SignalMgr::new(Rc::clone(&umx))));
-        let _commands = Rc::new(Commands::new(&_reli, CommandActionMgr::new(Rc::clone(&umx))));
+        let _commands = Rc::new(Commands::new(
+            &_reli,
+            CommandActionMgr::new(Rc::clone(&umx)),
+        ));
         Manager {
             event: Rc::clone(&_event),
             reli: Rc::clone(&_reli),
