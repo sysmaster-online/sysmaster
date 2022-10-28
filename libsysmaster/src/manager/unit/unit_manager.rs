@@ -927,7 +927,7 @@ mod unit_load {
             let subclass = match um.plugins.create_unit_obj(unit_type) {
                 Ok(sub) => sub,
                 Err(_e) => {
-                    log::error!("Failed to create unit_obj!");
+                    log::error!("Failed to create unit_obj!{}", _e);
                     return None;
                 }
             };
