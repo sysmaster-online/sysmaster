@@ -8,6 +8,7 @@ use super::unit_entry::{Unit, UnitObj, UnitX};
 use super::unit_rentry::{ExecCommand, JobMode, UnitLoadState, UnitRe, UnitType};
 use super::unit_runtime::UnitRT;
 use super::{ExecContext, UnitActionError};
+use crate::manager::pre_install::{Install, PresetMode};
 use crate::manager::rentry::ReliLastFrame;
 use crate::manager::table::{TableOp, TableSubscribe};
 use crate::manager::unit::data::{DataManager, UnitState};
@@ -20,6 +21,7 @@ use libutils::process_util;
 use libutils::Result;
 use nix::unistd::Pid;
 use std::convert::TryFrom;
+use std::io::Error;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -31,6 +33,7 @@ pub(in crate::manager) struct UnitManagerX {
     dm: Rc<DataManager>,
     sub_name: String, // key for table-subscriber: UnitState
     data: Rc<UnitManager>,
+    lookup_path: Rc<LookupPaths>,
 }
 
 impl Drop for UnitManagerX {
@@ -52,6 +55,7 @@ impl UnitManagerX {
             dm: Rc::clone(&_dm),
             sub_name: String::from("UnitManagerX"),
             data: UnitManager::new(eventr, relir, &_dm, lookup_path),
+            lookup_path: Rc::clone(lookup_path),
         };
         umx.register(&_dm, relir);
         umx
@@ -100,6 +104,20 @@ impl UnitManagerX {
         let station = Rc::clone(&self.data);
         let kind = ReStationKind::Level2;
         relir.station_register(&String::from("UnitManager"), kind, station);
+    }
+
+    pub(in crate::manager) fn enable_unit(&self, unit_file: &str) -> Result<(), Error> {
+        log::debug!("unit disable file {}", unit_file);
+        let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
+        install.unit_enable_files(unit_file)?;
+        Ok(())
+    }
+
+    pub(in crate::manager) fn disable_unit(&self, unit_file: &str) -> Result<(), Error> {
+        log::debug!("unit disable file {}", unit_file);
+        let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
+        install.unit_disable_files(unit_file)?;
+        Ok(())
     }
 }
 

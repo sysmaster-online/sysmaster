@@ -6,7 +6,8 @@ use std::{
     rc::Rc,
 };
 
-use super::{execute, CommandRequest, CommandResponse, Manager};
+use super::execute::ExecuterAction;
+use super::{execute, CommandRequest, CommandResponse};
 
 /// const MAX_FRAME: usize = 1436;
 const MAX_FRAME: usize = 1436;
@@ -50,9 +51,9 @@ where
 }
 
 /// Handle read and write of server-side socket
-pub struct ProstServerStream<S> {
+pub struct ProstServerStream<S, T> {
     inner: S,
-    manager: Rc<Manager>,
+    manager: Rc<T>,
 }
 
 /// Handle read and write of client-side socket
@@ -60,12 +61,13 @@ pub struct ProstClientStream<S> {
     inner: S,
 }
 
-impl<S> ProstServerStream<S>
+impl<S, T> ProstServerStream<S, T>
 where
     S: Read + Write + Unpin + Send,
+    T: ExecuterAction,
 {
     /// new ProstServerStream
-    pub(crate) fn new(stream: S, manager: Rc<Manager>) -> Self {
+    pub(crate) fn new(stream: S, manager: Rc<T>) -> Self {
         Self {
             inner: stream,
             manager,
@@ -75,7 +77,7 @@ where
     /// process frame in server-side
     pub fn process(mut self) -> Result<(), Error> {
         if let Ok(cmd) = self.recv() {
-            let res = execute::dispatch(cmd, self.manager.clone());
+            let res = execute::dispatch(cmd, Rc::clone(&self.manager));
             self.send(res)?;
         };
         Ok(())

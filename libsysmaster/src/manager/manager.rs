@@ -2,9 +2,10 @@
 use super::commands::Commands;
 use super::pre_install::{Install, PresetMode};
 use super::rentry::{ReliLastFrame, RELI_HISTORY_MAX_DBS};
-use super::signals::Signals;
+use super::signals::{SignalDispatcher, Signals};
 use super::unit::UnitManagerX;
 use super::MngErrno;
+use crate::proto::execute::ExecuterAction;
 use crate::reliability::Reliability;
 use libevent::{EventState, Events};
 use libutils::path_lookup::LookupPaths;
@@ -19,16 +20,115 @@ use std::rc::Rc;
 /// maximal size of process's arguments
 pub const MANAGER_ARGS_SIZE_MAX: usize = 5; // 6 - 1
 
-/// Encapsulate manager and expose api to the outside
-pub struct ManagerX {
-    event: Rc<Events>,
-    reli: Rc<Reliability>,
-    data: Rc<Manager>,
-    commands: Rc<Commands>,
-    signal: Rc<Signals>,
+struct SignalMgr {
+    um: Rc<UnitManagerX>,
 }
 
-impl Drop for ManagerX {
+impl SignalMgr {
+    fn new(um: Rc<UnitManagerX>) -> Self {
+        SignalMgr { um: Rc::clone(&um) }
+    }
+    fn reexec(&self) -> Result<i32> {
+        Ok(1)
+    }
+}
+
+impl SignalDispatcher for SignalMgr {
+    fn dispatch_signal(&self, signal: &Signal) -> Result<i32> {
+        match signal {
+            Signal::SIGHUP | Signal::SIGSEGV => self.reexec(),
+            Signal::SIGINT => todo!(),
+            Signal::SIGQUIT => todo!(),
+            Signal::SIGILL => todo!(),
+            Signal::SIGTRAP => todo!(),
+            Signal::SIGABRT => todo!(),
+            Signal::SIGBUS => todo!(),
+            Signal::SIGFPE => todo!(),
+            Signal::SIGKILL => todo!(),
+            Signal::SIGUSR1 => todo!(),
+            Signal::SIGUSR2 => todo!(),
+            Signal::SIGPIPE => todo!(),
+            Signal::SIGALRM => todo!(),
+            Signal::SIGTERM => todo!(),
+            Signal::SIGSTKFLT => todo!(),
+            Signal::SIGCHLD => self.um.child_sigchld_enable(true),
+            Signal::SIGCONT => todo!(),
+            Signal::SIGSTOP => todo!(),
+            Signal::SIGTSTP => todo!(),
+            Signal::SIGTTIN => todo!(),
+            Signal::SIGTTOU => todo!(),
+            Signal::SIGURG => todo!(),
+            Signal::SIGXCPU => todo!(),
+            Signal::SIGXFSZ => todo!(),
+            Signal::SIGVTALRM => todo!(),
+            Signal::SIGPROF => todo!(),
+            Signal::SIGWINCH => todo!(),
+            Signal::SIGIO => todo!(),
+            Signal::SIGPWR => todo!(),
+            Signal::SIGSYS => todo!(),
+            _ => todo!(),
+        }
+    }
+}
+
+struct CommandActionMgr {
+    um: Rc<UnitManagerX>,
+}
+
+impl CommandActionMgr {
+    fn new(um: Rc<UnitManagerX>) -> Self {
+        CommandActionMgr { um: Rc::clone(&um) }
+    }
+}
+
+impl ExecuterAction for CommandActionMgr {
+    fn start(&self, service_name: &str) -> Result<(), MngErrno> {
+        self.um.start_unit(service_name)
+    }
+
+    fn stop(&self, unit_name: &str) -> Result<(), MngErrno> {
+        self.um.stop_unit(unit_name)
+    }
+
+    fn suspend(&self) -> Result<i32> {
+        todo!()
+    }
+
+    fn poweroff(&self) -> Result<i32> {
+        todo!()
+    }
+
+    fn reboot(&self) -> Result<i32> {
+        todo!()
+    }
+
+    fn halt(&self) -> Result<i32> {
+        todo!()
+    }
+
+    fn disable(&self, unit_file: &str) -> Result<(), Error> {
+        self.um.disable_unit(unit_file)
+    }
+
+    fn enable(&self, unit_file: &str) -> Result<(), Error> {
+        self.um.enable_unit(unit_file)
+    }
+}
+
+/// Encapsulate manager and expose api to the outside
+pub struct Manager {
+    event: Rc<Events>,
+    reli: Rc<Reliability>,
+    commands: Rc<Commands<CommandActionMgr>>,
+    signal: Rc<Signals<SignalMgr>>,
+    mode: Mode,
+    action: Action,
+    state: RefCell<State>,
+    um: Rc<UnitManagerX>,
+    lookup_path: Rc<LookupPaths>,
+}
+
+impl Drop for Manager {
     fn drop(&mut self) {
         log::debug!("ManagerX drop, clear.");
         // repeating protection
@@ -37,52 +137,85 @@ impl Drop for ManagerX {
     }
 }
 
-impl ManagerX {
+impl Manager {
     /// create factory instance
-    pub fn new(mode: Mode, action: Action) -> ManagerX {
+    pub fn new(mode: Mode, action: Action) -> Self {
         let _event = Rc::new(Events::new().unwrap());
         let _reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
-        let _data = Rc::new(Manager::new(&_event, &_reli, mode, action));
-        ManagerX {
+        let mut l_path = LookupPaths::new();
+        l_path.init_lookup_paths();
+        let lookup_path = Rc::new(l_path);
+        let umx = Rc::new(UnitManagerX::new(&_event, &_reli, &lookup_path));
+        let _signal = Rc::new(Signals::new(&_reli, SignalMgr::new(Rc::clone(&umx))));
+        let _commands = Rc::new(Commands::new(&_reli, CommandActionMgr::new(Rc::clone(&umx))));
+        Manager {
             event: Rc::clone(&_event),
             reli: Rc::clone(&_reli),
-            data: Rc::clone(&_data),
-            commands: Rc::new(Commands::new(&_reli, &_data)),
-            signal: Rc::new(Signals::new(&_reli, &_data)),
+            commands: _commands,
+            signal: _signal,
+            mode,
+            action,
+            state: RefCell::new(State::Init),
+            um: umx,
+            lookup_path,
         }
+    }
+
+    fn add_default_job(&self) -> Result<i32> {
+        self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);
+        // add target "SPECIAL_DEFAULT_TARGET"
+        if let Err(e) = self.um.start_unit("basic.target") {
+            log::error!("Failed to start basic.target: {:?}", e);
+        }
+        self.reli.clear_last_frame();
+        Ok(0)
+    }
+
+    fn rloop(&self) -> Result<State> {
+        while self.state() == State::Ok {
+            // queue
+            self.um.dispatch_load_queue();
+
+            // event
+            self.reli.set_last_frame1(ReliLastFrame::OtherEvent as u32);
+            self.event.run(-1)?;
+            self.reli.clear_last_frame();
+        }
+
+        Ok(self.state())
     }
 
     /// start up
     pub fn startup(&self) -> Result<i32> {
-        let restore = self.data.get_restore();
+        let restore = self.reli.enable();
         log::info!("startup with restore[{}]...", restore);
 
         // recover
         if restore {
-            self.data.recover();
+            self.reli.recover();
         }
 
         // setup external connections
         /* enumerate */
-        self.data.enumerate();
+        self.um.enumerate();
         /* register entire external events */
         self.register_ex();
         /* register entry's external events */
         if restore {
-            self.data.entry_coldplug();
+            self.um.entry_coldplug();
         }
 
         // add the first job: default job
         if !restore {
-            self.data.add_default_job()?;
+            self.add_default_job()?;
             self.set_restore(true); // mark restore for next startup
         }
 
         // it's ok now
-        self.data.ok();
+        self.set_state(State::Ok);
         self.reli.clear_last_frame();
 
-        self.data.preset_all()?;
+        self.preset_all()?;
 
         Ok(0)
     }
@@ -90,7 +223,7 @@ impl ManagerX {
     /// enter the main loop
     pub fn main_loop(&self) -> Result<bool> {
         loop {
-            let state = self.data.rloop()?;
+            let state = self.rloop()?;
             match state {
                 State::ReLoad => self.reload(),
                 State::ReExecute => return self.reexec(),
@@ -106,40 +239,51 @@ impl ManagerX {
 
     /// debug action: clear all data restored
     pub fn debug_clear_restore(&self) {
-        self.data.clear_restore();
+        self.clear_restore();
     }
 
     fn reload(&self) {
         // clear data
-        self.data.entry_clear();
+        self.um.entry_clear();
 
         // recover entry
-        self.data.recover();
+        self.reli.recover();
 
         // rebuild external connections
         /* enumerate */
-        self.data.enumerate();
+        self.um.enumerate();
         /* register entry's external events */
-        self.data.entry_coldplug();
+        self.um.entry_coldplug();
 
         // it's ok now
-        self.data.ok();
+        self.set_state(State::Ok);
         self.reli.clear_last_frame();
+    }
+
+    fn clear_restore(&self) {
+        self.reli.data_clear();
     }
 
     fn set_restore(&self, enable: bool) {
         match enable {
-            true => self.data.enable_restore(),
+            true => self.reli.set_enable(true),
             false => {
-                self.data.clear_restore();
+                self.clear_restore();
                 self.reboot(RebootMode::RB_AUTOBOOT);
             }
         }
     }
 
     fn reexec(&self) -> Result<bool> {
-        self.data.prepare_reexec()?;
+        self.set_state(State::ReExecute);
+        self.prepare_reexec()?;
         Ok(true)
+    }
+
+    fn prepare_reexec(&self) -> Result<(), Error> {
+        // restore external resource, like: fd, ...
+        // do nothing now
+        Ok(())
     }
 
     fn reboot(&self, reboot_mode: RebootMode) {
@@ -157,7 +301,7 @@ impl ManagerX {
 
     fn register_ex(&self) {
         // data
-        self.data.register_ex();
+        self.um.register_ex();
 
         // cmd
         let cmd = Rc::clone(&self.commands);
@@ -206,29 +350,6 @@ pub(crate) enum State {
     SwitchRoot,
 }
 
-pub(crate) struct Manager {
-    // associated objects
-    event: Rc<Events>,
-    reli: Rc<Reliability>,
-
-    // owned objects
-    mode: Mode,
-    action: Action,
-    state: RefCell<State>,
-
-    um: UnitManagerX,
-    lookup_path: Rc<LookupPaths>,
-}
-
-impl Drop for Manager {
-    fn drop(&mut self) {
-        log::debug!("Manager drop, clear.");
-        // repeating protection
-        self.reli.clear();
-        self.event.clear();
-    }
-}
-
 type JobId = i32;
 
 impl Manager {
@@ -265,16 +386,6 @@ impl Manager {
         Ok(0)
     }
 
-    pub(crate) fn reexec(&self) -> Result<i32> {
-        self.set_state(State::ReExecute);
-        Ok(0)
-    }
-
-    pub(crate) fn reboot(&self) -> Result<i32> {
-        self.set_state(State::Reboot);
-        Ok(0)
-    }
-
     pub(crate) fn poweroff(&self) -> Result<i32> {
         self.set_state(State::PowerOff);
         Ok(0)
@@ -300,65 +411,12 @@ impl Manager {
         Ok(0)
     }
 
-    pub(super) fn new(
-        eventr: &Rc<Events>,
-        relir: &Rc<Reliability>,
-        mode: Mode,
-        action: Action,
-    ) -> Manager {
-        let mut l_path = LookupPaths::new();
-        l_path.init_lookup_paths();
-        let lookup_path = Rc::new(l_path);
-
-        Manager {
-            event: Rc::clone(eventr),
-            reli: Rc::clone(relir),
-            mode,
-            action,
-            state: RefCell::new(State::Init),
-            um: UnitManagerX::new(eventr, relir, &lookup_path),
-            lookup_path,
-        }
-    }
-
-    pub(super) fn register_ex(&self) {
-        self.um.register_ex();
-    }
-
-    pub(super) fn rloop(&self) -> Result<State> {
-        while self.state() == State::Ok {
-            // queue
-            self.um.dispatch_load_queue();
-
-            // event
-            self.reli.set_last_frame1(ReliLastFrame::OtherEvent as u32);
-            self.event.run(-1)?;
-            self.reli.clear_last_frame();
-        }
-
-        Ok(self.state())
-    }
-
     pub(super) fn recover(&self) {
         self.reli.recover();
     }
 
     pub(super) fn entry_coldplug(&self) {
         self.um.entry_coldplug();
-    }
-
-    pub(super) fn add_default_job(&self) -> Result<i32> {
-        self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);
-        // add target "SPECIAL_DEFAULT_TARGET"
-        if let Err(e) = self.start_unit("basic.target") {
-            log::error!("Failed to start basic.target: {:?}", e);
-        }
-        self.reli.clear_last_frame();
-        Ok(0)
-    }
-
-    pub(super) fn clear_restore(&self) {
-        self.reli.data_clear();
     }
 
     pub(super) fn enable_restore(&self) {
@@ -369,31 +427,12 @@ impl Manager {
         self.reli.enable()
     }
 
-    pub(super) fn prepare_reexec(&self) -> Result<(), Error> {
-        // restore external resource, like: fd, ...
-        // do nothing now
-        Ok(())
-    }
-
     pub(super) fn ok(&self) {
         self.set_state(State::Ok);
     }
 
     pub(super) fn check_finished(&self) -> Result<(), Error> {
         todo!()
-    }
-
-    pub(super) fn dispatch_signal(&self, signal: &Signal) -> Result<i32> {
-        match *signal {
-            Signal::SIGCHLD => self.um.child_sigchld_enable(true),
-            Signal::SIGHUP | Signal::SIGSEGV => self.reexec(),
-            Signal::SIGINT => todo!(),
-
-            Signal::SIGKILL => todo!(),
-            Signal::SIGUSR1 => todo!(),
-            Signal::SIGUSR2 => todo!(),
-            _ => todo!(),
-        }
     }
 
     fn entry_clear(&self) {
@@ -416,24 +455,6 @@ impl Manager {
 
         Ok(())
     }
-
-    pub(crate) fn unit_files_enable(&self, unit_file: &str) -> Result<(), Error> {
-        log::debug!("unit enable file {}, mode: {:?}", unit_file, self.mode);
-
-        let install = Install::new(PresetMode::Enable, self.lookup_path.clone());
-        install.unit_enable_files(unit_file)?;
-
-        Ok(())
-    }
-
-    pub(crate) fn unit_files_disable(&self, unit_file: &str) -> Result<(), Error> {
-        log::debug!("unit disable file {}", unit_file);
-
-        let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
-        install.unit_disable_files(unit_file)?;
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -446,23 +467,11 @@ mod tests {
         logger::init_log_with_console("test_target_unit_load", 4);
 
         // new
-        let manager = ManagerX::new(Mode::System, Action::Run);
-        manager.data.clear_restore(); // clear all data
+        let manager = Manager::new(Mode::System, Action::Run);
+        manager.clear_restore(); // clear all data
 
         // startup
         let ret = manager.startup();
-        assert!(ret.is_ok());
-
-        // start unit
-        let ret = manager.data.start_unit("config.service");
-        assert!(ret.is_ok());
-
-        // stop unit
-        let ret = manager.data.stop_unit("config.service");
-        assert!(ret.is_ok());
-
-        // dispatch signal
-        let ret = manager.data.dispatch_signal(&Signal::SIGCHLD);
         assert!(ret.is_ok());
     }
 }
