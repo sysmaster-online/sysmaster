@@ -1,27 +1,29 @@
-use super::manager::Manager;
 use super::rentry::ReliLastFrame;
 use crate::reliability::Reliability;
 use event::{EventType, Events, Source};
 use nix::sys::signal::Signal;
-use std::{convert::TryFrom, rc::Rc};
+use std::{convert::TryFrom, rc::{Rc}};
 use utils::Result;
 
-pub(super) struct Signals {
+pub(super) struct Signals<T>{
     // associated objects
     reli: Rc<Reliability>,
-    manager: Rc<Manager>,
+    signal_handler: T,
 }
 
-impl Signals {
-    pub(super) fn new(relir: &Rc<Reliability>, mr: &Rc<Manager>) -> Signals {
+pub (super) trait SignalDispatcher{
+    fn dispatch_signal(&self, signal: &Signal)->Result<i32>;
+}
+impl <T>Signals <T> {
+    pub(super) fn new(relir: &Rc<Reliability>,data_handler: T) -> Self {
         Signals {
             reli: Rc::clone(relir),
-            manager: Rc::clone(mr),
+            signal_handler: data_handler,
         }
     }
 }
 
-impl Source for Signals {
+impl <T:SignalDispatcher> Source for Signals<T>{
     fn event_type(&self) -> EventType {
         EventType::Signal
     }
@@ -42,7 +44,7 @@ impl Source for Signals {
             Ok(Some(info)) => {
                 let signal = Signal::try_from(info.si_signo).unwrap();
                 log::debug!("read signal from event: {}", signal);
-                if let Err(e) = self.manager.dispatch_signal(&signal) {
+                if let Err(e) = self.signal_handler.dispatch_signal(&signal) {
                     log::error!("dispatch signal{:?} error: {}", signal, e);
                 }
             }

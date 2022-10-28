@@ -1,19 +1,31 @@
 //! Convert the command request into the corresponding execution action
 
+use crate::manager::MngErrno;
+
 use super::{
     sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
 };
-use crate::manager::Manager;
 use http::StatusCode;
 use std::rc::Rc;
+use utils::Result;
 
 pub(crate) trait Executer {
     /// deal Command，return Response
-    fn execute(self, manager: Rc<Manager>) -> CommandResponse;
+    fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse;
+}
+
+pub trait ExecuterAction {
+    fn start(&self,service_name: &str)->Result<(), MngErrno> ;
+    fn stop(&self,unit_name: &str)->Result<(), MngErrno>;
+    fn suspend(&self)-> Result<i32>;
+    fn poweroff(&self)-> Result<i32>;
+    fn reboot(&self) ->  Result<i32>;
+    fn halt(&self) -> Result<i32>;
 }
 
 /// Depending on the type of request
-pub(crate) fn dispatch(cmd: CommandRequest, manager: Rc<Manager>) -> CommandResponse {
+pub(crate) fn dispatch<T>(cmd: CommandRequest, manager: Rc<T>) -> CommandResponse 
+where T : ExecuterAction{
     println!("commandRequest :{:?}", cmd);
     let res = match cmd.request_data {
         Some(RequestData::Ucomm(param)) => param.execute(manager),
@@ -25,14 +37,16 @@ pub(crate) fn dispatch(cmd: CommandRequest, manager: Rc<Manager>) -> CommandResp
     res
 }
 
-impl Executer for UnitComm {
-    fn execute(self, manager: Rc<Manager>) -> CommandResponse {
+impl Executer for UnitComm{
+
+    fn execute (self, manager: Rc<impl ExecuterAction>) -> CommandResponse
+    {
         let ret = match self.action() {
-            unit_comm::Action::Start => manager.start_unit(&self.unitname),
-            unit_comm::Action::Stop => manager.stop_unit(&self.unitname),
+            unit_comm::Action::Start => manager.start(&self.unitname),
+            unit_comm::Action::Stop => manager.stop(&self.unitname),
             _ => todo!(),
         };
-        match ret {
+        match ret { 
             Ok(_) => CommandResponse {
                 status: StatusCode::OK.as_u16() as _,
                 ..Default::default()
@@ -46,13 +60,13 @@ impl Executer for UnitComm {
 }
 
 impl Executer for MngrComm {
-    fn execute(self, _manager: Rc<Manager>) -> CommandResponse {
+    fn execute(self, _manager:  Rc<impl ExecuterAction>) -> CommandResponse {
         todo!()
     }
 }
 
 impl Executer for SysComm {
-    fn execute(self, manager: Rc<Manager>) -> CommandResponse {
+    fn execute(self, manager:  Rc<impl ExecuterAction>) -> CommandResponse {
         let ret = match self.action() {
             sys_comm::Action::Hibernate => manager.suspend(),
             sys_comm::Action::Suspend => manager.suspend(),

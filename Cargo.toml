@@ -89,5 +89,4 @@ members = [
   "components/socket",
   "components/target",
   "components/mount",
-  "components/slice",
 ]

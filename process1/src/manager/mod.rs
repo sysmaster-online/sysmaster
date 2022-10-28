@@ -1,6 +1,5 @@
 //!
-pub(super) use manager::Manager;
-pub use manager::{Action, ManagerX, Mode, MANAGER_ARGS_SIZE_MAX};
+pub use manager::{Manager,Action, Mode, MANAGER_ARGS_SIZE_MAX};
 pub use rentry::ReliLastFrame;
 pub use unit::{
     DeserializeWith, ExecCmdError, ExecCommand, ExecContext, ExecFlags, ExecParameters,

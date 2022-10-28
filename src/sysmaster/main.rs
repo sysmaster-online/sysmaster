@@ -4,7 +4,7 @@ use libc::c_int;
 use log::{self};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use nix::unistd::{self};
-use process1::manager::{Action, ManagerX, Mode, MANAGER_ARGS_SIZE_MAX};
+use process1::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use process1::mount::mount_setup;
 use process1::{self};
 use std::convert::TryFrom;
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     initialize_runtime(switch)?;
 
     let args: Vec<String> = env::args().collect();
-    let manager = ManagerX::new(Mode::System, Action::Run);
+    let manager = Manager::new(Mode::System, Action::Run);
 
     // enable clear, mutex with install_crash_handler
     if !switch {

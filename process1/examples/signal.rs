@@ -1,5 +1,5 @@
 //! test unit signal
-use process1::manager::{Action, ManagerX, Mode};
+use process1::manager::{Action, Manager, Mode};
 use std::env;
 
 use utils::logger;
@@ -19,7 +19,7 @@ fn main() {
 
     const MODE: Mode = Mode::System;
     const ACTION: Action = Action::Run;
-    let manager = ManagerX::new(MODE, ACTION);
+    let manager = Manager::new(MODE, ACTION);
 
     manager.startup().unwrap();
 

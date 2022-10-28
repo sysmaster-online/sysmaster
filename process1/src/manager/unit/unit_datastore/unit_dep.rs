@@ -3,7 +3,7 @@ use crate::manager::unit::UnitRelations;
 use crate::manager::table::{TableOp, TableSubscribe};
 use crate::manager::unit::unit_base::{self, UnitRelationAtom};
 use crate::manager::unit::unit_entry::UnitX;
-use crate::manager::unit::unit_rentry::{UnitRe, UnitRelations};
+use crate::manager::unit::unit_rentry::{UnitRe};
 use crate::manager::unit::UnitErrno;
 use crate::reliability::ReStation;
 use std::cell::RefCell;
