@@ -140,6 +140,11 @@ impl ServiceMng {
             return Ok(true);
         }
 
+        if self.comm.unit().test_start_limit() {
+            self.enter_dead(ServiceResult::FailureStartLimitHit);
+            return Err(UnitActionError::UnitActionECanceled);
+        }
+
         Ok(false)
     }
 

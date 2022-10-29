@@ -2,7 +2,7 @@
 
 use super::mount_comm::MountUnitComm;
 use super::mount_rentry::MountState;
-use process1::manager::{UnitActiveState, UnitNotifyFlags};
+use process1::manager::{UnitActionError, UnitActiveState, UnitNotifyFlags};
 use process1::ReStation;
 use std::{cell::RefCell, rc::Rc};
 
@@ -54,6 +54,15 @@ impl MountMng {
 
     pub(super) fn enter_mounted(&self, notify: bool) {
         self.set_state(MountState::Mounted, notify);
+    }
+
+    pub(super) fn start_check(&self) -> Result<bool, UnitActionError> {
+        if self.comm.unit().test_start_limit() {
+            self.enter_dead(true);
+            return Err(UnitActionError::UnitActionECanceled);
+        }
+
+        Ok(false)
     }
 
     fn set_state(&self, new_state: MountState, notify: bool) {

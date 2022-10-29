@@ -149,6 +149,7 @@ pub(super) enum ServiceResult {
     FailureProtocol,
     FailureResources,
     FailureSignal,
+    FailureStartLimitHit,
     ResultInvalid,
 }
 

@@ -32,6 +32,7 @@ pub enum UnitActionError {
     UnitActionEInval,
     UnitActionEBusy,
     UnitActionENoent,
+    UnitActionECanceled,
 }
 
 #[allow(missing_docs)]

@@ -7,6 +7,7 @@ use super::uu_condition::{
 };
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
+use super::uu_ratelimit::StartLimit;
 use crate::manager::unit::data::{DataManager, UnitActiveState, UnitDepConf, UnitState};
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{KillOperation, UnitActionError};
@@ -41,6 +42,7 @@ pub struct Unit {
     child: UeChild,
     cgroup: UeCgroup,
     conditions: Rc<UeCondition>,
+    start_limit: StartLimit,
     sub: Box<dyn UnitObj>,
 }
 
@@ -190,6 +192,7 @@ impl Unit {
             cgroup: UeCgroup::new(&_base),
             conditions: Rc::new(UeCondition::new()),
             sub,
+            start_limit: StartLimit::new(),
         });
         _u.sub.attach_unit(Rc::clone(&_u));
         _u
@@ -288,7 +291,7 @@ impl Unit {
         self.cgroup.prepare_cg_exec()
     }
 
-    ///
+    /// return the cgroup name of the unit
     pub fn cg_path(&self) -> PathBuf {
         self.cgroup.cg_path()
     }
@@ -430,6 +433,28 @@ impl Unit {
     ///
     pub fn current_active_state(&self) -> UnitActiveState {
         self.sub.current_active_state()
+    }
+
+    /// test start rate, if start more than burst times in interval time, return error
+    pub fn test_start_limit(&self) -> bool {
+        if self.config.config_data().borrow().Unit.StartLimitInterval > 0
+            && self.config.config_data().borrow().Unit.StartLimitBurst > 0
+        {
+            self.start_limit.init_from_config(
+                self.config.config_data().borrow().Unit.StartLimitInterval,
+                self.config.config_data().borrow().Unit.StartLimitBurst,
+            );
+        }
+
+        if self.start_limit.ratelimit_below() {
+            self.start_limit.set_hit(false);
+            return true;
+        }
+
+        self.start_limit.set_hit(true);
+        // todo emergency action
+
+        false
     }
 
     ///

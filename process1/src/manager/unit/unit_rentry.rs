@@ -266,6 +266,10 @@ pub(crate) struct UeConfigUnit {
     pub ConditionPathExists: String,
     #[config(default = "")]
     pub AssertPathExists: String,
+    #[config(default = 0)]
+    pub StartLimitInterval: u64,
+    #[config(default = 0)]
+    pub StartLimitBurst: u32,
 }
 
 #[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
