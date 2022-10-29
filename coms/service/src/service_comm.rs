@@ -1,26 +1,24 @@
-//!  socket_ The comm module provides management of common objects, mainly including weak references to UnitManager and Unit objects.
-//!  The method provided by the public object needs to be called.
-//!
-use super::socket_rentry::{SectionSocket, SocketCommand, SocketRe, SocketResult, SocketState};
+use super::service_rentry::{
+    NotifyState, SectionService, ServiceCommand, ServiceRe, ServiceResult, ServiceState,
+};
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
 use process1::manager::{Unit, UnitManager};
 use process1::Reliability;
 use std::cell::RefCell;
-use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, RwLock};
 
-pub(super) struct SocketUnitComm {
-    data: RefCell<SocketUnitCommData>,
-    umcomm: Arc<SocketUmComm>,
+pub(super) struct ServiceUnitComm {
+    data: RefCell<ServiceUnitCommData>,
+    umcomm: Arc<ServiceUmComm>,
 }
 
-impl SocketUnitComm {
+impl ServiceUnitComm {
     pub(super) fn new() -> Self {
-        SocketUnitComm {
-            data: RefCell::new(SocketUnitCommData::new()),
-            umcomm: SocketUmComm::get_instance(),
+        ServiceUnitComm {
+            data: RefCell::new(ServiceUnitCommData::new()),
+            umcomm: ServiceUmComm::get_instance(),
         }
     }
 
@@ -33,7 +31,7 @@ impl SocketUnitComm {
     }
 
     pub(super) fn attach_reli(&self, reli: Rc<Reliability>) {
-        self.umcomm.attach_reli(reli)
+        self.umcomm.attach_reli(reli);
     }
 
     pub(super) fn unit(&self) -> Rc<Unit> {
@@ -44,66 +42,71 @@ impl SocketUnitComm {
         self.umcomm.um()
     }
 
-    pub(super) fn reli(&self) -> Rc<Reliability> {
-        self.umcomm.reli()
+    pub(super) fn rentry_conf_insert(&self, service: &SectionService) {
+        self.rentry().conf_insert(self.unit().id(), service);
     }
 
-    pub(super) fn rentry(&self) -> Rc<SocketRe> {
-        self.umcomm.rentry()
-    }
-
-    pub(super) fn rentry_conf_insert(&self, socket: &SectionSocket, service: Option<String>) {
-        self.rentry().conf_insert(self.unit().id(), socket, service);
-    }
-
-    pub(super) fn rentry_conf_get(&self) -> Option<(SectionSocket, Option<String>)> {
+    pub(super) fn rentry_conf_get(&self) -> Option<SectionService> {
         self.rentry().conf_get(self.unit().id())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn rentry_mng_insert(
         &self,
-        state: SocketState,
-        result: SocketResult,
+        state: ServiceState,
+        result: ServiceResult,
+        main_pid: Option<Pid>,
         control_pid: Option<Pid>,
-        control_cmd_type: Option<SocketCommand>,
+        main_cmd_len: usize,
+        control_cmd_type: Option<ServiceCommand>,
         control_cmd_len: usize,
-        refused: i32,
-        ports: Vec<RawFd>,
+        notify_state: NotifyState,
     ) {
         self.rentry().mng_insert(
             self.unit().id(),
             state,
             result,
+            main_pid,
             control_pid,
+            main_cmd_len,
             control_cmd_type,
             control_cmd_len,
-            refused,
-            ports,
+            notify_state,
         );
     }
 
+    #[allow(clippy::type_complexity)]
     pub(super) fn rentry_mng_get(
         &self,
     ) -> Option<(
-        SocketState,
-        SocketResult,
+        ServiceState,
+        ServiceResult,
         Option<Pid>,
-        Option<SocketCommand>,
+        Option<Pid>,
         usize,
-        i32,
-        Vec<RawFd>,
+        Option<ServiceCommand>,
+        usize,
+        NotifyState,
     )> {
         self.rentry().mng_get(self.unit().id())
     }
+
+    pub(super) fn _reli(&self) -> Rc<Reliability> {
+        self.umcomm._reli()
+    }
+
+    fn rentry(&self) -> Rc<ServiceRe> {
+        self.umcomm.rentry()
+    }
 }
 
-struct SocketUnitCommData {
+struct ServiceUnitCommData {
     unit: Weak<Unit>,
 }
 
-impl SocketUnitCommData {
-    pub(self) fn new() -> SocketUnitCommData {
-        SocketUnitCommData { unit: Weak::new() }
+impl ServiceUnitCommData {
+    pub(self) fn new() -> ServiceUnitCommData {
+        ServiceUnitCommData { unit: Weak::new() }
     }
 
     fn attach_unit(&mut self, unit: Rc<Unit>) {
@@ -115,23 +118,23 @@ impl SocketUnitCommData {
     }
 }
 
-static SOCKET_UM_COMM: Lazy<Arc<SocketUmComm>> = Lazy::new(|| {
-    let comm = SocketUmComm::new();
+static SERVICE_UM_COMM: Lazy<Arc<ServiceUmComm>> = Lazy::new(|| {
+    let comm = ServiceUmComm::new();
     Arc::new(comm)
 });
 
-pub(super) struct SocketUmComm {
-    data: RwLock<SocketUmCommData>,
+pub(super) struct ServiceUmComm {
+    data: RwLock<ServiceUmCommData>,
 }
 
-unsafe impl Send for SocketUmComm {}
+unsafe impl Send for ServiceUmComm {}
 
-unsafe impl Sync for SocketUmComm {}
+unsafe impl Sync for ServiceUmComm {}
 
-impl SocketUmComm {
+impl ServiceUmComm {
     pub(super) fn new() -> Self {
-        SocketUmComm {
-            data: RwLock::new(SocketUmCommData::new()),
+        ServiceUmComm {
+            data: RwLock::new(ServiceUmCommData::new()),
         }
     }
 
@@ -145,13 +148,13 @@ impl SocketUmComm {
         wdata.attach_reli(reli);
     }
 
-    pub(super) fn get_instance() -> Arc<SocketUmComm> {
-        SOCKET_UM_COMM.clone()
+    pub(super) fn get_instance() -> Arc<ServiceUmComm> {
+        SERVICE_UM_COMM.clone()
     }
 
-    pub(super) fn reli(&self) -> Rc<Reliability> {
+    pub(super) fn _reli(&self) -> Rc<Reliability> {
         let rdata = self.data.read().unwrap();
-        rdata.reli()
+        rdata._reli()
     }
 
     pub(super) fn um(&self) -> Rc<UnitManager> {
@@ -159,25 +162,25 @@ impl SocketUmComm {
         rdata.um()
     }
 
-    pub(super) fn rentry(&self) -> Rc<SocketRe> {
+    pub(super) fn rentry(&self) -> Rc<ServiceRe> {
         let rdata = self.data.read().unwrap();
         rdata.rentry()
     }
 }
 
-struct SocketUmCommData {
+struct ServiceUmCommData {
     // associated objects
     um: Weak<UnitManager>,
-    reli: Weak<Reliability>,
-    rentry: Option<Rc<SocketRe>>,
+    _reli: Weak<Reliability>,
+    rentry: Option<Rc<ServiceRe>>,
 }
 
 // the declaration "pub(self)" is for identification only.
-impl SocketUmCommData {
-    pub(self) fn new() -> SocketUmCommData {
-        SocketUmCommData {
+impl ServiceUmCommData {
+    pub(self) fn new() -> ServiceUmCommData {
+        ServiceUmCommData {
             um: Weak::new(),
-            reli: Weak::new(),
+            _reli: Weak::new(),
             rentry: None,
         }
     }
@@ -185,17 +188,17 @@ impl SocketUmCommData {
     pub(self) fn attach_um(&mut self, um: Rc<UnitManager>) {
         let old = self.um.clone().upgrade();
         if old.is_none() {
-            log::debug!("SocketUmComm attach_um action.");
+            log::debug!("ServiceUmComm attach_um action.");
             self.um = Rc::downgrade(&um);
         }
     }
 
     pub(self) fn attach_reli(&mut self, reli: Rc<Reliability>) {
-        let old = self.reli.clone().upgrade();
+        let old = self._reli.clone().upgrade();
         if old.is_none() {
-            log::debug!("SocketUmComm attach_reli action.");
-            self.reli = Rc::downgrade(&reli);
-            self.rentry.replace(Rc::new(SocketRe::new(&reli)));
+            log::debug!("ServiceUmComm attach_reli action.");
+            self._reli = Rc::downgrade(&reli);
+            self.rentry.replace(Rc::new(ServiceRe::new(&reli)));
         }
     }
 
@@ -203,11 +206,11 @@ impl SocketUmCommData {
         self.um.clone().upgrade().unwrap()
     }
 
-    pub(self) fn reli(&self) -> Rc<Reliability> {
-        self.reli.clone().upgrade().unwrap()
+    pub(self) fn _reli(&self) -> Rc<Reliability> {
+        self._reli.clone().upgrade().unwrap()
     }
 
-    pub(self) fn rentry(&self) -> Rc<SocketRe> {
+    pub(self) fn rentry(&self) -> Rc<ServiceRe> {
         self.rentry.as_ref().cloned().unwrap()
     }
 }

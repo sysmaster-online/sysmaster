@@ -7,11 +7,11 @@ edition = "2018"
 
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["dylib"]
 name = "target"
 
 [dependencies]
-dynamic_reload = "0.4.0"
+dynamic_reload = "0.8.0"
 utils = { path = "../../libutils" }
 cgroup = { path = "../../libcgroup" }
 process1 = { path = "../../process1" }

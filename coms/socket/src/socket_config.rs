@@ -133,7 +133,7 @@ impl SocketConfig {
     }
 
     pub(super) fn ports(&self) -> Vec<Rc<SocketPortConf>> {
-        self.ports.borrow().iter().map(|p| p.clone()).collect::<_>()
+        self.ports.borrow().iter().cloned().collect::<_>()
     }
 
     fn parse_service(&self) -> Result<(), Box<dyn Error>> {
@@ -235,7 +235,7 @@ impl SocketConfig {
     }
 
     fn push_port(&self, port: Rc<SocketPortConf>) {
-        self.ports.borrow_mut().push(port.clone());
+        self.ports.borrow_mut().push(port);
     }
 }
 

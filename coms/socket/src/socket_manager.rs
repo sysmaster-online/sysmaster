@@ -72,7 +72,7 @@ impl SocketManager {
         }
     }
 
-    fn dc_last_fdlisten(&self, lunit: &String, spread: bool) {
+    fn dc_last_fdlisten(&self, lunit: &str, spread: bool) {
         match spread {
             true => self.comm.um().trigger_unit(lunit), // re-run
             false => {}                                 // do nothing, try again
