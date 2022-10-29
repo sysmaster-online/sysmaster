@@ -1,0 +1,9 @@
+
+enable basic.target
+enable dbus.service
+enable test.service
+
+disable config.service
+
+
+disable *

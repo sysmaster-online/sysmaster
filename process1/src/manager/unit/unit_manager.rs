@@ -22,6 +22,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use unit_load::UnitLoad;
 use unit_submanager::UnitSubManagers;
+use utils::path_lookup::LookupPaths;
 use utils::process_util;
 use utils::Result;
 
@@ -41,12 +42,16 @@ impl Drop for UnitManagerX {
 }
 
 impl UnitManagerX {
-    pub(in crate::manager) fn new(eventr: &Rc<Events>, relir: &Rc<Reliability>) -> UnitManagerX {
+    pub(in crate::manager) fn new(
+        eventr: &Rc<Events>,
+        relir: &Rc<Reliability>,
+        lookup_path: &Rc<LookupPaths>,
+    ) -> UnitManagerX {
         let _dm = Rc::new(DataManager::new());
         let umx = UnitManagerX {
             dm: Rc::clone(&_dm),
             sub_name: String::from("UnitManagerX"),
-            data: UnitManager::new(eventr, relir, &_dm),
+            data: UnitManager::new(eventr, relir, &_dm, lookup_path),
         };
         umx.register(&_dm, relir);
         umx
@@ -387,6 +392,7 @@ impl UnitManager {
         eventr: &Rc<Events>,
         relir: &Rc<Reliability>,
         dmr: &Rc<DataManager>,
+        lookup_path: &Rc<LookupPaths>,
     ) -> Rc<UnitManager> {
         let _rentry = Rc::new(UnitRe::new(relir));
         let _db = Rc::new(UnitDb::new(&_rentry));
@@ -398,7 +404,7 @@ impl UnitManager {
             plugins: Plugin::get_instance(),
             sms: UnitSubManagers::new(relir),
             rentry: Rc::clone(&_rentry),
-            load: UnitLoad::new(dmr, &_rentry, &_db, &_rt),
+            load: UnitLoad::new(dmr, &_rentry, &_db, &_rt, lookup_path),
             db: Rc::clone(&_db),
             rt: Rc::clone(&_rt),
             jm: Rc::clone(&_jm),
@@ -760,6 +766,8 @@ mod unit_submanager {
 }
 
 mod unit_load {
+    use utils::path_lookup::LookupPaths;
+
     use super::UnitManager;
     use crate::manager::table::{TableOp, TableSubscribe};
     use crate::manager::unit::data::{DataManager, UnitDepConf};
@@ -783,10 +791,11 @@ mod unit_load {
             rentryr: &Rc<UnitRe>,
             dbr: &Rc<UnitDb>,
             rtr: &Rc<UnitRT>,
+            lookup_path: &Rc<LookupPaths>,
         ) -> UnitLoad {
             let load = UnitLoad {
                 sub_name: String::from("UnitLoad"),
-                data: Rc::new(UnitLoadData::new(dmr, rentryr, dbr, rtr)),
+                data: Rc::new(UnitLoadData::new(dmr, rentryr, dbr, rtr, lookup_path)),
             };
             load.register(dmr);
             load
@@ -831,9 +840,10 @@ mod unit_load {
             rentryr: &Rc<UnitRe>,
             dbr: &Rc<UnitDb>,
             rtr: &Rc<UnitRT>,
+            lookup_path: &Rc<LookupPaths>,
         ) -> UnitLoadData {
             log::debug!("UnitLoadData db count is {}", Rc::strong_count(dbr));
-            let file = Rc::new(UnitFile::new());
+            let file = Rc::new(UnitFile::new(lookup_path));
             UnitLoadData {
                 dm: Rc::clone(dmr),
                 rentry: Rc::clone(rentryr),
@@ -988,10 +998,14 @@ mod tests {
 
     fn init_dm_for_test() -> (Rc<DataManager>, Rc<Events>, Rc<UnitManager>) {
         logger::init_log_with_console("manager test", 4);
+        let mut l_path = LookupPaths::new();
+        l_path.init_lookup_paths();
+        let lookup_path = Rc::new(l_path);
+
         let event = Rc::new(Events::new().unwrap());
         let dm = Rc::new(DataManager::new());
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
-        let um = UnitManager::new(&event, &reli, &dm);
+        let um = UnitManager::new(&event, &reli, &dm, &lookup_path);
         (dm, event, um)
     }
 
@@ -1004,13 +1018,9 @@ mod tests {
     #[test]
     fn test_service_unit_load() {
         logger::init_log_with_console("test_service_unit_load", 4);
-        let event = Rc::new(Events::new().unwrap());
-        let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
-        let um = UnitManager::new(&event, &reli, &dm);
-
+        let dm = init_dm_for_test();
         let unit_name = String::from("config.service");
-        let unit = um.load_unitx(&unit_name);
+        let unit = dm.2.load_unitx(&unit_name);
 
         match unit {
             Some(_unit_obj) => assert_eq!(_unit_obj.id(), "config.service"),
@@ -1026,13 +1036,9 @@ mod tests {
         }
 
         logger::init_log_with_console("test_service_unit_start", 4);
-        let event = Rc::new(Events::new().unwrap());
-        let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
-        let um = UnitManager::new(&event, &reli, &dm);
-
+        let dm = init_dm_for_test();
         let unit_name = String::from("config.service");
-        let unit = um.load_unitx(&unit_name);
+        let unit = dm.2.load_unitx(&unit_name);
 
         assert!(unit.is_some());
         let u = unit.unwrap();
@@ -1094,16 +1100,15 @@ mod tests {
     #[test]
     fn test_units_load() {
         logger::init_log_with_console("test_units_load", 4);
+
+        let dm = init_dm_for_test();
         let mut unit_name_lists: Vec<String> = Vec::new();
-        let event = Rc::new(Events::new().unwrap());
-        let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
-        let um = UnitManager::new(&event, &reli, &dm);
 
         unit_name_lists.push("config.service".to_string());
         // unit_name_lists.push("testsunit.target".to_string());
         for u_name in unit_name_lists.iter() {
-            let unit = um.load_unitx(u_name);
+            let unit = dm.2.load_unitx(u_name);
+
             match unit {
                 Some(_unit_obj) => assert_eq!(_unit_obj.id(), u_name),
                 None => println!("test unit load, not found unit: {}", u_name),
@@ -1113,16 +1118,13 @@ mod tests {
     #[test]
     fn test_target_unit_load() {
         logger::init_log_with_console("test_target_unit_load", 4);
+        let dm = init_dm_for_test();
         let mut unit_name_lists: Vec<String> = Vec::new();
-        let event = Rc::new(Events::new().unwrap());
-        let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
-        let um = UnitManager::new(&event, &reli, &dm);
 
         unit_name_lists.push("testsunit.target".to_string());
         // unit_name_lists.push("testsunit.target".to_string());
         for u_name in unit_name_lists.iter() {
-            let unit = um.load_unitx(u_name);
+            let unit = dm.2.load_unitx(u_name);
             match unit {
                 Some(_unit_obj) => {
                     println!(

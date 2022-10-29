@@ -2,6 +2,7 @@
 
 use super::{
     sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
+    UnitFile,
 };
 use crate::manager::Manager;
 use http::StatusCode;
@@ -19,6 +20,7 @@ pub(crate) fn dispatch(cmd: CommandRequest, manager: Rc<Manager>) -> CommandResp
         Some(RequestData::Ucomm(param)) => param.execute(manager),
         Some(RequestData::Mcomm(param)) => param.execute(manager),
         Some(RequestData::Syscomm(param)) => param.execute(manager),
+        Some(RequestData::Ufile(param)) => param.execute(manager),
         _ => CommandResponse::default(),
     };
     println!("CommandResponse :{:?}", res);
@@ -60,6 +62,26 @@ impl Executer for SysComm {
             sys_comm::Action::Poweroff => manager.poweroff(),
             sys_comm::Action::Shutdown => manager.poweroff(),
             sys_comm::Action::Reboot => manager.reboot(),
+        };
+        match ret {
+            Ok(_) => CommandResponse {
+                status: StatusCode::OK.as_u16() as _,
+                ..Default::default()
+            },
+            Err(_e) => CommandResponse {
+                status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                message: String::from("error."),
+            },
+        }
+    }
+}
+
+impl Executer for UnitFile {
+    fn execute(self, manager: Rc<Manager>) -> CommandResponse {
+        let ret = match self.action() {
+            super::unit_file::Action::Enable => manager.unit_files_enable(&self.unitname),
+            super::unit_file::Action::Disable => manager.unit_files_disable(&self.unitname),
+            _ => todo!(),
         };
         match ret {
             Ok(_) => CommandResponse {

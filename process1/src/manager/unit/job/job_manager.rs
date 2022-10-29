@@ -810,6 +810,7 @@ mod tests {
     use crate::manager::unit::unit_rentry::{UnitRe, UnitRelations, UnitType};
     use crate::plugin::Plugin;
     use utils::logger;
+    use utils::path_lookup::LookupPaths;
 
     //#[test]
     fn job_reli() {
@@ -1166,7 +1167,12 @@ mod tests {
     ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-        let file = Rc::new(UnitFile::new());
+
+        let mut l_path = LookupPaths::new();
+        l_path.init_lookup_paths();
+        let lookup_path = Rc::new(l_path);
+        let file = Rc::new(UnitFile::new(&lookup_path));
+
         let unit_type = UnitType::UnitService;
         let plugins = Plugin::get_instance();
         let subclass = plugins.create_unit_obj(unit_type).unwrap();

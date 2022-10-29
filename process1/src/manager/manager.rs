@@ -1,5 +1,6 @@
 #![allow(clippy::module_inception)]
 use super::commands::Commands;
+use super::pre_install::{Install, PresetMode};
 use super::rentry::{ReliLastFrame, RELI_HISTORY_MAX_DBS};
 use super::signals::Signals;
 use super::unit::UnitManagerX;
@@ -11,6 +12,7 @@ use nix::sys::signal::Signal;
 use std::cell::RefCell;
 use std::io::Error;
 use std::rc::Rc;
+use utils::path_lookup::LookupPaths;
 use utils::process_util::{self};
 use utils::Result;
 
@@ -79,6 +81,8 @@ impl ManagerX {
         // it's ok now
         self.data.ok();
         self.reli.clear_last_frame();
+
+        self.data.preset_all()?;
 
         Ok(0)
     }
@@ -171,6 +175,7 @@ impl ManagerX {
 
 /// manager running mode
 #[allow(missing_docs)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum Mode {
     System,
     User,
@@ -212,6 +217,7 @@ pub(crate) struct Manager {
     state: RefCell<State>,
 
     um: UnitManagerX,
+    lookup_path: Rc<LookupPaths>,
 }
 
 impl Drop for Manager {
@@ -300,13 +306,18 @@ impl Manager {
         mode: Mode,
         action: Action,
     ) -> Manager {
+        let mut l_path = LookupPaths::new();
+        l_path.init_lookup_paths();
+        let lookup_path = Rc::new(l_path);
+
         Manager {
             event: Rc::clone(eventr),
             reli: Rc::clone(relir),
             mode,
             action,
             state: RefCell::new(State::Init),
-            um: UnitManagerX::new(eventr, relir),
+            um: UnitManagerX::new(eventr, relir, &lookup_path),
+            lookup_path,
         }
     }
 
@@ -395,6 +406,33 @@ impl Manager {
 
     fn state(&self) -> State {
         *self.state.borrow()
+    }
+
+    pub(crate) fn preset_all(&self) -> Result<(), Error> {
+        if self.mode != Mode::System {
+            let install = Install::new(PresetMode::Enable, self.lookup_path.clone());
+            install.preset_all()?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn unit_files_enable(&self, unit_file: &str) -> Result<(), Error> {
+        log::debug!("unit enable file {}, mode: {:?}", unit_file, self.mode);
+
+        let install = Install::new(PresetMode::Enable, self.lookup_path.clone());
+        install.unit_enable_files(unit_file)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn unit_files_disable(&self, unit_file: &str) -> Result<(), Error> {
+        log::debug!("unit disable file {}", unit_file);
+
+        let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
+        install.unit_disable_files(unit_file)?;
+
+        Ok(())
     }
 }
 

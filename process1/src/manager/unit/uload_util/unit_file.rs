@@ -4,17 +4,18 @@ use std::collections::HashMap;
 use std::fs;
 use std::hash::Hasher;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use utils::path_lookup::LookupPaths;
-use utils::{path_lookup, time_util};
+use utils::time_util;
 
 pub struct UnitFile {
     data: RefCell<UnitFileData>,
 }
 
 impl UnitFile {
-    pub fn new() -> UnitFile {
+    pub fn new(lookup_path: &Rc<LookupPaths>) -> UnitFile {
         UnitFile {
-            data: RefCell::new(UnitFileData::new()),
+            data: RefCell::new(UnitFileData::new(lookup_path)),
         }
     }
 
@@ -41,21 +42,19 @@ struct UnitFileData {
     pub unit_id_dropin_wants: HashMap<String, Vec<PathBuf>>,
     pub unit_id_dropin_requires: HashMap<String, Vec<PathBuf>>,
     unit_name_map: HashMap<String, String>,
-    lookup_path: LookupPaths,
     last_updated_timestamp_hash: u64,
+    lookup_path: Rc<LookupPaths>,
 }
 
 // the declaration "pub(self)" is for identification only.
 impl UnitFileData {
-    pub(self) fn new() -> UnitFileData {
-        let mut lookup_path = path_lookup::LookupPaths::new();
-        lookup_path.init_lookup_paths();
+    pub(self) fn new(lookup_path: &Rc<LookupPaths>) -> UnitFileData {
         UnitFileData {
             unit_id_fragment: HashMap::new(),
             unit_id_dropin_wants: HashMap::new(),
             unit_id_dropin_requires: HashMap::new(),
             unit_name_map: HashMap::new(),
-            lookup_path,
+            lookup_path: lookup_path.clone(),
             last_updated_timestamp_hash: 0,
         }
     }
@@ -90,7 +89,7 @@ impl UnitFileData {
         false
     }
 
-    pub fn build_id_fragment(&mut self, name: &String) {
+    fn build_id_fragment(&mut self, name: &String) {
         let mut pathbuf_fragment = Vec::new();
         for v in &self.lookup_path.search_path {
             if let Err(_e) = fs::metadata(v) {
@@ -108,18 +107,11 @@ impl UnitFileData {
                             continue;
                         }
                         let path = format!("{}.toml", fragment.to_string_lossy());
-                        match std::fs::copy(fragment, &path).map(|ret| {
-                            pathbuf_fragment.push(Path::new(&path).to_path_buf());
-                            ret
-                        }) {
-                            Ok(_ret) => {
-                                continue;
-                            }
-                            Err(e) => {
-                                log::error!("{}", e.to_string());
-                                continue;
-                            }
+
+                        if let Err(e) = std::fs::copy(fragment, &path) {
+                            log::warn!("copy file content to toml file error: {}", e);
                         }
+                        pathbuf_fragment.push(Path::new(&path).to_path_buf());
                     }
                 }
             }
@@ -131,19 +123,11 @@ impl UnitFileData {
             let tmp = Path::new(&path);
             if tmp.exists() && !tmp.is_symlink() {
                 let path = format!("{}.toml", tmp.to_string_lossy());
-                match std::fs::copy(tmp, &path).map(|ret| {
-                    let to = Path::new(&path);
-                    pathbuf_fragment.push(to.to_path_buf());
-                    ret
-                }) {
-                    Ok(_ret) => {
-                        continue;
-                    }
-                    Err(e) => {
-                        log::error!("{}", e.to_string());
-                        continue;
-                    }
+                if let Err(e) = std::fs::copy(tmp, &path) {
+                    log::warn!("copy file content to toml file error: {}", e);
                 }
+                let to = Path::new(&path);
+                pathbuf_fragment.push(to.to_path_buf());
             }
         }
 
@@ -151,7 +135,7 @@ impl UnitFileData {
             .insert(name.to_string(), pathbuf_fragment);
     }
 
-    pub fn build_id_dropin(&mut self, name: &String, suffix: String) {
+    fn build_id_dropin(&mut self, name: &String, suffix: String) {
         let mut pathbuf_dropin = Vec::new();
         for v in &self.lookup_path.search_path {
             let path = format!("{}/{}.{}", v, name, suffix);

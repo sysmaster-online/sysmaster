@@ -596,18 +596,24 @@ mod tests {
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::manager::unit::unit_rentry::{UnitRe, UnitType};
     use crate::reliability::Reliability;
+    use std::rc::Rc;
+    use utils::{logger, path_lookup::LookupPaths};
+
     use crate::{
         manager::{unit::data::DataManager, unit::uload_util::UnitFile},
         plugin::Plugin,
     };
-    use std::rc::Rc;
-    use utils::logger;
 
     fn unit_init() -> Rc<Unit> {
         logger::init_log_with_console("test_unit_entry", 4);
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
         let rentry = Rc::new(UnitRe::new(&reli));
-        let unit_file = UnitFile::new();
+
+        let mut l_path = LookupPaths::new();
+        l_path.init_lookup_paths();
+        let lookup_path = Rc::new(l_path);
+        let unit_file = UnitFile::new(&lookup_path);
+
         let dm = DataManager::new();
         let plugin = Plugin::get_instance();
         let sub_obj = plugin.create_unit_obj(UnitType::UnitService).unwrap();
