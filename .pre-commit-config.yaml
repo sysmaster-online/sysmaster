@@ -44,7 +44,7 @@ repos:
   #     # - id: shfmt
 
   - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
-    rev: master
+    rev: v2.4.0
     hooks:
     - id: pretty-format-rust
       args: [--autofix]

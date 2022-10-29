@@ -6,11 +6,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["dylib"]
 name = "socket"
 
 [dependencies]
-dynamic_reload = "0.4.0"
+dynamic_reload = "0.8.0"
 utils = { path = "../../libutils" }
 cgroup = { path = "../../libcgroup" }
 event = { path = "../../libevent" }

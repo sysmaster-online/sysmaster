@@ -164,12 +164,12 @@ impl SocketRe {
 
     pub(super) fn conf_insert(
         &self,
-        unit_id: &String,
+        unit_id: &str,
         socket: &SectionSocket,
         service: Option<String>,
     ) {
         let conf = SocketReConf::new(socket, service);
-        self.conf.0.insert(unit_id.clone(), conf);
+        self.conf.0.insert(unit_id.to_string(), conf);
     }
 
     pub(super) fn _conf_remove(&self, unit_id: &String) {
@@ -181,9 +181,10 @@ impl SocketRe {
         conf.map(|c| (c.socket, c.service))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn mng_insert(
         &self,
-        unit_id: &String,
+        unit_id: &str,
         state: SocketState,
         result: SocketResult,
         control_pid: Option<Pid>,
@@ -203,13 +204,14 @@ impl SocketRe {
             refused,
             ps,
         );
-        self.mng.0.insert(unit_id.clone(), mng);
+        self.mng.0.insert(unit_id.to_string(), mng);
     }
 
     pub(super) fn _mng_remove(&self, unit_id: &String) {
         self.mng.0.remove(unit_id);
     }
 
+    #[allow(clippy::type_complexity)]
     pub(super) fn mng_get(
         &self,
         unit_id: &String,
@@ -227,7 +229,7 @@ impl SocketRe {
             (
                 m.state,
                 m.result,
-                m.control_pid.map(|pid| Pid::from_raw(pid)),
+                m.control_pid.map(Pid::from_raw),
                 m.control_cmd_type,
                 m.control_cmd_len,
                 m.refused,

@@ -673,11 +673,7 @@ impl SocketMngData {
     }
 
     fn mports(&self) -> Vec<Rc<SocketMngPort>> {
-        self.ports
-            .borrow()
-            .iter()
-            .map(|p| Rc::clone(p))
-            .collect::<_>()
+        self.ports.borrow().iter().map(Rc::clone).collect::<_>()
     }
 
     fn ports(&self) -> Vec<Rc<SocketPort>> {

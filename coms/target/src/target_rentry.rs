@@ -38,9 +38,9 @@ impl TargetRe {
         rentry
     }
 
-    pub(super) fn mng_insert(&self, unit_id: &String, state: TargetState) {
+    pub(super) fn mng_insert(&self, unit_id: &str, state: TargetState) {
         let mng = TargetReMng::new(state);
-        self.mng.0.insert(unit_id.clone(), mng);
+        self.mng.0.insert(unit_id.to_string(), mng);
     }
 
     pub(super) fn mng_get(&self, unit_id: &String) -> Option<TargetState> {

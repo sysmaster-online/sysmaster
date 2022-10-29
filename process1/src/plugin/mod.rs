@@ -39,6 +39,7 @@ use std::io::Read;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::RwLock;
+use std::time::Duration;
 use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
 use std::{env, io};
 use walkdir::{DirEntry, WalkDir};
@@ -229,6 +230,7 @@ impl Plugin {
             Some(search_path),
             Some(shadow_dir),
             dynamic_reload::Search::Default,
+            Duration::from_secs(2),
         );
 
         for file_item in lib_path.iter() {
@@ -278,7 +280,7 @@ impl Plugin {
                 return Ok(());
             }
 
-            match reload_handler.add_library(v, dynamic_reload::PlatformName::No) {
+            match unsafe { reload_handler.add_library(v, dynamic_reload::PlatformName::No) } {
                 Ok(lib) => {
                     #[allow(clippy::type_complexity)]
                     let _symunit: Result<

@@ -189,6 +189,7 @@ struct ServiceReMng {
 }
 
 impl ServiceReMng {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         state: ServiceState,
         result: ServiceResult,
@@ -227,9 +228,9 @@ impl ServiceRe {
         rentry
     }
 
-    pub(super) fn conf_insert(&self, unit_id: &String, service: &SectionService) {
+    pub(super) fn conf_insert(&self, unit_id: &str, service: &SectionService) {
         let conf = ServiceReConf::new(service);
-        self.conf.0.insert(unit_id.clone(), conf);
+        self.conf.0.insert(unit_id.to_string(), conf);
     }
 
     pub(super) fn _conf_remove(&self, unit_id: &String) {
@@ -241,9 +242,10 @@ impl ServiceRe {
         conf.map(|c| c.service)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn mng_insert(
         &self,
-        unit_id: &String,
+        unit_id: &str,
         state: ServiceState,
         result: ServiceResult,
         main_pid: Option<Pid>,
@@ -265,13 +267,14 @@ impl ServiceRe {
             control_cmd_len,
             notify_state,
         );
-        self.mng.0.insert(unit_id.clone(), mng);
+        self.mng.0.insert(unit_id.to_string(), mng);
     }
 
     pub(super) fn _mng_remove(&self, unit_id: &String) {
         self.mng.0.remove(unit_id);
     }
 
+    #[allow(clippy::type_complexity)]
     pub(super) fn mng_get(
         &self,
         unit_id: &String,
@@ -290,8 +293,8 @@ impl ServiceRe {
             (
                 m.state,
                 m.result,
-                m.main_pid.map(|pid| Pid::from_raw(pid)),
-                m.control_pid.map(|pid| Pid::from_raw(pid)),
+                m.main_pid.map(Pid::from_raw),
+                m.control_pid.map(Pid::from_raw),
                 m.main_cmd_len,
                 m.control_cmd_type,
                 m.control_cmd_len,

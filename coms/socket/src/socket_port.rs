@@ -67,8 +67,8 @@ impl SocketPort {
         let port_fd = match self.p_conf.p_type() {
             PortType::Socket => {
                 let flag = SockFlag::SOCK_CLOEXEC | SockFlag::SOCK_NONBLOCK;
-                let fd = self.p_conf.sa().socket_listen(flag, 128)?;
-                fd
+
+                self.p_conf.sa().socket_listen(flag, 128)?
             }
             PortType::Fifo => todo!(),
             PortType::Invalid => todo!(),

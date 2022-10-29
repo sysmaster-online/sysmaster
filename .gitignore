@@ -1,5 +1,4 @@
-target
-!components/target/
+/target
 .vscode
 Cargo.lock
 tests/*.log

@@ -1,3 +1,4 @@
+![](docs/res/sysmaster-description.jpg)
 # Process 1 设计思考
 
 ## 背景说明

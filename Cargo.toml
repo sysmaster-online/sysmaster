@@ -85,8 +85,8 @@ members = [
   "libutils",
   "libs/libtests",
   "libs/libwatchdog",
-  "components/service",
-  "components/socket",
-  "components/target",
-  "components/mount",
+  "coms/service",
+  "coms/socket",
+  "coms/target",
+  "coms/mount",
 ]

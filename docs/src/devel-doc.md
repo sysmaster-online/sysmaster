@@ -17,7 +17,7 @@ process1支撑以上工作，提供可以扩展的开发框架，支持开发多
 
 需要启动的进程，初始化的系统配置，如网络配置，
 本文当详细描述，如何基于process1开发框架，process1扩展开发新的子类，具体的开发流程如下：
-![avatar](u_dev_process.jpg)
+![avatar](../res/u_dev_process.jpg)
 
 ## 子类UnitSubClass实现 ##
 
