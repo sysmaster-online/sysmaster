@@ -4,7 +4,7 @@
 use crate::socket_base::PortType;
 use crate::socket_comm::SocketUnitComm;
 use crate::socket_config::SocketConfig;
-use process1::manager::{UnitRelations, UnitType};
+use libsysmaster::manager::{UnitRelations, UnitType};
 use std::path::Path;
 use std::{error::Error, rc::Rc};
 

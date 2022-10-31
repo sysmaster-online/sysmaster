@@ -10,13 +10,13 @@ Invalid commit message submission format, please use the correct format:
 -------- title
 <type>(<scope>): <short summary>   (Up to 72 characters)
   │       │             │
-  │       │             └─⫸ Summary in present tense. Not capitalized. No period at the end.
+  │       │             |--> Summary in present tense. Not capitalized. No period at the end.
   │       │
-  │       └─⫸ Commit Scope: Optional, can be anything specifying the scope of the commit change.
+  │       |--> Commit Scope: Optional, can be anything specifying the scope of the commit change.
   |                          For example \$location|\$browser|\$compile|\$rootScope|ngHref|ngClick|ngView, etc.
   |                          In App Development, scope can be a page, a module or a component.
   │
-  └─⫸ Commit Type: feature|fix|docs|style|refactor|perf|test|workflow|build|ci|chore|release|typo
+  |--> Commit Type: feature|fix|docs|style|refactor|perf|test|workflow|build|ci|chore|release|typo
                     feature: new feature
                     fix: bugfix
                     docs: documentation

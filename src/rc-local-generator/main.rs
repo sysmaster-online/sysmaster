@@ -4,8 +4,8 @@
 //! and added to the end of the system startup process
 
 mod rc_local_generator;
+use libutils::logger;
 use rc_local_generator::*;
-use utils::logger;
 
 fn main() {
     logger::init_log_with_console("rc_local_generator", 4);
@@ -14,7 +14,7 @@ fn main() {
     let e = check_executable(RC_LOCAL_PATH);
     match e {
         Ok(_) => {
-            let f = add_symlink("rc-local.service", "/etc/process1/basic.target");
+            let f = add_symlink("rc-local.service", "/etc/sysmaster/basic.target");
             match f {
                 Ok(()) => {}
                 Err(_) => log::debug!("failed to create symlink!"),

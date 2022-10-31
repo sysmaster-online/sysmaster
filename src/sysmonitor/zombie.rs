@@ -1,8 +1,8 @@
-//! 系统当前僵尸进程数量的监控
+//! Monitoring the current number of zombie processes in the system
 use serde_derive::Deserialize;
 
+use libutils::Error;
 use std::process::Command;
-use utils::Error;
 
 use crate::{Monitor, Switch, SysMonitor};
 
@@ -54,7 +54,7 @@ impl Monitor for ZombieCount {
     }
 
     fn check_status(&mut self) -> Result<(), Error> {
-        // 调用shell命令计算当前系统僵尸进程的数量
+        // Call the shell command to count the number of zombie processes in the current system
         let cmd = "ps -A -o stat,ppid,pid,cmd | grep -e '^[Zz]' | awk '{print $0}' | wc -l";
         let output = Command::new("bash").arg("-c").arg(cmd).output()?;
         let out = String::from_utf8(output.stdout)?;
@@ -62,7 +62,7 @@ impl Monitor for ZombieCount {
 
         println!("zombie count: {}", count);
 
-        // 调用外部脚本来打印僵尸进程的父亲
+        // Calling an external script to print the father of the zombie process
         if count >= self.alarm && !self.status {
             let _ = Command::new("/usr/libexec/sysmonitor/getzombieparent.py").output()?;
         } else if count <= self.resume && self.status {

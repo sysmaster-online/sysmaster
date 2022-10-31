@@ -1,4 +1,4 @@
-use process1::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
+use libsysmaster::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 

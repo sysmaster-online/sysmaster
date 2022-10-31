@@ -2,8 +2,8 @@
 
 use super::mount_comm::MountUnitComm;
 use super::mount_rentry::MountState;
-use process1::manager::{UnitActionError, UnitActiveState, UnitNotifyFlags};
-use process1::ReStation;
+use libsysmaster::manager::{UnitActionError, UnitActiveState, UnitNotifyFlags};
+use libsysmaster::ReStation;
 use std::{cell::RefCell, rc::Rc};
 
 impl MountState {

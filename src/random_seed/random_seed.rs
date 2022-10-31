@@ -10,8 +10,8 @@ use std::{
 };
 
 const RAMDOM_POOL_SIZE_MIN: usize = 512;
-const RANDOM_SEED: &str = "/usr/lib/process1/random-seed";
-const RAMDOM_SEED_DIR: &str = "/usr/lib/process1";
+const RANDOM_SEED: &str = "/usr/lib/sysmaster/random-seed";
+const RAMDOM_SEED_DIR: &str = "/usr/lib/sysmaster";
 const RANDOM_POOL_SIZE_MAX: usize = 10 * 1024 * 1024;
 
 fn read_one_line_file(path: &str) -> Result<String, ()> {

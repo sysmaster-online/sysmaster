@@ -10,14 +10,14 @@ use crate::{
     socket_load::SocketLoad,
     socket_mng::SocketMng,
 };
-use nix::{sys::signal::Signal, unistd::Pid};
-use process1::manager::{
+use libsysmaster::manager::{
     ExecContext, Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj,
     UnitSubClass,
 };
-use process1::{ReStation, Reliability};
+use libsysmaster::{ReStation, Reliability};
+use libutils::logger;
+use nix::{sys::signal::Signal, unistd::Pid};
 use std::{error::Error, path::PathBuf, rc::Rc};
-use utils::logger;
 
 // the structuer of the socket unit type
 struct SocketUnit {
@@ -154,5 +154,5 @@ impl Default for SocketUnit {
 }
 
 // define the method to create the instance of the unit
-use process1::declure_unitobj_plugin;
+use libsysmaster::declure_unitobj_plugin;
 declure_unitobj_plugin!(SocketUnit, SocketUnit::default, PLUGIN_NAME, LOG_LEVEL);

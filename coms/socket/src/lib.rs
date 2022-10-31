@@ -1,4 +1,4 @@
-//!  Socket is a kind of process1 startup type. It can accelerate startup by creating a socket socket first, and then pulling the corresponding service when the socket socket receives a request.
+//!  Socket is a kind of sysmaster startup type. It can accelerate startup by creating a socket socket first, and then pulling the corresponding service when the socket socket receives a request.
 //!  The socket configuration file contains three sections: Unit, Socket, and Install.
 //!
 //! #  Example:

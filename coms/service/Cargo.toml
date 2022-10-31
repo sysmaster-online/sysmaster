@@ -10,12 +10,13 @@ crate-type = ["dylib"]
 name = "service"
 
 [dependencies]
-dynamic_reload = "0.8.0"
-utils = { path = "../../libutils" }
-cgroup = { path = "../../libcgroup" }
-process1 = { path = "../../process1" }
-event = { path = "../../libevent" }
+libutils = { path = "../../libs/libutils" }
+libcgroup = { path = "../../libs/libcgroup" }
+libevent = { path = "../../libs/libevent" }
 libwatchdog = { path = "../../libs/libwatchdog" }
+libsysmaster = { path = "../../libsysmaster" }
+
+dynamic_reload = "0.8.0"
 strum = { version = "0.23", features = ["derive"] }
 nix = "0.24"
 log = "0.4"

@@ -10,11 +10,12 @@ crate-type = ["dylib"]
 name = "socket"
 
 [dependencies]
+libutils = { path = "../../libs/libutils" }
+libcgroup = { path = "../../libs/libcgroup" }
+libevent = { path = "../../libs/libevent" }
+libsysmaster = { path = "../../libsysmaster" }
+
 dynamic_reload = "0.8.0"
-utils = { path = "../../libutils" }
-cgroup = { path = "../../libcgroup" }
-event = { path = "../../libevent" }
-process1 = { path = "../../process1" }
 strum = { version = "0.23", features = ["derive"] }
 nix = "0.24"
 log = "0.4"

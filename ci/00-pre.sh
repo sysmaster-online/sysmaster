@@ -8,7 +8,7 @@
 # do not use chinese in source code
 for rustlist in `git diff origin/master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
 do
-    grep -P '[\p{Han}]' $rustlist  && echo "DO NOT USE CHANESE CHARACTERS in code, 不要在源码中使用中文!" && exit 1
+    grep -Pn '[\p{Han}]' $rustlist  && echo "DO NOT USE CHANESE CHARACTERS in code, 不要在源码中使用中文!" && exit 1
 done
 
 # install needed tools
@@ -38,9 +38,9 @@ EOF
 rm -rf  ~/.cargo/.package-cache
 
 ##拉取代码
-#rm -rf process1
-#git clone https://gitee.com/openeuler/process1.git
-#cd process1
+#rm -rf sysmaster
+#git clone https://gitee.com/openeuler/sysmaster.git
+#cd sysmaster
 #git checkout -b pr_$prid
 #git fetch origin pull/$prid/head:master-$prid
 #git merge --no-edit master-$prid

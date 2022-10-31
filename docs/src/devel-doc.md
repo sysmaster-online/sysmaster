@@ -1,6 +1,6 @@
-# process1 扩展子类开发指南 #
+# sysmaster 扩展子类开发指南 #
 
-process1为Linux系统下的一号进程，是linux内核启动后第一个用户态进程，在系统启动过程中和关机过程中，完成相关资源的初始化和回收工作：
+sysmaster为Linux系统下的一号进程，是linux内核启动后第一个用户态进程，在系统启动过程中和关机过程中，完成相关资源的初始化和回收工作：
 
 开机过程中主要完成以下工作：
 
@@ -13,10 +13,10 @@ process1为Linux系统下的一号进程，是linux内核启动后第一个用�
 1.资源的回收，如缓存的持久化。
 2.业务进程的关闭
 
-process1支撑以上工作，提供可以扩展的开发框架，支持开发多种管理单元（后文称为Unit），完成需要在开机和关机过程中可以方便扩展需要注入的系统启动过程中需要执行的工作，扩展Unit的开发流程如下：
+sysmaster支撑以上工作，提供可以扩展的开发框架，支持开发多种管理单元（后文称为Unit），完成需要在开机和关机过程中可以方便扩展需要注入的系统启动过程中需要执行的工作，扩展Unit的开发流程如下：
 
 需要启动的进程，初始化的系统配置，如网络配置，
-本文当详细描述，如何基于process1开发框架，process1扩展开发新的子类，具体的开发流程如下：
+本文当详细描述，如何基于sysmaster开发框架，sysmaster扩展开发新的子类，具体的开发流程如下：
 ![avatar](../res/u_dev_process.jpg)
 
 ## 子类UnitSubClass实现 ##
@@ -25,7 +25,7 @@ process1支撑以上工作，提供可以扩展的开发框架，支持开发多
 
 ```rust
 //定义Unit单元所有可以执行的行为，具体的行为列表可以参考代码文件：
-//process1/src/manager/unit/unit_entry/u_entry.rs
+//sysmaster/src/manager/unit/unit_entry/u_entry.rs
 pub trait UnitObj;
 
 //由于rust不支持面向对象，此trait实现从子Unit到UnitObj的downgrade.
@@ -38,10 +38,10 @@ pub trait UnitMngUtil;
 
 1. 前置条件说明
 
-   当前process1采用单线程运行环境，所以各process1管理单元（unit）在实现时需要以异步无阻塞方式编程.
+   当前sysmaster采用单线程运行环境，所以各sysmaster管理单元（unit）在实现时需要以异步无阻塞方式编程.
 
 2. 子类行为分类说明
-unit作为所管理的系统资源在process1中的投影，unit在通过os接口操作对应系统资源时，同时维护对应系统资源的状态和历史操作结果。
+unit作为所管理的系统资源在sysmaster中的投影，unit在通过os接口操作对应系统资源时，同时维护对应系统资源的状态和历史操作结果。
 
     - 子类生命周期行为：
     根据业务诉求提炼出其所需管理的系统资源，并通过os接口对这些系统资源进行管理，对外提供系统资源的操作接口，包括：start、stop、reload。
@@ -122,7 +122,7 @@ unit作为所管理的系统资源在process1中的投影，unit在通过os接�
     ```
 
 3. 子类的依赖关系动态管理[可选]
-    process1框架明确定义了子类的依赖关系，并且会根据依赖关系，执行子类的行为，依赖关系除了通过配置文件配置外，还可以通过接口动态添加，这样子类可以提前定义一些缺省的，公共依赖，而无需再每个配置文件增加这样的配置。降低配置文件中的重复配置，减少配置工作量，也可以对管理员隐藏这些配置。
+    sysmaster框架明确定义了子类的依赖关系，并且会根据依赖关系，执行子类的行为，依赖关系除了通过配置文件配置外，还可以通过接口动态添加，这样子类可以提前定义一些缺省的，公共依赖，而无需再每个配置文件增加这样的配置。降低配置文件中的重复配置，减少配置工作量，也可以对管理员隐藏这些配置。
 
     ```rust
     【编码示例】待补充
@@ -130,7 +130,7 @@ unit作为所管理的系统资源在process1中的投影，unit在通过os接�
     ```
 
 4. 进程管理[可选]
-   扩展子unit在实现的时候，常见的一种场景是需要创建一个新的进程来执行自己要完成的动作，如启动一个守护进程，通过一个新的集成来配置网络，等等，为此，unit框架提供了一些公共的进程操作的能力来进行(process1进程之外）独立进程的操作，以方便各类unit在此场景中的开发。
+   扩展子unit在实现的时候，常见的一种场景是需要创建一个新的进程来执行自己要完成的动作，如启动一个守护进程，通过一个新的集成来配置网络，等等，为此，unit框架提供了一些公共的进程操作的能力来进行(sysmaster进程之外）独立进程的操作，以方便各类unit在此场景中的开发。
    - 进程通信：支持各类unit通过系统调用kill向指定进程组发送各种信号。
    - 进程id跟踪：在各类unit提供pid-unit对应关系数据的情况下，支持根据pid对应关系进行sigchld信号分发(sigchld_events)。
    - 进程拉起：支持各类unit通过系统调用fork+execve拉起子进程（含cgroup设置），同时支持多种运行环境参数设置。
@@ -159,7 +159,7 @@ unit作为所管理的系统资源在process1中的投影，unit在通过os接�
        WantedBy="dbus.service"
     ```
 
-    process1框架使用Confique来解析配置，可以方便的将配置文件转化成子类配置数据结构，代码示例如下：
+    sysmaster框架使用Confique来解析配置，可以方便的将配置文件转化成子类配置数据结构，代码示例如下：
 
     ```rust
        #[derive(Config, Default)]
@@ -259,7 +259,7 @@ unit作为所管理的系统资源在process1中的投影，unit在通过os接�
     ```
 
 6. 插件注册
-   各类unit以插件方式集成到process1中，unit框架提供了插件注册能力的宏declure_unitobj_plugin，以支持各子unit的注册，插件是一动态库形式加载的，动态库的命名需要和子类的名称保持一致，如service，则动态库的名称应该为libservice.so
+   各类unit以插件方式集成到sysmaster中，unit框架提供了插件注册能力的宏declure_unitobj_plugin，以支持各子unit的注册，插件是一动态库形式加载的，动态库的命名需要和子类的名称保持一致，如service，则动态库的名称应该为libservice.so
 
    ```rust
    declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default, PLUGIN_NAME, LOG_LEVEL);

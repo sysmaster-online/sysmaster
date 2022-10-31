@@ -1,4 +1,4 @@
-//! Daemon Process1 or Systemd, restart the process when it exits
+//! Daemon sysmaster or Systemd, restart the process when it exits
 
 use std::collections::VecDeque;
 use std::io::Error;
@@ -14,7 +14,7 @@ use nix::sys::wait::waitpid;
 use nix::unistd::{fork, ForkResult, Pid};
 use signal_hook_registry::register_sigaction;
 
-const PROCESS1_PATH: &str = "/usr/lib/process1/process1";
+const SYSMASTER_PATH: &str = "/usr/lib/sysmaster/sysmaster";
 const SYSTEMD_PATH: &str = "/usr/lib/systemd/systemd";
 const TIME_INTERVAL: Duration = Duration::from_secs(10);
 const FAIL_COUNT: usize = 3;
@@ -51,8 +51,8 @@ fn get_command() -> Option<String> {
 }
 
 fn detect_init() -> String {
-    if Path::new(PROCESS1_PATH).exists() {
-        return String::from(PROCESS1_PATH);
+    if Path::new(SYSMASTER_PATH).exists() {
+        return String::from(SYSMASTER_PATH);
     } else if Path::new(SYSTEMD_PATH).exists() {
         return String::from(SYSTEMD_PATH);
     }

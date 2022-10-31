@@ -5,18 +5,20 @@ use super::service_rentry::{
     NotifyState, ServiceCommand, ServiceResult, ServiceState, ServiceType,
 };
 use super::service_spawn::ServiceSpawn;
-use event::{EventState, EventType, Events, Source};
+use libevent::{EventState, EventType, Events, Source};
+use libsysmaster::manager::{
+    ExecCommand, ExecContext, ExecFlags, KillOperation, UnitActionError, UnitActiveState,
+    UnitNotifyFlags,
+};
+use libsysmaster::ReStation;
+use libutils::{fd_util, Error, IN_SET};
+use libutils::{file_util, process_util};
 use nix::errno::Errno;
 use nix::libc;
 use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
-use process1::manager::{
-    ExecCommand, ExecContext, ExecFlags, KillOperation, UnitActionError, UnitActiveState,
-    UnitNotifyFlags,
-};
-use process1::ReStation;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -28,8 +30,6 @@ use std::{
     path::PathBuf,
     rc::Weak,
 };
-use utils::{fd_util, Error, IN_SET};
-use utils::{file_util, process_util};
 
 pub(super) struct ServiceMng {
     // associated objects
@@ -701,7 +701,7 @@ impl ServiceMng {
     fn valid_main_pid(&self, pid: Pid) -> Result<bool, Error> {
         if pid == nix::unistd::getpid() {
             return Err(Error::Other {
-                msg: "main pid is the process1's pid",
+                msg: "main pid is the sysmaster's pid",
             });
         }
 
@@ -789,7 +789,7 @@ impl ServiceMng {
     }
 
     fn cgroup_good(&self) -> bool {
-        if let Ok(v) = cgroup::cg_is_empty_recursive(&self.comm.unit().cg_path()) {
+        if let Ok(v) = libcgroup::cg_is_empty_recursive(&self.comm.unit().cg_path()) {
             return !v;
         }
 

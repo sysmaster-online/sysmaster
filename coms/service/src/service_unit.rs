@@ -5,20 +5,20 @@ use super::service_mng::RunningData;
 use super::service_mng::ServiceMng;
 use super::service_monitor::ServiceMonitor;
 use super::service_rentry::{NotifyAccess, ServiceCommand, ServiceType};
-use nix::sys::signal::Signal;
-use nix::sys::socket::UnixCredentials;
-use nix::unistd::Pid;
-use process1::manager::{
+use libsysmaster::manager::{
     ExecContext, Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj,
     UnitRelations, UnitSubClass,
 };
-use process1::{ReStation, Reliability};
+use libsysmaster::{ReStation, Reliability};
+use libutils::error::Error as ServiceError;
+use libutils::logger;
+use nix::sys::signal::Signal;
+use nix::sys::socket::UnixCredentials;
+use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
-use utils::error::Error as ServiceError;
-use utils::logger;
 
 struct ServiceUnit {
     comm: Rc<ServiceUnitComm>,
@@ -266,5 +266,5 @@ impl Default for ServiceUnit {
     }
 }
 
-use process1::declure_unitobj_plugin;
+use libsysmaster::declure_unitobj_plugin;
 declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default, PLUGIN_NAME, LOG_LEVEL);

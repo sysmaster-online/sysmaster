@@ -5,7 +5,7 @@
 use std::{env, process};
 mod random_seed;
 use crate::random_seed::run;
-use utils::logger;
+use libutils::logger;
 
 fn main() {
     logger::init_log_with_console("random-seed", 4);

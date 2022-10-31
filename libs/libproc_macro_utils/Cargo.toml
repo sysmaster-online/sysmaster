@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-utils = { path = "../libutils" }
+libutils = { path = "../libutils" }
 syn = {version="1.0", features=["extra-traits"]}
 quote = {version = "1.0"}
 proc-macro2 = {version = "1.0"}
