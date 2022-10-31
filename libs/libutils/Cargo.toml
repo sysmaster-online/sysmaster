@@ -1,0 +1,23 @@
+[package]
+name = "libutils"
+version = "0.1.0"
+authors = ["overweight <hexiaowen@huawei.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+toml = "0.5.8"
+serde_derive = "1.0.130"
+serde = "1.0.130"
+log = "0.4"
+log4rs = "1.0"
+thiserror = "1.0"
+anyhow = "1.0"
+http = "0.2.6"
+procfs = "0.12.0"
+nix = "0.24"
+pathdiff = "0.2.1"
+
+[dev-dependencies]
+tests = { path = "../libtests" }

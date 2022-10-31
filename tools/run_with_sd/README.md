@@ -1,7 +1,7 @@
 # 兼容systemd模式运行
 
 ## 思路
-以process1为1号进程，拉起systemd以非1号运行，并负责监控systemd的运行状态。
+以sysmaster为1号进程，拉起systemd以非1号运行，并负责监控systemd的运行状态。
 
 ## 适配
 基于openEuler 21.09构建systemd，需要适配systemd源码以支持非1号运行。
@@ -28,7 +28,7 @@
 1. 安装21.09虚拟机镜像。
 2. 禁用selinux，/etc/selinux/config, enforcing to disabled
 3. 将systemd的rpms上传到虚拟机中，并执行`rpm -Fvh *.rpm`安装升级。
-4. 将process1中编译的init进程，替换到虚拟机/init, /sbin/init，建议先`rm /sbin/init`删除init软链接，否则会覆盖systemd程序。
+4. 将sysmaster中编译的init进程，替换到虚拟机/init, /sbin/init，建议先`rm /sbin/init`删除init软链接，否则会覆盖systemd程序。
 5. 修改dracut，`/usr/lib/dracut/modules.d/00systemd/module-setup.sh`, 替换
 
 ```

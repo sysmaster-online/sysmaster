@@ -10,13 +10,14 @@ crate-type = ["dylib"]
 name = "mount"
 
 [dependencies]
+libevent = { path = "../../libs/libevent" }
+libutils = { path = "../../libs/libutils" }
+libsysmaster = { path = "../../libsysmaster" }
+
 dynamic_reload = "0.8.0"
-utils = { path = "../../libutils" }
-process1 = { path = "../../process1" }
 nix = "0.24"
 log = "0.4"
 epoll = "4.3.1"
-event = { path = "../../libevent" }
 libmount = "0.1.15"
 libc = "0.2.*"
 serde = "1.0.130"

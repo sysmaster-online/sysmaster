@@ -2,10 +2,10 @@
 //!  The method provided by the public object needs to be called.
 //!
 use super::socket_rentry::{SectionSocket, SocketCommand, SocketRe, SocketResult, SocketState};
+use libsysmaster::manager::{Unit, UnitManager};
+use libsysmaster::Reliability;
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
-use process1::manager::{Unit, UnitManager};
-use process1::Reliability;
 use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};

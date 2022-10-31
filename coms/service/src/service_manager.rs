@@ -1,10 +1,10 @@
 use super::service_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::service_comm::ServiceUmComm;
-use process1::manager::{UnitManager, UnitManagerObj, UnitMngUtil};
-use process1::{ReStation, Reliability};
+use libsysmaster::manager::{UnitManager, UnitManagerObj, UnitMngUtil};
+use libsysmaster::{ReStation, Reliability};
+use libutils::logger;
 use std::rc::Rc;
 use std::sync::Arc;
-use utils::logger;
 
 struct ServiceManager {
     comm: Arc<ServiceUmComm>,
@@ -48,7 +48,7 @@ impl Default for ServiceManager {
     }
 }
 
-use process1::declure_umobj_plugin;
+use libsysmaster::declure_umobj_plugin;
 declure_umobj_plugin!(
     ServiceManager,
     ServiceManager::default,

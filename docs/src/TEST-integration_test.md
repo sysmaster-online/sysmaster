@@ -77,7 +77,7 @@ cargo test -- --test-threads=1
 
 ```
 [root@localhost tests]# cargo test --test docker_example_001 -- --test-threads=1
-   Compiling process1 v0.1.0 (/root/sysmaster/process1)
+   Compiling sysmaster v0.1.0 (/root/sysmaster/sysmaster)
    Compiling sysmaster v0.2.2 (/root/sysmaster)
     Finished test [unoptimized + debuginfo] target(s) in 6.54s
      Running tests/docker_example_001.rs (/root/sysmaster/target/debug/deps/docker_example_001-21f1c699b9d8d520)
@@ -92,7 +92,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 ```
 [root@localhost tests]# cargo test --test docker_example_002 -- --test-threads=1
-   Compiling process1 v0.1.0 (/root/sysmaster/process1)
+   Compiling sysmaster v0.1.0 (/root/sysmaster/sysmaster)
    Compiling sysmaster v0.2.2 (/root/sysmaster)
     Finished test [unoptimized + debuginfo] target(s) in 5.86s
      Running tests/docker_example_002.rs (/root/sysmaster/target/debug/deps/docker_example_002-c2ed27402aa5f112)
@@ -121,7 +121,7 @@ error: test failed, to rerun pass '--test docker_example_002'
 
 ```
 [root@localhost tests]# cargo test --test docker_example_001 -- --test-threads=1 --show-output
-   Compiling process1 v0.1.0 (/root/sysmaster/process1)
+   Compiling sysmaster v0.1.0 (/root/sysmaster/sysmaster)
    Compiling sysmaster v0.2.2 (/root/sysmaster)
     Finished test [unoptimized + debuginfo] target(s) in 5.60s
      Running tests/docker_example_001.rs (/root/sysmaster/target/debug/deps/docker_example_001-21f1c699b9d8d520)
@@ -155,7 +155,7 @@ error: no test target named `docker_example`
 
 ```
 [root@localhost tests]# cargo test example -- --test-threads=1
-   Compiling process1 v0.1.0 (/root/sysmaster/process1)
+   Compiling sysmaster v0.1.0 (/root/sysmaster/sysmaster)
    Compiling sysmaster v0.2.2 (/root/sysmaster)
     Finished test [unoptimized + debuginfo] target(s) in 8.78s
      Running unittests src/fstab/main.rs (/root/sysmaster/target/debug/deps/fstab-8c2a561dde232947)
@@ -342,8 +342,8 @@ function runtest() {
 
 ```
 [root@localhost tests]# cat docker_example_001/check.sh
-ls -l /usr/lib/process1 || exit 1
-ls -l /usr/lib/process1/plugin || exit 1
+ls -l /usr/lib/sysmaster || exit 1
+ls -l /usr/lib/sysmaster/plugin || exit 1
 ls -l /usr/bin/pctrl || exit 1
 ```
 
@@ -358,7 +358,7 @@ ls -l /usr/bin/pctrl || exit 1
 + docker run --rm -v /tmp/docker_example_001_mTTo/opt:/opt sysmaster_base-openeuler-22.09 sh -c 'sh -x /opt/check.sh &> /opt/check.log'
 + ret=0
 + cat /tmp/docker_example_001_mTTo/opt/check.log
-+ ls -l /usr/lib/process1
++ ls -l /usr/lib/sysmaster
 total 28344
 -rwxr-xr-x. 1 root root 3994760 Oct 20 20:30 fstab
 -rwxr-xr-x. 1 root root 4003008 Oct 20 20:30 init
@@ -367,7 +367,7 @@ drwxr-x---. 1 root root    4096 Oct 21 11:31 plugin
 -rwxr-xr-x. 1 root root 4294784 Oct 20 20:30 rc-local-generator
 -rwxr-xr-x. 1 root root 7925360 Oct 20 20:30 sysmaster
 -rwxr-xr-x. 1 root root 4432992 Oct 20 20:30 sysmonitor
-+ ls -l /usr/lib/process1/plugin
++ ls -l /usr/lib/sysmaster/plugin
 total 6884
 -rw-r--r--. 1 root root  612640 Oct 21 11:31 libmount.so
 -rw-r--r--. 1 root root 2464064 Oct 21 11:31 libservice.so

@@ -1,21 +1,21 @@
 //!
 
 use libc::c_int;
+use libsysmaster::manager::{Action, ManagerX, Mode, MANAGER_ARGS_SIZE_MAX};
+use libsysmaster::mount::mount_setup;
+use libsysmaster::{self};
+use libutils::logger::{self};
 use log::{self};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use nix::unistd::{self};
-use process1::manager::{Action, ManagerX, Mode, MANAGER_ARGS_SIZE_MAX};
-use process1::mount::mount_setup;
-use process1::{self};
 use std::convert::TryFrom;
 use std::env::{self};
 use std::error::Error;
 use std::ffi::CString;
-use utils::logger::{self};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    logger::init_log_with_console("process1", 4);
-    log::info!("process1 running in system mode.");
+    logger::init_log_with_console("sysmaster", 4);
+    log::info!("sysmaster running in system mode.");
 
     // temporary annotation for repeat mount
 
@@ -29,9 +29,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         format!("failed to mount mount point, errno: {}", e)
     })?;
 
-    process1::reli_dir_prepare().expect("reliability directory prepare failed.");
-    let switch = process1::reli_debug_get_switch();
-    log::info!("process1 initialize with switch: {}.", switch);
+    libsysmaster::reli_dir_prepare().expect("reliability directory prepare failed.");
+    let switch = libsysmaster::reli_debug_get_switch();
+    log::info!("sysmaster initialize with switch: {}.", switch);
 
     initialize_runtime(switch)?;
 
@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // main loop
     let ret = manager.main_loop();
-    log::info!("process1 end its main loop with result: {:?}", ret);
+    log::info!("sysmaster end its main loop with result: {:?}", ret);
 
     // get result
     let reexec = ret.map_or(false, |ree| ree);

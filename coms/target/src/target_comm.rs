@@ -5,9 +5,9 @@
 *target_ unit->target_ mng->target_ comm
 */
 use super::target_rentry::{TargetRe, TargetState};
+use libsysmaster::manager::{Unit, UnitManager};
+use libsysmaster::Reliability;
 use once_cell::sync::Lazy;
-use process1::manager::{Unit, UnitManager};
-use process1::Reliability;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, RwLock};

@@ -9,21 +9,21 @@ use super::{
     socket_rentry::{SocketCommand, SocketRe, SocketReFrame, SocketResult, SocketState},
     socket_spawn::SocketSpawn,
 };
-use event::EventState;
-use event::{EventType, Events, Source};
-use nix::errno::Errno;
-use nix::libc::{self};
-use nix::{sys::signal::Signal, unistd::Pid};
-use process1::manager::{
+use libevent::EventState;
+use libevent::{EventType, Events, Source};
+use libsysmaster::manager::{
     ExecCommand, ExecContext, KillOperation, ReliLastFrame, UnitActionError, UnitActiveState,
     UnitNotifyFlags, UnitType,
 };
-use process1::{ReStation, Reliability};
+use libsysmaster::{ReStation, Reliability};
+use libutils::Error;
+use libutils::IN_SET;
+use nix::errno::Errno;
+use nix::libc::{self};
+use nix::{sys::signal::Signal, unistd::Pid};
 use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
-use utils::Error;
-use utils::IN_SET;
 
 impl SocketState {
     pub(super) fn to_unit_active_state(self) -> UnitActiveState {
@@ -865,7 +865,7 @@ mod tests {
     #[test]
     fn test_socket_active_state() {
         use super::SocketState;
-        use process1::manager::UnitActiveState;
+        use libsysmaster::manager::UnitActiveState;
 
         assert_eq!(
             SocketState::Dead.to_unit_active_state(),

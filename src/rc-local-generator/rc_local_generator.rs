@@ -1,6 +1,6 @@
 use std::{fs, io, os::linux::fs::MetadataExt};
 
-const SYSTEM_DATA_UNIT_DIR: &str = "/etc/process1/";
+const SYSTEM_DATA_UNIT_DIR: &str = "/etc/sysmaster/";
 pub const RC_LOCAL_PATH: &str = "/etc/rc.local";
 const B_EXEC: u32 = 0o100; /*judge whether file can be executed */
 

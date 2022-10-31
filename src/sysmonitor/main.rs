@@ -1,11 +1,13 @@
-/// sysmonitor主进程。作为系统监控的一部分，目前实现的监控类型主要和进程相关，分别是进程数量监控、僵尸进程数量监控、进程fd数量监控和关键进程监控
+//! sysmonitor main process. As part of system monitoring,
+//! process number monitoring, zombie process number monitoring,
+//! process fd number monitoring and key process monitoring.
 use serde_derive::Deserialize;
 
+use libutils::Error;
 use std::default::Default;
 use std::fs;
 use std::fs::File;
 use std::io::{self, Read};
-use utils::Error;
 
 use crate::process::ProcessMonitor;
 use crate::process_count::ProcessCount;
@@ -18,35 +20,24 @@ mod process_count;
 mod process_fd;
 mod zombie;
 
-/// sysmonitor默认配置文件的路径
+/// default configuration file path
 const CONFIG_FILE_PATH: &str = "/etc/sysconfig/sysmonitor";
 
-/// Sysmonitor框架。首先定义了一个trait，封装了一个监控的几个特性
-/// ```
-/// pub trait Monitor {
-///     fn config_path(&self) -> &str;
-///     fn load(&mut self, content: String, sysmonitor: SysMonitor);
-///     fn is_valid(&self) -> bool;
-///     fn check_status(&mut self) -> Result<(), SysMonitorError>;
-///     fn report_alarm(&self);
-/// }
-/// ```
-/// config_path每个监控会有自己的配置文件路径，load加载函数就是把配置文件转换为结构体，is_valid检查配置项是否合法，
-/// check_status检查当前监控关注的指标情况，report_alarm上报告警
-/// 这样在新增一个监控项时，只需要实现对应的trait，在主进程的monitor数组中新增一个成员即可
+/// First define a trait, which encapsulates several features
 pub trait Monitor {
+    /// Each monitor will have its own configuration file path,
     fn config_path(&self) -> &str;
+    /// convert the configuration file into a structure
     fn load(&mut self, content: String, sysmonitor: SysMonitor);
+    /// checks whether the configuration item is legal,
     fn is_valid(&self) -> bool;
+    /// Check the current monitoring of the indicators concerned,
     fn check_status(&mut self) -> Result<(), Error>;
+    /// report an alarm
     fn report_alarm(&self);
 }
 
-/// 首先定义了一个结构体，使用serde crate自动实现Deserialize trait，这样可以从配置文件反序列化成一个结构体，不需要自己写代码。
-/// 其次结构体使用了serde提供的default特性，可以通过default方法生成一个空结构体，所有字段为默认值，比如int为0，bool为false。
-/// 还使用了rename_all特性，这样可以读取配置文件中字段为结构体中成员对应大写的情况，以适配已有的配置文件。
-/// 最后，每个字段使用了serde的default方法特性，默认值可以通过函数的返回值指定，而不是系统默认，比如process_monitor关键进程监控默认为true，
-/// 这样可以支持配置文件中没有这个字段但默认值不想设成serde default为false的情况。
+/// Monitor structure
 #[allow(dead_code)]
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "UPPERCASE")]
@@ -72,7 +63,7 @@ pub struct SysMonitor {
     zombie_alarm: bool,
 }
 
-/// 因为每个监控项都有共同的控制选项，监控默认打开，而告警默认关闭，故把这两个字段组合为一个结构体Switch
+/// have common control options, monitor is enabled by default, and alarm is disabled by default
 #[allow(dead_code)]
 #[derive(Debug, Default, Deserialize)]
 pub struct Switch {
@@ -80,6 +71,7 @@ pub struct Switch {
     alarm: bool,
 }
 
+/// loading configuration
 pub fn config_file_load(file_path: &str) -> io::Result<String> {
     let mut file = File::open(file_path)?;
 
@@ -88,37 +80,38 @@ pub fn config_file_load(file_path: &str) -> io::Result<String> {
     Ok(buf)
 }
 
-/// 返回true默认值
 fn on() -> bool {
     true
 }
 
-/// 监控周期默认值
+/// the default Monitoring period value
 pub fn process_monitor_period_default() -> u64 {
     3
 }
 
-/// 恢复失败后再次尝试拉起周期的默认值
+/// after failure to restore
 fn process_recall_default_period() -> u32 {
     1
 }
 
-/// 进程重启时间默认值
+/// Default value for process restart time
 fn process_restart_default_timeout() -> u32 {
     90
 }
 
-/// 告警压制默认值
+/// Default value of alarm suppression
 fn process_alarm_suppress_num_default() -> u32 {
     5
 }
 
 fn main() -> io::Result<()> {
-    // 从配置文件生成sysmonitor结构体
+    // Generate sysmonitor structure from configuration file
     let toml_str = fs::read_to_string(CONFIG_FILE_PATH)?;
     let sysmonitor: SysMonitor = toml::from_str(&toml_str).unwrap();
 
-    // 当前支持四项监控，进程数量、僵尸进程数量、进程fd数量监控和关键进程监控，后期可以修改数组
+    // Currently supports four, the number of processes,
+    // the number of zombie processes, the number of process fd monitoring and key process monitoring,
+    // the array can be modified later
     let monitors: [&mut dyn Monitor; 4] = [
         &mut ProcessCount::default(),
         &mut ZombieCount::default(),
@@ -126,11 +119,8 @@ fn main() -> io::Result<()> {
         &mut ProcessMonitor::default(),
     ];
     for monitor in monitors {
-        // 读取每个监控项的配置文件
         let contents = fs::read_to_string(monitor.config_path())?;
-        // 将配置文件反序列化为一个结构体，赋值给当前monitor
         monitor.load(contents, sysmonitor.clone());
-        // 检查配置是否合法，并检查当前状态
         monitor.is_valid();
         let _ = monitor.check_status();
     }

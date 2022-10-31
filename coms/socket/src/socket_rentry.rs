@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 use confique::Config;
+use libsysmaster::manager::{DeserializeWith, ExecCommand};
+use libsysmaster::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use nix::unistd::Pid;
-use process1::manager::{DeserializeWith, ExecCommand};
-use process1::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use serde::{Deserialize, Serialize};
 use std::os::unix::prelude::RawFd;
 use std::rc::Rc;

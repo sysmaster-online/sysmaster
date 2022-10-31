@@ -6,6 +6,7 @@ use crate::{
     socket_comm::SocketUnitComm,
     socket_config::{SocketAddress, SocketConfig, SocketPortConf},
 };
+use libutils::{fd_util, io_util, socket_util};
 use nix::{
     errno::Errno,
     poll::PollFlags,
@@ -16,7 +17,6 @@ use nix::{
     },
 };
 use std::{cell::RefCell, fmt, os::unix::prelude::RawFd, rc::Rc};
-use utils::{fd_util, io_util, socket_util};
 
 pub(super) const SOCKET_INVALID_FD: RawFd = -1;
 

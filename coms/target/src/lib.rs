@@ -1,5 +1,5 @@
-//! # Target is the entry of process1's control startup mode. The earliest concept of startup mode comes from the concept of sysvint in Linux system. In sysvinit, startup mode includes 0-6 6 modes
-//!  Process1 refers to systemd, and uses target as the entry of the startup mode. It is the unit that process1 loads by default during startup. Target has no actual action to execute,
+//! # Target is the entry of sysmaster's control startup mode. The earliest concept of startup mode comes from the concept of sysvint in Linux system. In sysvinit, startup mode includes 0-6 6 modes
+//!  Sysmaster refers to systemd, and uses target as the entry of the startup mode. It is the unit that sysmaster loads by default during startup. Target has no actual action to execute,
 //!  Target can be understood as the logical grouping of units to be started during system startup
 //!  The target configuration file does not have its own private configuration item and only contains Unit/Install
 //! #  Example:

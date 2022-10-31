@@ -1,10 +1,10 @@
 use super::service_rentry::{
     NotifyState, SectionService, ServiceCommand, ServiceRe, ServiceResult, ServiceState,
 };
+use libsysmaster::manager::{Unit, UnitManager};
+use libsysmaster::Reliability;
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
-use process1::manager::{Unit, UnitManager};
-use process1::Reliability;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, RwLock};

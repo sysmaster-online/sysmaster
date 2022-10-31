@@ -3,7 +3,7 @@ authors = ["sysmasters"]
 language = "en"
 multilingual = false
 src = "src"
-title = "sysmaster: redesign and reimplement process1"
+title = "sysmaster: redesign and reimplement sysmaster"
 
 [output.html]
 default-theme = "Rust"
