@@ -63,6 +63,7 @@ impl UnitDb {
         self.units.insert(name, unit)
     }
 
+    #[allow(dead_code)]
     pub(super) fn unit_remove(&self, name: &str) {
         self.units.remove(name);
     }

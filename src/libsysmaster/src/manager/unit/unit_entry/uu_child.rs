@@ -50,7 +50,7 @@ struct UeChildData {
 
     // owned objects
     pids: HashSet<Pid>,
-    sigchldgen: u64,
+    _sigchldgen: u64,
 }
 
 // the declaration "pub(self)" is for identification only.
@@ -59,7 +59,7 @@ impl UeChildData {
         UeChildData {
             base: Rc::clone(baser),
             pids: HashSet::new(),
-            sigchldgen: 0,
+            _sigchldgen: 0,
         }
     }
 

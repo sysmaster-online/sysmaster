@@ -639,6 +639,7 @@ mod tests {
         assert_eq!(_unit.current_active_state(),UnitActiveState::UnitActive);*/
     }
 
+    #[allow(dead_code)]
     fn test_unit_condition() {
         let _unit = unit_init();
         let load_stat = _unit.load_unit();

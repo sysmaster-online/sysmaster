@@ -486,8 +486,8 @@ fn parse_socket_address(
 mod tests {
     use crate::socket_comm::SocketUnitComm;
     use crate::socket_config::SocketConfig;
+    use libtests::get_project_root;
     use std::rc::Rc;
-    use tests::get_project_root;
 
     #[test]
     fn test_socket_parse() {

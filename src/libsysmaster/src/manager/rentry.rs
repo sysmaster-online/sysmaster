@@ -76,6 +76,7 @@ impl TryFrom<u32> for ReliLastQue {
 }
 
 /* manager */
+#[allow(dead_code)]
 const RELI_DB_HMNG: &str = "manager";
 /* job */
 pub(super) const RELI_DB_HJOB_TRIGGER: &str = "jtrigger";
@@ -90,19 +91,28 @@ pub(super) const RELI_DB_HUNIT_PPS: &str = "upps";
 pub(super) const RELI_DB_HUNIT_DEP: &str = "udep";
 pub(super) const RELI_DB_HUM_NOTIFY: &str = "um-notify";
 /* service */
+#[allow(dead_code)]
 const RELI_DB_HSERVICE_CONF: &str = "svcconf";
+#[allow(dead_code)]
 const RELI_DB_HSERVICE_MNG: &str = "svcmng";
 /* socket */
+#[allow(dead_code)]
 const RELI_DB_HSOCKET_CONF: &str = "sockconf";
+#[allow(dead_code)]
 const RELI_DB_HSOCKET_MNG: &str = "sockmng";
+#[allow(dead_code)]
 const RELI_DB_HSOCKETM_FRAME: &str = "sockm-frame";
 /* mount */
+#[allow(dead_code)]
 const RELI_DB_HMOUNT_MNG: &str = "mntmng";
+#[allow(dead_code)]
 const RELI_DB_HMOUNTM_FRAME: &str = "mntm-frame";
+#[allow(dead_code)]
 /* target */
 const RELI_DB_HTARGET_MNG: &str = "tarmng";
 
 pub(super) const RELI_HISTORY_MAX_DBS: u32 = 18;
+#[allow(dead_code)]
 static RELI_HISTORY_DB_NAME: [&str; RELI_HISTORY_MAX_DBS as usize] = [
     RELI_DB_HJOB_TRIGGER,
     RELI_DB_HJOB_SUSPENDS,

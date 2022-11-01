@@ -1,4 +1,3 @@
-#![warn(unused_imports)]
 use crate::manager::unit::unit_rentry::UnitRelations;
 
 #[allow(missing_docs)]
@@ -41,6 +40,7 @@ pub enum UnitRelationAtom {
     UnitAtomSliceOf = 1u64 << 33,
 }
 
+#[allow(dead_code)]
 pub(in crate::manager::unit) fn unit_relation_to_atom(
     relation: UnitRelations,
 ) -> Vec<UnitRelationAtom> {

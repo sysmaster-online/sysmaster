@@ -122,7 +122,7 @@ pub struct Manager {
     commands: Rc<Commands<CommandActionMgr>>,
     signal: Rc<Signals<SignalMgr>>,
     mode: Mode,
-    action: Action,
+    _action: Action,
     state: RefCell<State>,
     um: Rc<UnitManagerX>,
     lookup_path: Rc<LookupPaths>,
@@ -157,7 +157,7 @@ impl Manager {
             commands: _commands,
             signal: _signal,
             mode,
-            action,
+            _action: action,
             state: RefCell::new(State::Init),
             um: umx,
             lookup_path,
@@ -338,6 +338,7 @@ pub enum Action {
 
 /// manager running states
 #[allow(missing_docs)]
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum State {
     Init,
@@ -356,88 +357,108 @@ pub(crate) enum State {
 type JobId = i32;
 
 impl Manager {
+    #[allow(dead_code)]
     pub(crate) fn get_job(&self, _id: JobId) -> Result<(), Error> {
         todo!()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get_unit(&self, _name: &str) -> Result<(), Error> {
         todo!()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn enumerate(&self) {
         self.um.enumerate()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.um.start_unit(name)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.um.stop_unit(name)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn clear_jobs(&self) -> Result<(), Error> {
         todo!()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn reset_failed(&mut self) -> Result<(), Error> {
         todo!()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn exit(&self) -> Result<i32> {
         self.set_state(State::Exit);
         Ok(0)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn poweroff(&self) -> Result<i32> {
         self.set_state(State::PowerOff);
         Ok(0)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn halt(&self) -> Result<i32> {
         self.set_state(State::Halt);
         Ok(0)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn kexec(&self) -> Result<i32> {
         self.set_state(State::KExec);
         Ok(0)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn suspend(&self) -> Result<i32> {
         self.set_state(State::Suspend);
         Ok(0)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn switch_root(&self) -> Result<i32> {
         self.set_state(State::SwitchRoot);
         Ok(0)
     }
 
+    #[allow(dead_code)]
     pub(super) fn recover(&self) {
         self.reli.recover();
     }
 
+    #[allow(dead_code)]
     pub(super) fn entry_coldplug(&self) {
         self.um.entry_coldplug();
     }
 
+    #[allow(dead_code)]
     pub(super) fn enable_restore(&self) {
         self.reli.set_enable(true);
     }
 
+    #[allow(dead_code)]
     pub(super) fn get_restore(&self) -> bool {
         self.reli.enable()
     }
 
+    #[allow(dead_code)]
     pub(super) fn ok(&self) {
         self.set_state(State::Ok);
     }
 
+    #[allow(dead_code)]
     pub(super) fn check_finished(&self) -> Result<(), Error> {
         todo!()
     }
 
+    #[allow(dead_code)]
     fn entry_clear(&self) {
         self.um.entry_clear();
     }
@@ -466,6 +487,7 @@ mod tests {
     use libutils::logger;
 
     //#[test]
+    #[allow(dead_code)]
     fn manager_api() {
         logger::init_log_with_console("test_target_unit_load", 4);
 

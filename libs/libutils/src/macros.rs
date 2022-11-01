@@ -1,4 +1,6 @@
-#![allow(unused_macros)]
+//! macros
+
+/// syscall
 #[macro_export]
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
@@ -11,6 +13,7 @@ macro_rules! syscall {
     }};
 }
 
+/// IN_SET
 #[macro_export]
 macro_rules! IN_SET {
     ($ov:expr, $($nv:expr),+) => {

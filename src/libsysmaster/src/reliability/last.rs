@@ -1,4 +1,3 @@
-#![allow(clippy::type_complexity)]
 use heed::types::{OwnedType, SerdeBincode, Str};
 use heed::{Database, Env, EnvOpenOptions};
 use std::cell::RefCell;
@@ -25,6 +24,7 @@ pub(super) struct ReliLast {
 
     /* database: singleton(1) */
     unit: Database<OwnedType<u32>, Str>, // RELI_DB_LUNIT; key: RELI_LAST_KEY, data: unit_id;
+    #[allow(clippy::type_complexity)]
     frame: Database<OwnedType<u32>, SerdeBincode<(u32, Option<u32>, Option<u32>)>>, // RELI_DB_LFRAME; key: RELI_LAST_KEY, data: f1+f2+f3;
 }
 

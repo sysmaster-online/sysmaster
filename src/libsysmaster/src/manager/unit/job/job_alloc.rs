@@ -1,4 +1,3 @@
-#![warn(unused_imports)]
 use super::job_entry::{Job, JobConf};
 use super::job_rentry::{JobKind, JobRe};
 use crate::manager::unit::unit_entry::UnitX;

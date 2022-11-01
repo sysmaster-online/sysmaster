@@ -1,11 +1,9 @@
 //! Convert the command request into the corresponding execution action
-
-use crate::manager::MngErrno;
-
 use super::{
     sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
     UnitFile,
 };
+use crate::manager::MngErrno;
 use http::StatusCode;
 use libutils::Result;
 use std::io::Error;
@@ -16,14 +14,23 @@ pub(crate) trait Executer {
     fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse;
 }
 
+/// ExecuterAction
 pub trait ExecuterAction {
-    fn start(&self, service_name: &str) -> Result<(), MngErrno>;
+    /// start the unit_name
+    fn start(&self, unit_name: &str) -> Result<(), MngErrno>;
+    /// stop the unit_name
     fn stop(&self, unit_name: &str) -> Result<(), MngErrno>;
+    /// suspend host
     fn suspend(&self) -> Result<i32>;
+    /// poweroff host
     fn poweroff(&self) -> Result<i32>;
+    /// reboot host
     fn reboot(&self) -> Result<i32>;
+    /// halt host
     fn halt(&self) -> Result<i32>;
-    fn disable(&self, unit_file: &str) -> Result<(), Error>;
+    /// disable unit_name
+    fn disable(&self, unit_name: &str) -> Result<(), Error>;
+    /// enable unit_name
     fn enable(&self, unit_name: &str) -> Result<(), Error>;
 }
 

@@ -111,7 +111,7 @@ impl UeConfigData {
 #[cfg(test)]
 mod tests {
     use confique::Config;
-    use tests::get_project_root;
+    use libtests::get_project_root;
 
     use crate::manager::unit::unit_entry::uu_config::UeConfigData;
     #[test]
