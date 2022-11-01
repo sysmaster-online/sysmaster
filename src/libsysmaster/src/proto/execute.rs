@@ -1,20 +1,37 @@
 //! Convert the command request into the corresponding execution action
 
+use crate::manager::MngErrno;
+
 use super::{
     sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
     UnitFile,
 };
-use crate::manager::Manager;
 use http::StatusCode;
+use libutils::Result;
+use std::io::Error;
 use std::rc::Rc;
 
 pub(crate) trait Executer {
     /// deal Command，return Response
-    fn execute(self, manager: Rc<Manager>) -> CommandResponse;
+    fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse;
+}
+
+pub trait ExecuterAction {
+    fn start(&self, service_name: &str) -> Result<(), MngErrno>;
+    fn stop(&self, unit_name: &str) -> Result<(), MngErrno>;
+    fn suspend(&self) -> Result<i32>;
+    fn poweroff(&self) -> Result<i32>;
+    fn reboot(&self) -> Result<i32>;
+    fn halt(&self) -> Result<i32>;
+    fn disable(&self, unit_file: &str) -> Result<(), Error>;
+    fn enable(&self, unit_name: &str) -> Result<(), Error>;
 }
 
 /// Depending on the type of request
-pub(crate) fn dispatch(cmd: CommandRequest, manager: Rc<Manager>) -> CommandResponse {
+pub(crate) fn dispatch<T>(cmd: CommandRequest, manager: Rc<T>) -> CommandResponse
+where
+    T: ExecuterAction,
+{
     println!("commandRequest :{:?}", cmd);
     let res = match cmd.request_data {
         Some(RequestData::Ucomm(param)) => param.execute(manager),
@@ -28,10 +45,10 @@ pub(crate) fn dispatch(cmd: CommandRequest, manager: Rc<Manager>) -> CommandResp
 }
 
 impl Executer for UnitComm {
-    fn execute(self, manager: Rc<Manager>) -> CommandResponse {
+    fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
         let ret = match self.action() {
-            unit_comm::Action::Start => manager.start_unit(&self.unitname),
-            unit_comm::Action::Stop => manager.stop_unit(&self.unitname),
+            unit_comm::Action::Start => manager.start(&self.unitname),
+            unit_comm::Action::Stop => manager.stop(&self.unitname),
             _ => todo!(),
         };
         match ret {
@@ -48,13 +65,13 @@ impl Executer for UnitComm {
 }
 
 impl Executer for MngrComm {
-    fn execute(self, _manager: Rc<Manager>) -> CommandResponse {
+    fn execute(self, _manager: Rc<impl ExecuterAction>) -> CommandResponse {
         todo!()
     }
 }
 
 impl Executer for SysComm {
-    fn execute(self, manager: Rc<Manager>) -> CommandResponse {
+    fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
         let ret = match self.action() {
             sys_comm::Action::Hibernate => manager.suspend(),
             sys_comm::Action::Suspend => manager.suspend(),
@@ -77,10 +94,10 @@ impl Executer for SysComm {
 }
 
 impl Executer for UnitFile {
-    fn execute(self, manager: Rc<Manager>) -> CommandResponse {
+    fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
         let ret = match self.action() {
-            super::unit_file::Action::Enable => manager.unit_files_enable(&self.unitname),
-            super::unit_file::Action::Disable => manager.unit_files_disable(&self.unitname),
+            super::unit_file::Action::Enable => manager.enable(&self.unitname),
+            super::unit_file::Action::Disable => manager.disable(&self.unitname),
             _ => todo!(),
         };
         match ret {

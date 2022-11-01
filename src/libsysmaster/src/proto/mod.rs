@@ -6,7 +6,6 @@ pub mod abi;
 pub mod execute;
 pub mod frame;
 
-use super::manager::Manager;
 pub use abi::command_request::RequestData;
 pub use abi::*;
 pub use frame::ProstClientStream;
