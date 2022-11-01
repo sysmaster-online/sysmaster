@@ -47,14 +47,15 @@ daemon类型的bin crate的目录以d结尾。
 ```
 / (根目录)
 |...coms (组件库)
-|      |...service (unit type)
-|      |...socket  (unit type)
-|      |...target  (unit type)
-|...libs
-|      |...libtest (测试库)
-|      |...libcgroup (cgroup)
+|      |...service (unit type crate)
+|      |...socket  (unit type crate)
+|      |...target  (unit type crate)
+|...libs (对外接口)
+|      |...libtest (test lib crate)
+|      |...libcgroup (cgroup lib crate)
 |...src
 |     |...sysmaster (daemon)
+|     |...libsysmaster (internal libs)
 |     |...udevd (daemon)
 |     |...random-seed (bin)
 |...tools
