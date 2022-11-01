@@ -23,13 +23,10 @@ pub enum MngErrno {
 }
 
 mod commands;
-#[allow(dead_code)]
+mod config;
 mod manager;
 mod pre_install;
-#[allow(dead_code)]
 mod rentry;
 mod signals;
-#[allow(dead_code)]
 mod table;
-#[allow(dead_code)]
 mod unit;

@@ -1,5 +1,3 @@
-#![warn(unused_imports)]
-#![allow(clippy::type_complexity)]
 use super::job_alloc::JobAlloc;
 use super::job_entry::{self, Job, JobConf, JobInfo, JobResult};
 use super::job_notify::{self};
@@ -44,6 +42,7 @@ impl JobAffect {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn record(&mut self, jobs: &(Vec<Rc<Job>>, Vec<Rc<Job>>, Vec<Rc<Job>>)) {
         if self.interested {
             let (adds, dels, updates) = jobs;
@@ -162,6 +161,7 @@ impl JobManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn notify(
         &self,
         config: &JobConf,
@@ -190,12 +190,14 @@ impl JobManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn remove(&self, id: u32) -> Result<(), JobErrno> {
         self.data.remove(id)?;
         self.try_enable();
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
         self.data.get_jobinfo(id)
     }
@@ -290,6 +292,7 @@ struct JobManagerData {
 
     // status
     running: RefCell<bool>,
+    #[allow(clippy::type_complexity)]
     text: RefCell<Option<(Rc<UnitX>, UnitActiveState, UnitActiveState, UnitNotifyFlags)>>, // (unit, os, ns, flags) for synchronous finish
 
     // statistics
@@ -413,6 +416,7 @@ impl JobManagerData {
         // if it's successful, all jobs expanded would be inserted in 'self.jobs', otherwise(failed) they would be cleared next time.
     }
 
+    #[allow(dead_code)]
     pub(self) fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
         if config.get_kind() != JobKind::Reload {
             return Err(JobErrno::Input);
@@ -494,6 +498,7 @@ impl JobManagerData {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(self) fn remove(&self, id: u32) -> Result<(), JobErrno> {
         assert!(!*self.running.borrow());
 
@@ -522,6 +527,7 @@ impl JobManagerData {
         self.jobs.update_up_ready();
     }
 
+    #[allow(dead_code)]
     pub(self) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
         self.jobs.get(id)
     }
@@ -813,6 +819,7 @@ mod tests {
     use libutils::path_lookup::LookupPaths;
 
     //#[test]
+    #[allow(dead_code)]
     fn job_reli() {
         logger::init_log_with_console("test_unit_load", 4);
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
@@ -1131,6 +1138,7 @@ mod tests {
         assert_eq!(jm.data.jobs.len(), 0);
     }
 
+    #[allow(clippy::type_complexity)]
     fn prepare_unit_multi(
         relation: Option<UnitRelations>,
     ) -> (

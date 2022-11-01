@@ -17,6 +17,7 @@ impl StartLimit {
         *self.hit.borrow_mut() = hit
     }
 
+    #[allow(dead_code)]
     pub(super) fn hit(&self) -> bool {
         *self.hit.borrow_mut()
     }

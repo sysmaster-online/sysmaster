@@ -24,16 +24,31 @@ pub fn get_project_root() -> io::Result<PathBuf> {
     ))
 }
 
+/// get the crate root path
+pub fn get_crate_root() -> io::Result<PathBuf> {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    Ok(PathBuf::from(manifest_dir))
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::get_project_root;
+    use crate::{get_crate_root, get_project_root};
 
     #[test]
-    fn test_service_parse() {
+    fn test_get_projecgt_root() {
         let mut file_path = get_project_root().unwrap();
-        file_path.push("test_units/config.service.toml");
+        file_path.push("tests/test_units/config.service.toml");
 
         println!("{:?}", file_path);
-        assert_eq!(file_path, file_path);
+        assert!(file_path.is_file())
+    }
+
+    #[test]
+    fn test_get_crate_root() {
+        let mut file_path = get_crate_root().unwrap();
+        file_path.push("Cargo.toml");
+
+        println!("{:?}", file_path);
+        assert!(file_path.is_file())
     }
 }

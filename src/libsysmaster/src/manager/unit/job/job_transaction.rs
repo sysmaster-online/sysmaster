@@ -1,5 +1,3 @@
-#![warn(unused_imports)]
-#![allow(clippy::type_complexity)]
 use super::job_alloc::JobAlloc;
 use super::job_entry::{self, Job, JobConf, JobResult};
 use super::job_rentry::JobKind;
@@ -84,6 +82,7 @@ pub(super) fn job_trans_fallback(
     del_jobs
 }
 
+#[allow(dead_code)]
 fn trans_expand_check_input(config: &JobConf) -> Result<(), JobErrno> {
     let kind = config.get_kind();
     let unit = config.get_unit();

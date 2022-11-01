@@ -88,7 +88,7 @@ impl Condition {
 #[cfg(test)]
 mod test {
     use crate::logger;
-    use tests::get_project_root;
+    use libtests::get_project_root;
 
     use super::{Condition, ConditionType};
 

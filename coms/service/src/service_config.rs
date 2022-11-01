@@ -126,8 +126,8 @@ impl ServiceConfigData {
 mod tests {
     use crate::service_comm::ServiceUnitComm;
     use crate::service_config::ServiceConfig;
+    use libtests::get_project_root;
     use std::rc::Rc;
-    use tests::get_project_root;
 
     #[test]
     fn test_service_parse() {

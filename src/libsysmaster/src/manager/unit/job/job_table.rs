@@ -1,5 +1,3 @@
-#![warn(unused_imports)]
-#![allow(clippy::type_complexity)]
 use super::job_alloc::JobAlloc;
 use super::job_entry::{Job, JobConf, JobInfo, JobResult};
 use super::job_rentry::JobKind;
@@ -88,6 +86,7 @@ impl JobTable {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     pub(super) fn commit(
         &self,
         other: &Self,
@@ -152,6 +151,7 @@ impl JobTable {
         del_jobs
     }
 
+    #[allow(clippy::type_complexity)]
     pub(super) fn try_trigger(
         &self,
         unit: Option<&UnitX>,
@@ -232,10 +232,12 @@ impl JobTable {
         self.t_unit.borrow_mut().update_up_ready()
     }
 
+    #[allow(dead_code)]
     pub(super) fn len(&self) -> usize {
         self.t_id.borrow().len()
     }
 
+    #[allow(dead_code)]
     pub(super) fn ready_len(&self) -> usize {
         self.t_unit.borrow().ready_len()
     }
@@ -258,6 +260,7 @@ impl JobTable {
             .map(|(job, pause)| (JobInfo::map(&job), pause))
     }
 
+    #[allow(dead_code)]
     pub(super) fn is_empty(&self) -> bool {
         self.t_unit.borrow().is_empty()
     }
@@ -275,6 +278,7 @@ impl JobTable {
         false
     }
 
+    #[allow(dead_code)]
     pub(super) fn is_suspend(&self, id: u32) -> bool {
         if let Some(job_info) = self.get(id) {
             if let Some(s_info) = self.get_suspend(&job_info.unit, job_info.kind) {
@@ -308,6 +312,7 @@ impl JobTable {
         self.t_unit.borrow().calc_ready()
     }
 
+    #[allow(clippy::type_complexity)]
     fn do_try_trigger(
         &self,
         db: &UnitDb,
@@ -328,6 +333,7 @@ impl JobTable {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn try_trigger_entry(
         &self,
         db: &UnitDb,
@@ -393,6 +399,7 @@ impl JobTable {
         del_jobs
     }
 
+    #[allow(clippy::type_complexity)]
     fn merge_suspends(&self, other: &Self) -> (Vec<Rc<Job>>, Vec<Rc<Job>>, Vec<Rc<Job>>) {
         // merge table-unit
         let (add_jobs, del_jobs, update_jobs) = self
@@ -536,6 +543,7 @@ impl JobUnitTable {
         del_jobs
     }
 
+    #[allow(clippy::type_complexity)]
     pub(self) fn merge_suspends(
         &mut self,
         other: &Self,
@@ -672,6 +680,7 @@ impl JobUnitTable {
         self.up_ready = self.calc_ready();
     }
 
+    #[allow(dead_code)]
     pub(self) fn ready_len(&self) -> usize {
         self.t_ready.len()
     }
@@ -719,6 +728,7 @@ impl JobUnitTable {
         self.sync
     }
 
+    #[allow(dead_code)]
     pub(self) fn is_empty(&self) -> bool {
         self.t_data.is_empty()
     }

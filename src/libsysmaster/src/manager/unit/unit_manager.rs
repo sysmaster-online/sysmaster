@@ -371,6 +371,7 @@ impl UnitManager {
         Rc::clone(&self.reli)
     }
 
+    #[allow(dead_code)]
     pub(in crate::manager) fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {
         self.db.get_unit_by_pid(pid)
     }
@@ -647,6 +648,7 @@ mod unit_submanager {
     use std::convert::TryFrom;
     use std::rc::{Rc, Weak};
 
+    #[allow(dead_code)]
     pub(super) struct UnitSubManagers {
         reli: Rc<Reliability>,
         um: RefCell<Weak<UnitManager>>,
@@ -977,6 +979,7 @@ mod unit_load {
             }
         }
 
+        #[allow(dead_code)]
         fn remove_udconf(&self, _source: &str) {
             todo!();
         }

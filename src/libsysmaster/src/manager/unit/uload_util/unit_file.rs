@@ -41,7 +41,7 @@ struct UnitFileData {
     pub unit_id_fragment: HashMap<String, Vec<PathBuf>>,
     pub unit_id_dropin_wants: HashMap<String, Vec<PathBuf>>,
     pub unit_id_dropin_requires: HashMap<String, Vec<PathBuf>>,
-    unit_name_map: HashMap<String, String>,
+    _unit_name_map: HashMap<String, String>,
     last_updated_timestamp_hash: u64,
     lookup_path: Rc<LookupPaths>,
 }
@@ -53,7 +53,7 @@ impl UnitFileData {
             unit_id_fragment: HashMap::new(),
             unit_id_dropin_wants: HashMap::new(),
             unit_id_dropin_requires: HashMap::new(),
-            unit_name_map: HashMap::new(),
+            _unit_name_map: HashMap::new(),
             lookup_path: lookup_path.clone(),
             last_updated_timestamp_hash: 0,
         }

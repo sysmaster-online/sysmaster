@@ -1,4 +1,3 @@
-#![warn(unused_imports)]
 use nix::sys::signal::Signal;
 use serde::{Deserialize, Deserializer};
 

@@ -1,4 +1,3 @@
-#![allow(clippy::type_complexity)]
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -7,6 +6,7 @@ use std::rc::Rc;
 
 pub(super) struct ReliStation {
     t_name: RefCell<HashMap<String, Rc<dyn ReStation>>>, // key: name, value: station
+    #[allow(clippy::type_complexity)]
     t_kind: RefCell<HashMap<ReStationKind, HashMap<String, Rc<dyn ReStation>>>>, // key: kind, value: stations
 }
 

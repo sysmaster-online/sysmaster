@@ -56,6 +56,7 @@ where
         ret
     }
 
+    #[allow(dead_code)]
     pub(super) fn remove(&mut self, k: &K) -> Option<V> {
         let ret = self.data.remove(k);
         if let Some(v) = &ret {
@@ -81,6 +82,7 @@ where
         self.subscribers.insert(name, subscriber)
     }
 
+    #[allow(dead_code)]
     pub(super) fn unsubscribe(&mut self, name: &str) -> Option<Rc<dyn TableSubscribe<K, V>>> {
         self.subscribers.remove(name)
     }

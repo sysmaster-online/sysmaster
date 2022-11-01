@@ -1,4 +1,3 @@
-#![warn(unused_imports)]
 use super::job_rentry::{self, JobAttr, JobKind, JobRe};
 use crate::manager::unit::data::{UnitActiveState, UnitNotifyFlags};
 use crate::manager::unit::unit_base::{UnitActionError, UnitRelationAtom};
@@ -9,6 +8,7 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(in crate::manager) enum JobResult {
     Done,

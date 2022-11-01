@@ -26,4 +26,4 @@ confique = { version = "0.1.3", default-features= false, features = [ 'toml' ] }
 once_cell = { version = "1.5.2"}
 
 [dev-dependencies]
-tests = { path = "../../libs/libtests" }
+libtests = { path = "../../libs/libtests" }

@@ -1,5 +1,3 @@
-#![warn(unused_imports)]
-#![allow(clippy::type_complexity)]
 use super::job_entry::{Job, JobResult, JobStage};
 use super::job_rentry::JobKind;
 use std::cell::RefCell;
@@ -21,6 +19,7 @@ impl JobStat {
         self.data.borrow_mut().clear();
     }
 
+    #[allow(clippy::type_complexity)]
     pub(super) fn update_change(
         &self,
         change: &(&Option<Rc<Job>>, &Option<Rc<Job>>, &Option<Rc<Job>>),
@@ -28,6 +27,7 @@ impl JobStat {
         self.data.borrow_mut().update_change(change)
     }
 
+    #[allow(clippy::type_complexity)]
     pub(super) fn update_changes(&self, changes: &(&Vec<Rc<Job>>, &Vec<Rc<Job>>, &Vec<Rc<Job>>)) {
         self.data.borrow_mut().update_changes(changes)
     }
@@ -65,6 +65,7 @@ impl JobStatData {
         self.cnt.clear();
     }
 
+    #[allow(clippy::type_complexity)]
     pub(self) fn update_change(
         &mut self,
         change: &(&Option<Rc<Job>>, &Option<Rc<Job>>, &Option<Rc<Job>>),
@@ -78,6 +79,7 @@ impl JobStatData {
         self.update_changes(&changes);
     }
 
+    #[allow(clippy::type_complexity)]
     pub(self) fn update_changes(
         &mut self,
         changes: &(&Vec<Rc<Job>>, &Vec<Rc<Job>>, &Vec<Rc<Job>>),
@@ -122,6 +124,7 @@ impl JobNum {
         self.stage.clear();
     }
 
+    #[allow(clippy::type_complexity)]
     pub(self) fn update(&mut self, changes: &(&Vec<Rc<Job>>, &Vec<Rc<Job>>, &Vec<Rc<Job>>)) {
         self.kind.update(changes);
     }
@@ -169,6 +172,7 @@ impl JobKindNum {
         };
     }
 
+    #[allow(clippy::type_complexity)]
     pub(self) fn update(&mut self, changes: &(&Vec<Rc<Job>>, &Vec<Rc<Job>>, &Vec<Rc<Job>>)) {
         let (adds, dels, _) = changes;
 
@@ -203,6 +207,7 @@ impl JobKindNum {
         // update: do nothing
     }
 
+    #[allow(dead_code)]
     fn total(&self) -> usize {
         self.start + self.stop + self.reload + self.restart + self.verify + self.nop
     }
@@ -246,6 +251,7 @@ impl JobStageNum {
         assert!(!overflow);
     }
 
+    #[allow(dead_code)]
     fn total(&self) -> usize {
         self.wait + self.running
     }
@@ -271,6 +277,7 @@ impl JobCnt {
         self.op.clear();
     }
 
+    #[allow(clippy::type_complexity)]
     pub(self) fn update(
         &mut self,
         changes: &(&Vec<Rc<Job>>, &Vec<Rc<Job>>, &Vec<Rc<Job>>),
@@ -334,6 +341,7 @@ impl JobResultCnt {
         };
     }
 
+    #[allow(clippy::type_complexity)]
     pub(self) fn update(
         &mut self,
         changes: &(&Vec<Rc<Job>>, &Vec<Rc<Job>>, &Vec<Rc<Job>>),
@@ -365,6 +373,7 @@ impl JobResultCnt {
         overflow
     }
 
+    #[allow(dead_code)]
     fn total(&self) -> usize {
         self.done
             + self.cancelled
@@ -406,6 +415,7 @@ impl JobOpCnt {
         };
     }
 
+    #[allow(clippy::type_complexity)]
     pub(self) fn update(
         &mut self,
         changes: &(&Vec<Rc<Job>>, &Vec<Rc<Job>>, &Vec<Rc<Job>>),
@@ -426,6 +436,7 @@ impl JobOpCnt {
         overflow
     }
 
+    #[allow(dead_code)]
     fn total(&self) -> usize {
         self.add + self.del + self.update
     }

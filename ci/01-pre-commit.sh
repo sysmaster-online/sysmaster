@@ -29,13 +29,17 @@ pip3 install pre-commit -i http://mirrors.aliyun.com/pypi/simple/ || pip3 instal
 # add doc for src code
 for rustlist in `git diff origin/master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
 do
+    # do not use global #!allow, exclude non_snake_case
+    sed -i 's/#!\[allow(/\/\/#!\[allow(/g' $rustlist 2>/dev/null || true
+    sed -i 's/\/\/#!\[allow(non_snake_case)\]/#!\[allow(non_snake_case)\]/g' $rustlist 2>/dev/null || true
+    sed -i 's/\/\/#!\[allow(clippy::module_inception)\]/#!\[allow(clippy::module_inception)\]/g' $rustlist 2>/dev/null || true
     egrep '#!\[deny\(missing_docs\)\]' $rustlist || sed -i '1i\#![deny(missing_docs)]' $rustlist 2>/dev/null || true
     egrep '#!\[deny\(clippy::all\)\]' $rustlist || sed -i '1i\#![deny(clippy::all)]' $rustlist 2>/dev/null || true
     egrep '#!\[deny\(warnings\)\]' $rustlist || sed -i '1i\#![deny(warnings)]' $rustlist 2>/dev/null || true
 done
 
 #fix cargo clippy fail in pre-commit when build.rs is changed
-RUSTC_WRAPPER="" cargo clippy -v --all-targets --all-features --tests --benches --examples || exit 1
+RUSTC_WRAPPER="" cargo clippy --all-targets --all-features --tests --benches --examples || exit 1
 
 # run base check
 filelist=`git diff origin/master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`

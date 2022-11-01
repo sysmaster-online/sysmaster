@@ -91,6 +91,7 @@ impl UeBase {
         self.rentry.pps_clear(&self.id, pps_mask);
     }
 
+    #[allow(dead_code)]
     pub(super) fn rentry_pps_contains(&self, pps_mask: UnitRePps) -> bool {
         self.rentry.pps_contains(&self.id, pps_mask)
     }

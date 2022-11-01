@@ -23,17 +23,17 @@ pub use unit_rentry::{ExecCommand, UnitRelations, UnitType};
 pub use unit_rentry::UeConfigInstall;
 
 ///
-#[allow(clippy::enum_variant_names)]
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum UnitErrno {
     ///
-    UnitErrInput,
+    InputErr,
     ///
-    UnitErrNotExisted,
+    NotExisted,
     ///
-    UnitErrInternal,
+    InternalErr,
     ///
-    UnitErrNotSupported,
+    NotSupported,
 }
 
 // dependency:

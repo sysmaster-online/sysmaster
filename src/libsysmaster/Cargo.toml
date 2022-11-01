@@ -39,7 +39,7 @@ fnmatch-regex = "0.2.0"
 prost-build = "0.9" # 编译 protobuf
 
 [dev-dependencies]
-tests = { path = "../../libs/libtests" }
+libtests = { path = "../../libs/libtests" }
 
 [[example]]
 name = "signals"

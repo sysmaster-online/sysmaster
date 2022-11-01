@@ -54,10 +54,12 @@ impl UnitDep {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(super) fn remove(&self, source: &UnitX, relation: UnitRelations, dest: &UnitX) {
         self.sub.data.borrow_mut().remove(source, relation, dest)
     }
 
+    #[allow(dead_code)]
     pub(super) fn remove_unit(&self, source: &UnitX) {
         self.sub.data.borrow_mut().remove_unit(source)
     }

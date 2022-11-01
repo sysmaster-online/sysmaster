@@ -48,6 +48,7 @@ impl UeCondition {
         Condition::new(c_type, trigger, revert, param_str.to_string())
     }
 
+    #[allow(dead_code)]
     pub(super) fn set_init_flag(&self, flag: i8) {
         *self.init_flag.borrow_mut() = flag;
     }

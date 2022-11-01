@@ -27,4 +27,4 @@ libc = "0.2.*"
 once_cell = { version = "1.5.2"}
 
 [dev-dependencies]
-tests = { path = "../../libs/libtests" }
+libtests = { path = "../../libs/libtests" }

@@ -1,6 +1,6 @@
 //! Provide commands that cli can call
 
-#![allow(missing_docs)]
+#[allow(missing_docs)]
 #[allow(clippy::all)]
 pub mod abi;
 pub mod execute;

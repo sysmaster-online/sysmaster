@@ -191,6 +191,7 @@ pub enum Action {
 
 /// manager running states
 #[allow(missing_docs)]
+#[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum State {
     Init,
@@ -206,6 +207,7 @@ pub(crate) enum State {
     SwitchRoot,
 }
 
+#[allow(dead_code)]
 pub(crate) struct Manager {
     // associated objects
     event: Rc<Events>,
@@ -232,10 +234,12 @@ impl Drop for Manager {
 type JobId = i32;
 
 impl Manager {
+    #[allow(dead_code)]
     pub(crate) fn get_job(&self, _id: JobId) -> Result<(), Error> {
         todo!()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get_unit(&self, _name: &str) -> Result<(), Error> {
         todo!()
     }
@@ -252,14 +256,17 @@ impl Manager {
         self.um.stop_unit(name)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn clear_jobs(&self) -> Result<(), Error> {
         todo!()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn reset_failed(&mut self) -> Result<(), Error> {
         todo!()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn exit(&self) -> Result<i32> {
         self.set_state(State::Exit);
         Ok(0)
@@ -285,6 +292,7 @@ impl Manager {
         Ok(0)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn kexec(&self) -> Result<i32> {
         self.set_state(State::KExec);
         Ok(0)
@@ -295,6 +303,7 @@ impl Manager {
         Ok(0)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn switch_root(&self) -> Result<i32> {
         self.set_state(State::SwitchRoot);
         Ok(0)
@@ -379,6 +388,7 @@ impl Manager {
         self.set_state(State::Ok);
     }
 
+    #[allow(dead_code)]
     pub(super) fn check_finished(&self) -> Result<(), Error> {
         todo!()
     }
@@ -442,6 +452,7 @@ mod tests {
     use libutils::logger;
 
     //#[test]
+    #[allow(dead_code)]
     fn manager_api() {
         logger::init_log_with_console("test_target_unit_load", 4);
 

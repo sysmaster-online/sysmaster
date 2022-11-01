@@ -36,6 +36,7 @@ impl UnitSets {
         self.t.borrow_mut().insert(name, unit)
     }
 
+    #[allow(dead_code)]
     pub(super) fn remove(&self, name: &str) -> Option<Rc<UnitX>> {
         self.t.borrow_mut().remove(&name.to_string())
     }

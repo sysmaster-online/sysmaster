@@ -36,6 +36,7 @@ impl ReStation for UnitX {
 }
 
 impl UnitX {
+    #[allow(dead_code)]
     pub(in crate::manager) fn dump(&self) {}
 
     pub(in crate::manager::unit) fn new(
@@ -50,11 +51,15 @@ impl UnitX {
         UnitX(unit)
     }
 
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn init(&self) {}
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn done(&self) {}
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn load(&self) -> Result<(), Box<dyn Error>> {
         self.0.load_unit()
     }
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn try_load(&self) -> Result<(), UnitActionError> {
         // transaction_add_job_and_dependencies: bus_unit_validate_load_state + manager_unit_cache_should_retry_load + unit_load + bus_unit_validate_load_state
         todo!();
@@ -71,11 +76,14 @@ impl UnitX {
         todo!();
     }
 
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn kill(&self) {}
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn release_resources(&self) {}
     pub(in crate::manager::unit) fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
         self.0.sigchld_events(pid, code, signal)
     }
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn reset_failed(&self) {}
     pub(in crate::manager::unit) fn trigger(&self, _other: &Self) {}
     pub(in crate::manager::unit) fn in_load_queue(&self) -> bool {
@@ -140,18 +148,27 @@ impl UnitX {
         true
     }
 
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn get_perpetual(&self) -> bool {
         todo!();
     }
+
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn can_start(&self) -> bool {
         todo!();
     }
+
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn can_stop(&self) -> bool {
         todo!();
     }
+
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn can_reload(&self) -> bool {
         todo!();
     }
+
+    #[allow(dead_code)]
     pub(in crate::manager::unit) fn is_load_complete(&self) -> bool {
         todo!();
     }

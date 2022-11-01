@@ -461,6 +461,7 @@ impl UnitRe {
         self.base.insert(String::from(unit_id), u_base);
     }
 
+    #[allow(dead_code)]
     pub(super) fn base_remove(&self, unit_id: &String) {
         self.base.remove(unit_id);
     }
@@ -481,6 +482,7 @@ impl UnitRe {
         self.load.insert(unit_id.clone(), u_load);
     }
 
+    #[allow(dead_code)]
     pub(super) fn load_remove(&self, unit_id: &String) {
         self.load.remove(unit_id);
     }
@@ -502,6 +504,7 @@ impl UnitRe {
         self.conf.insert(unit_id.clone(), u_conf);
     }
 
+    #[allow(dead_code)]
     pub(super) fn conf_remove(&self, unit_id: &String) {
         self.conf.remove(unit_id);
     }
@@ -518,6 +521,7 @@ impl UnitRe {
         self.cgroup.insert(unit_id.clone(), u_cgroup);
     }
 
+    #[allow(dead_code)]
     pub(super) fn cgroup_remove(&self, unit_id: &String) {
         self.cgroup.remove(unit_id);
     }
@@ -534,6 +538,7 @@ impl UnitRe {
         self.child.insert(unit_id.clone(), u_child);
     }
 
+    #[allow(dead_code)]
     pub(super) fn child_remove(&self, unit_id: &String) {
         self.child.remove(unit_id);
     }
@@ -575,6 +580,7 @@ impl UnitRe {
         self.pps.insert(unit_id.clone(), pps);
     }
 
+    #[allow(dead_code)]
     pub(super) fn pps_remove(&self, unit_id: &String) {
         self.pps.remove(unit_id);
     }
@@ -596,6 +602,7 @@ impl UnitRe {
         self.dep.insert(unit_id.clone(), ud_config);
     }
 
+    #[allow(dead_code)]
     pub(super) fn dep_remove(&self, unit_id: &String) {
         self.dep.remove(unit_id);
     }
@@ -626,6 +633,7 @@ impl UnitRe {
         self.notify.insert(RELI_LAST_KEY, um_notify);
     }
 
+    #[allow(dead_code)]
     pub(super) fn notify_remove(&self) {
         self.notify.remove(&RELI_LAST_KEY);
     }

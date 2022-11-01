@@ -1,5 +1,4 @@
-#![warn(unused_imports)]
-
+#[allow(dead_code)]
 enum UnitNameFlags {
     Plain = 1,
     Instance = 2,
@@ -7,6 +6,7 @@ enum UnitNameFlags {
     Any = 1 | 2 | 4,
 }
 
+#[allow(dead_code)]
 enum UnitFileState {
     Enabled,
     EnabledRuntime,

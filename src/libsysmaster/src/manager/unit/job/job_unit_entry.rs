@@ -1,5 +1,3 @@
-#![warn(unused_imports)]
-#![allow(clippy::type_complexity)]
 use super::job_entry::{Job, JobInfo, JobResult};
 use super::job_rentry::JobKind;
 use crate::manager::unit::data::UnitActiveState;
@@ -35,6 +33,7 @@ impl JobUnit {
         self.data.borrow_mut().flush_suspends()
     }
 
+    #[allow(clippy::type_complexity)]
     pub(super) fn merge_suspends(
         &self,
         other: &Self,
@@ -54,6 +53,7 @@ impl JobUnit {
         self.data.borrow_mut().resume()
     }
 
+    #[allow(clippy::type_complexity)]
     pub(super) fn do_trigger(&self) -> (Option<(JobInfo, Option<JobResult>)>, Option<Rc<Job>>) {
         let (cur_trigger, merge_trigger) = self.data.borrow_mut().do_next_trigger();
 
@@ -101,6 +101,7 @@ impl JobUnit {
         self.data.borrow_mut().clear_up_ready()
     }
 
+    #[allow(dead_code)]
     pub(super) fn len(&self) -> usize {
         self.data.borrow().len()
     }
@@ -275,6 +276,7 @@ impl JobUnitData {
         del_jobs
     }
 
+    #[allow(clippy::type_complexity)]
     pub(self) fn merge_suspends(
         &mut self,
         other: &Self,
@@ -1220,6 +1222,7 @@ mod tests {
         assert_eq!(uv.data.borrow().calc_ready(), None);
     }
 
+    #[allow(clippy::type_complexity)]
     fn prepare_jobs(
         relir: &Rc<Reliability>,
         unit: &Rc<UnitX>,
