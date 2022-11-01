@@ -1,7 +1,7 @@
 //!
 
 use libc::c_int;
-use libsysmaster::manager::{Action, ManagerX, Mode, MANAGER_ARGS_SIZE_MAX};
+use libsysmaster::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use libsysmaster::mount::mount_setup;
 use libsysmaster::{self};
 use libutils::logger::{self};
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     initialize_runtime(switch)?;
 
     let args: Vec<String> = env::args().collect();
-    let manager = ManagerX::new(Mode::System, Action::Run);
+    let manager = Manager::new(Mode::System, Action::Run);
 
     // enable clear, mutex with install_crash_handler
     if !switch {
