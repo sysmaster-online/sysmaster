@@ -7,9 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libutils = { path = "../libs/libutils" }
-libevent = { path = "../libs/libevent" }
-libcgroup = { path = "../libs/libcgroup" }
+libutils = { path = "../../libs/libutils" }
+libevent = { path = "../../libs/libevent" }
+libcgroup = { path = "../../libs/libcgroup" }
 
 dynamic_reload = "0.8.0"
 walkdir = "2"
@@ -39,7 +39,7 @@ fnmatch-regex = "0.2.0"
 prost-build = "0.9" # 编译 protobuf
 
 [dev-dependencies]
-tests = { path = "../libs/libtests" }
+tests = { path = "../../libs/libtests" }
 
 [[example]]
 name = "signals"

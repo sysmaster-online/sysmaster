@@ -4,6 +4,6 @@ echo $p_w_d
 
 target_dir=$1
 echo $target_dir
-cp -a $p_w_d/test_units/*  $target_dir
-cp -a $p_w_d/presets/*  $target_dir
+cp -a $p_w_d/tests/test_units/*  $target_dir
+cp -a $p_w_d/tests/presets/*  $target_dir
 exit $?
