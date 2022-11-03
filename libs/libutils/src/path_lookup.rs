@@ -71,7 +71,7 @@ impl LookupPaths {
         self.preset_path
             .push(format!("{}/{}", LIB_SYSTEM_PATH, "system-preset"));
 
-        self.persistent_path = "/etc/process1".to_string();
+        self.persistent_path = ETC_SYSTEM_PATH.to_string();
     }
 }
 

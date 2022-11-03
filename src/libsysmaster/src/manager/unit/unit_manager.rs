@@ -1030,6 +1030,7 @@ mod tests {
         (dm, event, um)
     }
 
+    #[allow(dead_code)]
     fn setup_mount_point() -> Result<(), Errno> {
         mount_setup::mount_setup()?;
 
@@ -1049,7 +1050,8 @@ mod tests {
         };
     }
 
-    #[test]
+    // #[test]
+    #[allow(dead_code)]
     fn test_service_unit_start() {
         let ret = setup_mount_point();
         if ret.is_err() {
@@ -1073,7 +1075,8 @@ mod tests {
         log::debug!("unit stop end!");
     }
 
-    #[test]
+    // #[test]
+    #[allow(dead_code)]
     fn test_socket_unit_start_and_stop() {
         logger::init_log_with_console("test_socket_unit_start_stop", 4);
 

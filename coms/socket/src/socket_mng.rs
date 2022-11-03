@@ -220,7 +220,7 @@ impl SocketMngData {
             }
         })?;
 
-        if self.comm.unit().test_start_limit() {
+        if !self.comm.unit().test_start_limit() {
             self.enter_dead(SocketResult::FailureStartLimitHit);
             return Err(UnitActionError::UnitActionECanceled);
         }

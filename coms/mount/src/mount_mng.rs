@@ -57,7 +57,7 @@ impl MountMng {
     }
 
     pub(super) fn start_check(&self) -> Result<bool, UnitActionError> {
-        if self.comm.unit().test_start_limit() {
+        if !self.comm.unit().test_start_limit() {
             self.enter_dead(true);
             return Err(UnitActionError::UnitActionECanceled);
         }
