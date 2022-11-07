@@ -4,7 +4,7 @@
 //! *  Call relation: mount_ unit->mount_ mng->mount_ comm
 
 use super::mount_rentry::{MountRe, MountState};
-use libsysmaster::manager::{Unit, UnitManager};
+use libsysmaster::manager::{Unit, UmIf};
 use libsysmaster::Reliability;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
@@ -28,7 +28,7 @@ impl MountUnitComm {
         self.data.borrow_mut().attach_unit(unit);
     }
 
-    pub(super) fn attach_um(&self, um: Rc<UnitManager>) {
+    pub(super) fn attach_um(&self, um: Rc<dyn UmIf>) {
         self.umcomm.attach_um(um)
     }
 
@@ -52,7 +52,7 @@ impl MountUnitComm {
         self.umcomm.rentry()
     }
 
-    pub(super) fn _um(&self) -> Rc<UnitManager> {
+    pub(super) fn _um(&self) -> Rc<dyn UmIf> {
         self.umcomm.um()
     }
 }
@@ -94,7 +94,7 @@ impl MountUmComm {
         }
     }
 
-    pub(super) fn attach_um(&self, um: Rc<UnitManager>) {
+    pub(super) fn attach_um(&self, um: Rc<dyn UmIf>) {
         let mut wdata = self.data.write().unwrap();
         wdata.attach_um(um);
     }
@@ -113,9 +113,9 @@ impl MountUmComm {
         rdata.reli()
     }
 
-    pub(super) fn um(&self) -> Rc<UnitManager> {
+    pub(super) fn um(&self) -> Rc<dyn UmIf> {
         let rdata = self.data.read().unwrap();
-        rdata.um()
+        rdata.um().unwrap()
     }
 
     pub(super) fn rentry(&self) -> Rc<MountRe> {
@@ -126,7 +126,7 @@ impl MountUmComm {
 
 struct MountUmCommData {
     // associated objects
-    um: Weak<UnitManager>,
+    um: Option<Rc<dyn UmIf>>,
     reli: Weak<Reliability>,
     rentry: Option<Rc<MountRe>>,
 }
@@ -135,17 +135,16 @@ struct MountUmCommData {
 impl MountUmCommData {
     pub(self) fn new() -> MountUmCommData {
         MountUmCommData {
-            um: Weak::new(),
+            um: None,
             reli: Weak::new(),
             rentry: None,
         }
     }
 
-    pub(self) fn attach_um(&mut self, um: Rc<UnitManager>) {
-        let old = self.um.clone().upgrade();
-        if old.is_none() {
+    pub(self) fn attach_um(&mut self, um: Rc<dyn UmIf>) {
+        if self.um.is_none() {
             log::debug!("MountUmComm attach_um action.");
-            self.um = Rc::downgrade(&um);
+            self.um = Some(um);
         }
     }
 
@@ -158,8 +157,12 @@ impl MountUmCommData {
         }
     }
 
-    pub(self) fn um(&self) -> Rc<UnitManager> {
-        self.um.clone().upgrade().unwrap()
+    pub(self) fn um(&self) -> Option<Rc<dyn UmIf>> {
+        if let Some(ref um) = self.um {
+            Some(Rc::clone(um))
+        }else{
+            None
+        }
     }
 
     pub(self) fn reli(&self) -> Rc<Reliability> {

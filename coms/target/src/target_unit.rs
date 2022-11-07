@@ -5,15 +5,18 @@
 use super::target_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::target_comm::TargetUnitComm;
 use super::target_mng::TargetMng;
+use libsysmaster::manager::Unit;
 use libsysmaster::manager::{
-    UnitActiveState, UnitDependencyMask, UnitManager, UnitMngUtil, UnitObj, UnitRelationAtom,
-    UnitRelations, UnitSubClass,
+    SubUnit, UmIf, UnitActiveState, UnitDependencyMask, UnitManager, UnitMngUtil, UnitRelationAtom,
+    UnitRelations,
 };
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
+use std::cell::RefCell;
 use std::{path::PathBuf, rc::Rc};
-
 struct Target {
+    owner: RefCell<Option<Rc<Unit>>>,
+    um: Rc<dyn UmIf>,
     comm: Rc<TargetUnitComm>,
     mng: Rc<TargetMng>,
 }
@@ -43,50 +46,63 @@ impl ReStation for Target {
 }
 
 impl Target {
-    fn new() -> Target {
+    fn new(um_if: Rc<dyn UmIf>) -> Target {
         let _comm = Rc::new(TargetUnitComm::new());
         Target {
+            owner: RefCell::new(None),
+            um: Rc::clone(&um_if),
             comm: Rc::clone(&_comm),
             mng: Rc::new(TargetMng::new(&_comm)),
         }
     }
 
-    pub(self) fn add_default_dependencies(&self) {
-        let unit = self.comm.unit();
-        log::debug!("add default dependencies for target[{}]", unit.id());
-        if !unit.default_dependencies() {
-            return;
+    pub(self) fn owner(&self) -> Option<Rc<Unit>> {
+        if let Some(ref unit) = *self.owner.borrow(){
+            Some(Rc::clone(unit))
+        }else{
+            None
         }
-        let um = self.comm.um();
-        let deps = um.get_dependency_list(
-            unit.id(),
-            UnitRelationAtom::UnitAtomAddDefaultTargetDependencyQueue,
-        );
-        for _u in deps {
-            if !_u.default_dependencies() {
-                continue;
-            }
+    }
 
-            if um.unit_has_dependecy(unit.id(), UnitRelationAtom::UnitAtomBefore, _u.id()) {
-                continue;
-            }
-
-            let e = um.unit_add_dependency(
-                unit.id(),
-                UnitRelations::UnitAfter,
-                _u.id(),
-                true,
-                UnitDependencyMask::UnitDependencyDefault,
-            );
-            if e.is_err() {
-                log::error!("add default dependencies error {:?}", e);
+    pub(self) fn add_default_dependencies(&self) {
+        if let Some(u) = self.owner() {
+            log::debug!("add default dependencies for target[{}]", u.id());
+            if !u.default_dependencies() {
                 return;
             }
+            let um = Rc::clone(&self.um);
+            let deps = um.get_dependency_list(
+                u.id(),
+                UnitRelationAtom::UnitAtomAddDefaultTargetDependencyQueue,
+            );
+            for _u in deps {
+                if !_u.default_dependencies() {
+                    continue;
+                }
+
+                if um.unit_has_dependecy(u.id(), UnitRelationAtom::UnitAtomBefore, _u.id()) {
+                    continue;
+                }
+
+                let e = um.unit_add_dependency(
+                    u.id(),
+                    UnitRelations::UnitAfter,
+                    _u.id(),
+                    true,
+                    UnitDependencyMask::UnitDependencyDefault,
+                );
+                if e.is_err() {
+                    log::error!("add default dependencies error {:?}", e);
+                    return;
+                }
+            }
+        } else {
+            return;
         }
     }
 }
 
-impl UnitObj for Target {
+impl SubUnit for Target {
     fn load(&self, _conf_str: Vec<PathBuf>) -> libutils::Result<(), Box<dyn std::error::Error>> {
         //todo add default dependency funnction need add
         log::debug!("load for target");
@@ -99,7 +115,8 @@ impl UnitObj for Target {
     }
 
     fn attach_unit(&self, unit: Rc<libsysmaster::manager::Unit>) {
-        self.comm.attach_unit(unit);
+        self.comm.attach_unit(Rc::clone(&unit));
+        self.owner.replace(Some(unit));
         self.db_insert();
     }
 
@@ -143,14 +160,8 @@ impl UnitObj for Target {
     fn reset_failed(&self) {}
 }
 
-impl UnitSubClass for Target {
-    fn into_unitobj(self: Box<Self>) -> Box<dyn UnitObj> {
-        Box::new(*self)
-    }
-}
-
 impl UnitMngUtil for Target {
-    fn attach_um(&self, _um: Rc<UnitManager>) {
+    fn attach_um(&self, _um: Rc<dyn UmIf>) {
         self.comm.attach_um(_um);
     }
 
@@ -159,11 +170,11 @@ impl UnitMngUtil for Target {
     }
 }
 
-impl Default for Target {
+/*impl Default for Target {
     fn default() -> Self {
         Target::new()
     }
-}
+}*/
 
-use libsysmaster::declure_unitobj_plugin;
-declure_unitobj_plugin!(Target, Target::default, PLUGIN_NAME, LOG_LEVEL);
+use libsysmaster::declure_unitobj_plugin_with_param;
+declure_unitobj_plugin_with_param!(Target, Target::new, PLUGIN_NAME, LOG_LEVEL);

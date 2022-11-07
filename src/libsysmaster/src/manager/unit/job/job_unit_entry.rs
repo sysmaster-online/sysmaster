@@ -1290,7 +1290,7 @@ mod tests {
             &file,
             unit_type,
             name,
-            subclass.into_unitobj(),
+            subclass,
         ))
     }
 }

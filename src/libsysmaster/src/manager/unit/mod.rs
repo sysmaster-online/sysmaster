@@ -14,9 +14,10 @@ pub use execute::{ExecCmdError, ExecContext, ExecFlags, ExecParameters};
 pub use unit_base::{
     DeserializeWith, KillOperation, UnitActionError, UnitDependencyMask, UnitRef, UnitRelationAtom,
 };
-pub use unit_entry::{Unit, UnitObj};
+pub use unit_entry::{Unit, SubUnit};
 pub(super) use unit_manager::UnitManagerX;
-pub use unit_manager::{UnitManager, UnitManagerObj, UnitMngUtil, UnitSubClass};
+pub use um_interface::{UmIf};
+pub use unit_manager::{UnitManager, UnitManagerObj, UnitMngUtil};
 pub(crate) use unit_rentry::unit_name_to_type;
 pub use unit_rentry::{ExecCommand, UnitRelations, UnitType};
 
@@ -50,6 +51,7 @@ mod uload_util;
 mod unit_base;
 mod unit_datastore;
 mod unit_entry;
+mod um_interface;
 mod unit_manager;
 mod unit_rentry;
 mod unit_runtime;

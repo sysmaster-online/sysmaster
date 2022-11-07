@@ -2,7 +2,7 @@
 //!  The method provided by the public object needs to be called.
 //!
 use super::socket_rentry::{SectionSocket, SocketCommand, SocketRe, SocketResult, SocketState};
-use libsysmaster::manager::{Unit, UnitManager};
+use libsysmaster::manager::{Unit, UmIf};
 use libsysmaster::Reliability;
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
@@ -28,7 +28,7 @@ impl SocketUnitComm {
         self.data.borrow_mut().attach_unit(unit);
     }
 
-    pub(super) fn attach_um(&self, um: Rc<UnitManager>) {
+    pub(super) fn attach_um(&self, um: Rc<dyn UmIf>) {
         self.umcomm.attach_um(um)
     }
 
@@ -40,7 +40,7 @@ impl SocketUnitComm {
         self.data.borrow().unit()
     }
 
-    pub(super) fn um(&self) -> Rc<UnitManager> {
+    pub(super) fn um(&self) -> Rc<dyn UmIf> {
         self.umcomm.um()
     }
 
@@ -137,7 +137,7 @@ impl SocketUmComm {
         }
     }
 
-    pub(super) fn attach_um(&self, um: Rc<UnitManager>) {
+    pub(super) fn attach_um(&self, um: Rc<dyn UmIf>) {
         let mut wdata = self.data.write().unwrap();
         wdata.attach_um(um);
     }
@@ -156,9 +156,9 @@ impl SocketUmComm {
         rdata.reli()
     }
 
-    pub(super) fn um(&self) -> Rc<UnitManager> {
+    pub(super) fn um(&self) -> Rc<dyn UmIf> {
         let rdata = self.data.read().unwrap();
-        rdata.um()
+        rdata.um().unwrap()
     }
 
     pub(super) fn rentry(&self) -> Rc<SocketRe> {
@@ -169,7 +169,7 @@ impl SocketUmComm {
 
 struct SocketUmCommData {
     // associated objects
-    um: Weak<UnitManager>,
+    um: Option<Rc<dyn UmIf>>,
     reli: Weak<Reliability>,
     rentry: Option<Rc<SocketRe>>,
 }
@@ -178,17 +178,16 @@ struct SocketUmCommData {
 impl SocketUmCommData {
     pub(self) fn new() -> SocketUmCommData {
         SocketUmCommData {
-            um: Weak::new(),
+            um: None,
             reli: Weak::new(),
             rentry: None,
         }
     }
 
-    pub(self) fn attach_um(&mut self, um: Rc<UnitManager>) {
-        let old = self.um.clone().upgrade();
-        if old.is_none() {
+    pub(self) fn attach_um(&mut self, um: Rc<dyn UmIf>) {
+        if self.um.is_none() {
             log::debug!("SocketUmComm attach_um action.");
-            self.um = Rc::downgrade(&um);
+            self.um = Some(um)
         }
     }
 
@@ -201,8 +200,12 @@ impl SocketUmCommData {
         }
     }
 
-    pub(self) fn um(&self) -> Rc<UnitManager> {
-        self.um.clone().upgrade().unwrap()
+    pub(self) fn um(&self) -> Option<Rc<dyn UmIf>> {
+        if let Some(ref um) = self.um {
+            Some(Rc::clone(um))
+        }else{
+            None
+        }
     }
 
     pub(self) fn reli(&self) -> Rc<Reliability> {

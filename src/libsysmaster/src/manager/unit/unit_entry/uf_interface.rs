@@ -1,4 +1,5 @@
-use super::u_entry::{Unit, UnitObj};
+use super::u_entry::{Unit};
+use super::u_interface::{SubUnit};
 use super::uu_config::UeConfig;
 use crate::manager::unit::data::{DataManager, UnitActiveState};
 use crate::manager::unit::uload_util::UnitFile;
@@ -45,7 +46,7 @@ impl UnitX {
         filer: &Rc<UnitFile>,
         unit_type: UnitType,
         name: &str,
-        subclass: Box<dyn UnitObj>,
+        subclass: Box<dyn SubUnit>,
     ) -> UnitX {
         let unit = Unit::new(unit_type, name, dmr, rentryr, filer, subclass);
         UnitX(unit)

@@ -4,8 +4,8 @@ pub use rentry::ReliLastFrame;
 pub use unit::{
     DeserializeWith, ExecCmdError, ExecCommand, ExecContext, ExecFlags, ExecParameters,
     KillOperation, Unit, UnitActionError, UnitActiveState, UnitDependencyMask, UnitManager,
-    UnitManagerObj, UnitMngUtil, UnitNotifyFlags, UnitObj, UnitRef, UnitRelationAtom,
-    UnitRelations, UnitSubClass, UnitType,
+    UnitManagerObj, UnitMngUtil, UnitNotifyFlags, SubUnit, UnitRef, UnitRelationAtom,
+    UnitRelations, UnitType,UmIf
 };
 
 /// error number of manager

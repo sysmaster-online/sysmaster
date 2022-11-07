@@ -27,7 +27,9 @@
 //! ````
 //! plugin or find the corresponding so according to the name of the corresponding unit configuration file, and load it dynamically, such as XXX.service to find libservice.so, XXX.socket to find libsocket.so
 //!
-use super::manager::{UnitManagerObj, UnitSubClass, UnitType};
+use crate::manager::UmIf;
+
+use super::manager::{SubUnit, UnitManagerObj, UnitType};
 use dy_re::Lib;
 use dy_re::Symbol;
 use dynamic_reload as dy_re;
@@ -37,6 +39,7 @@ use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::RwLock;
 use std::time::Duration;
@@ -284,18 +287,31 @@ impl Plugin {
                 Ok(lib) => {
                     #[allow(clippy::type_complexity)]
                     let _symunit: Result<
-                        Symbol<fn() -> *mut dyn UnitSubClass>,
+                        Symbol<fn() -> *mut dyn SubUnit>,
                         &str,
-                    > = unsafe { lib.lib.get(b"__unit_obj_create").map_err(|_e| "Invalid") };
+                    > = unsafe {
+                        lib.lib
+                            .get(b"__unit_obj_create_default")
+                            .map_err(|_e| "Invalid")
+                    };
                     if _symunit.is_err() {
-                        log::error!("Lib {} not contain __unit_obj_create sym unit skip it", v);
-                        return Ok(());
+                        log::error!("Lib {} not contain __unit_obj_create_default try  __unit_obj_create_with_params", v);
+                        let _symunit: Result<
+                            Symbol<fn(um: Rc<dyn crate::manager::UmIf>) -> *mut dyn SubUnit>,
+                            &str,
+                        > = unsafe {
+                            lib.lib
+                                .get(b"__unit_obj_create_with_params")
+                                .map_err(|_e| "Invalid")
+                        };
+                        if _symunit.is_err() {
+                            log::error!("Lib {} not contain __unit_obj_create_default and __unit_obj_create_with_params skip it", v);
+                            return Ok(());
+                        }
                     }
                     #[allow(clippy::type_complexity)]
-                    let _symum: Result<
-                        Symbol<fn() -> *mut dyn UnitSubClass>,
-                        &str,
-                    > = unsafe { lib.lib.get(b"__um_obj_create").map_err(|_e| "Invalid") };
+                    let _symum: Result<Symbol<fn() -> *mut dyn SubUnit>, &str> =
+                        unsafe { lib.lib.get(b"__um_obj_create").map_err(|_e| "Invalid") };
                     if _symum.is_err() {
                         log::error!("Lib {} not contain __um_obj_create sym um skip it", v);
                         return Ok(());
@@ -391,10 +407,7 @@ impl Plugin {
     /// Create a  obj for subclasses of unit
     /// each sub unit need reference of declure_unitobj_plugin
     ///
-    pub fn create_unit_obj(
-        &self,
-        unit_type: UnitType,
-    ) -> Result<Box<dyn UnitSubClass>, Box<dyn Error>> {
+    pub fn create_unit_obj(&self, unit_type: UnitType) -> Result<Box<dyn SubUnit>, Box<dyn Error>> {
         let ret = self.get_lib(unit_type);
         if ret.is_err() {
             return Err(format!("create unit, the {:?} plugin is not exist", unit_type).into());
@@ -402,8 +415,12 @@ impl Plugin {
 
         let dy_lib = ret.unwrap();
         #[allow(clippy::type_complexity)]
-        let _sym: Result<Symbol<fn() -> *mut dyn UnitSubClass>, &str> =
-            unsafe { dy_lib.lib.get(b"__unit_obj_create").map_err(|_e| "Invalid") };
+        let _sym: Result<Symbol<fn() -> *mut dyn SubUnit>, &str> = unsafe {
+            dy_lib
+                .lib
+                .get(b"__unit_obj_create_default")
+                .map_err(|_e| "Invalid")
+        };
         if let Ok(fun) = _sym {
             let boxed_raw = fun();
             Ok(unsafe { Box::from_raw(boxed_raw) })
@@ -412,6 +429,30 @@ impl Plugin {
         }
     }
 
+    pub fn create_unit_obj_with_um(
+        &self,
+        unit_type: UnitType,
+        um: Rc<dyn UmIf>,
+    ) -> Result<Box<dyn SubUnit>, Box<dyn Error>> {
+        let ret = self.get_lib(unit_type);
+        if ret.is_err() {
+            return Err(format!("create unit, the {:?} plugin is not exist", unit_type).into());
+        }
+
+        let dy_lib = ret.unwrap();
+        let _sym: Result<Symbol<fn(um: Rc<dyn crate::manager::UmIf>) -> *mut dyn SubUnit>, &str> = unsafe {
+            dy_lib
+                .lib
+                .get(b"__unit_obj_create_with_params")
+                .map_err(|_e| "Invalid")
+        };
+        if let Ok(fun) = _sym {
+            let boxed_raw = fun(um);
+            Ok(unsafe { Box::from_raw(boxed_raw) })
+        } else {
+            Err(format!("The library of {:?} is {:?}", unit_type, _sym.err()).into())
+        }
+    }
     /// Create a  obj for subclasses of unit manager
     /// each sub unit manager need reference of declure_umobj_plugin
     pub fn create_um_obj(

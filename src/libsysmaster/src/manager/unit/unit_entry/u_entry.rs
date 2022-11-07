@@ -1,3 +1,4 @@
+use super::SubUnit;
 use super::uu_base::UeBase;
 use super::uu_cgroup::UeCgroup;
 use super::uu_child::UeChild;
@@ -43,7 +44,7 @@ pub struct Unit {
     cgroup: UeCgroup,
     conditions: Rc<UeCondition>,
     start_limit: StartLimit,
-    sub: Box<dyn UnitObj>,
+    sub: Box<dyn SubUnit>,
 }
 
 impl PartialEq for Unit {
@@ -69,75 +70,6 @@ impl Ord for Unit {
 impl Hash for Unit {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.base.id().hash(state);
-    }
-}
-///The trait Defining Shared Behavior of sub unit
-///
-/// difference sub unit ref by dynamic trait
-///
-pub trait UnitObj: ReStation {
-    ///
-    fn init(&self) {}
-
-    ///
-    fn done(&self) {}
-
-    ///
-    fn load(&self, conf: Vec<PathBuf>) -> Result<(), Box<dyn Error>>;
-
-    ///
-    fn dump(&self) {}
-
-    /// Start a Unit
-    /// Each Sub Unit need to implement its own start function
-    ///
-    fn start(&self) -> Result<(), UnitActionError> {
-        Ok(())
-    }
-
-    ///
-    // process reentrant with force
-    fn stop(&self, _force: bool) -> Result<(), UnitActionError> {
-        Ok(())
-    }
-
-    ///
-    fn reload(&self) {}
-
-    ///
-    fn kill(&self) {}
-
-    ///
-    fn release_resources(&self) {}
-
-    ///
-    fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {}
-
-    ///
-    fn reset_failed(&self) {}
-
-    ///
-    fn collect_fds(&self) -> Vec<i32> {
-        Vec::new()
-    }
-
-    ///Get the the unit state
-    ///
-    /// Every sub unit  can define self states and map to [`UnitActiveState`]
-    ///
-    fn current_active_state(&self) -> UnitActiveState;
-
-    ///
-    fn attach_unit(&self, unit: Rc<Unit>);
-
-    ///
-    fn notify_message(
-        &self,
-        _ucred: &UnixCredentials,
-        _events: &HashMap<&str, &str>,
-        _fds: Vec<i32>,
-    ) -> Result<(), ServiceError> {
-        Ok(())
     }
 }
 
@@ -179,7 +111,7 @@ impl Unit {
         dmr: &Rc<DataManager>,
         rentryr: &Rc<UnitRe>,
         filer: &Rc<UnitFile>,
-        sub: Box<dyn UnitObj>,
+        sub: Box<dyn SubUnit>,
     ) -> Rc<Unit> {
         let _base = Rc::new(UeBase::new(rentryr, String::from(name), unit_type));
         let _config = Rc::new(UeConfig::new(&_base));
@@ -624,7 +556,7 @@ mod tests {
             &Rc::new(dm),
             &rentry,
             &Rc::new(unit_file),
-            sub_obj.into_unitobj(),
+            sub_obj,
         );
         unit
     }

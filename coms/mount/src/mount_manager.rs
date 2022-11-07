@@ -4,7 +4,7 @@ use super::mount_rentry::{MountRe, MountReFrame};
 use libevent::{EventState, EventType, Events, Source};
 use libmount::mountinfo;
 use libsysmaster::manager::{
-    ReliLastFrame, UnitActiveState, UnitManager, UnitManagerObj, UnitMngUtil, UnitType,
+    ReliLastFrame, UnitActiveState, UnitManager, UnitManagerObj, UnitMngUtil, UnitType, UmIf,
 };
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
@@ -412,7 +412,7 @@ fn mount_point_to_unit_name(mount_point: &str) -> String {
 }
 
 impl UnitMngUtil for MountManager {
-    fn attach_um(&self, um: Rc<UnitManager>) {
+    fn attach_um(&self, um: Rc<dyn UmIf>) {
         self.comm.attach_um(um);
         self.register();
     }

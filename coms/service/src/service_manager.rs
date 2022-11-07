@@ -1,6 +1,6 @@
 use super::service_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::service_comm::ServiceUmComm;
-use libsysmaster::manager::{UnitManager, UnitManagerObj, UnitMngUtil};
+use libsysmaster::manager::{UnitManager, UnitManagerObj, UnitMngUtil, UmIf};
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use std::rc::Rc;
@@ -33,7 +33,7 @@ impl ReStation for ServiceManager {
 }
 
 impl UnitMngUtil for ServiceManager {
-    fn attach_um(&self, um: Rc<UnitManager>) {
+    fn attach_um(&self, um: Rc<dyn UmIf>) {
         self.comm.attach_um(um);
     }
 
