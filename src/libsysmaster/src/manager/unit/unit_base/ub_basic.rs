@@ -34,7 +34,9 @@ pub enum UnitActionError {
     UnitActionECanceled,
 }
 
+/// kill operation send to process
 #[allow(missing_docs)]
+#[derive(PartialEq, Eq)]
 pub enum KillOperation {
     KillTerminate,
     KillTerminateAndLog,

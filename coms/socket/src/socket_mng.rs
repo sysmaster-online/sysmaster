@@ -220,7 +220,7 @@ impl SocketMngData {
             }
         })?;
 
-        if self.comm.unit().test_start_limit() {
+        if !self.comm.unit().test_start_limit() {
             self.enter_dead(SocketResult::FailureStartLimitHit);
             return Err(UnitActionError::UnitActionECanceled);
         }
@@ -461,7 +461,12 @@ impl SocketMngData {
         }
 
         let op = state.to_kill_operation();
-        match self.comm.unit().kill_context(None, self.pid.control(), op) {
+        match self.comm.unit().kill_context(
+            self.config.kill_context(),
+            None,
+            self.pid.control(),
+            op,
+        ) {
             Ok(_) => {}
             Err(_e) => {
                 if IN_SET!(

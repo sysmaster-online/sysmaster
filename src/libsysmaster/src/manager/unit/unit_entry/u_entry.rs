@@ -8,6 +8,7 @@ use super::uu_condition::{
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use super::uu_ratelimit::StartLimit;
+use super::{KillContext, KillMode};
 use crate::manager::unit::data::{DataManager, UnitActiveState, UnitDepConf, UnitState};
 use crate::manager::unit::uload_util::UnitFile;
 use crate::manager::unit::unit_base::{KillOperation, UnitActionError};
@@ -296,9 +297,10 @@ impl Unit {
         self.cgroup.cg_path()
     }
 
-    ///
+    /// kill the process belongs to the unit
     pub fn kill_context(
         &self,
+        k_context: Rc<KillContext>,
         m_pid: Option<Pid>,
         c_pid: Option<Pid>,
         ko: KillOperation,
@@ -339,7 +341,10 @@ impl Unit {
             }
         }
 
-        if !self.cgroup.cg_path().is_empty() {
+        if !self.cgroup.cg_path().is_empty()
+            && (k_context.kill_mode() == KillMode::ControlGroup
+                || (k_context.kill_mode() == KillMode::Mixed && ko == KillOperation::KillKill))
+        {
             let pids = self.pids_set(m_pid, c_pid);
 
             match libcgroup::cg_kill_recursive(

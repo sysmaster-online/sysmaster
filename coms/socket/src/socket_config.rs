@@ -5,7 +5,7 @@ use super::socket_comm::SocketUnitComm;
 use super::socket_rentry::{SectionSocket, SocketCommand};
 use crate::socket_base::{NetlinkProtocol, PortType};
 use confique::Config;
-use libsysmaster::manager::{ExecCommand, UnitRef};
+use libsysmaster::manager::{ExecCommand, KillContext, UnitRef};
 use libsysmaster::ReStation;
 use libutils::socket_util;
 use nix::errno::Errno;
@@ -38,6 +38,9 @@ pub struct SocketConfig {
     /* processed */
     service: RefCell<UnitRef>,
     ports: RefCell<Vec<Rc<SocketPortConf>>>,
+
+    // resolved from ServiceConfigData
+    kill_context: Rc<KillContext>,
 }
 
 impl ReStation for SocketConfig {
@@ -74,6 +77,7 @@ impl SocketConfig {
             data: Rc::new(RefCell::new(SocketConfigData::default())),
             service: RefCell::new(UnitRef::new()),
             ports: RefCell::new(Vec::new()),
+            kill_context: Rc::new(KillContext::default()),
         }
     }
 
@@ -92,6 +96,8 @@ impl SocketConfig {
         }
         let data = builder.load()?;
 
+        self.parse_kill_context();
+
         // record original configuration
         *self.data.borrow_mut() = data;
 
@@ -106,6 +112,7 @@ impl SocketConfig {
         if update {
             self.db_update();
         }
+
         Ok(())
     }
 
@@ -236,6 +243,15 @@ impl SocketConfig {
 
     fn push_port(&self, port: Rc<SocketPortConf>) {
         self.ports.borrow_mut().push(port);
+    }
+
+    pub(super) fn kill_context(&self) -> Rc<KillContext> {
+        self.kill_context.clone()
+    }
+
+    fn parse_kill_context(&self) {
+        self.kill_context
+            .set_kill_mode(self.config_data().borrow().Socket.kill_mode);
     }
 }
 

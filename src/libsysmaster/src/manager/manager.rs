@@ -473,9 +473,11 @@ impl Manager {
 
     pub(crate) fn preset_all(&self) -> Result<(), Error> {
         if self.mode != Mode::System {
-            let install = Install::new(PresetMode::Enable, self.lookup_path.clone());
-            install.preset_all()?;
+            return Ok(());
         }
+
+        let install = Install::new(PresetMode::Enable, self.lookup_path.clone());
+        install.preset_all()?;
 
         Ok(())
     }
