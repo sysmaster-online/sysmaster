@@ -1,21 +1,7 @@
 use nix::{libc, sys::socket::SockProtocol};
-use serde::{Deserialize, Serialize};
 
 pub(super) const LOG_LEVEL: u32 = 4;
 pub(super) const PLUGIN_NAME: &str = "SocketUnit";
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub(super) enum PortType {
-    Socket,
-    Fifo,
-    Invalid,
-}
-
-impl Default for PortType {
-    fn default() -> Self {
-        PortType::Socket
-    }
-}
 
 #[repr(i32)]
 #[derive(Debug, Eq, PartialEq)]

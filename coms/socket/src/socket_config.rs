@@ -2,8 +2,8 @@
 //!
 #![allow(non_snake_case)]
 use super::socket_comm::SocketUnitComm;
-use super::socket_rentry::{SectionSocket, SocketCommand};
-use crate::socket_base::{NetlinkProtocol, PortType};
+use super::socket_rentry::{PortType, SectionSocket, SocketCommand};
+use crate::socket_base::NetlinkProtocol;
 use confique::Config;
 use libsysmaster::manager::{ExecCommand, KillContext, UnitRef};
 use libsysmaster::ReStation;
@@ -21,12 +21,6 @@ use std::fs;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::PathBuf;
 use std::rc::Rc;
-
-pub(super) enum ListeningItem {
-    Stream,
-    Datagram,
-    Netlink,
-}
 
 pub struct SocketConfig {
     // associated objects
@@ -182,7 +176,7 @@ impl SocketConfig {
                             continue;
                         }
                         if let Ok(socket_addr) = parse_socket_address(v, SockType::Stream) {
-                            let port = SocketPortConf::new(PortType::Socket, socket_addr);
+                            let port = SocketPortConf::new(PortType::Socket, socket_addr, v);
                             self.push_port(Rc::new(port));
                         } else {
                             log::error!("create stream listening socket failed: {}", v);
@@ -200,7 +194,7 @@ impl SocketConfig {
                             continue;
                         }
                         if let Ok(socket_addr) = parse_socket_address(v, SockType::Datagram) {
-                            let port = SocketPortConf::new(PortType::Socket, socket_addr);
+                            let port = SocketPortConf::new(PortType::Socket, socket_addr, v);
                             self.push_port(Rc::new(port));
                         } else {
                             log::error!("create datagram listening socket failed: {}", v);
@@ -226,7 +220,7 @@ impl SocketConfig {
                         }
 
                         let socket_addr = parse_netlink_address(v).unwrap();
-                        let port = SocketPortConf::new(PortType::Socket, socket_addr);
+                        let port = SocketPortConf::new(PortType::Socket, socket_addr, v);
                         self.push_port(Rc::new(port));
                     }
                 }
@@ -255,6 +249,12 @@ impl SocketConfig {
     }
 }
 
+enum ListeningItem {
+    Stream,
+    Datagram,
+    Netlink,
+}
+
 #[derive(Config, Default, Debug)]
 pub(crate) struct SocketConfigData {
     #[config(nested)]
@@ -266,6 +266,7 @@ impl SocketConfigData {
         SocketConfigData { Socket }
     }
 
+    // keep consistency with the configuration, so just copy from configuration.
     pub(self) fn get_exec_cmds(&self, cmd_type: SocketCommand) -> Option<Vec<ExecCommand>> {
         match cmd_type {
             SocketCommand::StartPre => self.Socket.ExecStartPre.clone(),
@@ -300,11 +301,16 @@ impl SocketConfigData {
 pub(super) struct SocketPortConf {
     p_type: PortType,
     sa: SocketAddress,
+    listen: String,
 }
 
 impl SocketPortConf {
-    pub(super) fn new(p_type: PortType, sa: SocketAddress) -> SocketPortConf {
-        SocketPortConf { p_type, sa }
+    pub(super) fn new(p_type: PortType, sa: SocketAddress, listenr: &str) -> SocketPortConf {
+        SocketPortConf {
+            p_type,
+            sa,
+            listen: String::from(listenr),
+        }
     }
 
     pub(super) fn p_type(&self) -> PortType {
@@ -313,6 +319,10 @@ impl SocketPortConf {
 
     pub(super) fn sa(&self) -> &SocketAddress {
         &self.sa
+    }
+
+    pub(super) fn listen(&self) -> &str {
+        &self.listen
     }
 }
 

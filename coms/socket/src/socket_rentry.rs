@@ -108,6 +108,19 @@ pub(super) enum SocketCommand {
     StopPost,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub(super) enum PortType {
+    Socket,
+    Fifo,
+    Invalid,
+}
+
+impl Default for PortType {
+    fn default() -> Self {
+        PortType::Socket
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct SocketReMng {
     state: SocketState,
@@ -116,7 +129,7 @@ struct SocketReMng {
     control_cmd_type: Option<SocketCommand>,
     control_cmd_len: usize,
     refused: i32,
-    ports: Vec<i32>, // i32 ==> std::os::unix::prelude::RawFd ==> std::os::raw::c_int
+    ports: Vec<(PortType, String, i32)>, // i32 ==> std::os::unix::prelude::RawFd ==> std::os::raw::c_int
 }
 
 impl SocketReMng {
@@ -127,7 +140,7 @@ impl SocketReMng {
         control_cmd_type: Option<SocketCommand>,
         control_cmd_len: usize,
         refused: i32,
-        ports: Vec<i32>,
+        ports: Vec<(PortType, String, i32)>,
     ) -> SocketReMng {
         SocketReMng {
             state,
@@ -194,10 +207,13 @@ impl SocketRe {
         control_cmd_type: Option<SocketCommand>,
         control_cmd_len: usize,
         refused: i32,
-        ports: Vec<RawFd>,
+        ports: Vec<(PortType, String, RawFd)>,
     ) {
         let c_pid = control_pid.map(|x| x.as_raw() as i32);
-        let ps = ports.iter().map(|p| *p as i32).collect::<_>();
+        let ps = ports
+            .iter()
+            .map(|(t, l, id)| (*t, l.clone(), *id as i32))
+            .collect::<_>();
         let mng = SocketReMng::new(
             state,
             result,
@@ -225,7 +241,7 @@ impl SocketRe {
         Option<SocketCommand>,
         usize,
         i32,
-        Vec<RawFd>,
+        Vec<(PortType, String, RawFd)>,
     )> {
         let mng = self.mng.0.get(unit_id);
         mng.map(|m| {
@@ -236,7 +252,10 @@ impl SocketRe {
                 m.control_cmd_type,
                 m.control_cmd_len,
                 m.refused,
-                m.ports.iter().map(|p| *p as RawFd).collect::<_>(),
+                m.ports
+                    .iter()
+                    .map(|(t, l, id)| (*t, l.clone(), *id as RawFd))
+                    .collect::<_>(),
             )
         })
     }

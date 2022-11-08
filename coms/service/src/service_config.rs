@@ -126,6 +126,7 @@ impl ServiceConfigData {
         self.Service.set_notify_access(v)
     }
 
+    // keep consistency with the configuration, so just copy from configuration.
     pub(self) fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Option<Vec<ExecCommand>> {
         match cmd_type {
             ServiceCommand::Condition => self.Service.ExecCondition.clone(),

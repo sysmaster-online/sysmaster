@@ -24,8 +24,7 @@ pub(super) struct ReliLast {
 
     /* database: singleton(1) */
     unit: Database<OwnedType<u32>, Str>, // RELI_DB_LUNIT; key: RELI_LAST_KEY, data: unit_id;
-    #[allow(clippy::type_complexity)]
-    frame: Database<OwnedType<u32>, SerdeBincode<(u32, Option<u32>, Option<u32>)>>, // RELI_DB_LFRAME; key: RELI_LAST_KEY, data: f1+f2+f3;
+    frame: Database<OwnedType<u32>, SerdeBincode<Vec<ReliFrame>>>, // RELI_DB_LFRAME; key: RELI_LAST_KEY, data: vec<f1+f2+f3>;
 }
 
 impl fmt::Debug for ReliLast {
@@ -101,8 +100,13 @@ impl ReliLast {
         }
 
         let mut wtxn = self.env.write_txn().expect("last.write_txn");
+        let mut frame = match self.frame.get(&wtxn, &RELI_LAST_KEY).unwrap_or(None) {
+            Some(f) => f,
+            None => Vec::new(),
+        };
+        frame.push((f1, f2, f3));
         self.frame
-            .put(&mut wtxn, &RELI_LAST_KEY, &(f1, f2, f3))
+            .put(&mut wtxn, &RELI_LAST_KEY, &frame)
             .expect("last.put");
         wtxn.commit().expect("last.commit");
     }
@@ -113,9 +117,14 @@ impl ReliLast {
         }
 
         let mut wtxn = self.env.write_txn().expect("last.write_txn");
+        let mut frame = match self.frame.get(&wtxn, &RELI_LAST_KEY).unwrap_or(None) {
+            Some(f) => f,
+            None => Vec::new(),
+        };
+        frame.pop();
         self.frame
-            .delete(&mut wtxn, &RELI_LAST_KEY)
-            .expect("last.delete");
+            .put(&mut wtxn, &RELI_LAST_KEY, &frame)
+            .expect("last.put");
         wtxn.commit().expect("last.commit");
     }
 
@@ -125,10 +134,17 @@ impl ReliLast {
         unit_id.map(|u| u.to_string())
     }
 
-    pub(super) fn frame(&self) -> Option<(u32, Option<u32>, Option<u32>)> {
+    pub(super) fn frame(&self) -> Option<ReliFrame> {
         let rtxn = self.env.read_txn().expect("last.read_txn");
         let frame = self.frame.get(&rtxn, &RELI_LAST_KEY).unwrap_or(None);
-        frame
+        match frame {
+            Some(mut f) => f.pop(),
+            None => None,
+        }
+    }
+
+    pub(super) fn ignore(&self) -> bool {
+        *self.ignore.borrow()
     }
 
     fn unit_len(&self) -> heed::Result<u64> {
@@ -138,11 +154,12 @@ impl ReliLast {
 
     fn frame_len(&self) -> heed::Result<u64> {
         let rtxn = self.env.read_txn()?;
-        self.frame.len(&rtxn)
-    }
-
-    pub(super) fn ignore(&self) -> bool {
-        *self.ignore.borrow()
+        let frame = self.frame.get(&rtxn, &RELI_LAST_KEY).unwrap_or(None);
+        let len = match frame {
+            Some(f) => f.len(),
+            None => 0,
+        };
+        Ok(len as u64)
     }
 }
 
@@ -154,3 +171,5 @@ pub(super) fn prepare(dir_str: &str) -> Result<(), Error> {
 
     Ok(())
 }
+
+type ReliFrame = (u32, Option<u32>, Option<u32>);
