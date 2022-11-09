@@ -1,3 +1,4 @@
+//!
 #[allow(dead_code)]
 enum ErrKind {
     Unit,
@@ -28,6 +29,7 @@ impl std::fmt::Display for ErrKind {
     }
 }
 
+///
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// An error from syscall
@@ -38,9 +40,13 @@ pub enum Error {
         errno,
         syscall
     )]
+    ///
     Syscall {
+        ///
         syscall: &'static str,
+        ///
         ret: i32,
+        ///
         errno: i32,
     },
 
@@ -71,7 +77,9 @@ pub enum Error {
     /// An error getting the current pid
     #[error("{}: Got an error: {} for unit: {}", ErrKind::Unit, msg, unit)]
     Unit {
+        ///
         msg: &'static str,
+        ///
         unit: &'static str,
     },
 
@@ -81,9 +89,13 @@ pub enum Error {
         ErrKind::Other,
         msg
     )]
-    Other { msg: &'static str },
+    Other {
+        ///
+        msg: &'static str,
+    },
 }
 
+///
 pub type Result<T, E = Error> = anyhow::Result<T, E>;
 
 #[cfg(test)]

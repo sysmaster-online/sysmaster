@@ -6,7 +6,8 @@
 //!  [unit_base]: Definition of basic attributes of unit related objects, such as enumeration of unit type and definition of unit dependency
 //!  [unit_datastore]: the unit object storage module is responsible for storing the unit module status.
 //!  [unit_entry]: Definition of unit related objects
-//!
+//!  [unit_manager]: Manager all Unit Instances in sysmaster
+//!  [um_interface]: Share api of unit_manager for subunit
 
 pub use data::{UnitActiveState, UnitNotifyFlags};
 pub use execute::{ExecCmdError, ExecContext, ExecFlags, ExecParameters};
@@ -41,7 +42,7 @@ pub enum UnitErrno {
 // dependency:
 // unit_rentry -> data -> unit_base -> {uload_util} ->
 // unit_entry -> {unit_datastore -> unit_runtime} -> job ->
-// {execute | sigchld | notify} -> unit_manager
+// {execute | sigchld | notify} -> unit_manager -> um_interface
 
 mod data;
 mod execute;

@@ -1,3 +1,4 @@
+//!
 use log::LevelFilter;
 use log4rs::{
     append::console::{ConsoleAppender, Target},
@@ -27,6 +28,7 @@ fn set_logger(logger: log4rs::Logger) {
     let _ = log::set_boxed_logger(Box::new(LoggerPlugin(logger)));
 }
 
+///
 pub fn init_log_with_default(app_name: &str, log_level: u32) {
     let config = build_log_config(app_name, log_level);
     let logger = log4rs::Logger::new(config);
@@ -41,7 +43,7 @@ pub fn init_log_with_default(app_name: &str, log_level: u32) {
 ///
 pub fn init_log_with_file<P>(path: P)
 where
-    //where 字句限定 P的类型
+    //where
     P: AsRef<Path>,
 {
     log4rs::init_file(path, Default::default()).expect("logging init");

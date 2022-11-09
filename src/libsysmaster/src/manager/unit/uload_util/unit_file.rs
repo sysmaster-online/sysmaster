@@ -168,7 +168,7 @@ impl UnitFileData {
     pub(self) fn lookup_paths_updated(&mut self) -> bool {
         let mut siphash24 = SipHasher24::new_with_keys(0, 0);
         for dir in &self.lookup_path.search_path {
-            match fs::metadata(&dir) {
+            match fs::metadata(dir) {
                 Ok(metadata) => match metadata.modified() {
                     Ok(time) => {
                         siphash24.write_u128(time_util::timespec_load(time));

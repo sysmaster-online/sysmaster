@@ -531,8 +531,8 @@ impl Unit {
 mod tests {
     use super::Unit;
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::manager::unit::test::test_utils::UmIfD;
     use crate::manager::unit::unit_rentry::{UnitRe, UnitType};
-    use crate::manager::UmIf;
     use crate::reliability::Reliability;
     use libutils::{logger, path_lookup::LookupPaths};
     use std::rc::Rc;
@@ -541,8 +541,6 @@ mod tests {
         manager::{unit::data::DataManager, unit::uload_util::UnitFile},
         plugin::Plugin,
     };
-    struct UmIfD;
-    impl UmIf for UmIfD {}
     fn unit_init() -> Rc<Unit> {
         logger::init_log_with_console("test_unit_entry", 4);
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));

@@ -35,7 +35,7 @@ pub use uu_kill::{KillContext, KillMode};
 // dependency:
 // uu_condition ->
 // uu_base -> {uu_config | uu_cgroup} -> {uu_load | uu_child} ->
-// u_entry -> uf_interface
+// u_entry -> {uf_interface | u_interface}
 mod u_entry;
 mod u_interface;
 mod uf_interface;

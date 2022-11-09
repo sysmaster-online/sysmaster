@@ -17,10 +17,6 @@ use super::{
 /// if SubUnit needs to obtain information about othes,
 ///
 /// need create Self by attach a Impl UmIf
-/// ```rust
-/// fn -> new(um:Rc<dync UmIf>) -> Self{
-/// }
-/// ```
 ///
 pub trait UmIf {
     /// get the unit the has atom relation with the unit

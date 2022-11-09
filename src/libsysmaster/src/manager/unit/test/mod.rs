@@ -15,7 +15,7 @@ pub(in crate::manager::unit) mod test_utils {
         Reliability,
     };
 
-    struct UmIfD;
+    pub(in crate::manager::unit) struct UmIfD;
     impl UmIf for UmIfD {}
 
     pub(in crate::manager::unit) fn create_unit_for_test_pub(

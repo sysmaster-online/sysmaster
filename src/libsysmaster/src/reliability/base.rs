@@ -99,7 +99,7 @@ pub fn reli_dir_prepare() -> Result<(), Error> {
 fn reli_dir_prepare_run() -> Result<(), Error> {
     let dir = Path::new(RELI_PATH_DIR);
     if !dir.exists() {
-        fs::create_dir_all(&dir)?;
+        fs::create_dir_all(dir)?;
     }
 
     log::info!(
@@ -127,7 +127,7 @@ fn reli_dir_prepare_out() -> Result<(), Error> {
     if let Some(d_str) = dir_string {
         let dir = Path::new(&d_str);
         if !dir.exists() {
-            fs::create_dir_all(&dir)?;
+            fs::create_dir_all(dir)?;
         }
 
         log::info!("prepare reliability out directory successfully: {}.", d_str);
@@ -157,7 +157,7 @@ fn reli_dir_prepare_customize() -> Result<(), Error> {
     if let Some(d_str) = dir_string {
         let dir = Path::new(&d_str);
         if !dir.exists() {
-            fs::create_dir_all(&dir)?;
+            fs::create_dir_all(dir)?;
         }
 
         log::info!(
