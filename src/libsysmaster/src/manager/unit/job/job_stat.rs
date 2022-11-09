@@ -178,7 +178,7 @@ impl JobKindNum {
 
         // del
         for job in dels.iter() {
-            let overflow = match job.get_kind() {
+            let overflow = match job.kind() {
                 JobKind::Start => value_try_sub(&mut self.start, 1),
                 JobKind::Stop => value_try_sub(&mut self.stop, 1),
                 JobKind::Reload => value_try_sub(&mut self.reload, 1),
@@ -192,7 +192,7 @@ impl JobKindNum {
 
         // add
         for job in adds.iter() {
-            let overflow = match job.get_kind() {
+            let overflow = match job.kind() {
                 JobKind::Start => value_try_add(&mut self.start, 1),
                 JobKind::Stop => value_try_add(&mut self.stop, 1),
                 JobKind::Reload => value_try_add(&mut self.reload, 1),

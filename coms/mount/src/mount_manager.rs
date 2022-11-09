@@ -9,7 +9,6 @@ use libsysmaster::manager::{
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use libutils::{Error, Result};
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
@@ -19,9 +18,6 @@ use std::sync::Arc;
 
 struct MountManager {
     // owned objects
-    // control
-    first_enum: RefCell<bool>,
-
     // data
     comm: Arc<MountUmComm>,
     monitor: MountMonitor,
@@ -72,21 +68,13 @@ impl ReStation for MountManager {
     }
 }
 
-impl UnitManagerObj for MountManager {
-    fn enumerate(&self) {
-        if !*self.first_enum.borrow() {
-            self.register_ex();
-            *self.first_enum.borrow_mut() = true;
-        }
-    }
-}
+impl UnitManagerObj for MountManager {}
 
 // the declaration "pub(self)" is for identification only.
 impl MountManager {
     pub(self) fn new() -> MountManager {
         let _comm = MountUmComm::get_instance();
         MountManager {
-            first_enum: RefCell::new(false),
             comm: Arc::clone(&_comm),
             monitor: MountMonitor::new(&_comm),
         }

@@ -1,7 +1,9 @@
 //!  socket_ The comm module provides management of common objects, mainly including weak references to UnitManager and Unit objects.
 //!  The method provided by the public object needs to be called.
 //!
-use super::socket_rentry::{SectionSocket, SocketCommand, SocketRe, SocketResult, SocketState};
+use super::socket_rentry::{
+    PortType, SectionSocket, SocketCommand, SocketRe, SocketResult, SocketState,
+};
 use libsysmaster::manager::{UmIf, Unit};
 use libsysmaster::Reliability;
 use nix::unistd::Pid;
@@ -69,7 +71,7 @@ impl SocketUnitComm {
         control_cmd_type: Option<SocketCommand>,
         control_cmd_len: usize,
         refused: i32,
-        ports: Vec<RawFd>,
+        ports: Vec<(PortType, String, RawFd)>,
     ) {
         self.rentry().mng_insert(
             self.unit().id(),
@@ -93,7 +95,7 @@ impl SocketUnitComm {
         Option<SocketCommand>,
         usize,
         i32,
-        Vec<RawFd>,
+        Vec<(PortType, String, RawFd)>,
     )> {
         self.rentry().mng_get(self.unit().id())
     }

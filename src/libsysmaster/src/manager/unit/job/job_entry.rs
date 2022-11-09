@@ -40,13 +40,16 @@ pub(in crate::manager::unit) struct JobConf {
 }
 
 impl JobConf {
-    pub(in crate::manager::unit) fn new(unit: Rc<UnitX>, kind: JobKind) -> JobConf {
-        JobConf { unit, kind }
+    pub(in crate::manager::unit) fn new(unitr: &Rc<UnitX>, kind: JobKind) -> JobConf {
+        JobConf {
+            unit: Rc::clone(unitr),
+            kind,
+        }
     }
 
     pub(super) fn map(input: &Self) -> JobConf {
         let k = job_merge_unit(input.kind, &input.unit);
-        JobConf::new(Rc::clone(&input.unit), k)
+        JobConf::new(&input.unit, k)
     }
 
     pub(super) fn get_unit(&self) -> &Rc<UnitX> {
@@ -200,6 +203,7 @@ impl Job {
 
     pub(super) fn merge_attr(&self, other: &Self) {
         assert!(*self.stage.borrow() == JobStage::Wait);
+        assert!(self.kind == other.kind);
 
         // update attr
         self.attr.borrow_mut().or(&other.attr.borrow());
@@ -287,7 +291,7 @@ impl Job {
         &self.unit
     }
 
-    pub(super) fn get_kind(&self) -> JobKind {
+    pub(super) fn kind(&self) -> JobKind {
         self.kind
     }
 

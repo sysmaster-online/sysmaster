@@ -74,10 +74,6 @@ impl UnitManagerX {
         self.data.entry_coldplug();
     }
 
-    pub(in crate::manager) fn enumerate(&self) {
-        self.data.sms.enumerate()
-    }
-
     pub(in crate::manager) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.data.start_unit(name)
     }
@@ -130,7 +126,6 @@ pub struct UnitManager {
 
     // owned objects
     rentry: Rc<UnitRe>,
-    sms: UnitSubManagers,
     db: Rc<UnitDb>,
     rt: Rc<UnitRT>,
     load: UnitLoad,
@@ -138,6 +133,7 @@ pub struct UnitManager {
     exec: ExecSpawn,
     sigchld: Sigchld,
     notify: NotifyManager,
+    sms: UnitSubManagers,
 }
 
 impl UmIf for UnitManager {
@@ -214,10 +210,9 @@ impl UmIf for UnitManager {
         self.jm.rentry_trigger_merge(unit_id, force)
     }
 
+    ///
     fn trigger_unit(&self, lunit: &str) {
-        let unit = self.db.units_get(lunit).unwrap();
-        let cnt = self.jm.run(Some(&unit));
-        assert_ne!(cnt, 0); // something must be triggered
+        self.jm.trigger_unit(lunit)
     }
 
     /// call the exec spawn to start the child service
@@ -282,12 +277,12 @@ impl UnitManager {
     }
 
     ///
-    pub fn units_get(&self, name: &str) -> Option<Rc<Unit>> {
+    fn units_get(&self, name: &str) -> Option<Rc<Unit>> {
         self.db.units_get(name).map(|uxr| uxr.unit())
     }
 
     ///
-    pub fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<Rc<Unit>> {
+    fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<Rc<Unit>> {
         let units = self.db.units_get_all(unit_type);
         units.iter().map(|uxr| uxr.unit()).collect::<Vec<_>>()
     }
@@ -365,7 +360,7 @@ impl UnitManager {
     }
 
     /// check if there is already a stop job in process
-    pub fn has_stop_job(&self, name: &str) -> bool {
+    fn has_stop_job(&self, name: &str) -> bool {
         let u = if let Some(unit) = self.db.units_get(name) {
             unit
         } else {
@@ -391,7 +386,7 @@ impl UnitManager {
     }
 
     /// check the unit that will be triggered by {name} is in active or activating state
-    pub fn relation_active_or_pending(&self, name: &str) -> bool {
+    fn relation_active_or_pending(&self, name: &str) -> bool {
         let deps = self.db.dep_gets(name, UnitRelations::UnitTriggers);
         let mut pending: bool = false;
         for dep in deps.iter() {
@@ -405,7 +400,7 @@ impl UnitManager {
     }
 
     /// check the pid corresponding unit is the same with the unit
-    pub fn same_unit_with_pid(&self, unit: &str, pid: Pid) -> bool {
+    fn same_unit_with_pid(&self, unit: &str, pid: Pid) -> bool {
         if !process_util::valid_pid(pid) {
             return false;
         }
@@ -426,7 +421,7 @@ impl UnitManager {
         if let Some(unit) = self.load_unitx(name) {
             log::debug!("load unit success, send to job manager");
             self.jm.exec(
-                &JobConf::new(Rc::clone(&unit), JobKind::Start),
+                &JobConf::new(&unit, JobKind::Start),
                 JobMode::Replace,
                 &mut JobAffect::new(false),
             )?;
@@ -460,7 +455,7 @@ impl UnitManager {
     pub(self) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
         if let Some(unit) = self.load_unitx(name) {
             self.jm.exec(
-                &JobConf::new(Rc::clone(&unit), JobKind::Stop),
+                &JobConf::new(&unit, JobKind::Stop),
                 JobMode::Replace,
                 &mut JobAffect::new(false),
             )?;
@@ -484,7 +479,6 @@ impl UnitManager {
             events: Rc::clone(eventr),
             reli: Rc::clone(relir),
             plugins: Plugin::get_instance(),
-            sms: UnitSubManagers::new(relir),
             rentry: Rc::clone(&_rentry),
             load: UnitLoad::new(dmr, &_rentry, &_db, &_rt, lookup_path),
             db: Rc::clone(&_db),
@@ -493,9 +487,10 @@ impl UnitManager {
             exec: ExecSpawn::new(),
             sigchld: Sigchld::new(eventr, relir, &_db, &_jm),
             notify: NotifyManager::new(eventr, relir, &_rentry, &_db, &_jm),
+            sms: UnitSubManagers::new(relir),
         });
-        um.sms.set_um(&um);
         um.load.set_um(&um);
+        um.sms.set_um(&um);
         um
     }
 
@@ -633,6 +628,9 @@ impl ReStation for UnitManager {
     fn register_ex(&self) {
         // notify
         self.notify.register_ex();
+
+        // sub-manager
+        self.sms.enumerate();
     }
 
     fn entry_coldplug(&self) {
@@ -669,11 +667,11 @@ pub trait UnitMngUtil {
 ///The trait Defining Shared Behavior of sub unit-manager
 pub trait UnitManagerObj: UnitMngUtil + ReStation {
     ///
-    /* repeatable */
     fn enumerate_perpetual(&self) {}
     ///
-    /* repeatable */
-    fn enumerate(&self) {}
+    fn enumerate(&self) {
+        self.register_ex();
+    }
     ///
     fn shutdown(&self) {}
 }
@@ -1076,6 +1074,7 @@ mod tests {
         (dm, event, um)
     }
 
+    #[allow(dead_code)]
     fn setup_mount_point() -> Result<(), Errno> {
         mount_setup::mount_setup()?;
 
@@ -1095,7 +1094,8 @@ mod tests {
         };
     }
 
-    #[test]
+    // #[test]
+    #[allow(dead_code)]
     fn test_service_unit_start() {
         let ret = setup_mount_point();
         if ret.is_err() {
@@ -1119,7 +1119,8 @@ mod tests {
         log::debug!("unit stop end!");
     }
 
-    #[test]
+    // #[test]
+    #[allow(dead_code)]
     fn test_socket_unit_start_and_stop() {
         logger::init_log_with_console("test_socket_unit_start_stop", 4);
 

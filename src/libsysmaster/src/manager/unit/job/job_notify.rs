@@ -41,7 +41,7 @@ fn notify_result_start(db: &UnitDb, unit: Rc<UnitX>, atom: UnitRelationAtom) -> 
     );
     let mut configs = Vec::new();
     for other in db.dep_gets_atom(&unit, atom).iter() {
-        configs.push(JobConf::new(Rc::clone(other), JobKind::Start));
+        configs.push(JobConf::new(other, JobKind::Start));
     }
     configs
 }
@@ -60,7 +60,7 @@ fn notify_event_start(
         .iter()
     {
         if !db.dep_is_dep_atom_with(unit, UnitRelationAtom::UnitAtomAfter, other) {
-            targets.push((JobConf::new(Rc::clone(other), JobKind::Start), mode));
+            targets.push((JobConf::new(other, JobKind::Start), mode));
         }
     }
 
@@ -70,7 +70,7 @@ fn notify_event_start(
         .iter()
     {
         if !db.dep_is_dep_atom_with(unit, UnitRelationAtom::UnitAtomAfter, other) {
-            targets.push((JobConf::new(Rc::clone(other), JobKind::Start), mode));
+            targets.push((JobConf::new(other, JobKind::Start), mode));
         }
     }
 
@@ -79,7 +79,7 @@ fn notify_event_start(
         .dep_gets_atom(unit, UnitRelationAtom::UnitAtomRetroActiveStopOnStart)
         .iter()
     {
-        targets.push((JobConf::new(Rc::clone(other), JobKind::Stop), mode));
+        targets.push((JobConf::new(other, JobKind::Stop), mode));
     }
 
     targets
@@ -98,7 +98,7 @@ fn notify_event_stop(
         .dep_gets_atom(unit, UnitRelationAtom::UnitAtomRetroActiveStopOnStop)
         .iter()
     {
-        targets.push((JobConf::new(Rc::clone(other), JobKind::Stop), mode));
+        targets.push((JobConf::new(other, JobKind::Stop), mode));
     }
 
     targets
@@ -117,7 +117,7 @@ fn notify_event_reload(
         .dep_gets_atom(unit, UnitRelationAtom::UnitAtomPropagatesReloadTo)
         .iter()
     {
-        targets.push((JobConf::new(Rc::clone(other), JobKind::TryReload), mode));
+        targets.push((JobConf::new(other, JobKind::TryReload), mode));
     }
 
     targets
@@ -149,17 +149,17 @@ mod tests {
         assert_eq!(confs.len(), 0);
 
         // event: start
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let conf = JobConf::new(&unit_test1, JobKind::Start);
         let ret = job_notify_event(&db, &conf, None);
         assert_eq!(ret.len(), 0);
 
         // event: stop
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Stop);
+        let conf = JobConf::new(&unit_test1, JobKind::Stop);
         let ret = job_notify_event(&db, &conf, None);
         assert_eq!(ret.len(), 0);
 
         // event: reload
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Reload);
+        let conf = JobConf::new(&unit_test1, JobKind::Reload);
         let ret = job_notify_event(&db, &conf, None);
         assert_eq!(ret.len(), 0);
     }

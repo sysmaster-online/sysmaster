@@ -10,6 +10,7 @@ use nix::errno::Errno;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 use std::fs::{self, File};
 use std::hash::Hash;
 use std::io::Error;
@@ -125,8 +126,6 @@ impl Reliability {
 
     /// [process reentrant] recover the data
     pub fn recover(&self) {
-        self.debug_clear();
-
         // ignore last's input
         self.last.ignore_set(true);
 
@@ -279,6 +278,7 @@ impl Reliability {
         let lframe = self.last_frame();
         let lunit = self.last_unit();
 
+        log::debug!("make_consistent, lframe:{:?}, lunit{:?}.", lframe, lunit);
         self.pending.make_consistent();
         self.station.make_consistent(lframe, lunit);
         self.history.commit();
@@ -295,22 +295,24 @@ pub struct ReDb<K, V> {
     cache: RefCell<HashMap<K, V>>,
     add: RefCell<HashMap<K, V>>,
     del: RefCell<HashSet<K>>,
+    name: String,
 }
 
 impl<K, V> ReDb<K, V>
 where
-    K: 'static + Serialize + Eq + Hash + Clone,
-    V: 'static + Serialize + Clone,
+    K: 'static + Serialize + Eq + Hash + Clone + Debug,
+    V: 'static + Serialize + Clone + Debug,
 {
     /// create reliability database instance
-    pub fn new(relir: &Reliability, name: &str) -> ReDb<K, V> {
-        let db = relir.history.env().create_database(Some(name)).unwrap();
+    pub fn new(relir: &Reliability, db_name: &str) -> ReDb<K, V> {
+        let db = relir.history.env().create_database(Some(db_name)).unwrap();
         ReDb {
             ignore: RefCell::new(false),
             db,
             cache: RefCell::new(HashMap::new()),
             add: RefCell::new(HashMap::new()),
             del: RefCell::new(HashSet::new()),
+            name: String::from(db_name),
         }
     }
 
@@ -333,6 +335,9 @@ where
             return;
         }
 
+        let n = &self.name;
+        log::debug!("ReDb[{}] insert, key: {:?}, value: {:?}.", n, &k, &v);
+
         // remove "del" + insert "add"
         self.del.borrow_mut().remove(&k);
         self.add.borrow_mut().insert(k.clone(), v.clone());
@@ -347,6 +352,8 @@ where
             return;
         }
 
+        log::debug!("ReDb[{}] remove, key: {:?}.", &self.name, &k);
+
         // remove "add" + insert "del"
         self.add.borrow_mut().remove(k);
         self.del.borrow_mut().insert(k.clone());
@@ -357,7 +364,10 @@ where
 
     /// get a entry
     pub fn get(&self, k: &K) -> Option<V> {
-        self.cache.borrow().get(k).cloned()
+        let value = self.cache.borrow().get(k).cloned();
+        let n = &self.name;
+        log::debug!("ReDb[{}] get, key: {:?}, value: {:?}.", n, k, &value);
+        value
     }
 
     /// get the existence of the key
@@ -367,20 +377,26 @@ where
 
     /// get all keys
     pub fn keys(&self) -> Vec<K> {
-        self.cache
+        let keys = self
+            .cache
             .borrow()
             .iter()
             .map(|(k, _)| k.clone())
-            .collect::<_>()
+            .collect::<_>();
+        log::debug!("ReDb[{}] keys, keys: {:?}.", &self.name, &keys);
+        keys
     }
 
     /// get all entries
     pub fn entries(&self) -> Vec<(K, V)> {
-        self.cache
+        let entries = self
+            .cache
             .borrow()
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
-            .collect::<_>()
+            .collect::<_>();
+        log::debug!("ReDb[{}] entries, entries: {:?}.", &self.name, &entries);
+        entries
     }
 
     /// export all data from cache to database
@@ -443,7 +459,7 @@ pub fn reli_debug_enable_switch(enable: bool) -> Result<(), Error> {
 
 /// get the debug flag of switch
 pub fn reli_debug_get_switch() -> bool {
-    let dir_string = base::reli_dir_get().unwrap();
+    let dir_string = base::reli_dir_get().expect("guaranteed by caller.");
     let switch = Path::new(&dir_string).join(RELI_DEBUG_SWITCH_FILE);
     log::info!("reliability debug: get switch file: {:?}.", switch);
     switch.exists()

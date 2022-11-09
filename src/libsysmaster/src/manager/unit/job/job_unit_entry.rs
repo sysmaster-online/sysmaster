@@ -62,6 +62,11 @@ impl JobUnit {
 
         // finish old first
         if let Some(job) = &merge_trigger {
+            // merge attribution within the same kind
+            if job.kind() == cur_trigger.kind() {
+                cur_trigger.merge_attr(job);
+            }
+
             // finish merged job
             job.finish(JobResult::Merged);
         }
@@ -215,7 +220,7 @@ impl JobUnitData {
 
         // suspends
         /* data */
-        let old = self.suspends.insert(job.get_kind(), Rc::clone(&job));
+        let old = self.suspends.insert(job.kind(), Rc::clone(&job));
         assert_eq!(old, None);
         /* status */
         self.order = false;
@@ -293,9 +298,9 @@ impl JobUnitData {
 
         // union
         for (_, o_job) in other.suspends.iter() {
-            if let Some(job) = self.get_suspend(o_job.get_kind()) {
+            if let Some(job) = self.get_suspend(o_job.kind()) {
                 // merge other-job
-                job.merge_attr(o_job);
+                job.merge_attr(o_job); // merge attribution within the same kind
                 update_jobs.push(job);
             } else {
                 // add other-job
@@ -414,6 +419,7 @@ impl JobUnitData {
             } // the trigger one is needed to re-triggered, which could not be deleted now.
             false => {
                 self.interrupt = false;
+                self.retrigger = false;
                 self.trigger.take()
             } // it really needs to be finished, finish(delete) it.
         };
@@ -523,7 +529,7 @@ impl JobUnitData {
             return true;
         }
 
-        if job.get_kind() == JobKind::Nop {
+        if job.kind() == JobKind::Nop {
             return true;
         }
 
@@ -577,6 +583,7 @@ impl JobUnitData {
         let merge_trigger = match self.interrupt {
             true => {
                 self.interrupt = false;
+                self.retrigger = false;
                 self.trigger.take()
             } // interrupt the triggered job, trigger => the first suspend('stop' | 'restart')
             false => None,
@@ -584,7 +591,7 @@ impl JobUnitData {
 
         // the entire entry: data + status
         let next_trigger = Rc::clone(self.trigger.insert(self.sq.pop_front().unwrap())); // trigger the first suspend one
-        self.suspends.remove(&next_trigger.get_kind()); // remove the first suspend one
+        self.suspends.remove(&next_trigger.kind()); // remove the first suspend one
         self.dirty = true; // make it simple
         self.update_ready();
 
@@ -651,7 +658,7 @@ impl JobUnitData {
             // both jobs involved exist
             // the first(ready) suspend one has 'stop' ability, it's allowed. other kinds are not allowed.
             self.interrupt = matches!(
-                self.sq.front().unwrap().get_kind(),
+                self.sq.front().unwrap().kind(),
                 JobKind::Stop | JobKind::Restart
             );
         }
@@ -779,12 +786,18 @@ impl JobUnitData {
     }
 }
 
-pub(super) fn job_merge_trigger(old: JobKind) -> JobKind {
-    match old {
-        JobKind::Start | JobKind::Reload | JobKind::Restart => JobKind::Restart,
-        JobKind::Stop => JobKind::Stop,
-        JobKind::Verify => JobKind::Verify,
-        JobKind::Nop => JobKind::Nop,
+pub(super) fn job_merge_trigger_map(old: JobKind) -> JobKind {
+    if job_merge_trigger_iskeep(old) {
+        old
+    } else {
+        JobKind::Restart
+    }
+}
+
+pub(super) fn job_merge_trigger_iskeep(kind: JobKind) -> bool {
+    match kind {
+        JobKind::Start | JobKind::Reload | JobKind::Restart => false,
+        JobKind::Stop | JobKind::Verify | JobKind::Nop => true,
         _ => unreachable!("only the basic kind can be mergerd."),
     }
 }

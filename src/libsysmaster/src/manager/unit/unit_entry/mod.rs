@@ -29,6 +29,8 @@
 pub use u_entry::Unit;
 pub use u_interface::SubUnit;
 pub(in crate::manager) use uf_interface::UnitX;
+pub use uu_kill::{KillContext, KillMode};
+// pub(super) use uu_config::UnitConfigItem;
 
 // dependency:
 // uu_condition ->
@@ -42,5 +44,6 @@ mod uu_cgroup;
 mod uu_child;
 mod uu_condition;
 mod uu_config;
+mod uu_kill;
 mod uu_load;
 mod uu_ratelimit;

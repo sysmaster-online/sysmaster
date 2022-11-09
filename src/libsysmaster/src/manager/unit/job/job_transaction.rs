@@ -118,7 +118,7 @@ fn trans_expand_start(
 
     let atom = UnitRelationAtom::UnitAtomPullInStart;
     for other in db.dep_gets_atom(unit, atom).iter() {
-        let conf = JobConf::new(Rc::clone(other), JobKind::Start);
+        let conf = JobConf::new(other, JobKind::Start);
         if let Err(err) = job_trans_expand(stage, ja, db, &conf, mode) {
             // debug
             if JobErrno::BadRequest != err {
@@ -129,7 +129,7 @@ fn trans_expand_start(
 
     let atom = UnitRelationAtom::UnitAtomPullInStartIgnored;
     for other in db.dep_gets_atom(unit, atom).iter() {
-        let conf = JobConf::new(Rc::clone(other), JobKind::Start);
+        let conf = JobConf::new(other, JobKind::Start);
         if let Err(_err) = job_trans_expand(stage, ja, db, &conf, mode) {
             // debug
         }
@@ -137,7 +137,7 @@ fn trans_expand_start(
 
     let atom = UnitRelationAtom::UnitAtomPullInVerify;
     for other in db.dep_gets_atom(unit, atom).iter() {
-        let conf = JobConf::new(Rc::clone(other), JobKind::Verify);
+        let conf = JobConf::new(other, JobKind::Verify);
         if let Err(err) = job_trans_expand(stage, ja, db, &conf, mode) {
             // debug
             if JobErrno::BadRequest != err {
@@ -148,7 +148,7 @@ fn trans_expand_start(
 
     let atom = UnitRelationAtom::UnitAtomPullInStop;
     for other in db.dep_gets_atom(unit, atom).iter() {
-        let conf = JobConf::new(Rc::clone(other), JobKind::Stop);
+        let conf = JobConf::new(other, JobKind::Stop);
         if let Err(err) = job_trans_expand(stage, ja, db, &conf, mode) {
             // debug
             if JobErrno::BadRequest != err {
@@ -159,7 +159,7 @@ fn trans_expand_start(
 
     let atom = UnitRelationAtom::UnitAtomPullInStopIgnored;
     for other in db.dep_gets_atom(unit, atom).iter() {
-        let conf = JobConf::new(Rc::clone(other), JobKind::Stop);
+        let conf = JobConf::new(other, JobKind::Stop);
         if let Err(_err) = job_trans_expand(stage, ja, db, &conf, mode) {
             // debug
         }
@@ -187,7 +187,7 @@ fn trans_expand_stop(
     };
 
     for other in db.dep_gets_atom(unit, expand_atom).iter() {
-        let conf = JobConf::new(Rc::clone(other), expand_kind);
+        let conf = JobConf::new(other, expand_kind);
         if let Err(err) = job_trans_expand(stage, ja, db, &conf, mode) {
             // debug
             if JobErrno::BadRequest != err {
@@ -210,7 +210,7 @@ fn trans_expand_reload(
 
     let atom = UnitRelationAtom::UnitAtomPropagatesReloadTo;
     for other in db.dep_gets_atom(unit, atom).iter() {
-        let conf = JobConf::new(Rc::clone(other), JobKind::TryReload);
+        let conf = JobConf::new(other, JobKind::TryReload);
         if let Err(_err) = job_trans_expand(stage, ja, db, &conf, mode) {
             // debug
         }
@@ -265,7 +265,7 @@ fn trans_affect_isolate(
         }
 
         // isolate(stop)
-        let conf = JobConf::new(Rc::clone(other), JobKind::Stop);
+        let conf = JobConf::new(other, JobKind::Stop);
         if let Err(_err) = job_trans_expand(stage, ja, db, &conf, mode) {
             // debug
         }
@@ -294,7 +294,7 @@ fn trans_affect_trigger(
         }
 
         // trigger(stop)
-        let conf = JobConf::new(Rc::clone(other), JobKind::Stop);
+        let conf = JobConf::new(other, JobKind::Stop);
         if let Err(_err) = job_trans_expand(stage, ja, db, &conf, mode) {
             // debug
         }
@@ -428,7 +428,7 @@ mod tests {
         let table = JobTable::new(&db);
         let ja = JobAlloc::new(&reli, &rentry);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let conf = JobConf::new(&unit_test1, JobKind::Start);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
         assert!(ret.is_ok());
         assert_eq!(table.len(), 2);
@@ -441,7 +441,7 @@ mod tests {
         let table = JobTable::new(&db);
         let ja = JobAlloc::new(&reli, &rentry);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let conf = JobConf::new(&unit_test1, JobKind::Start);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
         assert!(ret.is_ok());
         assert_eq!(table.len(), 1);
@@ -455,7 +455,7 @@ mod tests {
         let table = JobTable::new(&db);
         let ja = JobAlloc::new(&reli, &rentry);
 
-        let conf = JobConf::new(Rc::clone(&unit_test2), JobKind::Stop);
+        let conf = JobConf::new(&unit_test2, JobKind::Stop);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
         assert!(ret.is_ok());
         assert_eq!(table.len(), 2);
@@ -468,7 +468,7 @@ mod tests {
         let table = JobTable::new(&db);
         let ja = JobAlloc::new(&reli, &rentry);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Stop);
+        let conf = JobConf::new(&unit_test1, JobKind::Stop);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
         assert!(ret.is_ok());
         assert_eq!(table.len(), 1);
@@ -482,7 +482,7 @@ mod tests {
         let table = JobTable::new(&db);
         let ja = JobAlloc::new(&reli, &rentry);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Reload);
+        let conf = JobConf::new(&unit_test1, JobKind::Reload);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
         assert!(ret.is_ok());
         assert_eq!(table.len(), 1);
@@ -495,7 +495,7 @@ mod tests {
         let table = JobTable::new(&db);
         let ja = JobAlloc::new(&reli, &rentry);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Reload);
+        let conf = JobConf::new(&unit_test1, JobKind::Reload);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
         assert!(ret.is_ok());
         assert_eq!(table.len(), 1);
@@ -509,7 +509,7 @@ mod tests {
         let table = JobTable::new(&db);
         let ja = JobAlloc::new(&reli, &rentry);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let conf = JobConf::new(&unit_test1, JobKind::Start);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
         assert!(ret.is_ok());
         let ret = job_trans_affect(&table, &ja, &db, &conf, JobMode::Replace);
@@ -523,7 +523,7 @@ mod tests {
         let table = JobTable::new(&db);
         let ja = JobAlloc::new(&reli, &rentry);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Start);
+        let conf = JobConf::new(&unit_test1, JobKind::Start);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
         assert!(ret.is_ok());
         let ret = job_trans_affect(&table, &ja, &db, &conf, JobMode::Replace);
@@ -538,7 +538,7 @@ mod tests {
         let table = JobTable::new(&db);
         let ja = JobAlloc::new(&reli, &rentry);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Stop);
+        let conf = JobConf::new(&unit_test1, JobKind::Stop);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
         assert!(ret.is_ok());
         let ret = job_trans_affect(&table, &ja, &db, &conf, JobMode::Replace);
@@ -552,7 +552,7 @@ mod tests {
         let table = JobTable::new(&db);
         let ja = JobAlloc::new(&reli, &rentry);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Stop);
+        let conf = JobConf::new(&unit_test1, JobKind::Stop);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
         assert!(ret.is_ok());
         let ret = job_trans_affect(&table, &ja, &db, &conf, JobMode::Replace);
@@ -576,7 +576,7 @@ mod tests {
         assert_eq!(ret.len(), 0);
 
         // something exists
-        let conf = JobConf::new(Rc::clone(&unit_test1), runkind);
+        let conf = JobConf::new(&unit_test1, runkind);
         let ret = job_trans_expand(&stage, &ja, &db, &conf, mode);
         assert!(ret.is_ok());
         let ret = jobs.commit(&stage, mode);
@@ -603,7 +603,7 @@ mod tests {
         assert_eq!(ret.len(), 0);
 
         // something exists
-        let conf = JobConf::new(Rc::clone(&unit_test2), runkind);
+        let conf = JobConf::new(&unit_test2, runkind);
         let ret = job_trans_expand(&stage, &ja, &db, &conf, mode);
         assert!(ret.is_ok());
         let ret = jobs.commit(&stage, mode);
