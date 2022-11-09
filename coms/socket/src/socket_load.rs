@@ -1,9 +1,9 @@
 //! socket_load mod parse the field of section Socket and add the extra dependency。
 //!
 
-use crate::socket_base::PortType;
 use crate::socket_comm::SocketUnitComm;
 use crate::socket_config::SocketConfig;
+use crate::socket_rentry::PortType;
 use libsysmaster::manager::{UnitRelations, UnitType};
 use std::path::Path;
 use std::{error::Error, rc::Rc};

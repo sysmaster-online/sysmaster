@@ -996,7 +996,7 @@ mod tests {
         let ja = JobAlloc::new(&reli, &job_rentry);
         let table = JobTable::new(&db);
 
-        let conf = JobConf::new(Rc::clone(&unit_test1), JobKind::Nop);
+        let conf = JobConf::new(&unit_test1, JobKind::Nop);
         let new = table.record_suspend(&ja, &conf, JobMode::Replace);
         assert!(new);
     }

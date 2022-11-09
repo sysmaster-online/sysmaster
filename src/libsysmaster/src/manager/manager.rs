@@ -190,6 +190,8 @@ impl Manager {
 
     /// start up
     pub fn startup(&self) -> Result<i32> {
+        self.reli.debug_clear();
+
         let restore = self.reli.enable();
         log::info!("startup with restore[{}]...", restore);
 
@@ -199,8 +201,6 @@ impl Manager {
         }
 
         // setup external connections
-        /* enumerate */
-        self.um.enumerate();
         /* register entire external events */
         self.register_ex();
         /* register entry's external events */
@@ -242,7 +242,7 @@ impl Manager {
 
     /// debug action: clear all data restored
     pub fn debug_clear_restore(&self) {
-        self.clear_restore();
+        self.reli.data_clear();
     }
 
     fn reload(&self) {
@@ -253,8 +253,6 @@ impl Manager {
         self.reli.recover();
 
         // rebuild external connections
-        /* enumerate */
-        self.um.enumerate();
         /* register entry's external events */
         self.um.entry_coldplug();
 
@@ -263,15 +261,11 @@ impl Manager {
         self.reli.clear_last_frame();
     }
 
-    fn clear_restore(&self) {
-        self.reli.data_clear();
-    }
-
     fn set_restore(&self, enable: bool) {
         match enable {
             true => self.reli.set_enable(true),
             false => {
-                self.clear_restore();
+                self.reli.data_clear();
                 self.reboot(RebootMode::RB_AUTOBOOT);
             }
         }
@@ -368,21 +362,6 @@ impl Manager {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn enumerate(&self) {
-        self.um.enumerate()
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
-        self.um.start_unit(name)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
-        self.um.stop_unit(name)
-    }
-
-    #[allow(dead_code)]
     pub(crate) fn clear_jobs(&self) -> Result<(), Error> {
         todo!()
     }
@@ -429,26 +408,6 @@ impl Manager {
     }
 
     #[allow(dead_code)]
-    pub(super) fn recover(&self) {
-        self.reli.recover();
-    }
-
-    #[allow(dead_code)]
-    pub(super) fn entry_coldplug(&self) {
-        self.um.entry_coldplug();
-    }
-
-    #[allow(dead_code)]
-    pub(super) fn enable_restore(&self) {
-        self.reli.set_enable(true);
-    }
-
-    #[allow(dead_code)]
-    pub(super) fn get_restore(&self) -> bool {
-        self.reli.enable()
-    }
-
-    #[allow(dead_code)]
     pub(super) fn ok(&self) {
         self.set_state(State::Ok);
     }
@@ -456,11 +415,6 @@ impl Manager {
     #[allow(dead_code)]
     pub(super) fn check_finished(&self) -> Result<(), Error> {
         todo!()
-    }
-
-    #[allow(dead_code)]
-    fn entry_clear(&self) {
-        self.um.entry_clear();
     }
 
     fn set_state(&self, state: State) {
@@ -495,7 +449,7 @@ mod tests {
 
         // new
         let manager = Manager::new(Mode::System, Action::Run);
-        manager.clear_restore(); // clear all data
+        manager.reli.data_clear(); // clear all data
 
         // startup
         let ret = manager.startup();

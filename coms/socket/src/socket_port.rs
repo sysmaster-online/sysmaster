@@ -2,9 +2,9 @@
 //!
 
 use crate::{
-    socket_base::PortType,
     socket_comm::SocketUnitComm,
     socket_config::{SocketAddress, SocketConfig, SocketPortConf},
+    socket_rentry::PortType,
 };
 use libutils::{fd_util, io_util, socket_util};
 use nix::{
@@ -64,7 +64,7 @@ impl SocketPort {
             return Ok(());
         }
 
-        let port_fd = match self.p_conf.p_type() {
+        let fd = match self.p_conf.p_type() {
             PortType::Socket => {
                 let flag = SockFlag::SOCK_CLOEXEC | SockFlag::SOCK_NONBLOCK;
 
@@ -75,24 +75,33 @@ impl SocketPort {
         };
 
         if update {
-            let ret = self.comm.reli().fd_cloexec(port_fd, false);
+            let ret = self.comm.reli().fd_cloexec(fd, false);
             if ret.is_err() {
                 // error
-                self.close();
+                self.close(update);
                 return ret;
             }
         }
-        self.set_fd(port_fd);
+        self.set_fd(fd);
 
         Ok(())
     }
 
-    pub(super) fn close(&self) {
-        if self.fd() < 0 {
+    pub(super) fn close(&self, update: bool) {
+        let fd = self.fd();
+        if fd < 0 {
+            // debug
             return;
         }
 
-        fd_util::close(self.fd());
+        if update {
+            let ret = self.comm.reli().fd_cloexec(fd, true);
+            if ret.is_err() {
+                log::error!("close socket, remark fd[{}] failed, ret: {:?}", fd, ret);
+            }
+        }
+
+        fd_util::close(fd);
 
         match self.p_conf.p_type() {
             PortType::Socket => {
@@ -217,6 +226,10 @@ impl SocketPort {
         self.p_conf.sa()
     }
 
+    pub(super) fn listen(&self) -> &str {
+        self.p_conf.listen()
+    }
+
     fn family(&self) -> AddressFamily {
         self.p_conf.sa().family()
     }
@@ -235,8 +248,9 @@ impl fmt::Display for SocketPort {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use super::{SocketPort, SOCKET_INVALID_FD};
-    use crate::socket_base::{NetlinkProtocol, PortType};
+    use crate::socket_base::NetlinkProtocol;
     use crate::socket_comm::SocketUnitComm;
     use crate::socket_config::{SocketAddress, SocketConfig, SocketPortConf};
     use nix::sys::socket::{
@@ -254,7 +268,11 @@ mod tests {
         let config = Rc::new(SocketConfig::new(&comm));
         let sock_addr = SockaddrIn::from(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 31457));
         let socket_addr = SocketAddress::new(Box::new(sock_addr), SockType::Stream, None);
-        let p_conf = Rc::new(SocketPortConf::new(PortType::Socket, socket_addr));
+        let p_conf = Rc::new(SocketPortConf::new(
+            PortType::Socket,
+            socket_addr,
+            "0.0.0.0:31457",
+        ));
 
         let p = SocketPort::new(&comm, &config, &p_conf);
         let port = Rc::new(p);
@@ -269,7 +287,7 @@ mod tests {
 
         port.flush_accept();
         port.flush_fd();
-        port.close();
+        port.close(false);
     }
 
     #[test]
@@ -281,7 +299,11 @@ mod tests {
 
         let socket_addr = SocketAddress::new(Box::new(unix_addr), SockType::Stream, None);
         assert_eq!(socket_addr.path().unwrap(), unix_path);
-        let p_conf = Rc::new(SocketPortConf::new(PortType::Socket, socket_addr));
+        let p_conf = Rc::new(SocketPortConf::new(
+            PortType::Socket,
+            socket_addr,
+            "/tmp/test.socket",
+        ));
 
         let p = SocketPort::new(&comm, &config, &p_conf);
         let port = Rc::new(p);
@@ -296,7 +318,7 @@ mod tests {
 
         port.flush_accept();
         port.flush_fd();
-        port.close();
+        port.close(false);
     }
 
     #[test]
@@ -315,7 +337,11 @@ mod tests {
             SockType::Raw,
             Some(SockProtocol::from(family)),
         );
-        let p_conf = Rc::new(SocketPortConf::new(PortType::Socket, socket_addr));
+        let p_conf = Rc::new(SocketPortConf::new(
+            PortType::Socket,
+            socket_addr,
+            "route 0",
+        ));
 
         let p = SocketPort::new(&comm, &config, &p_conf);
         let port = Rc::new(p);
@@ -329,6 +355,6 @@ mod tests {
 
         port.flush_accept();
         port.flush_fd();
-        port.close();
+        port.close(false);
     }
 }

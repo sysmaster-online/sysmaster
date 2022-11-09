@@ -1,12 +1,11 @@
 //! socket_mng is the core of the socket unit，implement the state transition, ports management and sub child management.
 //!
 use super::{
-    socket_base::PortType,
     socket_comm::SocketUnitComm,
     socket_config::SocketConfig,
     socket_pid::SocketPid,
     socket_port::SocketPort,
-    socket_rentry::{SocketCommand, SocketRe, SocketReFrame, SocketResult, SocketState},
+    socket_rentry::{PortType, SocketCommand, SocketRe, SocketReFrame, SocketResult, SocketState},
     socket_spawn::SocketSpawn,
 };
 use libevent::EventState;
@@ -370,21 +369,18 @@ impl SocketMngData {
                 .relation_active_or_pending(self.comm.unit().id())
             {
                 if self.config.unit_ref_target().is_none() {
-                    self.rentry().set_last_frame(SocketReFrame::FdListen(true));
                     self.enter_stop_pre(SocketResult::FailureResources);
                     return;
                 }
-                match self
-                    .comm
-                    .um()
-                    .start_unit(&self.config.unit_ref_target().unwrap())
-                {
-                    Ok(_) => {}
-                    Err(_) => {
-                        self.rentry().set_last_frame(SocketReFrame::FdListen(true));
-                        self.enter_stop_pre(SocketResult::FailureResources);
-                        return;
-                    }
+                let service = self.config.unit_ref_target().unwrap();
+
+                // start corresponding *.service
+                self.rentry().set_last_frame(SocketReFrame::FdListen(false)); // protect 'start_unit'
+                let ret = self.comm.um().start_unit(&service);
+                self.rentry().set_last_frame(SocketReFrame::FdListen(true));
+                if ret.is_err() {
+                    self.enter_stop_pre(SocketResult::FailureResources);
+                    return;
                 }
             }
 
@@ -542,7 +538,7 @@ impl SocketMngData {
 
         // close
         for port in self.ports().iter() {
-            port.close();
+            port.close(true);
         }
     }
 
@@ -670,20 +666,28 @@ impl SocketMngData {
         }
     }
 
-    fn map_ports_fd(&self, rports: Vec<RawFd>) {
-        let ports = self.ports();
-        assert_eq!(rports.len(), ports.len());
+    fn map_ports_fd(&self, rports: Vec<(PortType, String, RawFd)>) {
+        assert_eq!(rports.len(), self.ports().len());
 
-        // one to one in turn
-        let mut rfds = rports;
-        for port in ports.iter() {
-            let fd = rfds.pop().unwrap();
-            port.set_fd(self.comm.reli().fd_take(fd));
+        for (p_type, listen, fd) in rports.iter() {
+            let port = self.ports_find(*p_type, listen).unwrap();
+            port.set_fd(self.comm.reli().fd_take(*fd));
         }
     }
 
     fn mports(&self) -> Vec<Rc<SocketMngPort>> {
         self.ports.borrow().iter().map(Rc::clone).collect::<_>()
+    }
+
+    fn ports_find(&self, p_type: PortType, listen: &str) -> Option<Rc<SocketPort>> {
+        let ports = self.ports();
+        for port in ports.iter() {
+            if port.p_type() == p_type && port.listen() == listen {
+                return Some(Rc::clone(port));
+            }
+        }
+
+        None
     }
 
     fn ports(&self) -> Vec<Rc<SocketPort>> {
@@ -706,7 +710,10 @@ impl SocketMngData {
             *self.control_cmd_type.borrow(),
             self.control_command.borrow().len(),
             *self.refused.borrow(),
-            self.ports().iter().map(|p| p.fd()).collect::<_>(),
+            self.ports()
+                .iter()
+                .map(|p| (p.p_type(), String::from(p.listen()), p.fd()))
+                .collect::<_>(),
         );
     }
 
@@ -804,7 +811,7 @@ impl Source for SocketMngPort {
             ReliLastFrame::SubManager as u32,
             UnitType::UnitSocket as u32,
         );
-        self.rentry().set_last_frame(SocketReFrame::FdListen(false));
+        self.rentry().set_last_frame(SocketReFrame::FdListen(true));
         let ret = self.dispatch_io();
         self.rentry().clear_last_frame();
         self.reli().clear_last_frame();
@@ -837,7 +844,6 @@ impl SocketMngPort {
             && self.port.p_type() == PortType::Socket
             && self.port.sa().can_accept()
         {
-            self.rentry().set_last_frame(SocketReFrame::FdListen(true));
             let afd = self
                 .port
                 .accept()

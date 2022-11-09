@@ -74,10 +74,6 @@ impl UnitManagerX {
         self.data.entry_coldplug();
     }
 
-    pub(in crate::manager) fn enumerate(&self) {
-        self.data.sms.enumerate()
-    }
-
     pub(in crate::manager) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.data.start_unit(name)
     }
@@ -130,7 +126,6 @@ pub struct UnitManager {
 
     // owned objects
     rentry: Rc<UnitRe>,
-    sms: UnitSubManagers,
     db: Rc<UnitDb>,
     rt: Rc<UnitRT>,
     load: UnitLoad,
@@ -138,6 +133,7 @@ pub struct UnitManager {
     exec: ExecSpawn,
     sigchld: Sigchld,
     notify: NotifyManager,
+    sms: UnitSubManagers,
 }
 
 /// the declaration "pub(self)" is for identification only.
@@ -149,9 +145,7 @@ impl UnitManager {
 
     ///
     pub fn trigger_unit(&self, lunit: &str) {
-        let unit = self.db.units_get(lunit).unwrap();
-        let cnt = self.jm.run(Some(&unit));
-        assert_ne!(cnt, 0); // something must be triggered
+        self.jm.trigger_unit(lunit)
     }
 
     /// add pid and its correspond unit to
@@ -363,7 +357,7 @@ impl UnitManager {
         if let Some(unit) = self.load_unitx(name) {
             log::debug!("load unit success, send to job manager");
             self.jm.exec(
-                &JobConf::new(Rc::clone(&unit), JobKind::Start),
+                &JobConf::new(&unit, JobKind::Start),
                 JobMode::Replace,
                 &mut JobAffect::new(false),
             )?;
@@ -397,7 +391,7 @@ impl UnitManager {
     pub(self) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
         if let Some(unit) = self.load_unitx(name) {
             self.jm.exec(
-                &JobConf::new(Rc::clone(&unit), JobKind::Stop),
+                &JobConf::new(&unit, JobKind::Stop),
                 JobMode::Replace,
                 &mut JobAffect::new(false),
             )?;
@@ -421,7 +415,6 @@ impl UnitManager {
             events: Rc::clone(eventr),
             reli: Rc::clone(relir),
             plugins: Plugin::get_instance(),
-            sms: UnitSubManagers::new(relir),
             rentry: Rc::clone(&_rentry),
             load: UnitLoad::new(dmr, &_rentry, &_db, &_rt, lookup_path),
             db: Rc::clone(&_db),
@@ -430,9 +423,10 @@ impl UnitManager {
             exec: ExecSpawn::new(),
             sigchld: Sigchld::new(eventr, relir, &_db, &_jm),
             notify: NotifyManager::new(eventr, relir, &_rentry, &_db, &_jm),
+            sms: UnitSubManagers::new(relir),
         });
-        um.sms.set_um(&um);
         um.load.set_um(&um);
+        um.sms.set_um(&um);
         um
     }
 
@@ -570,6 +564,9 @@ impl ReStation for UnitManager {
     fn register_ex(&self) {
         // notify
         self.notify.register_ex();
+
+        // sub-manager
+        self.sms.enumerate();
     }
 
     fn entry_coldplug(&self) {
@@ -606,11 +603,11 @@ pub trait UnitMngUtil {
 ///The trait Defining Shared Behavior of sub unit-manager
 pub trait UnitManagerObj: UnitMngUtil + ReStation {
     ///
-    /* repeatable */
     fn enumerate_perpetual(&self) {}
     ///
-    /* repeatable */
-    fn enumerate(&self) {}
+    fn enumerate(&self) {
+        self.register_ex();
+    }
     ///
     fn shutdown(&self) {}
 }
