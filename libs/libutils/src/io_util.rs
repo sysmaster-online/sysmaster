@@ -1,3 +1,4 @@
+//!
 use nix::{
     errno::Errno,
     libc,
@@ -30,6 +31,7 @@ fn ppoll_timeout(fds: &mut [PollFd], timeout: Option<TimeSpec>) -> Result<libc::
     Ok(ret)
 }
 
+///
 pub fn wait_for_events(fd: RawFd, event: PollFlags, time_out: i64) -> Result<libc::c_int, Errno> {
     let poll_fd = PollFd::new(fd, event);
     let time_spec = TimeSpec::from_timespec(libc::timespec {

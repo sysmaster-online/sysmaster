@@ -79,10 +79,11 @@ impl TargetMng {
     }
 
     fn state_notify(&self, new_state: TargetState, old_state: TargetState) {
+        let unit = self.comm.owner().unwrap();
         if new_state != old_state {
             log::debug!(
                 "{} original state[{:?}] ->new state[{:?}]",
-                self.comm.unit().id(),
+                unit.id(),
                 old_state,
                 new_state,
             );
@@ -90,7 +91,7 @@ impl TargetMng {
 
         let old_unit_state = old_state.to_unit_state();
         let new_unit_state = new_state.to_unit_state();
-        self.comm.unit().notify(
+        unit.notify(
             old_unit_state,
             new_unit_state,
             UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,

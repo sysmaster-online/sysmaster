@@ -1,6 +1,6 @@
 use super::target_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::target_comm::TargetUmComm;
-use libsysmaster::manager::{UnitManager, UnitManagerObj, UnitMngUtil};
+use libsysmaster::manager::{UmIf, UnitManagerObj, UnitMngUtil};
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use std::rc::Rc;
@@ -33,8 +33,8 @@ impl ReStation for TargetManager {
 }
 
 impl UnitMngUtil for TargetManager {
-    fn attach_um(&self, um: Rc<UnitManager>) {
-        self.comm.attach_um(um);
+    fn attach_um(&self, um: Rc<dyn UmIf>) {
+        self.comm.attach_um(um)
     }
 
     fn attach_reli(&self, reli: Rc<Reliability>) {
@@ -42,16 +42,5 @@ impl UnitMngUtil for TargetManager {
     }
 }
 
-impl Default for TargetManager {
-    fn default() -> Self {
-        TargetManager::new()
-    }
-}
-
 use libsysmaster::declure_umobj_plugin;
-declure_umobj_plugin!(
-    TargetManager,
-    TargetManager::default,
-    PLUGIN_NAME,
-    LOG_LEVEL
-);
+declure_umobj_plugin!(TargetManager, TargetManager::new, PLUGIN_NAME, LOG_LEVEL);

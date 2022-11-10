@@ -1,9 +1,11 @@
+//!
 use nix::{
     errno::Errno,
     fcntl::AtFlags,
     sys::stat::{fstatat, SFlag},
 };
 
+///
 pub fn mount_point_fd_valid(fd: i32, file_name: &str, flags: AtFlags) -> Result<bool, Errno> {
     assert!(fd >= 0);
 

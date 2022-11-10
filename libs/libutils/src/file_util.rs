@@ -1,8 +1,11 @@
+//! the utils of the file operation
+//!
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Error;
 use std::path::Path;
 
+/// read first line from a file
 pub fn read_first_line(path: &Path) -> Result<String, Error> {
     let file = std::fs::File::open(path)?;
 

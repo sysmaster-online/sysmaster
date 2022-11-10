@@ -140,7 +140,7 @@ impl JobManager {
         self.data.coldplug_unit(unit);
     }
 
-    pub(in crate::manager::unit) fn rentry_trigger_merge(&self, unit_id: &String, force: bool) {
+    pub(in crate::manager::unit) fn rentry_trigger_merge(&self, unit_id: &str, force: bool) {
         self.data.rentry_trigger_merge(unit_id, force);
     }
 
@@ -324,7 +324,7 @@ impl JobManagerData {
         self.stat.clear();
     }
 
-    pub(self) fn rentry_trigger_merge(&self, unit_id: &String, force: bool) {
+    pub(self) fn rentry_trigger_merge(&self, unit_id: &str, force: bool) {
         // get old
         let (k_d, a_d) = (JobKind::Restart, JobAttr::new(true, true, force)); // default
         let (k_o, a_o) = self
@@ -823,11 +823,9 @@ mod tests {
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::manager::unit::data::DataManager;
     use crate::manager::unit::job::JobStage;
-    use crate::manager::unit::uload_util::UnitFile;
-    use crate::manager::unit::unit_rentry::{UnitRe, UnitRelations, UnitType};
-    use crate::plugin::Plugin;
+    use crate::manager::unit::test::test_utils;
+    use crate::manager::unit::unit_rentry::{UnitRe, UnitRelations};
     use libutils::logger;
-    use libutils::path_lookup::LookupPaths;
 
     //#[test]
     #[allow(dead_code)]
@@ -1187,22 +1185,7 @@ mod tests {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
 
-        let mut l_path = LookupPaths::new();
-        l_path.init_lookup_paths();
-        let lookup_path = Rc::new(l_path);
-        let file = Rc::new(UnitFile::new(&lookup_path));
-
-        let unit_type = UnitType::UnitService;
-        let plugins = Plugin::get_instance();
-        let subclass = plugins.create_unit_obj(unit_type).unwrap();
-        subclass.attach_reli(Rc::clone(relir));
-        Rc::new(UnitX::new(
-            dmr,
-            rentryr,
-            &file,
-            unit_type,
-            name,
-            subclass.into_unitobj(),
-        ))
+        let unitx = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
+        unitx
     }
 }

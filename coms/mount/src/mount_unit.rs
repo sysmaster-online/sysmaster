@@ -4,7 +4,7 @@
 use super::mount_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::mount_comm::MountUnitComm;
 use super::mount_mng::MountMng;
-use libsysmaster::manager::{UnitActiveState, UnitManager, UnitMngUtil, UnitObj, UnitSubClass};
+use libsysmaster::manager::{SubUnit, UmIf, UnitActiveState, UnitMngUtil};
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use nix::{sys::signal::Signal, unistd::Pid};
@@ -41,7 +41,7 @@ impl ReStation for MountUnit {
 }
 
 impl MountUnit {
-    fn new() -> MountUnit {
+    fn new(_um: Rc<dyn UmIf>) -> MountUnit {
         let _comm = Rc::new(MountUnitComm::new());
         MountUnit {
             comm: Rc::clone(&_comm),
@@ -50,7 +50,7 @@ impl MountUnit {
     }
 }
 
-impl UnitObj for MountUnit {
+impl SubUnit for MountUnit {
     fn load(&self, _paths: Vec<PathBuf>) -> libutils::Result<(), Box<dyn std::error::Error>> {
         self.comm.unit().set_ignore_on_isolate(true);
 
@@ -100,14 +100,8 @@ impl UnitObj for MountUnit {
     fn reset_failed(&self) {}
 }
 
-impl UnitSubClass for MountUnit {
-    fn into_unitobj(self: Box<Self>) -> Box<dyn UnitObj> {
-        Box::new(*self)
-    }
-}
-
 impl UnitMngUtil for MountUnit {
-    fn attach_um(&self, um: Rc<UnitManager>) {
+    fn attach_um(&self, um: Rc<dyn UmIf>) {
         self.comm.attach_um(um);
     }
 
@@ -116,11 +110,11 @@ impl UnitMngUtil for MountUnit {
     }
 }
 
-impl Default for MountUnit {
+/*impl Default for MountUnit {
     fn default() -> Self {
         MountUnit::new()
     }
-}
+}*/
 
-use libsysmaster::declure_unitobj_plugin;
-declure_unitobj_plugin!(MountUnit, MountUnit::default, PLUGIN_NAME, LOG_LEVEL);
+use libsysmaster::declure_unitobj_plugin_with_param;
+declure_unitobj_plugin_with_param!(MountUnit, MountUnit::new, PLUGIN_NAME, LOG_LEVEL);

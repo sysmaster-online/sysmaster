@@ -1,7 +1,7 @@
 use super::service_rentry::{
     NotifyState, SectionService, ServiceCommand, ServiceRe, ServiceResult, ServiceState,
 };
-use libsysmaster::manager::{Unit, UnitManager};
+use libsysmaster::manager::{UmIf, Unit};
 use libsysmaster::Reliability;
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
@@ -26,7 +26,7 @@ impl ServiceUnitComm {
         self.data.borrow_mut().attach_unit(unit);
     }
 
-    pub(super) fn attach_um(&self, um: Rc<UnitManager>) {
+    pub(super) fn attach_um(&self, um: Rc<dyn UmIf>) {
         self.umcomm.attach_um(um)
     }
 
@@ -38,7 +38,7 @@ impl ServiceUnitComm {
         self.data.borrow().unit()
     }
 
-    pub(super) fn um(&self) -> Rc<UnitManager> {
+    pub(super) fn um(&self) -> Rc<dyn UmIf> {
         self.umcomm.um()
     }
 
@@ -138,7 +138,7 @@ impl ServiceUmComm {
         }
     }
 
-    pub(super) fn attach_um(&self, um: Rc<UnitManager>) {
+    pub(super) fn attach_um(&self, um: Rc<dyn UmIf>) {
         let mut wdata = self.data.write().unwrap();
         wdata.attach_um(um);
     }
@@ -157,9 +157,9 @@ impl ServiceUmComm {
         rdata._reli()
     }
 
-    pub(super) fn um(&self) -> Rc<UnitManager> {
+    pub(super) fn um(&self) -> Rc<dyn UmIf> {
         let rdata = self.data.read().unwrap();
-        rdata.um()
+        rdata.um().unwrap()
     }
 
     pub(super) fn rentry(&self) -> Rc<ServiceRe> {
@@ -170,7 +170,7 @@ impl ServiceUmComm {
 
 struct ServiceUmCommData {
     // associated objects
-    um: Weak<UnitManager>,
+    um: Option<Rc<dyn UmIf>>,
     _reli: Weak<Reliability>,
     rentry: Option<Rc<ServiceRe>>,
 }
@@ -179,17 +179,16 @@ struct ServiceUmCommData {
 impl ServiceUmCommData {
     pub(self) fn new() -> ServiceUmCommData {
         ServiceUmCommData {
-            um: Weak::new(),
+            um: None,
             _reli: Weak::new(),
             rentry: None,
         }
     }
 
-    pub(self) fn attach_um(&mut self, um: Rc<UnitManager>) {
-        let old = self.um.clone().upgrade();
-        if old.is_none() {
+    pub(self) fn attach_um(&mut self, um: Rc<dyn UmIf>) {
+        if self.um.is_none() {
             log::debug!("ServiceUmComm attach_um action.");
-            self.um = Rc::downgrade(&um);
+            self.um = Some(um);
         }
     }
 
@@ -202,8 +201,12 @@ impl ServiceUmCommData {
         }
     }
 
-    pub(self) fn um(&self) -> Rc<UnitManager> {
-        self.um.clone().upgrade().unwrap()
+    pub(self) fn um(&self) -> Option<Rc<dyn UmIf>> {
+        if let Some(ref um) = self.um {
+            Some(Rc::clone(um))
+        } else {
+            None
+        }
     }
 
     pub(self) fn _reli(&self) -> Rc<Reliability> {

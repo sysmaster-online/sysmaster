@@ -1,3 +1,4 @@
+//!
 use nix::errno::errno;
 use nix::libc::{kill, ESRCH};
 use nix::sys::wait::{waitpid, WaitPidFlag};
@@ -11,6 +12,7 @@ use std::time::{Duration, SystemTime};
 
 use crate::file_util;
 
+///
 pub fn process_state(pid: Pid) -> Result<char, Error> {
     if pid == Pid::from_raw(0) || pid == nix::unistd::getpid() {
         return Ok('R');
@@ -42,6 +44,7 @@ pub fn process_state(pid: Pid) -> Result<char, Error> {
     Ok(p_stat[0])
 }
 
+///
 pub fn alive(pid: Pid) -> bool {
     if pid < Pid::from_raw(0) {
         return false;
@@ -66,6 +69,7 @@ pub fn alive(pid: Pid) -> bool {
     true
 }
 
+///
 pub fn valid_pid(pid: Pid) -> bool {
     if pid <= Pid::from_raw(0) {
         return false;
@@ -74,6 +78,7 @@ pub fn valid_pid(pid: Pid) -> bool {
     true
 }
 
+///
 pub fn kill_all_pids(signal: i32) -> HashSet<i32> {
     let mut pids: HashSet<i32> = HashSet::new();
     let proc_path = Path::new("/proc");
@@ -101,6 +106,7 @@ pub fn kill_all_pids(signal: i32) -> HashSet<i32> {
     pids
 }
 
+///
 pub fn wait_pids(mut pids: HashSet<i32>, timeout: u64) -> HashSet<i32> {
     let now = SystemTime::now();
     let until = now + Duration::from_micros(timeout);

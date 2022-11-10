@@ -5,8 +5,8 @@
 //! #  Overall abstraction
 //!  Unit is the basic unit abstraction of sysmaster management. Systemd originally contains 9 types. sysmaster supports the expansion of Unit into multiple types. The overall architecture is as follows:
 //! ! [avatar][../../../../docs/res/unit_c_diagram.jpg]
-//!  It contains two core objects: UnitObj, Unit and the implementation of a sub Unit.
-//!  UnitObj is the interface abstraction of subclasses, including the interfaces that subclasses must implement. It is represented by trait in trust. See ['UnitObj '] for specific definitions
+//!  It contains two core objects: SubUnit, Unit and the implementation of a sub Unit.
+//!  SubUnit is the interface abstraction of subclasses, including the interfaces that subclasses must implement. It is represented by trait in trust. See ['SubUnit'] for specific definitions
 //! #  Configuration Item Description
 //!  The unit configuration consists of three parts, which are described as follows
 //! ``` toml
@@ -19,15 +19,15 @@
 //! ##  Unit object creation
 //!   sysmaster refers to systemd. The preliminary plan includes 9 types of units. The naming rule of each type of configuration file is *. XXX. XXX refers to the specific unit type, such as service, slice, target, etc.
 //!  The following modules are included.
-//!  u_entry: The interface abstract entity of unit, which is the parent class of all units, can implement the unitObj trait object
+//!  u_entry: The interface abstract entity of unit, which is the parent class of all units, can implement the SubUnit trait object
 //!  uf_interface: The interface is an internally managed entity object that encapsulates the Unit. Only UnitX objects can be seen in sysmaster, but the Unit cannot be seen. The Unit is isolated
 //!  uu_load: Encapsulates Unitload Status
 //!  uu_child: The child maintains the parent and child processes associated with the unit. The child services associated with the unit may start the child processes. Therefore, it is necessary to maintain the processes associated with the unit.
 //!  uu_cgroup: cgroup related configurations
 //!  uu_config is the configuration of unit
 //!
-
-pub use u_entry::{Unit, UnitObj};
+pub use u_entry::Unit;
+pub use u_interface::SubUnit;
 pub(in crate::manager) use uf_interface::UnitX;
 pub use uu_kill::{KillContext, KillMode};
 // pub(super) use uu_config::UnitConfigItem;
@@ -35,8 +35,9 @@ pub use uu_kill::{KillContext, KillMode};
 // dependency:
 // uu_condition ->
 // uu_base -> {uu_config | uu_cgroup} -> {uu_load | uu_child} ->
-// u_entry -> uf_interface
+// u_entry -> {uf_interface | u_interface}
 mod u_entry;
+mod u_interface;
 mod uf_interface;
 mod uu_base;
 mod uu_cgroup;

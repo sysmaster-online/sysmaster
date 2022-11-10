@@ -360,12 +360,9 @@ mod tests {
     use super::*;
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::manager::unit::data::DataManager;
-    use crate::manager::unit::uload_util::UnitFile;
-    use crate::manager::unit::unit_rentry::UnitType;
-    use crate::plugin::Plugin;
+    use crate::manager::unit::test::test_utils;
     use crate::reliability::Reliability;
     use libutils::logger;
-    use libutils::path_lookup::LookupPaths;
 
     #[test]
     fn dep_insert() {
@@ -548,24 +545,8 @@ mod tests {
     ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-
-        let mut l_path = LookupPaths::new();
-        l_path.init_lookup_paths();
-        let lookup_path = Rc::new(l_path);
-        let file = Rc::new(UnitFile::new(&lookup_path));
-
-        let unit_type = UnitType::UnitService;
-        let plugins = Plugin::get_instance();
-        let subclass = plugins.create_unit_obj(unit_type).unwrap();
-        subclass.attach_reli(Rc::clone(relir));
-        Rc::new(UnitX::new(
-            dmr,
-            rentryr,
-            &file,
-            unit_type,
-            name,
-            subclass.into_unitobj(),
-        ))
+        let unitx = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
+        unitx
     }
 
     fn contain_unit(units: &[Rc<UnitX>], unit: &Rc<UnitX>) -> bool {

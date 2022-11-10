@@ -4,7 +4,7 @@ use std::{env, process::Command};
 
 fn main() {
     let mut config = prost_build::Config::new();
-    config.bytes(&["."]);
+    config.bytes(["."]);
     config.type_attribute(".", "#[rustfmt::skip]");
     config
         .out_dir("src/proto")
@@ -17,7 +17,7 @@ fn main() {
     let t: Vec<_> = out_dir.split("build").collect();
     println!("{:?},{:?}", s_cmd, t[0]);
     let result = Command::new(&s_cmd)
-        .args(&[&format!(" {}", t[0])])
+        .args(&[format!(" {}", t[0])])
         .status()
         .unwrap();
     println!("{:?}", result);

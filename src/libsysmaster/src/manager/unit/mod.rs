@@ -6,19 +6,20 @@
 //!  [unit_base]: Definition of basic attributes of unit related objects, such as enumeration of unit type and definition of unit dependency
 //!  [unit_datastore]: the unit object storage module is responsible for storing the unit module status.
 //!  [unit_entry]: Definition of unit related objects
-//!
+//!  [unit_manager]: Manager all Unit Instances in sysmaster
+//!  [um_interface]: Share api of unit_manager for subunit
 
 pub use data::{UnitActiveState, UnitNotifyFlags};
 pub use execute::{ExecCmdError, ExecContext, ExecFlags, ExecParameters};
 
+pub use um_interface::UmIf;
 pub use unit_base::{
     DeserializeWith, KillOperation, UnitActionError, UnitDependencyMask, UnitRef, UnitRelationAtom,
 };
-
 pub use unit_entry::{KillContext, KillMode};
-pub use unit_entry::{Unit, UnitObj};
+pub use unit_entry::{SubUnit, Unit};
 pub(super) use unit_manager::UnitManagerX;
-pub use unit_manager::{UnitManager, UnitManagerObj, UnitMngUtil, UnitSubClass};
+pub use unit_manager::{UnitManager, UnitManagerObj, UnitMngUtil};
 pub(crate) use unit_rentry::unit_name_to_type;
 pub use unit_rentry::{ExecCommand, UnitRelations, UnitType};
 
@@ -41,14 +42,17 @@ pub enum UnitErrno {
 // dependency:
 // unit_rentry -> data -> unit_base -> {uload_util} ->
 // unit_entry -> {unit_datastore -> unit_runtime} -> job ->
-// {execute | sigchld | notify} -> unit_manager
+// {execute | sigchld | notify} -> unit_manager -> um_interface
 
 mod data;
 mod execute;
 mod job;
 mod notify;
 mod sigchld;
+#[cfg(test)]
+mod test;
 mod uload_util;
+mod um_interface;
 mod unit_base;
 mod unit_datastore;
 mod unit_entry;

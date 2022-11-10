@@ -1,7 +1,7 @@
 use super::socket_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::socket_comm::SocketUmComm;
 use super::socket_rentry::SocketReFrame;
-use libsysmaster::manager::{UnitManager, UnitManagerObj, UnitMngUtil};
+use libsysmaster::manager::{UmIf, UnitManagerObj, UnitMngUtil};
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use std::rc::Rc;
@@ -81,7 +81,7 @@ impl SocketManager {
 }
 
 impl UnitMngUtil for SocketManager {
-    fn attach_um(&self, um: Rc<UnitManager>) {
+    fn attach_um(&self, um: Rc<dyn UmIf>) {
         self.comm.attach_um(um);
     }
 

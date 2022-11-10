@@ -8,6 +8,7 @@ use super::uu_condition::{
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use super::uu_ratelimit::StartLimit;
+use super::SubUnit;
 use super::{KillContext, KillMode};
 use crate::manager::unit::data::{DataManager, UnitActiveState, UnitDepConf, UnitState};
 use crate::manager::unit::uload_util::UnitFile;
@@ -44,7 +45,7 @@ pub struct Unit {
     cgroup: UeCgroup,
     conditions: Rc<UeCondition>,
     start_limit: StartLimit,
-    sub: Box<dyn UnitObj>,
+    sub: Box<dyn SubUnit>,
 }
 
 impl PartialEq for Unit {
@@ -70,75 +71,6 @@ impl Ord for Unit {
 impl Hash for Unit {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.base.id().hash(state);
-    }
-}
-///The trait Defining Shared Behavior of sub unit
-///
-/// difference sub unit ref by dynamic trait
-///
-pub trait UnitObj: ReStation {
-    ///
-    fn init(&self) {}
-
-    ///
-    fn done(&self) {}
-
-    ///
-    fn load(&self, conf: Vec<PathBuf>) -> Result<(), Box<dyn Error>>;
-
-    ///
-    fn dump(&self) {}
-
-    /// Start a Unit
-    /// Each Sub Unit need to implement its own start function
-    ///
-    fn start(&self) -> Result<(), UnitActionError> {
-        Ok(())
-    }
-
-    ///
-    // process reentrant with force
-    fn stop(&self, _force: bool) -> Result<(), UnitActionError> {
-        Ok(())
-    }
-
-    ///
-    fn reload(&self) {}
-
-    ///
-    fn kill(&self) {}
-
-    ///
-    fn release_resources(&self) {}
-
-    ///
-    fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {}
-
-    ///
-    fn reset_failed(&self) {}
-
-    ///
-    fn collect_fds(&self) -> Vec<i32> {
-        Vec::new()
-    }
-
-    ///Get the the unit state
-    ///
-    /// Every sub unit  can define self states and map to [`UnitActiveState`]
-    ///
-    fn current_active_state(&self) -> UnitActiveState;
-
-    ///
-    fn attach_unit(&self, unit: Rc<Unit>);
-
-    ///
-    fn notify_message(
-        &self,
-        _ucred: &UnixCredentials,
-        _events: &HashMap<&str, &str>,
-        _fds: Vec<i32>,
-    ) -> Result<(), ServiceError> {
-        Ok(())
     }
 }
 
@@ -180,7 +112,7 @@ impl Unit {
         dmr: &Rc<DataManager>,
         rentryr: &Rc<UnitRe>,
         filer: &Rc<UnitFile>,
-        sub: Box<dyn UnitObj>,
+        sub: Box<dyn SubUnit>,
     ) -> Rc<Unit> {
         let _base = Rc::new(UeBase::new(rentryr, String::from(name), unit_type));
         let _config = Rc::new(UeConfig::new(&_base));
@@ -599,6 +531,7 @@ impl Unit {
 mod tests {
     use super::Unit;
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::manager::unit::test::test_utils::UmIfD;
     use crate::manager::unit::unit_rentry::{UnitRe, UnitType};
     use crate::reliability::Reliability;
     use libutils::{logger, path_lookup::LookupPaths};
@@ -608,7 +541,6 @@ mod tests {
         manager::{unit::data::DataManager, unit::uload_util::UnitFile},
         plugin::Plugin,
     };
-
     fn unit_init() -> Rc<Unit> {
         logger::init_log_with_console("test_unit_entry", 4);
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
@@ -621,7 +553,10 @@ mod tests {
 
         let dm = DataManager::new();
         let plugin = Plugin::get_instance();
-        let sub_obj = plugin.create_unit_obj(UnitType::UnitService).unwrap();
+        let umifd = Rc::new(UmIfD);
+        let sub_obj = plugin
+            .create_unit_obj_with_um(UnitType::UnitService, umifd)
+            .unwrap();
         sub_obj.attach_reli(Rc::clone(&reli));
         let unit = Unit::new(
             UnitType::UnitService,
@@ -629,7 +564,7 @@ mod tests {
             &Rc::new(dm),
             &rentry,
             &Rc::new(unit_file),
-            sub_obj.into_unitobj(),
+            sub_obj,
         );
         unit
     }

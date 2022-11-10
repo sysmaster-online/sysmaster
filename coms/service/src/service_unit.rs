@@ -6,8 +6,7 @@ use super::service_mng::ServiceMng;
 use super::service_monitor::ServiceMonitor;
 use super::service_rentry::{NotifyAccess, ServiceCommand, ServiceType};
 use libsysmaster::manager::{
-    ExecContext, Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj,
-    UnitRelations, UnitSubClass,
+    ExecContext, SubUnit, UmIf, Unit, UnitActionError, UnitActiveState, UnitMngUtil, UnitRelations,
 };
 use libsysmaster::{ReStation, Reliability};
 use libutils::error::Error as ServiceError;
@@ -56,7 +55,7 @@ impl ReStation for ServiceUnit {
     }
 }
 
-impl UnitObj for ServiceUnit {
+impl SubUnit for ServiceUnit {
     fn init(&self) {
         todo!()
     }
@@ -148,7 +147,7 @@ impl UnitObj for ServiceUnit {
 }
 
 impl UnitMngUtil for ServiceUnit {
-    fn attach_um(&self, um: Rc<UnitManager>) {
+    fn attach_um(&self, um: Rc<dyn UmIf>) {
         self.comm.attach_um(um);
     }
 
@@ -157,14 +156,8 @@ impl UnitMngUtil for ServiceUnit {
     }
 }
 
-impl UnitSubClass for ServiceUnit {
-    fn into_unitobj(self: Box<Self>) -> Box<dyn UnitObj> {
-        Box::new(*self)
-    }
-}
-
 impl ServiceUnit {
-    fn new() -> ServiceUnit {
+    fn new(_um: Rc<dyn UmIf>) -> ServiceUnit {
         let comm = Rc::new(ServiceUnitComm::new());
         let config = Rc::new(ServiceConfig::new(&comm));
         let context = Rc::new(ExecContext::new());
@@ -260,11 +253,11 @@ impl ServiceUnit {
     }
 }
 
-impl Default for ServiceUnit {
+/*impl Default for ServiceUnit {
     fn default() -> Self {
         ServiceUnit::new()
     }
-}
+}*/
 
-use libsysmaster::declure_unitobj_plugin;
-declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default, PLUGIN_NAME, LOG_LEVEL);
+use libsysmaster::declure_unitobj_plugin_with_param;
+declure_unitobj_plugin_with_param!(ServiceUnit, ServiceUnit::new, PLUGIN_NAME, LOG_LEVEL);

@@ -1,3 +1,4 @@
+//!
 use std::fs::File;
 use std::io::{Error as IOError, ErrorKind, Read};
 
@@ -28,7 +29,7 @@ fn cmdline_content() -> Result<String, IOError> {
     Ok(buf)
 }
 
-// read the content from /proc/cmdline and return the value depend the key
+/// read the content from /proc/cmdline and return the value depend the key
 pub fn cmdline_get_value(key: &str) -> Result<Option<String>, Error> {
     let buf = cmdline_content()?;
 
@@ -44,7 +45,7 @@ pub fn cmdline_get_value(key: &str) -> Result<Option<String>, Error> {
     Ok(None)
 }
 
-// read the content from /proc/cmdline and return the bool value depend the key
+/// read the content from /proc/cmdline and return the bool value depend the key
 pub fn proc_cmdline_get_bool(key: &str) -> Result<bool, Error> {
     let val = cmdline_get_value(key)?;
 

@@ -1,7 +1,9 @@
+//!
 use std::env;
 
 use crate::Error;
 
+///
 pub fn env_path() -> Result<String, Error> {
     let out_dir = match env::var("OUT_DIR") {
         Ok(v) => v,

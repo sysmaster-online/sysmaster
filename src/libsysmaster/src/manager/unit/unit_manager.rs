@@ -4,10 +4,10 @@ use super::notify::NotifyManager;
 use super::sigchld::Sigchld;
 use super::unit_base::{UnitDependencyMask, UnitRelationAtom};
 use super::unit_datastore::UnitDb;
-use super::unit_entry::{Unit, UnitObj, UnitX};
+use super::unit_entry::{Unit, UnitX};
 use super::unit_rentry::{ExecCommand, JobMode, UnitLoadState, UnitRe, UnitType};
 use super::unit_runtime::UnitRT;
-use super::{ExecContext, UnitActionError};
+use super::{ExecContext, UmIf, UnitActionError};
 use crate::manager::pre_install::{Install, PresetMode};
 use crate::manager::rentry::ReliLastFrame;
 use crate::manager::table::{TableOp, TableSubscribe};
@@ -22,7 +22,7 @@ use libutils::Result;
 use nix::unistd::Pid;
 use std::convert::TryFrom;
 use std::io::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 use unit_load::UnitLoad;
@@ -136,83 +136,37 @@ pub struct UnitManager {
     sms: UnitSubManagers,
 }
 
-/// the declaration "pub(self)" is for identification only.
-impl UnitManager {
+impl UmIf for UnitManager {
+    /// get the unit the has atom relation with the unit
+    fn get_dependency_list(&self, unit_name: &str, atom: UnitRelationAtom) -> Vec<Rc<Unit>> {
+        self.get_dependency_list(unit_name, atom)
+    }
+    /// check the unit s_u_name and t_u_name have atom relation
+    fn unit_has_dependecy(&self, s_u_name: &str, atom: UnitRelationAtom, t_u_name: &str) -> bool {
+        self.unit_has_dependecy(s_u_name, atom, t_u_name)
+    }
+
+    ///add a unit dependency to th unit deplist
+    /// can called by sub unit
+    /// sub unit add some default dependency
     ///
-    pub fn rentry_trigger_merge(&self, unit_id: &String, force: bool) {
-        self.jm.rentry_trigger_merge(unit_id, force)
-    }
-
-    ///
-    pub fn trigger_unit(&self, lunit: &str) {
-        self.jm.trigger_unit(lunit)
-    }
-
-    /// add pid and its correspond unit to
-    pub fn child_watch_pid(&self, id: &str, pid: Pid) {
-        self.db.child_add_watch_pid(id, pid)
-    }
-
-    /// add all the pid of unit id, read pids from cgroup path.
-    pub fn child_watch_all_pids(&self, id: &str) {
-        self.db.child_watch_all_pids(id)
-    }
-
-    /// delete the pid from the db
-    pub fn child_unwatch_pid(&self, id: &str, pid: Pid) {
-        self.db.child_unwatch_pid(id, pid)
-    }
-
-    ///
-    pub fn units_get(&self, name: &str) -> Option<Rc<Unit>> {
-        self.db.units_get(name).map(|uxr| uxr.unit())
-    }
-
-    ///
-    pub fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<Rc<Unit>> {
-        let units = self.db.units_get_all(unit_type);
-        units.iter().map(|uxr| uxr.unit()).collect::<Vec<_>>()
-    }
-
-    /// call the exec spawn to start the child service
-    pub fn exec_spawn(
+    fn unit_add_dependency(
         &self,
-        unit: &Unit,
-        cmdline: &ExecCommand,
-        params: &ExecParameters,
-        ctx: Rc<ExecContext>,
-    ) -> Result<Pid, ExecCmdError> {
-        self.exec.spawn(unit, cmdline, params, ctx)
-    }
-
-    ///
-    pub fn load_unit(&self, name: &str) -> Option<Rc<Unit>> {
-        self.load_unitx(name).map(|uxr| uxr.unit())
+        unit_name: &str,
+        relation: UnitRelations,
+        target_name: &str,
+        add_ref: bool,
+        mask: UnitDependencyMask,
+    ) -> Result<(), UnitActionError> {
+        self.unit_add_dependency(unit_name, relation, target_name, add_ref, mask)
     }
 
     /// load the unit for reference name
-    pub fn load_unit_success(&self, name: &str) -> bool {
-        if let Some(_unit) = self.load_unitx(name) {
-            return true;
-        }
-
-        false
+    fn load_unit_success(&self, name: &str) -> bool {
+        self.load_unit_success(name)
     }
 
-    /// load the unit of the dependency UnitType
-    pub fn load_related_unit_success(&self, name: &str, unit_type: UnitType) -> bool {
-        let stem_name = Path::new(name).file_stem().unwrap().to_str().unwrap();
-        let relate_name = format!("{}.{}", stem_name, String::from(unit_type));
-
-        if let Some(_unit) = self.load_unitx(&relate_name) {
-            return true;
-        }
-
-        false
-    }
-
-    /// check the unit active state of of reference name
-    pub fn unit_enabled(&self, name: &str) -> Result<(), UnitActionError> {
+    fn unit_enabled(&self, name: &str) -> Result<(), UnitActionError> {
         let u = if let Some(unit) = self.db.units_get(name) {
             unit
         } else {
@@ -231,13 +185,124 @@ impl UnitManager {
         Ok(())
     }
 
-    /// check the unit s_u_name and t_u_name have atom relation
-    pub fn unit_has_dependecy(
+    fn has_stop_job(&self, name: &str) -> bool {
+        self.has_stop_job(name)
+    }
+    /// check the unit that will be triggered by {name} is in active or activating state
+    fn relation_active_or_pending(&self, name: &str) -> bool {
+        self.relation_active_or_pending(name)
+    }
+
+    /// start the unit
+    fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+        self.start_unit(name)
+    }
+
+    fn events(&self) -> Rc<Events> {
+        self.events()
+    }
+
+    fn child_unwatch_pid(&self, id: &str, pid: Pid) {
+        self.child_unwatch_pid(id, pid)
+    }
+
+    fn rentry_trigger_merge(&self, unit_id: &str, force: bool) {
+        self.jm.rentry_trigger_merge(unit_id, force)
+    }
+
+    ///
+    fn trigger_unit(&self, lunit: &str) {
+        self.jm.trigger_unit(lunit)
+    }
+
+    /// call the exec spawn to start the child service
+    fn exec_spawn(
         &self,
-        s_u_name: &str,
-        atom: UnitRelationAtom,
-        t_u_name: &str,
-    ) -> bool {
+        unit: &Unit,
+        cmdline: &ExecCommand,
+        params: &ExecParameters,
+        ctx: Rc<ExecContext>,
+    ) -> Result<Pid, ExecCmdError> {
+        self.exec.spawn(unit, cmdline, params, ctx)
+    }
+
+    fn child_watch_pid(&self, id: &str, pid: Pid) {
+        self.child_watch_pid(id, pid)
+    }
+
+    fn child_watch_all_pids(&self, id: &str) {
+        self.child_watch_all_pids(id)
+    }
+
+    fn notify_socket(&self) -> Option<PathBuf> {
+        self.notify_socket()
+    }
+
+    fn same_unit_with_pid(&self, unit: &str, pid: Pid) -> bool {
+        self.same_unit_with_pid(unit, pid)
+    }
+
+    fn collect_socket_fds(&self, name: &str) -> Vec<i32> {
+        self.collect_socket_fds(name)
+    }
+
+    fn load_unit(&self, name: &str) -> Option<Rc<Unit>> {
+        self.load_unit(name)
+    }
+
+    fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<Rc<Unit>> {
+        self.units_get_all(unit_type)
+    }
+
+    fn units_get(&self, name: &str) -> Option<Rc<Unit>> {
+        self.units_get(name)
+    }
+}
+
+/// the declaration "pub(self)" is for identification only.
+impl UnitManager {
+    /// add pid and its correspond unit to
+    fn child_watch_pid(&self, id: &str, pid: Pid) {
+        self.db.child_add_watch_pid(id, pid)
+    }
+
+    /// add all the pid of unit id, read pids from cgroup path.
+    fn child_watch_all_pids(&self, id: &str) {
+        self.db.child_watch_all_pids(id)
+    }
+
+    /// delete the pid from the db
+    fn child_unwatch_pid(&self, id: &str, pid: Pid) {
+        self.db.child_unwatch_pid(id, pid)
+    }
+
+    ///
+    fn units_get(&self, name: &str) -> Option<Rc<Unit>> {
+        self.db.units_get(name).map(|uxr| uxr.unit())
+    }
+
+    ///
+    fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<Rc<Unit>> {
+        let units = self.db.units_get_all(unit_type);
+        units.iter().map(|uxr| uxr.unit()).collect::<Vec<_>>()
+    }
+
+    ///
+    fn load_unit(&self, name: &str) -> Option<Rc<Unit>> {
+        self.load_unitx(name).map(|uxr| uxr.unit())
+    }
+
+    /// load the unit for reference name
+    fn load_unit_success(&self, name: &str) -> bool {
+        if let Some(_unit) = self.load_unitx(name) {
+            return true;
+        }
+
+        false
+    }
+
+    /// check the unit s_u_name and t_u_name have atom relation
+    fn unit_has_dependecy(&self, s_u_name: &str, atom: UnitRelationAtom, t_u_name: &str) -> bool {
         let s_unit = if let Some(s_unit) = self.db.units_get(s_u_name) {
             s_unit
         } else {
@@ -282,7 +347,7 @@ impl UnitManager {
     }
 
     /// get the unit the has atom relation with the unit
-    pub fn get_dependency_list(&self, unit_name: &str, atom: UnitRelationAtom) -> Vec<Rc<Unit>> {
+    fn get_dependency_list(&self, unit_name: &str, atom: UnitRelationAtom) -> Vec<Rc<Unit>> {
         let s_unit = if let Some(unit) = self.db.units_get(unit_name) {
             unit
         } else {
@@ -295,7 +360,7 @@ impl UnitManager {
     }
 
     /// check if there is already a stop job in process
-    pub fn has_stop_job(&self, name: &str) -> bool {
+    fn has_stop_job(&self, name: &str) -> bool {
         let u = if let Some(unit) = self.db.units_get(name) {
             unit
         } else {
@@ -306,7 +371,7 @@ impl UnitManager {
     }
 
     /// return the fds that trigger the unit {name};
-    pub fn collect_socket_fds(&self, name: &str) -> Vec<i32> {
+    fn collect_socket_fds(&self, name: &str) -> Vec<i32> {
         let deps = self.db.dep_gets(name, UnitRelations::UnitTriggeredBy);
         let mut fds = Vec::new();
         for dep in deps.iter() {
@@ -321,7 +386,7 @@ impl UnitManager {
     }
 
     /// check the unit that will be triggered by {name} is in active or activating state
-    pub fn relation_active_or_pending(&self, name: &str) -> bool {
+    fn relation_active_or_pending(&self, name: &str) -> bool {
         let deps = self.db.dep_gets(name, UnitRelations::UnitTriggers);
         let mut pending: bool = false;
         for dep in deps.iter() {
@@ -335,7 +400,7 @@ impl UnitManager {
     }
 
     /// check the pid corresponding unit is the same with the unit
-    pub fn same_unit_with_pid(&self, unit: &str, pid: Pid) -> bool {
+    fn same_unit_with_pid(&self, unit: &str, pid: Pid) -> bool {
         if !process_util::valid_pid(pid) {
             return false;
         }
@@ -352,8 +417,7 @@ impl UnitManager {
         false
     }
 
-    /// start the unit
-    pub fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+    fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         if let Some(unit) = self.load_unitx(name) {
             log::debug!("load unit success, send to job manager");
             self.jm.exec(
@@ -369,7 +433,7 @@ impl UnitManager {
     }
 
     /// return the notify path
-    pub fn notify_socket(&self) -> Option<PathBuf> {
+    fn notify_socket(&self) -> Option<PathBuf> {
         self.notify.notify_sock()
     }
 
@@ -594,7 +658,7 @@ impl ReStation for UnitManager {
 /// the trait used for attach UnitManager to sub unit
 pub trait UnitMngUtil {
     /// the method of attach to UnitManager to sub unit
-    fn attach_um(&self, um: Rc<UnitManager>);
+    fn attach_um(&self, um: Rc<dyn UmIf>);
 
     /// the method of attach to Reliability to sub unit
     fn attach_reli(&self, reli: Rc<Reliability>);
@@ -631,28 +695,10 @@ macro_rules! declure_umobj_plugin {
 }
 
 /// the trait used for translate to UnitObj
-pub trait UnitSubClass: UnitObj + UnitMngUtil {
+/*pub trait UnitSubClass: SubUnit + UnitMngUtil {
     /// the method of translate to UnitObj
-    fn into_unitobj(self: Box<Self>) -> Box<dyn UnitObj>;
-}
-
-/// #[macro_use]
-/// the macro for create a sub unit instance
-#[macro_export]
-macro_rules! declure_unitobj_plugin {
-    ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {
-        /// method for create the unit instance
-        #[no_mangle]
-        pub fn __unit_obj_create() -> *mut dyn $crate::manager::UnitSubClass {
-            logger::init_log_with_default($name, $level);
-            let construcotr: fn() -> $unit_type = $constructor;
-
-            let obj = construcotr();
-            let boxed: Box<dyn $crate::manager::UnitSubClass> = Box::new(obj);
-            Box::into_raw(boxed)
-        }
-    };
-}
+    fn into_unitobj(self: Box<Self>) -> Box<dyn SubUnit>;
+}*/
 
 mod unit_submanager {
     use super::{UnitManager, UnitManagerObj};
@@ -923,7 +969,8 @@ mod unit_load {
                 name
             );
             let um = self.um();
-            let subclass = match um.plugins.create_unit_obj(unit_type) {
+            let um_rc = Rc::clone(&um);
+            let subclass = match um.plugins.create_unit_obj_with_um(unit_type, um_rc) {
                 Ok(sub) => sub,
                 Err(_e) => {
                     log::error!("Failed to create unit_obj!{}", _e);
@@ -941,7 +988,7 @@ mod unit_load {
                 &self.file,
                 unit_type,
                 name,
-                subclass.into_unitobj(),
+                subclass,
             )))
         }
 

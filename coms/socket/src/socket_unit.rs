@@ -11,8 +11,7 @@ use crate::{
     socket_mng::SocketMng,
 };
 use libsysmaster::manager::{
-    ExecContext, Unit, UnitActionError, UnitActiveState, UnitManager, UnitMngUtil, UnitObj,
-    UnitSubClass,
+    ExecContext, SubUnit, UmIf, Unit, UnitActionError, UnitActiveState, UnitMngUtil,
 };
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
@@ -55,7 +54,7 @@ impl ReStation for SocketUnit {
     }
 }
 
-impl UnitObj for SocketUnit {
+impl SubUnit for SocketUnit {
     fn load(&self, paths: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
         log::debug!("socket begin to load conf file");
         self.config.load(paths, true)?;
@@ -118,7 +117,7 @@ impl UnitObj for SocketUnit {
 
 // attach the UnitManager for weak reference
 impl UnitMngUtil for SocketUnit {
-    fn attach_um(&self, um: Rc<UnitManager>) {
+    fn attach_um(&self, um: Rc<dyn UmIf>) {
         self.comm.attach_um(um);
     }
 
@@ -127,14 +126,8 @@ impl UnitMngUtil for SocketUnit {
     }
 }
 
-impl UnitSubClass for SocketUnit {
-    fn into_unitobj(self: Box<Self>) -> Box<dyn UnitObj> {
-        Box::new(*self)
-    }
-}
-
 impl SocketUnit {
-    fn new() -> SocketUnit {
+    fn new(_um: Rc<dyn UmIf>) -> SocketUnit {
         let context = Rc::new(ExecContext::new());
         let _comm = Rc::new(SocketUnitComm::new());
         let _config = Rc::new(SocketConfig::new(&_comm));
@@ -147,12 +140,6 @@ impl SocketUnit {
     }
 }
 
-impl Default for SocketUnit {
-    fn default() -> Self {
-        SocketUnit::new()
-    }
-}
-
 // define the method to create the instance of the unit
-use libsysmaster::declure_unitobj_plugin;
-declure_unitobj_plugin!(SocketUnit, SocketUnit::default, PLUGIN_NAME, LOG_LEVEL);
+use libsysmaster::declure_unitobj_plugin_with_param;
+declure_unitobj_plugin_with_param!(SocketUnit, SocketUnit::new, PLUGIN_NAME, LOG_LEVEL);
