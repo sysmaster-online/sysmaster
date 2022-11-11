@@ -125,6 +125,10 @@ impl SocketMng {
     pub(super) fn collect_fds(&self) -> Vec<i32> {
         self.data.collect_fds()
     }
+
+    pub(super) fn build_ports(&self) {
+        self.data.build_ports(&self.data)
+    }
 }
 
 struct SocketMngData {
@@ -163,7 +167,7 @@ impl SocketMngData {
             control_command: RefCell::new(Vec::new()),
             refused: RefCell::new(0),
         });
-        mng.build_ports(configr, &mng);
+
         mng
     }
 
@@ -658,9 +662,9 @@ impl SocketMngData {
         *self.result.borrow_mut() = res;
     }
 
-    fn build_ports(&self, configr: &Rc<SocketConfig>, mng: &Rc<SocketMngData>) {
-        for p_conf in configr.ports().iter() {
-            let port = Rc::new(SocketPort::new(&self.comm, configr, p_conf));
+    fn build_ports(&self, mng: &Rc<SocketMngData>) {
+        for p_conf in self.config.ports().iter() {
+            let port = Rc::new(SocketPort::new(&self.comm, &self.config, p_conf));
             let mport = Rc::new(SocketMngPort::new(mng, port));
             self.ports.borrow_mut().push(mport);
         }

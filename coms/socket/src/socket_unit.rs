@@ -65,6 +65,8 @@ impl SubUnit for SocketUnit {
             return ret;
         }
 
+        self.mng.build_ports();
+
         self.load.socket_verify()
     }
 
