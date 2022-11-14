@@ -1,9 +1,14 @@
 //!
 
+#[macro_use]
+extern crate lazy_static;
+
+mod core;
+
 use libc::c_int;
-use libsysmaster::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
-use libsysmaster::mount::mount_setup;
-use libsysmaster::{self};
+use crate::core::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
+use crate::core::mount::mount_setup;
+use crate::core::reliability;
 use libutils::logger::{self};
 use log::{self};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -12,6 +17,8 @@ use std::convert::TryFrom;
 use std::env::{self};
 use std::error::Error;
 use std::ffi::CString;
+
+
 
 fn main() -> Result<(), Box<dyn Error>> {
     logger::init_log_with_console("sysmaster", 4);
@@ -29,8 +36,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         format!("failed to mount mount point, errno: {}", e)
     })?;
 
-    libsysmaster::reli_dir_prepare().expect("reliability directory prepare failed.");
-    let switch = libsysmaster::reli_debug_get_switch();
+    reliability::reli_dir_prepare().expect("reliability directory prepare failed.");
+    let switch = reliability::reli_debug_get_switch();
     log::info!("sysmaster initialize with switch: {}.", switch);
 
     initialize_runtime(switch)?;

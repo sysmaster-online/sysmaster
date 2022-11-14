@@ -3,11 +3,25 @@ use super::{
     sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
     UnitFile,
 };
-use crate::manager::MngErrno;
+
 use http::StatusCode;
 use libutils::Result;
 use std::io::Error;
 use std::rc::Rc;
+
+
+/// error number of manager
+#[derive(Debug)]
+pub enum ExecCmdErrno {
+    /// invalid input
+    Input,
+    /// not existed
+    NotExisted,
+    /// Internal error
+    Internal,
+    /// not supported
+    NotSupported,
+}
 
 pub(crate) trait Executer {
     /// deal Command，return Response
@@ -17,9 +31,9 @@ pub(crate) trait Executer {
 /// ExecuterAction
 pub trait ExecuterAction {
     /// start the unit_name
-    fn start(&self, unit_name: &str) -> Result<(), MngErrno>;
+    fn start(&self, unit_name: &str) -> Result<(), ExecCmdErrno>;
     /// stop the unit_name
-    fn stop(&self, unit_name: &str) -> Result<(), MngErrno>;
+    fn stop(&self, unit_name: &str) -> Result<(), ExecCmdErrno>;
     /// suspend host
     fn suspend(&self) -> Result<i32>;
     /// poweroff host

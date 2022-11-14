@@ -28,3 +28,7 @@ dataStore：保存系统中所有加载的unit对象，实时更新状态
 eventEngine：事件驱动引擎，接收外部事件，驱动unit状态机
 jobEngine：工作任务引擎，unit状态的变化，通过job驱动，job支持事务的概念，支持会滚机制，保障unit状态迁移的原子性。
 potoServer：监听接收 pctrl的命令，执行对应的unit动作。
+
+## 源码目录结构
+
+coms:SubUnit 目录

@@ -1,11 +1,8 @@
 //! test unit signal
-use libsysmaster::manager::{Action, Manager, Mode};
-use std::env;
 
-use libutils::logger;
 
 fn main() {
-    logger::init_log_with_console("test_unit_signal", 4);
+    /*logger::init_log_with_console("test_unit_signal", 4);
     let out_dir = env::var("LD_LIBRARY_PATH");
     let _tmp_str = out_dir.unwrap();
     let _tmp_str_v = _tmp_str.split(':').collect::<Vec<_>>()[0];
@@ -23,5 +20,5 @@ fn main() {
 
     manager.startup().unwrap();
 
-    log::debug!("event running");
+    log::debug!("event running");*/
 }
