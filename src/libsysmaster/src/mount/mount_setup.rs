@@ -37,13 +37,15 @@ lazy_static! {
         //     options: None,
         //     flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
         // });
-        // table.push(MountPoint {
-        //     source: String::from("devtmpfs"),
-        //     target: String::from("/dev"),
-        //     fs_type: String::from("devtmpfs"),
-        //     options: Some("mode=755,size=4m,nr_inodes=64K".to_string()),
-        //     flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_STRICTATIME,
-        // });
+        MountPoint {
+            source: String::from("devtmpfs"),
+            target: String::from("/dev"),
+            fs_type: String::from("devtmpfs"),
+            options: Some("mode=755,size=4m,nr_inodes=64K".to_string()),
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_STRICTATIME,
+            callback: None,
+            mode: MountMode::MNT_FATAL,
+        },
         // table.push(MountPoint {
         //     source: String::from("securityfs"),
         //     target: String::from("/sys/kernel/security"),
@@ -188,18 +190,19 @@ impl MountPoint {
         log::debug!("check valid mount point: {}", self.target.to_string());
         match self.invalid_mount_point(AtFlags::AT_SYMLINK_FOLLOW) {
             Ok(v) => {
-                if v {
-                    if self.flags.intersects(MsFlags::MS_REMOUNT) {
-                        log::debug!("remount the root mount point for writable");
-                        nix::mount::mount::<str, str, str, str>(
-                            Some(self.source.as_str()),
-                            self.target.as_str(),
-                            Some(self.fs_type.as_str()),
-                            self.flags,
-                            None,
-                        )?;
-                    }
-                    log::debug!("mount point maybe is already mounted");
+                if v && self.flags.intersects(MsFlags::MS_REMOUNT) {
+                    log::debug!("remount the root mount point for writable");
+                    nix::mount::mount::<str, str, str, str>(
+                        Some(self.source.as_str()),
+                        self.target.as_str(),
+                        Some(self.fs_type.as_str()),
+                        self.flags,
+                        None,
+                    )?;
+
+                    return Ok(());
+                } else if v || self.flags.intersects(MsFlags::MS_REMOUNT) {
+                    log::debug!("mount point is not mounted but remount flag is set or is already mouted, both ignore it");
                     return Ok(());
                 }
             }
