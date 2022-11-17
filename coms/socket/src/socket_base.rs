@@ -29,25 +29,25 @@ pub(super) enum NetlinkProtocol {
 
 impl From<String> for NetlinkProtocol {
     fn from(protocol: String) -> Self {
-        match protocol {
-            protocol if protocol == "route" => NetlinkProtocol::NetlinkRoute,
-            protocol if protocol == "firewall" => NetlinkProtocol::NetlinkFirewall,
-            protocol if protocol == "inet-diag" => NetlinkProtocol::NetlinkInetDiag,
-            protocol if protocol == "nflog" => NetlinkProtocol::NetlinkNflog,
-            protocol if protocol == "xfrm" => NetlinkProtocol::NetlinkXfrm,
-            protocol if protocol == "selinux" => NetlinkProtocol::NetlinkSelinux,
-            protocol if protocol == "iscsi" => NetlinkProtocol::NetlinkIscsi,
-            protocol if protocol == "audit" => NetlinkProtocol::NetlinkAudit,
-            protocol if protocol == "fib-lookup" => NetlinkProtocol::NetlinkFibLookup,
-            protocol if protocol == "connector" => NetlinkProtocol::NetlinkConnector,
-            protocol if protocol == "netfilter" => NetlinkProtocol::NetlinkNetfilter,
-            protocol if protocol == "ip6-fw" => NetlinkProtocol::NetlinkIpv6Fw,
-            protocol if protocol == "dnrtmsg" => NetlinkProtocol::NetlinkDnrtMag,
-            protocol if protocol == "kobject_uevent" => NetlinkProtocol::NetlinkKobjectUevent,
-            protocol if protocol == "generic" => NetlinkProtocol::NetlinkGeneric,
-            protocol if protocol == "scsitransport" => NetlinkProtocol::NetlinkSCSITransport,
-            protocol if protocol == "ecryptfs" => NetlinkProtocol::NetlinkEcryptfs,
-            protocol if protocol == "rdma" => NetlinkProtocol::NetlinkRdma,
+        match protocol.as_str() {
+            "route" => NetlinkProtocol::NetlinkRoute,
+            "firewall" => NetlinkProtocol::NetlinkFirewall,
+            "inet-diag" => NetlinkProtocol::NetlinkInetDiag,
+            "nflog" => NetlinkProtocol::NetlinkNflog,
+            "xfrm" => NetlinkProtocol::NetlinkXfrm,
+            "selinux" => NetlinkProtocol::NetlinkSelinux,
+            "iscsi" => NetlinkProtocol::NetlinkIscsi,
+            "audit" => NetlinkProtocol::NetlinkAudit,
+            "fib-lookup" => NetlinkProtocol::NetlinkFibLookup,
+            "connector" => NetlinkProtocol::NetlinkConnector,
+            "netfilter" => NetlinkProtocol::NetlinkNetfilter,
+            "ip6-fw" => NetlinkProtocol::NetlinkIpv6Fw,
+            "dnrtmsg" => NetlinkProtocol::NetlinkDnrtMag,
+            "kobject-uevent" => NetlinkProtocol::NetlinkKobjectUevent,
+            "generic" => NetlinkProtocol::NetlinkGeneric,
+            "scsitransport" => NetlinkProtocol::NetlinkSCSITransport,
+            "ecryptfs" => NetlinkProtocol::NetlinkEcryptfs,
+            "rdma" => NetlinkProtocol::NetlinkRdma,
             _ => NetlinkProtocol::NetlinkInvalid,
         }
     }
@@ -138,7 +138,7 @@ mod tests {
             NetlinkProtocol::NetlinkDnrtMag
         );
         assert_eq!(
-            NetlinkProtocol::from("kobject_uevent".to_string()),
+            NetlinkProtocol::from("kobject-uevent".to_string()),
             NetlinkProtocol::NetlinkKobjectUevent
         );
         assert_eq!(

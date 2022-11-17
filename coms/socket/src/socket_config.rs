@@ -159,6 +159,8 @@ impl SocketConfig {
         self.parse_listen_socket(ListeningItem::Datagram, config.clone())?;
         self.parse_listen_socket(ListeningItem::Netlink, config.clone())?;
 
+        self.parse_listen_socket(ListeningItem::SequentialPacket, config.clone())?;
+
         Ok(())
     }
 
@@ -171,38 +173,12 @@ impl SocketConfig {
         match item {
             ListeningItem::Stream => {
                 if let Some(listen_stream) = socket_conf.borrow().listen_stream() {
-                    for v in &listen_stream {
-                        if v.is_empty() {
-                            continue;
-                        }
-                        if let Ok(socket_addr) = parse_socket_address(v, SockType::Stream) {
-                            let port = SocketPortConf::new(PortType::Socket, socket_addr, v);
-                            self.push_port(Rc::new(port));
-                        } else {
-                            log::error!("create stream listening socket failed: {}", v);
-                            return Err(
-                                format!("create stream listening socket failed: {}", v).into()
-                            );
-                        }
-                    }
+                    self.parse_sockets(listen_stream, SockType::Stream)?;
                 };
             }
             ListeningItem::Datagram => {
                 if let Some(listen_datagram) = socket_conf.borrow().listen_datagram() {
-                    for v in &listen_datagram {
-                        if v.is_empty() {
-                            continue;
-                        }
-                        if let Ok(socket_addr) = parse_socket_address(v, SockType::Datagram) {
-                            let port = SocketPortConf::new(PortType::Socket, socket_addr, v);
-                            self.push_port(Rc::new(port));
-                        } else {
-                            log::error!("create datagram listening socket failed: {}", v);
-                            return Err(
-                                format!("create stream datagram socket failed: {}", v).into()
-                            );
-                        }
-                    }
+                    self.parse_sockets(listen_datagram, SockType::Datagram)?;
                 }
             }
             ListeningItem::Netlink => {
@@ -224,6 +200,33 @@ impl SocketConfig {
                         self.push_port(Rc::new(port));
                     }
                 }
+            }
+            ListeningItem::SequentialPacket => {
+                if let Some(sequential_packet) = socket_conf.borrow().listen_sequential_packet() {
+                    self.parse_sockets(sequential_packet, SockType::SeqPacket)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn parse_sockets(
+        &self,
+        listens: Vec<String>,
+        socket_type: SockType,
+    ) -> Result<(), Box<dyn Error>> {
+        for v in &listens {
+            if v.is_empty() {
+                continue;
+            }
+
+            if let Ok(socket_addr) = parse_socket_address(v, socket_type) {
+                let port = SocketPortConf::new(PortType::Socket, socket_addr, v);
+                self.push_port(Rc::new(port));
+            } else {
+                log::error!("parsing listening socket failed: {}", v);
+                return Err(format!("parsing listening socket failed: {}", v).into());
             }
         }
 
@@ -253,6 +256,7 @@ enum ListeningItem {
     Stream,
     Datagram,
     Netlink,
+    SequentialPacket,
 }
 
 #[derive(Config, Default, Debug)]
@@ -293,6 +297,13 @@ impl SocketConfigData {
     pub(self) fn listen_netlink(&self) -> Option<Vec<String>> {
         self.Socket
             .ListenNetlink
+            .as_ref()
+            .map(|v| v.iter().map(|v| v.to_string()).collect())
+    }
+
+    pub(self) fn listen_sequential_packet(&self) -> Option<Vec<String>> {
+        self.Socket
+            .ListenSequentialPacket
             .as_ref()
             .map(|v| v.iter().map(|v| v.to_string()).collect())
     }
