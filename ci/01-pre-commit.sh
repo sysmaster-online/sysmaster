@@ -45,3 +45,9 @@ RUSTC_WRAPPER="" cargo clippy --all-targets --all-features --tests --benches --e
 filelist=`git diff origin/master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`
 export PATH="$PATH:/home/jenkins/.local/bin"
 pre-commit run -vvv --files ${filelist}
+
+
+# build for musl
+arch=`uname -m`
+cargo build --all --release --target=$arch-unknown-linux-musl
+cargo test --all --release --target=$arch-unknown-linux-musl
