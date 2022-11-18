@@ -21,22 +21,24 @@ type Callback = fn() -> bool;
 lazy_static! {
     static ref MOUNT_TABLE: Vec<MountPoint> = {
         let table: Vec<MountPoint> = vec![
-        // table.push(MountPoint {
-        //     source: String::from("proc"),
-        //     target: String::from("/test"),
-        //     fs_type: String::from("proc"),
-        //     options: None,
-        //     flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
-        //     callback: Some(cg_unified_wanted),
-        //     mode: MountMode::MNT_FATAL
-        // });
-        // table.push(MountPoint {
-        //     source: String::from("sysfs"),
-        //     target: String::from("/sys"),
-        //     fs_type: String::from("sysfs"),
-        //     options: None,
-        //     flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
-        // });
+        MountPoint {
+            source: String::from("proc"),
+            target: String::from("/proc"),
+            fs_type: String::from("proc"),
+            options: None,
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+            callback: None,
+            mode: MountMode::MNT_FATAL
+        },
+        MountPoint {
+            source: String::from("sysfs"),
+            target: String::from("/sys"),
+            fs_type: String::from("sysfs"),
+            options: None,
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+            callback: None,
+            mode: MountMode::MNT_FATAL
+        },
         MountPoint {
             source: String::from("devtmpfs"),
             target: String::from("/dev"),
