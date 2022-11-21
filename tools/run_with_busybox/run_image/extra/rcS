@@ -1,0 +1,13 @@
+#!/bin/bash
+
+mkdir /dev/pts
+mount -t devpts devpts /dev/pts
+mount -t debugfs nodev /sys/kernel/debug
+
+mkdir /dev/shm
+mount -t tmpfs -o nodev,nosuid,mode=1777,noexec tmpfs /dev/shm
+
+/sbin/mdev -s
+
+/sbin/ifconfig lo 127.0.0.1 up
+/sbin/route add 127.0.0.1 lo &

@@ -1,0 +1,11 @@
+function start_sshd()
+{
+#generate sshd key
+/usr/bin/sed -i "s/\/usr\/bin\/chgrp/\/usr\/sbin\/chgrp/g" /usr/libexec/openssh/sshd-keygen
+/usr/libexec/openssh/sshd-keygen rsa /usr/libexec/openssh/sshd-keygen ed25519
+/usr/libexec/openssh/sshd-keygen ecdsa
+/usr/sbin/sshd -D &
+echo "[`date +"%F %T"`] sshd started"
+}
+
+start_sshd &
