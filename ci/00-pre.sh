@@ -13,7 +13,7 @@ done
 
 # install needed tools
 sudo yum clean all
-sudo yum install --disablerepo everything --disablerepo EPOL --disablerepo source --disablerepo update --disablerepo EPOL-UPDATE --disablerepo debuginfo  -y gcc openssl-libs python3-pip musl-gcc
+sudo yum install --disablerepo EPOL --disablerepo source --disablerepo update --disablerepo EPOL-UPDATE --disablerepo debuginfo  -y gcc openssl-libs python3-pip musl-gcc
 
 #git加速并安装rust工具链
 git config --global url."https://github.91chi.fun/https://github.com/".insteadOf "https://github.com/"
