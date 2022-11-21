@@ -13,7 +13,7 @@ done
 
 # install needed tools
 sudo yum clean all
-sudo yum install --disablerepo everything --disablerepo EPOL --disablerepo source --disablerepo update --disablerepo EPOL-UPDATE --disablerepo debuginfo  -y gcc openssl-libs python3-pip
+sudo yum install --disablerepo EPOL --disablerepo source --disablerepo update --disablerepo EPOL-UPDATE --disablerepo debuginfo  -y gcc openssl-libs python3-pip musl-gcc
 
 #git加速并安装rust工具链
 git config --global url."https://github.91chi.fun/https://github.com/".insteadOf "https://github.com/"
@@ -24,16 +24,25 @@ rm -rf rustlang.sh
 source ~/.bashrc
 
 ##Fix cargo clippy timeout : replace cargo crates with ustc
+arch=`uname -m`
 # Modify config
 cat << EOF > ~/.cargo/config
 [source.crates-io]
 registry = "https://github.com/rust-lang/crates.io-index"
+
 # 指定镜像
 replace-with = 'ustc'
+
 # 中国科学技术大学
 [source.ustc]
 registry = "https://mirrors.ustc.edu.cn/crates.io-index"
+
+[target.$arch-unknown-linux-musl]
+rustflags = ["-C", "target-feature=-crt-static"]
 EOF
+
+# install musl-build
+rustup target add $arch-unknown-linux-musl
 # Delete cache
 rm -rf  ~/.cargo/.package-cache
 
