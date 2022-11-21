@@ -37,7 +37,7 @@ replace-with = 'ustc'
 [source.ustc]
 registry = "https://mirrors.ustc.edu.cn/crates.io-index"
 
-[build.$arch-unknown-linux-musl]
+[target.$arch-unknown-linux-musl]
 rustflags = ["-C", "target-feature=-crt-static"]
 EOF
 
