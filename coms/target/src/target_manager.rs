@@ -1,7 +1,7 @@
 use super::target_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::target_comm::TargetUmComm;
-use libsysmaster::manager::{UmIf, UnitManagerObj, UnitMngUtil};
-use libsysmaster::{ReStation, Reliability};
+use libsysmaster::unit::{UmIf, UnitManagerObj, UnitMngUtil};
+use libsysmaster::reliability::{ReStation, Reliability};
 use libutils::logger;
 use std::rc::Rc;
 use std::sync::Arc;

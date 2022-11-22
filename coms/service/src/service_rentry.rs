@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 use confique::Config;
-use libsysmaster::manager::{DeserializeWith, ExecCommand, KillMode};
+use libsysmaster::{DeserializeWith, ExecCommand, KillMode};
 use libsysmaster::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use nix::unistd::Pid;
 use serde::{Deserialize, Deserializer, Serialize};

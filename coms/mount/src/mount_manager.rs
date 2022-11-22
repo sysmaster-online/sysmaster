@@ -3,7 +3,7 @@ use super::mount_comm::MountUmComm;
 use super::mount_rentry::{MountRe, MountReFrame};
 use libevent::{EventState, EventType, Events, Source};
 use libmount::mountinfo;
-use libsysmaster::manager::{
+use libsysmaster::{
     ReliLastFrame, UmIf, UnitActiveState, UnitManagerObj, UnitMngUtil, UnitType,
 };
 use libsysmaster::{ReStation, Reliability};

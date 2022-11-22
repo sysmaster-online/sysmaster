@@ -5,10 +5,10 @@ use super::service_mng::RunningData;
 use super::service_mng::ServiceMng;
 use super::service_monitor::ServiceMonitor;
 use super::service_rentry::{NotifyAccess, ServiceCommand, ServiceType};
-use libsysmaster::manager::{
+use libsysmaster::unit::{
     ExecContext, SubUnit, UmIf, Unit, UnitActionError, UnitActiveState, UnitMngUtil, UnitRelations,
 };
-use libsysmaster::{ReStation, Reliability};
+use libsysmaster::reliability::{ReStation, Reliability};
 use libutils::error::Error as ServiceError;
 use libutils::logger;
 use nix::sys::signal::Signal;

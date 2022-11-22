@@ -4,7 +4,7 @@
 use super::mount_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::mount_comm::MountUnitComm;
 use super::mount_mng::MountMng;
-use libsysmaster::manager::{SubUnit, UmIf, UnitActiveState, UnitMngUtil};
+use libsysmaster::{SubUnit, UmIf, UnitActiveState, UnitMngUtil};
 use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use nix::{sys::signal::Signal, unistd::Pid};

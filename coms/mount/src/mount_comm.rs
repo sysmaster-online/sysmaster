@@ -4,7 +4,7 @@
 //! *  Call relation: mount_ unit->mount_ mng->mount_ comm
 
 use super::mount_rentry::{MountRe, MountState};
-use libsysmaster::manager::{UmIf, Unit};
+use libsysmaster::{UmIf, Unit};
 use libsysmaster::Reliability;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;

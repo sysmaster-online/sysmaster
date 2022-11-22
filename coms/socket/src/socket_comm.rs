@@ -4,8 +4,8 @@
 use super::socket_rentry::{
     PortType, SectionSocket, SocketCommand, SocketRe, SocketResult, SocketState,
 };
-use libsysmaster::manager::{UmIf, Unit};
-use libsysmaster::Reliability;
+use libsysmaster::unit::{UmIf, Unit};
+use libsysmaster::reliability::Reliability;
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;

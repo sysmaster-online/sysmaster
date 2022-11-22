@@ -5,12 +5,12 @@
 use super::target_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::target_comm::TargetUnitComm;
 use super::target_mng::TargetMng;
-use libsysmaster::manager::Unit;
-use libsysmaster::manager::{
+use libsysmaster::unit::Unit;
+use libsysmaster::unit::{
     SubUnit, UmIf, UnitActiveState, UnitDependencyMask, UnitMngUtil, UnitRelationAtom,
     UnitRelations,
 };
-use libsysmaster::{ReStation, Reliability};
+use libsysmaster::reliability::{ReStation, Reliability};
 use libutils::logger;
 use std::cell::RefCell;
 use std::{path::PathBuf, rc::Rc};

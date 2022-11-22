@@ -2,7 +2,7 @@
 
 use super::mount_comm::MountUnitComm;
 use super::mount_rentry::MountState;
-use libsysmaster::manager::{UnitActionError, UnitActiveState, UnitNotifyFlags};
+use libsysmaster::{UnitActionError, UnitActiveState, UnitNotifyFlags};
 use libsysmaster::ReStation;
 use std::{cell::RefCell, rc::Rc};
 

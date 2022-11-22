@@ -16,6 +16,7 @@ pub mod proc_cmdline;
 pub mod process_util;
 pub mod socket_util;
 pub mod time_util;
+pub mod serialize;
 
 pub mod condition;
 pub use anyhow::*;

@@ -4,34 +4,14 @@ version = "0.2.2"
 authors = ["sysmaster"]
 edition = "2018"
 
+[lib]
+name = "libsysmaster"
+path = "sysmaster/lib.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
 name = "sysmaster"
-path = "src/sysmaster/main.rs"
-
-[[bin]]
-name = "pctrl"
-path = "src/pctrl/main.rs"
-
-[[bin]]
-name = "init"
-path = "src/init/main.rs"
-
-[[bin]]
-name = "fstab"
-path = "src/fstab/main.rs"
-
-[[bin]]
-name = "random_seed"
-path = "src/random_seed/main.rs"
-
-[[bin]]
-name = "sysmonitor"
-path = "src/sysmonitor/main.rs"
-
-[[bin]]
-name = "rc-local-generator"
-path = "src/rc-local-generator/main.rs"
+path = "sysmaster/main.rs"
 
 [dev-dependencies]
 libtests = { path = "libs/libtests" }
@@ -41,7 +21,7 @@ libtests = { path = "libs/libtests" }
 libcgroup = { path = "libs/libcgroup" }
 libevent = { path = "libs/libevent" }
 libutils = { path = "libs/libutils" }
-libsysmaster = { path = "src/libsysmaster" }
+libcmdproto = { path = "libs/libcmdproto" }
 
 # third libraries
 bitflags = "1.3.2"
@@ -83,8 +63,15 @@ panic = 'abort'
 
 [workspace]
 members = [
+  # external binaries
+  "extends/fstab",
+  "extends/init",
+  "extends/pctrl",
+  "extends/random_seed",
+  "extends/rc-local-generator",
+  "extends/sysmonitor",
   #internal libraries crates
-  "src/libsysmaster",
+  "libs/libcmdproto",
   #external libraries crates
   "libs/libcgroup",
   "libs/libevent",
