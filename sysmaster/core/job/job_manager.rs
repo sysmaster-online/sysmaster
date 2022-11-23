@@ -7,20 +7,14 @@ use super::job_table::{self, JobTable};
 use super::job_transaction::{self};
 use super::job_unit_entry::{self};
 use super::JobErrno;
-use crate::core::manager::rentry::ReliLastFrame;
 use crate::core::butil::table::{TableOp, TableSubscribe};
-use libsysmaster::reliability::{Reliability,ReStation};
-use crate::core::unit::{
-    {UnitActiveState, UnitNotifyFlags},
-    UnitRelationAtom,
-    UnitDb,
-    UnitX,
-    JobMode,
-};
+use crate::core::unit::{JobMode, UnitDb, UnitRelationAtom, UnitX};
 use libevent::{EventState, EventType, Events, Source};
 use libutils::{Error, Result};
 use std::cell::RefCell;
 use std::rc::Rc;
+use sysmaster::reliability::{ReStation, ReliLastFrame, Reliability};
+use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
 #[derive(Debug)]
 pub(in crate::core) struct JobAffect {
@@ -165,11 +159,7 @@ impl JobManager {
     }
 
     #[allow(dead_code)]
-    pub(in crate::core) fn notify(
-        &self,
-        config: &JobConf,
-        mode: JobMode,
-    ) -> Result<(), JobErrno> {
+    pub(in crate::core) fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
         self.data.notify(config, mode)?;
         self.try_enable();
         Ok(())
@@ -821,11 +811,11 @@ fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno
 
 #[cfg(test)]
 mod tests {
+    use super::super::JobStage;
     use super::*;
     use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::DataManager;
-    use super::super::JobStage;
     use crate::core::unit::test_utils;
+    use crate::core::unit::DataManager;
     use crate::core::unit::{UnitRe, UnitRelations};
     use libutils::logger;
 
@@ -1187,7 +1177,6 @@ mod tests {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
 
-        let unitx = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
-        unitx
+        test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }
 }

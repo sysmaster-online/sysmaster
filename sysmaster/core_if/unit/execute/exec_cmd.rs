@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use libutils::serialize::DeserializeWith;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// the exec command that was parsed from the unit file
 #[derive(PartialEq, Clone, Eq, Debug, Serialize, Deserialize)]
@@ -9,7 +9,6 @@ pub struct ExecCommand {
     path: String,
     argv: Vec<String>,
 }
-
 
 impl ExecCommand {
     /// create a new instance of the command

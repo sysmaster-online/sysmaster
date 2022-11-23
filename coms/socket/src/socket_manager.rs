@@ -1,11 +1,11 @@
 use super::socket_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::socket_comm::SocketUmComm;
 use super::socket_rentry::SocketReFrame;
-use libsysmaster::unit::{UmIf, UnitManagerObj, UnitMngUtil};
-use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use std::rc::Rc;
 use std::sync::Arc;
+use sysmaster::reliability::{ReStation, Reliability};
+use sysmaster::unit::{UmIf, UnitManagerObj, UnitMngUtil};
 
 struct SocketManager {
     comm: Arc<SocketUmComm>,
@@ -96,7 +96,7 @@ impl Default for SocketManager {
     }
 }
 
-use libsysmaster::declure_umobj_plugin;
+use sysmaster::declure_umobj_plugin;
 declure_umobj_plugin!(
     SocketManager,
     SocketManager::default,

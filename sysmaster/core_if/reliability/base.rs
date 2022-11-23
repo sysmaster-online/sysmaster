@@ -8,11 +8,11 @@ use std::path::Path;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-use heed::Database;
 use heed::types::SerdeBincode;
-use serde::{Serialize};
-use std::hash::Hash;
+use heed::Database;
+use serde::Serialize;
 use std::fmt::Debug;
+use std::hash::Hash;
 
 use super::Reliability;
 
@@ -31,12 +31,10 @@ pub struct ReDb<K, V> {
     //_phantom: PhantomData<&'a K>,
 }
 
-
-
-impl <K,V> ReDbTable  for ReDb<K,V>
+impl<K, V> ReDbTable for ReDb<K, V>
 where
-    K:  'static + Serialize  + Eq + Hash + Clone + Debug + DeserializeOwned,
-    V:  'static + Serialize + Clone + Debug + DeserializeOwned,
+    K: 'static + Serialize + Eq + Hash + Clone + Debug + DeserializeOwned,
+    V: 'static + Serialize + Clone + Debug + DeserializeOwned,
 {
     fn clear(&self, wtxn: &mut ReDbRwTxn) {
         self.do_clear(wtxn);
@@ -46,8 +44,7 @@ where
         self.cache_2_db(db_wtxn);
     }
 
-    fn import(&self, db_rtxn: &ReDbRoTxn)
-    {
+    fn import(&self, db_rtxn: &ReDbRoTxn) {
         self.db_2_cache(db_rtxn);
     }
 
@@ -55,8 +52,6 @@ where
         self.set_ignore(ignore);
     }
 }
-
-
 
 impl<K, V> ReDb<K, V>
 where

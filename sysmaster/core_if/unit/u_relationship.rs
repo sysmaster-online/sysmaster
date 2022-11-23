@@ -1,6 +1,6 @@
-use std::{str::FromStr, num::ParseIntError, convert::TryFrom};
+use std::{convert::TryFrom, num::ParseIntError, str::FromStr};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[allow(missing_docs)]
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
@@ -88,9 +88,10 @@ pub enum UnitRelationAtom {
     UnitAtomSliceOf = 1u64 << 33,
 }
 
-
+#[allow(missing_docs)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum UnitDependencyMask {
-
+    UnitDependencyDefault = 1 << 2,
 }
 
 #[allow(missing_docs)]
@@ -104,7 +105,6 @@ pub enum UnitType {
     UnitTypeInvalid,
     UnitTypeErrnoMax,
 }
-
 
 impl FromStr for UnitType {
     type Err = ParseIntError;

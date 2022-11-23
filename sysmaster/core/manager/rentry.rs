@@ -1,47 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
-///
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum ReliLastFrame {
-    ///
-    Queue = 0,
-    ///
-    JobManager,
-    ///
-    SigChld,
-    ///
-    CgEvent,
-    ///
-    Notify,
-    ///
-    SubManager,
-    ///
-    ManagerOp,
-    ///
-    CmdOp,
-    ///
-    OtherEvent,
-}
-
-impl TryFrom<u32> for ReliLastFrame {
-    type Error = String;
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(ReliLastFrame::Queue),
-            1 => Ok(ReliLastFrame::JobManager),
-            2 => Ok(ReliLastFrame::SigChld),
-            3 => Ok(ReliLastFrame::CgEvent),
-            4 => Ok(ReliLastFrame::Notify),
-            5 => Ok(ReliLastFrame::SubManager),
-            6 => Ok(ReliLastFrame::ManagerOp),
-            7 => Ok(ReliLastFrame::CmdOp),
-            8 => Ok(ReliLastFrame::OtherEvent),
-            v => Err(format!("input {} is invalid", v)),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum ReliLastQue {
     Load = 0,

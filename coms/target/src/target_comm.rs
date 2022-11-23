@@ -5,15 +5,15 @@
 *target_ unit->target_ mng->target_ comm
 */
 use super::target_rentry::{TargetRe, TargetState};
-use libsysmaster::manager::{UmIf, Unit};
-use libsysmaster::Reliability;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, RwLock};
+use sysmaster::reliability::Reliability;
+use sysmaster::unit::{UmIf, UnitBase};
 
 pub(super) struct TargetUnitComm {
-    owner: RefCell<Option<Rc<Unit>>>,
+    owner: RefCell<Option<Rc<dyn UnitBase>>>,
     umcomm: Arc<TargetUmComm>,
 }
 
@@ -29,11 +29,11 @@ impl TargetUnitComm {
         self.umcomm.attach_um(um)
     }
 
-    pub(super) fn attach_unit(&self, unit: Rc<libsysmaster::manager::Unit>) {
+    pub(super) fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
         self.owner.replace(Some(unit));
     }
 
-    pub(super) fn owner(&self) -> Option<Rc<Unit>> {
+    pub(super) fn owner(&self) -> Option<Rc<dyn UnitBase>> {
         if let Some(ref unit) = *self.owner.borrow() {
             Some(Rc::clone(unit))
         } else {

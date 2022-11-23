@@ -8,18 +8,13 @@ use super::uu_condition::{
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use super::uu_ratelimit::StartLimit;
-use super::{KillContext, KillMode};
-use crate::core::unit::data::{DataManager, UnitActiveState, UnitDepConf, UnitState};
+use crate::core::unit::data::{DataManager, UnitDepConf, UnitState};
 use crate::core::unit::uload_util::UnitFile;
-use crate::core::unit::unit_base::{KillOperation, UnitActionError};
 use crate::core::unit::unit_rentry::{UnitLoadState, UnitRe};
-use libsysmaster::unit::{UnitType,SubUnit};
-use crate::core::unit::{UnitNotifyFlags, UnitRelations};
-use libsysmaster::reliability::ReStation;
+use crate::core::unit::UnitRelations;
 use libcgroup::{self, CgFlags};
 use libutils::error::Error as ServiceError;
 use libutils::Result;
-use log;
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
@@ -30,6 +25,9 @@ use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::reliability::ReStation;
+use sysmaster::unit::{KillContext, KillMode, KillOperation, UnitNotifyFlags};
+use sysmaster::unit::{SubUnit, UnitActionError, UnitActiveState, UnitBase, UnitType};
 
 ///
 pub struct Unit {
@@ -105,7 +103,73 @@ impl ReStation for Unit {
     }
 }
 
+impl UnitBase for Unit {
+    fn id(&self) -> &String {
+        self.id()
+    }
+
+    /*fn get_dependency_list(&self, _unit_name: &str, _atom: libsysmaster::unit::UnitRelationAtom) -> Vec<Rc<Self>> {
+        todo!()
+    }*/
+
+    fn test_start_limit(&self) -> bool {
+        self.test_start_limit()
+    }
+
+    fn kill_context(
+        &self,
+        k_context: Rc<KillContext>,
+        m_pid: Option<Pid>,
+        c_pid: Option<Pid>,
+        ko: KillOperation,
+    ) -> Result<(), Box<dyn Error>> {
+        self.kill_context(k_context, m_pid, c_pid, ko)
+    }
+
+    fn notify(
+        &self,
+        original_state: UnitActiveState,
+        new_state: UnitActiveState,
+        flags: UnitNotifyFlags,
+    ) {
+        self.notify(original_state, new_state, flags);
+    }
+
+    fn prepare_exec(&self) -> Result<()> {
+        self.prepare_exec()
+    }
+
+    fn default_dependencies(&self) -> bool {
+        self.default_dependencies()
+    }
+
+    fn insert_two_deps(
+        &self,
+        ra: UnitRelations,
+        rb: UnitRelations,
+        u_name: String,
+    ) -> Result<(), Box<dyn Error>> {
+        self.insert_two_deps(ra, rb, u_name);
+        Ok(())
+    }
+    fn insert_dep(&self, ra: UnitRelations, u_name: String) {
+        self.insert_dep(ra, u_name);
+    }
+    fn cg_path(&self) -> PathBuf {
+        self.cg_path()
+    }
+
+    fn ignore_on_isolate(&self) -> bool {
+        self.ignore_on_isolate()
+    }
+
+    fn set_ignore_on_isolate(&self, ignore_on_isolate: bool) {
+        self.set_ignore_on_isolate(ignore_on_isolate);
+    }
+}
+
 impl Unit {
+    /// need to consider use box or rc?
     pub(super) fn new(
         unit_type: UnitType,
         name: &str,
@@ -127,7 +191,8 @@ impl Unit {
             sub,
             start_limit: StartLimit::new(),
         });
-        _u.sub.attach_unit(Rc::clone(&_u));
+        let owner = Rc::clone(&_u);
+        _u.sub.attach_unit(owner);
         _u
     }
 
@@ -291,7 +356,6 @@ impl Unit {
                 }
             }
         }
-
         Ok(())
     }
 
@@ -336,7 +400,7 @@ impl Unit {
         pids
     }
 
-    ///
+    ///insert unit dep conf
     pub fn insert_two_deps(
         &self,
         ra: UnitRelations,
@@ -373,7 +437,7 @@ impl Unit {
     }
 
     /// test start rate, if start more than burst times in interval time, return error
-    pub fn test_start_limit(&self) -> bool {
+    fn test_start_limit(&self) -> bool {
         if self.config.config_data().borrow().Unit.StartLimitInterval > 0
             && self.config.config_data().borrow().Unit.StartLimitBurst > 0
         {
@@ -532,17 +596,13 @@ mod tests {
     use super::Unit;
     use crate::core::manager::RELI_HISTORY_MAX_DBS;
     use crate::core::unit::test::test_utils::UmIfD;
-    use crate::core::unit::unit_rentry::{UnitRe};
-    use libsysmaster::unit::UnitType;
-    use libsysmaster::reliability::Reliability;
+    use crate::core::unit::unit_rentry::UnitRe;
     use libutils::{logger, path_lookup::LookupPaths};
     use std::rc::Rc;
+    use sysmaster::reliability::Reliability;
+    use sysmaster::unit::UnitType;
 
-    use crate::core::{
-        unit::data::DataManager, 
-        unit::uload_util::UnitFile,
-        plugin::Plugin,
-    };
+    use crate::core::{plugin::Plugin, unit::data::DataManager, unit::uload_util::UnitFile};
     fn unit_init() -> Rc<Unit> {
         logger::init_log_with_console("test_unit_entry", 4);
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
@@ -560,15 +620,14 @@ mod tests {
             .create_unit_obj_with_um(UnitType::UnitService, umifd)
             .unwrap();
         sub_obj.attach_reli(Rc::clone(&reli));
-        let unit = Unit::new(
+        Unit::new(
             UnitType::UnitService,
             "config.service",
             &Rc::new(dm),
             &rentry,
             &Rc::new(unit_file),
             sub_obj,
-        );
-        unit
+        )
     }
 
     #[test]

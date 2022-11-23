@@ -1,4 +1,4 @@
-use libsysmaster::unit::UnitRelations;
+use sysmaster::unit::UnitRelations;
 
 pub(in super::super) fn unit_relation_to_inverse(relation: UnitRelations) -> UnitRelations {
     match relation {

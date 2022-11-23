@@ -1,8 +1,8 @@
-use super::unit_sets::UnitSets;
 use super::table::{TableOp, TableSubscribe};
-use super::UnitX;
-use super::UnitRe;
+use super::unit_sets::UnitSets;
 use super::ReStation;
+use super::UnitRe;
+use super::UnitX;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -133,8 +133,8 @@ mod tests {
     use crate::core::unit::data::DataManager;
     use crate::core::unit::test::test_utils;
     use crate::core::unit::unit_rentry::UnitRe;
-    use libsysmaster::reliability::Reliability;
     use libutils::logger;
+    use sysmaster::reliability::Reliability;
 
     #[test]
     #[should_panic]
@@ -212,7 +212,6 @@ mod tests {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
 
-        let unitx = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
-        unitx
+        test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }
 }

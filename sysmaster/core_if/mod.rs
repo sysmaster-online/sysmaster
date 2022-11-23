@@ -1,7 +1,7 @@
+//!
+//!
 
-
-
-#[allow(missing_docs)]
+///
 #[macro_export]
 macro_rules! null_str {
     ($name:expr) => {

@@ -1,12 +1,12 @@
-use super::unit_sets::UnitSets;
-use super::table::{TableOp, TableSubscribe};
 use super::super::unit_base;
-use super::super::{UnitRelationAtom};
-use super::UnitX;
-use super::UnitRe;
 use super::super::UnitErrno;
-use super::UnitRelations;
+use super::super::UnitRelationAtom;
+use super::table::{TableOp, TableSubscribe};
+use super::unit_sets::UnitSets;
 use super::ReStation;
+use super::UnitRe;
+use super::UnitRelations;
+use super::UnitX;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -362,8 +362,8 @@ mod tests {
     use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::core::unit::data::DataManager;
     use crate::core::unit::test::test_utils;
-    use libsysmaster::reliability::Reliability;
     use libutils::logger;
+    use sysmaster::reliability::Reliability;
 
     #[test]
     fn dep_insert() {
@@ -546,8 +546,7 @@ mod tests {
     ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-        let unitx = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
-        unitx
+        test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }
 
     fn contain_unit(units: &[Rc<UnitX>], unit: &Rc<UnitX>) -> bool {

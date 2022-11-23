@@ -3,11 +3,12 @@ use super::job_entry::{self, Job, JobConf, JobResult};
 use super::job_rentry::JobKind;
 use super::job_table::JobTable;
 use super::JobErrno;
-use crate::core::unit::{UnitActionError, UnitRelationAtom};
-use crate::core::unit::UnitDb;
-use crate::core::unit::UnitX;
 use crate::core::unit::JobMode;
+use crate::core::unit::UnitDb;
+use crate::core::unit::UnitRelationAtom;
+use crate::core::unit::UnitX;
 use std::rc::Rc;
+use sysmaster::unit::UnitActionError;
 
 pub(super) fn job_trans_expand(
     stage: &JobTable,
@@ -408,14 +409,14 @@ fn trans_fallback(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::job_rentry::JobRe;
-    use crate::core::unit::DataManager;
-    use crate::core::unit::test_utils;
-    use crate::core::unit::{UnitRe, UnitRelations};
+    use super::*;
     use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use libsysmaster::reliability::Reliability;
+    use crate::core::unit::test_utils;
+    use crate::core::unit::DataManager;
+    use crate::core::unit::{UnitRe, UnitRelations};
     use libutils::logger;
+    use sysmaster::reliability::Reliability;
 
     #[test]
     fn jt_api_expand_check() {}
@@ -651,7 +652,6 @@ mod tests {
     ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-        let unitx = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
-        unitx
+        test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }
 }

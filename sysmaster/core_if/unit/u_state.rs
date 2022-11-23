@@ -1,7 +1,6 @@
-use nix::sys::signal::Signal;
+use bitflags::bitflags;
 
-
- /**Unit stats：
+/**Unit stats：
  A[UnitActive]
  B[UnitReloading]
  C[UnitInActive]
@@ -35,30 +34,12 @@ pub enum UnitActiveState {
     UnitMaintenance,
 }
 
-
-
-/// kill operation send to process
-#[allow(missing_docs)]
-#[derive(PartialEq, Eq)]
-pub enum KillOperation {
-    KillTerminate,
-    KillTerminateAndLog,
-    KillRestart,
-    KillKill,
-    KillWatchdog,
-    KillInvalid,
-}
-
-impl KillOperation {
-    ///
-    pub fn to_signal(&self) -> Signal {
-        match *self {
-            KillOperation::KillTerminate
-            | KillOperation::KillTerminateAndLog
-            | KillOperation::KillRestart => Signal::SIGTERM,
-            KillOperation::KillKill => Signal::SIGKILL,
-            KillOperation::KillWatchdog => Signal::SIGABRT,
-            _ => Signal::SIGTERM,
-        }
+bitflags! {
+    /// notify unit state to manager
+    pub struct UnitNotifyFlags: u8 {
+        /// notify reload failure to manager
+        const UNIT_NOTIFY_RELOAD_FAILURE = 1 << 0;
+        /// notify auto restart to manager
+        const UNIT_NOTIFY_WILL_AUTO_RESTART = 1 << 1;
     }
 }

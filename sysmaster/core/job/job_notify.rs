@@ -1,9 +1,9 @@
 use super::job_entry::JobConf;
 use super::job_rentry::JobKind;
-use crate::core::unit::UnitRelationAtom;
-use crate::core::unit::UnitDb;
-use crate::core::unit::UnitX;
 use crate::core::unit::JobMode;
+use crate::core::unit::UnitDb;
+use crate::core::unit::UnitRelationAtom;
+use crate::core::unit::UnitX;
 use std::rc::Rc;
 
 pub(super) fn job_notify_result(
@@ -127,15 +127,15 @@ fn notify_event_reload(
 mod tests {
     use super::*;
     use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::DataManager;
     use crate::core::unit::test_utils;
+    use crate::core::unit::DataManager;
 
     use crate::core::unit::UnitDb;
-    use crate::core::unit::UnitX;
     use crate::core::unit::UnitRe;
+    use crate::core::unit::UnitX;
 
-    use libsysmaster::reliability::Reliability;
     use libutils::logger;
+    use sysmaster::reliability::Reliability;
 
     #[test]
     fn jn_api() {
@@ -183,7 +183,6 @@ mod tests {
     ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-        let unitx = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
-        unitx
+        test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }
 }

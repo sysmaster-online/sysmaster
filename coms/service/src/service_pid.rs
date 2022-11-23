@@ -1,9 +1,9 @@
 use super::service_comm::ServiceUnitComm;
-use libsysmaster::manager::UnitActionError;
 use libutils::process_util;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::rc::Rc;
+use sysmaster::unit::UnitActionError;
 
 pub(super) struct ServicePid {
     comm: Rc<ServiceUnitComm>,
@@ -36,7 +36,9 @@ impl ServicePid {
 
     pub(super) fn unwatch_main(&self) {
         if let Some(pid) = self.main() {
-            self.comm.um().child_unwatch_pid(self.comm.unit().id(), pid);
+            self.comm
+                .um()
+                .child_unwatch_pid(&self.comm.get_owner_id(), pid);
             self.data.borrow_mut().reset_main();
         }
     }
@@ -59,7 +61,9 @@ impl ServicePid {
 
     pub(super) fn unwatch_control(&self) {
         if let Some(pid) = self.control() {
-            self.comm.um().child_unwatch_pid(self.comm.unit().id(), pid);
+            self.comm
+                .um()
+                .child_unwatch_pid(&self.comm.get_owner_id(), pid);
             self.data.borrow_mut().reset_control();
         }
     }

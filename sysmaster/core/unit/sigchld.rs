@@ -1,8 +1,6 @@
+use super::unit_datastore::UnitDb;
 /// need to move to other directory,maybe manager
 use crate::core::job::JobManager;
-use super::unit_datastore::UnitDb;
-use crate::core::manager::rentry::ReliLastFrame;
-use libsysmaster::reliability::{ReStation, Reliability};
 use libevent::{EventState, EventType, Events, Source};
 use libutils::Result;
 use nix::errno::Errno;
@@ -10,6 +8,7 @@ use nix::sys::signal::Signal;
 use nix::sys::wait::{self, Id, WaitPidFlag, WaitStatus};
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
+use sysmaster::reliability::{ReStation, ReliLastFrame, Reliability};
 
 pub(super) struct Sigchld {
     // associated objects

@@ -22,13 +22,11 @@
 //! ```macro_rules
 //! const LOG_LEVEL: u32 = 4;
 //! const PLUGIN_NAME: &str = "TargetUnit";
-//! use libsysmaster::declure_unitobj_plugin;
+//! use sysmaster::declure_unitobj_plugin;
 //! declure_unitobj_plugin!(Target, Target::default, PLUGIN_NAME, LOG_LEVEL);
 //! ````
 //! plugin or find the corresponding so according to the name of the corresponding unit configuration file, and load it dynamically, such as XXX.service to find libservice.so, XXX.socket to find libsocket.so
 //!
-use libsysmaster::unit::UmIf;
-use crate::core::unit::{SubUnit, UnitManagerObj, UnitType};
 use dy_re::Lib;
 use dy_re::Symbol;
 use dynamic_reload as dy_re;
@@ -44,6 +42,8 @@ use std::sync::RwLock;
 use std::time::Duration;
 use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
 use std::{env, io};
+use sysmaster::unit::UmIf;
+use sysmaster::unit::{SubUnit, UnitManagerObj, UnitType};
 use walkdir::{DirEntry, WalkDir};
 
 const LIB_PLUGIN_PATH: &str = "/usr/lib/sysmaster/plugin/";
@@ -178,7 +178,7 @@ impl Plugin {
     /// # Examples
     ///
     /// ```
-    /// use libsysmaster::plugin::Plugin;
+    /// use sysmaster::plugin::Plugin;
     ///
     /// Plugin::get_instance();
     /// ```
@@ -407,31 +407,6 @@ impl Plugin {
     }
 
     /// Create a  obj for subclasses of unit
-    /// each sub unit need reference of declure_unitobj_plugin_default
-    ///
-    pub fn create_unit_obj(&self, unit_type: UnitType) -> Result<Box<dyn SubUnit>, Box<dyn Error>> {
-        let ret = self.get_lib(unit_type);
-        if ret.is_err() {
-            return Err(format!("create unit, the {:?} plugin is not exist", unit_type).into());
-        }
-
-        let dy_lib = ret.unwrap();
-        #[allow(clippy::type_complexity)]
-        let _sym: Result<Symbol<fn() -> *mut dyn SubUnit>, &str> = unsafe {
-            dy_lib
-                .lib
-                .get(CONSTRUCTOR_NAME_DEFAULT)
-                .map_err(|_e| "Invalid")
-        };
-        if let Ok(fun) = _sym {
-            let boxed_raw = fun();
-            Ok(unsafe { Box::from_raw(boxed_raw) })
-        } else {
-            Err(format!("The library of {:?} is {:?}", unit_type, _sym.err()).into())
-        }
-    }
-
-    /// Create a  obj for subclasses of unit
     /// each sub unit need reference of declure_unitobj_plugin_with_param
     ///
     pub fn create_unit_obj_with_um(
@@ -513,8 +488,8 @@ impl Plugin {
 #[cfg(test)]
 mod tests {
 
-    use libsysmaster::unit::UmIf;
     use libutils::logger;
+    use sysmaster::unit::UmIf;
 
     use super::*;
     // use services::service::ServiceUnit;

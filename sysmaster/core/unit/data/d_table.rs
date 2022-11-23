@@ -1,9 +1,9 @@
 use super::unit_dep_conf::UnitDepConf;
 use super::unit_state::UnitState;
 use crate::core::butil::table::{Table, TableSubscribe};
-use libsysmaster::reliability::ReStation;
 use std::cell::RefCell;
 use std::rc::Rc;
+use sysmaster::reliability::ReStation;
 
 #[allow(clippy::type_complexity)]
 pub struct DataManager {
@@ -88,8 +88,8 @@ impl DataManager {
 mod tests {
     use super::*;
     use crate::core::butil::table::TableOp;
-    use super::super::{UnitActiveState, UnitNotifyFlags};
     use crate::core::unit::UnitRelations;
+    use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
     #[test]
     fn dm_unit_dep_config() {

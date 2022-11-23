@@ -1,11 +1,10 @@
 #![allow(clippy::module_inception)]
 use super::commands::Commands;
 use super::pre_install::{Install, PresetMode};
-use super::rentry::{ReliLastFrame, RELI_HISTORY_MAX_DBS};
+use super::rentry::RELI_HISTORY_MAX_DBS;
 use super::signals::{SignalDispatcher, Signals};
-use libcmdproto::proto::execute::{ExecuterAction,ExecCmdErrno};
-use libsysmaster::reliability::Reliability;
 use crate::core::unit::UnitManagerX;
+use libcmdproto::proto::execute::{ExecCmdErrno, ExecuterAction};
 use libevent::{EventState, Events};
 use libutils::path_lookup::LookupPaths;
 use libutils::process_util::{self};
@@ -15,6 +14,7 @@ use nix::sys::signal::Signal;
 use std::cell::RefCell;
 use std::io::Error;
 use std::rc::Rc;
+use sysmaster::reliability::{ReliLastFrame, Reliability};
 
 /// maximal size of process's arguments
 pub const MANAGER_ARGS_SIZE_MAX: usize = 5; // 6 - 1
@@ -317,6 +317,7 @@ impl Manager {
 
 /// manager running mode
 #[allow(missing_docs)]
+#[allow(dead_code)]
 #[derive(PartialEq, Eq, Debug)]
 pub enum Mode {
     System,
@@ -325,6 +326,7 @@ pub enum Mode {
 
 /// manager action mode
 #[allow(missing_docs)]
+#[allow(dead_code)]
 pub enum Action {
     Run,
     Help,

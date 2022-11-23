@@ -468,16 +468,16 @@ fn value_try_sub(value: &mut usize, sub: usize) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::job_rentry::JobRe;
+    use super::*;
     use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::DataManager;
     use crate::core::unit::test_utils;
+    use crate::core::unit::DataManager;
     use crate::core::unit::UnitDb;
-    use crate::core::unit::UnitX;
     use crate::core::unit::UnitRe;
-    use libsysmaster::reliability::Reliability;
+    use crate::core::unit::UnitX;
     use libutils::logger;
+    use sysmaster::reliability::Reliability;
 
     #[test]
     fn js_api() {
@@ -522,7 +522,6 @@ mod tests {
     ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-        let unitx = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
-        unitx
+        test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }
 }

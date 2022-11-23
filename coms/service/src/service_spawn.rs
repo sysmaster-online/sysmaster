@@ -2,11 +2,11 @@ use super::service_comm::ServiceUnitComm;
 use super::service_config::ServiceConfig;
 use super::service_pid::ServicePid;
 use super::service_rentry::ServiceType;
-use libsysmaster::manager::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
 use nix::unistd::Pid;
 use std::env;
 use std::error::Error;
 use std::rc::Rc;
+use sysmaster::unit::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
 
 pub(super) struct ServiceSpawn {
     comm: Rc<ServiceUnitComm>,
@@ -48,36 +48,38 @@ impl ServiceSpawn {
         if let Some(pid) = self.pid.main() {
             params.add_env("MAINPID", format!("{}", pid));
         }
+        if let Some(unit) = self.comm.owner() {
+            let um = self.comm.um();
+            unit.prepare_exec()?;
 
-        let unit = self.comm.unit();
-        let um = self.comm.um();
-        unit.prepare_exec()?;
-
-        if ec_flags.contains(ExecFlags::PASS_FDS) {
-            params.insert_fds(self.collect_socket_fds());
-        }
-
-        if self.config.service_type() == ServiceType::Notify {
-            let notify_sock = um.notify_socket().unwrap();
-            log::debug!("add NOTIFY_SOCKET env: {}", notify_sock.to_str().unwrap());
-            params.add_env("NOTIFY_SOCKET", notify_sock.to_str().unwrap().to_string());
-            params.set_notify_sock(notify_sock);
-        }
-
-        log::debug!("begin to exec spawn");
-        match um.exec_spawn(&unit, cmdline, &params, self.exec_ctx.clone()) {
-            Ok(pid) => {
-                um.child_watch_pid(unit.id(), pid);
-                Ok(pid)
+            if ec_flags.contains(ExecFlags::PASS_FDS) {
+                params.insert_fds(self.collect_socket_fds());
             }
-            Err(e) => {
-                log::error!("failed to start service: {}, error:{:?}", unit.id(), e);
-                Err("spawn exec return error".to_string().into())
+
+            if self.config.service_type() == ServiceType::Notify {
+                let notify_sock = um.notify_socket().unwrap();
+                log::debug!("add NOTIFY_SOCKET env: {}", notify_sock.to_str().unwrap());
+                params.add_env("NOTIFY_SOCKET", notify_sock.to_str().unwrap().to_string());
+                params.set_notify_sock(notify_sock);
             }
+
+            log::debug!("begin to exec spawn");
+            match um.exec_spawn(&unit.id(), cmdline, &params, self.exec_ctx.clone()) {
+                Ok(pid) => {
+                    um.child_watch_pid(unit.id(), pid);
+                    Ok(pid)
+                }
+                Err(e) => {
+                    log::error!("failed to start service: {}, error:{:?}", unit.id(), e);
+                    Err("spawn exec return error".to_string().into())
+                }
+            }
+        } else {
+            Err("spawn exec return error".to_string().into())
         }
     }
 
     fn collect_socket_fds(&self) -> Vec<i32> {
-        self.comm.um().collect_socket_fds(self.comm.unit().id())
+        self.comm.um().collect_socket_fds(&self.comm.get_owner_id())
     }
 }

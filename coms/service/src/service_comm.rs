@@ -1,29 +1,29 @@
 use super::service_rentry::{
     NotifyState, SectionService, ServiceCommand, ServiceRe, ServiceResult, ServiceState,
 };
-use libsysmaster::unit::{UmIf, Unit};
-use libsysmaster::reliability::Reliability;
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, RwLock};
+use sysmaster::reliability::Reliability;
+use sysmaster::unit::{UmIf, UnitBase};
 
 pub(super) struct ServiceUnitComm {
-    data: RefCell<ServiceUnitCommData>,
+    owner: RefCell<Option<Rc<dyn UnitBase>>>,
     umcomm: Arc<ServiceUmComm>,
 }
 
 impl ServiceUnitComm {
     pub(super) fn new() -> Self {
         ServiceUnitComm {
-            data: RefCell::new(ServiceUnitCommData::new()),
+            owner: RefCell::new(None),
             umcomm: ServiceUmComm::get_instance(),
         }
     }
 
-    pub(super) fn attach_unit(&self, unit: Rc<Unit>) {
-        self.data.borrow_mut().attach_unit(unit);
+    pub(super) fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
+        self.owner.replace(Some(unit));
     }
 
     pub(super) fn attach_um(&self, um: Rc<dyn UmIf>) {
@@ -34,20 +34,40 @@ impl ServiceUnitComm {
         self.umcomm.attach_reli(reli);
     }
 
-    pub(super) fn unit(&self) -> Rc<Unit> {
-        self.data.borrow().unit()
+    pub(super) fn owner(&self) -> Option<Rc<dyn UnitBase>> {
+        if let Some(ref unit) = *self.owner.borrow() {
+            Some(Rc::clone(unit))
+        } else {
+            None
+        }
     }
 
+    pub(super) fn get_owner_id(&self) -> String {
+        let u = self.owner().map_or_else(
+            || "None".to_string(),
+            |u| {
+                let ret = u.id().to_string();
+                ret
+            },
+        );
+        u
+    }
     pub(super) fn um(&self) -> Rc<dyn UmIf> {
         self.umcomm.um()
     }
 
     pub(super) fn rentry_conf_insert(&self, service: &SectionService) {
-        self.rentry().conf_insert(self.unit().id(), service);
+        self.owner()
+            .map(|u| self.rentry().conf_insert(u.id(), service));
     }
 
     pub(super) fn rentry_conf_get(&self) -> Option<SectionService> {
-        self.rentry().conf_get(self.unit().id())
+        let ret = self.owner().map(|u| self.rentry().conf_get(u.id()));
+        if ret.is_none() {
+            None
+        } else {
+            ret.unwrap()
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -62,17 +82,19 @@ impl ServiceUnitComm {
         control_cmd_len: usize,
         notify_state: NotifyState,
     ) {
-        self.rentry().mng_insert(
-            self.unit().id(),
-            state,
-            result,
-            main_pid,
-            control_pid,
-            main_cmd_len,
-            control_cmd_type,
-            control_cmd_len,
-            notify_state,
-        );
+        self.owner().map(|u| {
+            self.rentry().mng_insert(
+                u.id(),
+                state,
+                result,
+                main_pid,
+                control_pid,
+                main_cmd_len,
+                control_cmd_type,
+                control_cmd_len,
+                notify_state,
+            )
+        });
     }
 
     #[allow(clippy::type_complexity)]
@@ -88,7 +110,12 @@ impl ServiceUnitComm {
         usize,
         NotifyState,
     )> {
-        self.rentry().mng_get(self.unit().id())
+        let ret = self.owner().map(|u| self.rentry().mng_get(u.id()));
+        if ret.is_none() {
+            None
+        } else {
+            ret.unwrap()
+        }
     }
 
     pub(super) fn _reli(&self) -> Rc<Reliability> {
@@ -97,24 +124,6 @@ impl ServiceUnitComm {
 
     fn rentry(&self) -> Rc<ServiceRe> {
         self.umcomm.rentry()
-    }
-}
-
-struct ServiceUnitCommData {
-    unit: Weak<Unit>,
-}
-
-impl ServiceUnitCommData {
-    pub(self) fn new() -> ServiceUnitCommData {
-        ServiceUnitCommData { unit: Weak::new() }
-    }
-
-    fn attach_unit(&mut self, unit: Rc<Unit>) {
-        self.unit = Rc::downgrade(&unit);
-    }
-
-    pub(self) fn unit(&self) -> Rc<Unit> {
-        self.unit.clone().upgrade().unwrap()
     }
 }
 

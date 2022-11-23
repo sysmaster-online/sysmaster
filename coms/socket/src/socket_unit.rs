@@ -10,13 +10,13 @@ use crate::{
     socket_load::SocketLoad,
     socket_mng::SocketMng,
 };
-use libsysmaster::manager::{
-    ExecContext, SubUnit, UmIf, Unit, UnitActionError, UnitActiveState, UnitMngUtil,
-};
-use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use nix::{sys::signal::Signal, unistd::Pid};
 use std::{error::Error, path::PathBuf, rc::Rc};
+use sysmaster::reliability::{ReStation, Reliability};
+use sysmaster::unit::{
+    ExecContext, SubUnit, UmIf, UnitActionError, UnitActiveState, UnitBase, UnitMngUtil,
+};
 
 // the structuer of the socket unit type
 struct SocketUnit {
@@ -109,7 +109,7 @@ impl SubUnit for SocketUnit {
         self.mng.collect_fds()
     }
 
-    fn attach_unit(&self, unit: Rc<Unit>) {
+    fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
         self.comm.attach_unit(unit);
         self.db_insert();
     }
@@ -141,5 +141,5 @@ impl SocketUnit {
 }
 
 // define the method to create the instance of the unit
-use libsysmaster::declure_unitobj_plugin_with_param;
+use sysmaster::declure_unitobj_plugin_with_param;
 declure_unitobj_plugin_with_param!(SocketUnit, SocketUnit::new, PLUGIN_NAME, LOG_LEVEL);

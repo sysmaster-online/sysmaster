@@ -4,12 +4,12 @@
 use super::mount_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::mount_comm::MountUnitComm;
 use super::mount_mng::MountMng;
-use libsysmaster::{SubUnit, UmIf, UnitActiveState, UnitMngUtil};
-use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use nix::{sys::signal::Signal, unistd::Pid};
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::reliability::{ReStation, Reliability};
+use sysmaster::unit::{SubUnit, UmIf, UnitActionError, UnitActiveState, UnitBase, UnitMngUtil};
 
 struct MountUnit {
     comm: Rc<MountUnitComm>,
@@ -52,7 +52,7 @@ impl MountUnit {
 
 impl SubUnit for MountUnit {
     fn load(&self, _paths: Vec<PathBuf>) -> libutils::Result<(), Box<dyn std::error::Error>> {
-        self.comm.unit().set_ignore_on_isolate(true);
+        self.comm.owner().map(|u| u.set_ignore_on_isolate(true));
 
         Ok(())
     }
@@ -61,7 +61,7 @@ impl SubUnit for MountUnit {
         self.mng.mount_state_to_unit_state()
     }
 
-    fn attach_unit(&self, unit: Rc<libsysmaster::manager::Unit>) {
+    fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
         self.comm.attach_unit(unit);
         self.db_insert();
     }
@@ -72,7 +72,7 @@ impl SubUnit for MountUnit {
 
     fn dump(&self) {}
 
-    fn start(&self) -> libutils::Result<(), libsysmaster::manager::UnitActionError> {
+    fn start(&self) -> libutils::Result<(), UnitActionError> {
         let started = self.mng.start_check()?;
         if started {
             log::debug!("mount already in starting, just return immediately");
@@ -84,7 +84,7 @@ impl SubUnit for MountUnit {
         Ok(())
     }
 
-    fn stop(&self, _force: bool) -> libutils::Result<(), libsysmaster::manager::UnitActionError> {
+    fn stop(&self, _force: bool) -> libutils::Result<(), UnitActionError> {
         self.mng.enter_dead(true);
         Ok(())
     }
@@ -116,5 +116,5 @@ impl UnitMngUtil for MountUnit {
     }
 }*/
 
-use libsysmaster::declure_unitobj_plugin_with_param;
+use sysmaster::declure_unitobj_plugin_with_param;
 declure_unitobj_plugin_with_param!(MountUnit, MountUnit::new, PLUGIN_NAME, LOG_LEVEL);

@@ -5,8 +5,6 @@ use super::socket_comm::SocketUnitComm;
 use super::socket_rentry::{PortType, SectionSocket, SocketCommand};
 use crate::socket_base::NetlinkProtocol;
 use confique::Config;
-use libsysmaster::unit::{ExecCommand, KillContext, UnitRef};
-use libsysmaster::reliability::ReStation;
 use libutils::socket_util;
 use nix::errno::Errno;
 use nix::sys::socket::sockopt::ReuseAddr;
@@ -21,6 +19,36 @@ use std::fs;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::reliability::ReStation;
+use sysmaster::unit::{ExecCommand, KillContext};
+
+///
+#[derive(Default)]
+pub struct UnitRef {
+    source: Option<String>,
+    target: Option<String>,
+}
+
+impl UnitRef {
+    ///
+    pub fn new() -> Self {
+        UnitRef {
+            source: None,
+            target: None,
+        }
+    }
+
+    ///
+    pub fn set_ref(&mut self, source: String, target: String) {
+        self.source = Some(source);
+        self.target = Some(target);
+    }
+
+    ///
+    pub fn target(&self) -> Option<&String> {
+        self.target.as_ref()
+    }
+}
 
 pub struct SocketConfig {
     // associated objects
@@ -231,8 +259,11 @@ impl SocketConfig {
     }
 
     fn set_ref(&self, target: String) {
-        let source = self.comm.unit().id().to_string();
-        self.service.borrow_mut().set_ref(source, target);
+        self.comm.owner().map(|u| {
+            self.service
+                .borrow_mut()
+                .set_ref(u.id().to_string(), target)
+        });
     }
 
     fn push_port(&self, port: Rc<SocketPortConf>) {

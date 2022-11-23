@@ -4,28 +4,28 @@
 //! *  Call relation: mount_ unit->mount_ mng->mount_ comm
 
 use super::mount_rentry::{MountRe, MountState};
-use libsysmaster::{UmIf, Unit};
-use libsysmaster::Reliability;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, RwLock};
+use sysmaster::reliability::Reliability;
+use sysmaster::unit::{UmIf, UnitBase};
 
 pub(super) struct MountUnitComm {
-    data: RefCell<MountUnitCommData>,
+    owner: RefCell<Option<Rc<dyn UnitBase>>>,
     umcomm: Arc<MountUmComm>,
 }
 
 impl MountUnitComm {
     pub(super) fn new() -> Self {
         MountUnitComm {
-            data: RefCell::new(MountUnitCommData::new()),
+            owner: RefCell::new(None),
             umcomm: MountUmComm::get_instance(),
         }
     }
 
-    pub(super) fn attach_unit(&self, unit: Rc<Unit>) {
-        self.data.borrow_mut().attach_unit(unit);
+    pub(super) fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
+        self.owner.replace(Some(unit));
     }
 
     pub(super) fn attach_um(&self, um: Rc<dyn UmIf>) {
@@ -36,16 +36,31 @@ impl MountUnitComm {
         self.umcomm.attach_reli(reli)
     }
 
-    pub(super) fn unit(&self) -> Rc<Unit> {
-        self.data.borrow().unit()
+    pub(super) fn owner(&self) -> Option<Rc<dyn UnitBase>> {
+        if let Some(ref unit) = *self.owner.borrow() {
+            Some(Rc::clone(unit))
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn get_owner_id(&self) -> String {
+        let u = self.owner().map_or_else(
+            || "None".to_string(),
+            |u| {
+                let ret = u.id().to_string();
+                ret
+            },
+        );
+        u
     }
 
     pub(super) fn rentry_mng_insert(&self, state: MountState) {
-        self.rentry().mng_insert(self.unit().id(), state)
+        self.rentry().mng_insert(&self.get_owner_id(), state)
     }
 
     pub(super) fn rentry_mng_get(&self) -> Option<MountState> {
-        self.rentry().mng_get(self.unit().id())
+        self.rentry().mng_get(&self.get_owner_id())
     }
 
     fn rentry(&self) -> Rc<MountRe> {
@@ -54,23 +69,6 @@ impl MountUnitComm {
 
     pub(super) fn _um(&self) -> Rc<dyn UmIf> {
         self.umcomm.um()
-    }
-}
-struct MountUnitCommData {
-    unit: Weak<Unit>,
-}
-
-impl MountUnitCommData {
-    pub(self) fn new() -> MountUnitCommData {
-        MountUnitCommData { unit: Weak::new() }
-    }
-
-    fn attach_unit(&mut self, unit: Rc<Unit>) {
-        self.unit = Rc::downgrade(&unit);
-    }
-
-    pub(self) fn unit(&self) -> Rc<Unit> {
-        self.unit.clone().upgrade().unwrap()
     }
 }
 

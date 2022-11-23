@@ -1,11 +1,11 @@
 use super::job_entry::{Job, JobInfo, JobResult};
 use super::job_rentry::JobKind;
-use crate::core::unit::UnitActiveState;
-use crate::core::unit::UnitX;
 use crate::core::unit::UnitRelationAtom;
+use crate::core::unit::UnitX;
 use std::cell::RefCell;
 use std::collections::{HashMap, LinkedList};
 use std::rc::Rc;
+use sysmaster::unit::UnitActiveState;
 
 const JOBUNIT_SQ_MUTOP_MAX_NUM: usize = 1; // stop or (restart|start|reload), which can change the unit's stage
 const JOBUNIT_SQ_MAX_NUM: usize = 3; // [stop] | [(restart|start|reload)->verify->nop]
@@ -805,14 +805,14 @@ pub(super) fn job_merge_trigger_iskeep(kind: JobKind) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::DataManager;
     use crate::core::job::job_rentry::JobRe;
+    use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::core::unit::test_utils;
+    use crate::core::unit::DataManager;
     use crate::core::unit::UnitX;
     use crate::core::unit::{JobMode, UnitRe};
-    use libsysmaster::reliability::Reliability;
     use libutils::logger;
+    use sysmaster::reliability::Reliability;
 
     #[test]
     fn juv_api_len() {
@@ -1286,7 +1286,6 @@ mod tests {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
 
-        let unitx = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
-        unitx
+        test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }
 }

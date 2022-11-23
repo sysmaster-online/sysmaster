@@ -3,18 +3,21 @@ name = "sysmaster"
 version = "0.2.2"
 authors = ["sysmaster"]
 edition = "2018"
+build = "build.rs"
 
 [lib]
-name = "libsysmaster"
+crate-type = ["dylib"]
 path = "sysmaster/lib.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
+
 name = "sysmaster"
 path = "sysmaster/main.rs"
 
-[dev-dependencies]
-libtests = { path = "libs/libtests" }
+[dev-dependencies.libtests]
+path = "libs/libtests"
+
 
 [dependencies]
 # internal libraries
@@ -54,12 +57,13 @@ fnmatch-regex = "0.2.0"
 
 [build-dependencies]
 prost-build = "0.9" # 编译 protobuf
+pkg-config = "0.3.16"
 
 [profile.dev]
-panic = 'abort'
+panic = 'unwind'
 
 [profile.release]
-panic = 'abort'
+panic = 'unwind'
 
 [workspace]
 members = [

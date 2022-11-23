@@ -1,9 +1,8 @@
-use super::rentry::ReliLastFrame;
-use libsysmaster::reliability::Reliability;
 use libevent::{EventType, Events, Source};
 use libutils::Result;
 use nix::sys::signal::Signal;
 use std::{convert::TryFrom, rc::Rc};
+use sysmaster::reliability::{ReliLastFrame, Reliability};
 
 pub(super) struct Signals<T> {
     // associated objects

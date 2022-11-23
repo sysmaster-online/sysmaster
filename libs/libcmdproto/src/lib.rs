@@ -7,4 +7,3 @@ extern crate strum;
 };*/
 
 pub mod proto;
-

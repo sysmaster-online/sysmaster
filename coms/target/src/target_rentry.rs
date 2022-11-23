@@ -1,6 +1,6 @@
-use libsysmaster::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
+use sysmaster::reliability::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 
 const RELI_DB_HTARGET_MNG: &str = "tarmng";
 

@@ -4,9 +4,9 @@
 use crate::socket_comm::SocketUnitComm;
 use crate::socket_config::SocketConfig;
 use crate::socket_rentry::PortType;
-use libsysmaster::manager::{UnitRelations, UnitType};
 use std::path::Path;
 use std::{error::Error, rc::Rc};
+use sysmaster::unit::{UnitRelations, UnitType};
 
 pub(super) struct SocketLoad {
     config: Rc<SocketConfig>,
@@ -28,11 +28,13 @@ impl SocketLoad {
                 self.load_related_unit(UnitType::UnitService)?;
             }
 
-            self.comm.unit().insert_two_deps(
-                UnitRelations::UnitBefore,
-                UnitRelations::UnitTriggers,
-                self.config.unit_ref_target().unwrap(),
-            );
+            self.comm.owner().map(|u| {
+                u.insert_two_deps(
+                    UnitRelations::UnitBefore,
+                    UnitRelations::UnitTriggers,
+                    self.config.unit_ref_target().unwrap(),
+                )
+            });
         }
 
         Ok(())
@@ -43,16 +45,18 @@ impl SocketLoad {
     }
 
     fn load_related_unit(&self, related_type: UnitType) -> Result<(), Box<dyn Error>> {
-        let unit_name = self.comm.unit().id().to_string();
+        let unit_name = self.comm.owner().map(|u| u.id().to_string());
         let suffix = String::from(related_type);
         if suffix.is_empty() {
             return Err(format!("failed to load related unit {}", suffix).into());
         }
-
-        let stem_name = Path::new(&unit_name).file_stem().unwrap().to_str().unwrap();
+        if unit_name.is_none() {
+            return Err(format!("failed to load related unit {} unit name is none", suffix).into());
+        }
+        let u_name = unit_name.unwrap();
+        let stem_name = Path::new(&u_name).file_stem().unwrap().to_str().unwrap();
         let relate_name = format!("{}.{}", stem_name, suffix);
         self.config.set_unit_ref(relate_name)?;
-
         Ok(())
     }
 

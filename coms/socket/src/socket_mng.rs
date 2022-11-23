@@ -10,11 +10,6 @@ use super::{
 };
 use libevent::EventState;
 use libevent::{EventType, Events, Source};
-use libsysmaster::manager::{
-    ExecCommand, ExecContext, KillOperation, ReliLastFrame, UnitActionError, UnitActiveState,
-    UnitNotifyFlags, UnitType,
-};
-use libsysmaster::{ReStation, Reliability};
 use libutils::Error;
 use libutils::IN_SET;
 use nix::errno::Errno;
@@ -23,6 +18,14 @@ use nix::{sys::signal::Signal, unistd::Pid};
 use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
+use sysmaster::reliability::{ReStation, Reliability};
+use sysmaster::{
+    reliability::ReliLastFrame,
+    unit::{
+        ExecCommand, ExecContext, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags,
+        UnitType,
+    },
+};
 
 impl SocketState {
     pub(super) fn to_unit_active_state(self) -> UnitActiveState {
@@ -218,12 +221,11 @@ impl SocketMngData {
                 Err(e) => Err(e),
             }
         })?;
-
-        if !self.comm.unit().test_start_limit() {
+        let ret = self.comm.owner().map(|u| u.test_start_limit());
+        if ret.is_none() || !ret.unwrap() {
             self.enter_dead(SocketResult::FailureStartLimitHit);
             return Err(UnitActionError::UnitActionECanceled);
         }
-
         Ok(false)
     }
 
@@ -291,10 +293,20 @@ impl SocketMngData {
                 match self.spawn.start_socket(&cmd) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(e) => {
-                        log::error!(
-                            "Failed to run start pre service: {}, error: {:?}",
-                            self.comm.unit().id(),
-                            e
+                        self.comm.owner().map_or_else(
+                            || {
+                                log::error!(
+                                "Failed to run start pre service, unit name is None,error: {:?}",
+                                e
+                            );
+                            },
+                            |u| {
+                                log::error!(
+                                    "Failed to run start pre service: {}, error: {:?}",
+                                    u.id(),
+                                    e
+                                );
+                            },
                         );
                         self.enter_dead(SocketResult::FailureResources);
                         return;
@@ -326,9 +338,9 @@ impl SocketMngData {
                 match self.spawn.start_socket(&cmd) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
-                        log::error!(
-                            "Failed to run start post service: {}",
-                            self.comm.unit().id()
+                        self.comm.owner().map_or(
+                            log::error!("Failed to run start post service unit id is None"),
+                            |u| log::error!("Failed to run start post service: {}", u.id()),
                         );
                         self.enter_stop_pre(SocketResult::FailureResources);
                         return;
@@ -352,42 +364,37 @@ impl SocketMngData {
     }
 
     fn enter_running(&self, fd: i32) {
-        if self.comm.um().has_stop_job(self.comm.unit().id()) {
-            if fd >= 0 {
-                *self.refused.borrow_mut() += 1;
+        if let Some(u) = self.comm.owner() {
+            if self.comm.um().has_stop_job(u.id()) {
+                if fd >= 0 {
+                    *self.refused.borrow_mut() += 1;
+                    return;
+                }
+                self.flush_ports();
                 return;
             }
+            if fd < 0 {
+                if !self.comm.um().relation_active_or_pending(u.id()) {
+                    if self.config.unit_ref_target().is_none() {
+                        self.enter_stop_pre(SocketResult::FailureResources);
+                        return;
+                    }
+                    let service = self.config.unit_ref_target().unwrap();
 
-            self.flush_ports();
-            return;
-        }
-
-        if fd < 0 {
-            if !self
-                .comm
-                .um()
-                .relation_active_or_pending(self.comm.unit().id())
-            {
-                if self.config.unit_ref_target().is_none() {
-                    self.enter_stop_pre(SocketResult::FailureResources);
-                    return;
+                    // start corresponding *.service
+                    self.rentry().set_last_frame(SocketReFrame::FdListen(false)); // protect 'start_unit'
+                    let ret = self.comm.um().start_unit(&service);
+                    self.rentry().set_last_frame(SocketReFrame::FdListen(true));
+                    if ret.is_err() {
+                        self.enter_stop_pre(SocketResult::FailureResources);
+                        return;
+                    }
                 }
-                let service = self.config.unit_ref_target().unwrap();
-
-                // start corresponding *.service
-                self.rentry().set_last_frame(SocketReFrame::FdListen(false)); // protect 'start_unit'
-                let ret = self.comm.um().start_unit(&service);
-                self.rentry().set_last_frame(SocketReFrame::FdListen(true));
-                if ret.is_err() {
-                    self.enter_stop_pre(SocketResult::FailureResources);
-                    return;
-                }
+                self.set_state(SocketState::Running);
+            } else {
+                // template support
+                todo!()
             }
-
-            self.set_state(SocketState::Running);
-        } else {
-            // template support
-            todo!()
         }
     }
 
@@ -406,9 +413,9 @@ impl SocketMngData {
                 match self.spawn.start_socket(&cmd) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
-                        log::error!(
-                            "Failed to run start post service: {}",
-                            self.comm.unit().id()
+                        self.comm.owner().map_or(
+                            log::error!("Failed to run stop pre cmd and service unit id is None"),
+                            |u| log::error!("Failed to run stop pre cmd for service: {}", u.id()),
                         );
                         self.enter_stop_post(SocketResult::FailureResources);
                         return;
@@ -433,9 +440,15 @@ impl SocketMngData {
                 match self.spawn.start_socket(&cmd) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
-                        log::error!(
-                            "Failed to run start post service: {}",
-                            self.comm.unit().id()
+                        self.comm.owner().map_or(
+                            log::error!("Failed to run stop post cmd and service unit id is None"),
+                            |u| {
+                                log::error!(
+                                    "Failed to run stop post cmd for service: {},err {}",
+                                    u.id(),
+                                    _e
+                                )
+                            },
                         );
                         self.enter_signal(
                             SocketState::FinalSigterm,
@@ -457,25 +470,22 @@ impl SocketMngData {
         }
 
         let op = state.to_kill_operation();
-        match self.comm.unit().kill_context(
-            self.config.kill_context(),
-            None,
-            self.pid.control(),
-            op,
-        ) {
-            Ok(_) => {}
-            Err(_e) => {
-                if IN_SET!(
-                    state,
-                    SocketState::StopPreSigterm,
-                    SocketState::StopPreSigkill
-                ) {
-                    return self.enter_stop_post(SocketResult::FailureResources);
-                } else {
-                    return self.enter_dead(SocketResult::FailureResources);
+        if let Some(u) = self.comm.owner() {
+            match u.kill_context(self.config.kill_context(), None, self.pid.control(), op) {
+                Ok(_) => {}
+                Err(_e) => {
+                    if IN_SET!(
+                        state,
+                        SocketState::StopPreSigterm,
+                        SocketState::StopPreSigkill
+                    ) {
+                        return self.enter_stop_post(SocketResult::FailureResources);
+                    } else {
+                        return self.enter_dead(SocketResult::FailureResources);
+                    }
                 }
             }
-        }
+        };
 
         if state == SocketState::StopPreSigterm {
             self.enter_signal(SocketState::StopPreSigkill, SocketResult::Success);
@@ -508,7 +518,10 @@ impl SocketMngData {
             match self.spawn.start_socket(&cmd) {
                 Ok(pid) => self.pid.set_control(pid),
                 Err(_e) => {
-                    log::error!("failed to run main command: {}", self.comm.unit().id());
+                    self.comm.owner().map_or(
+                        log::error!("failed to run main command unit is None,Error: {}", _e),
+                        |u| log::error!("failed to run main command unit{},err {}", u.id(), _e),
+                    );
                 }
             }
         }
@@ -616,11 +629,13 @@ impl SocketMngData {
         // todo!()
         // trigger the unit the dependency trigger_by
 
-        self.comm.unit().notify(
-            original_state.to_unit_active_state(),
-            state.to_unit_active_state(),
-            UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
-        );
+        self.comm.owner().map(|u| {
+            u.notify(
+                original_state.to_unit_active_state(),
+                state.to_unit_active_state(),
+                UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
+            )
+        });
     }
 
     fn state(&self) -> SocketState {
@@ -873,11 +888,10 @@ impl SocketMngPort {
 
 #[cfg(test)]
 mod tests {
+    use super::SocketState;
+    use sysmaster::unit::UnitActiveState;
     #[test]
     fn test_socket_active_state() {
-        use super::SocketState;
-        use libsysmaster::manager::UnitActiveState;
-
         assert_eq!(
             SocketState::Dead.to_unit_active_state(),
             UnitActiveState::UnitInActive

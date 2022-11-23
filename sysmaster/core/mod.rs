@@ -5,14 +5,13 @@
 ///       ↑
 ///[reliability] → [unit   job  plugin]
 ///            ↖  ↗
-///            [butil] 
-
-pub (in crate) mod manager;
-pub (in crate) mod unit;
-pub (in crate) mod job;
-pub (in crate) mod plugin;
-pub (in crate) mod reliability;
-pub (in self) mod  butil;
+///            [butil]
+///
+pub(self) mod butil;
+pub(crate) mod job;
+pub(crate) mod manager;
+pub(crate) mod plugin;
+pub(crate) mod unit;
 
 // mount not to be here;
-pub (in crate) mod mount;
+pub(crate) mod mount;

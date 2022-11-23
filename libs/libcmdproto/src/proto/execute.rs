@@ -15,13 +15,10 @@ use super::{
     UnitFile,
 };
 
-
 use http::StatusCode;
 use libutils::Result;
 use std::io::Error;
 use std::rc::Rc;
-
-
 
 pub(crate) trait Executer {
     /// deal Command，return Response

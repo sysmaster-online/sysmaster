@@ -1,14 +1,15 @@
-use serde::{Deserializer, Deserialize};
+//!
+use serde::{Deserialize, Deserializer};
 
+///
 pub trait DeserializeWith: Sized {
+    /// Item which  deserialize_with return
     type Item;
     ///
     fn deserialize_with<'de, D>(de: D) -> Result<Self::Item, D::Error>
     where
         D: Deserializer<'de>;
 }
-
-
 
 impl DeserializeWith for Vec<String> {
     type Item = Self;

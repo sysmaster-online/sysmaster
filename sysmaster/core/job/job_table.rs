@@ -3,7 +3,7 @@ use super::job_entry::{Job, JobConf, JobInfo, JobResult};
 use super::job_rentry::JobKind;
 use super::job_unit_entry::JobUnit;
 use super::JobErrno;
-use crate::core::unit::{UnitRelationAtom, UnitDb, UnitX, JobMode};
+use crate::core::unit::{JobMode, UnitDb, UnitRelationAtom, UnitX};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
@@ -970,14 +970,14 @@ pub(super) fn jobs_2_units(jobs: &[Rc<Job>]) -> Vec<Rc<UnitX>> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::job_rentry::JobRe;
+    use super::*;
     use crate::core::manager::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::DataManager;
     use crate::core::unit::test_utils;
+    use crate::core::unit::DataManager;
     use crate::core::unit::UnitRe;
-    use libsysmaster::reliability::Reliability;
     use libutils::logger;
+    use sysmaster::reliability::Reliability;
 
     #[test]
     fn job_table_record_suspend() {
@@ -1004,7 +1004,6 @@ mod tests {
     ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-        let unitx = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
-        unitx
+        test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }
 }

@@ -1,10 +1,10 @@
 use super::job_entry::{Job, JobConf};
 use super::job_rentry::{JobKind, JobRe};
 use crate::core::unit::UnitX;
-use libsysmaster::reliability::Reliability;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
+use sysmaster::reliability::Reliability;
 
 pub(super) struct JobAlloc {
     // associated objects

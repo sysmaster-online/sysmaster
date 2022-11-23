@@ -13,7 +13,7 @@ use std::fs::{self, File};
 use std::io::Error;
 use std::path::Path;
 use std::rc::Rc;
-use std::{thread};
+use std::thread;
 use std::time::Duration;
 
 const RELI_DEBUG_SWITCH_FILE: &str = "switch.debug";
@@ -70,8 +70,8 @@ impl Reliability {
     }
 
     /// create data base for reliability
-    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>,heedError>
-    where 
+    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>, heedError>
+    where
         KC: 'static,
         DC: 'static,
     {
@@ -115,7 +115,7 @@ impl Reliability {
     }
 
     /// set the fd's 'cloexec' flag and record it
-    pub fn fd_cloexec(&self, fd: i32, cloexec: bool) -> Result<(),Errno> {
+    pub fn fd_cloexec(&self, fd: i32, cloexec: bool) -> Result<(), Errno> {
         self.pending.fd_cloexec(fd, cloexec)
     }
 
@@ -289,7 +289,6 @@ impl Reliability {
         self.history.commit();
     }
 }
-
 
 /// do the debug action: enable or disable switch flag. effective after restart.
 #[allow(dead_code)]

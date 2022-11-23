@@ -5,10 +5,6 @@ use super::service_mng::RunningData;
 use super::service_mng::ServiceMng;
 use super::service_monitor::ServiceMonitor;
 use super::service_rentry::{NotifyAccess, ServiceCommand, ServiceType};
-use libsysmaster::unit::{
-    ExecContext, SubUnit, UmIf, Unit, UnitActionError, UnitActiveState, UnitMngUtil, UnitRelations,
-};
-use libsysmaster::reliability::{ReStation, Reliability};
 use libutils::error::Error as ServiceError;
 use libutils::logger;
 use nix::sys::signal::Signal;
@@ -18,6 +14,11 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::reliability::{ReStation, Reliability};
+use sysmaster::unit::{
+    ExecContext, SubUnit, UmIf, UnitActionError, UnitActiveState, UnitBase, UnitMngUtil,
+    UnitRelations,
+};
 
 struct ServiceUnit {
     comm: Rc<ServiceUnitComm>,
@@ -125,7 +126,7 @@ impl SubUnit for ServiceUnit {
         self.mng.current_active_state()
     }
 
-    fn attach_unit(&self, unit: Rc<Unit>) {
+    fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
         self.comm.attach_unit(unit);
         self.db_insert();
     }
@@ -186,18 +187,18 @@ impl ServiceUnit {
                     .insert_env(content[0].to_string(), content[1].to_string());
             }
         }
-
-        if let Some(sockets) = self.config.sockets() {
-            for socket in sockets {
-                self.comm.unit().insert_two_deps(
-                    UnitRelations::UnitWants,
-                    UnitRelations::UnitAfter,
-                    socket.to_string(),
-                );
-
-                self.comm
-                    .unit()
-                    .insert_dep(UnitRelations::UnitTriggeredBy, socket.clone());
+        if let Some(owner) = self.comm.owner() {
+            if let Some(sockets) = self.config.sockets() {
+                for socket in sockets {
+                    let ret = owner.insert_two_deps(
+                        UnitRelations::UnitWants,
+                        UnitRelations::UnitAfter,
+                        socket.to_string(),
+                    );
+                    if ret.is_ok() {
+                        owner.insert_dep(UnitRelations::UnitTriggeredBy, socket.clone());
+                    }
+                }
             }
         }
 
@@ -259,5 +260,5 @@ impl ServiceUnit {
     }
 }*/
 
-use libsysmaster::declure_unitobj_plugin_with_param;
+use sysmaster::declure_unitobj_plugin_with_param;
 declure_unitobj_plugin_with_param!(ServiceUnit, ServiceUnit::new, PLUGIN_NAME, LOG_LEVEL);

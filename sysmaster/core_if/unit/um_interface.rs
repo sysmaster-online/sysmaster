@@ -2,26 +2,12 @@ use std::{path::PathBuf, rc::Rc};
 
 use libevent::Events;
 use nix::unistd::Pid;
-/// error number of manager
-#[derive(Debug)]
-pub enum MngErrno {
-    /// invalid input
-    Input,
-    /// not existed
-    NotExisted,
-    /// Internal error
-    Internal,
-    /// not supported
-    NotSupported,
-}
 
+use crate::reliability::{ReStation, Reliability};
 
-use crate::reliability::{Reliability, ReStation};
-
-use super::{
-    ExecCmdError, ExecCommand, ExecContext, ExecParameters};
-use super::{Unit,UnitDependencyMask, UnitRelationAtom, UnitRelations, UnitType,};
-use super::{UnitActionError,};
+use super::{ExecCmdError, ExecCommand, ExecContext, ExecParameters, UnitActiveState, UnitType};
+use super::{MngErrno, UnitActionError};
+use super::{UnitDependencyMask, UnitRelationAtom, UnitRelations};
 
 ///The trait Defining Shared Behavior of UnitManager
 ///
@@ -33,8 +19,13 @@ use super::{UnitActionError,};
 ///
 pub trait UmIf {
     /// get the unit the has atom relation with the unit
-    fn get_dependency_list(&self, _unit_name: &str, _atom: UnitRelationAtom) -> Vec<Rc<Unit>> {
+    fn get_dependency_list(&self, _unit_name: &str, _atom: UnitRelationAtom) -> Vec<String> {
         Vec::new()
+    }
+
+    /// judge the unit has default dependency
+    fn unit_has_default_dependecy(&self, _unit_name: &str) -> bool {
+        false
     }
     /// check the unit s_u_name and t_u_name have atom relation
     fn unit_has_dependecy(
@@ -82,11 +73,15 @@ pub trait UmIf {
         Ok(())
     }
 
-    ///
-    fn load_unit(&self, _name: &str) -> Option<Rc<Unit>> {
-        None
+    /// call the unit start function
+    fn unit_start(&self, _name: &str) -> Result<(), UnitActionError> {
+        Ok(())
     }
 
+    /// call the unit stop function
+    fn unit_stop(&self, _name: &str, _force: bool) -> Result<(), UnitActionError> {
+        Ok(())
+    }
     /// why need events? need reconstruct
     fn events(&self) -> Rc<Events> {
         Rc::new(Events::new().unwrap())
@@ -109,7 +104,7 @@ pub trait UmIf {
     /// call the exec spawn to start the child service
     fn exec_spawn(
         &self,
-        _unit: &Unit,
+        _unit_name: &str,
         _cmdline: &ExecCommand,
         _params: &ExecParameters,
         _ctx: Rc<ExecContext>,
@@ -131,18 +126,16 @@ pub trait UmIf {
         Vec::new()
     }
 
-    ///
-    fn units_get_all(&self, _unit_type: Option<UnitType>) -> Vec<Rc<Unit>> {
+    /// get all unit in sysmaster
+    fn units_get_all(&self, _unit_type: Option<UnitType>) -> Vec<String> {
         Vec::new()
     }
 
-    ///
-    fn units_get(&self, _name: &str) -> Option<Rc<Unit>> {
-        None
+    /// check the unit active state of of reference name
+    fn current_active_state(&self, _unit_name: &str) -> UnitActiveState {
+        UnitActiveState::UnitFailed
     }
 }
-
-
 
 /// the trait used for attach UnitManager to sub unit
 pub trait UnitMngUtil {
@@ -163,4 +156,22 @@ pub trait UnitManagerObj: UnitMngUtil + ReStation {
     }
     ///
     fn shutdown(&self) {}
+}
+
+/// #[macro_use]
+/// the macro for create a sub unit-manager instance
+#[macro_export]
+macro_rules! declure_umobj_plugin {
+    ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {
+        // method for create the sub-unit-manager instance
+        #[no_mangle]
+        pub fn __um_obj_create() -> *mut dyn $crate::unit::UnitManagerObj {
+            logger::init_log_with_default($name, $level);
+            let construcotr: fn() -> $unit_type = $constructor;
+
+            let obj = construcotr();
+            let boxed: Box<dyn $crate::unit::UnitManagerObj> = Box::new(obj);
+            Box::into_raw(boxed)
+        }
+    };
 }

@@ -2,10 +2,10 @@
 //!
 use super::target_comm::TargetUnitComm;
 use super::target_rentry::TargetState;
-use libsysmaster::manager::{UnitActionError, UnitActiveState, UnitNotifyFlags};
-use libsysmaster::ReStation;
 use libutils::IN_SET;
 use std::{cell::RefCell, rc::Rc};
+use sysmaster::reliability::ReStation;
+use sysmaster::unit::{UnitActionError, UnitActiveState, UnitNotifyFlags};
 
 impl TargetState {
     fn to_unit_state(self) -> UnitActiveState {

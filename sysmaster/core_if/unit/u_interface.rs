@@ -1,23 +1,26 @@
-use std::{collections::HashMap, error::Error, path::PathBuf, rc::Rc};
+use super::u_error::UnitActionError;
+use super::u_kill::{KillContext, KillOperation};
+use super::u_state::{UnitActiveState, UnitNotifyFlags};
+use super::um_interface::UnitMngUtil;
+use super::{super::reliability::ReStation, UnitRelations};
+use libutils::error::Error as ServiceError;
+use libutils::Result;
 use nix::{
     sys::{signal::Signal, socket::UnixCredentials},
     unistd::Pid,
 };
-use libutils::error::Error as ServiceError;
-use super::{super::reliability::ReStation, u_state::KillOperation};
-use super::UnitActionError;
-use super::UnitMngUtil;
-use super::UnitActiveState;
+use std::{collections::HashMap, error::Error, path::PathBuf, rc::Rc};
 
 ///The trait Defining Shared Behavior from Base Unit  to SUB unit
 ///
 /// only one impl,sub unit ref by impl UnitBase
 ///
-pub trait UnitBase{
+pub trait UnitBase {
+    ///
     fn id(&self) -> &String;
-
+    ///
     fn test_start_limit(&self) -> bool;
-
+    ///
     fn kill_context(
         &self,
         k_context: Rc<KillContext>,
@@ -25,6 +28,39 @@ pub trait UnitBase{
         c_pid: Option<Pid>,
         ko: KillOperation,
     ) -> Result<(), Box<dyn Error>>;
+
+    ///
+    fn notify(
+        &self,
+        original_state: UnitActiveState,
+        new_state: UnitActiveState,
+        flags: UnitNotifyFlags,
+    );
+
+    ///
+    fn prepare_exec(&self) -> Result<()>;
+
+    ///
+    fn default_dependencies(&self) -> bool;
+
+    ///
+    fn insert_two_deps(
+        &self,
+        ra: UnitRelations,
+        rb: UnitRelations,
+        u_name: String,
+    ) -> Result<(), Box<dyn Error>>;
+    ///
+    fn insert_dep(&self, ra: UnitRelations, u_name: String);
+
+    ///
+    fn cg_path(&self) -> PathBuf;
+
+    ///
+    fn ignore_on_isolate(&self) -> bool;
+
+    ///
+    fn set_ignore_on_isolate(&self, ignore_on_isolate: bool);
 }
 
 ///The trait Defining Shared Behavior of sub unit

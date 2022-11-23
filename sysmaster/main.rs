@@ -5,10 +5,9 @@ extern crate lazy_static;
 
 mod core;
 
-use libc::c_int;
 use crate::core::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::core::mount::mount_setup;
-use libsysmaster::reliability;
+use libc::c_int;
 use libutils::logger::{self};
 use log::{self};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -17,8 +16,7 @@ use std::convert::TryFrom;
 use std::env::{self};
 use std::error::Error;
 use std::ffi::CString;
-
-
+use sysmaster::reliability;
 
 fn main() -> Result<(), Box<dyn Error>> {
     logger::init_log_with_console("sysmaster", 4);

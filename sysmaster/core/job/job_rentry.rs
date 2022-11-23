@@ -1,8 +1,8 @@
 use crate::core::manager::rentry::{RELI_DB_HJOB_SUSPENDS, RELI_DB_HJOB_TRIGGER};
-use libsysmaster::reliability::{Reliability,ReDb};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use std::rc::Rc;
+use sysmaster::reliability::{ReDb, Reliability};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub(in crate::core) enum JobKind {

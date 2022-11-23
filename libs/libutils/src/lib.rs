@@ -14,9 +14,9 @@ pub mod mount_util;
 pub mod path_util;
 pub mod proc_cmdline;
 pub mod process_util;
+pub mod serialize;
 pub mod socket_util;
 pub mod time_util;
-pub mod serialize;
 
 pub mod condition;
 pub use anyhow::*;

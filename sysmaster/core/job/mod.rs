@@ -15,7 +15,7 @@ pub(super) enum JobErrno {
     BadRequest,
 }
 
-use crate::core::manager::MngErrno;
+use sysmaster::unit::MngErrno;
 impl From<JobErrno> for MngErrno {
     fn from(err: JobErrno) -> Self {
         match err {

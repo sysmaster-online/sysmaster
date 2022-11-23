@@ -1,4 +1,4 @@
-use super::super::{UnitRelations,UnitRelationAtom};
+use super::super::{UnitRelationAtom, UnitRelations};
 
 #[allow(dead_code)]
 pub(in crate::core::unit) fn unit_relation_to_atom(

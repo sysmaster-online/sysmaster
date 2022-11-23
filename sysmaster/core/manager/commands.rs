@@ -1,12 +1,11 @@
-use super::rentry::ReliLastFrame;
 use libcmdproto::proto::execute::ExecuterAction;
 use libcmdproto::proto::ProstServerStream;
-use libsysmaster::reliability::Reliability;
 use libevent::{EventType, Events, Source};
 use libutils::{Error, Result};
 use std::net::{SocketAddr, TcpListener};
 use std::os::unix::io::RawFd;
 use std::{os::unix::prelude::AsRawFd, rc::Rc};
+use sysmaster::reliability::{ReliLastFrame, Reliability};
 
 pub(super) struct Commands<T> {
     // associated objects

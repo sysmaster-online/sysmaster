@@ -1,7 +1,7 @@
 use std::{error::Error, rc::Rc};
 
-use libsysmaster::unit::{ExecCommand, ExecContext, ExecParameters};
 use nix::unistd::Pid;
+use sysmaster::unit::{ExecCommand, ExecContext, ExecParameters};
 
 use crate::socket_comm::SocketUnitComm;
 
@@ -21,18 +21,21 @@ impl SocketSpawn {
     pub(super) fn start_socket(&self, cmdline: &ExecCommand) -> Result<Pid, Box<dyn Error>> {
         let params = ExecParameters::new();
 
-        let unit = self.comm.unit();
-        let um = self.comm.um();
-        unit.prepare_exec()?;
-        match um.exec_spawn(&unit, cmdline, &params, self.exec_ctx.clone()) {
-            Ok(pid) => {
-                um.child_watch_pid(unit.id(), pid);
-                Ok(pid)
+        if let Some(unit) = self.comm.owner() {
+            let um = self.comm.um();
+            unit.prepare_exec()?;
+            match um.exec_spawn(&unit.id(), cmdline, &params, self.exec_ctx.clone()) {
+                Ok(pid) => {
+                    um.child_watch_pid(unit.id(), pid);
+                    Ok(pid)
+                }
+                Err(_e) => {
+                    log::error!("failed to start socket: {}", unit.id());
+                    Err("spawn exec return error".to_string().into())
+                }
             }
-            Err(_e) => {
-                log::error!("failed to start socket: {}", unit.id());
-                Err("spawn exec return error".to_string().into())
-            }
+        } else {
+            Err("spawn exec return error".to_string().into())
         }
     }
 }

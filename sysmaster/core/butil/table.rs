@@ -83,7 +83,10 @@ where
     }
 
     #[allow(dead_code)]
-    pub(in crate::core) fn unsubscribe(&mut self, name: &str) -> Option<Rc<dyn TableSubscribe<K, V>>> {
+    pub(in crate::core) fn unsubscribe(
+        &mut self,
+        name: &str,
+    ) -> Option<Rc<dyn TableSubscribe<K, V>>> {
         self.subscribers.remove(name)
     }
 

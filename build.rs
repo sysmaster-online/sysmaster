@@ -1,5 +1,12 @@
+//!
 // if use env out_dir need add build.rs
 use std::{env, process::Command};
+
+macro_rules! warn {
+    ($message:expr) => {
+        println!("cargo:warning={}", $message);
+    };
+}
 
 fn main() {
     let m_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
@@ -12,7 +19,17 @@ fn main() {
         .args(&[t[0].to_string()])
         .status()
         .unwrap();
-    println!("{:?}", result);
+    warn!(format!("{:?}", result));
+
+    warn!(format!(
+        "{:?}",
+        pkg_config::Config::new().probe("liblmdb").is_ok()
+    ));
+    //println!("cargo:rust-flags = -C prefer-dynamic -C target-feature=-crt-static");
+    //pkg_config::Config::new().probe("lmdb").unwrap();
+
+    println!("cargo:rustc-link-search=native=/usr/lib");
+    println!("cargo:rustc-link-lib=dylib=lmdb");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=config.service");
 }

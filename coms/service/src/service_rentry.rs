@@ -1,10 +1,11 @@
 #![allow(non_snake_case)]
 use confique::Config;
-use libsysmaster::{DeserializeWith, ExecCommand, KillMode};
-use libsysmaster::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
+use libutils::serialize::DeserializeWith;
 use nix::unistd::Pid;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::rc::Rc;
+use sysmaster::reliability::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
+use sysmaster::unit::{ExecCommand, KillMode};
 
 struct ServiceReDb<K, V>(ReDb<K, V>);
 
@@ -40,6 +41,7 @@ impl Default for ServiceType {
 }
 
 impl DeserializeWith for ServiceType {
+    type Item = Self;
     fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -71,19 +73,19 @@ pub(super) struct SectionService {
     #[config(deserialize_with = ServiceType::deserialize_with)]
     #[config(default = "simple")]
     pub Type: ServiceType,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecStart: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecStartPre: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecStartPost: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecStop: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecStopPost: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecReload: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecCondition: Option<Vec<ExecCommand>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub Sockets: Option<Vec<String>>,

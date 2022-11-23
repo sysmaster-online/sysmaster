@@ -1,8 +1,35 @@
 use std::cell::RefCell;
 
+use nix::sys::signal::Signal;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use libutils::serialize::DeserializeWith;
+
+/// kill operation send to process
+#[allow(missing_docs)]
+#[derive(PartialEq, Eq)]
+pub enum KillOperation {
+    KillTerminate,
+    KillTerminateAndLog,
+    KillRestart,
+    KillKill,
+    KillWatchdog,
+    KillInvalid,
+}
+
+impl KillOperation {
+    ///
+    pub fn to_signal(&self) -> Signal {
+        match *self {
+            KillOperation::KillTerminate
+            | KillOperation::KillTerminateAndLog
+            | KillOperation::KillRestart => Signal::SIGTERM,
+            KillOperation::KillKill => Signal::SIGKILL,
+            KillOperation::KillWatchdog => Signal::SIGABRT,
+            _ => Signal::SIGTERM,
+        }
+    }
+}
 
 /// the method to kill the process
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,7 +83,8 @@ impl KillContext {
         *self.kill_mode.borrow_mut() = mode;
     }
 
-    pub(crate) fn kill_mode(&self) -> KillMode {
+    /// get the kill mode
+    pub fn kill_mode(&self) -> KillMode {
         *self.kill_mode.borrow()
     }
 }

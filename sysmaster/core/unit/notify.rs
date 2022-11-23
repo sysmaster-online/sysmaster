@@ -2,9 +2,6 @@ use super::unit_datastore::UnitDb;
 use super::unit_entry::UnitX;
 use super::unit_rentry::UnitRe;
 use crate::core::job::JobManager;
-use libsysmaster::reliability::{ReStation, Reliability};
-use crate::core::manager::rentry::ReliLastFrame;
-use libc;
 use libevent::{EventState, EventType, Events, Source};
 use libutils::fd_util;
 use libutils::Error;
@@ -18,6 +15,7 @@ use std::{
     cell::RefCell, collections::HashMap, fs, io::IoSliceMut, os::unix::prelude::RawFd,
     path::PathBuf, rc::Rc,
 };
+use sysmaster::reliability::{ReStation, ReliLastFrame, Reliability};
 
 const NOTIFY_SOCKET: &str = "/run/sysmaster/notify";
 

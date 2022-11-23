@@ -1,20 +1,26 @@
+///sysmaster entry
+/// 1. Load all unit need loaded in a system
+/// 2. Drive unit status through job engine;
+/// 3. Mainlain all unit life cycle
+///
+///                    / ---->unit_load
+/// ManagerX-> Manager | ---->job_manager
+///                      ---->rentry
+///
 use super::super::job::{JobAffect, JobConf, JobKind, JobManager};
 use super::execute::ExecSpawn;
 use super::notify::NotifyManager;
 use super::sigchld::Sigchld;
-use super::unit_base::{UnitDependencyMask};
 use super::unit_datastore::UnitDb;
 use super::unit_entry::{Unit, UnitX};
+use super::unit_load::UnitLoad;
 use super::unit_rentry::{JobMode, UnitLoadState, UnitRe};
 use super::unit_runtime::UnitRT;
 use super::UnitRelationAtom;
 use super::UnitRelations;
-use crate::core::manager::pre_install::{Install, PresetMode};
-use crate::core::manager::rentry::ReliLastFrame;
 use crate::core::butil::table::{TableOp, TableSubscribe};
+use crate::core::manager::pre_install::{Install, PresetMode};
 use crate::core::unit::data::{DataManager, UnitState};
-use crate::core::manager::{MngErrno};
-use crate::core::plugin::Plugin;
 use libevent::Events;
 use libutils::path_lookup::LookupPaths;
 use libutils::process_util;
@@ -24,14 +30,13 @@ use std::convert::TryFrom;
 use std::io::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::Arc;
-use unit_load::UnitLoad;
+use sysmaster::execute::{ExecCmdError, ExecParameters};
+use sysmaster::execute::{ExecCommand, ExecContext};
+use sysmaster::reliability::{ReStation, ReStationKind, ReliLastFrame, Reliability};
+use sysmaster::unit::{
+    MngErrno, UmIf, UnitActionError, UnitActiveState, UnitDependencyMask, UnitType,
+};
 use unit_submanager::UnitSubManagers;
-use libsysmaster::unit::{UmIf,UnitActionError,UnitType};
-use libsysmaster::execute::{ExecCmdError, ExecParameters};
-use libsysmaster::execute::{ExecCommand,ExecContext};
-use libsysmaster::reliability::{ReStation, ReStationKind, Reliability};
-
 
 //#[derive(Debug)]
 pub(in crate::core) struct UnitManagerX {
@@ -70,7 +75,7 @@ impl UnitManagerX {
         self.data.register_ex();
     }
 
-    pub(in crate) fn entry_clear(&self) {
+    pub(crate) fn entry_clear(&self) {
         self.dm.entry_clear();
         self.data.entry_clear();
     }
@@ -127,8 +132,6 @@ pub struct UnitManager {
     // associated objects
     events: Rc<Events>,
     reli: Rc<Reliability>,
-    plugins: Arc<Plugin>,
-
     // owned objects
     rentry: Rc<UnitRe>,
     db: Rc<UnitDb>,
@@ -142,10 +145,6 @@ pub struct UnitManager {
 }
 
 impl UmIf for UnitManager {
-    /// get the unit the has atom relation with the unit
-    fn get_dependency_list(&self, unit_name: &str, atom: UnitRelationAtom) -> Vec<Rc<Unit>> {
-        self.get_dependency_list(unit_name, atom)
-    }
     /// check the unit s_u_name and t_u_name have atom relation
     fn unit_has_dependecy(&self, s_u_name: &str, atom: UnitRelationAtom, t_u_name: &str) -> bool {
         self.unit_has_dependecy(s_u_name, atom, t_u_name)
@@ -223,12 +222,17 @@ impl UmIf for UnitManager {
     /// call the exec spawn to start the child service
     fn exec_spawn(
         &self,
-        unit: &Unit,
+        unit: &str,
         cmdline: &ExecCommand,
         params: &ExecParameters,
         ctx: Rc<ExecContext>,
     ) -> Result<Pid, ExecCmdError> {
-        self.exec.spawn(unit, cmdline, params, ctx)
+        let unit = self.units_get(unit);
+        if let Some(u) = unit {
+            self.exec.spawn(&u, cmdline, params, ctx)
+        } else {
+            Err(ExecCmdError::SpawnError)
+        }
     }
 
     fn child_watch_pid(&self, id: &str, pid: Pid) {
@@ -251,16 +255,46 @@ impl UmIf for UnitManager {
         self.collect_socket_fds(name)
     }
 
-    fn load_unit(&self, name: &str) -> Option<Rc<Unit>> {
-        self.load_unit(name)
+    fn get_dependency_list(&self, _unit_name: &str, _atom: UnitRelationAtom) -> Vec<String> {
+        self.get_dependency_list(_unit_name, _atom)
     }
 
-    fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<Rc<Unit>> {
+    fn unit_has_default_dependecy(&self, _unit_name: &str) -> bool {
+        let s_unit = if let Some(s_unit) = self.db.units_get(_unit_name) {
+            s_unit
+        } else {
+            return false;
+        };
+        s_unit.default_dependencies()
+    }
+
+    fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<String> {
         self.units_get_all(unit_type)
     }
 
-    fn units_get(&self, name: &str) -> Option<Rc<Unit>> {
-        self.units_get(name)
+    fn current_active_state(&self, _unit_name: &str) -> UnitActiveState {
+        let s_unit = if let Some(s_unit) = self.db.units_get(_unit_name) {
+            s_unit
+        } else {
+            return UnitActiveState::UnitFailed;
+        };
+        s_unit.current_active_state()
+    }
+
+    fn unit_start(&self, _name: &str) -> Result<(), UnitActionError> {
+        if let Some(unit) = self.db.units_get(_name) {
+            unit.start()
+        } else {
+            Err(UnitActionError::UnitActionENoent)
+        }
+    }
+
+    fn unit_stop(&self, _name: &str, force: bool) -> Result<(), UnitActionError> {
+        if let Some(unit) = self.db.units_get(_name) {
+            unit.stop(force)
+        } else {
+            Err(UnitActionError::UnitActionENoent)
+        }
     }
 }
 
@@ -287,14 +321,12 @@ impl UnitManager {
     }
 
     ///
-    fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<Rc<Unit>> {
+    fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<String> {
         let units = self.db.units_get_all(unit_type);
-        units.iter().map(|uxr| uxr.unit()).collect::<Vec<_>>()
-    }
-
-    ///
-    fn load_unit(&self, name: &str) -> Option<Rc<Unit>> {
-        self.load_unitx(name).map(|uxr| uxr.unit())
+        units
+            .iter()
+            .map(|uxr| uxr.unit().id().to_string())
+            .collect::<Vec<_>>()
     }
 
     /// load the unit for reference name
@@ -352,16 +384,18 @@ impl UnitManager {
     }
 
     /// get the unit the has atom relation with the unit
-    fn get_dependency_list(&self, unit_name: &str, atom: UnitRelationAtom) -> Vec<Rc<Unit>> {
+    fn get_dependency_list(&self, unit_name: &str, atom: UnitRelationAtom) -> Vec<String> {
         let s_unit = if let Some(unit) = self.db.units_get(unit_name) {
             unit
         } else {
             log::error!("unit [{}] not found!!!!!", unit_name);
             return Vec::new();
         };
-
-        let dep_units = self.rt.get_dependency_list(&s_unit, atom);
-        dep_units.iter().map(|uxr| uxr.unit()).collect::<Vec<_>>()
+        let dep_units = self.db.dep_gets_atom(&s_unit, atom);
+        dep_units
+            .iter()
+            .map(|uxr| uxr.unit().id().to_string())
+            .collect::<Vec<_>>()
     }
 
     /// check if there is already a stop job in process
@@ -483,7 +517,6 @@ impl UnitManager {
         let um = Rc::new(UnitManager {
             events: Rc::clone(eventr),
             reli: Rc::clone(relir),
-            plugins: Plugin::get_instance(),
             rentry: Rc::clone(&_rentry),
             load: UnitLoad::new(dmr, &_rentry, &_db, &_rt, lookup_path),
             db: Rc::clone(&_db),
@@ -504,6 +537,7 @@ impl UnitManager {
     }
 }
 
+// inert states need jm,so put here
 impl TableSubscribe<String, UnitState> for UnitManager {
     fn notify(&self, op: &TableOp<String, UnitState>) {
         match op {
@@ -660,25 +694,6 @@ impl ReStation for UnitManager {
     }
 }
 
-
-/// #[macro_use]
-/// the macro for create a sub unit-manager instance
-#[macro_export]
-macro_rules! declure_umobj_plugin {
-    ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {
-        // method for create the sub-unit-manager instance
-        #[no_mangle]
-        pub fn __um_obj_create() -> *mut dyn $crate::manager::UnitManagerObj {
-            logger::init_log_with_default($name, $level);
-            let construcotr: fn() -> $unit_type = $constructor;
-
-            let obj = construcotr();
-            let boxed: Box<dyn $crate::manager::UnitManagerObj> = Box::new(obj);
-            Box::into_raw(boxed)
-        }
-    };
-}
-
 /// the trait used for translate to UnitObj
 /*pub trait UnitSubClass: SubUnit + UnitMngUtil {
     /// the method of translate to UnitObj
@@ -686,13 +701,15 @@ macro_rules! declure_umobj_plugin {
 }*/
 
 mod unit_submanager {
-    use super::{UnitManager, UnitManagerObj};
-    use crate::core::unit::unit_rentry::UnitType;
-    use libsysmaster::reliability::Reliability;
+    use crate::core::plugin::Plugin;
+
+    use super::UnitManager;
     use std::cell::RefCell;
     use std::collections::HashMap;
     use std::convert::TryFrom;
     use std::rc::{Rc, Weak};
+    use sysmaster::reliability::Reliability;
+    use sysmaster::unit::{UnitManagerObj, UnitType};
 
     #[allow(dead_code)]
     pub(super) struct UnitSubManagers {
@@ -781,7 +798,7 @@ mod unit_submanager {
 
         fn new_sub(&self, unit_type: UnitType) -> Option<Box<dyn UnitManagerObj>> {
             let um = self.um();
-            let ret = um.plugins.create_um_obj(unit_type);
+            let ret = Plugin::get_instance().create_um_obj(unit_type);
             if ret.is_err() {
                 log::info!("create um_obj is not found, type {:?}!", unit_type);
                 return None;
@@ -813,231 +830,10 @@ mod unit_submanager {
     }
 }
 
-mod unit_load {
-    use libutils::path_lookup::LookupPaths;
-
-    use super::UnitManager;
-    use crate::core::butil::table::{TableOp, TableSubscribe};
-    use crate::core::unit::data::{DataManager, UnitDepConf};
-    use crate::core::unit::uload_util::UnitFile;
-    use crate::core::unit::unit_datastore::UnitDb;
-    use crate::core::unit::unit_entry::UnitX;
-    use crate::core::unit::unit_rentry::{self, UnitRe, UnitType};
-    use crate::core::unit::unit_runtime::UnitRT;
-    use std::cell::RefCell;
-    use std::rc::{Rc, Weak};
-
-    //#[derive(Debug)]
-    pub(super) struct UnitLoad {
-        sub_name: String, // key for table-subscriber: UnitDepConf
-        data: Rc<UnitLoadData>,
-    }
-
-    impl UnitLoad {
-        pub(super) fn new(
-            dmr: &Rc<DataManager>,
-            rentryr: &Rc<UnitRe>,
-            dbr: &Rc<UnitDb>,
-            rtr: &Rc<UnitRT>,
-            lookup_path: &Rc<LookupPaths>,
-        ) -> UnitLoad {
-            let load = UnitLoad {
-                sub_name: String::from("UnitLoad"),
-                data: Rc::new(UnitLoadData::new(dmr, rentryr, dbr, rtr, lookup_path)),
-            };
-            load.register(dmr);
-            load
-        }
-
-        pub(super) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-            self.data.load_unit(name)
-        }
-
-        pub(super) fn set_um(&self, um: &Rc<UnitManager>) {
-            self.data.set_um(um);
-        }
-
-        pub(super) fn try_new_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-            self.data.try_new_unit(name)
-        }
-
-        fn register(&self, dm: &DataManager) {
-            let subscriber = Rc::clone(&self.data);
-            let ret = dm.register_ud_config(&self.sub_name, subscriber);
-            assert!(ret.is_none())
-        }
-    }
-
-    //#[derive(Debug)]
-    struct UnitLoadData {
-        // associated objects
-        dm: Rc<DataManager>,
-        rentry: Rc<UnitRe>,
-        um: RefCell<Weak<UnitManager>>,
-        db: Rc<UnitDb>,
-        rt: Rc<UnitRT>,
-
-        // owned objects
-        file: Rc<UnitFile>,
-    }
-
-    // the declaration "pub(self)" is for identification only.
-    impl UnitLoadData {
-        pub(self) fn new(
-            dmr: &Rc<DataManager>,
-            rentryr: &Rc<UnitRe>,
-            dbr: &Rc<UnitDb>,
-            rtr: &Rc<UnitRT>,
-            lookup_path: &Rc<LookupPaths>,
-        ) -> UnitLoadData {
-            log::debug!("UnitLoadData db count is {}", Rc::strong_count(dbr));
-            let file = Rc::new(UnitFile::new(lookup_path));
-            UnitLoadData {
-                dm: Rc::clone(dmr),
-                rentry: Rc::clone(rentryr),
-                um: RefCell::new(Weak::new()),
-                db: Rc::clone(dbr),
-                rt: Rc::clone(rtr),
-                file: Rc::clone(&file),
-            }
-        }
-
-        pub(self) fn prepare_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-            match self.try_new_unit(name) {
-                Some(unit) => {
-                    self.db.units_insert(name.to_string(), Rc::clone(&unit));
-                    self.rt.push_load_queue(Rc::clone(&unit));
-                    Some(Rc::clone(&unit))
-                }
-                None => {
-                    log::error!(
-                        "create unit obj failed,name is {},{}",
-                        name,
-                        Rc::strong_count(&self.db)
-                    );
-                    None
-                }
-            }
-        }
-
-        pub(self) fn push_dep_unit_into_load_queue(&self, name: &str) -> Option<Rc<UnitX>> {
-            if let Some(unit) = self.db.units_get(name) {
-                return Some(Rc::clone(&unit));
-            };
-
-            self.prepare_unit(name)
-        }
-
-        pub(self) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-            if let Some(unit) = self.db.units_get(name) {
-                return Some(Rc::clone(&unit));
-            };
-            let unit = self.prepare_unit(name)?;
-            log::info!("begin dispatch unit in  load queue");
-            self.rt.dispatch_load_queue();
-            Some(Rc::clone(&unit))
-        }
-
-        pub(self) fn set_um(&self, um: &Rc<UnitManager>) {
-            self.um.replace(Rc::downgrade(um));
-        }
-
-        pub(self) fn try_new_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-            let unit_type = unit_rentry::unit_name_to_type(name);
-            if unit_type == UnitType::UnitTypeInvalid {
-                return None;
-            }
-
-            log::info!(
-                "begin create obj for type {:?}, name {} by plugin",
-                unit_type,
-                name
-            );
-            let um = self.um();
-            let um_rc = Rc::clone(&um);
-            let subclass = match um.plugins.create_unit_obj_with_um(unit_type, um_rc) {
-                Ok(sub) => sub,
-                Err(_e) => {
-                    log::error!("Failed to create unit_obj!{}", _e);
-                    return None;
-                }
-            };
-
-            let reli = um.reliability();
-            subclass.attach_um(um);
-            subclass.attach_reli(reli);
-
-            Some(Rc::new(UnitX::new(
-                &self.dm,
-                &self.rentry,
-                &self.file,
-                unit_type,
-                name,
-                subclass,
-            )))
-        }
-
-        fn um(&self) -> Rc<UnitManager> {
-            self.um.clone().into_inner().upgrade().unwrap()
-        }
-    }
-
-    impl TableSubscribe<String, UnitDepConf> for UnitLoadData {
-        fn notify(&self, op: &TableOp<String, UnitDepConf>) {
-            match op {
-                TableOp::TableInsert(name, config) => self.insert_udconf(name, config),
-                TableOp::TableRemove(_, _) => {} // self.remove_udconf(name)
-            }
-        }
-    }
-
-    impl UnitLoadData {
-        fn insert_udconf(&self, name: &str, config: &UnitDepConf) {
-            //hash map insert return is old value,need reconstruct
-            let unit = match self.db.units_get(name) {
-                Some(u) => u,
-                None => {
-                    log::error!("create unit obj error in unit manager");
-                    return;
-                } // load
-            };
-
-            // dependency
-            for (relation, list) in config.deps.iter() {
-                for o_name in list {
-                    let tmp_unit: Rc<UnitX>;
-                    if let Some(o_unit) = self.push_dep_unit_into_load_queue(o_name) {
-                        //can not call unit_load directly, will be nested.
-                        tmp_unit = Rc::clone(&o_unit);
-                    } else {
-                        log::error!("create unit obj error in unit manager");
-                        return;
-                    }
-
-                    if let Err(_e) =
-                        self.db
-                            .dep_insert(Rc::clone(&unit), *relation, tmp_unit, true, 0)
-                    //insert the dependency, but not judge loaded success, if loaded failed, whether record the dependency.
-                    {
-                        log::debug!("add dependency relation failed for source unit is {},dependency unit is {}",unit.id(),o_name);
-                        return;
-                    }
-                }
-            }
-        }
-
-        #[allow(dead_code)]
-        fn remove_udconf(&self, _source: &str) {
-            todo!();
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::data::UnitActiveState;
     use crate::core::mount::mount_setup;
     use libevent::Events;
     use libutils::logger;
@@ -1045,6 +841,7 @@ mod tests {
     use nix::sys::signal::Signal;
     use std::thread;
     use std::time::Duration;
+    use sysmaster::unit::UnitActiveState;
 
     fn init_dm_for_test() -> (Rc<DataManager>, Rc<Events>, Rc<UnitManager>) {
         logger::init_log_with_console("manager test", 4);

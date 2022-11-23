@@ -1,17 +1,16 @@
-use super::unit_base::{UnitDependencyMask};
 use super::unit_datastore::UnitDb;
 use super::unit_entry::UnitX;
-use super::unit_rentry::{UnitLoadState};
-use super::{UnitRelations,UnitType};
+use super::unit_rentry::UnitLoadState;
 use super::unit_rentry::{UnitRe, UnitRePps};
-use crate::core::manager::rentry::{ReliLastFrame, ReliLastQue};
+use super::{UnitRelations, UnitType};
 use crate::core::butil::table::{TableOp, TableSubscribe};
-use libsysmaster::reliability::{ReStation, Reliability};
-use libsysmaster::unit::UnitRelationAtom;
+use crate::core::manager::rentry::ReliLastQue;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::convert::TryFrom;
 use std::rc::Rc;
+use sysmaster::reliability::{ReStation, ReliLastFrame, Reliability};
+use sysmaster::unit::{UnitDependencyMask, UnitRelationAtom};
 
 //#[derive(Debug)]
 pub(super) struct UnitRT {
@@ -65,14 +64,6 @@ impl UnitRT {
 
     pub(super) fn dispatch_load_queue(&self) {
         self.data.dispatch_load_queue();
-    }
-
-    pub(super) fn get_dependency_list(
-        &self,
-        source: &UnitX,
-        atom: UnitRelationAtom,
-    ) -> Vec<Rc<UnitX>> {
-        self.data.get_dependency_list(source, atom)
     }
 
     pub(super) fn unit_add_dependency(
@@ -261,14 +252,6 @@ impl UnitRTData {
         self.reli.clear_last_frame();
     }
 
-    pub(self) fn get_dependency_list(
-        &self,
-        source: &UnitX,
-        atom: UnitRelationAtom,
-    ) -> Vec<Rc<UnitX>> {
-        self.db.dep_gets_atom(source, atom)
-    }
-
     pub(self) fn unit_add_dependency(
         &self,
         source: Rc<UnitX>,
@@ -360,8 +343,8 @@ mod tests {
     use crate::core::unit::data::DataManager;
     use crate::core::unit::test;
     use crate::core::unit::unit_rentry::UnitRe;
-    use libsysmaster::reliability::Reliability;
     use libutils::logger;
+    use sysmaster::reliability::Reliability;
 
     #[test]
     fn rt_push_load_queue() {
@@ -444,7 +427,6 @@ mod tests {
     ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", 4);
         log::info!("test");
-        let unitx = test::test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
-        unitx
+        test::test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }
 }
