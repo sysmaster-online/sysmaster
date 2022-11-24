@@ -37,12 +37,14 @@ replace-with = 'ustc'
 [source.ustc]
 registry = "https://mirrors.ustc.edu.cn/crates.io-index"
 
+# 字节跳动
+[source.rsproxy]
+registry = "https://rsproxy.cn/crates.io-index"
+
 [target.$arch-unknown-linux-musl]
 rustflags = ["-C", "target-feature=-crt-static"]
 EOF
 
-# install musl-build
-rustup target add $arch-unknown-linux-musl
 # Delete cache
 rm -rf  ~/.cargo/.package-cache
 
