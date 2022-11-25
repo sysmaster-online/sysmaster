@@ -33,6 +33,8 @@ pub(super) struct SectionSocket {
     pub ListenDatagram: Option<Vec<String>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub ListenNetlink: Option<Vec<String>>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    pub ListenSequentialPacket: Option<Vec<String>>,
     pub PassPacketInfo: Option<bool>,
     #[config(default = false)]
     pub Accept: bool,

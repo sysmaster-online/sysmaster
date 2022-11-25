@@ -8,6 +8,7 @@ ExecStopPre="/usr/bin/echo 'stop pre'"
 ListenStream="31972; /tmp/test.socket"
 ListenDatagram="127.0.0.1:31973"
 ListenNetlink="route 0"
+ListenSequentialPacket="/tmp/seq_packet.socket"
 Accept = false
 ReceiveBuffer = 4096
 SendBuffer = 4096
