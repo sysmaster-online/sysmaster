@@ -3,10 +3,11 @@ use nix::errno::errno;
 use nix::libc::{kill, ESRCH};
 use nix::sys::wait::{waitpid, WaitPidFlag};
 use nix::unistd::Pid;
+use procfs::process::Stat;
 use std::collections::HashSet;
-use std::fs::read_dir;
+use std::fs::{read_dir, File};
 use std::io::{Error, ErrorKind};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 
@@ -151,6 +152,34 @@ pub fn wait_pids(mut pids: HashSet<i32>, timeout: u64) -> HashSet<i32> {
         }
     }
     pids
+}
+
+/// get the parent pid of the reference pid
+fn get_ppid(pid: Pid) -> Result<Pid, Error> {
+    if pid == Pid::from_raw(0) || pid == nix::unistd::getpid() {
+        return Ok(nix::unistd::getppid());
+    }
+
+    let path = PathBuf::from(format!("/proc/{}/stat", pid));
+
+    let stat = Stat::from_reader(File::open(path)?).map_err(|e| Error::new(ErrorKind::Other, e))?;
+
+    Ok(Pid::from_raw(stat.ppid))
+}
+
+/// get the parent pid of the reference pid
+pub fn my_child(pid: Pid) -> bool {
+    if pid.as_raw() <= 1 {
+        return false;
+    }
+
+    let ppid = get_ppid(pid);
+
+    if let Ok(p) = ppid {
+        return p == nix::unistd::getppid();
+    }
+
+    false
 }
 
 #[cfg(test)]

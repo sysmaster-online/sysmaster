@@ -1,5 +1,6 @@
 use super::service_comm::ServiceUnitComm;
 use libutils::process_util;
+use nix::errno::Errno;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,7 +19,7 @@ impl ServicePid {
         }
     }
 
-    pub(super) fn set_main(&self, pid: Pid) {
+    pub(super) fn set_main(&self, pid: Pid) -> Result<(), Errno> {
         self.data.borrow_mut().set_main(pid)
     }
 
@@ -28,7 +29,7 @@ impl ServicePid {
 
     pub(super) fn update_main(&self, pid: Option<Pid>) {
         if let Some(id) = pid {
-            self.set_main(id);
+            let _ = self.set_main(id);
         } else {
             self.reset_main();
         }
@@ -95,8 +96,13 @@ impl ServicePidData {
         }
     }
 
-    pub(self) fn set_main(&mut self, pid: Pid) {
+    pub(self) fn set_main(&mut self, pid: Pid) -> Result<(), Errno> {
+        if pid < Pid::from_raw(1) {
+            return Err(Errno::EINVAL);
+        }
         self.main = Some(pid);
+
+        Ok(())
     }
 
     pub(self) fn reset_main(&mut self) {

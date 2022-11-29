@@ -14,6 +14,7 @@ use crate::core::unit::unit_rentry::{UnitLoadState, UnitRe};
 use crate::core::unit::UnitRelations;
 use libcgroup::{self, CgFlags};
 use libutils::error::Error as ServiceError;
+use libutils::process_util::my_child;
 use libutils::Result;
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
@@ -165,6 +166,10 @@ impl UnitBase for Unit {
 
     fn set_ignore_on_isolate(&self, ignore_on_isolate: bool) {
         self.set_ignore_on_isolate(ignore_on_isolate);
+    }
+
+    fn guess_main_pid(&self) -> Result<Pid, Box<dyn Error>> {
+        self.guess_main_pid()
     }
 }
 
@@ -384,6 +389,35 @@ impl Unit {
             .borrow_mut()
             .Unit
             .IgnoreOnIsolate = ignore_on_isolate;
+    }
+
+    /// guess main pid from the cgroup path
+    pub fn guess_main_pid(&self) -> Result<Pid, Box<dyn Error>> {
+        let cg_path = self.cgroup.cg_path();
+
+        if cg_path.is_empty() {
+            return Err(
+                "cgroup path is empty, can not guess main pid from cgroup path"
+                    .to_string()
+                    .into(),
+            );
+        }
+        let pids = libcgroup::cg_get_pids(&cg_path);
+        let mut main_pid = Pid::from_raw(0);
+
+        for pid in pids {
+            if pid == main_pid {
+                continue;
+            }
+
+            if !my_child(pid) {
+                continue;
+            }
+
+            main_pid = pid;
+            break;
+        }
+        Ok(main_pid)
     }
 
     fn pids_set(&self, m_pid: Option<Pid>, c_pid: Option<Pid>) -> HashSet<Pid> {
