@@ -3,10 +3,6 @@ use super::mount_comm::MountUmComm;
 use super::mount_rentry::{MountRe, MountReFrame};
 use libevent::{EventState, EventType, Events, Source};
 use libmount::mountinfo;
-use libsysmaster::manager::{
-    ReliLastFrame, UmIf, UnitActiveState, UnitManagerObj, UnitMngUtil, UnitType,
-};
-use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use libutils::{Error, Result};
 use std::collections::HashSet;
@@ -15,6 +11,8 @@ use std::io::Read;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::rc::Rc;
 use std::sync::Arc;
+use sysmaster::reliability::{ReStation, ReliLastFrame, Reliability};
+use sysmaster::unit::{UmIf, UnitActiveState, UnitManagerObj, UnitMngUtil, UnitType};
 
 struct MountManager {
     // owned objects
@@ -322,8 +320,8 @@ impl MountMonitorData {
         let mut dead_mount_set: HashSet<String> = HashSet::new();
         let unit_type = Some(UnitType::UnitMount);
         for unit in self.comm.um().units_get_all(unit_type).iter() {
-            if unit.current_active_state() == UnitActiveState::UnitActive {
-                dead_mount_set.insert(String::from(unit.id()));
+            if self.comm.um().current_active_state(unit) == UnitActiveState::UnitActive {
+                dead_mount_set.insert(String::from(unit));
             }
         }
 
@@ -346,10 +344,10 @@ impl MountMonitorData {
                     let unit_name = mount_point_to_unit_name(mount.mount_point.to_str().unwrap());
                     if dead_mount_set.contains(unit_name.as_str()) {
                         dead_mount_set.remove(unit_name.as_str());
-                    } else if let Some(unit) = self.comm.um().load_unit(unit_name.as_str()) {
+                    } else if self.comm.um().load_unit_success(unit_name.as_str()) {
                         // record + action
-                        self.comm.reli().set_last_unit(unit.id());
-                        let start_err = unit.start().is_err();
+                        self.comm.reli().set_last_unit(&unit_name);
+                        let start_err = self.comm.um().unit_start(&unit_name).is_err();
                         self.comm.reli().clear_last_unit();
 
                         if start_err {
@@ -368,17 +366,15 @@ impl MountMonitorData {
         // Finally stop mount point in dead_mount_set.
         for unit_name in dead_mount_set.into_iter() {
             // pop
-            if let Some(unit) = self.comm.um().units_get(unit_name.as_str()) {
-                // record + action
-                self.comm.reli().set_last_unit(unit.id());
-                let ret = unit.stop(false);
-                self.comm.reli().clear_last_unit();
+            // record + action
+            self.comm.reli().set_last_unit(&unit_name);
+            let ret = self.comm.um().unit_stop(&unit_name, false);
+            self.comm.reli().clear_last_unit();
 
-                if ret.is_ok() {
-                    log::debug!("{} change to dead.", unit_name);
-                } else {
-                    log::error!("Failed to stop {}.", unit_name);
-                }
+            if ret.is_ok() {
+                log::debug!("{} change to dead.", unit_name);
+            } else {
+                log::error!("Failed to stop {}.", unit_name);
             }
         }
         Ok(())
@@ -416,7 +412,7 @@ impl Default for MountManager {
     }
 }
 
-use libsysmaster::declure_umobj_plugin;
+use sysmaster::declure_umobj_plugin;
 declure_umobj_plugin!(MountManager, MountManager::default, PLUGIN_NAME, LOG_LEVEL);
 
 #[cfg(test)]

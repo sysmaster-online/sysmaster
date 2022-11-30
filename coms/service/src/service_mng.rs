@@ -6,11 +6,6 @@ use super::service_rentry::{
 };
 use super::service_spawn::ServiceSpawn;
 use libevent::{EventState, EventType, Events, Source};
-use libsysmaster::manager::{
-    ExecCommand, ExecContext, ExecFlags, KillOperation, UnitActionError, UnitActiveState,
-    UnitNotifyFlags,
-};
-use libsysmaster::ReStation;
 use libutils::{fd_util, Error, IN_SET};
 use libutils::{file_util, process_util};
 use nix::errno::Errno;
@@ -29,6 +24,11 @@ use std::{
     os::unix::prelude::{FromRawFd, RawFd},
     path::PathBuf,
     rc::Weak,
+};
+use sysmaster::reliability::ReStation;
+use sysmaster::unit::{
+    ExecCommand, ExecContext, ExecFlags, KillOperation, UnitActionError, UnitActiveState,
+    UnitNotifyFlags,
 };
 
 pub(super) struct ServiceMng {
@@ -139,8 +139,8 @@ impl ServiceMng {
         ) {
             return Ok(true);
         }
-
-        if !self.comm.unit().test_start_limit() {
+        let ret = self.comm.owner().map(|u| u.test_start_limit());
+        if ret.is_none() || !ret.unwrap() {
             self.enter_dead(ServiceResult::FailureStartLimitHit);
             return Err(UnitActionError::UnitActionECanceled);
         }
@@ -270,7 +270,10 @@ impl ServiceMng {
             .start_service(&cmd.unwrap(), 0, ExecFlags::PASS_FDS);
 
         if ret.is_err() {
-            log::error!("failed to start service: {}", self.comm.unit().id());
+            log::error!(
+                "failed to start service: unit Name{}",
+                self.comm.get_owner_id()
+            );
             self.enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
         }
 
@@ -309,8 +312,8 @@ impl ServiceMng {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
                         log::error!(
-                            "Failed to run start post service: {}",
-                            self.comm.unit().id()
+                            "Failed to run start post service, unit name:{}",
+                            self.comm.get_owner_id()
                         );
                         return;
                     }
@@ -354,7 +357,10 @@ impl ServiceMng {
                 match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
-                        log::error!("Failed to run stop service: {}", self.comm.unit().id());
+                        log::error!(
+                            "Failed to run stop service: unit Name{}",
+                            self.comm.get_owner_id()
+                        );
                         self.enter_signal(
                             ServiceState::StopSigterm,
                             ServiceResult::FailureResources,
@@ -390,7 +396,7 @@ impl ServiceMng {
                             ServiceState::FinalSigterm,
                             ServiceResult::FailureResources,
                         );
-                        log::error!("Failed to run stop service: {}", self.comm.unit().id());
+                        log::error!("Failed to run stop service: {}", self.comm.get_owner_id());
                         return;
                     }
                 }
@@ -425,7 +431,7 @@ impl ServiceMng {
                 match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
-                        log::error!("failed to start service: {}", self.comm.unit().id());
+                        log::error!("failed to start service: {}", self.comm.get_owner_id());
                         self.enter_running(ServiceResult::Success);
                         return;
                     }
@@ -443,26 +449,29 @@ impl ServiceMng {
             res
         );
 
-        self.comm.um().child_watch_all_pids(self.comm.unit().id());
-
-        let op = state.to_kill_operation();
-        match self.comm.unit().kill_context(
-            self.config.kill_context(),
-            self.pid.main(),
-            self.pid.control(),
-            op,
-        ) {
-            Ok(_) => {}
-            Err(_e) => {
-                if IN_SET!(
-                    state,
-                    ServiceState::StopWatchdog,
-                    ServiceState::StopSigterm,
-                    ServiceState::StopSigkill
-                ) {
-                    return self.enter_stop_post(ServiceResult::FailureResources);
-                } else {
-                    return self.enter_dead(ServiceResult::Success);
+        if let Some(u) = self.comm.owner() {
+            let op = state.to_kill_operation();
+            self.comm
+                .um()
+                .child_watch_all_pids(&self.comm.get_owner_id());
+            match u.kill_context(
+                self.config.kill_context(),
+                self.pid.main(),
+                self.pid.control(),
+                op,
+            ) {
+                Ok(_) => {}
+                Err(_e) => {
+                    if IN_SET!(
+                        state,
+                        ServiceState::StopWatchdog,
+                        ServiceState::StopSigterm,
+                        ServiceState::StopSigkill
+                    ) {
+                        return self.enter_stop_post(ServiceResult::FailureResources);
+                    } else {
+                        return self.enter_dead(ServiceResult::Success);
+                    }
                 }
             }
         }
@@ -532,7 +541,7 @@ impl ServiceMng {
 
         log::debug!(
             "unit: {}, original state: {:?}, change to: {:?}",
-            self.comm.unit().id(),
+            self.comm.get_owner_id(),
             original_state,
             state
         );
@@ -542,8 +551,8 @@ impl ServiceMng {
         let os = service_state_to_unit_state(self.config.service_type(), original_state);
         let ns = service_state_to_unit_state(self.config.service_type(), state);
         self.comm
-            .unit()
-            .notify(os, ns, UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE);
+            .owner()
+            .map(|u| u.notify(os, ns, UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE));
     }
 
     fn service_alive(&self) -> bool {
@@ -560,7 +569,7 @@ impl ServiceMng {
             match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                 Ok(pid) => self.pid.set_control(pid),
                 Err(_e) => {
-                    log::error!("failed to start service: {}", self.comm.unit().id());
+                    log::error!("failed to start service: {}", self.comm.get_owner_id());
                 }
             }
         }
@@ -571,7 +580,7 @@ impl ServiceMng {
             match self.spawn.start_service(&cmd, 0, ExecFlags::PASS_FDS) {
                 Ok(pid) => self.pid.set_main(pid),
                 Err(_e) => {
-                    log::error!("failed to run main command: {}", self.comm.unit().id());
+                    log::error!("failed to run main command: {}", self.comm.get_owner_id());
                 }
             }
         }
@@ -694,7 +703,9 @@ impl ServiceMng {
 
         self.pid.unwatch_main();
         self.pid.set_main(pid);
-        self.comm.um().child_watch_pid(self.comm.unit().id(), pid);
+        self.comm
+            .um()
+            .child_watch_pid(&self.comm.get_owner_id(), pid);
 
         Ok(true)
     }
@@ -720,7 +731,7 @@ impl ServiceMng {
         if self
             .comm
             .um()
-            .same_unit_with_pid(self.comm.unit().id(), pid)
+            .same_unit_with_pid(&self.comm.get_owner_id(), pid)
         {
             return Ok(true);
         }
@@ -790,7 +801,11 @@ impl ServiceMng {
     }
 
     fn cgroup_good(&self) -> bool {
-        if let Ok(v) = libcgroup::cg_is_empty_recursive(&self.comm.unit().cg_path()) {
+        if let Some(Ok(v)) = self
+            .comm
+            .owner()
+            .map(|u| libcgroup::cg_is_empty_recursive(&u.cg_path()))
+        {
             return !v;
         }
 
@@ -1048,7 +1063,7 @@ impl ServiceMng {
                         self.pid.set_main(main_pid);
                         self.comm
                             .um()
-                            .child_watch_pid(self.comm.unit().id(), main_pid);
+                            .child_watch_pid(&self.comm.get_owner_id(), main_pid);
                     }
                 }
             }

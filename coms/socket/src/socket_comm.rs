@@ -4,30 +4,30 @@
 use super::socket_rentry::{
     PortType, SectionSocket, SocketCommand, SocketRe, SocketResult, SocketState,
 };
-use libsysmaster::manager::{UmIf, Unit};
-use libsysmaster::Reliability;
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, RwLock};
+use sysmaster::reliability::Reliability;
+use sysmaster::unit::{UmIf, UnitBase};
 
 pub(super) struct SocketUnitComm {
-    data: RefCell<SocketUnitCommData>,
+    owner: RefCell<Option<Rc<dyn UnitBase>>>,
     umcomm: Arc<SocketUmComm>,
 }
 
 impl SocketUnitComm {
     pub(super) fn new() -> Self {
         SocketUnitComm {
-            data: RefCell::new(SocketUnitCommData::new()),
+            owner: RefCell::new(None),
             umcomm: SocketUmComm::get_instance(),
         }
     }
 
-    pub(super) fn attach_unit(&self, unit: Rc<Unit>) {
-        self.data.borrow_mut().attach_unit(unit);
+    pub(super) fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
+        self.owner.replace(Some(unit));
     }
 
     pub(super) fn attach_um(&self, um: Rc<dyn UmIf>) {
@@ -38,8 +38,12 @@ impl SocketUnitComm {
         self.umcomm.attach_reli(reli)
     }
 
-    pub(super) fn unit(&self) -> Rc<Unit> {
-        self.data.borrow().unit()
+    pub(super) fn owner(&self) -> Option<Rc<dyn UnitBase>> {
+        if let Some(ref unit) = *self.owner.borrow() {
+            Some(Rc::clone(unit))
+        } else {
+            None
+        }
     }
 
     pub(super) fn um(&self) -> Rc<dyn UmIf> {
@@ -55,11 +59,17 @@ impl SocketUnitComm {
     }
 
     pub(super) fn rentry_conf_insert(&self, socket: &SectionSocket, service: Option<String>) {
-        self.rentry().conf_insert(self.unit().id(), socket, service);
+        self.owner()
+            .map(|u| self.rentry().conf_insert(u.id(), socket, service));
     }
 
     pub(super) fn rentry_conf_get(&self) -> Option<(SectionSocket, Option<String>)> {
-        self.rentry().conf_get(self.unit().id())
+        let ret = self.owner().map(|u| self.rentry().conf_get(u.id()));
+        if ret.is_none() {
+            None
+        } else {
+            ret.unwrap()
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -73,16 +83,18 @@ impl SocketUnitComm {
         refused: i32,
         ports: Vec<(PortType, String, RawFd)>,
     ) {
-        self.rentry().mng_insert(
-            self.unit().id(),
-            state,
-            result,
-            control_pid,
-            control_cmd_type,
-            control_cmd_len,
-            refused,
-            ports,
-        );
+        self.owner().map(|u| {
+            self.rentry().mng_insert(
+                u.id(),
+                state,
+                result,
+                control_pid,
+                control_cmd_type,
+                control_cmd_len,
+                refused,
+                ports,
+            )
+        });
     }
 
     #[allow(clippy::type_complexity)]
@@ -97,25 +109,12 @@ impl SocketUnitComm {
         i32,
         Vec<(PortType, String, RawFd)>,
     )> {
-        self.rentry().mng_get(self.unit().id())
-    }
-}
-
-struct SocketUnitCommData {
-    unit: Weak<Unit>,
-}
-
-impl SocketUnitCommData {
-    pub(self) fn new() -> SocketUnitCommData {
-        SocketUnitCommData { unit: Weak::new() }
-    }
-
-    fn attach_unit(&mut self, unit: Rc<Unit>) {
-        self.unit = Rc::downgrade(&unit);
-    }
-
-    pub(self) fn unit(&self) -> Rc<Unit> {
-        self.unit.clone().upgrade().unwrap()
+        let ret = self.owner().map(|u| self.rentry().mng_get(u.id()));
+        if ret.is_none() {
+            None
+        } else {
+            ret.unwrap()
+        }
     }
 }
 

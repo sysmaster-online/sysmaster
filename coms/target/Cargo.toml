@@ -13,7 +13,8 @@ name = "target"
 [dependencies]
 libutils = { path = "../../libs/libutils" }
 libcgroup = { path = "../../libs/libcgroup" }
-libsysmaster = { path = "../../src/libsysmaster" }
+libcmdproto = { path = "../../libs/libcmdproto" }
+sysmaster = {path = "../../"}
 
 dynamic_reload = "0.8.0"
 strum = { version = "0.23", features = ["derive"] }

@@ -3,48 +3,34 @@ name = "sysmaster"
 version = "0.2.2"
 authors = ["sysmaster"]
 edition = "2018"
+build = "build.rs"
+
+[lib]
+crate-type = ["dylib"]
+path = "sysmaster/lib.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
+
 name = "sysmaster"
-path = "src/sysmaster/main.rs"
+path = "sysmaster/main.rs"
 
-[[bin]]
-name = "pctrl"
-path = "src/pctrl/main.rs"
+[dev-dependencies.libtests]
+path = "libs/libtests"
 
-[[bin]]
-name = "init"
-path = "src/init/main.rs"
-
-[[bin]]
-name = "fstab"
-path = "src/fstab/main.rs"
-
-[[bin]]
-name = "random_seed"
-path = "src/random_seed/main.rs"
-
-[[bin]]
-name = "sysmonitor"
-path = "src/sysmonitor/main.rs"
-
-[[bin]]
-name = "rc-local-generator"
-path = "src/rc-local-generator/main.rs"
 
 [dependencies]
 # internal libraries
 libcgroup = { path = "libs/libcgroup" }
 libevent = { path = "libs/libevent" }
 libutils = { path = "libs/libutils" }
-libsysmaster = { path = "src/libsysmaster" }
+libcmdproto = { path = "libs/libcmdproto" }
 
 # third libraries
 bitflags = "1.3.2"
 clap = { version = "3.1.8", features = ["derive"] }
 confique = { version = "0.1.3", default-features= false, features = [ 'toml' ] }
-dynamic_reload = "0.4.0"
+dynamic_reload = "0.8.0"
 epoll = "4.3.1"
 heed = "0.11.0"
 http = "0.2" # 我们使用 HTTP status code 所以引入这个类型库
@@ -67,20 +53,29 @@ strum = { version = "0.23", features = ["derive"] }
 toml = "0.5.8"
 walkdir = "2"
 xattr = "0.2.3"
+fnmatch-regex = "0.2.0"
 
 [build-dependencies]
 prost-build = "0.9" # 编译 protobuf
+pkg-config = "0.3.16"
 
 [profile.dev]
-panic = 'abort'
+panic = 'unwind'
 
 [profile.release]
-panic = 'abort'
+panic = 'unwind'
 
 [workspace]
 members = [
+  # external binaries
+  "extends/fstab",
+  "extends/init",
+  "extends/pctrl",
+  "extends/random_seed",
+  "extends/rc-local-generator",
+  "extends/sysmonitor",
   #internal libraries crates
-  "src/libsysmaster",
+  "libs/libcmdproto",
   #external libraries crates
   "libs/libcgroup",
   "libs/libevent",

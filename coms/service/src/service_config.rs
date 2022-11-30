@@ -2,12 +2,12 @@
 use super::service_comm::ServiceUnitComm;
 use super::service_rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
 use confique::Config;
-use libsysmaster::manager::{ExecCommand, KillContext};
-use libsysmaster::ReStation;
 use std::cell::RefCell;
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::reliability::ReStation;
+use sysmaster::unit::{ExecCommand, KillContext};
 
 pub(super) struct ServiceConfig {
     // associated objects

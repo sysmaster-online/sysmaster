@@ -1,11 +1,12 @@
 #![allow(non_snake_case)]
 use confique::Config;
-use libsysmaster::manager::{DeserializeWith, ExecCommand, KillMode};
-use libsysmaster::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
+use libutils::serialize::DeserializeWith;
 use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
 use std::os::unix::prelude::RawFd;
 use std::rc::Rc;
+use sysmaster::reliability::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
+use sysmaster::unit::{ExecCommand, KillMode};
 
 struct SocketReDb<K, V>(ReDb<K, V>);
 
@@ -17,15 +18,15 @@ const RELI_LAST_KEY: u32 = 0; // singleton
 #[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub(super) struct SectionSocket {
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecStartPre: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecStartChown: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecStartPost: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecStopPre: Option<Vec<ExecCommand>>,
-    #[config(deserialize_with = Vec::<ExecCommand>::deserialize_with)]
+    #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecStopPost: Option<Vec<ExecCommand>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub ListenStream: Option<Vec<String>>,

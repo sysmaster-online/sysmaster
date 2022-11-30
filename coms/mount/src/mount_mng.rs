@@ -2,9 +2,9 @@
 
 use super::mount_comm::MountUnitComm;
 use super::mount_rentry::MountState;
-use libsysmaster::manager::{UnitActionError, UnitActiveState, UnitNotifyFlags};
-use libsysmaster::ReStation;
 use std::{cell::RefCell, rc::Rc};
+use sysmaster::reliability::ReStation;
+use sysmaster::unit::{UnitActionError, UnitActiveState, UnitNotifyFlags};
 
 impl MountState {
     fn mount_state_to_unit_state(&self) -> UnitActiveState {
@@ -57,7 +57,8 @@ impl MountMng {
     }
 
     pub(super) fn start_check(&self) -> Result<bool, UnitActionError> {
-        if !self.comm.unit().test_start_limit() {
+        let ret = self.comm.owner().map_or(false, |u| u.test_start_limit());
+        if !ret {
             self.enter_dead(true);
             return Err(UnitActionError::UnitActionECanceled);
         }
@@ -78,7 +79,7 @@ impl MountMng {
         if new_state != old_state {
             log::debug!(
                 "{} original state[{:?}] -> new state[{:?}]",
-                self.comm.unit().id(),
+                self.comm.get_owner_id(),
                 old_state,
                 new_state,
             );
@@ -86,11 +87,13 @@ impl MountMng {
 
         let old_unit_state = old_state.mount_state_to_unit_state();
         let new_unit_state = new_state.mount_state_to_unit_state();
-        self.comm.unit().notify(
-            old_unit_state,
-            new_unit_state,
-            UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
-        );
+        self.comm.owner().map(|u| {
+            u.notify(
+                old_unit_state,
+                new_unit_state,
+                UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
+            )
+        });
 
         self.db_update();
     }

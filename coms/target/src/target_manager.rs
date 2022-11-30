@@ -1,11 +1,10 @@
 use super::target_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::target_comm::TargetUmComm;
-use libsysmaster::manager::{UmIf, UnitManagerObj, UnitMngUtil};
-use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use std::rc::Rc;
 use std::sync::Arc;
-
+use sysmaster::reliability::{ReStation, Reliability};
+use sysmaster::unit::{UmIf, UnitManagerObj, UnitMngUtil};
 struct TargetManager {
     comm: Arc<TargetUmComm>,
 }
@@ -42,5 +41,5 @@ impl UnitMngUtil for TargetManager {
     }
 }
 
-use libsysmaster::declure_umobj_plugin;
+use sysmaster::declure_umobj_plugin;
 declure_umobj_plugin!(TargetManager, TargetManager::new, PLUGIN_NAME, LOG_LEVEL);

@@ -5,17 +5,17 @@
 use super::target_base::{LOG_LEVEL, PLUGIN_NAME};
 use super::target_comm::TargetUnitComm;
 use super::target_mng::TargetMng;
-use libsysmaster::manager::Unit;
-use libsysmaster::manager::{
-    SubUnit, UmIf, UnitActiveState, UnitDependencyMask, UnitMngUtil, UnitRelationAtom,
-    UnitRelations,
-};
-use libsysmaster::{ReStation, Reliability};
 use libutils::logger;
 use std::cell::RefCell;
 use std::{path::PathBuf, rc::Rc};
+use sysmaster::reliability::{ReStation, Reliability};
+use sysmaster::unit::{
+    SubUnit, UmIf, UnitActiveState, UnitDependencyMask, UnitMngUtil, UnitRelationAtom,
+    UnitRelations,
+};
+use sysmaster::unit::{UnitActionError, UnitBase};
 struct Target {
-    owner: RefCell<Option<Rc<Unit>>>,
+    owner: RefCell<Option<Rc<dyn UnitBase>>>,
     um: Rc<dyn UmIf>,
     comm: Rc<TargetUnitComm>,
     mng: Rc<TargetMng>,
@@ -56,7 +56,7 @@ impl Target {
         }
     }
 
-    pub(self) fn owner(&self) -> Option<Rc<Unit>> {
+    pub(self) fn owner(&self) -> Option<Rc<dyn UnitBase>> {
         if let Some(ref unit) = *self.owner.borrow() {
             Some(Rc::clone(unit))
         } else {
@@ -75,19 +75,19 @@ impl Target {
                 u.id(),
                 UnitRelationAtom::UnitAtomAddDefaultTargetDependencyQueue,
             );
-            for _u in deps {
-                if !_u.default_dependencies() {
+            for _u_n in deps {
+                if !um.unit_has_default_dependecy(&_u_n) {
                     continue;
                 }
 
-                if um.unit_has_dependecy(u.id(), UnitRelationAtom::UnitAtomBefore, _u.id()) {
+                if um.unit_has_dependecy(u.id(), UnitRelationAtom::UnitAtomBefore, &_u_n) {
                     continue;
                 }
 
                 let e = um.unit_add_dependency(
                     u.id(),
                     UnitRelations::UnitAfter,
-                    _u.id(),
+                    &_u_n,
                     true,
                     UnitDependencyMask::UnitDependencyDefault,
                 );
@@ -114,7 +114,7 @@ impl SubUnit for Target {
         self.mng.to_unit_state()
     }
 
-    fn attach_unit(&self, unit: Rc<libsysmaster::manager::Unit>) {
+    fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
         self.comm.attach_unit(Rc::clone(&unit));
         self.owner.replace(Some(unit));
         self.db_insert();
@@ -126,7 +126,7 @@ impl SubUnit for Target {
 
     fn dump(&self) {}
 
-    fn start(&self) -> libutils::Result<(), libsysmaster::manager::UnitActionError> {
+    fn start(&self) -> libutils::Result<(), UnitActionError> {
         //if current state is not valid, just return.
         self.mng.start_check()?;
 
@@ -134,7 +134,7 @@ impl SubUnit for Target {
         Ok(())
     }
 
-    fn stop(&self, force: bool) -> libutils::Result<(), libsysmaster::manager::UnitActionError> {
+    fn stop(&self, force: bool) -> libutils::Result<(), UnitActionError> {
         if !force {
             self.mng.stop_check()?;
         }
@@ -176,5 +176,5 @@ impl UnitMngUtil for Target {
     }
 }*/
 
-use libsysmaster::declure_unitobj_plugin_with_param;
+use sysmaster::declure_unitobj_plugin_with_param;
 declure_unitobj_plugin_with_param!(Target, Target::new, PLUGIN_NAME, LOG_LEVEL);
