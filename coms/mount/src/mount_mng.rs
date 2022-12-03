@@ -87,13 +87,13 @@ impl MountMng {
 
         let old_unit_state = old_state.mount_state_to_unit_state();
         let new_unit_state = new_state.mount_state_to_unit_state();
-        self.comm.owner().map(|u| {
+        if let Some(u) = self.comm.owner() {
             u.notify(
                 old_unit_state,
                 new_unit_state,
                 UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
             )
-        });
+        }
 
         self.db_update();
     }

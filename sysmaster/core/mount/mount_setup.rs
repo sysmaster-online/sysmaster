@@ -273,7 +273,7 @@ impl MountPoint {
 }
 
 #[allow(dead_code)]
-/// need use furture
+/// need use feature
 /// mount the minimal mount point for enable the most basic function
 pub fn mount_setup_early() -> Result<(), Errno> {
     for i in 0..EARLY_MOUNT_NUM {

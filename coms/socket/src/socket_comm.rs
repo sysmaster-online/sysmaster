@@ -59,17 +59,13 @@ impl SocketUnitComm {
     }
 
     pub(super) fn rentry_conf_insert(&self, socket: &SectionSocket, service: Option<String>) {
-        self.owner()
-            .map(|u| self.rentry().conf_insert(u.id(), socket, service));
+        if let Some(u) = self.owner() {
+            self.rentry().conf_insert(u.id(), socket, service)
+        }
     }
 
     pub(super) fn rentry_conf_get(&self) -> Option<(SectionSocket, Option<String>)> {
-        let ret = self.owner().map(|u| self.rentry().conf_get(u.id()));
-        if ret.is_none() {
-            None
-        } else {
-            ret.unwrap()
-        }
+        self.owner().map(|u| self.rentry().conf_get(u.id()))?
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -83,7 +79,7 @@ impl SocketUnitComm {
         refused: i32,
         ports: Vec<(PortType, String, RawFd)>,
     ) {
-        self.owner().map(|u| {
+        if let Some(u) = self.owner() {
             self.rentry().mng_insert(
                 u.id(),
                 state,
@@ -94,7 +90,7 @@ impl SocketUnitComm {
                 refused,
                 ports,
             )
-        });
+        };
     }
 
     #[allow(clippy::type_complexity)]
@@ -109,12 +105,7 @@ impl SocketUnitComm {
         i32,
         Vec<(PortType, String, RawFd)>,
     )> {
-        let ret = self.owner().map(|u| self.rentry().mng_get(u.id()));
-        if ret.is_none() {
-            None
-        } else {
-            ret.unwrap()
-        }
+        self.owner().map(|u| self.rentry().mng_get(u.id()))?
     }
 }
 

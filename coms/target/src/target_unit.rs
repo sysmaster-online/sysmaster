@@ -96,8 +96,6 @@ impl Target {
                     return;
                 }
             }
-        } else {
-            return;
         }
     }
 }

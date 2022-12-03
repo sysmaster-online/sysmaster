@@ -64,7 +64,7 @@ impl ServiceSpawn {
             }
 
             log::debug!("begin to exec spawn");
-            match um.exec_spawn(&unit.id(), cmdline, &params, self.exec_ctx.clone()) {
+            match um.exec_spawn(unit.id(), cmdline, &params, self.exec_ctx.clone()) {
                 Ok(pid) => {
                     um.child_watch_pid(unit.id(), pid);
                     Ok(pid)

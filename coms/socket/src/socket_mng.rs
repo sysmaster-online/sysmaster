@@ -157,7 +157,7 @@ impl SocketMngData {
         configr: &Rc<SocketConfig>,
         exec_ctx: &Rc<ExecContext>,
     ) -> Rc<SocketMngData> {
-        let mng = Rc::new(SocketMngData {
+        Rc::new(SocketMngData {
             comm: Rc::clone(commr),
             config: Rc::clone(configr),
 
@@ -169,9 +169,7 @@ impl SocketMngData {
             control_cmd_type: RefCell::new(None),
             control_command: RefCell::new(Vec::new()),
             refused: RefCell::new(0),
-        });
-
-        mng
+        })
     }
 
     pub(self) fn db_map(&self) {
@@ -296,6 +294,7 @@ impl SocketMngData {
             Some(cmd) => {
                 match self.spawn.start_socket(&cmd) {
                     Ok(pid) => self.pid.set_control(pid),
+                    #[allow(clippy::unit_arg)]
                     Err(e) => {
                         self.comm.owner().map_or_else(
                             || {
@@ -443,14 +442,15 @@ impl SocketMngData {
             Some(cmd) => {
                 match self.spawn.start_socket(&cmd) {
                     Ok(pid) => self.pid.set_control(pid),
-                    Err(_e) => {
+                    Err(e) => {
+                        #[allow(clippy::unit_arg)]
                         self.comm.owner().map_or(
                             log::error!("Failed to run stop post cmd and service unit id is None"),
                             |u| {
                                 log::error!(
                                     "Failed to run stop post cmd for service: {},err {}",
                                     u.id(),
-                                    _e
+                                    e
                                 )
                             },
                         );
@@ -633,13 +633,13 @@ impl SocketMngData {
         // todo!()
         // trigger the unit the dependency trigger_by
 
-        self.comm.owner().map(|u| {
+        if let Some(u) = self.comm.owner() {
             u.notify(
                 original_state.to_unit_active_state(),
                 state.to_unit_active_state(),
                 UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
             )
-        });
+        }
     }
 
     fn state(&self) -> SocketState {

@@ -21,9 +21,9 @@ impl SocketPid {
 
     pub(super) fn unwatch_control(&self) {
         if let Some(pid) = self.control() {
-            self.comm
-                .owner()
-                .map(|u| self.comm.um().child_unwatch_pid(u.id(), pid));
+            if let Some(u) = self.comm.owner() {
+                self.comm.um().child_unwatch_pid(u.id(), pid)
+            }
             self.reset_control();
         }
     }

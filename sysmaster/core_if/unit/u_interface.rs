@@ -153,7 +153,7 @@ macro_rules! declure_unitobj_plugin_default {
 
 /// #[macro_use]
 /// the macro for create a sub unit instance with dyn ref of UmIf,
-/// which sub unit want's invoke um interface, about UmIf see doc of UmIf
+/// which sub unit wants invoke um interface, about UmIf see doc of UmIf
 #[macro_export]
 macro_rules! declure_unitobj_plugin_with_param {
     ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {

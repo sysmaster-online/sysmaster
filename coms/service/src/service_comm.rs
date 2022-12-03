@@ -57,17 +57,13 @@ impl ServiceUnitComm {
     }
 
     pub(super) fn rentry_conf_insert(&self, service: &SectionService) {
-        self.owner()
-            .map(|u| self.rentry().conf_insert(u.id(), service));
+        if let Some(u) = self.owner() {
+            self.rentry().conf_insert(u.id(), service)
+        }
     }
 
     pub(super) fn rentry_conf_get(&self) -> Option<SectionService> {
-        let ret = self.owner().map(|u| self.rentry().conf_get(u.id()));
-        if ret.is_none() {
-            None
-        } else {
-            ret.unwrap()
-        }
+        self.owner().map(|u| self.rentry().conf_get(u.id()))?
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -82,7 +78,7 @@ impl ServiceUnitComm {
         control_cmd_len: usize,
         notify_state: NotifyState,
     ) {
-        self.owner().map(|u| {
+        if let Some(u) = self.owner() {
             self.rentry().mng_insert(
                 u.id(),
                 state,
@@ -94,7 +90,7 @@ impl ServiceUnitComm {
                 control_cmd_len,
                 notify_state,
             )
-        });
+        }
     }
 
     #[allow(clippy::type_complexity)]
@@ -110,12 +106,7 @@ impl ServiceUnitComm {
         usize,
         NotifyState,
     )> {
-        let ret = self.owner().map(|u| self.rentry().mng_get(u.id()));
-        if ret.is_none() {
-            None
-        } else {
-            ret.unwrap()
-        }
+        self.owner().map(|u| self.rentry().mng_get(u.id()))?
     }
 
     pub(super) fn _reli(&self) -> Rc<Reliability> {

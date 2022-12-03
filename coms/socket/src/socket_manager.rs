@@ -65,7 +65,7 @@ impl ReStation for SocketManager {
 }
 
 impl SocketManager {
-    fn rc_last_fdlisten(&self, lunit: &String, spread: bool) {
+    fn rc_last_fdlisten(&self, lunit: &str, spread: bool) {
         match spread {
             true => self.comm.um().rentry_trigger_merge(lunit, true), // merge to trigger
             false => {}                                               // do nothing, try again

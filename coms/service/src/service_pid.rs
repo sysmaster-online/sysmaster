@@ -36,9 +36,9 @@ impl ServicePid {
 
     pub(super) fn unwatch_main(&self) {
         if let Some(pid) = self.main() {
-            self.comm
-                .um()
-                .child_unwatch_pid(&self.comm.get_owner_id(), pid);
+            if let Some(u) = self.comm.owner() {
+                self.comm.um().child_unwatch_pid(u.id(), pid)
+            }
             self.data.borrow_mut().reset_main();
         }
     }
@@ -61,9 +61,9 @@ impl ServicePid {
 
     pub(super) fn unwatch_control(&self) {
         if let Some(pid) = self.control() {
-            self.comm
-                .um()
-                .child_unwatch_pid(&self.comm.get_owner_id(), pid);
+            if let Some(u) = self.comm.owner() {
+                self.comm.um().child_unwatch_pid(u.id(), pid)
+            }
             self.data.borrow_mut().reset_control();
         }
     }

@@ -94,7 +94,7 @@ function fn_remake()
 	cp -r ../../extra/usr/bin/pctrl usr/bin/
 	mkdir -p etc/sysmaster/
 	cp -r ../../extra/etc/sysmaster/* etc/sysmaster/
-	
+
 	sed -i 's/^PermitRootLogin.*/PermitRootLogin yes/g' etc/ssh/sshd_config
 
 	#change sysmaster as init

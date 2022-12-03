@@ -262,11 +262,11 @@ impl SocketConfig {
     }
 
     fn set_ref(&self, target: String) {
-        self.comm.owner().map(|u| {
+        if let Some(u) = self.comm.owner() {
             self.service
                 .borrow_mut()
                 .set_ref(u.id().to_string(), target)
-        });
+        };
     }
 
     fn push_port(&self, port: Rc<SocketPortConf>) {

@@ -2,6 +2,7 @@
 
 #RUST_BACKTRACE=1 cargo run --release -p sysmaster --example signals
 
+arch=`uname -m`
 # install musl-build
 rustup target add $arch-unknown-linux-musl
 
@@ -12,6 +13,5 @@ rustup target add $arch-unknown-linux-musl
 #[target.$arch-unknown-linux-musl]
 #rustflags = ["-C", "target-feature=-crt-static"]
 
-arch=`uname -m`
 cargo build --all --release --target=$arch-unknown-linux-musl
-cargo test --all --release --target=$arch-unknown-linux-musl
+#RUST_BACKTRACE=full cargo test --all --release --target=$arch-unknown-linux-musl -- --nocapture --test-threads=1

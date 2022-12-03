@@ -46,8 +46,9 @@ impl TargetUnitComm {
     }
 
     pub(super) fn rentry_mng_insert(&self, state: TargetState) {
-        self.owner()
-            .map(|u| self.rentry().mng_insert(u.id(), state));
+        if let Some(u) = self.owner() {
+            self.rentry().mng_insert(u.id(), state)
+        }
     }
 
     pub(super) fn rentry_mng_get(&self) -> Option<TargetState> {

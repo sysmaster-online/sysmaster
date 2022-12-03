@@ -550,9 +550,9 @@ impl ServiceMng {
 
         let os = service_state_to_unit_state(self.config.service_type(), original_state);
         let ns = service_state_to_unit_state(self.config.service_type(), state);
-        self.comm
-            .owner()
-            .map(|u| u.notify(os, ns, UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE));
+        if let Some(u) = self.comm.owner() {
+            u.notify(os, ns, UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE)
+        }
     }
 
     fn service_alive(&self) -> bool {
