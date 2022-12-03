@@ -2,11 +2,10 @@ use crate::CgType;
 
 use super::CgFlags;
 use super::CgroupErr;
-use nix::errno::Errno;
 use nix::libc;
 use nix::sys::signal::Signal;
+use nix::sys::statfs::{statfs, FsType};
 use nix::unistd::Pid;
-use nix::NixPath;
 use regex::Regex;
 use std::collections::HashSet;
 use std::fs;
@@ -14,11 +13,16 @@ use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
 use std::io::{Error as IOError, ErrorKind};
-use std::mem;
 use std::path::PathBuf;
 use walkdir::{DirEntry, WalkDir};
 
 use libutils::IN_SET;
+
+#[cfg(target_env = "musl")]
+type FsTypeT = libc::c_ulong;
+
+#[cfg(not(target_env = "musl"))]
+type FsTypeT = libc::c_long;
 
 const CG_BASE_DIR: &str = "/sys/fs/cgroup";
 const CG_UNIFIED_DIR: &str = "/sys/fs/cgroup/unified";
@@ -28,23 +32,23 @@ const CG_V1_DIR: &str = "/sys/fs/cgroup/sysmaster";
 pub fn cg_type() -> Result<CgType, CgroupErr> {
     let stat = statfs(CG_BASE_DIR).map_err(|_e| CgroupErr::NotSupported)?;
 
-    if stat.f_type == libc::CGROUP2_SUPER_MAGIC {
+    if stat.filesystem_type() == FsType(libc::CGROUP2_SUPER_MAGIC as FsTypeT) {
         return Ok(CgType::UnifiedV2);
     }
 
-    if stat.f_type == libc::TMPFS_MAGIC {
+    if stat.filesystem_type() == FsType(libc::TMPFS_MAGIC as FsTypeT) {
         if let Ok(s) = statfs(CG_UNIFIED_DIR) {
-            if s.f_type == libc::CGROUP2_SUPER_MAGIC {
+            if s.filesystem_type() == FsType(libc::CGROUP2_SUPER_MAGIC as FsTypeT) {
                 return Ok(CgType::UnifiedV1);
             }
         }
 
         match statfs(CG_V1_DIR) {
             Ok(s) => {
-                let fy = s.f_type;
-                if fy == libc::CGROUP2_SUPER_MAGIC {
+                let fy = s.filesystem_type();
+                if fy == FsType(libc::CGROUP2_SUPER_MAGIC as FsTypeT) {
                     return Ok(CgType::UnifiedV1);
-                } else if fy == libc::CGROUP_SUPER_MAGIC {
+                } else if fy == FsType(libc::CGROUP_SUPER_MAGIC as FsTypeT) {
                     return Ok(CgType::Legacy);
                 } else {
                     return Ok(CgType::None);
@@ -57,14 +61,6 @@ pub fn cg_type() -> Result<CgType, CgroupErr> {
     }
 
     Err(CgroupErr::NotSupported)
-}
-
-fn statfs(path: &str) -> Result<libc::statfs, Errno> {
-    unsafe {
-        let mut stat = mem::MaybeUninit::<libc::statfs>::uninit();
-        let res = path.with_nix_path(|p| libc::statfs(p.as_ptr(), stat.as_mut_ptr()))?;
-        Errno::result(res).map(|_| stat.assume_init())
-    }
 }
 
 fn cgtype_to_path(cg_type: CgType) -> &'static str {
