@@ -2,7 +2,7 @@
 
 busybox_file=/usr/share/busybox/busybox.links
 
-#remove the files we don't need and 
+#remove the files we don't need and
 #create symbolic links for busybox
 
 rm -rf /etc/systemd

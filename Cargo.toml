@@ -6,7 +6,7 @@ edition = "2018"
 build = "build.rs"
 
 [lib]
-crate-type = ["dylib"]
+crate-type = ["rlib", "dylib"]
 path = "sysmaster/lib.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -64,6 +64,7 @@ panic = 'unwind'
 
 [profile.release]
 panic = 'unwind'
+strip = true
 
 [workspace]
 members = [

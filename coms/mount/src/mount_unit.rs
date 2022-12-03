@@ -52,8 +52,9 @@ impl MountUnit {
 
 impl SubUnit for MountUnit {
     fn load(&self, _paths: Vec<PathBuf>) -> libutils::Result<(), Box<dyn std::error::Error>> {
-        self.comm.owner().map(|u| u.set_ignore_on_isolate(true));
-
+        if let Some(u) = self.comm.owner() {
+            u.set_ignore_on_isolate(true)
+        }
         Ok(())
     }
 

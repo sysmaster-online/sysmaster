@@ -90,14 +90,14 @@ repos:
       - id: cargo-build
         name: cargo build
         description: build the package for errors.
-        entry: bash -c 'RUSTFLAGS="-C prefer-dynamic -C target-feature=-crt-static" cargo build --release --all -v'
+        entry: bash -c 'cargo build --release --all -v'
         language: rust
         pass_filenames: false
         files: \.(rs|toml|sh)$
       - id: cargo-test
         name: cargo test
         description: test the package for errors.
-        entry: bash -c 'RUSTFLAGS="-C prefer-dynamic -C target-feature=-crt-static" RUST_BACKTRACE=1 cargo test --all --release -v -- --nocapture --test-threads=1'
+        entry: bash -c 'RUST_BACKTRACE=full cargo test --all --release -v -- --nocapture --test-threads=1'
         language: rust
         pass_filenames: false
         files: \.(rs|toml|sh)$
