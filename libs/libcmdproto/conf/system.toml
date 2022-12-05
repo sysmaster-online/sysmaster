@@ -1,6 +1,0 @@
-#  This file is part of sysmaster.
-
-[Manager]
-DefaultRestartSec=100
-DefaultTimeoutStartSec=90
-DefaultTimeoutStopSec=90

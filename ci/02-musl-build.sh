@@ -14,4 +14,4 @@ rustup target add $arch-unknown-linux-musl
 #rustflags = ["-C", "target-feature=-crt-static"]
 
 cargo build --all --release --target=$arch-unknown-linux-musl
-#RUST_BACKTRACE=full cargo test --all --release --target=$arch-unknown-linux-musl -- --nocapture --test-threads=1
+#RUST_BACKTRACE=full cargo test --all --target=$arch-unknown-linux-musl -- --nocapture --test-threads=1

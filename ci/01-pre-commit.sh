@@ -20,7 +20,8 @@ do
     grep -Pn '[\p{Han}]' $rustlist  && echo "DO NOT USE CHANESE CHARACTERS in code, 不要在源码中使用中文!" && exit 1
 done
 
-pip3 install pre-commit -i http://mirrors.aliyun.com/pypi/simple/ || pip3 install  -i https://pypi.tuna.tsinghua.edu.cn/simple/ pre-commit || pip3 install pre-commit
+pip3 install  -i https://pypi.tuna.tsinghua.edu.cn/simple/ pre-commit ruamel.yaml || pip3 install pre-commit ruamel.yaml || pip3 install pre-commit ruamel.yaml -i http://mirrors.aliyun.com/pypi/simple/
+
 ## one PR ? Commit
 # oldnum=`git rev-list origin/master --no-merges --count`
 # newnum=`git rev-list HEAD --no-merges --count`
@@ -42,6 +43,8 @@ done
 RUSTC_WRAPPER="" cargo clippy --all-targets --all-features --tests --benches --examples || exit 1
 
 # run base check
-filelist=`git diff origin/master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`
+#filelist=`git diff origin/master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`
 export PATH="$PATH:/home/jenkins/.local/bin"
-pre-commit run -vvv --files ${filelist}
+# ln -s `which python3` /home/jenkins/.local/bin/python
+# pre-commit autoupdate || pre-commit autoupdate || pre-commit autoupdate
+pre-commit run -vvv --all-files

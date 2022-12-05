@@ -1,4 +1,15 @@
 //! Convert the command request into the corresponding execution action
+use super::{
+    sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
+    UnitFile,
+};
+
+use http::StatusCode;
+use libutils::Result;
+use std::io::Error;
+use std::rc::Rc;
+
+/// CMD error
 pub enum ExecCmdErrno {
     /// invalid input
     Input,
@@ -9,16 +20,6 @@ pub enum ExecCmdErrno {
     /// not supported
     NotSupported,
 }
-
-use super::{
-    sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
-    UnitFile,
-};
-
-use http::StatusCode;
-use libutils::Result;
-use std::io::Error;
-use std::rc::Rc;
 
 pub(crate) trait Executer {
     /// deal Command，return Response

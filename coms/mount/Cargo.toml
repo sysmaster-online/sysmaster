@@ -12,7 +12,6 @@ name = "mount"
 [dependencies]
 libevent = { path = "../../libs/libevent" }
 libutils = { path = "../../libs/libutils" }
-libcmdproto = { path = "../../libs/libcmdproto" }
 sysmaster = { path = "../../" }
 
 dynamic_reload = "0.8.0"
