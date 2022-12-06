@@ -53,9 +53,12 @@ xattr = "0.2.3"
 fnmatch-regex = "0.2.0"
 
 [profile.dev]
-panic = 'unwind'
+panic = 'abort'
 
 [profile.release]
+panic = 'abort'
+
+[profile.test]
 panic = 'unwind'
 
 # for optimize program size
