@@ -278,7 +278,11 @@ impl ServiceMng {
         }
 
         let pid = ret.unwrap();
-        log::debug!("service type is: {}, forking pid is: {}", service_type, pid);
+        log::debug!(
+            "service type is: {:?}, forking pid is: {}",
+            service_type,
+            pid
+        );
 
         match service_type {
             ServiceType::Simple => {

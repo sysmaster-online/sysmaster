@@ -12,23 +12,17 @@ struct ServiceReDb<K, V>(ReDb<K, V>);
 const RELI_DB_HSERVICE_CONF: &str = "svcconf";
 const RELI_DB_HSERVICE_MNG: &str = "svcmng";
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, EnumString, Display, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy)]
 pub(super) enum ServiceType {
-    #[strum(serialize = "simple")]
     #[serde(alias = "simple")]
     Simple,
-    #[strum(serialize = "forking")]
     #[serde(alias = "forking")]
     Forking,
-    #[strum(serialize = "oneshot")]
     #[serde(alias = "oneshot")]
     Oneshot,
-    #[strum(serialize = "notify")]
     #[serde(alias = "notify")]
     Notify,
-    #[strum(serialize = "idle")]
     Idle,
-    #[strum(serialize = "exec")]
     Exec,
     TypeMax,
     TypeInvalid = -1,
@@ -58,12 +52,10 @@ impl DeserializeWith for ServiceType {
     }
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, EnumString, Display, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy)]
 pub(super) enum NotifyAccess {
-    #[strum(serialize = "none")]
     #[serde(alias = "none")]
     None,
-    #[strum(serialize = "main")]
     #[serde(alias = "main")]
     Main,
 }

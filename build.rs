@@ -1,4 +1,4 @@
-//!
+//! do prepared actions for build
 // if use env out_dir need add build.rs
 use std::{env, process::Command};
 
@@ -21,15 +21,16 @@ fn main() {
         .unwrap();
     warn!(format!("{:?}", result));
 
-    warn!(format!(
-        "{:?}",
-        pkg_config::Config::new().probe("liblmdb").is_ok()
-    ));
+    // warn!(format!(
+    //     "{:?}",
+    //     pkg_config::Config::new().probe("liblmdb").is_ok()
+    // ));
     //println!("cargo:rust-flags = -C prefer-dynamic -C target-feature=-crt-static");
     //pkg_config::Config::new().probe("lmdb").unwrap();
 
-    println!("cargo:rustc-link-search=native=/usr/lib");
-    println!("cargo:rustc-link-lib=dylib=lmdb");
+    // println!("cargo:rustc-link-search=native=/usr/lib");
+    // println!("cargo:rustc-link-lib=dylib=lmdb");
+    println!("cargo:rerun-if-changed=build.sh");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=config.service");
 }

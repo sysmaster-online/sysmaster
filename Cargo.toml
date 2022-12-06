@@ -33,7 +33,6 @@ confique = { version = "0.1.3", default-features= false, features = [ 'toml' ] }
 dynamic_reload = "0.8.0"
 epoll = "4.3.1"
 heed = "0.11.0"
-http = "0.2" # 我们使用 HTTP status code 所以引入这个类型库
 inotify = "0.10"
 lazy_static = "1.4.0"
 libc = "0.2.*"
@@ -42,29 +41,28 @@ log = "0.4"
 nix = "0.24"
 once_cell = { version = "1.5.2"}
 procfs = "0.12.0"
-prost = "0.9" # 处理 protobuf 的代码
-regex = "1"
+regex = { version = "1.6.0", default-features = false, features = ["std"] }
 serde = "1.0.130"
 serde_derive = "1.0.130"
 signal-hook = "0.3.13"
 signal-hook-registry = "1.4.0"
 siphasher = { version = "0.3", features = ["serde"] }
-strum = { version = "0.23", features = ["derive"] }
 toml = "0.5.8"
 walkdir = "2"
 xattr = "0.2.3"
 fnmatch-regex = "0.2.0"
-
-[build-dependencies]
-prost-build = "0.9" # 编译 protobuf
-pkg-config = "0.3.16"
 
 [profile.dev]
 panic = 'unwind'
 
 [profile.release]
 panic = 'unwind'
-strip = true
+
+# for optimize program size
+#strip = true
+#lto = true
+#opt-level = 'z'
+#codegen-units = 1
 
 [workspace]
 members = [

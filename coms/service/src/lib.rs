@@ -56,9 +56,6 @@
 //! Indicates the socket service that the current service depends on. The dependency is Wants. Support multiple configurations, and use ";" when configuring multiple division.
 //!
 
-#[macro_use]
-extern crate strum;
-
 // dependency:
 // service_base -> service_rentry -> {service_comm | service_config}
 // {service_pid | service_spawn} ->
