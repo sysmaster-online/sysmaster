@@ -90,14 +90,14 @@ repos:
       - id: cargo-build
         name: cargo build
         description: build the package for errors.
-        entry: bash -c 'cargo build --all --release -v'
+        entry: bash -c 'cargo build --all -v'
         language: rust
         pass_filenames: false
         files: \.(rs|toml|sh)$
       - id: cargo-test
         name: cargo test
         description: test the package for errors.
-        entry: bash -c 'RUST_BACKTRACE=full cargo test --all --release -v -- --nocapture --test-threads=1'
+        entry: bash -c 'RUST_BACKTRACE=full cargo test --all -v -- --nocapture --test-threads=1'
         language: rust
         pass_filenames: false
         files: \.(rs|toml|sh)$
