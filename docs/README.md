@@ -1,10 +1,12 @@
 # Summary
->  说明
-1. mdbook的格式说明参考 https://llever.com/mdBook-zh/README.zh.html
+
+>说明
+
+1. mdbook的格式说明参考:<https://llever.com/mdBook-zh/README.zh.html>
 2. markdown格式参考官方文档
 3. 如果是需求设计,请参考如下格式.
 
-# 标题
+## 标题
 
 ## 概述
 
@@ -15,9 +17,13 @@
 ## 需求场景分析
 
 ### 需求来源
+
 ### 价值分析
+
 ### 场景分析
+
 ### 影响分析
+
 ### 已有实现方案分析
 
 ## 特性/功能实现方案

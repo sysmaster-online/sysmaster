@@ -41,7 +41,7 @@ Linux系统还支持不同的启动模式，每种模式启动的Unit范围也�
 5. Unit对象是有生命周期的，因此需要有一个整体的管理模块，将所有模块串联起来。
 6. Unit对象每次启动，通过Job出发，因此需要划分出一个Job引擎。
 
-![avatar](../res/unitManger.jpg)
+![avatar](../res/sysMaster_um.jpg)
 
 ### unit接口定义
 
