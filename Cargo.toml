@@ -58,14 +58,14 @@ panic = 'abort'
 [profile.release]
 panic = 'abort'
 
-[profile.test]
-panic = 'unwind'
-
 # for optimize program size
 #strip = true
 #lto = true
 #opt-level = 'z'
 #codegen-units = 1
+
+[profile.test]
+panic = 'unwind'
 
 [workspace]
 members = [
