@@ -46,7 +46,7 @@
 daemon类型的bin crate的目录以d结尾。
 ```
 / (根目录)
-|...coms (组件库)
+|...coms (插件)
 |      |...service (unit type crate)
 |      |...socket  (unit type crate)
 |      |...target  (unit type crate)
@@ -54,19 +54,21 @@ daemon类型的bin crate的目录以d结尾。
 |      |...libtest (test lib crate)
 |      |...libcgroup (cgroup lib crate)
 |      |...libcmdproto(cmd proto lib crate)
-|...src
+|...extends (sysmaster-extends组件)
 |     |...sysmaster (daemon,and libsysmaster
 |     |...udevd (daemon)
 |     |...random-seed (bin)
+|...sysmaster (sysmaster-core核心组件)
 |...tools
 |     |...musl_build
 |     |...run_with_sd
 |...docs
+|...requirements.sh (安装依赖)
 ```
 
 如：
 ```
   - lib crate: libs/libevent, libs/libutils
-  - bin crate: src/init, src/sysmaster
-  - daemon crate: src/udevd, src/logind
+  - bin crate: extends/init, sysmaster
+  - daemon crate: extends/udevd, extends/logind
 ```
