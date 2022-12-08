@@ -1,2 +1,20 @@
 [build]
 rustflags = ["-C", "target-feature=-crt-static"]
+
+[source.crates-io]
+registry = "https://github.com/rust-lang/crates.io-index"
+
+# 指定镜像
+replace-with = 'ustc'
+
+# 本地vendor
+[source.local]
+directory = "vendor"
+
+# 中国科学技术大学
+[source.ustc]
+registry = "https://mirrors.ustc.edu.cn/crates.io-index"
+
+# 字节跳动
+[source.rsproxy]
+registry = "https://rsproxy.cn/crates.io-index"
