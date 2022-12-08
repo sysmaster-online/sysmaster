@@ -113,7 +113,7 @@ impl UnitManagerX {
     }
 
     pub(in crate::core) fn enable_unit(&self, unit_file: &str) -> Result<(), Error> {
-        log::debug!("unit disable file {}", unit_file);
+        log::debug!("unit enable file {}", unit_file);
         let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
         install.unit_enable_files(unit_file)?;
         Ok(())
