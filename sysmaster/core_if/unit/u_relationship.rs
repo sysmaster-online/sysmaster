@@ -110,11 +110,11 @@ impl FromStr for UnitType {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let ret = match s {
-            "Service" => UnitType::UnitService,
-            "Target" => UnitType::UnitTarget,
-            "Socket" => UnitType::UnitSocket,
-            "Mount" => UnitType::UnitMount,
+        let ret = match s.to_lowercase().as_str() {
+            "service" => UnitType::UnitService,
+            "target" => UnitType::UnitTarget,
+            "socket" => UnitType::UnitSocket,
+            "mount" => UnitType::UnitMount,
             _ => UnitType::UnitTypeInvalid,
         };
         Ok(ret)

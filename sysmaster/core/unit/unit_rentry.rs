@@ -11,18 +11,13 @@ use nix::unistd::Pid;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::str::FromStr;
 use sysmaster::reliability::{ReDb, Reliability};
 use sysmaster::unit::{UnitRelations, UnitType};
 
 pub(crate) fn unit_name_to_type(unit_name: &str) -> UnitType {
     let words: Vec<&str> = unit_name.split('.').collect();
-    match words[words.len() - 1] {
-        "service" => UnitType::UnitService,
-        "target" => UnitType::UnitTarget,
-        "socket" => UnitType::UnitSocket,
-        "mount" => UnitType::UnitMount,
-        _ => UnitType::UnitTypeInvalid,
-    }
+    UnitType::from_str(words[words.len() - 1]).unwrap_or(UnitType::UnitTypeInvalid)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

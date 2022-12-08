@@ -1,5 +1,5 @@
-#[build]
-#rustflags = ["-C", "target-feature=-crt-static"]
+[build]
+rustflags = ["-C", "target-feature=-crt-static"]
 
 [source.crates-io]
 registry = "https://github.com/rust-lang/crates.io-index"

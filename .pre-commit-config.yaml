@@ -94,6 +94,7 @@ repos:
         language: rust
         pass_filenames: false
         files: \.(rs|toml|sh)$
+        verbose: true
       - id: cargo-test
         name: cargo test
         description: test the package for errors.
@@ -101,6 +102,7 @@ repos:
         language: rust
         pass_filenames: false
         files: \.(rs|toml|sh)$
+        verbose: true
 
 #      - id: cargo-deny
 #        name: cargo deny check

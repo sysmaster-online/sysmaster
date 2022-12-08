@@ -14,4 +14,4 @@ rustup target add $arch-unknown-linux-musl
 #rustflags = ["-C", "target-feature=-crt-static"]
 
 cargo build --all --all-features --target=$arch-unknown-linux-musl
-#RUST_BACKTRACE=full cargo test --all --all-targets --all-features --target=$arch-unknown-linux-musl -- --nocapture --test-threads=1
+#RUST_BACKTRACE=full RUSTFLAGS="-L /usr/$arch-linux-musl/lib64/libm.a" cargo test --all --all-targets --all-features --target=$arch-unknown-linux-musl -- --nocapture --test-threads=1
