@@ -1,9 +1,9 @@
 use std::{env, process::Command};
 
-pub fn run_script(name: &str) {
+pub fn run_script(suit: &str, name: &str) {
     let m_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let testpath = format!("{}/tests/{}/{}.sh", m_dir, name, name);
-    let logpath = format!("{}/tests/{}/{}.log", m_dir, name, name);
+    let testpath = format!("{}/tests/{}/{}/{}.sh", m_dir, suit, name, name);
+    let logpath = format!("{}/tests/{}/{}/{}.log", m_dir, suit, name, name);
     let cmd = format!("sh -x {} &> {}", testpath, logpath);
     println!("[ {} ]: {}", name, cmd);
 
