@@ -1,16 +1,19 @@
-!/bin/bash
+#!/bin/bash
 # Description: test frame functions for docker integration test
 
-set +e
 source "${TEST_PATH}"/common/log.sh
 source "${TEST_PATH}"/common/lib.sh
 source "${TEST_PATH}"/common/docker_lib.sh
 
+set +e
 TMP_DIR=''
 
 function test_setup() {
+    setenforce 0
     TMP_DIR="$(mktemp -d /tmp/"${TEST_SCRIPT%.sh}"_XXXX)"
-    which docker || return 1
+    if ! which docker; then
+        yum install -y docker || return 1
+    fi
     docker images | grep "${SYSMST_BASE_IMG}" && return 0
 
     if ! docker images | grep "${BASE_IMG}"; then
@@ -32,6 +35,7 @@ function test_cleanup() {
     if docker images | grep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}"; then
         docker images | grep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}" | awk '{print $3}' | xargs docker rmi -f
     fi
+    rm -rf "${SYSMST_INSTALL_PATH}"
 }
 
 function runtest() {
