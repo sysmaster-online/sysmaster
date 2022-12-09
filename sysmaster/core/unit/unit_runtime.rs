@@ -132,12 +132,19 @@ impl UnitRTData {
 
     fn rc_last_queue_load(&self, lunit: &String) {
         // remove from pps, which would be compensated later(dc_last_queue_load).
-        self.rentry.pps_clear(lunit, UnitRePps::QUEUE_LOAD);
+        if self.rentry.pps_contains(lunit, UnitRePps::QUEUE_LOAD) {
+            self.rentry.pps_clear(lunit, UnitRePps::QUEUE_LOAD);
+        }
     }
 
     fn rc_last_queue_targetdeps(&self, lunit: &String) {
         // remove from pps, which would be compensated later(dc_last_queue_targetdeps).
-        self.rentry.pps_clear(lunit, UnitRePps::QUEUE_TARGET_DEPS);
+        if self
+            .rentry
+            .pps_contains(lunit, UnitRePps::QUEUE_TARGET_DEPS)
+        {
+            self.rentry.pps_clear(lunit, UnitRePps::QUEUE_TARGET_DEPS);
+        }
     }
 
     fn do_compensate_last(&self, lframe: (u32, Option<u32>, Option<u32>), lunit: Option<&String>) {
@@ -162,16 +169,18 @@ impl UnitRTData {
 
     fn dc_last_queue_load(&self, lunit: &str) {
         // retry
-        let unit = self.db.units_get(lunit).unwrap();
-        if let Err(e) = unit.load() {
-            log::error!("load unit [{}] failed: {}", unit.id(), e.to_string());
+        if let Some(unit) = self.db.units_get(lunit) {
+            if let Err(e) = unit.load() {
+                log::error!("load unit [{}] failed: {}", unit.id(), e.to_string());
+            }
         }
     }
 
     fn dc_last_queue_targetdeps(&self, lunit: &str) {
         // retry
-        let unit = self.db.units_get(lunit).unwrap();
-        dispatch_target_dep_unit(&self.db, &unit);
+        if let Some(unit) = self.db.units_get(lunit) {
+            dispatch_target_dep_unit(&self.db, &unit);
+        }
     }
 }
 
