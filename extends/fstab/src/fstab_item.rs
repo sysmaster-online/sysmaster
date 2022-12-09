@@ -103,7 +103,7 @@ mod tests {
         ";
         let path = Path::new("./fstab");
 
-        let mut file = match File::create(&path) {
+        let mut file = match File::create(path) {
             Err(why) => panic!("couldn't create {:?}: {:?}", path, why),
             Ok(file) => file,
         };
