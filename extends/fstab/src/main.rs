@@ -208,13 +208,13 @@ mod tests {
         let src_path = Path::new(&fstab_items[0].device_spec);
         let dst_path = Path::new(&fstab_items[0].mount_point);
         if !(Path::exists(src_path) && src_path.is_dir()) {
-            if let Err(why) = fs::create_dir_all(&src_path) {
+            if let Err(why) = fs::create_dir_all(src_path) {
                 clean();
                 panic!("Failed to create {:?}: {:?}", src_path, why);
             }
         }
         if !(Path::exists(dst_path) && dst_path.is_dir()) {
-            if let Err(why) = fs::create_dir_all(&dst_path) {
+            if let Err(why) = fs::create_dir_all(dst_path) {
                 clean();
                 panic!("Failed to create {:?}: {:?}", dst_path, why);
             }
