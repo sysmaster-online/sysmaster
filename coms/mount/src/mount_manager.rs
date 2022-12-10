@@ -132,7 +132,8 @@ impl MountMonitor {
 
         // io
         let io = Rc::clone(&self.io);
-        events.add_source(io).unwrap();
+        events.add_source(io.clone()).unwrap();
+        events.set_enabled(io, EventState::On).unwrap();
     }
 
     pub(self) fn defer_enable(&self, enable: bool) -> Result<i32> {
