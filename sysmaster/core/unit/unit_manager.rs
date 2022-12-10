@@ -761,7 +761,7 @@ mod unit_submanager {
             lunit: Option<&String>,
         ) {
             let utype = self.last_unittype(lframe);
-            if utype.is_none() {
+            if utype.is_none() || lunit.is_none() {
                 return;
             }
 
@@ -777,7 +777,7 @@ mod unit_submanager {
             lunit: Option<&String>,
         ) {
             let utype = self.last_unittype(lframe);
-            if utype.is_none() {
+            if utype.is_none() || lunit.is_none() {
                 return;
             }
 
