@@ -82,7 +82,7 @@ repos:
       - id: cargo-fix
         name: cargo fix
         description: Check the package for errors.
-        entry: bash -c 'cargo fix -v --broken-code --all-targets --all --all-features --allow-dirty --allow-staged'
+        entry: bash -c 'cargo fix -v --broken-code --all-targets --all --allow-dirty --allow-staged'
         language: rust
         pass_filenames: false
         files: \.rs$
@@ -90,7 +90,7 @@ repos:
       - id: cargo-build
         name: cargo build
         description: build the package for errors.
-        entry: bash -c 'cargo build --all --all-features -v'
+        entry: bash -c 'cargo build --all --features "default" -v'
         language: rust
         pass_filenames: false
         files: \.(rs|toml|sh)$
@@ -98,7 +98,7 @@ repos:
       - id: cargo-test
         name: cargo test
         description: test the package for errors.
-        entry: bash -c 'RUST_BACKTRACE=full cargo test --all-targets --all --all-features -v -- --nocapture --test-threads=1'
+        entry: bash -c 'RUST_BACKTRACE=full cargo test --all-targets --all -v -- --nocapture --test-threads=1'
         language: rust
         pass_filenames: false
         files: \.(rs|toml|sh)$

@@ -24,9 +24,20 @@ type FsTypeT = libc::c_ulong;
 #[cfg(not(target_env = "musl"))]
 type FsTypeT = libc::c_long;
 
-const CG_BASE_DIR: &str = "/sys/fs/cgroup";
+/// the base dir of the cgroup
+#[cfg(feature = "linux")]
+pub const CG_BASE_DIR: &str = "/sys/fs/cgroup";
+#[cfg(feature = "linux")]
+const CGROUP_PROCS: &str = "cgroup.procs";
+
 const CG_UNIFIED_DIR: &str = "/sys/fs/cgroup/unified";
 const CG_V1_DIR: &str = "/sys/fs/cgroup/sysmaster";
+
+/// the base dir of the cgroup
+#[cfg(feature = "hongmeng")]
+pub const CG_BASE_DIR: &str = "/run/sysmaster/cgroup";
+#[cfg(feature = "hongmeng")]
+const CGROUP_PROCS: &str = "procs";
 
 /// return the cgroup mounted type, if not support cgroup return CgroupErr.
 pub fn cg_type() -> Result<CgType, CgroupErr> {
@@ -63,6 +74,7 @@ pub fn cg_type() -> Result<CgType, CgroupErr> {
     Err(CgroupErr::NotSupported)
 }
 
+#[allow(dead_code)]
 fn cgtype_to_path(cg_type: CgType) -> &'static str {
     match cg_type {
         CgType::None => "",
@@ -72,6 +84,7 @@ fn cgtype_to_path(cg_type: CgType) -> &'static str {
     }
 }
 
+#[cfg(feature = "linux")]
 fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf, CgroupErr> {
     let cg_type = cg_type()?;
     let base_path = cgtype_to_path(cg_type);
@@ -79,10 +92,16 @@ fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf, CgroupErr
     Ok(path_buf.join(cg_path).join(suffix))
 }
 
+#[cfg(feature = "hongmeng")]
+fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf, CgroupErr> {
+    let path_buf: PathBuf = PathBuf::from(CG_BASE_DIR);
+    Ok(path_buf.join(cg_path).join(suffix))
+}
+
 /// attach the pid to the controller which is depend the cg_path
 pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<(), CgroupErr> {
     log::debug!("attach pid {} to path {:?}", pid, cg_path);
-    let cg_procs = cg_abs_path(cg_path, &PathBuf::from("cgroup.procs"))?;
+    let cg_procs = cg_abs_path(cg_path, &PathBuf::from(CGROUP_PROCS))?;
 
     if !cg_procs.exists() {
         return Err(CgroupErr::IoError(std::io::Error::from(
@@ -120,7 +139,11 @@ fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>, CgroupErr> {
     let mut pids = Vec::new();
     for line in reader.lines() {
         let line = line.map_err(CgroupErr::IoError)?;
-        let pid = Pid::from_raw(line.parse::<i32>().unwrap());
+        let pid = Pid::from_raw(
+            line.trim_matches(|c: char| !c.is_numeric())
+                .parse::<i32>()
+                .unwrap(),
+        );
 
         pids.push(pid);
     }
@@ -130,7 +153,7 @@ fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>, CgroupErr> {
 
 /// return all the pids in the cg_path, read from cgroup.procs.
 pub fn cg_get_pids(cg_path: &PathBuf) -> Vec<Pid> {
-    match get_pids(cg_path, "cgroup.procs") {
+    match get_pids(cg_path, CGROUP_PROCS) {
         Ok(pids) => pids,
         Err(_) => Vec::new(),
     }
@@ -173,7 +196,11 @@ fn cg_kill_process(
     let reader = BufReader::new(file);
     for line in reader.lines() {
         let line = line.map_err(CgroupErr::IoError)?;
-        let pid = Pid::from_raw(line.parse::<i32>().unwrap());
+        let pid = Pid::from_raw(
+            line.trim_matches(|c: char| !c.is_numeric())
+                .parse::<i32>()
+                .unwrap(),
+        );
 
         if pids.contains(&pid) {
             continue;
@@ -207,7 +234,7 @@ fn cg_kill(
     flags: CgFlags,
     pids: HashSet<Pid>,
 ) -> Result<(), CgroupErr> {
-    cg_kill_process(cg_path, signal, flags, pids, "cgroup.procs")?;
+    cg_kill_process(cg_path, signal, flags, pids, CGROUP_PROCS)?;
 
     Ok(())
 }
@@ -271,6 +298,7 @@ pub fn cg_controllers() -> Result<Vec<String>, IOError> {
     Ok(controllers)
 }
 
+#[allow(dead_code)]
 fn cg_read_event(cg_path: &PathBuf, event: &str) -> Result<String, CgroupErr> {
     let events_path = cg_abs_path(cg_path, &PathBuf::from("cgroup.events"))?;
     let file = File::open(events_path).map_err(CgroupErr::IoError)?;
@@ -295,7 +323,7 @@ fn cg_read_event(cg_path: &PathBuf, event: &str) -> Result<String, CgroupErr> {
 }
 
 fn cg_is_empty(cg_path: &PathBuf) -> bool {
-    let procs_path = cg_abs_path(cg_path, &PathBuf::from("cgroup.procs"));
+    let procs_path = cg_abs_path(cg_path, &PathBuf::from(CGROUP_PROCS));
     if procs_path.is_err() {
         return true;
     }
@@ -304,7 +332,7 @@ fn cg_is_empty(cg_path: &PathBuf) -> bool {
         return true;
     }
 
-    if let Ok(pids) = get_pids(cg_path, "cgroup.procs") {
+    if let Ok(pids) = get_pids(cg_path, CGROUP_PROCS) {
         if pids.is_empty() {
             return true;
         }
@@ -322,6 +350,7 @@ fn is_dir(entry: &DirEntry) -> bool {
 }
 
 /// whether the cg_path cgroup is empty, return true if empty.
+#[cfg(feature = "linux")]
 pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
     if cg_path == &PathBuf::from("") || cg_path == &PathBuf::from("/") {
         return Ok(true);
@@ -375,6 +404,39 @@ pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
     }
 
     Ok(false)
+}
+
+/// whether the cg_path cgroup is empty, return true if empty.
+#[cfg(feature = "hongmeng")]
+pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
+    if cg_path == &PathBuf::from("") || cg_path == &PathBuf::from("/") {
+        return Ok(true);
+    }
+
+    if !cg_is_empty(cg_path) {
+        return Ok(false);
+    }
+
+    let cgroup_path = cg_abs_path(cg_path, &PathBuf::from(""))?;
+
+    for entry in WalkDir::new(cgroup_path)
+        .min_depth(1)
+        .max_depth(1)
+        .into_iter()
+        .filter_entry(|e| !is_dir(e))
+    {
+        if entry.is_err() {
+            continue;
+        }
+
+        let sub_cg = cg_path.join(entry.unwrap().path());
+        let exist = cg_is_empty_recursive(&sub_cg)?;
+        if exist {
+            return Ok(false);
+        }
+    }
+
+    return Ok(true);
 }
 
 mod tests {

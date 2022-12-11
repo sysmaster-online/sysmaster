@@ -1,6 +1,9 @@
 //! the library of operation on the cgroup
 //!
 
+#[cfg(all(feature = "linux", feature = "hongmeng"))]
+compile_error!("feature linux and hongmeng cannot be enabled at the same time");
+
 use bitflags::bitflags;
 use nix::errno::Errno;
 use std::io::Error;
@@ -62,3 +65,4 @@ pub use crate::cgroup::cg_get_pids;
 pub use crate::cgroup::cg_is_empty_recursive;
 pub use crate::cgroup::cg_kill_recursive;
 pub use crate::cgroup::cg_type;
+pub use crate::cgroup::CG_BASE_DIR;

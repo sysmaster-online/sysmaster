@@ -11,13 +11,14 @@ use nix::{
 };
 use std::{collections::HashMap, error::Error, fs, path::Path};
 
-use libcgroup::{self, CgType};
+use libcgroup::{self, CgType, CG_BASE_DIR};
 
 const EARLY_MOUNT_NUM: u8 = 4;
-const CGROUP_ROOT: &str = "/sys/fs/cgroup/";
+// const CGROUP_ROOT: &str = "/sys/fs/cgroup/";
 
 type Callback = fn() -> bool;
 
+#[cfg(feature = "linux")]
 lazy_static! {
     static ref MOUNT_TABLE: Vec<MountPoint> = {
         let table: Vec<MountPoint> = vec![
@@ -133,6 +134,51 @@ lazy_static! {
             callback: Some(cg_legacy_wanted),
             mode: MountMode::MNT_WRITABLE,
         }
+        ];
+        table
+    };
+}
+
+#[cfg(feature = "hongmeng")]
+lazy_static! {
+    static ref MOUNT_TABLE: Vec<MountPoint> = {
+        let table: Vec<MountPoint> = vec![
+            MountPoint {
+                source: String::from("proc"),
+                target: String::from("/proc"),
+                fs_type: String::from("proc"),
+                options: None,
+                flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+                callback: None,
+                mode: MountMode::MNT_FATAL,
+            },
+            MountPoint {
+                source: String::from("sysfs"),
+                target: String::from("/sys"),
+                fs_type: String::from("sysfs"),
+                options: None,
+                flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+                callback: None,
+                mode: MountMode::MNT_FATAL,
+            },
+            MountPoint {
+                source: String::from("devtmpfs"),
+                target: String::from("/dev"),
+                fs_type: String::from("devtmpfs"),
+                options: Some("mode=755,size=4m,nr_inodes=64K".to_string()),
+                flags: MsFlags::MS_NOSUID | MsFlags::MS_STRICTATIME,
+                callback: None,
+                mode: MountMode::MNT_FATAL,
+            },
+            MountPoint {
+                source: String::from("none"),
+                target: String::from(CG_BASE_DIR),
+                fs_type: String::from("resmgrfs"),
+                options: None,
+                flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+                callback: None,
+                mode: MountMode::MNT_WRITABLE,
+            },
         ];
         table
     };
@@ -292,6 +338,7 @@ pub fn mount_setup() -> Result<(), Errno> {
     Ok(())
 }
 
+#[allow(dead_code)]
 /// mount all the cgroup controller subsystem
 pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
     if !cg_legacy_wanted() {
@@ -326,7 +373,7 @@ pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
             (controllers[index].to_string(), "".to_string())
         };
 
-        let target = CGROUP_ROOT.to_string() + &target;
+        let target = CG_BASE_DIR.to_string() + &target;
         m_point.set_target(&target);
         m_point.mount()?;
 
@@ -349,7 +396,7 @@ pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
 
     nix::mount::mount(
         Some("tmpfs"),
-        CGROUP_ROOT,
+        CG_BASE_DIR,
         Some("tmpfs"),
         MsFlags::MS_REMOUNT
             | MsFlags::MS_NOSUID
@@ -363,6 +410,7 @@ pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[allow(dead_code)]
 // return the pair controller which will join with the original controller
 fn pair_controller(controller: &str) -> Option<String> {
     let mut pairs = HashMap::new();
@@ -382,12 +430,14 @@ fn pair_controller(controller: &str) -> Option<String> {
     None
 }
 
+#[allow(dead_code)]
 fn symlink_controller(source: String, alias: String) -> Result<(), Errno> {
-    let target = CGROUP_ROOT.to_string() + &alias;
+    let target = CG_BASE_DIR.to_string() + &alias;
     fs_util::symlink(&source, &target, false)?;
     Ok(())
 }
 
+#[allow(dead_code)]
 fn cg_unified_wanted() -> bool {
     let cg_ver = libcgroup::cg_type();
 
@@ -410,6 +460,7 @@ fn cg_unified_wanted() -> bool {
     false
 }
 
+#[allow(dead_code)]
 fn cg_legacy_wanted() -> bool {
     let cg_ver = libcgroup::cg_type();
 
@@ -420,6 +471,7 @@ fn cg_legacy_wanted() -> bool {
     true
 }
 
+#[allow(dead_code)]
 fn cg_unifiedv1_wanted() -> bool {
     let cg_ver = libcgroup::cg_type();
 
