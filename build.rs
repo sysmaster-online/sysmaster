@@ -32,5 +32,5 @@ fn main() {
     // println!("cargo:rustc-link-lib=dylib=lmdb");
     println!("cargo:rerun-if-changed=build.sh");
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=config.service");
+    // println!("cargo:rerun-if-changed=config.service");
 }

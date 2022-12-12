@@ -12,8 +12,8 @@ repos:
       - id: mixed-line-ending
       - id: trailing-whitespace
       - id: detect-private-key
-    #  - id: check-executables-have-shebangs
-    #  - id: check-shebang-scripts-are-executable
+  #      - id: check-executables-have-shebangs
+      # - id: check-shebang-scripts-are-executable
   - repo: "https://github.com/codespell-project/codespell"
     rev: v2.2.0
     hooks:
@@ -32,27 +32,16 @@ repos:
   #     - id: fasterer
   #     # - id: forbid-binary
   #     # - id: forbid-space-in-indent
-  #     # - id: git-check  # Configure in .gitattributes
-  #     # - id: git-dirty  # Configure in .gitignore
-  #     # - id: markdownlint # Configure in .mdlrc
+  #     - id: git-check  # Configure in .gitattributes
+  #     - id: git-dirty  # Configure in .gitignore
+  #     - id: markdownlint # Configure in .mdlrc
   #     - id: reek
   #     # - id: require-ascii
   #     - id: rubocop
-  #     # - id: script-must-have-extension
+  #     - id: script-must-have-extension
   #     # - id: script-must-not-have-extension
-  #     # - id: shellcheck
-  #     # - id: shfmt
-
-  # - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
-  #   rev: v2.4.0
-  #   hooks:
-  #   - id: pretty-format-rust
-  #     args: [--autofix]
-
-  # - repo: https://github.com/doublify/pre-commit-rust
-  #   rev: master
-  #   hooks:
-  #     - id: clippy
+  #     - id: shellcheck
+  #     - id: shfmt
 
   - repo: local
     hooks:
@@ -93,7 +82,7 @@ repos:
         entry: bash -c 'cargo build --all --all-features -v'
         language: rust
         pass_filenames: false
-        files: \.(rs|toml|sh)$
+        files: \.(rs|toml)$
         verbose: true
       - id: cargo-test
         name: cargo test
@@ -101,7 +90,7 @@ repos:
         entry: bash -c 'RUST_BACKTRACE=full cargo test --all-targets --all --all-features -v -- --nocapture --test-threads=1'
         language: rust
         pass_filenames: false
-        files: \.(rs|toml|sh)$
+        files: \.(rs|toml)$
         verbose: true
 
 #      - id: cargo-deny

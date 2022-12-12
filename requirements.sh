@@ -15,7 +15,7 @@ source ~/.bashrc
 fi
 
 # add musl target
-uname=`uname -m`
+arch=`uname -m`
 rustup target add $arch-unknown-linux-musl
 
 # Delete cache
