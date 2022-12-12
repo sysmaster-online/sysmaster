@@ -329,7 +329,7 @@ fn dispatch_target_dep_unit(db: &Rc<UnitDb>, unit: &Rc<UnitX>) {
             return;
         }
 
-        if let Err(_e) = db.dep_insert(Rc::clone(unit), after, dep_target, true, mask as u16) {
+        if let Err(_e) = db.dep_insert(dep_target, after, Rc::clone(unit), true, mask as u16) {
             log::error!("dispatch_target_dep_queue add default dep err {:?}", _e);
             return;
         }

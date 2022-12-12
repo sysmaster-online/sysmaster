@@ -458,7 +458,7 @@ impl UnitManager {
 
     fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         if let Some(unit) = self.load_unitx(name) {
-            log::debug!("load unit success, send to job manager");
+            log::debug!("load unit {} success, send to job manager", name);
             self.jm.exec(
                 &JobConf::new(&unit, JobKind::Start),
                 JobMode::Replace,
