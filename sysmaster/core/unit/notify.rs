@@ -78,14 +78,16 @@ impl NotifyManager {
         dbr: &Rc<UnitDb>,
         jmr: &Rc<JobManager>,
     ) -> NotifyManager {
-        let _config = Rc::new(NotifConfig::new());
-        let _notify = Rc::new(Notify::new(relir, rentryr, dbr, &_config));
+        let notify_config = Rc::new(NotifConfig::new());
+        notify_config.set_notify_sock(PathBuf::from(NOTIFY_SOCKET));
+        let _notify = Rc::new(Notify::new(relir, rentryr, dbr, &notify_config));
         let nm = NotifyManager {
             events: Rc::clone(eventr),
             jm: Rc::clone(jmr),
-            config: Rc::clone(&_config),
+            config: Rc::clone(&notify_config),
             notify: Rc::clone(&_notify),
         };
+
         nm.db_insert();
         nm
     }
@@ -133,9 +135,7 @@ impl Notify {
 
     // process reentrant
     pub(super) fn open_socket(&self) -> Result<(), Errno> {
-        // build config
-        let sock_path = PathBuf::from(NOTIFY_SOCKET);
-        self.config.set_notify_sock(sock_path.clone());
+        let sock_path = self.config.data.borrow().notify_sock.clone().unwrap();
 
         // process reentrant protection
         if self.rawfd() as i32 >= 0 {
