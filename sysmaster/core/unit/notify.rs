@@ -25,7 +25,7 @@ pub(super) struct NotifyManager {
     jm: Rc<JobManager>,
 
     // owned objects
-    config: Rc<NotifConfig>,
+    config: Rc<NotifyConfig>,
     notify: Rc<Notify>,
 }
 
@@ -78,7 +78,7 @@ impl NotifyManager {
         dbr: &Rc<UnitDb>,
         jmr: &Rc<JobManager>,
     ) -> NotifyManager {
-        let notify_config = Rc::new(NotifConfig::new());
+        let notify_config = Rc::new(NotifyConfig::new());
         notify_config.set_notify_sock(PathBuf::from(NOTIFY_SOCKET));
         let _notify = Rc::new(Notify::new(relir, rentryr, dbr, &notify_config));
         let nm = NotifyManager {
@@ -105,7 +105,7 @@ struct Notify {
     reli: Rc<Reliability>,
     rentry: Rc<UnitRe>,
     db: Rc<UnitDb>,
-    config: Rc<NotifConfig>,
+    config: Rc<NotifyConfig>,
 
     // owned objects
     fd: RefCell<i32>,
@@ -116,7 +116,7 @@ impl Notify {
         relir: &Rc<Reliability>,
         rentryr: &Rc<UnitRe>,
         dbr: &Rc<UnitDb>,
-        configr: &Rc<NotifConfig>,
+        configr: &Rc<NotifyConfig>,
     ) -> Notify {
         Notify {
             reli: Rc::clone(relir),
@@ -135,7 +135,7 @@ impl Notify {
 
     // process reentrant
     pub(super) fn open_socket(&self) -> Result<(), Errno> {
-        let sock_path = self.config.data.borrow().notify_sock.clone().unwrap();
+        let sock_path = self.config.notify_sock().unwrap();
 
         // process reentrant protection
         if self.rawfd() as i32 >= 0 {
@@ -344,14 +344,14 @@ impl Source for Notify {
     }
 }
 
-struct NotifConfig {
-    data: RefCell<NotifConfigData>,
+struct NotifyConfig {
+    data: RefCell<NotifyConfigData>,
 }
 
-impl NotifConfig {
-    pub(super) fn new() -> NotifConfig {
-        NotifConfig {
-            data: RefCell::new(NotifConfigData::new()),
+impl NotifyConfig {
+    pub(super) fn new() -> NotifyConfig {
+        NotifyConfig {
+            data: RefCell::new(NotifyConfigData::new()),
         }
     }
 
@@ -364,13 +364,13 @@ impl NotifConfig {
     }
 }
 
-pub(self) struct NotifConfigData {
+pub(self) struct NotifyConfigData {
     notify_sock: Option<PathBuf>,
 }
 
-impl NotifConfigData {
-    fn new() -> NotifConfigData {
-        NotifConfigData { notify_sock: None }
+impl NotifyConfigData {
+    fn new() -> NotifyConfigData {
+        NotifyConfigData { notify_sock: None }
     }
 
     pub(self) fn set_notify_sock(&mut self, socket: PathBuf) {
