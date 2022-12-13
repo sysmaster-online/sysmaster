@@ -138,3 +138,8 @@ exclude = [
   "config",
   "tools"
 ]
+
+[features]
+default = ["linux"]
+hongmeng = []
+linux = []

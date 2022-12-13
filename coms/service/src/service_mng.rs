@@ -275,6 +275,7 @@ impl ServiceMng {
                 self.comm.get_owner_id()
             );
             self.enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
+            return;
         }
 
         let pid = ret.unwrap();

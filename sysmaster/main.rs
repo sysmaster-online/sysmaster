@@ -73,7 +73,10 @@ fn initialize_runtime(switch: bool) -> Result<(), Box<dyn Error>> {
         log::info!("install crash handler.");
     }
 
-    mount_setup::mount_cgroup_controllers()?;
+    #[cfg(feature = "linux")]
+    {
+        mount_setup::mount_cgroup_controllers()?;
+    }
 
     Ok(())
 }
