@@ -201,6 +201,9 @@ impl Manager {
             self.reli.recover();
         }
 
+        // preset file before add default job
+        self.preset_all()?;
+
         // setup external connections
         /* register entire external events */
         self.register_ex();
@@ -218,8 +221,6 @@ impl Manager {
         // it's ok now
         self.set_state(State::Ok);
         self.reli.clear_last_frame();
-
-        self.preset_all()?;
 
         Ok(0)
     }
