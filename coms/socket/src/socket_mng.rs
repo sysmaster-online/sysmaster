@@ -70,6 +70,7 @@ impl ReStation for SocketMng {
 
     // data
     fn db_map(&self) {
+        self.build_ports();
         self.data.db_map();
     }
 
@@ -130,7 +131,8 @@ impl SocketMng {
     }
 
     pub(super) fn build_ports(&self) {
-        self.data.build_ports(&self.data)
+        self.data.build_ports(&self.data);
+        self.db_update();
     }
 }
 
@@ -341,10 +343,11 @@ impl SocketMngData {
                 match self.spawn.start_socket(&cmd) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
-                        self.comm.owner().map_or(
-                            log::error!("Failed to run start post service unit id is None"),
-                            |u| log::error!("Failed to run start post service: {}", u.id()),
-                        );
+                        if let Some(u) = self.comm.owner() {
+                            log::error!("Failed to run start post service: {}", u.id());
+                        } else {
+                            log::error!("Failed to run start post service unit id is None");
+                        }
                         self.enter_stop_pre(SocketResult::FailureResources);
                         return;
                     }
@@ -416,10 +419,11 @@ impl SocketMngData {
                 match self.spawn.start_socket(&cmd) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
-                        self.comm.owner().map_or(
-                            log::error!("Failed to run stop pre cmd and service unit id is None"),
-                            |u| log::error!("Failed to run stop pre cmd for service: {}", u.id()),
-                        );
+                        if let Some(u) = self.comm.owner() {
+                            log::error!("Failed to run stop pre cmd for service: {}", u.id());
+                        } else {
+                            log::error!("Failed to run stop pre cmd and service unit id is None");
+                        }
                         self.enter_stop_post(SocketResult::FailureResources);
                         return;
                     }
@@ -522,10 +526,11 @@ impl SocketMngData {
             match self.spawn.start_socket(&cmd) {
                 Ok(pid) => self.pid.set_control(pid),
                 Err(_e) => {
-                    self.comm.owner().map_or(
-                        log::error!("failed to run main command unit is None,Error: {}", _e),
-                        |u| log::error!("failed to run main command unit{},err {}", u.id(), _e),
-                    );
+                    if let Some(u) = self.comm.owner() {
+                        log::error!("failed to run main command unit{},err {}", u.id(), _e);
+                    } else {
+                        log::error!("failed to run main command unit is None,Error: {}", _e);
+                    }
                 }
             }
         }
@@ -562,6 +567,9 @@ impl SocketMngData {
     fn watch_fds(&self) {
         let events = self.comm.um().events();
         for mport in self.mports().iter() {
+            if mport.fd() < 0 {
+                continue;
+            }
             let source = Rc::clone(mport);
             events.add_source(source).unwrap();
             let source = Rc::clone(mport);
@@ -831,7 +839,10 @@ impl Source for SocketMngPort {
             UnitType::UnitSocket as u32,
         );
         self.rentry().set_last_frame(SocketReFrame::FdListen(true));
+        self.reli()
+            .set_last_unit(self.mng().comm.owner().unwrap().id());
         let ret = self.dispatch_io();
+        self.reli().clear_last_unit();
         self.rentry().clear_last_frame();
         self.reli().clear_last_frame();
         ret
