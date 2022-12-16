@@ -43,8 +43,8 @@ RUN mkdir -p ${SYSMST_INSTALL_PATH}/plugin
 COPY plugin.conf ${SYSMST_INSTALL_PATH}/plugin/
 COPY lib/* ${SYSMST_INSTALL_PATH}/plugin/
 COPY bin/* ${SYSMST_INSTALL_PATH}/
-RUN mv ${SYSMST_INSTALL_PATH}/pctrl /usr/bin/
-RUN rm -rf ${SYSMST_INSTALL_PATH}/pctrl
+RUN mv ${SYSMST_INSTALL_PATH}/sctl /usr/bin/
+RUN rm -rf ${SYSMST_INSTALL_PATH}/sctl
 EOF
     cat Dockerfile
     if ! docker build -t "${SYSMST_BASE_IMG}:latest" .; then

@@ -46,7 +46,7 @@ run_image
 │   ├── sysmasterwithbusybox.xml
 │   └── usr
 │       ├── bin
-│       │   └── pctrl
+│       │   └── sctl
 │       └── lib
 │           └── sysmaster
 │               ├── fstab

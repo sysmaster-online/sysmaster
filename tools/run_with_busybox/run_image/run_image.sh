@@ -91,7 +91,7 @@ function fn_remake()
 
 	#move sysmaster from "extra" dir to the image
 	cp -r ../../extra/usr/lib/* usr/lib/
-	cp -r ../../extra/usr/bin/pctrl usr/bin/
+	cp -r ../../extra/usr/bin/sctl usr/bin/
 	mkdir -p etc/sysmaster/
 	cp -r ../../extra/etc/sysmaster/* etc/sysmaster/
 

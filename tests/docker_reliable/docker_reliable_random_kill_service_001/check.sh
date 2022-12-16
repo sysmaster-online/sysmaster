@@ -18,21 +18,21 @@ function stress() {
     while ((1)); do
         sleep $((RANDOM % 3 + 1))
         date
-        pctrl start test2.service
+        sctl start test2.service
 
         sleep $((RANDOM % 3 + 1))
         date
-        pctrl stop test2.service
+        sctl stop test2.service
     done
 }
 
 ## usage: check unit function
 function check_fun() {
-    pctrl start test1.service || return 1
+    sctl start test1.service || return 1
     sleep 1
     ps -elf | grep -v grep | grep 'sleep 888' || return 1
 
-    pctrl stop test1.service || return 1
+    sctl stop test1.service || return 1
     sleep 1
     ps -elf | grep -v grep | grep 'sleep 888' && return 1
     return 0

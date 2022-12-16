@@ -173,7 +173,7 @@ running 0 tests
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running unittests src/pctrl/main.rs (/root/sysmaster/target/debug/deps/pctrl-efe504cbad79e269)
+     Running unittests src/sctl/main.rs (/root/sysmaster/target/debug/deps/sctl-efe504cbad79e269)
 
 running 0 tests
 
@@ -344,7 +344,7 @@ function runtest() {
 [root@localhost tests]# cat docker_example/docker_example_001/check.sh
 ls -l /usr/lib/sysmaster || exit 1
 ls -l /usr/lib/sysmaster/plugin || exit 1
-ls -l /usr/bin/pctrl || exit 1
+ls -l /usr/bin/sctl || exit 1
 ```
 
 详细日志如下：
@@ -374,8 +374,8 @@ total 6884
 -rw-r--r--. 1 root root 3303776 Oct 21 11:31 libsocket.so
 -rw-r--r--. 1 root root  657696 Oct 21 11:31 libtarget.so
 -rw-r--r--. 1 root root      68 Oct 18 11:35 plugin.conf
-+ ls -l /usr/bin/pctrl
--rwxr-xr-x. 1 root root 4730576 Oct 20 20:30 /usr/bin/pctrl
++ ls -l /usr/bin/sctl
+-rwxr-xr-x. 1 root root 4730576 Oct 20 20:30 /usr/bin/sctl
 + return 0
 + log_info '===== test_run OK ====='
 ++ date '+%F %T'
