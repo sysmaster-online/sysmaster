@@ -116,7 +116,7 @@ members = [
   # external binaries
   "extends/fstab",
   "extends/init",
-  "extends/pctrl",
+  "extends/sctl",
   "extends/random_seed",
   "extends/rc-local-generator",
   "extends/sysmonitor",

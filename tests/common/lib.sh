@@ -3,7 +3,7 @@
 
 BUILD_PATH="$(dirname "${TEST_PATH}")"
 SYSMST_INSTALL_PATH='/usr/lib/sysmaster'
-BIN_LIST='pctrl init sysmaster fstab sysmonitor random_seed rc-local-generator'
+BIN_LIST='sctl init sysmaster fstab sysmonitor random_seed rc-local-generator'
 LIB_LIST='libmount.so libservice.so libsocket.so libtarget.so'
 if test -f "${BUILD_PATH}/target/release/sysmaster" && test -f "${BUILD_PATH}/target/release/libmount.so"; then
     SYSMST_INSTALL_SOURCE="${BUILD_PATH}/target/release"
