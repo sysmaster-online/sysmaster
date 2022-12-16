@@ -29,7 +29,7 @@
 
 ## sysmaster设计的目标和约束
 
-**设计目标**
+### 设计目标
 
 - **极高质量**: 极致的可靠性,内存安全,永不宕机,消减对业务影响;
 - **极易使用**：可以方便的安装/部署/升级/运维;
@@ -38,13 +38,16 @@
 - **极致安全**：保持对进程的跟踪，提供最小的运行环境。
 
 ## 架构图
-![](docs/res/sysmaster-description.jpg)
+
+![atlas](docs/res/sysmaster-description.jpg)
 
 ## 代码目录结构说明
+
 源码仓库以workspaces方式管理，每一个目录是一个package，每个package包含一个crate（lib或bin形式），
 公共lib crate的目录带lib前缀，使用cargo new --lib libtests创建,
 daemon类型的bin crate的目录以d结尾。
-```
+
+```text
 / (根目录)
 |...coms (插件)
 |      |...service (unit type crate)
@@ -67,7 +70,8 @@ daemon类型的bin crate的目录以d结尾。
 ```
 
 如：
-```
+
+```text
   - lib crate: libs/libevent, libs/libutils
   - bin crate: extends/init, sysmaster
   - daemon crate: extends/udevd, extends/logind
