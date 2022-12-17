@@ -81,4 +81,5 @@ message SysComm {
     HIBERNATE = 5;
   }
   Action action = 1;
+  bool force = 2;
 }
