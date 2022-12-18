@@ -13,7 +13,7 @@ use std::{collections::HashMap, error::Error, fs, path::Path};
 
 use libcgroup::{self, CgType, CG_BASE_DIR};
 
-const EARLY_MOUNT_NUM: u8 = 4;
+const EARLY_MOUNT_NUM: u8 = 3;
 // const CGROUP_ROOT: &str = "/sys/fs/cgroup/";
 
 type Callback = fn() -> bool;
@@ -331,8 +331,8 @@ pub fn mount_setup_early() -> Result<(), Errno> {
 
 /// mount the point of all the mount_table
 pub fn mount_setup() -> Result<(), Errno> {
-    for i in 0..MOUNT_TABLE.len() {
-        MOUNT_TABLE[i as usize].mount()?;
+    for table in MOUNT_TABLE.iter() {
+        table.mount()?;
     }
 
     Ok(())
@@ -373,8 +373,9 @@ pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
             (controllers[index].to_string(), "".to_string())
         };
 
-        let target = CG_BASE_DIR.to_string() + &target;
-        m_point.set_target(&target);
+        let target_dir = Path::new(CG_BASE_DIR).join(target);
+        let target = target_dir.to_str().expect("invalid cgroup path");
+        m_point.set_target(target);
         m_point.mount()?;
 
         if pair {
