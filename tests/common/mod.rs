@@ -12,6 +12,18 @@ pub fn run_script(suit: &str, name: &str) {
         .arg(cmd)
         .status()
         .expect("failed to execute process!");
-    println!("[ {} ]: {}", name, status);
+
+    if status.success() {
+        println!("[ {} ]: {}", name, status);
+    } else {
+        println!("[ {} ]: {}   Detail Log:", name, status);
+        let cmd = format!("cat {}", logpath);
+        Command::new("/bin/bash")
+            .arg("-c")
+            .arg(cmd)
+            .status()
+            .expect("failed to cat log!");
+    }
+
     assert!(status.success());
 }
