@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use libutils::serialize::DeserializeWith;
+use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// the exec command that was parsed from the unit file
@@ -43,11 +44,18 @@ impl DeserializeWith for ExecCommand {
             }
 
             #[allow(clippy::trim_split_whitespace)]
-            let mut command: Vec<String> = cmd
-                .trim()
-                .split_whitespace()
-                .map(|s| s.to_string())
-                .collect();
+            let mut command: Vec<String> = Vec::new();
+            let re = Regex::new(r"'([^']*)'|\S+").unwrap();
+            for cap in re.captures_iter(cmd) {
+                if let Some(s) = cap.get(1) {
+                    command.push(s.as_str().to_string());
+                    continue;
+                }
+
+                if let Some(s) = cap.get(0) {
+                    command.push(s.as_str().to_string());
+                }
+            }
 
             // get the command and leave the command args
             let exec_cmd = command.remove(0);
