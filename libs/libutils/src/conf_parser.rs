@@ -111,7 +111,7 @@ pub fn parse_size(item: &str, base: Base) -> Result<u64> {
             });
         }
 
-        ret = (cur as f64 * table[start].1 as f64) as u64;
+        ret = (cur * table[start].1 as f64) as u64;
     }
 
     Ok(ret)

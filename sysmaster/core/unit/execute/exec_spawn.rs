@@ -209,7 +209,7 @@ fn shift_fds(fds: &mut Vec<i32>) -> bool {
     loop {
         let mut restart = -1;
         for i in start..(fds.len() as i32) {
-            if fds[i as usize] == (i as i32) + 3 {
+            if fds[i as usize] == i + 3 {
                 continue;
             }
 
@@ -224,7 +224,7 @@ fn shift_fds(fds: &mut Vec<i32>) -> bool {
 
             fds[i as usize] = nfd;
 
-            if nfd != (i as i32) + 3 && restart < 0 {
+            if nfd != i + 3 && restart < 0 {
                 restart = i;
             }
         }

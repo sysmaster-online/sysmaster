@@ -81,14 +81,25 @@ impl CommandActionMgr {
 }
 
 impl ExecuterAction for CommandActionMgr {
-    fn start(&self, service_name: &str) -> Result<(), ExecCmdErrno> {
-        self.um.start_unit(service_name)?;
-        Ok(())
+    fn start(&self, unit_name: &str) -> Result<(), ExecCmdErrno> {
+        match self.um.start_unit(unit_name) {
+            Ok(()) => Ok(()),
+            Err(err) => Err(ExecCmdErrno::from(err)),
+        }
     }
 
     fn stop(&self, unit_name: &str) -> Result<(), ExecCmdErrno> {
-        self.um.stop_unit(unit_name)?;
-        Ok(())
+        match self.um.stop_unit(unit_name) {
+            Ok(()) => Ok(()),
+            Err(err) => Err(ExecCmdErrno::from(err)),
+        }
+    }
+
+    fn status(&self, unit_name: &str) -> Result<String, ExecCmdErrno> {
+        match self.um.get_unit_status(unit_name) {
+            Ok(str) => Ok(str),
+            Err(err) => Err(ExecCmdErrno::from(err)),
+        }
     }
 
     fn suspend(&self) -> Result<i32> {

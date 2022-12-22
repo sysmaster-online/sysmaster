@@ -15,6 +15,7 @@ pub mod path_util;
 pub mod proc_cmdline;
 pub mod process_util;
 pub mod serialize;
+pub mod show_table;
 pub mod socket_util;
 pub mod time_util;
 

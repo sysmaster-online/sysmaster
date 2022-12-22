@@ -33,6 +33,10 @@ impl UeChild {
         child
     }
 
+    pub(super) fn get_pids(&self) -> Vec<Pid> {
+        return self.data.borrow().get_pids();
+    }
+
     pub(super) fn add_pids(&self, pid: Pid) {
         self.data.borrow_mut().add_pids(pid);
         self.db_update();
@@ -67,6 +71,14 @@ impl UeChildData {
         for pid in self.base.rentry_child_get().iter() {
             self.pids.insert(*pid);
         }
+    }
+
+    pub(self) fn get_pids(&self) -> Vec<Pid> {
+        let mut res = Vec::new();
+        for pid in self.pids.iter() {
+            res.push(*pid);
+        }
+        res
     }
 
     pub(self) fn add_pids(&mut self, pid: Pid) {

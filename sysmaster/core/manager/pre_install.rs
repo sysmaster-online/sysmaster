@@ -543,6 +543,7 @@ impl Install {
 
         for v in &self.lookup_path.search_path {
             let base_dir = Path::new(v);
+            #[allow(clippy::needless_borrow)]
             let dropin_dir = base_dir.join(&dropin_dir_name);
 
             if !dropin_dir.exists() {

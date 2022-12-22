@@ -465,7 +465,7 @@ mod tests {
 
         println!("base path is: {:?}", base_path);
         if let Ok(p) = super::cg_abs_path(&cg_path, &PathBuf::from("")) {
-            assert_eq!(p, path_buf.join(&cg_path).join(&PathBuf::from("")),)
+            assert_eq!(p, path_buf.join(&cg_path).join(PathBuf::from("")),)
         }
 
         let t_thread = unsafe { fork() };

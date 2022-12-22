@@ -1,6 +1,9 @@
 //!
 use std::fs::File;
-use std::io::{Error as IOError, ErrorKind, Read};
+use std::io::{BufReader, Error as IOError, ErrorKind, Read};
+use std::path::Path;
+
+use nix::unistd::Pid;
 
 use crate::conf_parser;
 use crate::Error;
@@ -56,4 +59,27 @@ pub fn proc_cmdline_get_bool(key: &str) -> Result<bool, Error> {
     let r = conf_parser::parse_boolean(&val.unwrap())?;
 
     Ok(r)
+}
+
+/// read /proc/PID/cmdline and return
+pub fn get_process_cmdline(pid: &Pid) -> String {
+    let pid_str = pid.to_string();
+    let cmdline_path = Path::new("/proc").join(pid_str).join("cmdline");
+    let file = match File::open(cmdline_path) {
+        Ok(file) => file,
+        Err(_) => {
+            return String::from("");
+        }
+    };
+    let buf_reader = BufReader::new(file);
+    let mut cmdline_content = String::new();
+    for byte in buf_reader.bytes() {
+        let b = match byte {
+            Ok(b) => b,
+            Err(_) => break,
+        };
+        let b = if b != 0 { b as char } else { ' ' };
+        cmdline_content += &b.to_string();
+    }
+    cmdline_content
 }

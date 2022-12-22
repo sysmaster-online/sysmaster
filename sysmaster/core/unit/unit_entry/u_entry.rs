@@ -281,6 +281,11 @@ impl Unit {
         self.base.id()
     }
 
+    /// return pids of the unit
+    pub fn get_pids(&self) -> Vec<Pid> {
+        self.child.get_pids()
+    }
+
     ///
     pub fn prepare_exec(&self) -> Result<()> {
         log::debug!("prepare exec cgroup");
