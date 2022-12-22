@@ -138,7 +138,7 @@ impl Notify {
         let sock_path = self.config.notify_sock().unwrap();
 
         // process reentrant protection
-        if self.rawfd() as i32 >= 0 {
+        if self.rawfd() >= 0 {
             // debug: process reentrant
             return Ok(());
         }
@@ -247,7 +247,7 @@ impl Notify {
     }
 
     fn db_insert(&self) {
-        let fd = self.rawfd() as i32;
+        let fd = self.rawfd();
         self.rentry.notify_insert(fd);
     }
 }

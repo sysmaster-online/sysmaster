@@ -212,10 +212,10 @@ impl SocketRe {
         refused: i32,
         ports: Vec<(PortType, String, RawFd)>,
     ) {
-        let c_pid = control_pid.map(|x| x.as_raw() as i32);
+        let c_pid = control_pid.map(|x| x.as_raw());
         let ps = ports
             .iter()
-            .map(|(t, l, id)| (*t, l.clone(), *id as i32))
+            .map(|(t, l, id)| (*t, l.clone(), *id))
             .collect::<_>();
         let mng = SocketReMng::new(
             state,

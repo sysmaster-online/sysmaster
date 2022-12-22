@@ -52,7 +52,7 @@ impl ServiceConfig {
         log::debug!("service load path: {:?}", paths);
         // fragment
         for v in paths {
-            builder = builder.file(&v);
+            builder = builder.file(v);
         }
 
         *self.data.borrow_mut() = builder.load()?;

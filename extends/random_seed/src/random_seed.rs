@@ -38,11 +38,7 @@ fn random_pool_size() -> usize {
         Ok(str) => match str.parse::<usize>() {
             Ok(size) => {
                 let mut size = size / 8;
-                if size < RAMDOM_POOL_SIZE_MIN {
-                    size = RAMDOM_POOL_SIZE_MIN;
-                } else if size > RANDOM_POOL_SIZE_MAX {
-                    size = RANDOM_POOL_SIZE_MAX;
-                }
+                size = size.clamp(RAMDOM_POOL_SIZE_MIN, RANDOM_POOL_SIZE_MAX);
                 size
             }
             Err(_) => RAMDOM_POOL_SIZE_MIN,

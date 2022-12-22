@@ -366,7 +366,7 @@ impl UnitRe {
     pub(super) fn child_insert(&self, unit_id: &String, pids: &[Pid]) {
         assert!(self.base_contains(unit_id));
 
-        let u_child = UnitReChild::new(pids.iter().map(|x| x.as_raw() as i32).collect::<_>());
+        let u_child = UnitReChild::new(pids.iter().map(|x| x.as_raw()).collect::<_>());
         self.child.insert(unit_id.clone(), u_child);
     }
 

@@ -454,10 +454,7 @@ impl JobUnitData {
     }
 
     pub(self) fn get_suspends(&self) -> Vec<Rc<Job>> {
-        self.suspends
-            .iter()
-            .map(|(_, jr)| Rc::clone(jr))
-            .collect::<Vec<_>>()
+        self.suspends.values().map(Rc::clone).collect::<Vec<_>>()
     }
 
     pub(self) fn get_trigger(&self) -> Option<Rc<Job>> {

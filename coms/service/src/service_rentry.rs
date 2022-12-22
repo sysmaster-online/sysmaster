@@ -253,8 +253,8 @@ impl ServiceRe {
         control_cmd_len: usize,
         notify_state: NotifyState,
     ) {
-        let m_pid = main_pid.map(|x| x.as_raw() as i32);
-        let c_pid = control_pid.map(|x| x.as_raw() as i32);
+        let m_pid = main_pid.map(|x| x.as_raw());
+        let c_pid = control_pid.map(|x| x.as_raw());
         let mng = ServiceReMng::new(
             state,
             result,

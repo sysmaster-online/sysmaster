@@ -21,6 +21,17 @@ pub enum ExecCmdErrno {
     NotSupported,
 }
 
+impl From<ExecCmdErrno> for String {
+    fn from(errno: ExecCmdErrno) -> Self {
+        match errno {
+            ExecCmdErrno::Input => "Invalid input".into(),
+            ExecCmdErrno::NotExisted => "No such file or directory".into(),
+            ExecCmdErrno::Internal => "Unexpected internal error".into(),
+            ExecCmdErrno::NotSupported => "Unsupported action".into(),
+        }
+    }
+}
+
 pub(crate) trait Executer {
     /// deal Command，return Response
     fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse;
@@ -32,6 +43,8 @@ pub trait ExecuterAction {
     fn start(&self, unit_name: &str) -> Result<(), ExecCmdErrno>;
     /// stop the unit_name
     fn stop(&self, unit_name: &str) -> Result<(), ExecCmdErrno>;
+    /// show the status of unit_name
+    fn status(&self, unit_name: &str) -> Result<String, ExecCmdErrno>;
     /// suspend host
     fn suspend(&self) -> Result<i32>;
     /// poweroff host
@@ -66,19 +79,39 @@ where
 impl Executer for UnitComm {
     fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
         let ret = match self.action() {
-            unit_comm::Action::Start => manager.start(&self.unitname),
-            unit_comm::Action::Stop => manager.stop(&self.unitname),
+            unit_comm::Action::Status => manager.status(&self.unitname),
+            unit_comm::Action::Start => match manager.start(&self.unitname) {
+                Ok(()) => Ok(String::new()),
+                Err(e) => Err(e),
+            },
+            unit_comm::Action::Stop => match manager.stop(&self.unitname) {
+                Ok(()) => Ok(String::new()),
+                Err(e) => Err(e),
+            },
             _ => todo!(),
         };
         match ret {
-            Ok(_) => CommandResponse {
+            Ok(m) => CommandResponse {
                 status: StatusCode::OK.as_u16() as _,
-                ..Default::default()
+                message: m,
             },
-            Err(_e) => CommandResponse {
-                status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
-                message: String::from("error."),
-            },
+            Err(e) => {
+                let action_str = match self.action() {
+                    unit_comm::Action::Status => String::from("get status of "),
+                    unit_comm::Action::Start => String::from("start "),
+                    unit_comm::Action::Stop => String::from("stop "),
+                    _ => String::from("process"),
+                };
+                let error_message = String::from("Failed to ")
+                    + &action_str
+                    + &self.unitname
+                    + ": "
+                    + &String::from(e);
+                CommandResponse {
+                    status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                    message: error_message,
+                }
+            }
         }
     }
 }

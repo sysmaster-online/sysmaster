@@ -23,7 +23,9 @@ use crate::core::manager::pre_install::{Install, PresetMode};
 use crate::core::unit::data::{DataManager, UnitState};
 use libevent::Events;
 use libutils::path_lookup::LookupPaths;
+use libutils::proc_cmdline::get_process_cmdline;
 use libutils::process_util;
+use libutils::show_table::StatusItem;
 use libutils::Result;
 use nix::unistd::Pid;
 use std::convert::TryFrom;
@@ -90,6 +92,10 @@ impl UnitManagerX {
 
     pub(in crate::core) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.data.stop_unit(name)
+    }
+
+    pub(in crate::core) fn get_unit_status(&self, name: &str) -> Result<String, MngErrno> {
+        self.data.get_unit_status(name)
     }
 
     pub(in crate::core) fn child_sigchld_enable(&self, enable: bool) -> Result<i32> {
@@ -502,6 +508,82 @@ impl UnitManager {
         } else {
             Err(MngErrno::Internal)
         }
+    }
+
+    fn get_unit_status_active_state(&self, active_state: UnitActiveState) -> String {
+        match active_state {
+            UnitActiveState::UnitActive => String::from("active"),
+            UnitActiveState::UnitActivating => String::from("activating"),
+            UnitActiveState::UnitDeActivating => String::from("deactivating"),
+            UnitActiveState::UnitFailed => String::from("failed"),
+            UnitActiveState::UnitInActive => String::from("inactive"),
+            UnitActiveState::UnitMaintenance => String::from("maintenance"),
+            UnitActiveState::UnitReloading => String::from("reloading"),
+            #[allow(unreachable_patterns)]
+            _ => String::from("unknown"),
+        }
+    }
+
+    fn get_unit_cgroup_path(&self, unit: Rc<Unit>) -> String {
+        let res = match unit.cg_path().to_str() {
+            Some(res) => res.to_string(),
+            None => String::new(),
+        };
+        if res.is_empty() {
+            return "Empty cgroup path".to_string();
+        }
+        res
+    }
+
+    fn get_unit_status_pids(&self, unit: Rc<Unit>) -> String {
+        let pids = unit.get_pids();
+        if pids.is_empty() {
+            return "No process".to_string();
+        }
+        let mut res = String::new();
+        for pid in pids.iter() {
+            if !res.is_empty() {
+                res += "\n";
+            }
+            res += &pid.to_string();
+            res += " ";
+            res += get_process_cmdline(pid).as_str();
+        }
+        res
+    }
+
+    pub(self) fn get_unit_status(&self, name: &str) -> Result<String, MngErrno> {
+        let unit = match self.units_get(name) {
+            Some(unit) => unit,
+            None => {
+                return Err(MngErrno::NotExisted);
+            }
+        };
+        let status_list = vec![
+            StatusItem::new(
+                "Loaded".to_string(),
+                self.load_unit_success(name).to_string(),
+            ),
+            StatusItem::new(
+                "Active".to_string(),
+                self.get_unit_status_active_state(unit.current_active_state()),
+            ),
+            StatusItem::new(
+                "CGroup".to_string(),
+                self.get_unit_cgroup_path(unit.clone()),
+            ),
+            StatusItem::new("PID".to_string(), self.get_unit_status_pids(unit)),
+        ];
+        let mut status_table = tabled::Table::new(status_list);
+        status_table
+            .with(tabled::style::Style::empty()) // don't show the border
+            .with(tabled::Disable::row(tabled::object::Rows::first())) // remove the first row
+            .with(
+                tabled::Modify::new(tabled::object::Columns::first()) // modify the first column
+                    .with(tabled::format::Format::new(|s| format!("{}:", s))) // add ":"
+                    .with(tabled::Alignment::right()),
+            ); // align to right
+        Ok("● ".to_string() + name + "\n" + &status_table.to_string())
     }
 
     pub(self) fn new(

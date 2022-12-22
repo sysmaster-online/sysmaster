@@ -280,7 +280,7 @@ impl SocketMngData {
         let mut fds = Vec::new();
         for port in self.ports().iter() {
             if port.fd() >= 0 {
-                fds.push(port.fd() as i32);
+                fds.push(port.fd());
             }
         }
 

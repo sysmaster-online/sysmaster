@@ -71,7 +71,7 @@ where
     }
 
     pub(in crate::core) fn get_all(&self) -> Vec<&V> {
-        self.data.iter().map(|(_, vr)| vr).collect::<Vec<_>>()
+        self.data.values().collect::<Vec<_>>()
     }
 
     pub(in crate::core) fn subscribe(

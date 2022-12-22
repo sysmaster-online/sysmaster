@@ -79,9 +79,10 @@ fn main() -> Result<(), Error> {
     match action {
         CommAction::Unit(a) => {
             let cmd = CommandRequest::new_unitcomm(a, unit_name.unwrap());
-            println!("{:?}", cmd);
             let data = client.execute(cmd).unwrap();
-            println!("{:?}", data);
+            if !data.message.is_empty() {
+                println!("{}", data.message);
+            }
         }
         CommAction::Sys(a) => {
             let cmd = CommandRequest::new_syscomm(a);
