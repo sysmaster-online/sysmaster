@@ -1,9 +1,12 @@
 //! the management of the unit file lookup path
 use std::env;
 
-const ETC_SYSTEM_PATH: &str = "/etc/sysmaster";
-const RUN_SYSTEM_PATH: &str = "/run/sysmaster";
-const LIB_SYSTEM_PATH: &str = "/usr/lib/sysmaster";
+/// unit lookup path in /etc
+pub const ETC_SYSTEM_PATH: &str = "/etc/sysmaster";
+/// unit lookup path in /run
+pub const RUN_SYSTEM_PATH: &str = "/run/sysmaster";
+/// unit lookup path in /usr/lib
+pub const LIB_SYSTEM_PATH: &str = "/usr/lib/sysmaster";
 
 /// struct LookupPaths
 #[derive(Debug, Clone)]

@@ -17,35 +17,50 @@ pub fn open_parent(path: &Path, flags: OFlag, mode: Mode) -> Result<i32, Errno> 
     Ok(fd)
 }
 
-/// create symlink {from} source to {target}
-pub fn symlink(source: &str, target: &str, relative: bool) -> Result<(), Errno> {
-    let t_path = Path::new(&target);
-    let f_path = Path::new(&source);
-    let (from, fd) = if relative {
-        let t_parent = t_path.parent().unwrap();
-        let rel_path = diff_paths(f_path, t_parent).unwrap();
+/// create symlink link_name -> target
+pub fn symlink(target: &str, link_name: &str, relative: bool) -> Result<(), Errno> {
+    let link_name_path = Path::new(&link_name);
+    let target_path = Path::new(&target);
+    let (target_path, fd) = if relative {
+        let link_name_path_parent = link_name_path.parent().unwrap();
+        let rel_path = diff_paths(target_path, link_name_path_parent).unwrap();
         let fd = nix::fcntl::open(&rel_path, OFlag::O_DIRECT, Mode::from_bits(0).unwrap())?;
         (rel_path, Some(fd))
     } else {
-        (f_path.to_path_buf(), None)
+        (target_path.to_path_buf(), None)
     };
 
-    let ret = nix::unistd::symlinkat(from.as_path(), fd, t_path);
-
-    if ret.is_err() {
-        return Ok(());
+    match nix::unistd::symlinkat(target_path.as_path(), fd, link_name_path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            log::debug!("Failed to create symlink: {} -> {}", link_name, target);
+            Err(e)
+        }
     }
-
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use crate::fs_util::symlink;
+    use nix::unistd;
 
     #[test]
     fn test_symlink() {
-        let ret = symlink("/dev/null", "/tmp/test", false);
+        // use a complicated long name to make sure we don't have this file
+        // before running this testcase.
+        let link_name_path = std::path::Path::new("/tmp/test_link_name_39285b");
+        if link_name_path.exists() {
+            return;
+        }
+
+        let ret = symlink("/dev/null", "/tmp/test_link_name_39285b", false);
+        assert!(ret.is_ok());
+
+        let ret = unistd::unlinkat(
+            None,
+            link_name_path.to_str().unwrap(),
+            unistd::UnlinkatFlags::NoRemoveDir,
+        );
         assert!(ret.is_ok());
     }
 }

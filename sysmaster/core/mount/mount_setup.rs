@@ -433,9 +433,21 @@ fn pair_controller(controller: &str) -> Option<String> {
 
 #[allow(dead_code)]
 fn symlink_controller(source: String, alias: String) -> Result<(), Errno> {
-    let target = CG_BASE_DIR.to_string() + &alias;
-    fs_util::symlink(&source, &target, false)?;
-    Ok(())
+    let target_path = Path::new(CG_BASE_DIR).join(alias);
+    let target = target_path.to_str().unwrap();
+    match fs_util::symlink(&source, target, false) {
+        Ok(()) => Ok(()),
+        Err(Errno::EEXIST) => Ok(()),
+        Err(e) => {
+            log::debug!(
+                "Failed to symlink controller from {} to {}: {}",
+                target,
+                source,
+                e
+            );
+            Ok(())
+        }
+    }
 }
 
 #[allow(dead_code)]

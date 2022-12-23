@@ -131,6 +131,57 @@ impl UnitManagerX {
         install.unit_disable_files(unit_file)?;
         Ok(())
     }
+
+    pub(in crate::core) fn mask_unit(&self, unit_file: &str) -> Result<(), Error> {
+        log::debug!("unit mask file {}", unit_file);
+        let link_name_path =
+            std::path::Path::new(libutils::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
+        let target_path = std::path::Path::new("/dev/null");
+        match libutils::fs_util::symlink(
+            target_path.to_str().unwrap(),
+            link_name_path.to_str().unwrap(),
+            false,
+        ) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(Error::from(e)),
+        }
+    }
+
+    pub(in crate::core) fn unmask_unit(&self, unit_file: &str) -> Result<(), Error> {
+        log::debug!("unit unmask file {}", unit_file);
+        let link_name_path =
+            std::path::Path::new(libutils::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
+        if !link_name_path.exists() {
+            return Ok(());
+        }
+
+        let target = match link_name_path.read_link() {
+            Ok(target_path) => target_path,
+            Err(_) => {
+                return Ok(());
+            }
+        };
+
+        if !target.ends_with("/dev/null") {
+            return Ok(());
+        }
+
+        // So, this is a symlink points to /dev/null
+        if let Err(e) = nix::unistd::unlinkat(
+            None,
+            &link_name_path,
+            nix::unistd::UnlinkatFlags::NoRemoveDir,
+        ) {
+            log::warn!(
+                "Failed to unlink {}: {}",
+                link_name_path.to_str().unwrap(),
+                e
+            );
+            return Err(Error::from(e));
+        }
+
+        Ok(())
+    }
 }
 
 /// the struct for manager the unit instance

@@ -504,7 +504,17 @@ impl Install {
                 continue;
             }
 
-            self.unit_file_load(unit.to_str().unwrap(), unit_install.clone(), ctx.clone())?;
+            // Skip unit which we can't load, instead of panic.
+            if let Err(e) =
+                self.unit_file_load(unit.to_str().unwrap(), unit_install.clone(), ctx.clone())
+            {
+                log::debug!(
+                    "Failed to load unit {}: {}, ignoring",
+                    unit.to_str().unwrap(),
+                    e
+                );
+                continue;
+            }
             unit_install.set_path(unit.to_str().unwrap().to_string());
         }
 
