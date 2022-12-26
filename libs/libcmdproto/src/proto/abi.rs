@@ -78,8 +78,9 @@ pub mod unit_file {
         Enable = 1,
         Disable = 2,
         Mask = 3,
-        Getdef = 4,
-        Setdef = 5,
+        Unmask = 4,
+        Getdef = 5,
+        Setdef = 6,
     }
 }
 #[rustfmt::skip]

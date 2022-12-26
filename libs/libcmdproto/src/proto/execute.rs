@@ -57,6 +57,10 @@ pub trait ExecuterAction {
     fn disable(&self, unit_name: &str) -> Result<(), Error>;
     /// enable unit_name
     fn enable(&self, unit_name: &str) -> Result<(), Error>;
+    /// mask unit_name
+    fn mask(&self, unit_name: &str) -> Result<(), Error>;
+    /// unmask unit_name
+    fn unmask(&self, unit_name: &str) -> Result<(), Error>;
 }
 
 /// Depending on the type of request
@@ -150,17 +154,34 @@ impl Executer for UnitFile {
         let ret = match self.action() {
             super::unit_file::Action::Enable => manager.enable(&self.unitname),
             super::unit_file::Action::Disable => manager.disable(&self.unitname),
+            super::unit_file::Action::Mask => manager.mask(&self.unitname),
+            super::unit_file::Action::Unmask => manager.unmask(&self.unitname),
             _ => todo!(),
         };
         match ret {
             Ok(_) => CommandResponse {
                 status: StatusCode::OK.as_u16() as _,
-                ..Default::default()
+                message: String::new(),
             },
-            Err(_e) => CommandResponse {
-                status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
-                message: String::from("error."),
-            },
+            Err(e) => {
+                let action_str = match self.action() {
+                    super::unit_file::Action::Enable => String::from("enable "),
+                    super::unit_file::Action::Disable => String::from("disable "),
+                    super::unit_file::Action::Mask => String::from("mask "),
+                    super::unit_file::Action::Unmask => String::from("unmask "),
+                    #[allow(unreachable_patterns)]
+                    _ => String::from("process"),
+                };
+                let error_message = String::from("Failed to ")
+                    + &action_str
+                    + &self.unitname
+                    + ": "
+                    + &e.to_string();
+                CommandResponse {
+                    status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                    message: error_message,
+                }
+            }
         }
     }
 }

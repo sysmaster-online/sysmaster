@@ -45,8 +45,9 @@ message UnitFile {
     ENABLE = 1;
     DISABLE = 2;
     MASK = 3;
-    GETDEF = 4;
-    SETDEF = 5;
+    UNMASK = 4;
+    GETDEF = 5;
+    SETDEF = 6;
   }
   Action action = 1;
   string unitname = 2;

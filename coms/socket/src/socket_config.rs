@@ -114,7 +114,7 @@ impl SocketConfig {
         // get original configuration
         let mut builder = SocketConfigData::builder().env();
         for v in paths {
-            builder = builder.file(&v);
+            builder = builder.file(v);
         }
         let data = builder.load()?;
 

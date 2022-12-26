@@ -26,15 +26,21 @@ struct Args {
 enum SubCmd {
     /// [unit] start the unit
     #[clap(display_order = 1)]
-    Start { unit_name: Option<String> },
+    Start {
+        unit_name: Option<String>,
+    },
 
     /// [unit] stop the unit
     #[clap(display_order = 2)]
-    Stop { unit_name: Option<String> },
+    Stop {
+        unit_name: Option<String>,
+    },
 
     /// [unit] status of the unit
     #[clap(display_order = 3)]
-    Status { unit_name: Option<String> },
+    Status {
+        unit_name: Option<String>,
+    },
 
     /// [system] shutdown the system
     Shutdown {},
@@ -43,10 +49,24 @@ enum SubCmd {
     DaemonReload {},
 
     /// enable one unit file
-    Enable { unit_file: Option<String> },
+    Enable {
+        unit_file: Option<String>,
+    },
 
     /// enable one unit file
-    Disable { unit_file: Option<String> },
+    Disable {
+        unit_file: Option<String>,
+    },
+
+    // mask one unit file
+    Mask {
+        unit_file: Option<String>,
+    },
+
+    // unmask one unit file
+    Unmask {
+        unit_file: Option<String>,
+    },
 }
 
 enum CommAction {
@@ -65,6 +85,8 @@ fn main() -> Result<(), Error> {
         SubCmd::Shutdown {} => (CommAction::Sys(sys_comm::Action::Shutdown), None),
         SubCmd::Enable { unit_file } => (CommAction::File(unit_file::Action::Enable), unit_file),
         SubCmd::Disable { unit_file } => (CommAction::File(unit_file::Action::Disable), unit_file),
+        SubCmd::Mask { unit_file } => (CommAction::File(unit_file::Action::Mask), unit_file),
+        SubCmd::Unmask { unit_file } => (CommAction::File(unit_file::Action::Unmask), unit_file),
         _ => unreachable!(),
     };
 
@@ -92,9 +114,10 @@ fn main() -> Result<(), Error> {
         }
         CommAction::File(a) => {
             let cmd = CommandRequest::new_unitfile(a, unit_name.unwrap());
-            println!("{:?}", cmd);
             let data = client.execute(cmd).unwrap();
-            println!("{:?}", data);
+            if !data.message.is_empty() {
+                println!("{}", data.message);
+            }
         }
     }
     Ok(())

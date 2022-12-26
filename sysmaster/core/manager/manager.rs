@@ -125,6 +125,14 @@ impl ExecuterAction for CommandActionMgr {
     fn enable(&self, unit_file: &str) -> Result<(), Error> {
         self.um.enable_unit(unit_file)
     }
+
+    fn mask(&self, unit_file: &str) -> Result<(), Error> {
+        self.um.mask_unit(unit_file)
+    }
+
+    fn unmask(&self, unit_file: &str) -> Result<(), Error> {
+        self.um.unmask_unit(unit_file)
+    }
 }
 
 /// Encapsulate manager and expose api to the outside
