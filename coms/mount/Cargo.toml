@@ -13,8 +13,6 @@ name = "mount"
 libevent = { path = "../../libs/libevent" }
 libutils = { path = "../../libs/libutils" }
 sysmaster = { path = "../../" }
-
-dynamic_reload = "0.8.0"
 nix = "0.24"
 log = "0.4"
 epoll = "4.3.1"
