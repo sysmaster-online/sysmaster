@@ -15,8 +15,6 @@ libcgroup = { path = "../../libs/libcgroup" }
 libevent = { path = "../../libs/libevent" }
 libwatchdog = { path = "../../libs/libwatchdog" }
 sysmaster = { path = "../../" }
-
-dynamic_reload = "0.8.0"
 nix = "0.24"
 log = "0.4"
 serde = "1.0.130"
