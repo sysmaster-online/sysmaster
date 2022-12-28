@@ -2,6 +2,7 @@
 use confique::Config;
 use libutils::serialize::DeserializeWith;
 use nix::unistd::Pid;
+use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::rc::Rc;
 use sysmaster::reliability::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
@@ -112,7 +113,7 @@ impl ServiceReConf {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, EnumDisplay)]
 pub(super) enum ServiceState {
     Dead,
     Condition,

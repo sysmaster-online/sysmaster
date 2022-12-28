@@ -1,7 +1,7 @@
 //! Convert the command request into the corresponding execution action
 use super::{
-    sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData, SysComm, UnitComm,
-    UnitFile,
+    mngr_comm, sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData,
+    SysComm, UnitComm, UnitFile,
 };
 
 use http::StatusCode;
@@ -45,6 +45,8 @@ pub trait ExecuterAction {
     fn stop(&self, unit_name: &str) -> Result<(), ExecCmdErrno>;
     /// show the status of unit_name
     fn status(&self, unit_name: &str) -> Result<String, ExecCmdErrno>;
+    /// list all units
+    fn list_units(&self) -> Result<String, ExecCmdErrno>;
     /// suspend host
     fn suspend(&self) -> Result<i32>;
     /// poweroff host
@@ -121,8 +123,29 @@ impl Executer for UnitComm {
 }
 
 impl Executer for MngrComm {
-    fn execute(self, _manager: Rc<impl ExecuterAction>) -> CommandResponse {
-        todo!()
+    fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
+        let ret = match self.action() {
+            mngr_comm::Action::Listunits => manager.list_units(),
+            _ => todo!(),
+        };
+        match ret {
+            Ok(m) => CommandResponse {
+                status: StatusCode::OK.as_u16() as _,
+                message: m,
+            },
+            Err(e) => {
+                let action_str = match self.action() {
+                    mngr_comm::Action::Listunits => String::from("list all units"),
+                    _ => String::from("process"),
+                };
+                let error_message =
+                    String::from("Failed to ") + &action_str + ": " + &String::from(e);
+                CommandResponse {
+                    status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                    message: error_message,
+                }
+            }
+        }
     }
 }
 

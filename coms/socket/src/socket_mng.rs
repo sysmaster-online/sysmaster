@@ -117,6 +117,11 @@ impl SocketMng {
         self.db_update();
     }
 
+    pub(super) fn get_state(&self) -> String {
+        let state = self.data.state();
+        state.to_string()
+    }
+
     pub(super) fn sigchld_event(&self, _pid: Pid, code: i32, status: Signal) {
         self.data.sigchld_event(_pid, code, status);
         self.db_update();

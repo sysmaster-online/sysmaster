@@ -69,6 +69,11 @@ impl TargetMng {
         self.set_state(TargetState::Dead, notify);
     }
 
+    pub fn get_state(&self) -> String {
+        let state = *self.state.borrow();
+        state.to_string()
+    }
+
     fn set_state(&self, new_state: TargetState, notify: bool) {
         let old_state = self.state();
         self.state.replace(new_state);

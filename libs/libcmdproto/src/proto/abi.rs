@@ -115,6 +115,7 @@ pub mod mngr_comm {
     pub enum Action {
         Reload = 0,
         Reexec = 1,
+        Listunits = 2,
     }
 }
 #[rustfmt::skip]

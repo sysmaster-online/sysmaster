@@ -286,6 +286,11 @@ impl Unit {
         self.child.get_pids()
     }
 
+    /// return description
+    pub fn get_description(&self) -> Option<String> {
+        self.load.get_description()
+    }
+
     ///
     pub fn prepare_exec(&self) -> Result<()> {
         log::debug!("prepare exec cgroup");
@@ -439,6 +444,11 @@ impl Unit {
     ///
     pub fn current_active_state(&self) -> UnitActiveState {
         self.sub.current_active_state()
+    }
+
+    ///
+    pub fn get_subunit_state(&self) -> String {
+        self.sub.get_subunit_state()
     }
 
     /// test start rate, if start more than burst times in interval time, return error

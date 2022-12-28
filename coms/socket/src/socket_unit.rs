@@ -107,6 +107,10 @@ impl SubUnit for SocketUnit {
         self.mng.current_active_state()
     }
 
+    fn get_subunit_state(&self) -> String {
+        self.mng.get_state()
+    }
+
     fn collect_fds(&self) -> Vec<i32> {
         self.mng.collect_fds()
     }

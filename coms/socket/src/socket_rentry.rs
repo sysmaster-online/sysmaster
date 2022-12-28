@@ -2,6 +2,7 @@
 use confique::Config;
 use libutils::serialize::DeserializeWith;
 use nix::unistd::Pid;
+use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Serialize};
 use std::os::unix::prelude::RawFd;
 use std::rc::Rc;
@@ -67,7 +68,7 @@ impl SocketReConf {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, EnumDisplay)]
 pub(super) enum SocketState {
     Dead,
     StartPre,

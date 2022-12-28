@@ -106,6 +106,20 @@ pub enum UnitType {
     UnitTypeErrnoMax,
 }
 
+impl UnitType {
+    ///
+    pub fn iterator() -> impl Iterator<Item = UnitType> {
+        [
+            UnitType::UnitService,
+            UnitType::UnitTarget,
+            UnitType::UnitSocket,
+            UnitType::UnitMount,
+        ]
+        .iter()
+        .copied()
+    }
+}
+
 impl FromStr for UnitType {
     type Err = ParseIntError;
 

@@ -62,6 +62,10 @@ impl SubUnit for MountUnit {
         self.mng.mount_state_to_unit_state()
     }
 
+    fn get_subunit_state(&self) -> String {
+        self.mng.get_state()
+    }
+
     fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
         self.comm.attach_unit(unit);
         self.db_insert();

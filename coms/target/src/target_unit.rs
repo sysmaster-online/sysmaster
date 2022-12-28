@@ -112,6 +112,10 @@ impl SubUnit for Target {
         self.mng.to_unit_state()
     }
 
+    fn get_subunit_state(&self) -> String {
+        self.mng.get_state()
+    }
+
     fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
         self.comm.attach_unit(Rc::clone(&unit));
         self.owner.replace(Some(unit));

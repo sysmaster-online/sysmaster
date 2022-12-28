@@ -591,6 +591,11 @@ impl ServiceMng {
         }
     }
 
+    pub fn get_state(&self) -> String {
+        let state = *self.state.borrow();
+        state.to_string()
+    }
+
     fn state(&self) -> ServiceState {
         *self.state.borrow()
     }
