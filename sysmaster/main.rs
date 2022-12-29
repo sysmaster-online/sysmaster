@@ -49,6 +49,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         log::info!("debug: clear data restored.");
     }
 
+    manager.setup_cgroup()?;
+
     // startup
     manager.startup().unwrap();
 
@@ -129,7 +131,7 @@ fn execarg_build_default() -> (CString, Vec<CString>) {
 
     // current execute path
     let path = env::current_exe().unwrap();
-    let cmd = CString::new(path.file_name().unwrap().to_str().unwrap()).unwrap();
+    let cmd = CString::new(path.to_str().unwrap()).unwrap();
     argv.push(cmd.clone());
 
     // return

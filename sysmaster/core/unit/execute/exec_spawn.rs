@@ -195,7 +195,6 @@ fn close_all_fds(fds: Vec<i32>) -> bool {
                     return;
                 }
 
-                log::debug!("socket fds: {:?}, close fd {}", fds, fd);
                 fd_util::close(fd);
             },
         );

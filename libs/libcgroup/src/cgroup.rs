@@ -109,7 +109,13 @@ pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<(), CgroupErr> {
         )));
     }
 
-    fs::write(cg_procs, format!("{}\n", pid)).map_err(CgroupErr::IoError)?;
+    let p = if pid == Pid::from_raw(0) {
+        nix::unistd::getpid()
+    } else {
+        pid
+    };
+
+    fs::write(cg_procs, format!("{}\n", p)).map_err(CgroupErr::IoError)?;
 
     Ok(())
 }
@@ -193,6 +199,8 @@ fn cg_kill_process(
         .open(path)
         .map_err(CgroupErr::IoError)?;
 
+    let cur_pid = nix::unistd::getpid();
+
     let reader = BufReader::new(file);
     for line in reader.lines() {
         let line = line.map_err(CgroupErr::IoError)?;
@@ -201,6 +209,10 @@ fn cg_kill_process(
                 .parse::<i32>()
                 .unwrap(),
         );
+
+        if flags.contains(CgFlags::IGNORE_SELF) && cur_pid == pid {
+            continue;
+        }
 
         if pids.contains(&pid) {
             continue;
@@ -437,6 +449,15 @@ pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
     }
 
     return Ok(true);
+}
+
+/// create cgroup path and attach pid to this cgroup
+pub fn cg_create_and_attach(cg_path: &PathBuf, pid: Pid) -> Result<bool, CgroupErr> {
+    cg_create(cg_path)?;
+
+    cg_attach(pid, cg_path)?;
+
+    Ok(true)
 }
 
 mod tests {
