@@ -22,12 +22,12 @@ pub fn do_expand(st: &syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream>
     let struct_name_literal = st.ident.to_string();
     let parser_name_literal = format!("{}Parser", struct_name_literal);
     let parser_name_ident = syn::Ident::new(&parser_name_literal, st.span());
-    let serder_name = get_user_specific_serde_name(&st);
+    let serder_name = get_user_specific_serde_name(st);
     let _tmp_serder_name = serder_name.map_or_else(|| struct_name_literal, |x| x);
 
     let vis = &st.vis;
     let fields = get_fieds_from_driver_input(st)?;
-    let setter_functions = gererate_setter_functions(&fields, vis)?;
+    let setter_functions = gererate_setter_functions(fields, vis)?;
 
     let ret = quote! {
         #vis struct #parser_name_ident(String);
@@ -60,7 +60,7 @@ pub fn do_expand(st: &syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream>
             }
         };
     };
-    return Ok(ret);
+    Ok(ret)
 }
 
 fn get_user_specific_serde_name(st: &syn::DeriveInput) -> Option<String> {
@@ -76,10 +76,10 @@ fn get_user_specific_serde_name(st: &syn::DeriveInput) -> Option<String> {
                     let _n = nested.first();
                     if let Some(syn::NestedMeta::Meta(syn::Meta::Path(p))) = _n {
                         if let Some(p) = p.segments.first() {
-                            return Some(std::string::String::from(p.ident.to_string()));
+                            return Some(p.ident.to_string());
                         }
                     } else if let Some(syn::NestedMeta::Lit(syn::Lit::Str(lit_str))) = _n {
-                        return Some(lit_str.value().to_string());
+                        return Some(lit_str.value());
                     }
                 }
             }
@@ -117,8 +117,8 @@ fn gererate_setter_functions(
 
     for (ident, _type) in idents.iter().zip(types.iter()) {
         let token_piece;
-        let set_field_name = format!("set_{}", ident.as_ref().unwrap().to_string());
-        let get_field_name = format!("get_{}", ident.as_ref().unwrap().to_string());
+        let set_field_name = format!("set_{}", ident.as_ref().unwrap());
+        let get_field_name = format!("get_{}", ident.as_ref().unwrap());
         let set_field_ident = syn::Ident::new(&set_field_name, ident.span());
         let get_field_ident = syn::Ident::new(&get_field_name, ident.span());
         if let Some(inner_ty) = get_option_inner_type(_type) {

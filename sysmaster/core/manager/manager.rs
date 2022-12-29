@@ -102,6 +102,13 @@ impl ExecuterAction for CommandActionMgr {
         }
     }
 
+    fn list_units(&self) -> Result<String, ExecCmdErrno> {
+        match self.um.get_all_units() {
+            Ok(str) => Ok(str),
+            Err(err) => Err(ExecCmdErrno::from(err)),
+        }
+    }
+
     fn suspend(&self) -> Result<i32> {
         todo!()
     }

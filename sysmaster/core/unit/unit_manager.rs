@@ -25,7 +25,7 @@ use libevent::Events;
 use libutils::path_lookup::LookupPaths;
 use libutils::proc_cmdline::get_process_cmdline;
 use libutils::process_util;
-use libutils::show_table::StatusItem;
+use libutils::show_table::{ListUnitsItem, StatusItem};
 use libutils::Result;
 use nix::unistd::Pid;
 use std::convert::TryFrom;
@@ -96,6 +96,10 @@ impl UnitManagerX {
 
     pub(in crate::core) fn get_unit_status(&self, name: &str) -> Result<String, MngErrno> {
         self.data.get_unit_status(name)
+    }
+
+    pub(in crate::core) fn get_all_units(&self) -> Result<String, MngErrno> {
+        self.data.get_all_units()
     }
 
     pub(in crate::core) fn child_sigchld_enable(&self, enable: bool) -> Result<i32> {
@@ -338,6 +342,15 @@ impl UmIf for UnitManager {
         s_unit.current_active_state()
     }
 
+    fn get_subunit_state(&self, _unit_name: &str) -> String {
+        let s_unit = if let Some(s_unit) = self.db.units_get(_unit_name) {
+            s_unit
+        } else {
+            return String::new();
+        };
+        s_unit.get_subunit_state()
+    }
+
     fn unit_start(&self, _name: &str) -> Result<(), UnitActionError> {
         if let Some(unit) = self.db.units_get(_name) {
             unit.start()
@@ -561,20 +574,6 @@ impl UnitManager {
         }
     }
 
-    fn get_unit_status_active_state(&self, active_state: UnitActiveState) -> String {
-        match active_state {
-            UnitActiveState::UnitActive => String::from("active"),
-            UnitActiveState::UnitActivating => String::from("activating"),
-            UnitActiveState::UnitDeActivating => String::from("deactivating"),
-            UnitActiveState::UnitFailed => String::from("failed"),
-            UnitActiveState::UnitInActive => String::from("inactive"),
-            UnitActiveState::UnitMaintenance => String::from("maintenance"),
-            UnitActiveState::UnitReloading => String::from("reloading"),
-            #[allow(unreachable_patterns)]
-            _ => String::from("unknown"),
-        }
-    }
-
     fn get_unit_cgroup_path(&self, unit: Rc<Unit>) -> String {
         let res = match unit.cg_path().to_str() {
             Some(res) => res.to_string(),
@@ -617,13 +616,16 @@ impl UnitManager {
             ),
             StatusItem::new(
                 "Active".to_string(),
-                self.get_unit_status_active_state(unit.current_active_state()),
+                self.current_active_state(name).to_string()
+                    + " ("
+                    + &self.get_subunit_state(name)
+                    + ")",
             ),
             StatusItem::new(
                 "CGroup".to_string(),
                 self.get_unit_cgroup_path(unit.clone()),
             ),
-            StatusItem::new("PID".to_string(), self.get_unit_status_pids(unit)),
+            StatusItem::new("PID".to_string(), self.get_unit_status_pids(unit.clone())),
         ];
         let mut status_table = tabled::Table::new(status_list);
         status_table
@@ -634,7 +636,47 @@ impl UnitManager {
                     .with(tabled::format::Format::new(|s| format!("{}:", s))) // add ":"
                     .with(tabled::Alignment::right()),
             ); // align to right
-        Ok("● ".to_string() + name + "\n" + &status_table.to_string())
+        let first_line = match unit.get_description() {
+            None => "● ".to_string() + name + "\n",
+            Some(str) => "● ".to_string() + name + " - " + &str + "\n",
+        };
+        Ok(first_line + &status_table.to_string())
+    }
+
+    pub(self) fn get_all_units(&self) -> Result<String, MngErrno> {
+        let mut list_units: Vec<ListUnitsItem> = Vec::new();
+        for unit_type in UnitType::iterator() {
+            if unit_type == UnitType::UnitMount {
+                continue;
+            }
+            for unit_name in self.units_get_all(Some(unit_type)) {
+                let unit = match self.units_get(&unit_name) {
+                    Some(unit) => unit,
+                    None => {
+                        return Err(MngErrno::NotExisted);
+                    }
+                };
+                let load_state = self.load_unit_success(&unit_name).to_string();
+                let active_state = self.current_active_state(&unit_name).to_string();
+                let sub_state = self.get_subunit_state(&unit_name);
+                let description = match unit.get_description() {
+                    None => String::from(&unit_name),
+                    Some(str) => str,
+                };
+                list_units.push(ListUnitsItem::new(
+                    unit_name,
+                    load_state,
+                    active_state,
+                    sub_state,
+                    description,
+                ));
+            }
+        }
+
+        let mut list_units_table = tabled::Table::new(list_units);
+        list_units_table.with(tabled::style::Style::empty());
+
+        Ok(list_units_table.to_string())
     }
 
     pub(self) fn new(

@@ -34,6 +34,20 @@ pub enum UnitActiveState {
     UnitMaintenance,
 }
 
+impl std::fmt::Display for UnitActiveState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UnitActiveState::UnitActive => write!(f, "active"),
+            UnitActiveState::UnitReloading => write!(f, "reloading"),
+            UnitActiveState::UnitInActive => write!(f, "inactive"),
+            UnitActiveState::UnitFailed => write!(f, "failed"),
+            UnitActiveState::UnitActivating => write!(f, "activating"),
+            UnitActiveState::UnitDeActivating => write!(f, "deactivating"),
+            UnitActiveState::UnitMaintenance => write!(f, "maintenance"),
+        }
+    }
+}
+
 bitflags! {
     /// notify unit state to manager
     pub struct UnitNotifyFlags: u8 {

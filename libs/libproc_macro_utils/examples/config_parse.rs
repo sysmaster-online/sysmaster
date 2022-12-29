@@ -1,3 +1,4 @@
+/*
 use proc_macro_utils::ConfigParseM;
 use serde::{Deserialize, Serialize};
 use std::io::{Error as IoError, ErrorKind};
@@ -119,3 +120,7 @@ ExecStop = ["/usr/bin/kill $MAINPID"]
     let _d_s = sp.conf_file_parse(default_service_str).unwrap();
     assert_eq!(_d_s.get_service_type(), ServiceType::ServiceSimple);
 }
+*/
+
+//! This is an example about how to use config_parse macro
+fn main() {}

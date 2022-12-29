@@ -135,6 +135,11 @@ pub trait UmIf {
     fn current_active_state(&self, _unit_name: &str) -> UnitActiveState {
         UnitActiveState::UnitFailed
     }
+
+    /// get the subunit state of one unit. i.e. running(service), listening(socket)
+    fn get_subunit_state(&self, _unit_name: &str) -> String {
+        String::new()
+    }
 }
 
 /// the trait used for attach UnitManager to sub unit

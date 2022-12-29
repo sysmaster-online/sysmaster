@@ -1,3 +1,4 @@
+use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use sysmaster::reliability::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
@@ -5,7 +6,7 @@ use sysmaster::reliability::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability}
 const RELI_DB_HTARGET_MNG: &str = "tarmng";
 
 // target contain Dead and Active state，correspond the inactive and active of the unit
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, EnumDisplay)]
 pub(super) enum TargetState {
     Dead,
     Active,

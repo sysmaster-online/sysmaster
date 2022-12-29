@@ -66,6 +66,7 @@ message MngrComm {
   enum Action {
     RELOAD = 0;
     REEXEC = 1;
+    LISTUNITS = 2;
   }
   Action action = 1;
 }

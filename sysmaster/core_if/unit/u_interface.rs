@@ -119,6 +119,9 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     ///
     fn current_active_state(&self) -> UnitActiveState;
 
+    /// Return the state of subunit, i.e. (mounted for .mount, running for .service, listening for .socket)
+    fn get_subunit_state(&self) -> String;
+
     ///
     fn attach_unit(&self, unit: Rc<dyn UnitBase>);
 

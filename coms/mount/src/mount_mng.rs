@@ -66,6 +66,11 @@ impl MountMng {
         Ok(false)
     }
 
+    pub fn get_state(&self) -> String {
+        let state = *self.state.borrow();
+        state.to_string()
+    }
+
     fn set_state(&self, new_state: MountState, notify: bool) {
         let old_state = self.state();
         self.change_state(new_state);
