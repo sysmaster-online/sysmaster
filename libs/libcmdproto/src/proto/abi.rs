@@ -43,8 +43,8 @@ pub struct CommandResponse {
 pub struct UnitComm {
     #[prost(enumeration="unit_comm::Action", tag="1")]
     pub action: i32,
-    #[prost(string, tag="2")]
-    pub unitname: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag="2")]
+    pub units: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Nested message and enum types in `UnitComm`.
 pub mod unit_comm {

@@ -356,8 +356,6 @@ impl JobManagerData {
             .update_changes(&(&triggers, &Vec::new(), &Vec::new()));
         self.stat
             .update_changes(&(&suspends, &Vec::new(), &Vec::new()));
-        self.stat.update_stage_run(triggers.len(), true); // trigger-add[init->run]: increase 'run'
-        self.stat.update_stage_wait(suspends.len(), true); // suspend-add[init->wait]: increase 'wait'
         self.stat.clear_cnt(); // no history
 
         // compensate relevancy
@@ -407,8 +405,6 @@ impl JobManagerData {
         // update statistics
         self.stat
             .update_changes(&(&add_jobs, &del_jobs, &update_jobs));
-        self.stat.update_stage_wait(del_jobs.len(), false); // commit-del[wait->end]: decrease 'wait'
-        self.stat.update_stage_wait(add_jobs.len(), true); // commit-add[init->wait]: increase 'wait'
 
         // output
         affect.record(&(add_jobs, del_jobs, update_jobs));
@@ -443,12 +439,6 @@ impl JobManagerData {
 
                 // update statistics
                 self.stat.update_change(&(&None, &merge_trigger, &None));
-                if trigger_info.is_some() {
-                    let t_jinfo = trigger_info.as_ref().cloned().unwrap().0;
-                    let not_retrigger = t_jinfo.kind == t_jinfo.run_kind;
-                    self.stat.update_stage_wait(not_retrigger.into(), false); // trigger-non-retrigger[wait->run]: decrease 'wait'
-                    self.stat.update_stage_run(not_retrigger.into(), true); // trigger-non-retrigger[wait->run]: increase 'run'
-                }
 
                 // try to finish it now in two case, and the case coming from unit has higher priority
                 // case 1. the job has been finished synchronously in context, which is derived from outside('unit') directly.
@@ -559,9 +549,6 @@ impl JobManagerData {
         self.stat.update_change(&(&None, &del_trigger, &None));
         self.stat
             .update_changes(&(&Vec::new(), &del_suspends, &Vec::new()));
-        self.stat
-            .update_stage_run(del_trigger.is_some().into(), false); // remove-unit[run->end]: decrease 'run'
-        self.stat.update_stage_wait(del_suspends.len(), false); // remove-unit[wait->end]: decrease 'wait'
     }
 
     fn do_try_finish(
@@ -647,11 +634,6 @@ impl JobManagerData {
         // update statistics
         self.stat.update_change(&(&None, &del_trigger, &None));
         self.stat.update_change(&(&None, &del_suspend, &None));
-        self.stat
-            .update_stage_run(del_trigger.is_some().into(), false); // finish-non-retrigger(the trigger has not been deleted)[run->end]: decrease 'run'
-        self.stat
-            .update_stage_wait(del_suspend.is_some().into(), false); // finish-remove[wait->end]: decrease 'wait'
-
         del_one
     }
 
@@ -675,7 +657,6 @@ impl JobManagerData {
         // update statistics
         self.stat
             .update_changes(&(&Vec::new(), &del_rel, &Vec::new()));
-        self.stat.update_stage_wait(del_rel.len(), false); // finish-remove[wait->end]: decrease 'wait'
     }
 
     fn simulate_job_notify(&self, unit: &Rc<UnitX>, os: UnitActiveState, ns: UnitActiveState) {

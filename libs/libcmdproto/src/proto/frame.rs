@@ -151,7 +151,8 @@ mod tests {
             ];
             let stream = TcpStream::connect(&addrs[..]).unwrap();
             let mut client = ProstClientStream::new(stream);
-            let cmd = CommandRequest::new_unitcomm(UnitAction::Start, "test.service");
+            let cmd =
+                CommandRequest::new_unitcomm(UnitAction::Start, vec!["test.service".to_string()]);
             let _ = client.execute(cmd).unwrap();
         });
 

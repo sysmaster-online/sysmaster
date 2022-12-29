@@ -26,15 +26,19 @@ struct Args {
 enum SubCmd {
     /// [unit] start the unit
     #[clap(display_order = 1)]
-    Start { unit_name: Option<String> },
+    Start { units: Vec<String> },
 
     /// [unit] stop the unit
     #[clap(display_order = 2)]
-    Stop { unit_name: Option<String> },
+    Stop { units: Vec<String> },
+
+    /// [unit] restart the unit
+    #[clap(display_order = 3)]
+    Restart { units: Vec<String> },
 
     /// [unit] status of the unit
-    #[clap(display_order = 3)]
-    Status { unit_name: Option<String> },
+    #[clap(display_order = 4)]
+    Status { units: Vec<String> },
 
     /// [manager] list all units
     ListUnits {},
@@ -58,27 +62,49 @@ enum SubCmd {
     Unmask { unit_file: Option<String> },
 }
 
-enum CommAction {
-    Unit(unit_comm::Action),
-    Sys(sys_comm::Action),
-    File(unit_file::Action),
-    Mng(mngr_comm::Action),
+/// Generate CommandRequest based on parsed args
+/// clap Args => protobuf based CommandRequest
+fn generate_command_request(args: Args) -> Option<CommandRequest> {
+    let command_request = match args.subcmd {
+        SubCmd::Start { units } => CommandRequest::new_unitcomm(unit_comm::Action::Start, units),
+        SubCmd::Stop { units } => CommandRequest::new_unitcomm(unit_comm::Action::Stop, units),
+        SubCmd::Restart { units } => {
+            CommandRequest::new_unitcomm(unit_comm::Action::Restart, units)
+        }
+        SubCmd::Status { units } => CommandRequest::new_unitcomm(unit_comm::Action::Status, units),
+
+        SubCmd::Mask { unit_file } => {
+            CommandRequest::new_unitfile(unit_file::Action::Mask, unit_file.unwrap())
+        }
+        SubCmd::Unmask { unit_file } => {
+            CommandRequest::new_unitfile(unit_file::Action::Unmask, unit_file.unwrap())
+        }
+        SubCmd::Enable { unit_file } => {
+            CommandRequest::new_unitfile(unit_file::Action::Enable, unit_file.unwrap())
+        }
+        SubCmd::Disable { unit_file } => {
+            CommandRequest::new_unitfile(unit_file::Action::Disable, unit_file.unwrap())
+        }
+
+        SubCmd::Shutdown {} => CommandRequest::new_syscomm(sys_comm::Action::Shutdown),
+
+        SubCmd::ListUnits {} => CommandRequest::new_mngrcomm(mngr_comm::Action::Listunits),
+        _ => {
+            return None;
+        }
+    };
+    Some(command_request)
 }
 
 fn main() -> Result<(), Error> {
     let args = Args::parse();
 
-    let (action, unit_name) = match args.subcmd {
-        SubCmd::Start { unit_name } => (CommAction::Unit(unit_comm::Action::Start), unit_name),
-        SubCmd::Stop { unit_name } => (CommAction::Unit(unit_comm::Action::Stop), unit_name),
-        SubCmd::Status { unit_name } => (CommAction::Unit(unit_comm::Action::Status), unit_name),
-        SubCmd::Shutdown {} => (CommAction::Sys(sys_comm::Action::Shutdown), None),
-        SubCmd::Enable { unit_file } => (CommAction::File(unit_file::Action::Enable), unit_file),
-        SubCmd::Disable { unit_file } => (CommAction::File(unit_file::Action::Disable), unit_file),
-        SubCmd::Mask { unit_file } => (CommAction::File(unit_file::Action::Mask), unit_file),
-        SubCmd::Unmask { unit_file } => (CommAction::File(unit_file::Action::Unmask), unit_file),
-        SubCmd::ListUnits {} => (CommAction::Mng(mngr_comm::Action::Listunits), None),
-        _ => unreachable!(),
+    let command_request = match generate_command_request(args) {
+        None => {
+            println!("This command is currently not supported.");
+            return Ok(());
+        }
+        Some(command_request) => command_request,
     };
 
     let addrs = [
@@ -89,34 +115,11 @@ fn main() -> Result<(), Error> {
 
     let mut client = ProstClientStream::new(stream);
 
-    match action {
-        CommAction::Unit(a) => {
-            let cmd = CommandRequest::new_unitcomm(a, unit_name.unwrap());
-            let data = client.execute(cmd).unwrap();
-            if !data.message.is_empty() {
-                println!("{}", data.message);
-            }
-        }
-        CommAction::Sys(a) => {
-            let cmd = CommandRequest::new_syscomm(a);
-            println!("{:?}", cmd);
-            let data = client.execute(cmd).unwrap();
-            println!("{:?}", data);
-        }
-        CommAction::File(a) => {
-            let cmd = CommandRequest::new_unitfile(a, unit_name.unwrap());
-            let data = client.execute(cmd).unwrap();
-            if !data.message.is_empty() {
-                println!("{}", data.message);
-            }
-        }
-        CommAction::Mng(a) => {
-            let cmd = CommandRequest::new_mngrcomm(a);
-            let data = client.execute(cmd).unwrap();
-            if !data.message.is_empty() {
-                println!("{}", data.message);
-            }
-        }
+    let data = client.execute(command_request).unwrap();
+
+    if !data.message.is_empty() {
+        println!("{}", data.message);
     }
+
     Ok(())
 }

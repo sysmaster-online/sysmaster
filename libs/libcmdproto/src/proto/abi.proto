@@ -36,7 +36,7 @@ message UnitComm {
     KILL = 5;
   }
   Action action = 1;
-  string unitname = 2;
+  repeated string units = 2;
 }
 
 message UnitFile {
