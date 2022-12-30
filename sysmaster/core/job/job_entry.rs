@@ -67,6 +67,7 @@ pub(in crate::core) struct JobInfo {
     pub(in crate::core) id: u32,
     pub(in crate::core) unit: Rc<UnitX>,
     pub(in crate::core) kind: JobKind,
+    pub(in crate::core) attr: JobAttr,
     pub(in crate::core) run_kind: JobKind,
     pub(in crate::core) stage: JobStage,
 }
@@ -77,6 +78,7 @@ impl fmt::Debug for JobInfo {
             .field("id", &self.id)
             .field("unit", &self.unit.id())
             .field("kind", &self.kind)
+            .field("attr", &self.attr)
             .field("run_kind", &self.run_kind)
             .field("stage", &self.stage)
             .finish()
@@ -89,6 +91,7 @@ impl JobInfo {
             id: job.id,
             unit: Rc::clone(&job.unit),
             kind: job.kind,
+            attr: job.attr(),
             run_kind: job.run_kind(),
             stage: job.get_stage(),
         }
@@ -152,7 +155,7 @@ impl Job {
             id,
             unit,
             kind,
-            attr: RefCell::new(JobAttr::new(false, false, false)),
+            attr: RefCell::new(JobAttr::new(false, false, false, false)),
             run_kind: RefCell::new(job_rkind_new(kind)),
             stage: RefCell::new(JobStage::Init),
         }
@@ -198,8 +201,7 @@ impl Job {
             self.attr.borrow_mut().irreversible = true;
         }
 
-        // update reliability
-        self.rentry_suspends_update();
+        // update reliability: nothing to update in 'Init'
     }
 
     pub(super) fn merge_attr(&self, other: &Self) {

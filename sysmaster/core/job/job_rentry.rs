@@ -33,18 +33,25 @@ pub(super) fn job_is_basic_op(kind: JobKind) -> bool {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(super) struct JobAttr {
-    pub(super) ignore_order: bool,
-    pub(super) irreversible: bool,
-    pub(super) force: bool,
+pub(in crate::core) struct JobAttr {
+    pub(in crate::core) ignore_order: bool,
+    pub(in crate::core) irreversible: bool,
+    pub(in crate::core) force: bool,
+    pub(in crate::core) no_relevancy: bool,
 }
 
 impl JobAttr {
-    pub(super) fn new(ignore_order: bool, irreversible: bool, force: bool) -> JobAttr {
+    pub(super) fn new(
+        ignore_order: bool,
+        irreversible: bool,
+        force: bool,
+        no_relevancy: bool,
+    ) -> JobAttr {
         JobAttr {
             ignore_order,
             irreversible,
             force,
+            no_relevancy,
         }
     }
 
@@ -52,6 +59,7 @@ impl JobAttr {
         self.ignore_order |= other.ignore_order;
         self.irreversible |= other.irreversible;
         self.force |= other.force;
+        self.no_relevancy |= other.no_relevancy;
         self
     }
 }
