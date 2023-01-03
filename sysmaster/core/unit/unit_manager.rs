@@ -94,6 +94,10 @@ impl UnitManagerX {
         self.data.stop_unit(name)
     }
 
+    pub(in crate::core) fn restart_unit(&self, name: &str) -> Result<(), MngErrno> {
+        self.data.restart_unit(name)
+    }
+
     pub(in crate::core) fn get_unit_status(&self, name: &str) -> Result<String, MngErrno> {
         self.data.get_unit_status(name)
     }
@@ -565,6 +569,19 @@ impl UnitManager {
         if let Some(unit) = self.load_unitx(name) {
             self.jm.exec(
                 &JobConf::new(&unit, JobKind::Stop),
+                JobMode::Replace,
+                &mut JobAffect::new(false),
+            )?;
+            Ok(())
+        } else {
+            Err(MngErrno::Internal)
+        }
+    }
+
+    pub(self) fn restart_unit(&self, name: &str) -> Result<(), MngErrno> {
+        if let Some(unit) = self.load_unitx(name) {
+            self.jm.exec(
+                &JobConf::new(&unit, JobKind::Restart),
                 JobMode::Replace,
                 &mut JobAffect::new(false),
             )?;

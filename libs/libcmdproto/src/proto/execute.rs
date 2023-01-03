@@ -5,6 +5,7 @@ use super::{
 };
 
 use http::StatusCode;
+use libutils::string::new_line_break;
 use libutils::Result;
 use std::io::Error;
 use std::rc::Rc;
@@ -43,6 +44,8 @@ pub trait ExecuterAction {
     fn start(&self, unit_name: &str) -> Result<(), ExecCmdErrno>;
     /// stop the unit_name
     fn stop(&self, unit_name: &str) -> Result<(), ExecCmdErrno>;
+    /// restart the unit_name
+    fn restart(&self, unit_name: &str) -> Result<(), ExecCmdErrno>;
     /// show the status of unit_name
     fn status(&self, unit_name: &str) -> Result<String, ExecCmdErrno>;
     /// list all units
@@ -84,40 +87,54 @@ where
 
 impl Executer for UnitComm {
     fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
-        let ret = match self.action() {
-            unit_comm::Action::Status => manager.status(&self.unitname),
-            unit_comm::Action::Start => match manager.start(&self.unitname) {
-                Ok(()) => Ok(String::new()),
-                Err(e) => Err(e),
-            },
-            unit_comm::Action::Stop => match manager.stop(&self.unitname) {
-                Ok(()) => Ok(String::new()),
-                Err(e) => Err(e),
-            },
-            _ => todo!(),
-        };
-        match ret {
-            Ok(m) => CommandResponse {
-                status: StatusCode::OK.as_u16() as _,
-                message: m,
-            },
-            Err(e) => {
-                let action_str = match self.action() {
-                    unit_comm::Action::Status => String::from("get status of "),
-                    unit_comm::Action::Start => String::from("start "),
-                    unit_comm::Action::Stop => String::from("stop "),
-                    _ => String::from("process"),
-                };
-                let error_message = String::from("Failed to ")
-                    + &action_str
-                    + &self.unitname
-                    + ": "
-                    + &String::from(e);
-                CommandResponse {
-                    status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
-                    message: error_message,
+        let mut reply = String::new();
+        match self.action() {
+            unit_comm::Action::Status => {
+                for unit in self.units {
+                    new_line_break(&mut reply);
+                    match manager.status(&unit) {
+                        Ok(status) => {
+                            reply += &status;
+                        }
+                        Err(e) => {
+                            reply = reply
+                                + "Failed to show the status of "
+                                + &unit
+                                + ": "
+                                + &String::from(e);
+                        }
+                    }
                 }
             }
+            unit_comm::Action::Start => {
+                for unit in self.units {
+                    if let Err(e) = manager.start(&unit) {
+                        new_line_break(&mut reply);
+                        reply = reply + "Failed to start " + &unit + ": " + &String::from(e);
+                    }
+                }
+            }
+            unit_comm::Action::Stop => {
+                for unit in self.units {
+                    if let Err(e) = manager.stop(&unit) {
+                        new_line_break(&mut reply);
+                        reply = reply + "Failed to stop " + &unit + ": " + &String::from(e);
+                    }
+                }
+            }
+            unit_comm::Action::Restart => {
+                for unit in self.units {
+                    if let Err(e) = manager.restart(&unit) {
+                        new_line_break(&mut reply);
+                        reply = reply + "Failed to restart " + &unit + ": " + &String::from(e);
+                    }
+                }
+            }
+            _ => todo!(),
+        }
+        CommandResponse {
+            status: StatusCode::OK.as_u16() as _,
+            message: reply,
         }
     }
 }

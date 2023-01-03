@@ -15,11 +15,11 @@ pub use http::StatusCode;
 
 impl CommandRequest {
     /// Create a new command request for unit
-    pub fn new_unitcomm(action: unit_comm::Action, unitname: impl Into<String>) -> Self {
+    pub fn new_unitcomm(action: unit_comm::Action, units: Vec<String>) -> Self {
         Self {
             request_data: Some(RequestData::Ucomm(UnitComm {
                 action: action.into(),
-                unitname: unitname.into(),
+                units,
             })),
         }
     }

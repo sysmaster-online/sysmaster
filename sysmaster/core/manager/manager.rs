@@ -95,6 +95,13 @@ impl ExecuterAction for CommandActionMgr {
         }
     }
 
+    fn restart(&self, unit_name: &str) -> Result<(), ExecCmdErrno> {
+        match self.um.restart_unit(unit_name) {
+            Ok(()) => Ok(()),
+            Err(err) => Err(ExecCmdErrno::from(err)),
+        }
+    }
+
     fn status(&self, unit_name: &str) -> Result<String, ExecCmdErrno> {
         match self.um.get_unit_status(unit_name) {
             Ok(str) => Ok(str),

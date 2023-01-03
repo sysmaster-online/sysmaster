@@ -17,6 +17,7 @@ pub mod process_util;
 pub mod serialize;
 pub mod show_table;
 pub mod socket_util;
+pub mod string;
 pub mod time_util;
 
 pub mod condition;

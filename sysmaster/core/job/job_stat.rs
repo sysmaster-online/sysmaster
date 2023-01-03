@@ -32,14 +32,6 @@ impl JobStat {
         self.data.borrow_mut().update_changes(changes)
     }
 
-    pub(super) fn update_stage_wait(&self, change: usize, inc: bool) {
-        self.data.borrow_mut().update_stage_wait(change, inc)
-    }
-
-    pub(super) fn update_stage_run(&self, change: usize, inc: bool) {
-        self.data.borrow_mut().update_stage_run(change, inc)
-    }
-
     pub(super) fn clear_cnt(&self) {
         self.data.borrow_mut().clear_cnt()
     }
@@ -91,14 +83,6 @@ impl JobStatData {
         }
     }
 
-    pub(self) fn update_stage_wait(&mut self, change: usize, inc: bool) {
-        self.num.update_stage_wait(change, inc);
-    }
-
-    pub(self) fn update_stage_run(&mut self, change: usize, inc: bool) {
-        self.num.update_stage_run(change, inc);
-    }
-
     pub(self) fn clear_cnt(&mut self) {
         self.cnt.clear();
     }
@@ -127,14 +111,6 @@ impl JobNum {
     #[allow(clippy::type_complexity)]
     pub(self) fn update(&mut self, changes: &(&Vec<Rc<Job>>, &Vec<Rc<Job>>, &Vec<Rc<Job>>)) {
         self.kind.update(changes);
-    }
-
-    pub(self) fn update_stage_wait(&mut self, change: usize, inc: bool) {
-        self.stage.update_wait(change, inc);
-    }
-
-    pub(self) fn update_stage_run(&mut self, change: usize, inc: bool) {
-        self.stage.update_run(change, inc);
     }
 }
 
@@ -233,22 +209,6 @@ impl JobStageNum {
             wait: 0,
             running: 0,
         };
-    }
-
-    pub(self) fn update_wait(&mut self, change: usize, inc: bool) {
-        let overflow = match inc {
-            true => value_try_add(&mut self.wait, change),
-            false => value_try_sub(&mut self.wait, change),
-        };
-        assert!(!overflow);
-    }
-
-    pub(self) fn update_run(&mut self, change: usize, inc: bool) {
-        let overflow = match inc {
-            true => value_try_add(&mut self.running, change),
-            false => value_try_sub(&mut self.running, change),
-        };
-        assert!(!overflow);
     }
 
     #[allow(dead_code)]
