@@ -318,15 +318,13 @@ impl JobManagerData {
 
     pub(self) fn rentry_trigger_merge(&self, unit_id: &str, force: bool) {
         // get old
-        let (k_d, a_d) = (JobKind::Restart, JobAttr::new(true, true, force)); // default
-        let (k_o, a_o) = self
-            .rentry
-            .trigger_get(unit_id)
-            .unwrap_or((k_d, a_d.clone()));
+        let (k_d, a_d) = (JobKind::Restart, JobAttr::new(true, true, force, true)); // default
+        let (k_o, a_o) = self.rentry.trigger_get(unit_id).unwrap_or((k_d, a_d));
 
         // build new
+        let relevancy = job_unit_entry::job_merge_trigger_iskeep(k_o);
         let k_n = job_unit_entry::job_merge_trigger_map(k_o);
-        let mut a_n = a_d; // JobAttr::new(true, true, force)
+        let mut a_n = JobAttr::new(true, true, force, !relevancy);
         a_n.or(&a_o);
 
         // insert rentry
@@ -357,20 +355,6 @@ impl JobManagerData {
         self.stat
             .update_changes(&(&suspends, &Vec::new(), &Vec::new()));
         self.stat.clear_cnt(); // no history
-
-        // compensate relevancy
-        let mode = JobMode::Replace;
-        let mut afftect = JobAffect::new(false);
-        for trigger in triggers.iter() {
-            let kind = trigger.kind();
-            if !job_unit_entry::job_merge_trigger_iskeep(kind) {
-                let config = JobConf::new(trigger.unit(), kind);
-                match kind {
-                    JobKind::Restart => self.exec(&config, mode, &mut afftect).unwrap(),
-                    _ => unreachable!("only the basic kind can be mergerd."),
-                }
-            }
-        }
     }
 
     pub(self) fn coldplug_unit(&self, unit: &UnitX) {
@@ -640,6 +624,15 @@ impl JobManagerData {
     fn do_remove_relation(&self, job_info: &JobInfo) {
         let unit = &job_info.unit;
         let run_kind = job_info.run_kind;
+
+        // judgement of relevancy
+        if job_info.attr.no_relevancy {
+            let config = JobConf::new(unit, JobKind::Stop);
+            if let Err(_e) = self.exec(&config, JobMode::Replace, &mut JobAffect::new(false)) {
+                // debug
+            }
+            return;
+        }
 
         // delete its relations: suspends
         let result_rel = JobResult::Dependency;
