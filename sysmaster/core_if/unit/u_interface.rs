@@ -61,6 +61,9 @@ pub trait UnitBase {
 
     ///
     fn set_ignore_on_isolate(&self, ignore_on_isolate: bool);
+
+    /// guess main pid from the cgroup path
+    fn guess_main_pid(&self) -> Result<Pid, Box<dyn Error>>;
 }
 
 ///The trait Defining Shared Behavior of sub unit

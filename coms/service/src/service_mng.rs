@@ -287,7 +287,7 @@ impl ServiceMng {
 
         match service_type {
             ServiceType::Simple => {
-                self.pid.set_main(pid);
+                let _ = self.pid.set_main(pid);
                 self.enter_start_post();
             }
             ServiceType::Forking => {
@@ -297,7 +297,7 @@ impl ServiceMng {
                 self.set_state(ServiceState::Start);
             }
             ServiceType::Oneshot | ServiceType::Notify => {
-                self.pid.set_main(pid);
+                let _ = self.pid.set_main(pid);
                 self.set_state(ServiceState::Start);
             }
 
@@ -583,7 +583,9 @@ impl ServiceMng {
     fn run_next_main(&self) {
         if let Some(cmd) = self.main_command_pop() {
             match self.spawn.start_service(&cmd, 0, ExecFlags::PASS_FDS) {
-                Ok(pid) => self.pid.set_main(pid),
+                Ok(pid) => {
+                    let _ = self.pid.set_main(pid);
+                }
                 Err(_e) => {
                     log::error!("failed to run main command: {}", self.comm.get_owner_id());
                 }
@@ -712,7 +714,10 @@ impl ServiceMng {
         self.valid_main_pid(pid)?;
 
         self.pid.unwatch_main();
-        self.pid.set_main(pid);
+        self.pid.set_main(pid).map_err(|_e| Error::Other {
+            msg: "invalid main pid",
+        })?;
+
         self.comm
             .um()
             .child_watch_pid(&self.comm.get_owner_id(), pid);
@@ -820,6 +825,24 @@ impl ServiceMng {
         }
 
         false
+    }
+
+    fn guess_main_pid(&self) {
+        if self.pid.main().is_some() {
+            return;
+        }
+
+        if let Some(u) = self.comm.owner() {
+            if let Ok(pid) = u.guess_main_pid() {
+                if let Err(e) = self.pid.set_main(pid) {
+                    log::error!("set main pid error: {}", e);
+                    return;
+                }
+                self.comm
+                    .um()
+                    .child_watch_pid(&self.comm.get_owner_id(), pid);
+            }
+        }
     }
 }
 
@@ -937,58 +960,61 @@ impl ServiceMng {
                     }
                 }
                 ServiceState::Start => {
+                    if self.config.service_type() != ServiceType::Forking {
+                        return;
+                    }
                     // only forking type will be in Start state with the control pid exit.
-                    if self.config.service_type() == ServiceType::Forking {
-                        log::debug!("in sigchild, forking type control pid exit");
-                        if res == ServiceResult::Success
-                            && self.config.config_data().borrow().Service.PIDFile.is_some()
+                    log::debug!("in sigchild, forking type control pid exit");
+                    if res != ServiceResult::Success {
+                        self.enter_signal(ServiceState::StopSigterm, res);
+                        return;
+                    }
+
+                    if self.config.config_data().borrow().Service.PIDFile.is_some() {
+                        // will load the pid_file after the forking pid exist.
+                        let start_post_exist = if self
+                            .config
+                            .get_exec_cmds(ServiceCommand::StartPost)
+                            .is_some()
                         {
-                            // will load the pid_file after the forking pid exist.
-                            let start_post_exist = if self
+                            !self
                                 .config
                                 .get_exec_cmds(ServiceCommand::StartPost)
-                                .is_some()
-                            {
-                                !self
-                                    .config
-                                    .get_exec_cmds(ServiceCommand::StartPost)
-                                    .unwrap()
-                                    .is_empty()
-                            } else {
-                                false
-                            };
+                                .unwrap()
+                                .is_empty()
+                        } else {
+                            false
+                        };
 
-                            let loaded = self.load_pid_file();
-                            log::debug!(
-                                "service in Start state, load pid file result: {:?}",
-                                loaded
-                            );
-                            if loaded.is_err() && !start_post_exist {
-                                match self.demand_pid_file() {
-                                    Ok(_) => {
-                                        if !self.cgroup_good() {
-                                            self.enter_signal(
-                                                ServiceState::StopSigterm,
-                                                ServiceResult::FailureProtocol,
-                                            );
-                                        }
-                                    }
-                                    Err(_e) => {
-                                        log::error!("demand pid file failed: {:?}", _e);
+                        let loaded = self.load_pid_file();
+                        log::debug!("service in Start state, load pid file result: {:?}", loaded);
+                        if loaded.is_err() && !start_post_exist {
+                            match self.demand_pid_file() {
+                                Ok(_) => {
+                                    if !self.cgroup_good() {
                                         self.enter_signal(
                                             ServiceState::StopSigterm,
                                             ServiceResult::FailureProtocol,
                                         );
                                     }
                                 }
-                                return;
+                                Err(_e) => {
+                                    log::error!("demand pid file failed: {:?}", _e);
+                                    self.enter_signal(
+                                        ServiceState::StopSigterm,
+                                        ServiceResult::FailureProtocol,
+                                    );
+                                }
                             }
-
-                            self.enter_start_post();
-                        } else {
-                            self.enter_signal(ServiceState::StopSigterm, res);
+                            return;
                         }
+
+                        self.enter_start_post();
+                    } else {
+                        self.guess_main_pid();
                     }
+
+                    self.enter_start_post();
                 }
                 ServiceState::StartPost => {
                     if res != ServiceResult::Success {
@@ -1012,6 +1038,8 @@ impl ServiceMng {
                             }
                             return;
                         }
+                    } else {
+                        self.guess_main_pid();
                     }
                     self.enter_running(ServiceResult::Success);
                 }
@@ -1070,7 +1098,7 @@ impl ServiceMng {
                     let valid = self.valid_main_pid(main_pid)?;
 
                     if ucred.pid() == 0 || valid {
-                        self.pid.set_main(main_pid);
+                        let _ = self.pid.set_main(main_pid);
                         self.comm
                             .um()
                             .child_watch_pid(&self.comm.get_owner_id(), main_pid);
