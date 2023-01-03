@@ -362,7 +362,7 @@ impl EventsData {
             | EventType::TimerRealtimeAlarm
             | EventType::TimerBoottimeAlarm => {
                 if self.timer.is_empty(&et) {
-                    let fd = self.timerfd.get(&et);
+                    let fd = self.timerfd.remove(&et);
                     if let Some(fd) = fd {
                         self.poller.unregister(fd.as_raw_fd())?
                     }
