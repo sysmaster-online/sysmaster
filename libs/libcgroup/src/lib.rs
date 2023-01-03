@@ -60,6 +60,7 @@ impl std::fmt::Display for CgroupErr {
 pub use crate::cgroup::cg_attach;
 pub use crate::cgroup::cg_controllers;
 pub use crate::cgroup::cg_create;
+pub use crate::cgroup::cg_create_and_attach;
 pub use crate::cgroup::cg_escape;
 pub use crate::cgroup::cg_get_pids;
 pub use crate::cgroup::cg_is_empty_recursive;

@@ -4,6 +4,7 @@ use super::pre_install::{Install, PresetMode};
 use super::rentry::RELI_HISTORY_MAX_DBS;
 use super::signals::{SignalDispatcher, Signals};
 use crate::core::unit::UnitManagerX;
+use libcgroup::{cg_create_and_attach, CgFlags};
 use libcmdproto::proto::execute::{ExecCmdErrno, ExecuterAction};
 use libevent::{EventState, Events};
 use libutils::path_lookup::LookupPaths;
@@ -11,8 +12,11 @@ use libutils::process_util::{self};
 use libutils::Result;
 use nix::sys::reboot::{self, RebootMode};
 use nix::sys::signal::Signal;
+use nix::unistd::Pid;
 use std::cell::RefCell;
-use std::io::Error;
+use std::collections::HashSet;
+use std::io::{Error, ErrorKind};
+use std::path::PathBuf;
 use std::rc::Rc;
 use sysmaster::reliability::{ReliLastFrame, Reliability};
 
@@ -185,6 +189,7 @@ impl Manager {
             &_reli,
             CommandActionMgr::new(Rc::clone(&umx)),
         ));
+
         Manager {
             event: Rc::clone(&_event),
             reli: Rc::clone(&_reli),
@@ -278,6 +283,34 @@ impl Manager {
     /// debug action: clear all data restored
     pub fn debug_clear_restore(&self) {
         self.reli.data_clear();
+    }
+
+    /// create cgroup and attach self to it
+    pub fn setup_cgroup(&self) -> Result<(), Error> {
+        let cg_init = PathBuf::from("sysmaster");
+
+        cg_create_and_attach(&cg_init, Pid::from_raw(0)).map_err(|e| {
+            Error::new(
+                ErrorKind::Other,
+                format!("create and attach to sysmaster cgroup error: {}", e),
+            )
+        })?;
+
+        log::debug!("kill all pids except sysmaster in the sysmaster cgroup");
+        libcgroup::cg_kill_recursive(
+            &cg_init,
+            Signal::SIGKILL,
+            CgFlags::IGNORE_SELF,
+            HashSet::new(),
+        )
+        .map_err(|e| {
+            Error::new(
+                ErrorKind::Other,
+                format!("failed to kill cgroup: {:?}, error: {}", cg_init, e),
+            )
+        })?;
+
+        Ok(())
     }
 
     fn reload(&self) {
