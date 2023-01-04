@@ -361,6 +361,8 @@ impl EventsData {
             | EventType::TimerMonotonic
             | EventType::TimerRealtimeAlarm
             | EventType::TimerBoottimeAlarm => {
+                self.timer.remove(&et, source.clone());
+
                 if self.timer.is_empty(&et) {
                     let fd = self.timerfd.remove(&et);
                     if let Some(fd) = fd {

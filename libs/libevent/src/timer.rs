@@ -1,6 +1,8 @@
 use std::{
+    cmp::Ordering,
     collections::{BinaryHeap, HashMap},
     mem,
+    ops::Deref,
     rc::Rc,
 };
 
@@ -55,7 +57,6 @@ impl Timestamp {
     }
 }
 
-/// 为timer处理添加的辅助数据结构
 #[derive(Debug)]
 pub(crate) struct Timer {
     timer_set: HashMap<EventType, TimerInner>,
@@ -168,6 +169,12 @@ impl Timer {
     pub fn now(&mut self) -> Timestamp {
         self.timestamp.now()
     }
+
+    pub fn remove(&mut self, et: &EventType, source: Rc<dyn Source>) {
+        if let Some(t) = self.timer_set.get_mut(et) {
+            t.remove(source);
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -198,9 +205,21 @@ impl TimerInner {
             None => None,
         }
     }
+
+    pub fn remove(&mut self, source: Rc<dyn Source>) {
+        // let v = self.data.;
+        let mut tmp = BinaryHeap::<ClockData>::new();
+        for clock_data in self.data.iter() {
+            if clock_data.source().cmp(&source) != Ordering::Equal {
+                tmp.push(clock_data.deref().clone());
+            }
+        }
+        self.data.clear();
+        self.data.append(&mut tmp);
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ClockData {
     source: Rc<dyn Source>,
     next: u64,
