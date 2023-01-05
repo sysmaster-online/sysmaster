@@ -220,7 +220,7 @@ impl InstallContext {
 
             let i = unit_install.unwrap();
             if i.u_type() != UnitFileType::Regular {
-                println!(
+                log::debug!(
                     "apply unit install type is: {:?}, skip it: {:?}",
                     i.u_type(),
                     i.name()
@@ -430,13 +430,13 @@ impl Install {
 
     /// disable one unit file
     pub fn unit_disable_files(&self, file: &str) -> Result<(), Error> {
-        let target_path = &self.lookup_path.persistent_path;
-        let _ = self.prepare_unit_install(file, self.disable_ctx.clone());
+        self.unit_install_discover(file, self.disable_ctx.clone())?;
+
         let mut removal_symlinks = HashSet::new();
         self.disable_ctx
             .collect_disable_install(&mut removal_symlinks);
 
-        self.remove_symlinks(&mut removal_symlinks, target_path);
+        self.remove_symlinks(&mut removal_symlinks, &self.lookup_path.persistent_path);
 
         Ok(())
     }
@@ -604,21 +604,34 @@ impl Install {
     }
 
     fn remove_symlinks(&self, removal_symlinks: &mut HashSet<String>, target_path: &str) {
+        log::debug!("remove symlinks set is : {:?}", removal_symlinks);
         for entry in WalkDir::new(target_path).min_depth(1).into_iter() {
             if let Err(_e) = entry {
                 continue;
             }
+
             let entry = entry.unwrap();
-
-            let file_type = entry.file_type();
-
-            if !file_type.is_symlink() {
+            if !entry.file_type().is_symlink() {
                 continue;
             }
 
             let file_name = entry.file_name();
+            let link_path = match entry.path().read_link() {
+                Ok(target_path) => target_path,
+                Err(e) => {
+                    log::warn!("read link from {:?} error: {:?} ", entry, e);
+                    continue;
+                }
+            };
 
-            if !removal_symlinks.contains(file_name.to_str().unwrap()) {
+            let link_name = match link_path.file_name() {
+                Some(name) => name,
+                None => continue,
+            };
+
+            if !removal_symlinks.contains(link_name.to_str().unwrap())
+                && !removal_symlinks.contains(file_name.to_str().unwrap())
+            {
                 continue;
             }
 
