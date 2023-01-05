@@ -50,7 +50,7 @@ pub(super) struct SectionSocket {
     pub SocketMode: Option<u32>,
     #[config(deserialize_with = KillMode::deserialize_with)]
     #[config(default = "none")]
-    pub kill_mode: KillMode,
+    pub KillMode: KillMode,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

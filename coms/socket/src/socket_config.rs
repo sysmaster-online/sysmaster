@@ -279,7 +279,7 @@ impl SocketConfig {
 
     fn parse_kill_context(&self) {
         self.kill_context
-            .set_kill_mode(self.config_data().borrow().Socket.kill_mode);
+            .set_kill_mode(self.config_data().borrow().Socket.KillMode);
     }
 }
 
