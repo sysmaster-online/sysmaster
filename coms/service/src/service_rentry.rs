@@ -91,7 +91,7 @@ pub(super) struct SectionService {
     pub Environment: Option<Vec<String>>,
     #[config(deserialize_with = KillMode::deserialize_with)]
     #[config(default = "none")]
-    pub kill_mode: KillMode,
+    pub KillMode: KillMode,
 }
 
 impl SectionService {
