@@ -87,8 +87,8 @@ function clean() {
 }
 
 cp -arf /opt/test1.service /opt/test2.service /usr/lib/sysmaster || exit 1
-mkdir -p /run/systemd/reliability
-touch /run/systemd/reliability/switch.debug || exit 1
+mkdir -p /run/sysmaster/reliability
+touch /run/sysmaster/reliability/switch.debug || exit 1
 run_sysmaster || exit 1
 
 stress &> /opt/stress.log &

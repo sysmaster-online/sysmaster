@@ -12,14 +12,20 @@ do
 done
 
 # install needed tools
-sudo yum clean all
+rpm -qi gcc openssl-libs python3-pip musl-gcc
+if [ $? -ne 0 ]; then
 sudo yum install --disablerepo EPOL --disablerepo source --disablerepo update --disablerepo EPOL-UPDATE --disablerepo debuginfo  -y gcc openssl-libs python3-pip musl-gcc
+fi
 
 #git加速并安装rust工具链
 git config --global url."https://github.91chi.fun/https://github.com/".insteadOf "https://github.com/"
+source ~/.bashrc
+cargo -v
+if [ $? -ne 0 ]; then
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustlang.sh
 sh rustlang.sh -y
 rm -rf rustlang.sh
+fi
 
 source ~/.bashrc
 
