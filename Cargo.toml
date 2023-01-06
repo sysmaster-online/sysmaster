@@ -39,7 +39,6 @@ nix = "0.24"
 regex = { version = "1.6.0", default-features = false, features = ["std"] }
 serde = "1.0.130"
 siphasher = { version = "0.3", features = ["serde"] }
-tabled = "0.10.0"
 walkdir = "2"
 fnmatch-regex = "0.2.0"
 

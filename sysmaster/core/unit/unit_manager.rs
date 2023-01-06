@@ -25,7 +25,7 @@ use libevent::Events;
 use libutils::path_lookup::LookupPaths;
 use libutils::proc_cmdline::get_process_cmdline;
 use libutils::process_util;
-use libutils::show_table::{ListUnitsItem, StatusItem};
+use libutils::show_table::ShowTable;
 use libutils::Result;
 use nix::unistd::Pid;
 use std::convert::TryFrom;
@@ -626,33 +626,25 @@ impl UnitManager {
                 return Err(MngErrno::NotExisted);
             }
         };
-        let status_list = vec![
-            StatusItem::new(
-                "Loaded".to_string(),
-                self.load_unit_success(name).to_string(),
-            ),
-            StatusItem::new(
-                "Active".to_string(),
-                self.current_active_state(name).to_string()
-                    + " ("
-                    + &self.get_subunit_state(name)
-                    + ")",
-            ),
-            StatusItem::new(
-                "CGroup".to_string(),
-                self.get_unit_cgroup_path(unit.clone()),
-            ),
-            StatusItem::new("PID".to_string(), self.get_unit_status_pids(unit.clone())),
-        ];
-        let mut status_table = tabled::Table::new(status_list);
-        status_table
-            .with(tabled::style::Style::empty()) // don't show the border
-            .with(tabled::Disable::row(tabled::object::Rows::first())) // remove the first row
-            .with(
-                tabled::Modify::new(tabled::object::Columns::first()) // modify the first column
-                    .with(tabled::format::Format::new(|s| format!("{}:", s))) // add ":"
-                    .with(tabled::Alignment::right()),
-            ); // align to right
+        let mut status_table = ShowTable::new();
+        status_table.add_line(vec![
+            "Loaded:".to_string(),
+            self.load_unit_success(name).to_string(),
+        ]);
+        status_table.add_line(vec![
+            "Active:".to_string(),
+            self.current_active_state(name).to_string() + "(" + &self.get_subunit_state(name) + ")",
+        ]);
+        status_table.add_line(vec![
+            "CGroup:".to_string(),
+            self.get_unit_cgroup_path(unit.clone()),
+        ]);
+        status_table.add_line(vec![
+            "PID:".to_string(),
+            self.get_unit_status_pids(unit.clone()),
+        ]);
+        status_table.set_one_cell_align_right(0);
+        status_table.align_define();
         let first_line = match unit.get_description() {
             None => "● ".to_string() + name + "\n",
             Some(str) => "● ".to_string() + name + " - " + &str + "\n",
@@ -661,7 +653,14 @@ impl UnitManager {
     }
 
     pub(self) fn get_all_units(&self) -> Result<String, MngErrno> {
-        let mut list_units: Vec<ListUnitsItem> = Vec::new();
+        let mut list_units_table = ShowTable::new();
+        list_units_table.add_line(vec![
+            "UNIT".to_string(),
+            "LOAD".to_string(),
+            "ACTIVE".to_string(),
+            "SUB".to_string(),
+            "DESCRIPTION".to_string(),
+        ]);
         for unit_type in UnitType::iterator() {
             if unit_type == UnitType::UnitMount {
                 continue;
@@ -680,19 +679,16 @@ impl UnitManager {
                     None => String::from(&unit_name),
                     Some(str) => str,
                 };
-                list_units.push(ListUnitsItem::new(
+                list_units_table.add_line(vec![
                     unit_name,
                     load_state,
                     active_state,
                     sub_state,
                     description,
-                ));
+                ]);
             }
         }
-
-        let mut list_units_table = tabled::Table::new(list_units);
-        list_units_table.with(tabled::style::Style::empty());
-
+        list_units_table.align_left();
         Ok(list_units_table.to_string())
     }
 
