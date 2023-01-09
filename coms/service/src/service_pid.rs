@@ -6,6 +6,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use sysmaster::unit::UnitActionError;
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum MainState {
+    Unknown,
+    Known,
+}
+
 pub(super) struct ServicePid {
     comm: Rc<ServiceUnitComm>,
     data: RefCell<ServicePidData>,
@@ -20,6 +26,13 @@ impl ServicePid {
     }
 
     pub(super) fn set_main(&self, pid: Pid) -> Result<(), Errno> {
+        if let Some(p) = self.main() {
+            if p == pid {
+                return Ok(());
+            }
+
+            self.unwatch_main();
+        }
         self.data.borrow_mut().set_main(pid)
     }
 
@@ -84,6 +97,7 @@ impl ServicePid {
 
 struct ServicePidData {
     main: Option<Pid>,
+    state: MainState,
     control: Option<Pid>,
 }
 
@@ -92,6 +106,7 @@ impl ServicePidData {
     pub(self) fn new() -> ServicePidData {
         ServicePidData {
             main: None,
+            state: MainState::Unknown,
             control: None,
         }
     }
@@ -101,7 +116,7 @@ impl ServicePidData {
             return Err(Errno::EINVAL);
         }
         self.main = Some(pid);
-
+        self.state = MainState::Known;
         Ok(())
     }
 
@@ -126,10 +141,15 @@ impl ServicePidData {
     }
 
     pub(self) fn main_alive(&self) -> Result<bool, UnitActionError> {
-        if self.main.is_none() {
-            return Err(UnitActionError::UnitActionEAgain);
-        }
+        match self.state {
+            MainState::Unknown => Err(UnitActionError::UnitActionEAgain),
+            MainState::Known => {
+                if self.main.is_none() {
+                    return Ok(false);
+                }
 
-        Ok(process_util::alive(self.main.unwrap()))
+                Ok(process_util::alive(self.main.unwrap()))
+            }
+        }
     }
 }
