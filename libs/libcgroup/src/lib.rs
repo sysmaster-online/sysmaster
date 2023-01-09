@@ -66,4 +66,5 @@ pub use crate::cgroup::cg_get_pids;
 pub use crate::cgroup::cg_is_empty_recursive;
 pub use crate::cgroup::cg_kill_recursive;
 pub use crate::cgroup::cg_type;
+pub use crate::cgroup::CgController;
 pub use crate::cgroup::CG_BASE_DIR;

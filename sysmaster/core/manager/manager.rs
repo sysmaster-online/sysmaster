@@ -5,6 +5,7 @@ use super::rentry::RELI_HISTORY_MAX_DBS;
 use super::signals::{SignalDispatcher, Signals};
 use crate::core::unit::UnitManagerX;
 use libcgroup::{cg_create_and_attach, CgFlags};
+use libcgroup::{CgController, CgroupErr};
 use libcmdproto::proto::execute::{ExecCmdErrno, ExecuterAction};
 use libevent::{EventState, Events};
 use libutils::path_lookup::LookupPaths;
@@ -76,11 +77,18 @@ impl SignalDispatcher for SignalMgr {
 
 struct CommandActionMgr {
     um: Rc<UnitManagerX>,
+    state: Rc<RefCell<State>>,
 }
 
 impl CommandActionMgr {
-    fn new(um: Rc<UnitManagerX>) -> Self {
-        CommandActionMgr { um: Rc::clone(&um) }
+    fn new(um: Rc<UnitManagerX>, state: Rc<RefCell<State>>) -> Self {
+        CommandActionMgr { um, state }
+    }
+
+    fn set_state(&self, state: State) {
+        if *self.state.borrow_mut() != state {
+            *self.state.borrow_mut() = state;
+        }
     }
 }
 
@@ -121,19 +129,23 @@ impl ExecuterAction for CommandActionMgr {
     }
 
     fn suspend(&self) -> Result<i32> {
-        todo!()
+        self.set_state(State::Suspend);
+        Ok(0)
     }
 
     fn poweroff(&self) -> Result<i32> {
-        todo!()
+        self.set_state(State::PowerOff);
+        Ok(0)
     }
 
     fn reboot(&self) -> Result<i32> {
-        todo!()
+        self.set_state(State::Reboot);
+        Ok(0)
     }
 
     fn halt(&self) -> Result<i32> {
-        todo!()
+        self.set_state(State::Halt);
+        Ok(0)
     }
 
     fn disable(&self, unit_file: &str) -> Result<(), Error> {
@@ -161,7 +173,7 @@ pub struct Manager {
     signal: Rc<Signals<SignalMgr>>,
     mode: Mode,
     _action: Action,
-    state: RefCell<State>,
+    state: Rc<RefCell<State>>,
     um: Rc<UnitManagerX>,
     lookup_path: Rc<LookupPaths>,
 }
@@ -185,9 +197,10 @@ impl Manager {
         let lookup_path = Rc::new(l_path);
         let umx = Rc::new(UnitManagerX::new(&_event, &_reli, &lookup_path));
         let _signal = Rc::new(Signals::new(&_reli, SignalMgr::new(Rc::clone(&umx))));
+        let _state = Rc::new(RefCell::new(State::Init));
         let _commands = Rc::new(Commands::new(
             &_reli,
-            CommandActionMgr::new(Rc::clone(&umx)),
+            CommandActionMgr::new(Rc::clone(&umx), Rc::clone(&_state)),
         ));
 
         Manager {
@@ -197,7 +210,7 @@ impl Manager {
             signal: _signal,
             mode,
             _action: action,
-            state: RefCell::new(State::Init),
+            state: _state,
             um: umx,
             lookup_path,
         }
@@ -352,7 +365,14 @@ impl Manager {
     }
 
     fn reboot(&self, reboot_mode: RebootMode) {
+        log::debug!("RebootMode: {:?}", reboot_mode);
         // self.start_unit("shutdown.target");
+        if let Ok(mut cg_ctrl) = CgController::new("sysmaster", Pid::from_raw(0)) {
+            if let Err(CgroupErr::IoError(err)) = cg_ctrl.trim(false) {
+                log::debug!("CgController trim err: {err}");
+            }
+        }
+
         let mut pids = process_util::kill_all_pids(15);
         pids = process_util::wait_pids(pids, 10000000);
         if pids.is_empty() {

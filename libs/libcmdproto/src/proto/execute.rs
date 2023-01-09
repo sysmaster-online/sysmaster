@@ -6,8 +6,9 @@ use super::{
 
 use http::StatusCode;
 use libutils::string::new_line_break;
-use libutils::Result;
+use libutils::{error, Result};
 use std::io::Error;
+use std::io::ErrorKind;
 use std::rc::Rc;
 
 /// CMD error
@@ -168,14 +169,26 @@ impl Executer for MngrComm {
 
 impl Executer for SysComm {
     fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
-        let ret = match self.action() {
-            sys_comm::Action::Hibernate => manager.suspend(),
-            sys_comm::Action::Suspend => manager.suspend(),
-            sys_comm::Action::Halt => manager.halt(),
-            sys_comm::Action::Poweroff => manager.poweroff(),
-            sys_comm::Action::Shutdown => manager.poweroff(),
-            sys_comm::Action::Reboot => manager.reboot(),
+        let ret = if self.force {
+            let unit_name = self.action().to_string() + ".target";
+            match manager.start(&unit_name) {
+                Ok(_) => Ok(0),
+                Err(e) => Err(error::Error::Io(std::io::Error::new(
+                    ErrorKind::Other,
+                    "Failed to start ".to_string() + &unit_name + ": " + &String::from(e),
+                ))),
+            }
+        } else {
+            match self.action() {
+                sys_comm::Action::Hibernate => manager.suspend(),
+                sys_comm::Action::Suspend => manager.suspend(),
+                sys_comm::Action::Halt => manager.halt(),
+                sys_comm::Action::Poweroff => manager.poweroff(),
+                sys_comm::Action::Shutdown => manager.poweroff(),
+                sys_comm::Action::Reboot => manager.reboot(),
+            }
         };
+
         match ret {
             Ok(_) => CommandResponse {
                 status: StatusCode::OK.as_u16() as _,

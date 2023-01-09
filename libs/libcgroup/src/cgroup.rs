@@ -13,6 +13,7 @@ use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
 use std::io::{Error as IOError, ErrorKind};
+use std::path::Path;
 use std::path::PathBuf;
 use walkdir::{DirEntry, WalkDir};
 
@@ -32,6 +33,9 @@ const CGROUP_PROCS: &str = "cgroup.procs";
 
 const CG_UNIFIED_DIR: &str = "/sys/fs/cgroup/unified";
 const CG_V1_DIR: &str = "/sys/fs/cgroup/sysmaster";
+const CGROUP_SYSMASTER: &str = "sysmaster";
+const SPECIAL_INIT_SCOPE: &str = "init.scope";
+const SPECIAL_SYSMASTER_SLICE: &str = "system.slice";
 
 /// the base dir of the cgroup
 #[cfg(feature = "hongmeng")]
@@ -460,7 +464,167 @@ pub fn cg_create_and_attach(cg_path: &PathBuf, pid: Pid) -> Result<bool, CgroupE
     Ok(true)
 }
 
+/// cgroup controller
+pub struct CgController {
+    /// pid
+    pid: Pid,
+    /// controller name
+    controller: String,
+}
+
+impl CgController {
+    /// create the controller instance
+    pub fn new(controller: &str, pid: Pid) -> io::Result<Self> {
+        let controller = if let Some(str) = controller.strip_prefix("name=") {
+            str
+        } else {
+            controller
+        };
+
+        let s = CgController {
+            pid,
+            controller: controller.to_string(),
+        };
+
+        s.valid()?;
+        Ok(s)
+    }
+
+    /// checks whether valid
+    pub fn valid(&self) -> io::Result<()> {
+        self.cg_pid_get_path()?;
+        Ok(())
+    }
+
+    fn cg_pid_get_path(&self) -> io::Result<String> {
+        self.cg_get_path(self.get_procfs_path())
+    }
+
+    fn get_procfs_path(&self) -> String {
+        if self.pid.as_raw() == 0 {
+            "/proc/self/cgroup".to_string()
+        } else {
+            format!("/proc/{}/cgroup", self.pid)
+        }
+    }
+
+    fn cg_get_path<P: AsRef<Path>>(&self, path: P) -> io::Result<String> {
+        let file = fs::OpenOptions::new().read(true).open(path)?;
+
+        let reader = BufReader::new(file);
+        for line in reader.lines() {
+            let str = match line {
+                Ok(str) => str,
+                Err(err) => {
+                    log::debug!("read line err: {}", err);
+                    return Err(err);
+                }
+            };
+
+            let vec: Vec<&str> = str.split(':').collect();
+            if vec.len() != 3 {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("data format error:{}", str),
+                ));
+            }
+            for ctrl in vec[1].split(',') {
+                if ctrl.contains(&self.controller) {
+                    return Ok(vec[2].to_string());
+                }
+            }
+        }
+        Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("not find: {}", self.controller),
+        ))
+    }
+
+    fn cg_strip_suffix<'a>(&self, str: &'a str) -> &'a str {
+        if let Some(str) = str.strip_suffix(&format!("/{}", SPECIAL_INIT_SCOPE)) {
+            return str;
+        }
+
+        if let Some(str) = str.strip_suffix(&format!("/{}", SPECIAL_SYSMASTER_SLICE)) {
+            return str;
+        }
+
+        if let Some(str) = str.strip_suffix(&format!("/{}", CGROUP_SYSMASTER)) {
+            return str;
+        }
+
+        str
+    }
+
+    fn cg_get_root_path(&self) -> io::Result<String> {
+        let path = match self.cg_pid_get_path() {
+            Ok(str) => str,
+            Err(err) => {
+                log::debug!("cg_get_root_path err: {}", err);
+                return Err(err);
+            }
+        };
+        Ok(self.cg_strip_suffix(&path).to_string())
+    }
+
+    fn get_abs_path_by_cgtype(&self, path: &str, cg_type: CgType) -> Result<String, CgroupErr> {
+        match cg_type {
+            CgType::UnifiedV2 => Ok(format!("{}/{}", CG_BASE_DIR, path)),
+            CgType::UnifiedV1 => Ok(format!("{}/{}", CG_UNIFIED_DIR, path)),
+            CgType::Legacy => Ok(format!("{}/{}/{}", CG_BASE_DIR, self.controller, path)),
+            _ => Err(CgroupErr::NotSupported),
+        }
+    }
+
+    /// trim the dir
+    pub fn trim(&mut self, delete_root: bool) -> Result<(), CgroupErr> {
+        let path = match self.cg_get_root_path() {
+            Ok(path) => path,
+            Err(err) => {
+                return Err(CgroupErr::IoError(err));
+            }
+        };
+
+        let cg_type = cg_type()?;
+        let path = self.get_abs_path_by_cgtype(&path, cg_type)?;
+        // let path = cg_abs_path(&PathBuf::from(path),&PathBuf::from(""))?;
+        if let Err(err) = Self::cg_remove_dir(&PathBuf::from(path), delete_root) {
+            return Err(CgroupErr::IoError(err));
+        }
+
+        Ok(())
+    }
+
+    fn cg_remove_dir(path: &PathBuf, delete_root: bool) -> io::Result<()> {
+        if !path.exists() {
+            return Ok(());
+        }
+
+        if !path.is_dir() {
+            return Err(io::Error::new(io::ErrorKind::Other, "NotADirectory"));
+        }
+
+        if delete_root {
+            fs::remove_dir_all(path)?;
+        } else {
+            for entry in fs::read_dir(path)? {
+                let path = entry?.path();
+                if path.symlink_metadata()?.is_dir() {
+                    Self::cg_remove_dir(&path, true)?;
+                } else {
+                    fs::remove_file(path)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+
 mod tests {
+    use super::*;
     #[test]
     fn test_cgroup() {
         use crate::CgFlags;
@@ -570,5 +734,53 @@ mod tests {
         for c in clist {
             assert!(controllers.contains(&&c[..]));
         }
+    }
+
+    #[test]
+    fn test_cgcontrol() {
+        let controller = match super::cg_type() {
+            Ok(_) => "sysmaster",
+            Err(_) => "systemd",
+        };
+
+        let cg0 = CgController::new(controller, Pid::from_raw(0)).unwrap();
+        let cg1 = CgController::new(controller, Pid::from_raw(1)).unwrap();
+
+        assert_eq!(cg0.get_procfs_path(), "/proc/self/cgroup");
+        assert_eq!(cg1.get_procfs_path(), "/proc/1/cgroup");
+
+        let path = cg0.cg_get_path(cg0.get_procfs_path()).unwrap();
+        assert_ne!(path.len(), 0);
+
+        assert_eq!(
+            cg0.cg_strip_suffix(&format!("/test/{}", SPECIAL_INIT_SCOPE)),
+            "/test"
+        );
+        assert_eq!(cg0.cg_strip_suffix(&format!("/{}", SPECIAL_INIT_SCOPE)), "");
+        assert_eq!(
+            cg0.cg_strip_suffix(&format!("/test/{}", SPECIAL_SYSMASTER_SLICE)),
+            "/test"
+        );
+        assert_eq!(
+            cg0.cg_strip_suffix(&format!("/test/{}", CGROUP_SYSMASTER)),
+            "/test"
+        );
+
+        println!("{}", cg0.cg_get_root_path().unwrap());
+
+        assert_eq!(
+            cg0.get_abs_path_by_cgtype("test", CgType::UnifiedV2)
+                .unwrap(),
+            format!("{}/{}", CG_BASE_DIR, "test")
+        );
+        assert_eq!(
+            cg0.get_abs_path_by_cgtype("test", CgType::UnifiedV1)
+                .unwrap(),
+            format!("{}/{}", CG_UNIFIED_DIR, "test")
+        );
+        assert_eq!(
+            cg0.get_abs_path_by_cgtype("test", CgType::Legacy).unwrap(),
+            format!("{}/{}/{}", CG_BASE_DIR, controller, "test")
+        );
     }
 }

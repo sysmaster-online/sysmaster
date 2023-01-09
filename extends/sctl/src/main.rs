@@ -26,11 +26,17 @@ struct Args {
 enum SubCmd {
     /// [unit] start the unit
     #[clap(display_order = 1)]
-    Start { units: Vec<String> },
+    Start {
+        #[clap(required = true)]
+        units: Vec<String>,
+    },
 
     /// [unit] stop the unit
     #[clap(display_order = 2)]
-    Stop { units: Vec<String> },
+    Stop {
+        #[clap(required = true)]
+        units: Vec<String>,
+    },
 
     /// [unit] restart the unit
     #[clap(display_order = 3)]
@@ -38,28 +44,64 @@ enum SubCmd {
 
     /// [unit] status of the unit
     #[clap(display_order = 4)]
-    Status { units: Vec<String> },
+    Status {
+        #[clap(required = true)]
+        units: Vec<String>,
+    },
 
     /// [manager] list all units
     ListUnits {},
 
     /// [system] shutdown the system
-    Shutdown {},
+    Shutdown {
+        #[clap(short, required = false)]
+        force: bool,
+    },
+
+    /// [system] reboot the system
+    Reboot {
+        #[clap(short, required = false)]
+        force: bool,
+    },
+
+    /// [system] halt the system
+    Halt {
+        #[clap(short, required = false)]
+        force: bool,
+    },
+
+    /// [system] poweroff the system
+    Poweroff {
+        #[clap(short, required = false)]
+        force: bool,
+    },
 
     /// manager command
     DaemonReload {},
 
     /// enable one unit file
-    Enable { unit_file: Option<String> },
+    Enable {
+        #[clap(required = true)]
+        unit_file: String,
+    },
 
     /// enable one unit file
-    Disable { unit_file: Option<String> },
+    Disable {
+        #[clap(required = true)]
+        unit_file: String,
+    },
 
-    /// mask one unit file
-    Mask { unit_file: Option<String> },
+    // mask one unit file
+    Mask {
+        #[clap(required = true)]
+        unit_file: String,
+    },
 
-    /// unmask one unit file
-    Unmask { unit_file: Option<String> },
+    // unmask one unit file
+    Unmask {
+        #[clap(required = true)]
+        unit_file: String,
+    },
 }
 
 /// Generate CommandRequest based on parsed args
@@ -74,19 +116,29 @@ fn generate_command_request(args: Args) -> Option<CommandRequest> {
         SubCmd::Status { units } => CommandRequest::new_unitcomm(unit_comm::Action::Status, units),
 
         SubCmd::Mask { unit_file } => {
-            CommandRequest::new_unitfile(unit_file::Action::Mask, unit_file.unwrap())
+            CommandRequest::new_unitfile(unit_file::Action::Mask, unit_file)
         }
         SubCmd::Unmask { unit_file } => {
-            CommandRequest::new_unitfile(unit_file::Action::Unmask, unit_file.unwrap())
+            CommandRequest::new_unitfile(unit_file::Action::Unmask, unit_file)
         }
         SubCmd::Enable { unit_file } => {
-            CommandRequest::new_unitfile(unit_file::Action::Enable, unit_file.unwrap())
+            CommandRequest::new_unitfile(unit_file::Action::Enable, unit_file)
         }
         SubCmd::Disable { unit_file } => {
-            CommandRequest::new_unitfile(unit_file::Action::Disable, unit_file.unwrap())
+            CommandRequest::new_unitfile(unit_file::Action::Disable, unit_file)
         }
 
-        SubCmd::Shutdown {} => CommandRequest::new_syscomm(sys_comm::Action::Shutdown),
+        SubCmd::Shutdown { force } => {
+            CommandRequest::new_syscomm(sys_comm::Action::Shutdown, force)
+        }
+
+        SubCmd::Reboot { force } => CommandRequest::new_syscomm(sys_comm::Action::Shutdown, force),
+
+        SubCmd::Halt { force } => CommandRequest::new_syscomm(sys_comm::Action::Shutdown, force),
+
+        SubCmd::Poweroff { force } => {
+            CommandRequest::new_syscomm(sys_comm::Action::Shutdown, force)
+        }
 
         SubCmd::ListUnits {} => CommandRequest::new_mngrcomm(mngr_comm::Action::Listunits),
         _ => {

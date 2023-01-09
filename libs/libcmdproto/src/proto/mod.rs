@@ -6,6 +6,8 @@ pub mod abi;
 pub mod execute;
 pub mod frame;
 
+use std::fmt;
+
 pub use abi::command_request::RequestData;
 pub use abi::*;
 pub use frame::ProstClientStream;
@@ -34,10 +36,11 @@ impl CommandRequest {
     }
 
     /// Create a new command request for system
-    pub fn new_syscomm(action: sys_comm::Action) -> Self {
+    pub fn new_syscomm(action: sys_comm::Action, force: bool) -> Self {
         Self {
             request_data: Some(RequestData::Syscomm(SysComm {
                 action: action.into(),
+                force,
             })),
         }
     }
@@ -50,5 +53,11 @@ impl CommandRequest {
                 unitname: unitfile.into(),
             })),
         }
+    }
+}
+
+impl fmt::Display for sys_comm::Action {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", format!("{:?}", self).to_lowercase())
     }
 }

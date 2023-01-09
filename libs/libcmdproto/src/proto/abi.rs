@@ -123,6 +123,8 @@ pub mod mngr_comm {
 pub struct SysComm {
     #[prost(enumeration="sys_comm::Action", tag="1")]
     pub action: i32,
+    #[prost(bool, tag="2")]
+    pub force: bool,
 }
 /// Nested message and enum types in `SysComm`.
 pub mod sys_comm {
