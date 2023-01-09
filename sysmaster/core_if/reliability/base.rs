@@ -224,10 +224,10 @@ pub trait ReDbTable {
     fn ignore_set(&self, ignore: bool);
 }
 
-const RELI_PATH_DIR: &str = "/run/systemd/reliability";
+const RELI_PATH_DIR: &str = "/run/sysmaster/reliability";
 
 pub(super) fn reli_dir_get() -> Result<String, Error> {
-    // /run/systemd/reliability/
+    // /run/sysmaster/reliability/
     let ret_run = reli_dir_get_run();
     if ret_run.is_ok() {
         return ret_run; // ok
@@ -251,11 +251,11 @@ pub(super) fn reli_dir_get() -> Result<String, Error> {
 
 /// prepare the directory for reliability.
 /// the reliability path is prepared and searched according to the following priority, from high to low:
-/// 1. /run/systemd/reliability/: the real running directory.
+/// 1. /run/sysmaster/reliability/: the real running directory.
 /// 2. OUT_DIR/../reliability/: make CI happy, which is target/debug/reliability/ or target/release/reliability/ usually.
 /// 3. PROCESS_RELI_PATH: the path customized.
 pub fn reli_dir_prepare() -> Result<(), Error> {
-    // /run/systemd/reliability/
+    // /run/sysmaster/reliability/
     let ret_run = reli_dir_prepare_run();
     if ret_run.is_ok() {
         return ret_run; // ok
