@@ -2,7 +2,10 @@ use std::path::Path;
 
 use libutils::serialize::DeserializeWith;
 use regex::Regex;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{
+    de::{self, Unexpected},
+    Deserialize, Deserializer, Serialize,
+};
 
 /// the exec command that was parsed from the unit file
 #[derive(PartialEq, Clone, Eq, Debug, Serialize, Deserialize)]
@@ -62,8 +65,10 @@ impl DeserializeWith for ExecCommand {
             let path = Path::new(&exec_cmd);
 
             if path.is_absolute() && !path.exists() {
-                log::debug!("{:?} is not exist in parse!", path);
-                continue;
+                return Err(de::Error::invalid_value(
+                    Unexpected::Str(&exec_cmd),
+                    &"no exist absolute path",
+                ));
             }
 
             let cmd = path.to_str().unwrap().to_string();

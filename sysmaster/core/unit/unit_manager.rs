@@ -405,8 +405,8 @@ impl UnitManager {
 
     /// load the unit for reference name
     fn load_unit_success(&self, name: &str) -> bool {
-        if let Some(_unit) = self.load_unitx(name) {
-            return true;
+        if let Some(unit) = self.load_unitx(name) {
+            return unit.load_state() == UnitLoadState::UnitLoaded;
         }
 
         false
@@ -533,6 +533,7 @@ impl UnitManager {
     fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         if let Some(unit) = self.load_unitx(name) {
             log::debug!("load unit {} success, send to job manager", name);
+
             self.jm.exec(
                 &JobConf::new(&unit, JobKind::Start),
                 JobMode::Replace,
