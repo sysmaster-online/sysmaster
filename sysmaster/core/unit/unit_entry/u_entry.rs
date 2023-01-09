@@ -538,17 +538,11 @@ impl Unit {
         }
         match self.load.load_unit_confs() {
             Ok(_) => {
-                {
-                    let paths = self.load.get_unit_id_fragment_pathbuf();
-                    log::debug!("begin exec sub class load");
-                    let ret = self.sub.load(paths);
+                let paths = self.load.get_unit_id_fragment_pathbuf();
+                log::debug!("begin exec sub class load");
+                self.sub.load(paths)?;
 
-                    if let Err(e) = ret {
-                        return Err(format!("load Unit {} failed, error: {}", self.id(), e).into());
-                    }
-
-                    self.load.set_load_state(UnitLoadState::UnitLoaded);
-                };
+                self.load.set_load_state(UnitLoadState::UnitLoaded);
                 Ok(())
             }
             Err(e) => {

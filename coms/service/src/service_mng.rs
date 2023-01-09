@@ -256,7 +256,7 @@ impl ServiceMng {
 
         if cmd.is_none() {
             if self.config.service_type() != ServiceType::Oneshot {
-                log::error!("no start command is configured and service type is oneshot");
+                log::error!("no start command is configured and service type is not oneshot");
                 self.enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
                 return;
             }
