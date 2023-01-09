@@ -190,28 +190,26 @@ impl Drop for Manager {
 impl Manager {
     /// create factory instance
     pub fn new(mode: Mode, action: Action) -> Self {
-        let _event = Rc::new(Events::new().unwrap());
-        let _reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let event = Rc::new(Events::new().unwrap());
+        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
         let mut l_path = LookupPaths::new();
         l_path.init_lookup_paths();
         let lookup_path = Rc::new(l_path);
-        let umx = Rc::new(UnitManagerX::new(&_event, &_reli, &lookup_path));
-        let _signal = Rc::new(Signals::new(&_reli, SignalMgr::new(Rc::clone(&umx))));
-        let _state = Rc::new(RefCell::new(State::Init));
-        let _commands = Rc::new(Commands::new(
-            &_reli,
-            CommandActionMgr::new(Rc::clone(&umx), Rc::clone(&_state)),
-        ));
+        let um = Rc::new(UnitManagerX::new(&event, &reli, &lookup_path));
+        let state = Rc::new(RefCell::new(State::Init));
 
         Manager {
-            event: Rc::clone(&_event),
-            reli: Rc::clone(&_reli),
-            commands: _commands,
-            signal: _signal,
+            event,
+            commands: Rc::new(Commands::new(
+                &reli,
+                CommandActionMgr::new(Rc::clone(&um), Rc::clone(&state)),
+            )),
+            signal: Rc::new(Signals::new(&reli, SignalMgr::new(Rc::clone(&um)))),
+            reli,
             mode,
             _action: action,
-            state: _state,
-            um: umx,
+            state,
+            um,
             lookup_path,
         }
     }
