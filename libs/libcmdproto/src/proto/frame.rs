@@ -9,8 +9,8 @@ use std::{
 use super::execute::ExecuterAction;
 use super::{execute, CommandRequest, CommandResponse};
 
-/// const MAX_FRAME: usize = 1436;
-const MAX_FRAME: usize = 1436;
+/// Reading buffer size used in `fn read` of `std::io::Read`
+const MAX_FRAME: usize = 10240;
 
 /// Frame : encode/decode
 pub trait FrameCoder
@@ -19,12 +19,6 @@ where
 {
     /// Encode message into frame
     fn encode_frame(&self, buf: &mut BytesMut) -> Result<(), Error> {
-        let size = self.encoded_len();
-
-        if size > MAX_FRAME {
-            return Err(std::io::Error::last_os_error());
-        }
-
         self.encode(buf)?;
         Ok(())
     }
@@ -44,9 +38,20 @@ pub fn read_frame<S>(stream: &mut S, buf: &mut BytesMut) -> Result<(), Error>
 where
     S: Read + Unpin + Send,
 {
-    let mut tmp = [0u8; MAX_FRAME];
-    let len = stream.read(&mut tmp)?;
-    buf.put_slice(&tmp[..len]);
+    let mut tmp = vec![0; MAX_FRAME];
+    loop {
+        match stream.read(&mut tmp) {
+            Ok(len) => {
+                buf.put_slice(&tmp[..len]);
+                if len < MAX_FRAME {
+                    break;
+                }
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    }
     Ok(())
 }
 
