@@ -663,9 +663,6 @@ impl UnitManager {
             "DESCRIPTION".to_string(),
         ]);
         for unit_type in UnitType::iterator() {
-            if unit_type == UnitType::UnitMount {
-                continue;
-            }
             for unit_name in self.units_get_all(Some(unit_type)) {
                 let unit = match self.units_get(&unit_name) {
                     Some(unit) => unit,
