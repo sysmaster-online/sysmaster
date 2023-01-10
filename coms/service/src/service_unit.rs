@@ -7,6 +7,7 @@ use super::service_monitor::ServiceMonitor;
 use super::service_rentry::{NotifyAccess, ServiceCommand, ServiceType};
 use libutils::error::Error as ServiceError;
 use libutils::logger;
+use libutils::special::{BASIC_TARGET, SHUTDOWN_TARGET, SYSINIT_TARGET};
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::unistd::Pid;
@@ -16,8 +17,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use sysmaster::reliability::{ReStation, Reliability};
 use sysmaster::unit::{
-    ExecContext, SubUnit, UmIf, UnitActionError, UnitActiveState, UnitBase, UnitMngUtil,
-    UnitRelations,
+    ExecContext, SubUnit, UmIf, UnitActionError, UnitActiveState, UnitBase, UnitDependencyMask,
+    UnitMngUtil, UnitRelations,
 };
 
 struct ServiceUnit {
@@ -214,6 +215,12 @@ impl ServiceUnit {
             self.config.set_notify_access(NotifyAccess::Main);
         }
 
+        self.add_default_dependencies().map_err(|_e| {
+            Box::new(ServiceError::Other {
+                msg: "add default dependency error",
+            })
+        })?;
+
         Ok(())
     }
 
@@ -252,6 +259,45 @@ impl ServiceUnit {
                 msg:
                     "More than Oneshot ExecStart command is configured, service type is not oneshot",
             }));
+        }
+
+        Ok(())
+    }
+
+    pub(self) fn add_default_dependencies(&self) -> Result<(), UnitActionError> {
+        if let Some(u) = self.comm.owner() {
+            log::debug!("add default dependencies for service [{}]", u.id());
+            if !u.default_dependencies() {
+                return Ok(());
+            }
+
+            let um = self.comm.um();
+
+            um.unit_add_two_dependency(
+                u.id(),
+                UnitRelations::UnitAfter,
+                UnitRelations::UnitRequires,
+                SYSINIT_TARGET,
+                true,
+                UnitDependencyMask::UnitDependencyDefault,
+            )?;
+
+            um.unit_add_dependency(
+                u.id(),
+                UnitRelations::UnitAfter,
+                BASIC_TARGET,
+                true,
+                UnitDependencyMask::UnitDependencyDefault,
+            )?;
+
+            um.unit_add_two_dependency(
+                u.id(),
+                UnitRelations::UnitBefore,
+                UnitRelations::UnitConflicts,
+                SHUTDOWN_TARGET,
+                true,
+                UnitDependencyMask::UnitDependencyDefault,
+            )?;
         }
 
         Ok(())

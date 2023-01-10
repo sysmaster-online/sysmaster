@@ -10,6 +10,7 @@ use libcmdproto::proto::execute::{ExecCmdErrno, ExecuterAction};
 use libevent::{EventState, Events};
 use libutils::path_lookup::LookupPaths;
 use libutils::process_util::{self};
+use libutils::special::{BASIC_TARGET, CGROUP_SYSMASTER};
 use libutils::Result;
 use nix::sys::reboot::{self, RebootMode};
 use nix::sys::signal::Signal;
@@ -217,7 +218,7 @@ impl Manager {
     fn add_default_job(&self) -> Result<i32> {
         self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);
         // add target "SPECIAL_DEFAULT_TARGET"
-        if let Err(e) = self.um.start_unit("basic.target") {
+        if let Err(e) = self.um.start_unit(BASIC_TARGET) {
             log::error!("Failed to start basic.target: {:?}", e);
         }
         self.reli.clear_last_frame();
@@ -298,7 +299,7 @@ impl Manager {
 
     /// create cgroup and attach self to it
     pub fn setup_cgroup(&self) -> Result<(), Error> {
-        let cg_init = PathBuf::from("sysmaster");
+        let cg_init = PathBuf::from(CGROUP_SYSMASTER);
 
         cg_create_and_attach(&cg_init, Pid::from_raw(0)).map_err(|e| {
             Error::new(

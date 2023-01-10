@@ -51,6 +51,23 @@ pub trait UmIf {
     ) -> Result<(), UnitActionError> {
         Ok(())
     }
+
+    ///add two unit dependency to the unit
+    /// can called by sub unit
+    /// sub unit add some default dependency
+    ///
+    fn unit_add_two_dependency(
+        &self,
+        _unit_name: &str,
+        _ra: UnitRelations,
+        _rb: UnitRelations,
+        _target_name: &str,
+        _add_ref: bool,
+        _mask: UnitDependencyMask,
+    ) -> Result<(), UnitActionError> {
+        Ok(())
+    }
+
     /// load the unit for reference name
     fn load_unit_success(&self, _name: &str) -> bool {
         false

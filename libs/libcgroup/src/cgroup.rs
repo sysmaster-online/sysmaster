@@ -2,6 +2,9 @@ use crate::CgType;
 
 use super::CgFlags;
 use super::CgroupErr;
+use libutils::special::CGROUP_SYSMASTER;
+use libutils::special::INIT_SCOPE;
+use libutils::special::SYSMASTER_SLICE;
 use nix::libc;
 use nix::sys::signal::Signal;
 use nix::sys::statfs::{statfs, FsType};
@@ -33,9 +36,6 @@ const CGROUP_PROCS: &str = "cgroup.procs";
 
 const CG_UNIFIED_DIR: &str = "/sys/fs/cgroup/unified";
 const CG_V1_DIR: &str = "/sys/fs/cgroup/sysmaster";
-const CGROUP_SYSMASTER: &str = "sysmaster";
-const SPECIAL_INIT_SCOPE: &str = "init.scope";
-const SPECIAL_SYSMASTER_SLICE: &str = "system.slice";
 
 /// the base dir of the cgroup
 #[cfg(feature = "hongmeng")]
@@ -541,11 +541,11 @@ impl CgController {
     }
 
     fn cg_strip_suffix<'a>(&self, str: &'a str) -> &'a str {
-        if let Some(str) = str.strip_suffix(&format!("/{SPECIAL_INIT_SCOPE}")) {
+        if let Some(str) = str.strip_suffix(&format!("/{INIT_SCOPE}")) {
             return str;
         }
 
-        if let Some(str) = str.strip_suffix(&format!("/{SPECIAL_SYSMASTER_SLICE}")) {
+        if let Some(str) = str.strip_suffix(&format!("/{SYSMASTER_SLICE}")) {
             return str;
         }
 
@@ -752,13 +752,10 @@ mod tests {
         let path = cg0.cg_get_path(cg0.get_procfs_path()).unwrap();
         assert_ne!(path.len(), 0);
 
+        assert_eq!(cg0.cg_strip_suffix(&format!("/test/{INIT_SCOPE}")), "/test");
+        assert_eq!(cg0.cg_strip_suffix(&format!("/{INIT_SCOPE}")), "");
         assert_eq!(
-            cg0.cg_strip_suffix(&format!("/test/{SPECIAL_INIT_SCOPE}")),
-            "/test"
-        );
-        assert_eq!(cg0.cg_strip_suffix(&format!("/{SPECIAL_INIT_SCOPE}")), "");
-        assert_eq!(
-            cg0.cg_strip_suffix(&format!("/test/{SPECIAL_SYSMASTER_SLICE}")),
+            cg0.cg_strip_suffix(&format!("/test/{SYSMASTER_SLICE}")),
             "/test"
         );
         assert_eq!(
