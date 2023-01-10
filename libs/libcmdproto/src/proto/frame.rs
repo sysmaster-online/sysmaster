@@ -10,7 +10,9 @@ use super::execute::ExecuterAction;
 use super::{execute, CommandRequest, CommandResponse};
 
 /// Reading buffer size used in `fn read` of `std::io::Read`
-const MAX_FRAME: usize = 10240;
+const MAX_FRAME: usize = 1024;
+/// The length of u8 to represent usize
+const USIZE_TO_U8_LENGTH: usize = 8;
 
 /// Frame : encode/decode
 pub trait FrameCoder
@@ -38,12 +40,20 @@ pub fn read_frame<S>(stream: &mut S, buf: &mut BytesMut) -> Result<(), Error>
 where
     S: Read + Unpin + Send,
 {
+    // 1. Got the message length
+    let mut msg_len = [0_u8; USIZE_TO_U8_LENGTH];
+    stream.read_exact(&mut msg_len)?;
+    let msg_len = get_msg_len(msg_len);
+
+    // 2. Got the message
     let mut tmp = vec![0; MAX_FRAME];
+    let mut cur_len: usize = 0;
     loop {
         match stream.read(&mut tmp) {
             Ok(len) => {
+                cur_len += len;
                 buf.put_slice(&tmp[..len]);
-                if len < MAX_FRAME {
+                if len < MAX_FRAME || cur_len >= msg_len {
                     break;
                 }
             }
@@ -53,6 +63,16 @@ where
         }
     }
     Ok(())
+}
+
+fn msg_len_vec(len: usize) -> [u8; USIZE_TO_U8_LENGTH] {
+    let res = len.to_le_bytes();
+    assert_eq!(res.len(), USIZE_TO_U8_LENGTH);
+    res
+}
+
+fn get_msg_len(message: [u8; USIZE_TO_U8_LENGTH]) -> usize {
+    usize::from_le_bytes(message)
 }
 
 /// Handle read and write of server-side socket
@@ -92,7 +112,9 @@ where
         let mut buf = BytesMut::new();
         msg.encode_frame(&mut buf)?;
         let encoded = buf.freeze();
-        self.inner.write_all(&encoded[..])?;
+        let msg_len = msg_len_vec(encoded.len());
+        self.inner.write_all(&msg_len)?;
+        self.inner.write_all(&encoded)?;
         self.inner.flush()?;
         Ok(())
     }
@@ -125,7 +147,9 @@ where
         let mut buf = BytesMut::new();
         msg.encode_frame(&mut buf)?;
         let encoded = buf.freeze();
-        self.inner.write_all(&encoded[..])?;
+        let msg_len = msg_len_vec(encoded.len());
+        self.inner.write_all(&msg_len)?;
+        self.inner.write_all(&encoded)?;
         self.inner.flush()?;
         Ok(())
     }
