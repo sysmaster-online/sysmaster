@@ -9,7 +9,8 @@ pub fn fd_nonblock(fd: i32, nonblock: bool) -> Result<(), Errno> {
     assert!(fd >= 0);
 
     let flags = nix::fcntl::fcntl(fd, FcntlArg::F_GETFL)?;
-    let fd_flag = OFlag::from_bits(flags).unwrap();
+    let fd_flag = unsafe { OFlag::from_bits_unchecked(flags) };
+
     let n_block = match nonblock {
         true => OFlag::O_NONBLOCK,
         false => !OFlag::O_NONBLOCK,
@@ -26,7 +27,9 @@ pub fn fd_cloexec(fd: i32, cloexec: bool) -> Result<(), Errno> {
     assert!(fd >= 0);
 
     let flags = nix::fcntl::fcntl(fd, FcntlArg::F_GETFD)?;
-    let fd_flag = FdFlag::from_bits(flags).unwrap();
+
+    let fd_flag = unsafe { FdFlag::from_bits_unchecked(flags) };
+
     let nflag = match cloexec {
         true => fd_flag | FdFlag::FD_CLOEXEC,
         false => fd_flag & !FdFlag::FD_CLOEXEC,
