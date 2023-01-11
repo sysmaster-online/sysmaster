@@ -7,7 +7,7 @@ mod core;
 
 use crate::core::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::core::mount::mount_setup;
-use libc::c_int;
+use libc::{c_int, prctl, PR_SET_CHILD_SUBREAPER};
 use libutils::logger::{self};
 use log::{self};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
@@ -80,7 +80,17 @@ fn initialize_runtime(switch: bool) -> Result<(), Box<dyn Error>> {
         mount_setup::mount_cgroup_controllers()?;
     }
 
+    set_child_reaper();
+
     Ok(())
+}
+
+fn set_child_reaper() {
+    let ret = unsafe { prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) };
+
+    if ret < 0 {
+        log::warn!("failed to set child reaper, errno: {}", ret);
+    }
 }
 
 fn do_reexecute(args: &Vec<String>) {
