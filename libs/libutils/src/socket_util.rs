@@ -42,3 +42,8 @@ pub fn set_receive_buffer(fd: RawFd, v: usize) -> Result<(), Errno> {
 pub fn set_send_buffer(fd: RawFd, v: usize) -> Result<(), Errno> {
     socket::setsockopt(fd, sockopt::SndBuf, &v)
 }
+
+/// Require specific privileges to ignore the kernel limit
+pub fn set_receive_buffer_force(fd: RawFd, v: usize) -> Result<(), Errno> {
+    socket::setsockopt(fd, sockopt::RcvBufForce, &v)
+}
