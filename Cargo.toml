@@ -115,6 +115,7 @@ members = [
   "extends/random_seed",
   "extends/rc-local-generator",
   "extends/sysmonitor",
+  "extends/devmaster",
   #internal libraries crates
   "libs/libcmdproto",
   #external libraries crates
@@ -123,6 +124,7 @@ members = [
   "libs/libutils",
   "libs/libtests",
   "libs/libwatchdog",
+  "libs/libdevice",
   #components crates
   "coms/service",
   "coms/socket",
