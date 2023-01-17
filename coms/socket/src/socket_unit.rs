@@ -4,11 +4,8 @@
 //! Trait UnitSubClass implement the convert from sub unit to UnitObj.
 
 use crate::{
-    socket_base::{LOG_LEVEL, PLUGIN_NAME},
-    socket_comm::SocketUnitComm,
-    socket_config::SocketConfig,
-    socket_load::SocketLoad,
-    socket_mng::SocketMng,
+    socket_base::PLUGIN_NAME, socket_comm::SocketUnitComm, socket_config::SocketConfig,
+    socket_load::SocketLoad, socket_mng::SocketMng,
 };
 use libutils::logger;
 use nix::{sys::signal::Signal, unistd::Pid};
@@ -148,4 +145,4 @@ impl SocketUnit {
 
 // define the method to create the instance of the unit
 use sysmaster::declure_unitobj_plugin_with_param;
-declure_unitobj_plugin_with_param!(SocketUnit, SocketUnit::new, PLUGIN_NAME, LOG_LEVEL);
+declure_unitobj_plugin_with_param!(SocketUnit, SocketUnit::new, PLUGIN_NAME);

@@ -1030,7 +1030,7 @@ mod tests {
     use sysmaster::unit::UnitActiveState;
 
     fn init_dm_for_test() -> (Rc<DataManager>, Rc<Events>, Rc<UnitManager>) {
-        logger::init_log_with_console("manager test", 4);
+        logger::init_log_with_console("manager test", log::LevelFilter::Trace);
         let mut l_path = LookupPaths::new();
         l_path.init_lookup_paths();
         let lookup_path = Rc::new(l_path);
@@ -1051,7 +1051,6 @@ mod tests {
 
     #[test]
     fn test_service_unit_load() {
-        logger::init_log_with_console("test_service_unit_load", 4);
         let dm = init_dm_for_test();
         let unit_name = String::from("config.service");
         let unit = dm.2.load_unitx(&unit_name);
@@ -1070,7 +1069,6 @@ mod tests {
             return;
         }
 
-        logger::init_log_with_console("test_service_unit_start", 4);
         let dm = init_dm_for_test();
         let unit_name = String::from("config.service");
         let unit = dm.2.load_unitx(&unit_name);
@@ -1090,8 +1088,6 @@ mod tests {
     // #[test]
     #[allow(dead_code)]
     fn test_socket_unit_start_and_stop() {
-        logger::init_log_with_console("test_socket_unit_start_stop", 4);
-
         let ret = setup_mount_point();
         if ret.is_err() {
             return;
@@ -1135,8 +1131,6 @@ mod tests {
 
     #[test]
     fn test_units_load() {
-        logger::init_log_with_console("test_units_load", 4);
-
         let dm = init_dm_for_test();
         let mut unit_name_lists: Vec<String> = Vec::new();
 
@@ -1153,7 +1147,6 @@ mod tests {
     }
     #[test]
     fn test_target_unit_load() {
-        logger::init_log_with_console("test_target_unit_load", 4);
         let dm = init_dm_for_test();
         let mut unit_name_lists: Vec<String> = Vec::new();
 

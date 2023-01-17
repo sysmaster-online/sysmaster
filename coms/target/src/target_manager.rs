@@ -1,4 +1,4 @@
-use super::target_base::{LOG_LEVEL, PLUGIN_NAME};
+use super::target_base::PLUGIN_NAME;
 use super::target_comm::TargetUmComm;
 use libutils::logger;
 use std::rc::Rc;
@@ -42,4 +42,4 @@ impl UnitMngUtil for TargetManager {
 }
 
 use sysmaster::declure_umobj_plugin;
-declure_umobj_plugin!(TargetManager, TargetManager::new, PLUGIN_NAME, LOG_LEVEL);
+declure_umobj_plugin!(TargetManager, TargetManager::new, PLUGIN_NAME);

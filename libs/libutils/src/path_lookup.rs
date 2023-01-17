@@ -94,7 +94,7 @@ mod tests {
     use super::LookupPaths;
     #[test]
     fn test_init_lookup_paths() {
-        logger::init_log_with_console("test_init_lookup_paths", 4);
+        logger::init_log_with_console("test_init_lookup_paths", log::LevelFilter::Trace);
         let mut _lp = LookupPaths::default();
         _lp.init_lookup_paths();
         for item in _lp.search_path.iter() {

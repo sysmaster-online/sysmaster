@@ -24,12 +24,12 @@ impl log::Log for LoggerPlugin {
 }
 
 fn set_logger(logger: log4rs::Logger) {
-    log::set_max_level(logger.max_log_level());
+    log::set_max_level(LevelFilter::Trace);
     let _ = log::set_boxed_logger(Box::new(LoggerPlugin(logger)));
 }
 
 ///
-pub fn init_log_with_default(app_name: &str, log_level: u32) {
+pub fn init_log_with_default(app_name: &str, log_level: LevelFilter) {
     let config = build_log_config(app_name, log_level);
     let logger = log4rs::Logger::new(config);
     set_logger(logger);
@@ -60,7 +60,7 @@ where
 /// [4]  Trace
 /// [others] Info
 ///
-pub fn init_log_with_console(app_name: &str, log_level: u32) {
+pub fn init_log_with_console(app_name: &str, log_level: LevelFilter) {
     let config = build_log_config(app_name, log_level);
     let log_init_result = log4rs::init_config(config);
     if let Err(e) = log_init_result {
@@ -68,7 +68,7 @@ pub fn init_log_with_console(app_name: &str, log_level: u32) {
     }
 }
 
-fn build_log_config(app_name: &str, log_level: u32) -> Config {
+fn build_log_config(app_name: &str, level: LevelFilter) -> Config {
     let mut pattern = String::new();
     pattern += "{d(%Y-%m-%d %H:%M:%S)} ";
     pattern += "{h({l}):<5} ";
@@ -79,20 +79,12 @@ fn build_log_config(app_name: &str, log_level: u32) -> Config {
         .build();
     let logging_builder =
         Config::builder().appender(Appender::builder().build("console", Box::new(stdout)));
-    let l_level = match log_level {
-        0 => LevelFilter::Error,
-        1 => LevelFilter::Warn,
-        2 => LevelFilter::Info,
-        3 => LevelFilter::Debug,
-        4 => LevelFilter::Trace,
-        _ => LevelFilter::Info,
-    };
 
     match Some(app_name) {
         Some(a_p) => logging_builder
-            .logger(Logger::builder().build(a_p, l_level))
-            .build(Root::builder().appender("console").build(l_level)),
-        _ => logging_builder.build(Root::builder().appender("console").build(l_level)),
+            .logger(Logger::builder().build(a_p, level))
+            .build(Root::builder().appender("console").build(level)),
+        _ => logging_builder.build(Root::builder().appender("console").build(level)),
     }
     .unwrap()
 }
@@ -104,7 +96,7 @@ mod tests {
     use log;
     #[test]
     fn test_init_log_with_console() {
-        init_log_with_console("test", 4);
+        init_log_with_console("test", LevelFilter::Debug);
         // assert_eq!((), ());
         log::info!("test for logger info");
         log::error!("test for logger error");

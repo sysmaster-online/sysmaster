@@ -1,7 +1,7 @@
 //! mount unit is entry of mount type of unit，need impl
 //! UnitObj,UnitMngUtil, UnitSubClass trait
 
-use super::mount_base::{LOG_LEVEL, PLUGIN_NAME};
+use super::mount_base::PLUGIN_NAME;
 use super::mount_comm::MountUnitComm;
 use super::mount_mng::MountMng;
 use libutils::logger;
@@ -122,4 +122,4 @@ impl UnitMngUtil for MountUnit {
 }*/
 
 use sysmaster::declure_unitobj_plugin_with_param;
-declure_unitobj_plugin_with_param!(MountUnit, MountUnit::new, PLUGIN_NAME, LOG_LEVEL);
+declure_unitobj_plugin_with_param!(MountUnit, MountUnit::new, PLUGIN_NAME);
