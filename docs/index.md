@@ -1,3 +1,9 @@
+---
+hide:
+  - navigation
+  - toc
+---
+# Home
 
 在所有 Unix 系统中都有一个进程号为 1 的进程。这是操作系统内核完成启动后，执行的第一个用户态应用程序，所以进程号在数值上仅次于 idle 这个特殊进程。
 
@@ -24,42 +30,6 @@
 | upstart  | debian,  Ubuntu等系统使用的initdaemon                                            | ✓        | ✓        | ✓        | ✓        |          |          |          |
 | systemd  | 提高系统的启动速度，相比传统的System  V是一大革新，已被大多数Linux发行版所使用。 | ✓        | ✓        | ✓        | ✓        | ✓        | ✓        | ✓        |
 
-## sysmaster项目
+## sysmaster
 
-![atlas](docs/res/sysmaster-description.jpg)
-
-## 代码目录结构说明
-
-源码仓库以workspaces方式管理，每一个目录是一个package，每个package包含一个crate（lib或bin形式），
-公共lib crate的目录带lib前缀，使用cargo new --lib libtests创建,
-daemon类型的bin crate的目录以d结尾。
-
-```text
-/ (根目录)
-|...coms (插件)
-|      |...service (unit type crate)
-|      |...socket  (unit type crate)
-|      |...target  (unit type crate)
-|...libs (对外接口)
-|      |...libtest (test lib crate)
-|      |...libcgroup (cgroup lib crate)
-|      |...libcmdproto(cmd proto lib crate)
-|...extends (sysmaster-extends组件)
-|     |...sysmaster (daemon,and libsysmaster
-|     |...udevd (daemon)
-|     |...random-seed (bin)
-|...sysmaster (sysmaster-core核心组件)
-|...tools
-|     |...musl_build
-|     |...run_with_sd
-|...docs
-|...requirements.sh (安装依赖)
-```
-
-如：
-
-```text
-  - lib crate: libs/libevent, libs/libutils
-  - bin crate: extends/init, sysmaster
-  - daemon crate: extends/udevd, extends/logind
-```
+<center>![atlas](res/sysmaster-description.jpg)</center>
