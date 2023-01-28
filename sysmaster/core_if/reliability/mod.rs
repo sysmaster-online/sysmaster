@@ -51,7 +51,7 @@ impl TryFrom<u32> for ReliLastFrame {
             6 => Ok(ReliLastFrame::ManagerOp),
             7 => Ok(ReliLastFrame::CmdOp),
             8 => Ok(ReliLastFrame::OtherEvent),
-            v => Err(format!("input {} is invalid", v)),
+            v => Err(format!("input {v} is invalid")),
         }
     }
 }

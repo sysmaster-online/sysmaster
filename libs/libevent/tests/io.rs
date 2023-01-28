@@ -1,18 +1,16 @@
 #[cfg(test)]
 mod test {
-    use libutils::Error;
+    use libevent::Error;
+    use libevent::Events;
+    use libevent::Source;
+    use libevent::{EventState, EventType};
+    use std::thread;
+    use std::time::Duration;
     use std::{
         net::{TcpListener, TcpStream},
         os::unix::io::{AsRawFd, RawFd},
         rc::Rc,
     };
-
-    use std::thread;
-    use std::time::Duration;
-
-    use libevent::Events;
-    use libevent::Source;
-    use libevent::{EventState, EventType};
 
     #[derive(Debug)]
     struct Io {
@@ -65,7 +63,7 @@ mod test {
             let listener = TcpListener::bind("0.0.0.0:9097").unwrap();
             loop {
                 let (_stream, addr) = listener.accept().unwrap();
-                println!("Accepted a new connection: {}", addr);
+                println!("Accepted a new connection: {addr}");
             }
         });
 
@@ -93,7 +91,7 @@ mod test {
             let listener = TcpListener::bind("0.0.0.0:9098").unwrap();
             loop {
                 let (_stream, addr) = listener.accept().unwrap();
-                println!("Accepted a new connection: {}", addr);
+                println!("Accepted a new connection: {addr}");
             }
         });
 

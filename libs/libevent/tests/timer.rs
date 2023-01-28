@@ -1,12 +1,11 @@
 #[cfg(test)]
 mod test {
-    use libutils::Error;
-    use std::os::unix::prelude::RawFd;
-    use std::rc::Rc;
-
+    use libevent::Error;
     use libevent::Events;
     use libevent::Source;
     use libevent::{EventState, EventType};
+    use std::os::unix::prelude::RawFd;
+    use std::rc::Rc;
 
     #[derive(Debug)]
     struct Timer();

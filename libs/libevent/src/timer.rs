@@ -267,6 +267,6 @@ mod test {
     fn timestamp() {
         let mut ts = Timestamp::new();
         ts.now();
-        println!("{:?}", ts);
+        println!("{ts:?}");
     }
 }

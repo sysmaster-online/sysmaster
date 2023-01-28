@@ -101,7 +101,7 @@ impl Plugin {
             }
         };
 
-        let mut conf_file = format!("{}plugin.conf", LIB_PLUGIN_PATH);
+        let mut conf_file = format!("{LIB_PLUGIN_PATH}plugin.conf");
         let mut path = Path::new(&conf_file);
         if !path.exists() {
             let lib_path_str = devel_path();
@@ -115,7 +115,7 @@ impl Plugin {
                 let _tmp: Vec<_> = lib_path_str.split("build").collect();
                 conf_file = format!("{}/conf/plugin.conf", _tmp[0]);
             } else {
-                conf_file = format!("{}/conf/plugin.conf", lib_path_str);
+                conf_file = format!("{lib_path_str}/conf/plugin.conf");
             }
             path = Path::new(&conf_file);
         }
@@ -416,7 +416,7 @@ impl Plugin {
     ) -> Result<Box<dyn SubUnit>, Box<dyn Error>> {
         let ret = self.get_lib(unit_type);
         if ret.is_err() {
-            return Err(format!("create unit, the {:?} plugin is not exist", unit_type).into());
+            return Err(format!("create unit, the {unit_type:?} plugin is not exist").into());
         }
 
         type SymType = fn(um: Rc<dyn UmIf>) -> *mut dyn SubUnit;
@@ -442,7 +442,7 @@ impl Plugin {
     ) -> Result<Box<dyn UnitManagerObj>, Box<dyn Error>> {
         let ret = self.get_lib(unit_type);
         if ret.is_err() {
-            return Err(format!("create um, the {:?} plugin is not exist", unit_type).into());
+            return Err(format!("create um, the {unit_type:?} plugin is not exist").into());
         }
 
         let dy_lib = ret.unwrap();
@@ -467,7 +467,7 @@ impl Plugin {
             let dy_lib: Result<Arc<Lib>, String> =
                 match (*self.load_libs.read().unwrap()).get(&unit_type) {
                     Some(lib) => Ok(lib.clone()),
-                    None => Err(format!("the {:?} plugin is not exist", unit_type)),
+                    None => Err(format!("the {unit_type:?} plugin is not exist")),
                 };
             if dy_lib.is_err() {
                 if retry_count < 2 {
@@ -475,7 +475,7 @@ impl Plugin {
                     self.load_lib();
                     continue;
                 } else {
-                    return Err(format!("the {:?} plugin is not exist", unit_type));
+                    return Err(format!("the {unit_type:?} plugin is not exist"));
                 }
             }
             break dy_lib;

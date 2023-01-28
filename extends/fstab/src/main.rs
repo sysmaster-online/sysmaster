@@ -210,13 +210,13 @@ mod tests {
         if !(Path::exists(src_path) && src_path.is_dir()) {
             if let Err(why) = fs::create_dir_all(src_path) {
                 clean();
-                panic!("Failed to create {:?}: {:?}", src_path, why);
+                panic!("Failed to create {src_path:?}: {why:?}");
             }
         }
         if !(Path::exists(dst_path) && dst_path.is_dir()) {
             if let Err(why) = fs::create_dir_all(dst_path) {
                 clean();
-                panic!("Failed to create {:?}: {:?}", dst_path, why);
+                panic!("Failed to create {dst_path:?}: {why:?}");
             }
         }
         assert_eq!(mount_one(&fstab_items[0]), 0);
@@ -227,7 +227,7 @@ mod tests {
         let status = match status {
             Ok(status) => status,
             Err(why) => {
-                panic!("Failed to execute /usr/bin/umount: {}", why);
+                panic!("Failed to execute /usr/bin/umount: {why}");
             }
         };
         let r = match status.code() {
@@ -250,7 +250,7 @@ mod tests {
         let dst_path = String::from(&fstab_items[0].mount_point);
         if let Err(why) = fs::create_dir_all(&dst_path) {
             clean();
-            panic!("Failed to create dir ({:?}): {:?}.", dst_path, why);
+            panic!("Failed to create dir ({dst_path:?}): {why:?}.");
         }
 
         let (tx, rx) = mpsc::channel();
@@ -258,11 +258,11 @@ mod tests {
         thread::spawn(move || {
             if let Err(why) = rx.recv() {
                 clean();
-                panic!("Failed to receive ready message: {:?}", why);
+                panic!("Failed to receive ready message: {why:?}");
             }
             if let Err(why) = fs::File::create(&src_path) {
                 clean();
-                panic!("Failed to create file ({:?}): {:?}.", src_path, why);
+                panic!("Failed to create file ({src_path:?}): {why:?}.");
             }
         });
 
@@ -271,7 +271,7 @@ mod tests {
         let mut buffer = [0u8; 4096];
         if let Err(why) = tx.send("ready") {
             clean();
-            panic!("Failed to send ready message: {:?}", why);
+            panic!("Failed to send ready message: {why:?}");
         }
         let events = inotify
             .read_events_blocking(&mut buffer)

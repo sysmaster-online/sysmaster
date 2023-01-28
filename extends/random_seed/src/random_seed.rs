@@ -144,7 +144,7 @@ fn fsync_full(file: &mut File) -> bool {
         return false;
     }
 
-    let file_path = read_link(PathBuf::from(format!("/proc/self/fd/{}", fd))).unwrap();
+    let file_path = read_link(PathBuf::from(format!("/proc/self/fd/{fd}"))).unwrap();
 
     unsafe {
         let r = libc::fsync(
@@ -294,7 +294,7 @@ fn loop_write(file: &mut File, buf: &[u8]) -> bool {
         write_size += match file.write(&buf[write_size..]) {
             Ok(size) => size,
             Err(err) => {
-                println!("write err: {}", err);
+                println!("write err: {err}");
                 return false;
             }
         };
@@ -423,7 +423,7 @@ pub fn run(arg: &str) -> Result<(), String> {
 
     if !Path::new(RAMDOM_SEED_DIR).exists() {
         if let Err(err) = fs::create_dir_all(RAMDOM_SEED_DIR) {
-            return Err(format!("Failed to create directory:{}", err));
+            return Err(format!("Failed to create directory:{err}"));
         }
     }
 
@@ -437,7 +437,7 @@ pub fn run(arg: &str) -> Result<(), String> {
             if err.kind() == io::ErrorKind::NotFound {
                 return Ok(());
             }
-            return Err(format!("open random-seed failed: {}", err));
+            return Err(format!("open random-seed failed: {err}"));
         }
         Ok(file) => file,
     };
@@ -448,7 +448,7 @@ pub fn run(arg: &str) -> Result<(), String> {
         .open("/dev/urandom")
     {
         Err(err) => {
-            return Err(format!("Failed to open /dev/urandom, err:{}", err));
+            return Err(format!("Failed to open /dev/urandom, err:{err}"));
         }
         Ok(file) => file,
     };
@@ -495,7 +495,7 @@ pub fn run(arg: &str) -> Result<(), String> {
         let size_seed = match loop_read(&mut seed_fd, &mut buf) {
             Ok(size) => size,
             Err(_) => {
-                return Err(format!("Failed to read seed from {}", RANDOM_SEED));
+                return Err(format!("Failed to read seed from {RANDOM_SEED}"));
             }
         };
 
@@ -507,7 +507,7 @@ pub fn run(arg: &str) -> Result<(), String> {
         }
 
         if let Err(err) = seed_fd.rewind() {
-            return Err(format!("Failed to rewind start: {}", err));
+            return Err(format!("Failed to rewind start: {err}"));
         }
 
         let mut lets_credit = may_credit(&mut seed_fd);
@@ -698,7 +698,7 @@ mod test {
         let mut data1 = vec![0u8; 4096];
         let get_size = get_random(&mut data1, 0x0001).unwrap();
         println!("get_random_size:{get_size}");
-        println!("get_random_size:{:?}", data1);
+        println!("get_random_size:{data1:?}");
         assert!(get_size >= 512);
         let mut file = fs::File::create("random-seed").unwrap();
         assert!(loop_write(&mut file, &data1));

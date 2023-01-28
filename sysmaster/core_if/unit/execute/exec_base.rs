@@ -80,7 +80,7 @@ impl EnvData {
         let mut envs = Vec::new();
 
         for (key, value) in &*self.env.borrow() {
-            envs.push(std::ffi::CString::new(format!("{}={}", key, value)).unwrap());
+            envs.push(std::ffi::CString::new(format!("{key}={value}")).unwrap());
         }
 
         envs

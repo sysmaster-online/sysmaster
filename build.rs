@@ -10,7 +10,7 @@ macro_rules! warn {
 
 fn main() {
     let m_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let s_cmd = format!("{}/build.sh", m_dir);
+    let s_cmd = format!("{m_dir}/build.sh");
     let out_dir = env::var("OUT_DIR").unwrap();
     let t: Vec<_> = out_dir.split("build").collect();
     println!("{:?},{:?}", s_cmd, t[0]);
@@ -19,7 +19,7 @@ fn main() {
         .args(&[t[0].to_string()])
         .status()
         .unwrap();
-    warn!(format!("{:?}", result));
+    warn!(format!("{result:?}"));
 
     // warn!(format!(
     //     "{:?}",

@@ -102,7 +102,7 @@ impl Monitor for ProcessCount {
                 .fold(0, |num, process| num + process.stat.num_threads as u32);
         }
 
-        println!("{} {}", proc_num, thread_num);
+        println!("{proc_num} {thread_num}");
         let pid_max = pid_max()?;
         if pid_max == 0 {
             return Err(Error::Other {
@@ -144,7 +144,7 @@ mod tests {
         "#;
 
         let decoded: ProcessCount = toml::from_str(toml_str).unwrap();
-        println!("{:#?}", decoded);
+        println!("{decoded:#?}");
     }
 
     #[test]

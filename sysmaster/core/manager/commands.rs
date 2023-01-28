@@ -1,7 +1,6 @@
 use libcmdproto::proto::execute::ExecuterAction;
 use libcmdproto::proto::ProstServerStream;
 use libevent::{EventType, Events, Source};
-use libutils::{Error, Result};
 use std::net::{SocketAddr, TcpListener};
 use std::os::unix::io::RawFd;
 use std::{os::unix::prelude::AsRawFd, rc::Rc};
@@ -43,14 +42,14 @@ where
         (libc::EPOLLIN) as u32
     }
 
-    fn dispatch(&self, _e: &Events) -> Result<i32, Error> {
+    fn dispatch(&self, _e: &Events) -> libevent::Result<i32> {
         println!("Dispatching Command!");
 
         self.reli.set_last_frame1(ReliLastFrame::CmdOp as u32);
         match self.fd.incoming().next() {
             None => println!("None CommandRequest!"),
             Some(stream) => {
-                println!("{:?}", stream);
+                println!("{stream:?}");
                 let dispatch = ProstServerStream::new(stream.unwrap(), self.command_action.clone());
                 dispatch.process().unwrap();
             }

@@ -1058,7 +1058,7 @@ mod tests {
 
         match unit {
             Some(_unit_obj) => assert_eq!(_unit_obj.id(), "config.service"),
-            None => println!("test unit load, not found unit: {}", unit_name),
+            None => println!("test unit load, not found unit: {unit_name}"),
         };
     }
 
@@ -1147,7 +1147,7 @@ mod tests {
 
             match unit {
                 Some(_unit_obj) => assert_eq!(_unit_obj.id(), u_name),
-                None => println!("test unit load, not found unit: {}", u_name),
+                None => println!("test unit load, not found unit: {u_name}"),
             };
         }
     }
@@ -1169,7 +1169,7 @@ mod tests {
                     );
                     assert_eq!(_unit_obj.id(), u_name);
                 }
-                None => println!("test unit load, not found unit: {}", u_name),
+                None => println!("test unit load, not found unit: {u_name}"),
             };
         }
     }

@@ -25,7 +25,7 @@ impl std::fmt::Display for ErrKind {
             ErrKind::ParseBoolean => "parse_boolean",
             ErrKind::ParseFloat => "parsefloat",
         };
-        write!(f, "{}", err_kind)
+        write!(f, "{err_kind}")
     }
 }
 
@@ -109,7 +109,7 @@ mod test {
         let err: Error = io::Error::new(ErrorKind::Other, "testing").into();
         assert_eq!(
             "unit: There was an error writing the cargo instructions to stdout: testing",
-            format!("{}", err)
+            format!("{err}")
         );
     }
 }

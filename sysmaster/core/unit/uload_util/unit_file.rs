@@ -95,7 +95,7 @@ impl UnitFileData {
             if let Err(_e) = fs::metadata(v) {
                 continue;
             }
-            let pathd = format!("{}/{}.d", v, name);
+            let pathd = format!("{v}/{name}.d");
             let dir = Path::new(&pathd);
             if dir.is_dir() {
                 for entry in dir.read_dir().unwrap() {
@@ -116,9 +116,9 @@ impl UnitFileData {
                 }
             }
             let path = if v.ends_with('/') {
-                format!("{}{}", v, name)
+                format!("{v}{name}")
             } else {
-                format!("{}/{}", v, name)
+                format!("{v}/{name}")
             };
             let tmp = Path::new(&path);
             if tmp.exists() && !tmp.is_symlink() {
@@ -138,7 +138,7 @@ impl UnitFileData {
     fn build_id_dropin(&mut self, name: &String, suffix: String) {
         let mut pathbuf_dropin = Vec::new();
         for v in &self.lookup_path.search_path {
-            let path = format!("{}/{}.{}", v, name, suffix);
+            let path = format!("{v}/{name}.{suffix}");
             let dir = Path::new(&path);
             if dir.is_dir() {
                 for entry in dir.read_dir().unwrap() {

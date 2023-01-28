@@ -297,7 +297,7 @@ impl InstallContext {
 
         let source = install.path();
         for symlink in symlinks {
-            let target = format!("{}/{}", target_path, symlink);
+            let target = format!("{target_path}/{symlink}");
             if let Err(e) = fs_util::symlink(&source, &target, false) {
                 log::warn!(
                     "create symlink from {} to {}, errno is: {}",

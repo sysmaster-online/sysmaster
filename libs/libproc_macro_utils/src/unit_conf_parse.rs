@@ -20,7 +20,7 @@ fn get_fieds_from_driver_input(st: &syn::DeriveInput) -> syn::Result<&StructFiel
 pub fn do_expand(st: &syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let struct_ident = &st.ident;
     let struct_name_literal = st.ident.to_string();
-    let parser_name_literal = format!("{}Parser", struct_name_literal);
+    let parser_name_literal = format!("{struct_name_literal}Parser");
     let parser_name_ident = syn::Ident::new(&parser_name_literal, st.span());
     let serder_name = get_user_specific_serde_name(st);
     let _tmp_serder_name = serder_name.map_or_else(|| struct_name_literal, |x| x);

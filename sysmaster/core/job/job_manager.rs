@@ -10,7 +10,7 @@ use super::JobErrno;
 use crate::core::butil::table::{TableOp, TableSubscribe};
 use crate::core::unit::{JobMode, UnitDb, UnitRelationAtom, UnitX};
 use libevent::{EventState, EventType, Events, Source};
-use libutils::{Error, Result};
+use libutils::Result;
 use std::cell::RefCell;
 use std::rc::Rc;
 use sysmaster::reliability::{ReStation, ReliLastFrame, Reliability};
@@ -238,7 +238,7 @@ impl Source for JobManagerData {
         data
     }
 
-    fn dispatch(&self, _event: &Events) -> Result<i32, Error> {
+    fn dispatch(&self, _event: &Events) -> libevent::Result<i32> {
         log::debug!("job manager data dispatch");
 
         self.reli.set_last_frame1(ReliLastFrame::JobManager as u32);

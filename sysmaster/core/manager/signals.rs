@@ -35,7 +35,7 @@ impl<T: SignalDispatcher> Source for Signals<T> {
         (libc::EPOLLIN) as u32
     }
 
-    fn dispatch(&self, e: &Events) -> Result<i32> {
+    fn dispatch(&self, e: &Events) -> libevent::Result<i32> {
         log::debug!("Dispatching signals!");
 
         self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);

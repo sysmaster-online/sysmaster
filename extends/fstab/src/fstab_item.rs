@@ -104,14 +104,14 @@ mod tests {
         let path = Path::new("./fstab");
 
         let mut file = match File::create(path) {
-            Err(why) => panic!("couldn't create {:?}: {:?}", path, why),
+            Err(why) => panic!("couldn't create {path:?}: {why:?}"),
             Ok(file) => file,
         };
         match file.write_all(contents.as_bytes()) {
             Err(why) => {
-                panic!("couldn't write to {:?}: {:?}", path, why)
+                panic!("couldn't write to {path:?}: {why:?}")
             }
-            Ok(_) => println!("successfully wrote to {:?}", path),
+            Ok(_) => println!("successfully wrote to {path:?}"),
         }
 
         let fstab_items = parse("./fstab");

@@ -9,5 +9,4 @@ edition = "2021"
 [dependencies]
 libc = { version = "0.2" }
 nix = { version = "0.24" }
-libutils = { path = "../libutils" }
-log = "0.4"
+snafu = { version = "0.7" }

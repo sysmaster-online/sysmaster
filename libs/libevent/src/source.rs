@@ -1,5 +1,5 @@
 //! # Events must implement the Source trait
-use libutils::Result;
+use crate::Result;
 
 use crate::EventType;
 use crate::Events;
@@ -45,7 +45,6 @@ pub trait Source {
         (libc::EPOLLIN | libc::EPOLLONESHOT) as u32
     }
 
-    /// token用来区分事件来源, 除非你能统一指定, 否则建议使用推荐实现
     ///
     /// The token is used to distinguish the source of the event, unless you can specify it uniformly,
     /// it is recommended to use the recommended implementation

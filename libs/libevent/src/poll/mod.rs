@@ -1,14 +1,14 @@
-//! # 一种对epoll接口的封装
+//! Encapsulation of the epoll interface
 
+use crate::Result;
 use libc::epoll_event;
-use libutils::Result;
 use std::os::unix::{io::AsRawFd, io::RawFd};
 
 pub(crate) mod epoll;
 #[cfg(unix)]
 use epoll::Epoll as Poller;
 
-/// 一种对epoll接口的封装
+/// Encapsulation of the epoll interface
 #[derive(Debug, Default)]
 pub struct Poll {
     poller: Poller,
