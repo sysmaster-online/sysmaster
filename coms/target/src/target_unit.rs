@@ -2,7 +2,7 @@
 //! Trait UnitObj defines the behavior of the sub unit.
 //! Trait UnitMngUtil is used to attach the Unitmanager to the sub unit.
 //! Trait UnitSubClass implement the convert from sub unit to UnitObj.
-use super::target_base::{LOG_LEVEL, PLUGIN_NAME};
+use super::target_base::PLUGIN_NAME;
 use super::target_comm::TargetUnitComm;
 use super::target_mng::TargetMng;
 use libutils::logger;
@@ -179,4 +179,4 @@ impl UnitMngUtil for Target {
 }*/
 
 use sysmaster::declure_unitobj_plugin_with_param;
-declure_unitobj_plugin_with_param!(Target, Target::new, PLUGIN_NAME, LOG_LEVEL);
+declure_unitobj_plugin_with_param!(Target, Target::new, PLUGIN_NAME);

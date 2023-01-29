@@ -533,7 +533,7 @@ mod tests {
     //#[test]
     #[allow(dead_code)]
     fn manager_api() {
-        logger::init_log_with_console("test_target_unit_load", 4);
+        logger::init_log_with_console("test_target_unit_load", log::LevelFilter::Trace);
 
         // new
         let manager = Manager::new(Mode::System, Action::Run);

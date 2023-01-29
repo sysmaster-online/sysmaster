@@ -1,4 +1,4 @@
-use super::service_base::{LOG_LEVEL, PLUGIN_NAME};
+use super::service_base::PLUGIN_NAME;
 use super::service_comm::ServiceUnitComm;
 use super::service_config::ServiceConfig;
 use super::service_mng::RunningData;
@@ -265,4 +265,4 @@ impl ServiceUnit {
 }*/
 
 use sysmaster::declure_unitobj_plugin_with_param;
-declure_unitobj_plugin_with_param!(ServiceUnit, ServiceUnit::new, PLUGIN_NAME, LOG_LEVEL);
+declure_unitobj_plugin_with_param!(ServiceUnit, ServiceUnit::new, PLUGIN_NAME);

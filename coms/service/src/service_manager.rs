@@ -1,4 +1,4 @@
-use super::service_base::{LOG_LEVEL, PLUGIN_NAME};
+use super::service_base::PLUGIN_NAME;
 use super::service_comm::ServiceUmComm;
 use libutils::logger;
 use std::rc::Rc;
@@ -49,9 +49,4 @@ impl Default for ServiceManager {
 }
 
 use sysmaster::declure_umobj_plugin;
-declure_umobj_plugin!(
-    ServiceManager,
-    ServiceManager::default,
-    PLUGIN_NAME,
-    LOG_LEVEL
-);
+declure_umobj_plugin!(ServiceManager, ServiceManager::default, PLUGIN_NAME);

@@ -1,4 +1,4 @@
-use super::socket_base::{LOG_LEVEL, PLUGIN_NAME};
+use super::socket_base::PLUGIN_NAME;
 use super::socket_comm::SocketUmComm;
 use super::socket_rentry::SocketReFrame;
 use libutils::logger;
@@ -97,9 +97,4 @@ impl Default for SocketManager {
 }
 
 use sysmaster::declure_umobj_plugin;
-declure_umobj_plugin!(
-    SocketManager,
-    SocketManager::default,
-    PLUGIN_NAME,
-    LOG_LEVEL
-);
+declure_umobj_plugin!(SocketManager, SocketManager::default, PLUGIN_NAME);

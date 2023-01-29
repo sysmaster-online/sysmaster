@@ -1,4 +1,4 @@
-use super::mount_base::{LOG_LEVEL, PLUGIN_NAME};
+use super::mount_base::PLUGIN_NAME;
 use super::mount_comm::MountUmComm;
 use super::mount_rentry::{MountRe, MountReFrame};
 use libevent::{EventState, EventType, Events, Source};
@@ -414,7 +414,7 @@ impl Default for MountManager {
 }
 
 use sysmaster::declure_umobj_plugin;
-declure_umobj_plugin!(MountManager, MountManager::default, PLUGIN_NAME, LOG_LEVEL);
+declure_umobj_plugin!(MountManager, MountManager::default, PLUGIN_NAME);
 
 #[cfg(test)]
 mod test {

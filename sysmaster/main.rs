@@ -19,7 +19,7 @@ use std::ffi::CString;
 use sysmaster::reliability;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    logger::init_log_with_console("sysmaster", 4);
+    logger::init_log_with_console("sysmaster", log::LevelFilter::Debug);
     log::info!("sysmaster running in system mode.");
 
     // temporary annotation for repeat mount

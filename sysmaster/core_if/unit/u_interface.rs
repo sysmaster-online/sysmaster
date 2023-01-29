@@ -162,13 +162,15 @@ macro_rules! declure_unitobj_plugin_default {
 /// which sub unit wants invoke um interface, about UmIf see doc of UmIf
 #[macro_export]
 macro_rules! declure_unitobj_plugin_with_param {
-    ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {
+    ($unit_type:ty, $constructor:path, $name:expr) => {
+        use log::LevelFilter;
         /// method for create the unit instance
         #[no_mangle]
         pub fn __unit_obj_create_with_params(
             um: Rc<dyn $crate::unit::UmIf>,
+            level: LevelFilter,
         ) -> *mut dyn $crate::unit::SubUnit {
-            logger::init_log_with_default($name, $level);
+            logger::init_log_with_default($name, level);
             let construcotr: fn(um: Rc<dyn $crate::unit::UmIf>) -> $unit_type = $constructor;
 
             let obj = construcotr(um);
