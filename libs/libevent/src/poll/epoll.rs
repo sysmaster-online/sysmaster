@@ -1,9 +1,21 @@
+use crate::Result;
 use libc::{epoll_event, EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD};
-use libutils::syscall;
-use libutils::Result;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// syscall
+#[macro_export]
+macro_rules! syscall {
+    ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
+        let res = unsafe { libc::$fn($($arg, )*) };
+        if res < 0 {
+            $crate::Result::Err($crate::Error::Syscall { syscall: stringify!($fn), errno: unsafe { *libc::__errno_location() }, ret: res })
+        } else {
+            $crate::Result::Ok(res)
+        }
+    }};
+}
 
 const LOWEST_FD: libc::c_int = 3;
 

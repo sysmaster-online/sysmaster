@@ -55,13 +55,13 @@ impl UeConfig {
         let unit_conf_frag = files.get_unit_id_fragment_pathbuf(name);
         if unit_conf_frag.is_empty() {
             log::error!("config file for {} is not exist", name);
-            return Err(format!("config file for {} is not exist", name).into());
+            return Err(format!("config file for {name} is not exist").into());
         }
         // fragment
         for v in unit_conf_frag {
             if !v.exists() {
                 log::error!("config file is not exist");
-                return Err(format!("config file is not exist {}", name).into());
+                return Err(format!("config file is not exist {name}").into());
             }
             builder = builder.file(&v);
         }
@@ -124,6 +124,6 @@ mod tests {
 
         let result = builder.load();
 
-        println!("{:?}", result);
+        println!("{result:?}");
     }
 }

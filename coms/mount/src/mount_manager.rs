@@ -95,7 +95,7 @@ impl MountManager {
                     );
                 }
                 Err(err) => {
-                    println!("parse error: {}", err);
+                    println!("parse error: {err}");
                 }
             }
         }
@@ -136,7 +136,7 @@ impl MountMonitor {
         events.set_enabled(io, EventState::On).unwrap();
     }
 
-    pub(self) fn defer_enable(&self, enable: bool) -> Result<i32> {
+    pub(self) fn defer_enable(&self, enable: bool) -> libevent::Result<i32> {
         self.io.defer_enable(enable)
     }
 
@@ -167,7 +167,7 @@ impl MountMonitorIo {
         }
     }
 
-    pub(self) fn defer_enable(&self, enable: bool) -> Result<i32> {
+    pub(self) fn defer_enable(&self, enable: bool) -> libevent::Result<i32> {
         let source = Rc::clone(&self.defer);
         let state = match enable {
             true => EventState::OneShot,
@@ -196,7 +196,7 @@ impl Source for MountMonitorIo {
         (libc::EPOLLIN) as u32
     }
 
-    fn dispatch(&self, _e: &Events) -> Result<i32> {
+    fn dispatch(&self, _e: &Events) -> libevent::Result<i32> {
         drain_out(self.data.epfd);
 
         self.reli()
@@ -260,7 +260,7 @@ impl Source for MountMonitorDefer {
         data
     }
 
-    fn dispatch(&self, _event: &Events) -> Result<i32> {
+    fn dispatch(&self, _event: &Events) -> libevent::Result<i32> {
         println!("mount monitor dispatch");
 
         self.reli()

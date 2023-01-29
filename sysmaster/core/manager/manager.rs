@@ -231,7 +231,7 @@ impl Manager {
 
             // event
             self.reli.set_last_frame1(ReliLastFrame::OtherEvent as u32);
-            self.event.run(-1)?;
+            self.event.run(-1).unwrap();
             self.reli.clear_last_frame();
         }
 
@@ -303,7 +303,7 @@ impl Manager {
         cg_create_and_attach(&cg_init, Pid::from_raw(0)).map_err(|e| {
             Error::new(
                 ErrorKind::Other,
-                format!("create and attach to sysmaster cgroup error: {}", e),
+                format!("create and attach to sysmaster cgroup error: {e}"),
             )
         })?;
 
@@ -317,7 +317,7 @@ impl Manager {
         .map_err(|e| {
             Error::new(
                 ErrorKind::Other,
-                format!("failed to kill cgroup: {:?}, error: {}", cg_init, e),
+                format!("failed to kill cgroup: {cg_init:?}, error: {e}"),
             )
         })?;
 

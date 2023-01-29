@@ -13,7 +13,7 @@ fn cmdline_content() -> Result<String, IOError> {
         Err(why) => {
             return Err(IOError::new(
                 ErrorKind::Other,
-                format!("Error: Open file failed detail {}!", why),
+                format!("Error: Open file failed detail {why}!"),
             ))
         }
         Ok(file) => file,
@@ -25,7 +25,7 @@ fn cmdline_content() -> Result<String, IOError> {
         Err(why) => {
             return Err(IOError::new(
                 ErrorKind::Other,
-                format!("Error: read file buf error reason is {}", why),
+                format!("Error: read file buf error reason is {why}"),
             ));
         }
     };

@@ -74,7 +74,7 @@ pub(crate) fn dispatch<T>(cmd: CommandRequest, manager: Rc<T>) -> CommandRespons
 where
     T: ExecuterAction,
 {
-    println!("commandRequest :{:?}", cmd);
+    println!("commandRequest :{cmd:?}");
     let res = match cmd.request_data {
         Some(RequestData::Ucomm(param)) => param.execute(manager),
         Some(RequestData::Mcomm(param)) => param.execute(manager),
@@ -82,7 +82,7 @@ where
         Some(RequestData::Ufile(param)) => param.execute(manager),
         _ => CommandResponse::default(),
     };
-    println!("CommandResponse :{:?}", res);
+    println!("CommandResponse :{res:?}");
     res
 }
 

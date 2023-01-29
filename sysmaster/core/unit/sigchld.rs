@@ -94,7 +94,7 @@ impl SigchldSub {
             true => EventState::On,
             false => EventState::Off,
         };
-        self.event.set_enabled(source, state)?;
+        self.event.set_enabled(source, state).unwrap();
         Ok(0)
     }
 
@@ -126,7 +126,7 @@ impl Source for SigchldData {
         data
     }
 
-    fn dispatch(&self, _event: &Events) -> Result<i32> {
+    fn dispatch(&self, _event: &Events) -> libevent::Result<i32> {
         println!("sigchld dispatch");
 
         self.reli.set_last_frame1(ReliLastFrame::SigChld as u32);
@@ -134,7 +134,7 @@ impl Source for SigchldData {
         self.reli.clear_last_frame();
 
         if !enable {
-            self.sub().enable(false)?;
+            self.sub().enable(false).unwrap();
         }
 
         Ok(0)

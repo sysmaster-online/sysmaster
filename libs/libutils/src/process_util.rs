@@ -160,7 +160,7 @@ fn get_ppid(pid: Pid) -> Result<Pid, Error> {
         return Ok(nix::unistd::getppid());
     }
 
-    let path = PathBuf::from(format!("/proc/{}/stat", pid));
+    let path = PathBuf::from(format!("/proc/{pid}/stat"));
 
     let stat = Stat::from_reader(File::open(path)?).map_err(|e| Error::new(ErrorKind::Other, e))?;
 

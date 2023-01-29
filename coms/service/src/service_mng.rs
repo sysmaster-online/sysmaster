@@ -1428,7 +1428,7 @@ impl PathIntofy {
         self.mng.borrow().clone().upgrade().unwrap()
     }
 
-    fn do_dispatch(&self) -> Result<i32, Error> {
+    fn do_dispatch(&self) -> libevent::Result<i32> {
         log::debug!("dispatch initify pid file: {:?}", self.path);
         match self.read_fd_event() {
             Ok(_) => {
@@ -1469,7 +1469,7 @@ impl Source for PathIntofy {
         0i8
     }
 
-    fn dispatch(&self, _: &Events) -> Result<i32, Error> {
+    fn dispatch(&self, _: &Events) -> libevent::Result<i32> {
         let ret = self.do_dispatch();
         self.mng().db_update();
         ret

@@ -119,7 +119,7 @@ pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<(), CgroupErr> {
         pid
     };
 
-    fs::write(cg_procs, format!("{}\n", p)).map_err(CgroupErr::IoError)?;
+    fs::write(cg_procs, format!("{p}\n")).map_err(CgroupErr::IoError)?;
 
     Ok(())
 }
@@ -525,7 +525,7 @@ impl CgController {
             if vec.len() != 3 {
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
-                    format!("data format error:{}", str),
+                    format!("data format error:{str}"),
                 ));
             }
             for ctrl in vec[1].split(',') {
@@ -541,15 +541,15 @@ impl CgController {
     }
 
     fn cg_strip_suffix<'a>(&self, str: &'a str) -> &'a str {
-        if let Some(str) = str.strip_suffix(&format!("/{}", SPECIAL_INIT_SCOPE)) {
+        if let Some(str) = str.strip_suffix(&format!("/{SPECIAL_INIT_SCOPE}")) {
             return str;
         }
 
-        if let Some(str) = str.strip_suffix(&format!("/{}", SPECIAL_SYSMASTER_SLICE)) {
+        if let Some(str) = str.strip_suffix(&format!("/{SPECIAL_SYSMASTER_SLICE}")) {
             return str;
         }
 
-        if let Some(str) = str.strip_suffix(&format!("/{}", CGROUP_SYSMASTER)) {
+        if let Some(str) = str.strip_suffix(&format!("/{CGROUP_SYSMASTER}")) {
             return str;
         }
 
@@ -569,8 +569,8 @@ impl CgController {
 
     fn get_abs_path_by_cgtype(&self, path: &str, cg_type: CgType) -> Result<String, CgroupErr> {
         match cg_type {
-            CgType::UnifiedV2 => Ok(format!("{}/{}", CG_BASE_DIR, path)),
-            CgType::UnifiedV1 => Ok(format!("{}/{}", CG_UNIFIED_DIR, path)),
+            CgType::UnifiedV2 => Ok(format!("{CG_BASE_DIR}/{path}")),
+            CgType::UnifiedV1 => Ok(format!("{CG_UNIFIED_DIR}/{path}")),
             CgType::Legacy => Ok(format!("{}/{}/{}", CG_BASE_DIR, self.controller, path)),
             _ => Err(CgroupErr::NotSupported),
         }
@@ -648,7 +648,7 @@ mod tests {
         let base_path = super::cgtype_to_path(cg_type);
         let path_buf: PathBuf = PathBuf::from(base_path);
 
-        println!("base path is: {:?}", base_path);
+        println!("base path is: {base_path:?}");
         if let Ok(p) = super::cg_abs_path(&cg_path, &PathBuf::from("")) {
             assert_eq!(p, path_buf.join(&cg_path).join(PathBuf::from("")),)
         }
@@ -657,7 +657,7 @@ mod tests {
 
         let pid = match t_thread {
             Ok(ForkResult::Parent { child }) => {
-                println!("child pid is: {:?}", child);
+                println!("child pid is: {child:?}");
                 if !nix::unistd::getuid().is_root() {
                     println!("Unprivileged users cannot attach process to system.slice, skipping.");
                     return;
@@ -688,7 +688,7 @@ mod tests {
             HashSet::new(),
         );
         assert!(ret.is_ok());
-        println!("kill cgroup ret is: {:?}", ret);
+        println!("kill cgroup ret is: {ret:?}");
 
         thread::sleep(Duration::from_secs(1));
 
@@ -713,7 +713,7 @@ mod tests {
         let clist = ret.unwrap();
         assert_ne!(clist.len(), 0);
 
-        println!("supported controllers: {:?}", clist);
+        println!("supported controllers: {clist:?}");
         let controllers = [
             "cpuset",
             "cpu",
@@ -753,16 +753,16 @@ mod tests {
         assert_ne!(path.len(), 0);
 
         assert_eq!(
-            cg0.cg_strip_suffix(&format!("/test/{}", SPECIAL_INIT_SCOPE)),
+            cg0.cg_strip_suffix(&format!("/test/{SPECIAL_INIT_SCOPE}")),
             "/test"
         );
-        assert_eq!(cg0.cg_strip_suffix(&format!("/{}", SPECIAL_INIT_SCOPE)), "");
+        assert_eq!(cg0.cg_strip_suffix(&format!("/{SPECIAL_INIT_SCOPE}")), "");
         assert_eq!(
-            cg0.cg_strip_suffix(&format!("/test/{}", SPECIAL_SYSMASTER_SLICE)),
+            cg0.cg_strip_suffix(&format!("/test/{SPECIAL_SYSMASTER_SLICE}")),
             "/test"
         );
         assert_eq!(
-            cg0.cg_strip_suffix(&format!("/test/{}", CGROUP_SYSMASTER)),
+            cg0.cg_strip_suffix(&format!("/test/{CGROUP_SYSMASTER}")),
             "/test"
         );
 

@@ -148,7 +148,7 @@ impl SocketConfig {
 
     pub(super) fn set_unit_ref(&self, service: String) -> Result<(), Box<dyn Error>> {
         if !self.comm.um().load_unit_success(&service) {
-            return Err(format!("failed to load unit {}", service).into());
+            return Err(format!("failed to load unit {service}").into());
         }
 
         self.set_ref(service);
@@ -219,7 +219,7 @@ impl SocketConfig {
                         if let Err(e) = parse_netlink_address(v) {
                             log::error!("create netlink listening socket: {}, failed: {:?}", v, e);
                             return Err(
-                                format!("create netlink listening socket failed: {}", v).into()
+                                format!("create netlink listening socket failed: {v}").into()
                             );
                         }
 
@@ -254,7 +254,7 @@ impl SocketConfig {
                 self.push_port(Rc::new(port));
             } else {
                 log::error!("parsing listening socket failed: {}", v);
-                return Err(format!("parsing listening socket failed: {}", v).into());
+                return Err(format!("parsing listening socket failed: {v}").into());
             }
         }
 
@@ -481,7 +481,7 @@ impl fmt::Display for SocketAddress {
 fn parse_netlink_address(item: &str) -> Result<SocketAddress, Box<dyn Error>> {
     let words: Vec<String> = item.split_whitespace().map(|s| s.to_string()).collect();
     if words.len() != 2 {
-        return Err(format!("Netlink configuration format is not correct: {}", item).into());
+        return Err(format!("Netlink configuration format is not correct: {item}").into());
     }
 
     let family = NetlinkProtocol::from(words[0].to_string());

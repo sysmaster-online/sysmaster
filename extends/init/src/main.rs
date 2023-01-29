@@ -81,7 +81,7 @@ fn execute_mode(s: &str) -> Result<(), Error> {
             continue;
         } else if pid == child.as_raw() {
             if need_exit(&mut fail_record) {
-                println!("Manager({}) failed 3 times, exit", pid);
+                println!("Manager({pid}) failed 3 times, exit");
                 let _ = waitpid(Pid::from_raw(pid), None);
                 break;
             }
@@ -89,14 +89,14 @@ fn execute_mode(s: &str) -> Result<(), Error> {
         } else {
             send_signal(pid, siginfo);
         }
-        println!("Reaped child {}", pid);
+        println!("Reaped child {pid}");
         let _ = waitpid(Pid::from_raw(pid), None);
     }
     Ok(())
 }
 
 fn create_init(s: &str) -> Pid {
-    println!("Running to execute command : {:?}", s);
+    println!("Running to execute command : {s:?}");
     if let Ok(ForkResult::Parent { child, .. }) = unsafe { fork() } {
         child
     } else {

@@ -836,7 +836,7 @@ impl Source for SocketMngPort {
         0i8
     }
 
-    fn dispatch(&self, _: &Events) -> Result<i32, Error> {
+    fn dispatch(&self, _: &Events) -> libevent::Result<i32> {
         println!("Dispatching IO!");
 
         self.reli().set_last_frame2(
@@ -846,7 +846,9 @@ impl Source for SocketMngPort {
         self.rentry().set_last_frame(SocketReFrame::FdListen(true));
         self.reli()
             .set_last_unit(self.mng().comm.owner().unwrap().id());
-        let ret = self.dispatch_io();
+        let ret = self.dispatch_io().map_err(|_| libevent::Error::Other {
+            word: "Dispatch IO failed!",
+        });
         self.reli().clear_last_unit();
         self.rentry().clear_last_frame();
         self.reli().clear_last_frame();

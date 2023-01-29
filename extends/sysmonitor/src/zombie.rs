@@ -60,7 +60,7 @@ impl Monitor for ZombieCount {
         let out = String::from_utf8(output.stdout)?;
         let count: u32 = out.replace('\n', "").parse()?;
 
-        println!("zombie count: {}", count);
+        println!("zombie count: {count}");
 
         // Calling an external script to print the father of the zombie process
         if count >= self.alarm && !self.status {
@@ -85,7 +85,7 @@ mod tests {
         match z.check_status() {
             Ok(_) => {}
             Err(e) => {
-                println!("error: {:?}", e);
+                println!("error: {e:?}");
             }
         }
     }

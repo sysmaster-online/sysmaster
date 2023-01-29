@@ -379,9 +379,8 @@ pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
         m_point.mount()?;
 
         if pair {
-            symlink_controller(target.to_string(), other.to_string()).map_err(|e| {
-                format!("create symlink  from {} to {} error: {}", target, other, e)
-            })?;
+            symlink_controller(target.to_string(), other.to_string())
+                .map_err(|e| format!("create symlink  from {target} to {other} error: {e}"))?;
             symlink_controller(target.to_string(), controllers[index].to_string()).map_err(
                 |e| {
                     format!(

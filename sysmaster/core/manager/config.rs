@@ -40,7 +40,7 @@ mod test {
         let mut file: PathBuf = get_crate_root().unwrap();
         file.push("config/system.toml");
         let config = ManagerConfig::new(file.to_str());
-        println!("{:?}", config);
+        println!("{config:?}");
         assert_eq!(config.Manager.DefaultRestartSec, 100);
     }
 }

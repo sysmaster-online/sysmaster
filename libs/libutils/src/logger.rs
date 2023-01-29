@@ -64,7 +64,7 @@ pub fn init_log_with_console(app_name: &str, log_level: u32) {
     let config = build_log_config(app_name, log_level);
     let log_init_result = log4rs::init_config(config);
     if let Err(e) = log_init_result {
-        println!("{}", e);
+        println!("{e}");
     }
 }
 

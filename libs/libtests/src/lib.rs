@@ -39,7 +39,7 @@ mod tests {
         let mut file_path = get_project_root().unwrap();
         file_path.push("tests/test_units/config.service.toml");
 
-        println!("{:?}", file_path);
+        println!("{file_path:?}");
         assert!(file_path.is_file())
     }
 
@@ -48,7 +48,7 @@ mod tests {
         let mut file_path = get_crate_root().unwrap();
         file_path.push("Cargo.toml");
 
-        println!("{:?}", file_path);
+        println!("{file_path:?}");
         assert!(file_path.is_file())
     }
 }

@@ -1,16 +1,15 @@
 #[cfg(test)]
 mod test {
-    use libutils::Error;
+    use libevent::Error;
+    use libevent::Events;
+    use libevent::Source;
+    use libevent::{EventState, EventType};
     use nix::sys::inotify::AddWatchFlags;
     use std::fs::File;
     use std::os::unix::prelude::RawFd;
     use std::path::Path;
     use std::rc::Rc;
     use std::thread;
-
-    use libevent::Events;
-    use libevent::Source;
-    use libevent::{EventState, EventType};
 
     #[derive(Debug)]
     struct Timer();

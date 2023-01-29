@@ -1,16 +1,14 @@
 use libevent::EventState;
 // These tests cannot run as a regular test because cargo would spawn a thread to run it,
 // failing the signal masking. So we make our own, non-threaded harnessing
-use libutils::Error;
-use libutils::Result;
-use nix::unistd::fork;
-use nix::unistd::ForkResult;
-
-use std::rc::Rc;
-
+use libevent::Error;
 use libevent::EventType;
 use libevent::Events;
+use libevent::Result;
 use libevent::Source;
+use nix::unistd::fork;
+use nix::unistd::ForkResult;
+use std::rc::Rc;
 
 #[derive(Debug)]
 struct Signals {}
@@ -46,7 +44,7 @@ impl Source for Signals {
             }
             Ok(None) => (),
             Err(e) => {
-                println!("{:?}", e);
+                println!("{e:?}");
             }
         }
         Ok(0)
@@ -67,10 +65,7 @@ fn main() {
     let pid = unsafe { fork() };
     match pid {
         Ok(ForkResult::Parent { child, .. }) => {
-            println!(
-                "Continuing execution in parent process, new child has pid: {}",
-                child
-            );
+            println!("Continuing execution in parent process, new child has pid: {child}");
             e.run(-1).unwrap();
         }
         Ok(ForkResult::Child) => println!("I'm a new child process"),

@@ -49,8 +49,8 @@ pub enum CgroupErr {
 impl std::fmt::Display for CgroupErr {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         let info = match self {
-            CgroupErr::IoError(e) => format!("Io error: {}", e),
-            CgroupErr::KillError(e) => format!("kill error no: {}", e),
+            CgroupErr::IoError(e) => format!("Io error: {e}"),
+            CgroupErr::KillError(e) => format!("kill error no: {e}"),
             CgroupErr::NotSupported => "cgroup is not supported".to_string(),
         };
         fmt.write_str(info.as_str())

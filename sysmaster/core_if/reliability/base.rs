@@ -219,7 +219,7 @@ pub trait ReDbTable {
     /// export all data to database
     fn export(&self, wtxn: &mut ReDbRwTxn);
     /// import all data from database
-    fn import<'a>(&self, rtxn: &'a ReDbRoTxn);
+    fn import(&self, rtxn: &ReDbRoTxn);
     /// set the ignore flag of data
     fn ignore_set(&self, ignore: bool);
 }
@@ -386,7 +386,7 @@ fn out_dir_string_get() -> Option<String> {
             let _tmp: Vec<_> = dir_string.split("build").collect();
             format!("{}reliability", _tmp[0])
         } else {
-            format!("{}reliability", dir_string)
+            format!("{dir_string}reliability")
         }
     })
 }

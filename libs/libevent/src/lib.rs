@@ -12,7 +12,7 @@
 //! #     net::{TcpListener, TcpStream},
 //! #     os::unix::io::{AsRawFd, RawFd},
 //! #     rc::Rc};
-//! # use libutils::Error;
+//! # use libevent::Error;
 //! #
 //! # use std::thread;
 //! # use std::time::Duration;
@@ -98,6 +98,7 @@
 //! }
 //! ```
 //!
+pub mod error;
 pub mod events;
 pub mod poll;
 mod signal;
@@ -108,6 +109,7 @@ pub use crate::events::Events;
 pub(crate) use crate::poll::Poll;
 pub(crate) use crate::signal::Signals;
 pub use crate::source::Source;
+pub use error::*;
 
 /// Supports event types added to the frame
 /// An event scheduling framework based on epoll

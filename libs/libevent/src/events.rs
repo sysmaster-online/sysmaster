@@ -2,8 +2,8 @@
 use crate::timer::Timer;
 use crate::{EventState, EventType, Poll, Signals, Source};
 
-use libutils::Error;
-use libutils::Result;
+use crate::Error;
+use crate::Result;
 use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, InotifyEvent, WatchDescriptor};
 use nix::NixPath;
 
@@ -22,8 +22,6 @@ pub struct Events {
 
 impl Drop for Events {
     fn drop(&mut self) {
-        println!("Events drop, clear.");
-        log::debug!("Events drop, clear.");
         // repeating protection
         self.clear();
     }
@@ -100,7 +98,7 @@ impl Events {
         let state = self.data.borrow().source_state(&top).unwrap();
         match state {
             EventState::Off => {
-                println!("set_enabled Off: {:?}", top);
+                println!("set_enabled Off: {top:?}");
             }
             EventState::On => {
                 top.dispatch(self)?;
@@ -235,19 +233,19 @@ impl EventsData {
                 self.sources.remove(&token);
             }
             EventType::Defer => {
-                self.defer_sources
-                    .remove(&token)
-                    .ok_or(Error::Other { msg: "not found" })?;
+                self.defer_sources.remove(&token).ok_or(Error::Other {
+                    word: "item not found",
+                })?;
             }
             EventType::Post => {
-                self.post_sources
-                    .remove(&token)
-                    .ok_or(Error::Other { msg: "not found" })?;
+                self.post_sources.remove(&token).ok_or(Error::Other {
+                    word: "item not found",
+                })?;
             }
             EventType::Exit => {
-                self.exit_sources
-                    .remove(&token)
-                    .ok_or(Error::Other { msg: "not found" })?;
+                self.exit_sources.remove(&token).ok_or(Error::Other {
+                    word: "item not found",
+                })?;
             }
             EventType::TimerRealtime
             | EventType::TimerBoottime

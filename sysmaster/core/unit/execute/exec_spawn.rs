@@ -148,7 +148,7 @@ fn build_environment(_unit: &Unit, fds: usize) -> Vec<std::ffi::CString> {
     if fds > 0 {
         envs.push(std::ffi::CString::new(format!("LISTEN_PID={}", nix::unistd::getpid())).unwrap());
 
-        envs.push(std::ffi::CString::new(format!("LISTEN_FDS={}", fds)).unwrap());
+        envs.push(std::ffi::CString::new(format!("LISTEN_FDS={fds}")).unwrap());
     }
     envs
 }
