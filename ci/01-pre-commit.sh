@@ -44,7 +44,7 @@ do
 done
 
 #fix cargo clippy fail in pre-commit when build.rs is changed
-RUSTC_WRAPPER="" cargo clippy --all-targets --features "default" --all || exit 1
+RUSTC_WRAPPER="" cargo clippy --all-targets --features "default" --all -- -Dwarnings || exit 1
 
 # run base check
 #filelist=`git diff origin/master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`

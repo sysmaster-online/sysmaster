@@ -1,6 +1,6 @@
 fail_fast: true
 repos:
-  - repo: "http://github.com/pre-commit/pre-commit-hooks.git"
+  - repo: "https://github.com/pre-commit/pre-commit-hooks.git"
     rev: v4.4.0
     hooks:
       - id: check-byte-order-marker
@@ -14,7 +14,7 @@ repos:
       - id: detect-private-key
   #      - id: check-executables-have-shebangs
       # - id: check-shebang-scripts-are-executable
-  - repo: "http://github.com/codespell-project/codespell.git"
+  - repo: "https://github.com/codespell-project/codespell.git"
     rev: v2.2.2
     hooks:
       - id: codespell
