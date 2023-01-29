@@ -322,7 +322,7 @@ impl ReDbTable for ServiceReDb<String, ServiceReConf> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn import<'a>(&self, db_rtxn: &'a ReDbRoTxn) {
+    fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
         self.0.db_2_cache(db_rtxn);
     }
 
@@ -340,7 +340,7 @@ impl ReDbTable for ServiceReDb<String, ServiceReMng> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn import<'a>(&self, db_rtxn: &'a ReDbRoTxn) {
+    fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
         self.0.db_2_cache(db_rtxn);
     }
 

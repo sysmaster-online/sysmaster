@@ -18,7 +18,8 @@ sudo yum install --disablerepo EPOL --disablerepo source --disablerepo update --
 fi
 
 #git加速并安装rust工具链
-git config --global url."https://github.91chi.fun/https://github.com/".insteadOf "https://github.com/"
+# git config --global url."https://gh.api.99988866.xyz/https://github.com/".insteadOf "https://github.com/"
+git config --global url."https://gitclone.com/github.com/".insteadOf "https://github.com/"
 source ~/.bashrc
 cargo -v
 if [ $? -ne 0 ]; then

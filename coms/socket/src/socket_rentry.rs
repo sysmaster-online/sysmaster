@@ -300,7 +300,7 @@ impl ReDbTable for SocketReDb<String, SocketReConf> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn import<'a>(&self, db_rtxn: &'a ReDbRoTxn) {
+    fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
         self.0.db_2_cache(db_rtxn);
     }
 
@@ -318,7 +318,7 @@ impl ReDbTable for SocketReDb<String, SocketReMng> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn import<'a>(&self, db_rtxn: &'a ReDbRoTxn) {
+    fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
         self.0.db_2_cache(db_rtxn);
     }
 
@@ -336,7 +336,7 @@ impl ReDbTable for SocketReDb<u32, SocketReFrame> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn import<'a>(&self, db_rtxn: &'a ReDbRoTxn) {
+    fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
         self.0.db_2_cache(db_rtxn);
     }
 
