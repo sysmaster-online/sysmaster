@@ -1,0 +1,15 @@
+[package]
+name = "libdevice"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# internal libraries
+libutils = { path = "../libutils" }
+
+# third libraries
+kobject-uevent = "0.1.0"
+nix = "0.24"
+libc = "0.2.*"
