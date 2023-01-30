@@ -92,6 +92,8 @@ pub(super) struct SectionService {
     #[config(deserialize_with = KillMode::deserialize_with)]
     #[config(default = "none")]
     pub KillMode: KillMode,
+    #[config(default = "")]
+    pub WorkingDirectory: String,
 }
 
 impl SectionService {

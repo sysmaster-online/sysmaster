@@ -179,6 +179,12 @@ impl ServiceUnit {
         }
     }
 
+    fn parse_kill_context(&self) {
+        self.config
+            .kill_context()
+            .set_kill_mode(self.config.config_data().borrow().Service.KillMode);
+    }
+
     fn parse(&self) -> Result<(), Box<dyn Error>> {
         if let Some(envs) = self.config.environments() {
             for env in envs {
@@ -205,6 +211,8 @@ impl ServiceUnit {
                 }
             }
         }
+
+        self.parse_kill_context();
 
         Ok(())
     }
