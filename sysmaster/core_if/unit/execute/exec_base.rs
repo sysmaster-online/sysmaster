@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use std::{cell::RefCell, collections::HashMap, ffi::CString, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, error::Error, ffi::CString, path::PathBuf, rc::Rc};
 
 /// the error
 #[derive(Debug)]
@@ -55,6 +55,7 @@ pub struct ExecParameters {
     environment: Rc<EnvData>,
     fds: Vec<i32>,
     notify_sock: Option<PathBuf>,
+    working_directory: Option<PathBuf>,
 }
 
 struct EnvData {
@@ -100,6 +101,7 @@ impl ExecParameters {
             environment: Rc::new(EnvData::new()),
             fds: Vec::new(),
             notify_sock: None,
+            working_directory: None,
         }
     }
 
@@ -132,6 +134,52 @@ impl ExecParameters {
     pub fn set_notify_sock(&mut self, notify_sock: PathBuf) {
         self.notify_sock = Some(notify_sock)
     }
+
+    /// add WorkingDirectory
+    pub fn add_working_directory(
+        &mut self,
+        working_directory_str: String,
+    ) -> Result<(), Box<dyn Error>> {
+        if working_directory_str.is_empty() {
+            return Ok(());
+        }
+
+        let mut miss_ok = false;
+        if working_directory_str.starts_with('-') {
+            miss_ok = true;
+        }
+
+        let mut working_directory_str = working_directory_str.trim_start_matches('-').to_string();
+
+        if working_directory_str == *"~".to_string() {
+            working_directory_str = match std::env::var("HOME") {
+                Err(e) => {
+                    return Err(Box::new(e));
+                }
+                Ok(v) => v,
+            };
+        }
+
+        let working_directory = PathBuf::from(&working_directory_str);
+        if !working_directory.is_dir() {
+            if miss_ok {
+                return Ok(());
+            } else {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Specified directory is invalid.",
+                )));
+            }
+        }
+
+        self.working_directory = Some(working_directory);
+        Ok(())
+    }
+
+    /// get WorkingDirectory
+    pub fn get_working_directory(&self) -> Option<PathBuf> {
+        self.working_directory.clone()
+    }
 }
 
 bitflags! {
@@ -141,5 +189,49 @@ bitflags! {
         const CONTROL = 1 << 1;
         /// need pass fds to the command
         const PASS_FDS = 1 << 2;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ExecParameters;
+
+    #[test]
+    fn test_add_working_directory() {
+        let mut params = ExecParameters::new();
+        assert!(params.add_working_directory("/root".to_string()).is_ok());
+        assert_eq!(
+            params.get_working_directory().unwrap().to_str(),
+            Some("/root")
+        );
+        let mut params = ExecParameters::new();
+        assert!(params
+            .add_working_directory("-/root/foooooooobarrrrrr".to_string())
+            .is_ok());
+        assert_eq!(params.get_working_directory(), None);
+        let mut params = ExecParameters::new();
+        assert!(params
+            .add_working_directory("/root/fooooooooobarrrrrrrrrrrr".to_string())
+            .is_err());
+        assert_eq!(params.get_working_directory(), None);
+        let mut params = ExecParameters::new();
+        assert!(params
+            .add_working_directory("--------------/usr/lib".to_string())
+            .is_ok());
+        assert_eq!(
+            params.get_working_directory().unwrap().to_str(),
+            Some("/usr/lib")
+        );
+        let mut params = ExecParameters::new();
+        assert!(params.add_working_directory("~".to_string()).is_ok());
+        assert_eq!(
+            params
+                .get_working_directory()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+            std::env::var("HOME").unwrap()
+        );
     }
 }

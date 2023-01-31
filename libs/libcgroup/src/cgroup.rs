@@ -738,6 +738,15 @@ mod tests {
 
     #[test]
     fn test_cgcontrol() {
+        let res = std::process::Command::new("/usr/bin/stat")
+            .args(["-fc", "%T", "/sys/fs/cgroup"])
+            .output()
+            .unwrap();
+        if res.stdout != "tmpfs".as_bytes() {
+            println!("This testcase can only run if /sys/fs/cgroup is under tmpfs, skipping");
+            return;
+        }
+
         let controller = match super::cg_type() {
             Ok(_) => "sysmaster",
             Err(_) => "systemd",

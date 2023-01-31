@@ -48,34 +48,47 @@ impl ServiceSpawn {
         if let Some(pid) = self.pid.main() {
             params.add_env("MAINPID", format!("{pid}"));
         }
-        if let Some(unit) = self.comm.owner() {
-            let um = self.comm.um();
-            unit.prepare_exec()?;
-
-            if ec_flags.contains(ExecFlags::PASS_FDS) {
-                params.insert_fds(self.collect_socket_fds());
+        let unit = match self.comm.owner() {
+            None => {
+                return Err("spawn exec return error".to_string().into());
             }
+            Some(v) => v,
+        };
+        let um = self.comm.um();
+        unit.prepare_exec()?;
 
-            if self.config.service_type() == ServiceType::Notify {
-                let notify_sock = um.notify_socket().unwrap();
-                log::debug!("add NOTIFY_SOCKET env: {}", notify_sock.to_str().unwrap());
-                params.add_env("NOTIFY_SOCKET", notify_sock.to_str().unwrap().to_string());
-                params.set_notify_sock(notify_sock);
-            }
+        if ec_flags.contains(ExecFlags::PASS_FDS) {
+            params.insert_fds(self.collect_socket_fds());
+        }
 
-            log::debug!("begin to exec spawn");
-            match um.exec_spawn(unit.id(), cmdline, &params, self.exec_ctx.clone()) {
-                Ok(pid) => {
-                    um.child_watch_pid(unit.id(), pid);
-                    Ok(pid)
-                }
-                Err(e) => {
-                    log::error!("failed to start service: {}, error:{:?}", unit.id(), e);
-                    Err("spawn exec return error".to_string().into())
-                }
+        if self.config.service_type() == ServiceType::Notify {
+            let notify_sock = um.notify_socket().unwrap();
+            log::debug!("add NOTIFY_SOCKET env: {}", notify_sock.to_str().unwrap());
+            params.add_env("NOTIFY_SOCKET", notify_sock.to_str().unwrap().to_string());
+            params.set_notify_sock(notify_sock);
+        }
+        if let Err(e) = params.add_working_directory(
+            self.config
+                .config_data()
+                .borrow()
+                .Service
+                .WorkingDirectory
+                .clone(),
+        ) {
+            log::error!("Failed to add working directory: {}", e.to_string());
+            return Err(e);
+        }
+
+        log::debug!("begin to exec spawn");
+        match um.exec_spawn(unit.id(), cmdline, &params, self.exec_ctx.clone()) {
+            Ok(pid) => {
+                um.child_watch_pid(unit.id(), pid);
+                Ok(pid)
             }
-        } else {
-            Err("spawn exec return error".to_string().into())
+            Err(e) => {
+                log::error!("failed to start service: {}, error:{:?}", unit.id(), e);
+                Err("spawn exec return error".to_string().into())
+            }
         }
     }
 

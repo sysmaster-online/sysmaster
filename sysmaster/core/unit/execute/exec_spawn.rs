@@ -5,6 +5,7 @@ use libutils::fd_util;
 use nix::fcntl::FcntlArg;
 use nix::unistd::{self, ForkResult, Pid};
 use regex::Regex;
+use std::error::Error;
 use std::path::PathBuf;
 use std::process;
 use std::rc::Rc;
@@ -46,6 +47,23 @@ impl ExecSpawn {
     }
 }
 
+fn apply_working_directory(working_directory: Option<PathBuf>) -> Result<(), Box<dyn Error>> {
+    let working_directory = match working_directory {
+        None => {
+            return Ok(());
+        }
+        Some(v) => v,
+    };
+    if let Err(e) = std::env::set_current_dir(&working_directory) {
+        log::error!(
+            "Failed to change working directory: {}",
+            working_directory.to_string_lossy()
+        );
+        return Err(Box::new(e));
+    }
+    Ok(())
+}
+
 fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: Rc<ExecContext>) {
     log::debug!("exec context params: {:?}", ctx.envs());
 
@@ -60,7 +78,7 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
         .collect::<Vec<_>>();
 
     log::debug!(
-        "exec child command is2: {}, args is: {:?}",
+        "exec child command is: {}, args is: {:?}",
         cmd.to_str().unwrap(),
         args
     );
@@ -86,6 +104,11 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
 
     if !flags_fds(&mut keep_fds) {
         log::error!("flags set all fds error");
+        return;
+    }
+
+    if let Err(e) = apply_working_directory(params.get_working_directory()) {
+        log::error!("Failed to apply working directory: {}", e.to_string());
         return;
     }
 

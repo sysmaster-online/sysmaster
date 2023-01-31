@@ -61,8 +61,6 @@ impl ServiceConfig {
             self.db_update();
         }
 
-        self.parse_kill_context();
-
         Ok(())
     }
 
@@ -103,11 +101,6 @@ impl ServiceConfig {
 
     pub(super) fn kill_context(&self) -> Rc<KillContext> {
         self.kill_context.clone()
-    }
-
-    fn parse_kill_context(&self) {
-        self.kill_context
-            .set_kill_mode(self.config_data().borrow().Service.KillMode);
     }
 }
 
