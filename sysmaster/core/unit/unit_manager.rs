@@ -230,6 +230,24 @@ impl UmIf for UnitManager {
         self.unit_add_dependency(unit_name, relation, target_name, add_ref, mask)
     }
 
+    ///add two unit dependency to the unit
+    /// can called by sub unit
+    /// sub unit add some default dependency
+    ///
+    fn unit_add_two_dependency(
+        &self,
+        unit_name: &str,
+        ra: UnitRelations,
+        rb: UnitRelations,
+        target_name: &str,
+        add_ref: bool,
+        mask: UnitDependencyMask,
+    ) -> Result<(), UnitActionError> {
+        self.unit_add_dependency(unit_name, ra, target_name, add_ref, mask)?;
+
+        self.unit_add_dependency(unit_name, rb, target_name, add_ref, mask)
+    }
+
     /// load the unit for reference name
     fn load_unit_success(&self, name: &str) -> bool {
         self.load_unit_success(name)
@@ -441,12 +459,12 @@ impl UnitManager {
         add_ref: bool,
         mask: UnitDependencyMask,
     ) -> Result<(), UnitActionError> {
-        let s_unit = if let Some(unit) = self.db.units_get(unit_name) {
+        let s_unit = if let Some(unit) = self.load_unitx(unit_name) {
             unit
         } else {
             return Err(UnitActionError::UnitActionENoent);
         };
-        let t_unit = if let Some(unit) = self.db.units_get(target_name) {
+        let t_unit = if let Some(unit) = self.load_unitx(target_name) {
             unit
         } else {
             return Err(UnitActionError::UnitActionENoent);

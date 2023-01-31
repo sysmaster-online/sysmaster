@@ -4,9 +4,11 @@
 use crate::socket_comm::SocketUnitComm;
 use crate::socket_config::SocketConfig;
 use crate::socket_rentry::PortType;
+use libutils::error::Error as SocketError;
+use libutils::special::{SHUTDOWN_TARGET, SOCKETS_TARGET, SYSINIT_TARGET};
 use std::path::Path;
 use std::{error::Error, rc::Rc};
-use sysmaster::unit::{UnitRelations, UnitType};
+use sysmaster::unit::{UnitActionError, UnitDependencyMask, UnitRelations, UnitType};
 
 pub(super) struct SocketLoad {
     config: Rc<SocketConfig>,
@@ -36,6 +38,12 @@ impl SocketLoad {
                 )
             });
         }
+
+        self.add_default_dependencies().map_err(|_e| {
+            Box::new(SocketError::Other {
+                msg: "add default dependency error",
+            })
+        })?;
 
         Ok(())
     }
@@ -80,6 +88,44 @@ impl SocketLoad {
         }
 
         false
+    }
+
+    pub(self) fn add_default_dependencies(&self) -> Result<(), UnitActionError> {
+        if let Some(u) = self.comm.owner() {
+            log::debug!("add default dependencies for socket [{}]", u.id());
+            if !u.default_dependencies() {
+                return Ok(());
+            }
+
+            let um = self.comm.um();
+            um.unit_add_dependency(
+                u.id(),
+                UnitRelations::UnitAfter,
+                SOCKETS_TARGET,
+                true,
+                UnitDependencyMask::UnitDependencyDefault,
+            )?;
+
+            um.unit_add_two_dependency(
+                u.id(),
+                UnitRelations::UnitAfter,
+                UnitRelations::UnitRequires,
+                SYSINIT_TARGET,
+                true,
+                UnitDependencyMask::UnitDependencyDefault,
+            )?;
+
+            um.unit_add_two_dependency(
+                u.id(),
+                UnitRelations::UnitBefore,
+                UnitRelations::UnitConflicts,
+                SHUTDOWN_TARGET,
+                true,
+                UnitDependencyMask::UnitDependencyDefault,
+            )?;
+        }
+
+        Ok(())
     }
 }
 

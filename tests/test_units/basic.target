@@ -1,0 +1,4 @@
+[Unit]
+Description="Basic System"
+Documentation="man sysmaster special"
+Requires="sysinit.target"
