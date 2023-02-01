@@ -67,6 +67,23 @@ impl ServiceSpawn {
             params.add_env("NOTIFY_SOCKET", notify_sock.to_str().unwrap().to_string());
             params.set_notify_sock(notify_sock);
         }
+
+        if let Err(e) = params.add_user(self.config.config_data().borrow().Service.User.clone()) {
+            log::error!(
+                "Failed to add user to execute parameters: {}",
+                e.to_string()
+            );
+            return Err(e);
+        }
+
+        if let Err(e) = params.add_group(self.config.config_data().borrow().Service.Group.clone()) {
+            log::error!(
+                "Failed to add group to execute parameters: {}",
+                e.to_string()
+            );
+            return Err(e);
+        }
+
         if let Err(e) = params.add_working_directory(
             self.config
                 .config_data()

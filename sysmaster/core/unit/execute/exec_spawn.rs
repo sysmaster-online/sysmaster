@@ -3,7 +3,7 @@ use sysmaster::unit::{ExecCmdError, ExecCommand, ExecContext, ExecParameters};
 
 use libutils::fd_util;
 use nix::fcntl::FcntlArg;
-use nix::unistd::{self, ForkResult, Pid};
+use nix::unistd::{self, setresgid, setresuid, ForkResult, Gid, Group, Pid, Uid, User};
 use regex::Regex;
 use std::error::Error;
 use std::path::PathBuf;
@@ -47,6 +47,50 @@ impl ExecSpawn {
     }
 }
 
+fn apply_user_and_group(
+    user: Option<User>,
+    group: Option<Group>,
+    params: &ExecParameters,
+) -> Result<(), Box<dyn Error>> {
+    let user = match user {
+        // ExecParameters.add_user() has already assigned valid user if the configuration is correct
+        None => {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid user",
+            )));
+        }
+        Some(v) => v,
+    };
+    let group = match group {
+        None => {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid group",
+            )));
+        }
+        Some(v) => v,
+    };
+    // Skip if this is root
+    if user.uid == Uid::from_raw(0) && group.gid == Gid::from_raw(0) {
+        return Ok(());
+    }
+    // Careful: set group first, or we may get EPERM when setting group
+    log::debug!("Setting process group to {}", group.name);
+    if let Err(e) = setresgid(group.gid, group.gid, group.gid) {
+        return Err(Box::new(e));
+    }
+    // Set environment
+    params.add_env("LOGNAME", user.name.clone());
+    params.add_env("USER", user.name.clone());
+    // Set user
+    log::debug!("Setting process user to {}", user.name);
+    if let Err(e) = setresuid(user.uid, user.uid, user.uid) {
+        return Err(Box::new(e));
+    }
+    Ok(())
+}
+
 fn apply_working_directory(working_directory: Option<PathBuf>) -> Result<(), Box<dyn Error>> {
     let working_directory = match working_directory {
         None => {
@@ -66,6 +110,16 @@ fn apply_working_directory(working_directory: Option<PathBuf>) -> Result<(), Box
 
 fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: Rc<ExecContext>) {
     log::debug!("exec context params: {:?}", ctx.envs());
+
+    if let Err(e) = apply_user_and_group(params.get_user(), params.get_group(), params) {
+        log::error!("Failed to apply user or group: {}", e.to_string());
+        return;
+    }
+
+    if let Err(e) = apply_working_directory(params.get_working_directory()) {
+        log::error!("Failed to apply working directory: {}", e.to_string());
+        return;
+    }
 
     for (key, value) in ctx.envs() {
         params.add_env(&key, value.to_string());
@@ -104,11 +158,6 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
 
     if !flags_fds(&mut keep_fds) {
         log::error!("flags set all fds error");
-        return;
-    }
-
-    if let Err(e) = apply_working_directory(params.get_working_directory()) {
-        log::error!("Failed to apply working directory: {}", e.to_string());
         return;
     }
 

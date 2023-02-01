@@ -19,6 +19,7 @@ pub mod show_table;
 pub mod socket_util;
 pub mod string;
 pub mod time_util;
+pub mod user_group_util;
 
 pub mod condition;
 pub use anyhow::*;

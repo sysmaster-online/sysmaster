@@ -94,6 +94,10 @@ pub(super) struct SectionService {
     pub KillMode: KillMode,
     #[config(default = "")]
     pub WorkingDirectory: String,
+    #[config(default = "")]
+    pub User: String,
+    #[config(default = "")]
+    pub Group: String,
 }
 
 impl SectionService {
