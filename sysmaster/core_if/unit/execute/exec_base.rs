@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use nix::unistd::{Group, Uid, User};
 use std::{cell::RefCell, collections::HashMap, error::Error, ffi::CString, path::PathBuf, rc::Rc};
 
 /// the error
@@ -56,6 +57,8 @@ pub struct ExecParameters {
     fds: Vec<i32>,
     notify_sock: Option<PathBuf>,
     working_directory: Option<PathBuf>,
+    user: Option<User>,
+    group: Option<Group>,
 }
 
 struct EnvData {
@@ -102,6 +105,8 @@ impl ExecParameters {
             fds: Vec::new(),
             notify_sock: None,
             working_directory: None,
+            user: None,
+            group: None,
         }
     }
 
@@ -180,6 +185,63 @@ impl ExecParameters {
     pub fn get_working_directory(&self) -> Option<PathBuf> {
         self.working_directory.clone()
     }
+
+    /// add User
+    pub fn add_user(&mut self, user_str: String) -> Result<(), Box<dyn Error>> {
+        // 1. Try to parse user_str as UID
+        if let Ok(user) = libutils::user_group_util::parse_uid(&user_str) {
+            self.user = Some(user);
+            return Ok(());
+        }
+        if user_str.is_empty() {
+            self.user = User::from_uid(Uid::from_raw(0)).unwrap();
+        }
+        // 2. OK, this is not a valid UID, try to parse it as user name
+        if let Ok(Some(user)) = User::from_name(&user_str) {
+            self.user = Some(user);
+            return Ok(());
+        }
+        Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Invalid user configuration",
+        )))
+    }
+
+    /// get User
+    pub fn get_user(&self) -> Option<User> {
+        self.user.clone()
+    }
+
+    /// add Group
+    pub fn add_group(&mut self, group_str: String) -> Result<(), Box<dyn Error>> {
+        // add_user should be called before add_group
+        assert!(self.get_user().is_some());
+        // 1. Group is not configured, use the primary group of user
+        if group_str.is_empty() {
+            let gid = self.get_user().unwrap().gid;
+            self.group = Group::from_gid(gid).unwrap();
+            return Ok(());
+        }
+        // 2. Try to parse group_str as GID
+        if let Ok(group) = libutils::user_group_util::parse_gid(&group_str) {
+            self.group = Some(group);
+            return Ok(());
+        }
+        // 3. Not a valid GID, parse it as a group name
+        if let Ok(Some(group)) = Group::from_name(&group_str) {
+            self.group = Some(group);
+            return Ok(());
+        }
+        Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Invalid group configuration",
+        )))
+    }
+
+    /// get Group
+    pub fn get_group(&self) -> Option<Group> {
+        self.group.clone()
+    }
 }
 
 bitflags! {
@@ -194,6 +256,8 @@ bitflags! {
 
 #[cfg(test)]
 mod tests {
+    use nix::unistd::{Gid, Uid};
+
     use super::ExecParameters;
 
     #[test]
@@ -233,5 +297,38 @@ mod tests {
                 .to_string(),
             std::env::var("HOME").unwrap()
         );
+    }
+
+    #[test]
+    fn test_add_user() {
+        let mut params = ExecParameters::new();
+        assert!(params.add_user("0".to_string()).is_ok());
+        assert_eq!(params.get_user().unwrap().name, "root");
+        let mut params = ExecParameters::new();
+        assert!(params.add_user("root".to_string()).is_ok());
+        assert_eq!(params.get_user().unwrap().uid, Uid::from_raw(0));
+        let mut params = ExecParameters::new();
+        assert!(params.add_user("010123".to_string()).is_err());
+        assert!(params.add_user("---".to_string()).is_err());
+        assert!(params.add_user("wwwwyyyyyffffff".to_string()).is_err());
+    }
+
+    #[test]
+    fn test_add_group() {
+        let mut params = ExecParameters::new();
+        assert!(params.add_user("0".to_string()).is_ok());
+        assert!(params.add_group("0".to_string()).is_ok());
+        assert_eq!(params.get_group().unwrap().name, "root");
+
+        let mut params = ExecParameters::new();
+        assert!(params.add_user("0".to_string()).is_ok());
+        assert!(params.add_group("root".to_string()).is_ok());
+        assert_eq!(params.get_group().unwrap().gid, Gid::from_raw(0));
+
+        let mut params = ExecParameters::new();
+        assert!(params.add_user("0".to_string()).is_ok());
+        assert!(params.add_group("010123".to_string()).is_err());
+        assert!(params.add_group("---".to_string()).is_err());
+        assert!(params.add_group("wwwwyyyyyffffff".to_string()).is_err());
     }
 }
