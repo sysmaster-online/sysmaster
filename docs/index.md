@@ -8,29 +8,26 @@ hide:
 ## 为什么我们要开发sysMaster
 
 sysMaster是openEuler对当前Linux系统初始化和服务管理在嵌入式，服务器，云化等不同场景下面临的问题和特点进行总结和思考后，开展的一种改进和探索，提供统一的，能够支持嵌入式，服务器，云场景下的系统初始化和服务（进程，容器，虚拟机）管理系统。
-![avatar](res/sysmaster-desc.jpeg)
+
+<center>![avatar](res/sysmaster-desc.jpeg)</center>
 
 ## Linux的初始化系统和服务管理
 
 我们都知道1号进程是所有Unix系统中由内核启动的第一个用户态进 程，它是操作系统正常工作的前提，它是操作系统初始化程序的代表（初始化实际包含一些的工具集合），并且需要一直运行在后台，回收孤儿进程，确保系统正常工作。
 大家熟悉的初始化系统，有历史悠久的sysvinit，有Debian和Ubuntu等系统的Upstart，以及当前使用广泛的systemd，这些软件各有特点，具体可以参考下表:
 
-|       | Systemd | upstart | sysvinit |
-| ----- | -----   | -----   | -----    |
-| 启动管理 | ✓ |✓ |✓ |
-| 进程回收 | ✓ |✓ |✓ |
-| 服务管理 | ✓ |✓ | |
-| 并发启动| ✓ |✓ | |
-| 设备管理 | ✓ | | |
-| 资源控制 | ✓ | | |
-| 日志管理 | ✓ | | |
-| 按需启动 | ✓ | | |
+| Init软件 | 说明                                                                             | 启动管理 | 进程回收 | 服务管理 | 并行启动 | 设备管理 | 资源控制 | 日志管理 |
+| -------- | -------------------------------------------------------------------------------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- |
+| sysvinit | 早期版本使用的初始化进程工具,  逐渐淡出舞台。                                    | ✓        | ✓        |          |          |          |          |          |
+| upstart  | debian,  Ubuntu等系统使用的initdaemon                                            | ✓        | ✓        | ✓        | ✓        |          |          |          |
+| systemd  | 提高系统的启动速度，相比传统的System  V是一大革新，已被大多数Linux发行版所使用。 | ✓        | ✓        | ✓        | ✓        | ✓        | ✓        | ✓        |
+
 
 Systemd对Sysvinit做出了很大的改进，尤其是启动速度上，功能也越来越丰富，但这也导致其系统架构和实现越来越复杂，在违背Keep It Simple的道路上越走越远。大而全的功能也不是所有场景都需要的，也不支持灵活组合，对于嵌入式以及一些IOT设备不能做很好的支持。同时与openEuler面向边缘，嵌入式，服务器，云场景OS的愿景不契合。
 
 根据维护问题的统计追踪，Systemd每个版本引入的问题都不是一个收敛状态，并且近些年问题越来越多。而且由于1号进程特殊性，这些问题会带来系统级别的宕机。
 
-![avatar](res/sysmaster_problem.png)
+<center>![avatar](res/sysmaster_problem.png)</center>
 
 ## 云的服务管理
 
@@ -38,7 +35,7 @@ Systemd对Sysvinit做出了很大的改进，尤其是启动速度上，功能�
 
 对于Node（VM，Host）内部的一些关键服务，如Ngnix，通过Systemd进行生命周期的管理，并且这些服务也是分布式的，当前出现问题，由服务自行进行处理，无法像容器实例和虚拟机实例一样通过类似K8S、OpenStack平台统一编排。
 
-![avatar](res/cloud_ori.jpg)
+<center>![avatar](res/cloud_ori.jpg)</center>
 
 ## sysMaster应该聚焦什么？
 
@@ -56,7 +53,8 @@ Systemd对Sysvinit做出了很大的改进，尤其是启动速度上，功能�
 
 ## 极致可靠、轻量，满足嵌入式，服务器、云多种场景
 
-![avatar](res/sysmaster_arch_desc.jpg)
+<center>![avatar](res/sysmaster_arch_desc.jpg)</center>
+
 sysMaster通过多级拆分的1+1+N架构，确保每个组件专注自己的职责，降低单组件的复杂性，确保组件架构的及简，从而提升系统整体架构扩展性，和适应性，并降低开发和维护的成本，并拥有以下主要特特点：
 
 1. 轻量化调度，支持更快的启动速度
@@ -77,4 +75,4 @@ sysMaster定位为支持嵌入式和服务器，云等全场景的支持，当�
 
 sysMaster吸收现有运化场景的一些特点，结合容器引擎(iSulad)和Qemu，提供统一的容器实例和虚拟化实例的管理接口，以及由sysMaster管理的一些关键应用实例的管理统一对接到Kubernetes和OpenStack。
 
-![avatar](res/cloud_new.jpg)
+<center>![avatar](res/cloud_new.jpg)</center>
