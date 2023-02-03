@@ -188,15 +188,16 @@ impl ExecParameters {
 
     /// add User
     pub fn add_user(&mut self, user_str: String) -> Result<(), Box<dyn Error>> {
-        // 1. Try to parse user_str as UID
+        // 1. If user_str is empty, treat it as UID 0
+        if user_str.is_empty() {
+            self.user = User::from_uid(Uid::from_raw(0)).unwrap();
+        }
+        // 2. Try to parse user_str as UID
         if let Ok(user) = libutils::user_group_util::parse_uid(&user_str) {
             self.user = Some(user);
             return Ok(());
         }
-        if user_str.is_empty() {
-            self.user = User::from_uid(Uid::from_raw(0)).unwrap();
-        }
-        // 2. OK, this is not a valid UID, try to parse it as user name
+        // 3. OK, this is not a valid UID, try to parse it as user name
         if let Ok(Some(user)) = User::from_name(&user_str) {
             self.user = Some(user);
             return Ok(());
