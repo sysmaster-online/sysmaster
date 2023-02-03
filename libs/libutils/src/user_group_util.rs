@@ -1,5 +1,6 @@
 //! Common used functions to parse user and group
 
+use nix::libc::uid_t;
 use nix::unistd::{Gid, Group, Uid, User};
 use std::error::Error;
 use std::result::Result;
@@ -108,4 +109,34 @@ pub fn parse_gid(gid_str: &String) -> Result<Group, Box<dyn Error>> {
         ))),
         Some(v) => Ok(v),
     }
+}
+
+/// Parse a string as Username
+pub fn parse_name(name_str: &String) -> Result<User, Box<dyn Error>> {
+    if name_str.is_empty() {
+        return Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Username is empty",
+        )));
+    }
+
+    let user = match User::from_name(name_str) {
+        Err(e) => {
+            return Err(Box::new(e));
+        }
+        Ok(v) => v,
+    };
+    match user {
+        None => Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "No matched username",
+        ))),
+        Some(v) => Ok(v),
+    }
+}
+
+/// check if the user id is within the system user range
+pub fn uid_is_system(uid: Uid) -> bool {
+    const SYSTEM_UID_MAX: uid_t = 999;
+    uid.as_raw() <= SYSTEM_UID_MAX
 }
