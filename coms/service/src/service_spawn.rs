@@ -84,6 +84,14 @@ impl ServiceSpawn {
             return Err(e);
         }
 
+        if let Err(e) = params.add_umask(self.config.config_data().borrow().Service.UMask.clone()) {
+            log::error!(
+                "Failed to add umask to execute parameters: {}",
+                e.to_string()
+            );
+            return Err(e);
+        }
+
         if let Err(e) = params.add_working_directory(
             self.config
                 .config_data()

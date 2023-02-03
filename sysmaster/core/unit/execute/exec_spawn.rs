@@ -3,6 +3,7 @@ use sysmaster::unit::{ExecCmdError, ExecCommand, ExecContext, ExecParameters};
 
 use libutils::fd_util;
 use nix::fcntl::FcntlArg;
+use nix::sys::stat::Mode;
 use nix::unistd::{self, setresgid, setresuid, ForkResult, Gid, Group, Pid, Uid, User};
 use regex::Regex;
 use std::error::Error;
@@ -108,6 +109,20 @@ fn apply_working_directory(working_directory: Option<PathBuf>) -> Result<(), Box
     Ok(())
 }
 
+fn apply_umask(umask: Option<Mode>) -> Result<(), Box<dyn Error>> {
+    let umask = match umask {
+        None => {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid umask",
+            )));
+        }
+        Some(v) => v,
+    };
+    nix::sys::stat::umask(umask);
+    Ok(())
+}
+
 fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: Rc<ExecContext>) {
     log::debug!("exec context params: {:?}", ctx.envs());
 
@@ -118,6 +133,11 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
 
     if let Err(e) = apply_working_directory(params.get_working_directory()) {
         log::error!("Failed to apply working directory: {}", e.to_string());
+        return;
+    }
+
+    if let Err(e) = apply_umask(params.get_umask()) {
+        log::error!("Failed to apply umask: {}", e.to_string());
         return;
     }
 
