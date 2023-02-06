@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use nix::sys::stat::Mode;
 use nix::unistd::{Group, Uid, User};
 use std::{cell::RefCell, collections::HashMap, error::Error, ffi::CString, path::PathBuf, rc::Rc};
 
@@ -59,6 +60,7 @@ pub struct ExecParameters {
     working_directory: Option<PathBuf>,
     user: Option<User>,
     group: Option<Group>,
+    umask: Option<Mode>,
 }
 
 struct EnvData {
@@ -107,6 +109,7 @@ impl ExecParameters {
             working_directory: None,
             user: None,
             group: None,
+            umask: None,
         }
     }
 
@@ -243,6 +246,39 @@ impl ExecParameters {
     pub fn get_group(&self) -> Option<Group> {
         self.group.clone()
     }
+
+    /// add UMask
+    pub fn add_umask(&mut self, umask_str: String) -> Result<(), Box<dyn Error>> {
+        let mut umask_str = umask_str;
+        if umask_str.is_empty() {
+            umask_str = "0022".to_string();
+        }
+        for c in umask_str.as_bytes() {
+            if !(b'0'..b'8').contains(c) {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Invalid UMask Configuration",
+                )));
+            }
+        }
+        let mode = match u32::from_str_radix(&umask_str, 8) {
+            Err(e) => {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    e.to_string(),
+                )));
+            }
+            Ok(v) => v,
+        };
+        self.umask = Mode::from_bits(mode);
+        log::debug!("Adding umask {:?}", mode);
+        Ok(())
+    }
+
+    /// get UMask
+    pub fn get_umask(&self) -> Option<Mode> {
+        self.umask
+    }
 }
 
 bitflags! {
@@ -257,7 +293,10 @@ bitflags! {
 
 #[cfg(test)]
 mod tests {
-    use nix::unistd::{Gid, Uid};
+    use nix::{
+        sys::stat::Mode,
+        unistd::{Gid, Uid},
+    };
 
     use super::ExecParameters;
 
@@ -331,5 +370,22 @@ mod tests {
         assert!(params.add_group("010123".to_string()).is_err());
         assert!(params.add_group("---".to_string()).is_err());
         assert!(params.add_group("wwwwyyyyyffffff".to_string()).is_err());
+    }
+
+    #[test]
+    fn test_add_umask() {
+        let mut params = ExecParameters::new();
+        assert!(params.add_umask("".to_string()).is_ok());
+        assert_eq!(params.get_umask().unwrap(), Mode::from_bits(18).unwrap());
+        assert!(params.add_umask("0022".to_string()).is_ok());
+        assert_eq!(params.get_umask().unwrap(), Mode::from_bits(18).unwrap());
+        params.umask = None;
+        assert!(params.add_umask("0o0022".to_string()).is_err());
+        assert_eq!(params.get_umask(), None);
+        params.umask = None;
+        assert!(params.add_umask("0088".to_string()).is_err());
+        assert_eq!(params.get_umask(), None);
+        assert!(params.add_umask("0011".to_string()).is_ok());
+        assert_eq!(params.get_umask().unwrap(), Mode::from_bits(9).unwrap());
     }
 }

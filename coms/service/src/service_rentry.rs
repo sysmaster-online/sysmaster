@@ -98,6 +98,8 @@ pub(super) struct SectionService {
     pub User: String,
     #[config(default = "")]
     pub Group: String,
+    #[config(default = "0022")]
+    pub UMask: String,
 }
 
 impl SectionService {
