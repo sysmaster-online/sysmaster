@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 # internal libraries
 libutils = { path = "../libutils" }
+libevent = { path = "../libevent" }
 
 # third libraries
 kobject-uevent = "0.1.0"

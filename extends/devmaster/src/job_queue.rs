@@ -48,7 +48,7 @@ pub struct DeviceJob {
 }
 
 impl DeviceJob {
-    ///
+    /// create a device job
     pub fn new(device: Device, state: JobState, seqnum: u64) -> DeviceJob {
         DeviceJob {
             device,

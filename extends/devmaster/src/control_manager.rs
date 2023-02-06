@@ -30,18 +30,16 @@ pub struct ControlManager {
 }
 
 impl ControlManager {
-    ///
+    /// create a control manager instance
     pub fn new(
         listen_addr: String,
         worker_manager: Rc<WorkerManager>,
         job_queue: Rc<JobQueue>,
-        // events: Rc<Events>,
     ) -> ControlManager {
         ControlManager {
             listener: RefCell::new(TcpListener::bind(listen_addr).unwrap()),
             worker_manager,
             job_queue,
-            // events: events,
         }
     }
 
@@ -58,11 +56,6 @@ impl ControlManager {
                     .unwrap()
                     .as_secs()
                     % 1000;
-
-                // let device = Device {
-                //     devname: device.to_string(),
-                //     seqnum: seqnum,
-                // };
 
                 let mut device = Device::new();
                 device.devname = devname.to_string();
@@ -82,17 +75,17 @@ impl ControlManager {
 }
 
 impl Source for ControlManager {
-    ///
+    /// tcp listener fd
     fn fd(&self) -> RawFd {
         self.listener.borrow().as_raw_fd()
     }
 
-    ///
+    /// event type
     fn event_type(&self) -> libevent::EventType {
         libevent::EventType::Io
     }
 
-    ///
+    /// epoll type
     fn epoll_event(&self) -> u32 {
         (libc::EPOLLIN) as u32
     }
