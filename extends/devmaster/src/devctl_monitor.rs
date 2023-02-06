@@ -6,8 +6,6 @@ use libevent::{EventState, EventType, Events, Source};
 use libutils::socket_util::set_receive_buffer_force;
 use std::{os::unix::prelude::RawFd, rc::Rc};
 
-use crate::log_error;
-
 /// wrapper of DeviceMonitor
 struct DevctlMonitorX {
     /// device monitor
@@ -75,11 +73,11 @@ pub fn subcommand_monitor() {
     });
 
     if let Err(errno) = set_receive_buffer_force(kernel_monitor.fd(), 1024 * 1024 * 128) {
-        log_error(format!("Failed to set receive buffer forcely ({errno:?})"));
+        log::error!("Failed to set receive buffer forcely ({errno:?})");
     }
 
     if let Err(errno) = set_receive_buffer_force(userspace_monitor.fd(), 1024 * 1024 * 128) {
-        log_error(format!("Failed to set receive buffer forcely ({errno:?})"));
+        log::error!("Failed to set receive buffer forcely ({errno:?})");
     }
 
     let events = Events::new().unwrap();

@@ -1,6 +1,5 @@
 //! job queue
 //!
-use crate::log_debug;
 use crate::worker_manager::{Worker, WorkerManager};
 use libdevice::Device;
 use std::cell::RefCell;
@@ -132,7 +131,7 @@ impl JobQueue {
     /// dispatch job to worker manager
     pub fn job_queue_start(&self) {
         if self.jobs.borrow().is_empty() {
-            log_debug("Job Queue: job queue is empty\n".to_string());
+            log::debug!("Job Queue: job queue is empty");
             return;
         }
 
@@ -142,7 +141,6 @@ impl JobQueue {
             match *job.state.borrow() {
                 JobState::Queued => {}
                 JobState::Running | JobState::Undef => {
-                    // log_debug(format!("Job Queue: job {} is not queued\n", job.seqnum));
                     continue;
                 }
             }
@@ -154,14 +152,14 @@ impl JobQueue {
                 Ok(worker) => {
                     *job.state.borrow_mut() = JobState::Running;
                     job.bind(&worker);
-                    log_debug(format!(
-                        "Job Queue: dispatch job {} to worker {}\n",
+                    log::debug!(
+                        "Job Queue: dispatch job {} to worker {}",
                         job.seqnum,
                         worker.get_id(),
-                    ));
+                    );
                 }
                 Err(error) => {
-                    log_debug(error.to_string());
+                    log::debug!("{}", error.to_string());
                     return;
                 }
             }
@@ -173,9 +171,8 @@ impl JobQueue {
         let seqnum: u64 = match device.get_seqnum() {
             Some(seqnum) => seqnum,
             None => {
-                log_debug(
-                    "Job Queue: failed to insert device as it is not received from netlink\n"
-                        .to_string(),
+                log::debug!(
+                    "Job Queue: failed to insert device as it is not received from netlink"
                 );
                 return;
             }
@@ -193,9 +190,7 @@ impl JobQueue {
             .binary_search_by(|x| x.seqnum.cmp(&seqnum))
             .is_ok()
         {
-            log_debug(format!(
-                "Job Queue: failed to insert reduplicated job {seqnum}\n"
-            ));
+            log::debug!("Job Queue: failed to insert reduplicated job {seqnum}");
             return;
         }
 
@@ -203,7 +198,7 @@ impl JobQueue {
         let idx = self.jobs.borrow().partition_point(|x| x < &job);
         self.jobs.borrow_mut().insert(idx, job);
 
-        log_debug(format!("Job Queue: insert job {seqnum}\n"));
+        log::debug!("Job Queue: insert job {seqnum}");
     }
 
     /// cleanup the job queue, if match_state is Undef, cleanup all jobs, otherwise just retain the unmatched jobs
@@ -216,7 +211,7 @@ impl JobQueue {
             false
         });
 
-        log_debug("Job Queue: cleanup\n".to_string());
+        log::debug!("Job Queue: cleanup");
     }
 
     /// free a job from job queue
@@ -226,17 +221,17 @@ impl JobQueue {
         let idx = match self.jobs.borrow().binary_search(job) {
             Ok(idx) => idx,
             Err(_) => {
-                log_debug(format!("Job Queue: failed to find job {}\n", job.seqnum));
+                log::debug!("Job Queue: failed to find job {}", job.seqnum);
                 return;
             }
         };
 
         match self.jobs.borrow_mut().remove(idx) {
             Some(job) => {
-                log_debug(format!("Job Queue: succeeded to free job {}\n", job.seqnum));
+                log::debug!("Job Queue: succeeded to free job {}", job.seqnum);
             }
             None => {
-                log_debug(format!("Job Queue: failed to free job {}\n", job.seqnum));
+                log::debug!("Job Queue: failed to free job {}", job.seqnum);
             }
         }
     }
@@ -244,7 +239,7 @@ impl JobQueue {
     /// show states of each device job in the job queue
     pub fn job_queue_show_state(&self) {
         for job in self.jobs.borrow().iter() {
-            log_debug(format!("{job:?}\n"));
+            log::debug!("{job:?}");
         }
     }
 }

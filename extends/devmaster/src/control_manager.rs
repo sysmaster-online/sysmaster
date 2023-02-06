@@ -1,6 +1,5 @@
 //! control manager
 //!
-use crate::log_debug;
 use crate::worker_manager::WorkerManager;
 use crate::JobQueue;
 use libdevice::Device;
@@ -101,7 +100,7 @@ impl Source for ControlManager {
         let mut cmd = String::new();
         stream.read_to_string(&mut cmd).unwrap();
 
-        log_debug(format!("Control Manager: received message \"{cmd}\"\n"));
+        log::debug!("Control Manager: received message \"{cmd}\"");
 
         self.cmd_process(cmd);
 

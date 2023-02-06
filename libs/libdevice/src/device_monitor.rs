@@ -1,7 +1,10 @@
 //! device monitor
 //!
-use nix::sys::socket::{
-    recv, sendmsg, AddressFamily, MsgFlags, NetlinkAddr, SockFlag, SockProtocol, SockType,
+use nix::{
+    errno::Errno,
+    sys::socket::{
+        recv, sendmsg, AddressFamily, MsgFlags, NetlinkAddr, SockFlag, SockProtocol, SockType,
+    },
 };
 use std::io::IoSlice;
 
@@ -57,7 +60,15 @@ impl DeviceMonitor {
     /// receive device
     pub fn receive_device(&self) -> Option<Device> {
         let mut buf = vec![0; 1024 * 8];
-        let n = recv(self.socket, &mut buf, MsgFlags::empty()).unwrap();
+        let n = match recv(self.socket, &mut buf, MsgFlags::empty()) {
+            Ok(ret) => ret,
+            Err(errno) => match errno {
+                Errno::EAGAIN => return None,
+                _ => {
+                    return None;
+                }
+            },
+        };
         let mut prefix_split_idx: usize = 0;
 
         for (idx, val) in buf.iter().enumerate() {

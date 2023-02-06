@@ -1,6 +1,8 @@
 //! devctrl is the client of devmaster
 //!
 use libdevmaster::*;
+use libutils::logger::init_log_with_console;
+use log::LevelFilter;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
@@ -45,6 +47,7 @@ fn subcommand_listen() {
 }
 
 fn main() {
+    init_log_with_console("devctl", LevelFilter::Debug);
     let mut args = std::env::args();
     match args.nth(1).unwrap().as_str() {
         "test" => subcommand_test(args.collect::<Vec<String>>()),
