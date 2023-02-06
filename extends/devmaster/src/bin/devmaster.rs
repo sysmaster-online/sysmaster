@@ -6,7 +6,7 @@ use log::LevelFilter;
 use std::rc::Rc;
 
 fn main() {
-    init_log_with_console("devmaster", LevelFilter::Info);
+    init_log_with_console("devmaster", LevelFilter::Debug);
     log::info!("daemon start");
 
     let events = Rc::new(Events::new().unwrap());

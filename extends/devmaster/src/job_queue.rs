@@ -159,7 +159,7 @@ impl JobQueue {
                     );
                 }
                 Err(error) => {
-                    log::debug!("{}", error.to_string());
+                    log::debug!("{}", error);
                     return;
                 }
             }

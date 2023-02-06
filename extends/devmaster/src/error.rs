@@ -1,27 +1,30 @@
 //! utils of libdevmaster
 //!
+use snafu::prelude::*;
 
-/// Error kinds of devmaster
-#[derive(Debug, thiserror::Error)]
+/// devmaster error
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub(crate)))]
+#[non_exhaustive]
 pub enum Error {
-    /// Error kind for worker manager
-    #[error("Worker Manager: {}", msg)]
+    /// Error in worker manager
+    #[snafu(display("Worker Manager: {}", msg))]
     WorkerManagerError {
-        ///
+        /// message
         msg: &'static str,
     },
 
-    /// Error kind for job queue
-    #[error("Job Queue: {}", msg)]
+    /// Error in job queue
+    #[snafu(display("Job Queue: {}", msg))]
     JobQueueError {
-        ///
+        /// message
         msg: &'static str,
     },
 
-    /// Error kind for control manager
-    #[error("Control Manager: {}", msg)]
+    /// Error in control manager
+    #[snafu(display("Control Manager: {}", msg))]
     ControlManagerError {
-        ///
+        /// message
         msg: &'static str,
     },
 }

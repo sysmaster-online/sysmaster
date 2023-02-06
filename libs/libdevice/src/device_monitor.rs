@@ -8,7 +8,7 @@ use nix::{
 };
 use std::io::IoSlice;
 
-use crate::Device;
+use crate::{Device, Error};
 
 /// netlink group of device monitor
 pub enum MonitorNetlinkGroup {
@@ -58,16 +58,16 @@ impl DeviceMonitor {
     }
 
     /// receive device
-    pub fn receive_device(&self) -> Option<Device> {
+    pub fn receive_device(&self) -> Result<Device, Error> {
         let mut buf = vec![0; 1024 * 8];
         let n = match recv(self.socket, &mut buf, MsgFlags::empty()) {
             Ok(ret) => ret,
-            Err(errno) => match errno {
-                Errno::EAGAIN => return None,
-                _ => {
-                    return None;
-                }
-            },
+            Err(errno) => {
+                return Err(Error::Syscall {
+                    syscall: "recv",
+                    errno,
+                })
+            }
         };
         let mut prefix_split_idx: usize = 0;
 
@@ -81,12 +81,15 @@ impl DeviceMonitor {
         let prefix = std::str::from_utf8(&buf[..prefix_split_idx]).unwrap();
 
         if prefix.contains("@/") {
-            return Some(Device::from_buffer(&buf[prefix_split_idx + 1..n]));
+            return Ok(Device::from_buffer(&buf[prefix_split_idx + 1..n]));
         } else if prefix == "libdevm" {
-            return Some(Device::from_buffer(&buf[40..n]));
+            return Ok(Device::from_buffer(&buf[40..n]));
         }
 
-        None
+        Err(Error::Other {
+            msg: "Ignore invalid buffer data",
+            errno: Some(Errno::EINVAL),
+        })
     }
 
     /// send device
