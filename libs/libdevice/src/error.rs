@@ -1,5 +1,5 @@
 //! Error definition of libdevice
-//! 
+//!
 use nix::errno::Errno;
 use snafu::prelude::*;
 

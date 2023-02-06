@@ -1,7 +1,7 @@
 //! worker manager
 //!
-use crate::job_queue::{DeviceJob, JobState};
 use crate::error::Error;
+use crate::job_queue::{DeviceJob, JobState};
 use crate::JobQueue;
 use libdevice::{Device, DeviceMonitor, MonitorNetlinkGroup};
 use libevent::{EventState, EventType, Events, Source};
@@ -187,16 +187,23 @@ impl Worker {
 impl WorkerManager {
     ///
     pub fn new(workers_capacity: u32, listen_addr: String, events: Rc<Events>) -> WorkerManager {
+        let listener = RefCell::new(TcpListener::bind(listen_addr.as_str()).unwrap_or_else(
+            |error| {
+                log::error!("Worker Manager: failed to bind listener \"{error}\"");
+                panic!();
+            },
+        ));
+
+        listener
+            .borrow()
+            .set_nonblocking(true)
+            .expect("Cannot set non-blocking");
+
         WorkerManager {
             workers_capacity,
             workers: RefCell::new(HashMap::new()),
-            listen_addr: listen_addr.clone(),
-            listener: RefCell::new(TcpListener::bind(listen_addr.as_str()).unwrap_or_else(
-                |error| {
-                    log::error!("Worker Manager: failed to bind listener \"{error}\"");
-                    panic!();
-                },
-            )),
+            listen_addr,
+            listener,
             kill_idle_workers: RefCell::new(None),
             job_queue: RefCell::new(Weak::new()),
             events,
@@ -400,7 +407,16 @@ impl Source for WorkerManager {
 
     /// start dispatching after the event arrives
     fn dispatch(&self, _: &libevent::Events) -> Result<i32, libevent::Error> {
-        let (mut stream, _) = self.listener.borrow_mut().accept().unwrap();
+        let (mut stream, _) = match self.listener.borrow_mut().accept() {
+            Ok((s, sa)) => (s, sa),
+            Err(e) => {
+                // WouldBlock error is expected when a large number of uevents are triggered in a shot interval
+                if e.kind() != std::io::ErrorKind::WouldBlock {
+                    log::error!("failed to listen worker ack ({})", e.kind());
+                }
+                return Ok(0);
+            }
+        };
         let mut ack = String::new();
         stream.read_to_string(&mut ack).unwrap();
 
