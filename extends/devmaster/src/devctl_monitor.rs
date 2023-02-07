@@ -62,7 +62,7 @@ impl Source for DevctlMonitorX {
         };
 
         println!(
-            "{} >> {:?} {} ({})",
+            "{} >> {} {} ({})",
             self.prefix,
             device.action.unwrap(),
             device.devpath,
