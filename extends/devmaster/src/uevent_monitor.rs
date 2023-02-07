@@ -77,6 +77,8 @@ impl Source for Monitor {
             },
         };
 
+        log::debug!("Monitor: received device {}", device.devpath);
+
         self.job_queue.job_queue_insert(device);
         self.job_queue.job_queue_start();
         Ok(0)
