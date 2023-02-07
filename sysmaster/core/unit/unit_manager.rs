@@ -387,6 +387,10 @@ impl UmIf for UnitManager {
             Err(UnitActionError::UnitActionENoent)
         }
     }
+
+    fn restart_unit(&self, name: &str) -> Result<(), MngErrno> {
+        self.restart_unit(name)
+    }
 }
 
 /// the declaration "pub(self)" is for identification only.

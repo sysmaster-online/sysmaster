@@ -61,6 +61,30 @@ pub(super) enum NotifyAccess {
     Main,
 }
 
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy)]
+pub(super) enum ServiceRestart {
+    #[serde(alias = "no")]
+    No,
+    #[serde(alias = "on-success")]
+    OnSuccess,
+    #[serde(alias = "on-failure")]
+    OnFailure,
+    #[serde(alias = "on-watchdog")]
+    OnWatchdog,
+    #[serde(alias = "on-abnormal")]
+    OnAbnormal,
+    #[serde(alias = "on-abort")]
+    OnAbort,
+    #[serde(alias = "always")]
+    Always,
+}
+
+impl Default for ServiceRestart {
+    fn default() -> Self {
+        ServiceRestart::No
+    }
+}
+
 #[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
 pub(super) struct SectionService {
     #[config(deserialize_with = ServiceType::deserialize_with)]
@@ -100,6 +124,11 @@ pub(super) struct SectionService {
     pub Group: String,
     #[config(default = "0022")]
     pub UMask: String,
+    #[config(default = "no")]
+    pub Restart: ServiceRestart,
+    pub RestartPreventExitStatus: Option<String>,
+    #[config(default = 0)]
+    pub RestartSec: u64,
 }
 
 impl SectionService {
@@ -139,6 +168,7 @@ pub(super) enum ServiceState {
     FinalWatchdog,
     FinalSigterm,
     FinalSigkill,
+    AutoRestart,
     Failed,
     Cleaning,
 }
@@ -156,6 +186,11 @@ pub(super) enum ServiceResult {
     FailureResources,
     FailureSignal,
     FailureStartLimitHit,
+    FailureWatchdog,
+    FailureExitCode,
+    FailureCoreDump,
+    FailureTimeout,
+    SkipCondition,
     ResultInvalid,
 }
 
@@ -193,6 +228,9 @@ struct ServiceReMng {
     control_cmd_type: Option<ServiceCommand>,
     control_cmd_len: usize,
     notify_state: NotifyState,
+    forbid_restart: bool,
+    reset_restart: bool,
+    restarts: u32,
 }
 
 impl ServiceReMng {
@@ -206,6 +244,9 @@ impl ServiceReMng {
         control_cmd_type: Option<ServiceCommand>,
         control_cmd_len: usize,
         notify_state: NotifyState,
+        forbid_restart: bool,
+        reset_restart: bool,
+        restarts: u32,
     ) -> ServiceReMng {
         ServiceReMng {
             state,
@@ -216,6 +257,9 @@ impl ServiceReMng {
             control_cmd_type,
             control_cmd_len,
             notify_state,
+            forbid_restart,
+            reset_restart,
+            restarts,
         }
     }
 }
@@ -261,6 +305,9 @@ impl ServiceRe {
         control_cmd_type: Option<ServiceCommand>,
         control_cmd_len: usize,
         notify_state: NotifyState,
+        forbid_restart: bool,
+        reset_restart: bool,
+        restarts: u32,
     ) {
         let m_pid = main_pid.map(|x| x.as_raw());
         let c_pid = control_pid.map(|x| x.as_raw());
@@ -273,6 +320,9 @@ impl ServiceRe {
             control_cmd_type,
             control_cmd_len,
             notify_state,
+            forbid_restart,
+            reset_restart,
+            restarts,
         );
         self.mng.0.insert(unit_id.to_string(), mng);
     }
@@ -294,6 +344,9 @@ impl ServiceRe {
         Option<ServiceCommand>,
         usize,
         NotifyState,
+        bool,
+        bool,
+        u32,
     )> {
         let mng = self.mng.0.get(unit_id);
         mng.map(|m| {
@@ -306,6 +359,9 @@ impl ServiceRe {
                 m.control_cmd_type,
                 m.control_cmd_len,
                 m.notify_state,
+                m.forbid_restart,
+                m.reset_restart,
+                m.restarts,
             )
         })
     }

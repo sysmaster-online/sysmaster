@@ -2,9 +2,10 @@ use super::service_comm::ServiceUnitComm;
 use super::service_config::ServiceConfig;
 use super::service_pid::ServicePid;
 use super::service_rentry::{
-    NotifyState, ServiceCommand, ServiceResult, ServiceState, ServiceType,
+    NotifyState, ServiceCommand, ServiceRestart, ServiceResult, ServiceState, ServiceType,
 };
 use super::service_spawn::ServiceSpawn;
+use crate::service_rentry::ExitStatus;
 use libevent::{EventState, EventType, Events, Source};
 use libutils::{fd_util, Error, IN_SET};
 use libutils::{file_util, process_util};
@@ -63,6 +64,9 @@ impl ReStation for ServiceMng {
             control_cmd_type,
             control_cmd_len,
             notify_state,
+            forbid_restart,
+            reset_restart,
+            restarts,
         )) = self.comm.rentry_mng_get()
         {
             *self.state.borrow_mut() = state;
@@ -72,6 +76,9 @@ impl ReStation for ServiceMng {
             self.main_command_update(main_cmd_len);
             self.control_command_update(control_cmd_type, control_cmd_len);
             self.rd.set_notify_state(notify_state);
+            self.rd.set_forbid_restart(forbid_restart);
+            self.rd.set_reset_restart(reset_restart);
+            self.rd.set_restarts(restarts);
         }
     }
 
@@ -85,6 +92,9 @@ impl ReStation for ServiceMng {
             *self.control_cmd_type.borrow(),
             self.control_command.borrow().len(),
             self.rd.notify_state(),
+            self.rd.forbid_restart(),
+            self.rd.reset_restart(),
+            self.rd.restarts(),
         );
     }
 
@@ -141,7 +151,7 @@ impl ServiceMng {
         }
         let ret = self.comm.owner().map(|u| u.test_start_limit());
         if ret.is_none() || !ret.unwrap() {
-            self.enter_dead(ServiceResult::FailureStartLimitHit);
+            self.enter_dead(ServiceResult::FailureStartLimitHit, false);
             return Err(UnitActionError::UnitActionECanceled);
         }
 
@@ -149,6 +159,10 @@ impl ServiceMng {
     }
 
     pub(super) fn start_action(&self) {
+        if self.rd.reset_restart() {
+            self.rd.clear_restarts();
+            self.rd.set_reset_restart(false);
+        }
         self.set_result(ServiceResult::Success);
         self.enter_contion();
         self.db_update();
@@ -171,6 +185,7 @@ impl ServiceMng {
     }
 
     pub(super) fn stop_action(&self) {
+        self.rd.set_forbid_restart(true);
         let starting_state = vec![
             ServiceState::Condition,
             ServiceState::StartPre,
@@ -206,7 +221,7 @@ impl ServiceMng {
                 match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
-                        self.enter_dead(ServiceResult::FailureResources);
+                        self.enter_dead(ServiceResult::FailureResources, true);
                         return;
                     }
                 }
@@ -227,7 +242,7 @@ impl ServiceMng {
                 match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
-                        self.enter_dead(ServiceResult::FailureResources);
+                        self.enter_dead(ServiceResult::FailureResources, true);
                         return;
                     }
                 }
@@ -352,6 +367,7 @@ impl ServiceMng {
 
     fn enter_stop(&self, res: ServiceResult) {
         log::debug!("enter running stop command");
+
         if self.result() == ServiceResult::Success {
             self.set_result(res);
         }
@@ -411,8 +427,13 @@ impl ServiceMng {
         }
     }
 
-    fn enter_dead(&self, res: ServiceResult) {
+    fn enter_dead(&self, res: ServiceResult, force_restart: bool) {
         log::debug!("Running into dead state, res: {:?}", res);
+        let mut restart = force_restart;
+        if self.comm.um().has_stop_job(self.comm.owner().unwrap().id()) {
+            restart = false;
+        }
+
         if self.result() == ServiceResult::Success {
             self.set_result(res);
         }
@@ -423,7 +444,22 @@ impl ServiceMng {
             ServiceState::Failed
         };
 
+        if !restart {
+            log::debug!("not allowded restart");
+        } else {
+            restart = self.shall_restart();
+        }
+
         self.set_state(state);
+
+        if restart {
+            self.enable_timer(self.config.config_data().borrow().Service.RestartSec);
+            self.set_state(ServiceState::AutoRestart);
+        } else {
+            self.rd.set_reset_restart(true);
+        }
+
+        self.rd.set_forbid_restart(false);
     }
 
     fn enter_reload(&self) {
@@ -445,6 +481,31 @@ impl ServiceMng {
             }
             None => self.enter_running(ServiceResult::Success),
         }
+    }
+
+    fn enter_restart(&self) {
+        if self.comm.um().has_stop_job(self.comm.owner().unwrap().id()) {
+            log::info!("there is stop in pending, not restart");
+            return;
+        }
+
+        if let Err(e) = self.comm.um().restart_unit(&self.comm.get_owner_id()) {
+            log::debug!(
+                "failed to restart unit:{}, errno: {:?}",
+                &self.comm.get_owner_id(),
+                e
+            );
+            self.enter_dead(ServiceResult::FailureResources, false);
+            return;
+        }
+
+        self.rd.add_restarts();
+        self.rd.set_reset_restart(false);
+        log::info!(
+            "restart unit {}; restart times: {}",
+            &self.comm.get_owner_id(),
+            self.rd.restarts()
+        );
     }
 
     fn enter_signal(&self, state: ServiceState, res: ServiceResult) {
@@ -475,7 +536,7 @@ impl ServiceMng {
                     ) {
                         return self.enter_stop_post(ServiceResult::FailureResources);
                     } else {
-                        return self.enter_dead(ServiceResult::Success);
+                        return self.enter_dead(ServiceResult::FailureResources, true);
                     }
                 }
             }
@@ -492,7 +553,7 @@ impl ServiceMng {
         } else if vec![ServiceState::FinalWatchdog, ServiceState::FinalSigterm].contains(&state) {
             self.enter_signal(ServiceState::FinalSigkill, ServiceResult::Success);
         } else {
-            self.enter_dead(ServiceResult::Success);
+            self.enter_dead(ServiceResult::Success, true);
         }
     }
 
@@ -598,7 +659,7 @@ impl ServiceMng {
         state.to_string()
     }
 
-    fn state(&self) -> ServiceState {
+    pub(super) fn state(&self) -> ServiceState {
         *self.state.borrow()
     }
 
@@ -652,20 +713,6 @@ impl ServiceMng {
             assert_eq!(len, 0);
         }
     }
-
-    // fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Vec<ExecCommand> {
-    //     if let Some(cmds) = self.exec_commands.borrow_mut().get(&cmd_type) {
-    //         cmds.as_slice()
-    //     } else {
-    //         Vec::new()
-    //     }
-    // }
-
-    // fn insert_exec_cmds(&mut self, cmd_type: ServiceCommand, cmds: Vec<ExecCommand>) {
-    //     self.exec_commands
-    //         .borrow_mut()
-    //         .insert(cmd_type, cmds.clone());
-    // }
 
     fn load_pid_file(&self) -> Result<bool, Error> {
         let pid_file = self
@@ -844,6 +891,53 @@ impl ServiceMng {
             }
         }
     }
+
+    fn shall_restart(&self) -> bool {
+        if self.rd.forbid_restart() {
+            return false;
+        }
+
+        match self.config.config_data().borrow().Service.Restart {
+            ServiceRestart::No => false,
+            ServiceRestart::OnSuccess => self.result() == ServiceResult::Success,
+            ServiceRestart::OnFailure => !matches!(
+                self.result(),
+                ServiceResult::Success | ServiceResult::SkipCondition
+            ),
+            ServiceRestart::OnWatchdog => self.result() == ServiceResult::FailureWatchdog,
+            ServiceRestart::OnAbnormal => !matches!(
+                self.result(),
+                ServiceResult::Success
+                    | ServiceResult::FailureExitCode
+                    | ServiceResult::SkipCondition
+            ),
+            ServiceRestart::OnAbort => {
+                matches!(
+                    self.result(),
+                    ServiceResult::FailureSignal | ServiceResult::FailureCoreDump
+                )
+            }
+            ServiceRestart::Always => self.result() != ServiceResult::SkipCondition,
+        }
+    }
+
+    fn enable_timer(&self, usec: u64) {
+        if self.rd.armd_timer() {
+            self.rd.timer().set_time(usec);
+
+            let events = self.comm.um().events();
+            let source = self.rd.timer();
+            events.set_enabled(source, EventState::OneShot).unwrap();
+            return;
+        }
+
+        let timer = Rc::new(ServiceTimer::new(usec));
+        self.rd.attach_timer(timer.clone());
+
+        let events = self.comm.um().events();
+        events.add_source(timer.clone()).unwrap();
+        events.set_enabled(timer, EventState::OneShot).unwrap();
+    }
 }
 
 impl ServiceMng {
@@ -930,7 +1024,7 @@ impl ServiceMng {
                         self.enter_stop_post(res);
                     }
                     ServiceState::FinalSigterm | ServiceState::FinalSigkill => {
-                        self.enter_dead(res);
+                        self.enter_dead(res, true);
                     }
                     _ => {}
                 }
@@ -1020,6 +1114,7 @@ impl ServiceMng {
                     if res != ServiceResult::Success {
                         self.enter_signal(ServiceState::StopSigterm, res);
                     }
+
                     if self.config.config_data().borrow().Service.PIDFile.is_some() {
                         let loaded = self.load_pid_file();
                         if loaded.is_err() {
@@ -1059,7 +1154,7 @@ impl ServiceMng {
                     self.enter_signal(ServiceState::FinalSigterm, res);
                 }
                 ServiceState::FinalSigterm | ServiceState::FinalSigkill => {
-                    self.enter_dead(res);
+                    self.enter_dead(res, true);
                 }
                 _ => {}
             }
@@ -1147,7 +1242,8 @@ impl ServiceState {
             ServiceState::Condition
             | ServiceState::StartPre
             | ServiceState::Start
-            | ServiceState::StartPost => UnitActiveState::UnitActivating,
+            | ServiceState::StartPost
+            | ServiceState::AutoRestart => UnitActiveState::UnitActivating,
             ServiceState::Running | ServiceState::Exited => UnitActiveState::UnitActive,
             ServiceState::Reload => UnitActiveState::UnitReloading,
             ServiceState::Stop
@@ -1183,6 +1279,7 @@ impl ServiceState {
             | ServiceState::FinalWatchdog => UnitActiveState::UnitDeActivating,
             ServiceState::Failed => UnitActiveState::UnitFailed,
             ServiceState::Cleaning => UnitActiveState::UnitMaintenance,
+            ServiceState::AutoRestart => UnitActiveState::UnitActivating,
         }
     }
 
@@ -1241,12 +1338,62 @@ impl RunningData {
     pub(self) fn notify_state(&self) -> NotifyState {
         self.data.borrow().notify_state()
     }
+
+    pub(self) fn set_forbid_restart(&self, forbid_restart: bool) {
+        self.data.borrow_mut().set_forbid_restart(forbid_restart);
+    }
+
+    pub(self) fn forbid_restart(&self) -> bool {
+        self.data.borrow().forbid_restart()
+    }
+
+    pub(self) fn set_reset_restart(&self, reset: bool) {
+        self.data.borrow_mut().set_reset_restart(reset);
+    }
+
+    pub(self) fn reset_restart(&self) -> bool {
+        self.data.borrow().reset_restart()
+    }
+
+    pub(self) fn attach_timer(&self, timer: Rc<ServiceTimer>) {
+        timer.attach_mng(self.mng.borrow_mut().clone());
+        self.data.borrow_mut().attach_timer(timer)
+    }
+
+    pub(self) fn timer(&self) -> Rc<ServiceTimer> {
+        self.data.borrow().timer()
+    }
+
+    pub(self) fn armd_timer(&self) -> bool {
+        self.data.borrow().armd_timer()
+    }
+
+    pub(super) fn add_restarts(&self) {
+        self.data.borrow_mut().add_restarts();
+    }
+
+    pub(super) fn clear_restarts(&self) {
+        self.data.borrow_mut().clear_restarts();
+    }
+
+    pub(super) fn set_restarts(&self, restarts: u32) {
+        self.data.borrow_mut().set_restarts(restarts);
+    }
+
+    pub(self) fn restarts(&self) -> u32 {
+        self.data.borrow().restarts()
+    }
 }
 
 struct Rtdata {
     errno: i32,
     notify_state: NotifyState,
     path_inotify: Option<Rc<PathIntofy>>,
+
+    forbid_restart: bool,
+    reset_restarts: bool,
+    restarts: u32,
+    timer: Option<Rc<ServiceTimer>>,
 }
 
 impl Rtdata {
@@ -1255,6 +1402,10 @@ impl Rtdata {
             errno: 0,
             notify_state: NotifyState::Unknown,
             path_inotify: None,
+            forbid_restart: false,
+            reset_restarts: false,
+            restarts: 0,
+            timer: None,
         }
     }
 
@@ -1281,6 +1432,50 @@ impl Rtdata {
 
     pub(self) fn path_inotify(&self) -> Rc<PathIntofy> {
         self.path_inotify.as_ref().unwrap().clone()
+    }
+
+    pub(self) fn set_forbid_restart(&mut self, forbid_restart: bool) {
+        self.forbid_restart = forbid_restart
+    }
+
+    pub(self) fn forbid_restart(&self) -> bool {
+        self.forbid_restart
+    }
+
+    pub(self) fn set_reset_restart(&mut self, reset: bool) {
+        self.reset_restarts = reset
+    }
+
+    pub(self) fn reset_restart(&self) -> bool {
+        self.reset_restarts
+    }
+
+    pub(self) fn attach_timer(&mut self, timer: Rc<ServiceTimer>) {
+        self.timer = Some(timer)
+    }
+
+    pub(self) fn timer(&self) -> Rc<ServiceTimer> {
+        self.timer.as_ref().unwrap().clone()
+    }
+
+    pub(self) fn armd_timer(&self) -> bool {
+        self.timer.is_some()
+    }
+
+    pub(self) fn add_restarts(&mut self) {
+        self.restarts += 1;
+    }
+
+    pub(self) fn clear_restarts(&mut self) {
+        self.restarts = 0;
+    }
+
+    pub(super) fn set_restarts(&mut self, restarts: u32) {
+        self.restarts = restarts;
+    }
+
+    pub(self) fn restarts(&self) -> u32 {
+        self.restarts
     }
 }
 
@@ -1473,6 +1668,90 @@ impl Source for PathIntofy {
         let ret = self.do_dispatch();
         self.mng().db_update();
         ret
+    }
+
+    fn token(&self) -> u64 {
+        let data: u64 = unsafe { std::mem::transmute(self) };
+        data
+    }
+}
+
+pub(super) struct ServiceTimer {
+    time: RefCell<u64>,
+    mng: RefCell<Weak<ServiceMng>>,
+}
+
+impl ServiceTimer {
+    pub fn new(usec: u64) -> Self {
+        ServiceTimer {
+            time: RefCell::new(usec),
+            mng: RefCell::new(Weak::new()),
+        }
+    }
+
+    pub(super) fn attach_mng(&self, mng: Weak<ServiceMng>) {
+        *self.mng.borrow_mut() = mng;
+    }
+
+    pub(super) fn set_time(&self, usec: u64) {
+        *self.time.borrow_mut() = usec
+    }
+
+    pub(self) fn mng(&self) -> Rc<ServiceMng> {
+        self.mng.borrow().clone().upgrade().unwrap()
+    }
+
+    fn do_dispatch(&self) -> libevent::Result<i32> {
+        log::debug!("dispatch service timer");
+
+        match self.mng().state() {
+            ServiceState::Dead => todo!(),
+            ServiceState::Condition => todo!(),
+            ServiceState::Start => todo!(),
+            ServiceState::StartPost => todo!(),
+            ServiceState::Running => {
+                self.mng().enter_stop(ServiceResult::FailureTimeout);
+            }
+            ServiceState::Exited => todo!(),
+            ServiceState::Reload => todo!(),
+            ServiceState::StartPre => todo!(),
+            ServiceState::Stop => todo!(),
+            ServiceState::StopWatchdog => todo!(),
+            ServiceState::StopPost => todo!(),
+            ServiceState::StopSigterm => todo!(),
+            ServiceState::StopSigkill => todo!(),
+            ServiceState::FinalWatchdog => todo!(),
+            ServiceState::FinalSigterm => todo!(),
+            ServiceState::FinalSigkill => todo!(),
+            ServiceState::AutoRestart => {
+                self.mng().enter_restart();
+            }
+            ServiceState::Failed => todo!(),
+            ServiceState::Cleaning => todo!(),
+        }
+        Ok(0)
+    }
+}
+
+impl Source for ServiceTimer {
+    fn fd(&self) -> RawFd {
+        0
+    }
+
+    fn event_type(&self) -> EventType {
+        EventType::TimerMonotonic
+    }
+
+    fn epoll_event(&self) -> u32 {
+        (libc::EPOLLIN) as u32
+    }
+
+    fn time_relative(&self) -> u64 {
+        *self.time.borrow() * 1000000
+    }
+
+    fn dispatch(&self, _: &Events) -> Result<i32, libevent::Error> {
+        self.do_dispatch()
     }
 
     fn token(&self) -> u64 {

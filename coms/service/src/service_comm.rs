@@ -77,6 +77,9 @@ impl ServiceUnitComm {
         control_cmd_type: Option<ServiceCommand>,
         control_cmd_len: usize,
         notify_state: NotifyState,
+        forbid_restart: bool,
+        reset_restart: bool,
+        restarts: u32,
     ) {
         if let Some(u) = self.owner() {
             self.rentry().mng_insert(
@@ -89,6 +92,9 @@ impl ServiceUnitComm {
                 control_cmd_type,
                 control_cmd_len,
                 notify_state,
+                forbid_restart,
+                reset_restart,
+                restarts,
             )
         }
     }
@@ -105,6 +111,9 @@ impl ServiceUnitComm {
         Option<ServiceCommand>,
         usize,
         NotifyState,
+        bool,
+        bool,
+        u32,
     )> {
         self.owner().map(|u| self.rentry().mng_get(u.id()))?
     }
