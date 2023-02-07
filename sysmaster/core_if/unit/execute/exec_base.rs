@@ -194,6 +194,7 @@ impl ExecParameters {
         // 1. If user_str is empty, treat it as UID 0
         if user_str.is_empty() {
             self.user = User::from_uid(Uid::from_raw(0)).unwrap();
+            return Ok(());
         }
         // 2. Try to parse user_str as UID
         if let Ok(user) = libutils::user_group_util::parse_uid(&user_str) {
