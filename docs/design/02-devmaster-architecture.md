@@ -1,8 +1,4 @@
-目 录
-
-[TOC]
-
-
+# devmaster组件架构设计
 
 **Keywords** **关键词**： *devmaster*
 
@@ -80,7 +76,7 @@ devmaster是sysMaster的设备管理模块，是支撑sysMaster在虚拟机、�
 
 ## 4.1 总体方案
 
-![](../res/devmaster_architecture.jpg)
+![](../assets/devmaster_architecture.jpg)
 
 devmaster总体架构分两个粗粒度模块：服务端程序devmaster和客户端程序devmaster-cli。
 
@@ -99,11 +95,11 @@ devmaster总体架构分两个粗粒度模块：服务端程序devmaster和客�
 
 1. worker定义结构体Worker进行封装，每个worker持有一个线程句柄，每个线程同一时间最多能处理一个设备，Worker有5种状态：WORKER_UNDEF表示刚初始化，还未开始监听WokerManager的派发任务；WORKER_IDLE表示Worker线程正在执行，等待WorkerManager派送设备任务；WORKER_RUNNING表示正在处理一个设备，同一时间一个worker只能有一个正在处理的设备；WORKER_KILLING表示正在杀死这个Worker，如果Worker正在处理一个设备，要等该Worker处理完，向WokerManager发送应答消息后再真正执行杀的动作；WORKER_KILLED表示这个Worker已经杀死，等待从WokerManager控制块中清理残留。
 
-![](../res/devmaster_worker_state_machine.jpg)
+![](../assets/devmaster_worker_state_machine.jpg)
 
 2. WorkerManager结构体对所有worker集中管理：对每个worker，分配一个channel，worker中持有发送端，接收端所有权转移至线程中；通过一个Tcp端口监听所有worker的响应消息，消息溯源通过消息内容进行区分。
 
-![](../res/devmaster_worker_communicate.jpg)
+![](../assets/devmaster_worker_communicate.jpg)
 
 
 # 5    可靠性/可用性/Function Safety设计

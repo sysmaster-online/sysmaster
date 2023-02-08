@@ -9,7 +9,7 @@ hide:
 
 sysMaster是openEuler对当前Linux系统初始化和服务管理在嵌入式，服务器，云化等不同场景下面临的问题和特点进行总结和思考后，开展的一种改进和探索，提供统一的，能够支持嵌入式，服务器，云场景下的系统初始化和服务（进程，容器，虚拟机）管理系统。
 
-<center>![avatar](res/sysmaster-desc.jpeg)</center>
+<center>![](assets/sysmaster-desc.jpeg)</center>
 
 ## Linux的初始化系统和服务管理
 
@@ -27,7 +27,7 @@ Systemd对Sysvinit做出了很大的改进，尤其是启动速度上，功能�
 
 根据维护问题的统计追踪，Systemd每个版本引入的问题都不是一个收敛状态，并且近些年问题越来越多。而且由于1号进程特殊性，这些问题会带来系统级别的宕机。
 
-<center>![avatar](res/sysmaster_problem.png)</center>
+<center>![avatar](assets/systemd_problems.png)</center>
 
 ## 云的服务管理
 
@@ -35,7 +35,7 @@ Systemd对Sysvinit做出了很大的改进，尤其是启动速度上，功能�
 
 对于Node（VM，Host）内部的一些关键服务，如Ngnix，通过Systemd进行生命周期的管理，并且这些服务也是分布式的，当前出现问题，由服务自行进行处理，无法像容器实例和虚拟机实例一样通过类似K8S、OpenStack平台统一编排。
 
-<center>![avatar](res/cloud_ori.jpg)</center>
+<center>![avatar](assets/cloud_ori.jpg)</center>
 
 ## sysMaster应该聚焦什么？
 
@@ -53,7 +53,7 @@ Systemd对Sysvinit做出了很大的改进，尤其是启动速度上，功能�
 
 ## 极致可靠、轻量，满足嵌入式，服务器、云多种场景
 
-<center>![avatar](res/sysmaster_arch_desc.jpg)</center>
+<center>![avatar](assets/sysmaster_arch_desc.jpg)</center>
 
 sysMaster通过多级拆分的1+1+N架构，确保每个组件专注自己的职责，降低单组件的复杂性，确保组件架构的及简，从而提升系统整体架构扩展性，和适应性，并降低开发和维护的成本，并拥有以下主要特特点：
 
@@ -75,4 +75,44 @@ sysMaster定位为支持嵌入式和服务器，云等全场景的支持，当�
 
 sysMaster吸收现有运化场景的一些特点，结合容器引擎(iSulad)和Qemu，提供统一的容器实例和虚拟化实例的管理接口，以及由sysMaster管理的一些关键应用实例的管理统一对接到Kubernetes和OpenStack。
 
-<center>![avatar](res/cloud_new.jpg)</center>
+<center>![avatar](assets/cloud_new.jpg)</center>
+
+## sysmaster项目里程碑及愿景
+
+<center><img src="assets/sysmaster-description.jpg" alt="atlas" style="zoom: 150%;" /></center>
+
+## 代码目录结构说明
+
+源码仓库以workspaces方式管理，每一个目录是一个package，每个package包含一个crate（lib或bin形式），
+公共lib crate的目录带lib前缀，使用cargo new --lib libtests创建,
+daemon类型的bin crate的目录以d结尾。
+
+```text
+/ (根目录)
+|...coms (插件)
+|      |...service (unit type crate)
+|      |...socket  (unit type crate)
+|      |...target  (unit type crate)
+|...libs (对外接口)
+|      |...libtest (test lib crate)
+|      |...libcgroup (cgroup lib crate)
+|      |...libcmdproto(cmd proto lib crate)
+|...extends (sysmaster-extends组件)
+|     |...sysmaster (daemon,and libsysmaster
+|     |...udevd (daemon)
+|     |...random-seed (bin)
+|...sysmaster (sysmaster-core核心组件)
+|...tools
+|     |...musl_build
+|     |...run_with_sd
+|...docs
+|...requirements.sh (安装依赖)
+```
+
+如：
+
+```text
+  - lib crate: libs/libevent, libs/libutils
+  - bin crate: extends/init, sysmaster
+  - daemon crate: extends/udevd, extends/logind
+```
