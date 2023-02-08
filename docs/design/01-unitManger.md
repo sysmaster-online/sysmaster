@@ -54,11 +54,11 @@ Unit接口定义Unit子类的公共行为，每种子类必须实现这些接口
 每个unit都会包含配置文件，并且Unit的配置文件和Unit同名，并且以Unit的类型作为扩展名，如XXX.service, XXX.socket。
 
 unit配置文件存储路径为：
-|配置文件路径|   优先级           |
-|    --     |   --              |
-|/etc/sysmaster| 第一优先级      |
-|/run/sysmaster| 第二优先级      |
-|/usr/lib/sysmaster|  第三优先级 |
+| 配置文件路径       | 优先级     |
+| ------------------ | ---------- |
+| /etc/sysmaster     | 第一优先级 |
+| /run/sysmaster     | 第二优先级 |
+| /usr/lib/sysmaster | 第三优先级 |
 
 配置目录下可以存在同名的文件，同名的文件高优先级的会覆盖低优先级的的配置，Unit的配置文件和Unit的对应关系会在首次加载的时候完成缓存，只有在目录发生更新的时候才会刷新缓存的映射关系。
 

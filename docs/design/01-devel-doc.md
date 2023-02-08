@@ -1,4 +1,4 @@
-# sysmaster 扩展子类开发指南 #
+# 扩展子类开发指南
 
 sysmaster为Linux系统下的一号进程，是linux内核启动后第一个用户态进程，在系统启动过程中和关机过程中，完成相关资源的初始化和回收工作：
 
@@ -17,7 +17,7 @@ sysmaster支撑以上工作，提供可以扩展的开发框架，支持开发�
 
 需要启动的进程，初始化的系统配置，如网络配置，
 本文当详细描述，如何基于sysmaster开发框架，sysmaster扩展开发新的子类，具体的开发流程如下：
-![avatar](../res/u_dev_process.jpg)
+![avatar](../assets/u_dev_process.jpg)
 
 ## 子类UnitSubClass实现 ##
 

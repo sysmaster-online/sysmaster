@@ -4,7 +4,7 @@
 //!  2. Execution stage: create unit instance and execute specific actions defined by unit.
 //! #  Overall abstraction
 //!  Unit is the basic unit abstraction of sysmaster management. Systemd originally contains 9 types. sysmaster supports the expansion of Unit into multiple types. The overall architecture is as follows:
-//! ! [avatar][../../../../docs/res/unit_c_diagram.jpg]
+//! ! [avatar][../../../../docs/assets/unit_c_diagram.jpg]
 //!  It contains two core objects: SubUnit, Unit and the implementation of a sub Unit.
 //!  SubUnit is the interface abstraction of subclasses, including the interfaces that subclasses must implement. It is represented by trait in trust. See ['SubUnit'] for specific definitions
 //! #  Configuration Item Description
