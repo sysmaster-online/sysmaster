@@ -1,10 +1,7 @@
 use super::uu_base::UeBase;
 use super::uu_cgroup::UeCgroup;
 use super::uu_child::UeChild;
-use super::uu_condition::{
-    UeCondition, ASSERT_PATH_EXISTS, CONDITION_FILE_NOT_EMPTY, CONDITION_NEEDS_UPDATE,
-    CONDITION_PATH_EXISTS,
-};
+use super::uu_condition::{assert_keys::*, condition_keys::*, UeCondition};
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use super::uu_ratelimit::StartLimit;
@@ -247,6 +244,26 @@ impl Unit {
                     .borrow()
                     .Unit
                     .ConditionPathExists
+                    .as_str(),
+            );
+
+            add_condition(
+                CONDITION_USER,
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionUser
+                    .as_str(),
+            );
+
+            add_condition(
+                CONDITION_FIRST_BOOT,
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionFirstBoot
                     .as_str(),
             );
 

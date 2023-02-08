@@ -1,12 +1,18 @@
 use libutils::condition::{Condition, ConditionType};
 use std::cell::RefCell;
 
-pub(super) const CONDITION_PATH_EXISTS: &str = "ConditionPathExists";
-pub(super) const CONDITION_FILE_NOT_EMPTY: &str = "ConditionFileNotEmpty";
-pub(super) const CONDITION_NEEDS_UPDATE: &str = "ConditionNeedsUpdate";
+pub(super) mod condition_keys {
+    pub(crate) const CONDITION_PATH_EXISTS: &str = "ConditionPathExists";
+    pub(crate) const CONDITION_FILE_NOT_EMPTY: &str = "ConditionFileNotEmpty";
+    pub(crate) const CONDITION_FIRST_BOOT: &str = "ConditionFirstBOOT";
+    pub(crate) const CONDITION_NEEDS_UPDATE: &str = "ConditionNeedsUpdate";
+    pub(crate) const CONDITION_USER: &str = "ConditionUser";
+}
 
-pub(super) const ASSERT_PATH_EXISTS: &str = "AssertPathExists";
-pub(super) const ASSERT_FILE_NOT_EMPTY: &str = "AssertFileNotEmpty";
+pub(super) mod assert_keys {
+    pub(crate) const ASSERT_PATH_EXISTS: &str = "AssertPathExists";
+    pub(crate) const ASSERT_FILE_NOT_EMPTY: &str = "AssertFileNotEmpty";
+}
 
 pub(super) struct UeCondition {
     init_flag: RefCell<i8>,
@@ -61,17 +67,15 @@ impl UeCondition {
         if _params.is_empty() {
             return;
         }
-
+        use condition_keys::*;
         let c_type = match condop {
             CONDITION_PATH_EXISTS => ConditionType::PathExists,
             CONDITION_FILE_NOT_EMPTY => ConditionType::FileNotEmpty,
             CONDITION_NEEDS_UPDATE => ConditionType::NeedsUpdate,
-            _ => ConditionType::_MAX,
+            CONDITION_USER => ConditionType::User,
+            CONDITION_FIRST_BOOT => ConditionType::FirstBoot,
+            _ => return,
         };
-
-        if c_type == ConditionType::_MAX {
-            return;
-        }
         let condition = self.new_condition(c_type, _params);
         self.conditions.borrow_mut().0.push(condition);
     }
@@ -80,15 +84,12 @@ impl UeCondition {
         if _params.is_empty() {
             return;
         }
+        use assert_keys::*;
         let c_type = match assertop {
             ASSERT_PATH_EXISTS => ConditionType::PathExists,
             ASSERT_FILE_NOT_EMPTY => ConditionType::FileNotEmpty,
-            _ => ConditionType::_MAX,
+            _ => return,
         };
-
-        if c_type == ConditionType::_MAX {
-            return;
-        }
 
         let condition = self.new_condition(c_type, _params);
         self.asserts.borrow_mut().0.push(condition);
