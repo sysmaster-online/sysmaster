@@ -34,6 +34,44 @@ pub enum UnitActiveState {
     UnitMaintenance,
 }
 
+impl UnitActiveState {
+    ///
+    pub fn is_active_or_reloading(&self) -> bool {
+        matches!(
+            self,
+            UnitActiveState::UnitActive | UnitActiveState::UnitReloading
+        )
+    }
+
+    ///
+    pub fn is_inactive_or_failed(&self) -> bool {
+        matches!(
+            self,
+            UnitActiveState::UnitInActive | UnitActiveState::UnitFailed
+        )
+    }
+
+    ///
+    pub fn is_active_or_activating(&self) -> bool {
+        matches!(
+            self,
+            UnitActiveState::UnitActive
+                | UnitActiveState::UnitActivating
+                | UnitActiveState::UnitReloading
+        )
+    }
+
+    ///
+    pub fn is_inactive_or_deactivating(&self) -> bool {
+        matches!(
+            self,
+            UnitActiveState::UnitInActive
+                | UnitActiveState::UnitFailed
+                | UnitActiveState::UnitDeActivating
+        )
+    }
+}
+
 impl std::fmt::Display for UnitActiveState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

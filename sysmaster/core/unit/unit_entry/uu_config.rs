@@ -3,6 +3,8 @@ use super::uu_base::UeBase;
 use crate::core::unit::uload_util::UnitFile;
 use crate::core::unit::unit_rentry::{UeConfigInstall, UeConfigUnit};
 use confique::Config;
+use libutils::serialize::DeserializeWith;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::RefCell;
 use std::error::Error as stdError;
 use std::rc::Rc;
@@ -14,6 +16,75 @@ pub(crate) struct UeConfig {
 
     // owned objects
     data: Rc<RefCell<UeConfigData>>,
+}
+
+#[allow(missing_docs)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UnitEmergencyAction {
+    #[serde(alias = "none")]
+    None,
+    #[serde(alias = "reboot")]
+    Reboot,
+    #[serde(alias = "reboot-force")]
+    RebootForce,
+    #[serde(alias = "reboot-immediate")]
+    RebootImmediate,
+    #[serde(alias = "poweroff")]
+    Poweroff,
+    #[serde(alias = "poweroff-force")]
+    PoweroffForce,
+    #[serde(alias = "poweroff-immediate")]
+    PoweroffImmediate,
+    #[serde(alias = "exit")]
+    Exit,
+    #[serde(alias = "exit-force")]
+    ExitForce,
+}
+
+impl Default for UnitEmergencyAction {
+    fn default() -> Self {
+        UnitEmergencyAction::None
+    }
+}
+
+impl DeserializeWith for UnitEmergencyAction {
+    type Item = Self;
+    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(de)?;
+
+        match s.as_ref() {
+            "none" => Ok(UnitEmergencyAction::None),
+            "reboot" => Ok(UnitEmergencyAction::Reboot),
+            "reboot-force" => Ok(UnitEmergencyAction::RebootForce),
+            "reboot-immediate" => Ok(UnitEmergencyAction::RebootImmediate),
+            "poweroff" => Ok(UnitEmergencyAction::Poweroff),
+            "poweroff-force" => Ok(UnitEmergencyAction::PoweroffForce),
+            "poweroff-immediate" => Ok(UnitEmergencyAction::PoweroffImmediate),
+            "exit" => Ok(UnitEmergencyAction::Exit),
+            "exit-force" => Ok(UnitEmergencyAction::ExitForce),
+            &_ => Ok(UnitEmergencyAction::None),
+        }
+    }
+}
+
+impl From<String> for UnitEmergencyAction {
+    fn from(action: String) -> Self {
+        match action.as_ref() {
+            "none" => UnitEmergencyAction::None,
+            "reboot" => UnitEmergencyAction::Reboot,
+            "reboot-force" => UnitEmergencyAction::RebootForce,
+            "reboot-immediate" => UnitEmergencyAction::RebootImmediate,
+            "poweroff" => UnitEmergencyAction::Poweroff,
+            "poweroff-force" => UnitEmergencyAction::PoweroffForce,
+            "poweroff-immediate" => UnitEmergencyAction::PoweroffImmediate,
+            "exit" => UnitEmergencyAction::Exit,
+            "exit-force" => UnitEmergencyAction::ExitForce,
+            _ => UnitEmergencyAction::None,
+        }
+    }
 }
 
 impl ReStation for UeConfig {

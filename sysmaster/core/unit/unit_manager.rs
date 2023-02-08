@@ -12,13 +12,14 @@ use super::execute::ExecSpawn;
 use super::notify::NotifyManager;
 use super::sigchld::Sigchld;
 use super::unit_datastore::UnitDb;
-use super::unit_entry::{Unit, UnitX};
+use super::unit_entry::{StartLimitResult, Unit, UnitEmergencyAction, UnitX};
 use super::unit_load::UnitLoad;
 use super::unit_rentry::{JobMode, UnitLoadState, UnitRe};
 use super::unit_runtime::UnitRT;
 use super::UnitRelationAtom;
 use super::UnitRelations;
 use crate::core::butil::table::{TableOp, TableSubscribe};
+use crate::core::manager::manager::State;
 use crate::core::manager::pre_install::{Install, PresetMode};
 use crate::core::unit::data::{DataManager, UnitState};
 use libevent::Events;
@@ -28,6 +29,7 @@ use libutils::process_util;
 use libutils::show_table::ShowTable;
 use libutils::Result;
 use nix::unistd::Pid;
+use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::io::Error;
 use std::path::PathBuf;
@@ -45,6 +47,7 @@ pub(in crate::core) struct UnitManagerX {
     sub_name: String, // key for table-subscriber: UnitState
     data: Rc<UnitManager>,
     lookup_path: Rc<LookupPaths>,
+    state: Rc<RefCell<State>>,
 }
 
 impl Drop for UnitManagerX {
@@ -60,16 +63,28 @@ impl UnitManagerX {
         eventr: &Rc<Events>,
         relir: &Rc<Reliability>,
         lookup_path: &Rc<LookupPaths>,
+        state: Rc<RefCell<State>>,
     ) -> UnitManagerX {
         let _dm = Rc::new(DataManager::new());
         let umx = UnitManagerX {
             dm: Rc::clone(&_dm),
             sub_name: String::from("UnitManagerX"),
-            data: UnitManager::new(eventr, relir, &_dm, lookup_path),
+            data: UnitManager::new(eventr, relir, &_dm, lookup_path, Rc::clone(&state)),
             lookup_path: Rc::clone(lookup_path),
+            state,
         };
         umx.register(&_dm, relir);
         umx
+    }
+
+    #[allow(unused)]
+    pub(crate) fn get_state(&self) -> State {
+        *((*self.state).borrow())
+    }
+
+    #[allow(unused)]
+    pub(crate) fn set_state(&self, state: State) {
+        *self.state.borrow_mut() = state;
     }
 
     pub(in crate::core) fn register_ex(&self) {
@@ -116,7 +131,11 @@ impl UnitManagerX {
     fn register(&self, dm: &DataManager, relir: &Reliability) {
         // dm-unit_state
         let subscriber = Rc::clone(&self.data);
-        let ret = dm.register_unit_state(&self.sub_name, subscriber);
+        let ret = dm.register_unit_state(&self.sub_name, subscriber.clone());
+        assert!(ret.is_none());
+
+        // dm-start_limit_result
+        let ret = dm.register_start_limit_result(&self.sub_name, subscriber);
         assert!(ret.is_none());
 
         // reliability-station
@@ -196,6 +215,8 @@ pub struct UnitManager {
     // associated objects
     events: Rc<Events>,
     reli: Rc<Reliability>,
+    state: Rc<RefCell<State>>,
+
     // owned objects
     rentry: Rc<UnitRe>,
     db: Rc<UnitDb>,
@@ -407,7 +428,18 @@ impl UnitManager {
     }
 
     ///
-    fn units_get(&self, name: &str) -> Option<Rc<Unit>> {
+    #[allow(unused)]
+    pub(crate) fn get_state(&self) -> State {
+        *((*self.state).borrow())
+    }
+
+    ///
+    pub(crate) fn set_state(&self, state: State) {
+        *self.state.borrow_mut() = state;
+    }
+
+    ///
+    pub fn units_get(&self, name: &str) -> Option<Rc<Unit>> {
         self.db.units_get(name).map(|uxr| uxr.unit())
     }
 
@@ -498,6 +530,80 @@ impl UnitManager {
         };
 
         self.jm.has_stop_job(&u)
+    }
+
+    ///
+    pub fn unit_emergency_action(&self, action: UnitEmergencyAction, reason: String) {
+        if action == UnitEmergencyAction::None {
+            return;
+        }
+        if matches!(
+            action,
+            UnitEmergencyAction::Reboot | UnitEmergencyAction::Poweroff | UnitEmergencyAction::Exit
+        ) {
+            if let Some(shutdown_target) = self.units_get("shutdown.target") {
+                if shutdown_target
+                    .current_active_state()
+                    .is_active_or_activating()
+                {
+                    return;
+                }
+                let shutdown_target_unitx = Rc::new(UnitX::from_unit(shutdown_target));
+                if self.jm.has_start_like_job(&shutdown_target_unitx) {
+                    return;
+                }
+            }
+        }
+        match action {
+            UnitEmergencyAction::Reboot => {
+                log::info!("Rebooting by starting reboot.target caused by {}", reason);
+                if self.start_unit("reboot.target").is_err() {
+                    log::error!("Failed to start reboot.target.");
+                }
+            }
+            UnitEmergencyAction::RebootForce => {
+                log::info!("Rebooting forcely caused by {}", reason);
+                self.set_state(State::Reboot);
+            }
+            UnitEmergencyAction::RebootImmediate => {
+                log::info!("Rebooting immediately caused by {}", reason);
+                nix::unistd::sync();
+                if nix::sys::reboot::reboot(nix::sys::reboot::RebootMode::RB_AUTOBOOT).is_err() {
+                    log::error!("Failed to reboot immediately.");
+                }
+            }
+            UnitEmergencyAction::Poweroff => {
+                log::info!(
+                    "Poweroffing by starting poweroff.target caused by {}",
+                    reason
+                );
+                if self.start_unit("poweroff.target").is_err() {
+                    log::error!("Failed to start poweroff.target.");
+                }
+            }
+            UnitEmergencyAction::PoweroffForce => {
+                log::info!("Poweroffing forcely caused by {}", reason);
+                self.set_state(State::PowerOff);
+            }
+            UnitEmergencyAction::PoweroffImmediate => {
+                log::info!("Poweroffing immediately caused by {}", reason);
+                nix::unistd::sync();
+                if nix::sys::reboot::reboot(nix::sys::reboot::RebootMode::RB_POWER_OFF).is_err() {
+                    log::error!("Failed to poweroff immediately.");
+                }
+            }
+            UnitEmergencyAction::Exit => {
+                log::info!("Exiting by starting exit.target caused by {}", reason);
+                if self.start_unit("exit.target").is_err() {
+                    log::error!("Failed to start exit.target.");
+                }
+            }
+            UnitEmergencyAction::ExitForce => {
+                log::info!("Exiting forcely caused by {}", reason);
+                self.set_state(State::Exit);
+            }
+            _ => {}
+        }
     }
 
     /// return the fds that trigger the unit {name};
@@ -712,6 +818,7 @@ impl UnitManager {
         relir: &Rc<Reliability>,
         dmr: &Rc<DataManager>,
         lookup_path: &Rc<LookupPaths>,
+        state: Rc<RefCell<State>>,
     ) -> Rc<UnitManager> {
         let _rentry = Rc::new(UnitRe::new(relir));
         let _db = Rc::new(UnitDb::new(&_rentry));
@@ -729,6 +836,7 @@ impl UnitManager {
             sigchld: Sigchld::new(eventr, relir, &_db, &_jm),
             notify: NotifyManager::new(eventr, relir, &_rentry, &_db, &_jm),
             sms: UnitSubManagers::new(relir),
+            state,
         });
         um.load.set_um(&um);
         um.sms.set_um(&um);
@@ -750,6 +858,16 @@ impl TableSubscribe<String, UnitState> for UnitManager {
     }
 }
 
+// insert start_limit_hit
+impl TableSubscribe<String, StartLimitResult> for UnitManager {
+    fn notify(&self, op: &TableOp<String, StartLimitResult>) {
+        match op {
+            TableOp::TableInsert(name, config) => self.insert_start_limit_res(name, config),
+            TableOp::TableRemove(name, _) => self.remove_start_limit_res(name),
+        }
+    }
+}
+
 impl UnitManager {
     fn insert_states(&self, source: &str, state: &UnitState) {
         log::debug!("insert unit states source {}, state: {:?}", source, state);
@@ -758,6 +876,19 @@ impl UnitManager {
         } else {
             return;
         };
+
+        if state.os != UnitActiveState::UnitFailed && state.ns == UnitActiveState::UnitFailed {
+            self.unit_emergency_action(
+                unitx.get_failure_action(),
+                "unit ".to_string() + source + " failed",
+            );
+        }
+        if !state.os.is_inactive_or_failed() && state.ns == UnitActiveState::UnitInActive {
+            self.unit_emergency_action(
+                unitx.get_success_action(),
+                "unit ".to_string() + source + " succeeded",
+            );
+        }
 
         if let Err(_e) = self.jm.try_finish(&unitx, state.os, state.ns, state.flags) {
             // debug
@@ -772,6 +903,21 @@ impl UnitManager {
     fn remove_states(&self, _source: &str) {
         todo!();
     }
+
+    fn insert_start_limit_res(&self, source: &str, start_limit_res: &StartLimitResult) {
+        if start_limit_res == &StartLimitResult::StartLimitNotHit {
+            return;
+        }
+        let unitx = if let Some(u) = self.db.units_get(source) {
+            u
+        } else {
+            return;
+        };
+        let reason = "unit ".to_string() + source + " hit StartLimit";
+        self.unit_emergency_action(unitx.get_start_limit_action(), reason)
+    }
+
+    fn remove_start_limit_res(&self, _source: &str) {}
 }
 
 impl ReStation for UnitManager {
@@ -1055,7 +1201,8 @@ mod tests {
         let event = Rc::new(Events::new().unwrap());
         let dm = Rc::new(DataManager::new());
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
-        let um = UnitManager::new(&event, &reli, &dm, &lookup_path);
+        let state = Rc::new(RefCell::new(State::Init));
+        let um = UnitManager::new(&event, &reli, &dm, &lookup_path, state);
         (dm, event, um)
     }
 
@@ -1175,7 +1322,10 @@ mod tests {
                 Some(_unit_obj) => {
                     println!(
                         "{:?}",
-                        _unit_obj.get_config().config_data().borrow().Unit.Requires
+                        (*_unit_obj.get_config().config_data())
+                            .borrow()
+                            .Unit
+                            .Requires
                     );
                     assert_eq!(_unit_obj.id(), u_name);
                 }

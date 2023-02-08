@@ -5,7 +5,6 @@ use crate::core::unit::UnitX;
 use std::cell::RefCell;
 use std::collections::{HashMap, LinkedList};
 use std::rc::Rc;
-use sysmaster::unit::UnitActiveState;
 
 const JOBUNIT_SQ_MUTOP_MAX_NUM: usize = 1; // stop or (restart|start|reload), which can change the unit's stage
 const JOBUNIT_SQ_MAX_NUM: usize = 3; // [stop] | [(restart|start|reload)->verify->nop]
@@ -669,11 +668,7 @@ impl JobUnitData {
 
     fn jobs_ms_start_or_reload(&mut self, del_jobs: &mut Vec<Rc<Job>>) {
         // 'start' <=or=> 'reload'
-        let us_is_active_or_reloading = matches!(
-            self.unit.active_state(),
-            UnitActiveState::UnitActive | UnitActiveState::UnitReloading
-        );
-        if us_is_active_or_reloading {
+        if self.unit.active_state().is_active_or_reloading() {
             // 'start' => 'reload'
             self.jobs_suspends_remove(JobKind::Start, del_jobs);
         } else {
