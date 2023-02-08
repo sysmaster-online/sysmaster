@@ -1,10 +1,6 @@
 //! devctrl is the client of devmaster
 //!
-// use kobject_uevent::UEvent;
 use libdevmaster::*;
-use netlink_sys::{protocols::NETLINK_KOBJECT_UEVENT, Socket, SocketAddr};
-use std::os::unix::prelude::AsRawFd;
-use std::process;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
@@ -45,34 +41,6 @@ fn subcommand_listen() {
         let mut msg = String::new();
         stream.read_to_string(&mut msg).unwrap();
         println!("{msg}");
-    }
-}
-
-/// subcommand for monitoring uevent
-fn subcommand_monitor() {
-    let mut socket = Socket::new(NETLINK_KOBJECT_UEVENT).unwrap();
-    match libutils::socket_util::set_receive_buffer_force(socket.as_raw_fd(), 1024 * 1024 * 128) {
-        Ok(()) => {}
-        Err(errno) => {
-            println!("Failed to set receive buffer: {errno}");
-        }
-    }
-
-    let sa = SocketAddr::new(process::id(), 1);
-    socket.bind(&sa).unwrap();
-
-    loop {
-        let mut buf = vec![0; 1024 * 8];
-        let n = socket.recv(&mut &mut buf[..], 0).unwrap();
-        let s = std::str::from_utf8(&buf[..n]).unwrap();
-        // let u = UEvent::from_netlink_packet(&buf[..n]).unwrap();
-        println!(">> {s}");
-        // println!("{:#?}", u);
-
-        // let lines = s.split("\0");
-        // for line in lines {
-        //     println!("{}", line);
-        // }
     }
 }
 

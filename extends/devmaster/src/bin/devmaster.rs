@@ -31,7 +31,6 @@ fn main() {
         String::from(CONTROL_MANAGER_LISTEN_ADDR),
         worker_manager.clone(),
         job_queue.clone(),
-        // events.clone(),
     ));
     events.add_source(control_manager.clone()).unwrap();
     events

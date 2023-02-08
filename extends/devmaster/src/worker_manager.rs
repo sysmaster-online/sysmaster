@@ -3,7 +3,7 @@
 use crate::job_queue::{DeviceJob, JobState};
 use crate::utils::{log_debug, log_info, Error};
 use crate::{log_error, JobQueue};
-use libdevice::Device;
+use libdevice::{Device, DeviceMonitor, MonitorNetlinkGroup};
 use libevent::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -87,6 +87,8 @@ impl Worker {
                 panic!();
             });
 
+            let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
+
             match msg {
                 WorkerMessage::Job(device) => {
                     log_info(format!(
@@ -94,9 +96,11 @@ impl Worker {
                         device.devname
                     ));
 
-                    Self::worker_process_device(id, *device);
+                    Self::worker_process_device(id, device.as_ref());
 
                     log_info(format!("Worker {id}: finished job\n"));
+
+                    broadcaster.send_device(device.as_ref(), None);
 
                     let mut tcp_stream =
                         TcpStream::connect(tcp_address.as_str()).unwrap_or_else(|error| {
@@ -162,10 +166,8 @@ impl Worker {
     }
 
     /// process a device
-    fn worker_process_device(id: u32, device: Device) {
-        // log_info(format!("Worker {}: Processing: {:?}\n", id, device));
+    fn worker_process_device(id: u32, device: &Device) {
         log_info(format!("Worker {id}: Processing: {}\n", device.devpath));
-        // std::thread::sleep(std::time::Duration::from_secs(5));
     }
 
     /// send message to the worker thread
@@ -329,8 +331,6 @@ impl WorkerManager {
                     .unwrap();
             }
             "finished" => {
-                // log_debug(format!("Worker Manager: set Idle on worker {}\n", id));
-
                 let job = &self
                     .workers
                     .borrow()
@@ -390,14 +390,17 @@ impl WorkerManager {
 }
 
 impl Source for WorkerManager {
+    /// tcp listener fd
     fn fd(&self) -> RawFd {
         self.listener.borrow().as_raw_fd()
     }
 
+    /// event type
     fn event_type(&self) -> libevent::EventType {
         libevent::EventType::Io
     }
 
+    /// epoll type
     fn epoll_event(&self) -> u32 {
         (libc::EPOLLIN) as u32
     }
@@ -437,7 +440,7 @@ pub struct WorkerManagerKillWorkers {
 }
 
 impl WorkerManagerKillWorkers {
-    ///
+    /// create a timer instance to recycle workers
     fn new(time: u64, worker_manager: Rc<WorkerManager>) -> WorkerManagerKillWorkers {
         WorkerManagerKillWorkers {
             time,
@@ -447,33 +450,32 @@ impl WorkerManagerKillWorkers {
 }
 
 impl Source for WorkerManagerKillWorkers {
-    ///
+    /// timer fd is zero
     fn fd(&self) -> RawFd {
         0
     }
 
-    ///
+    /// timer type
     fn event_type(&self) -> EventType {
         EventType::TimerMonotonic
     }
 
-    ///
+    /// epoll type
     fn epoll_event(&self) -> u32 {
         (libc::EPOLLIN) as u32
     }
 
-    ///
+    /// priority of timer source
     fn priority(&self) -> i8 {
-        // -50
         -55
     }
 
-    ///
+    /// relative time
     fn time_relative(&self) -> u64 {
         self.time * 1000000
     }
 
-    ///
+    /// kill workers if job queue keeps empty for an interval
     fn dispatch(&self, _: &Events) -> Result<i32, libevent::Error> {
         log_info("Worker Manager Kill Workers timeout!\n".to_string());
         self.worker_manager
@@ -483,7 +485,7 @@ impl Source for WorkerManagerKillWorkers {
         Ok(0)
     }
 
-    ///
+    /// token of event source
     fn token(&self) -> u64 {
         let data: u64 = unsafe { std::mem::transmute(self) };
         data

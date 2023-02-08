@@ -67,6 +67,10 @@ pub struct Device {
     pub properties: HashMap<String, String>,
     /// the subset of properties that should be written to db
     pub properties_db: HashMap<String, String>,
+    /// the string of properties
+    pub properties_nulstr: Vec<u8>,
+    /// the length of properties nulstr
+    pub properties_nulstr_len: usize,
 
     /// cached sysattr values
     pub sysattr_values: HashMap<String, String>,
@@ -114,6 +118,8 @@ impl Device {
             seqnum: None,
             properties: HashMap::new(),
             properties_db: HashMap::new(),
+            properties_nulstr: vec![],
+            properties_nulstr_len: 0,
             sysattr_values: HashMap::new(),
             sysattrs: HashSet::new(),
             all_tags: HashSet::new(),
@@ -161,6 +167,57 @@ impl Device {
             device.properties.insert(key.clone(), value.clone());
         }
 
+        device
+    }
+
+    /// create Device from buffer
+    pub fn from_buffer(buffer: &[u8]) -> Device {
+        let mut device = Device::new();
+        let s = std::str::from_utf8(buffer).unwrap();
+        let mut length = 0;
+        for line in s.split('\0') {
+            let tokens = line.split('=').collect::<Vec<&str>>();
+            if tokens.len() < 2 {
+                break;
+            }
+            length = length + line.len() + 1;
+            let (key, value) = (tokens[0], tokens[1]);
+            match key {
+                "DEVPATH" => {
+                    device.devpath = value.to_string();
+                }
+                "ACTION" => {
+                    device.action = Some(ActionType::from_str(value).unwrap());
+                }
+                "SUBSYSTEM" => {
+                    device.subsystem = value.to_string();
+                }
+                "DEVTYPE" => {
+                    device.devtype = value.to_string();
+                }
+                "MINOR" => {
+                    device.minor = value.parse().unwrap();
+                }
+                "MAJOR" => {
+                    device.major = value.parse().unwrap();
+                }
+                "PARTN" => {}
+                "SYNTH_UUID" => {}
+                "DEVNAME" => {
+                    device.devname = value.to_string();
+                }
+                "SEQNUM" => {
+                    device.seqnum = Some(value.parse().unwrap());
+                }
+
+                _ => {}
+            }
+
+            device.properties.insert(key.to_string(), value.to_string());
+        }
+        device.properties_nulstr = buffer[0..length].to_vec();
+        device.properties_nulstr.push(0);
+        device.properties_nulstr_len = length;
         device
     }
 
