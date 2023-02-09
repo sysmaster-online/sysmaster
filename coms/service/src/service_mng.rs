@@ -25,10 +25,10 @@ use std::{
     path::PathBuf,
     rc::Weak,
 };
-use sysmaster::reliability::ReStation;
+use sysmaster::error::UnitActionError;
+use sysmaster::rel::ReStation;
 use sysmaster::unit::{
-    ExecCommand, ExecContext, ExecFlags, KillOperation, UnitActionError, UnitActiveState,
-    UnitNotifyFlags,
+    ExecCommand, ExecContext, ExecFlags, KillOperation, UnitActiveState, UnitNotifyFlags,
 };
 
 pub(super) struct ServiceMng {

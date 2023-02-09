@@ -8,7 +8,8 @@ use libutils::error::Error as SocketError;
 use libutils::special::{SHUTDOWN_TARGET, SOCKETS_TARGET, SYSINIT_TARGET};
 use std::path::Path;
 use std::{error::Error, rc::Rc};
-use sysmaster::unit::{UnitActionError, UnitDependencyMask, UnitRelations, UnitType};
+use sysmaster::error::UnitActionError;
+use sysmaster::unit::{UnitDependencyMask, UnitRelations, UnitType};
 
 pub(super) struct SocketLoad {
     config: Rc<SocketConfig>,

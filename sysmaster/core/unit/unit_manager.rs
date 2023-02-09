@@ -32,12 +32,11 @@ use std::convert::TryFrom;
 use std::io::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
-use sysmaster::execute::{ExecCmdError, ExecParameters};
-use sysmaster::execute::{ExecCommand, ExecContext};
-use sysmaster::reliability::{ReStation, ReStationKind, ReliLastFrame, Reliability};
-use sysmaster::unit::{
-    MngErrno, UmIf, UnitActionError, UnitActiveState, UnitDependencyMask, UnitType,
-};
+use sysmaster::error::{MngErrno, UnitActionError};
+use sysmaster::exec::{ExecCmdError, ExecParameters};
+use sysmaster::exec::{ExecCommand, ExecContext};
+use sysmaster::rel::{ReStation, ReStationKind, ReliLastFrame, Reliability};
+use sysmaster::unit::{UmIf, UnitActiveState, UnitDependencyMask, UnitType};
 use unit_submanager::UnitSubManagers;
 
 //#[derive(Debug)]
@@ -912,7 +911,7 @@ mod unit_submanager {
     use std::collections::HashMap;
     use std::convert::TryFrom;
     use std::rc::{Rc, Weak};
-    use sysmaster::reliability::Reliability;
+    use sysmaster::rel::Reliability;
     use sysmaster::unit::{UnitManagerObj, UnitType};
 
     #[allow(dead_code)]

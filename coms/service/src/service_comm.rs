@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, RwLock};
-use sysmaster::reliability::Reliability;
+use sysmaster::rel::Reliability;
 use sysmaster::unit::{UmIf, UnitBase};
 
 pub(super) struct ServiceUnitComm {

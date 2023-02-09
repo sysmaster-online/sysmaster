@@ -6,7 +6,7 @@ use confique::Config;
 use std::cell::RefCell;
 use std::error::Error as stdError;
 use std::rc::Rc;
-use sysmaster::reliability::ReStation;
+use sysmaster::rel::ReStation;
 
 pub(crate) struct UeConfig {
     // associated objects

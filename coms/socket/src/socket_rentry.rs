@@ -6,7 +6,7 @@ use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Serialize};
 use std::os::unix::prelude::RawFd;
 use std::rc::Rc;
-use sysmaster::reliability::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
+use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use sysmaster::unit::{ExecCommand, KillMode};
 
 struct SocketReDb<K, V>(ReDb<K, V>);
@@ -277,15 +277,15 @@ impl SocketRe {
     }
 
     fn register(&self, relir: &Reliability) {
-        // reliability-db: RELI_DB_HSOCKET_CONF
+        // rel-db: RELI_DB_HSOCKET_CONF
         let db = Rc::clone(&self.conf);
         relir.history_db_register(RELI_DB_HSOCKET_CONF, db);
 
-        // reliability-db: RELI_DB_HSOCKET_MNG
+        // rel-db: RELI_DB_HSOCKET_MNG
         let db = Rc::clone(&self.mng);
         relir.history_db_register(RELI_DB_HSOCKET_MNG, db);
 
-        // reliability-db: RELI_DB_HSOCKETM_FRAME
+        // rel-db: RELI_DB_HSOCKETM_FRAME
         let db = Rc::clone(&self.frame);
         relir.history_db_register(RELI_DB_HSOCKETM_FRAME, db);
     }

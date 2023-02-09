@@ -3,7 +3,7 @@ use super::unit_state::UnitState;
 use crate::core::butil::table::{Table, TableSubscribe};
 use std::cell::RefCell;
 use std::rc::Rc;
-use sysmaster::reliability::ReStation;
+use sysmaster::rel::ReStation;
 
 #[allow(clippy::type_complexity)]
 pub struct DataManager {

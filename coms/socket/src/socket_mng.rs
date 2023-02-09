@@ -18,13 +18,11 @@ use nix::{sys::signal::Signal, unistd::Pid};
 use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
-use sysmaster::reliability::{ReStation, Reliability};
+use sysmaster::error::UnitActionError;
+use sysmaster::rel::{ReStation, Reliability};
 use sysmaster::{
-    reliability::ReliLastFrame,
-    unit::{
-        ExecCommand, ExecContext, KillOperation, UnitActionError, UnitActiveState, UnitNotifyFlags,
-        UnitType,
-    },
+    rel::ReliLastFrame,
+    unit::{ExecCommand, ExecContext, KillOperation, UnitActiveState, UnitNotifyFlags, UnitType},
 };
 
 impl SocketState {

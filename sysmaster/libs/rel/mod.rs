@@ -1,4 +1,4 @@
-//!
+//! reliability module
 use std::convert::TryFrom;
 
 pub use api::{reli_debug_enable_switch, reli_debug_get_switch, Reliability};

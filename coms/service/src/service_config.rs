@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
-use sysmaster::reliability::ReStation;
+use sysmaster::rel::ReStation;
 use sysmaster::unit::{ExecCommand, KillContext};
 
 pub(super) struct ServiceConfig {

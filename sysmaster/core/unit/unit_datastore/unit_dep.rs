@@ -363,7 +363,7 @@ mod tests {
     use crate::core::unit::data::DataManager;
     use crate::core::unit::test::test_utils;
     use libutils::logger;
-    use sysmaster::reliability::Reliability;
+    use sysmaster::rel::Reliability;
 
     #[test]
     fn dep_insert() {

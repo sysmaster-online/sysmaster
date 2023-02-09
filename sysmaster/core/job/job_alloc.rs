@@ -4,7 +4,7 @@ use crate::core::unit::UnitX;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
-use sysmaster::reliability::Reliability;
+use sysmaster::rel::Reliability;
 
 pub(super) struct JobAlloc {
     // associated objects

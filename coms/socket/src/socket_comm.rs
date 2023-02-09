@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
 use std::sync::{Arc, RwLock};
-use sysmaster::reliability::Reliability;
+use sysmaster::rel::Reliability;
 use sysmaster::unit::{UmIf, UnitBase};
 
 pub(super) struct SocketUnitComm {

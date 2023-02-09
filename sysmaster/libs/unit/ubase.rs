@@ -1,8 +1,8 @@
-use super::u_error::UnitActionError;
-use super::u_kill::{KillContext, KillOperation};
-use super::u_state::{UnitActiveState, UnitNotifyFlags};
-use super::um_interface::UnitMngUtil;
-use super::{super::reliability::ReStation, UnitRelations};
+use super::ukill::{KillContext, KillOperation};
+use super::umif::UnitMngUtil;
+use super::ustate::{UnitActiveState, UnitNotifyFlags};
+use super::{super::rel::ReStation, UnitRelations};
+use crate::error::UnitActionError;
 use libutils::error::Error as ServiceError;
 use libutils::Result;
 use nix::{

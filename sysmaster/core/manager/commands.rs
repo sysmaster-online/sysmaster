@@ -4,7 +4,7 @@ use libevent::{EventType, Events, Source};
 use std::net::{SocketAddr, TcpListener};
 use std::os::unix::io::RawFd;
 use std::{os::unix::prelude::AsRawFd, rc::Rc};
-use sysmaster::reliability::{ReliLastFrame, Reliability};
+use sysmaster::rel::{ReliLastFrame, Reliability};
 
 pub(super) struct Commands<T> {
     // associated objects

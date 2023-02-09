@@ -4,7 +4,7 @@ use libutils::Result;
 use nix::NixPath;
 use std::rc::Rc;
 use std::{cell::RefCell, path::PathBuf};
-use sysmaster::reliability::ReStation;
+use sysmaster::rel::ReStation;
 
 pub(super) struct UeCgroup {
     data: RefCell<UnitCgroupData>,

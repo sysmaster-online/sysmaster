@@ -8,7 +8,7 @@ use crate::core::unit::UnitDb;
 use crate::core::unit::UnitRelationAtom;
 use crate::core::unit::UnitX;
 use std::rc::Rc;
-use sysmaster::unit::UnitActionError;
+use sysmaster::error::UnitActionError;
 
 pub(super) fn job_trans_expand(
     stage: &JobTable,
@@ -416,7 +416,7 @@ mod tests {
     use crate::core::unit::DataManager;
     use crate::core::unit::{UnitRe, UnitRelations};
     use libutils::logger;
-    use sysmaster::reliability::Reliability;
+    use sysmaster::rel::Reliability;
 
     #[test]
     fn jt_api_expand_check() {}

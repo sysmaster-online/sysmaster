@@ -809,7 +809,7 @@ mod tests {
     use crate::core::unit::UnitX;
     use crate::core::unit::{JobMode, UnitRe};
     use libutils::logger;
-    use sysmaster::reliability::Reliability;
+    use sysmaster::rel::Reliability;
 
     #[test]
     fn juv_api_len() {

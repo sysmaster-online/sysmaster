@@ -8,7 +8,7 @@ pub(in crate::core) mod test_utils {
         unit::{uload_util::UnitFile, unit_entry::UnitX, unit_rentry::UnitRe},
     };
     use libutils::path_lookup::LookupPaths;
-    use sysmaster::reliability::Reliability;
+    use sysmaster::rel::Reliability;
     use sysmaster::unit::UmIf;
     pub(in crate::core) struct UmIfD;
     impl UmIf for UmIfD {}

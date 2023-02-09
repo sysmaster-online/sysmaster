@@ -15,7 +15,7 @@ pub(super) enum JobErrno {
     BadRequest,
 }
 
-use sysmaster::unit::MngErrno;
+use sysmaster::error::MngErrno;
 impl From<JobErrno> for MngErrno {
     fn from(err: JobErrno) -> Self {
         match err {

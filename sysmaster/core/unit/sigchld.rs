@@ -8,7 +8,7 @@ use nix::sys::signal::Signal;
 use nix::sys::wait::{self, Id, WaitPidFlag, WaitStatus};
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
-use sysmaster::reliability::{ReStation, ReliLastFrame, Reliability};
+use sysmaster::rel::{ReStation, ReliLastFrame, Reliability};
 
 pub(super) struct Sigchld {
     // associated objects

@@ -20,7 +20,7 @@ use std::collections::HashSet;
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
 use std::rc::Rc;
-use sysmaster::reliability::{ReliLastFrame, Reliability};
+use sysmaster::rel::{ReliLastFrame, Reliability};
 
 /// maximal size of process's arguments
 pub const MANAGER_ARGS_SIZE_MAX: usize = 5; // 6 - 1

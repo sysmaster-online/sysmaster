@@ -437,7 +437,7 @@ mod tests {
     use crate::core::unit::UnitRe;
     use crate::core::unit::UnitX;
     use libutils::logger;
-    use sysmaster::reliability::Reliability;
+    use sysmaster::rel::Reliability;
 
     #[test]
     fn js_api() {
