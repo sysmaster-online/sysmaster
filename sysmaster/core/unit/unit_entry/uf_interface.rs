@@ -6,7 +6,7 @@ use crate::core::unit::uload_util::UnitFile;
 use crate::core::unit::unit_rentry::{UnitLoadState, UnitRe};
 use crate::core::unit::UnitErrno;
 use libutils::IN_SET;
-use nix::sys::signal::Signal;
+use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::error::Error;
 use std::ops::Deref;
@@ -82,8 +82,8 @@ impl UnitX {
     pub(in crate::core) fn kill(&self) {}
     #[allow(dead_code)]
     pub(in crate::core) fn release_resources(&self) {}
-    pub(in crate::core) fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
-        self.0.sigchld_events(pid, code, signal)
+    pub(in crate::core) fn sigchld_events(&self, wait_status: WaitStatus) {
+        self.0.sigchld_events(wait_status)
     }
     #[allow(dead_code)]
     pub(in crate::core) fn reset_failed(&self) {}

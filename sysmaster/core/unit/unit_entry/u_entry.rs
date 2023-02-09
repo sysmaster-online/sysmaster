@@ -15,6 +15,7 @@ use libutils::process_util::my_child;
 use libutils::Result;
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
+use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use nix::NixPath;
 use std::cmp::Ordering;
@@ -618,8 +619,8 @@ impl Unit {
         self.sub.stop(force)
     }
 
-    pub(super) fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
-        self.sub.sigchld_events(pid, code, signal)
+    pub(super) fn sigchld_events(&self, wait_status: WaitStatus) {
+        self.sub.sigchld_events(wait_status)
     }
 
     pub(super) fn load_state(&self) -> UnitLoadState {

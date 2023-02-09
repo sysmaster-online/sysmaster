@@ -115,7 +115,7 @@ mod tests {
 
     use crate::core::unit::unit_entry::uu_config::UeConfigData;
     #[test]
-    fn test_service_parse() {
+    fn test_unit_parse() {
         let mut file_path = get_project_root().unwrap();
         file_path.push("test_units/config.service.toml");
 

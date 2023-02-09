@@ -12,8 +12,8 @@ use libutils::{file_util, process_util};
 use nix::errno::Errno;
 use nix::libc;
 use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};
-use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
+use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -67,6 +67,7 @@ impl ReStation for ServiceMng {
             forbid_restart,
             reset_restart,
             restarts,
+            exit_status,
         )) = self.comm.rentry_mng_get()
         {
             *self.state.borrow_mut() = state;
@@ -79,10 +80,12 @@ impl ReStation for ServiceMng {
             self.rd.set_forbid_restart(forbid_restart);
             self.rd.set_reset_restart(reset_restart);
             self.rd.set_restarts(restarts);
+            self.rd.set_wait_status(WaitStatus::from(exit_status));
         }
     }
 
     fn db_insert(&self) {
+        let exit_status = ExitStatus::from(self.rd.wait_status());
         self.comm.rentry_mng_insert(
             self.state(),
             self.result(),
@@ -95,6 +98,7 @@ impl ReStation for ServiceMng {
             self.rd.forbid_restart(),
             self.rd.reset_restart(),
             self.rd.restarts(),
+            exit_status,
         );
     }
 
@@ -897,6 +901,17 @@ impl ServiceMng {
             return false;
         }
 
+        if self
+            .config
+            .config_data()
+            .borrow()
+            .Service
+            .RestartPreventExitStatus
+            .exit_status_enabled(self.rd.wait_status())
+        {
+            return false;
+        }
+
         match self.config.config_data().borrow().Service.Restart {
             ServiceRestart::No => false,
             ServiceRestart::OnSuccess => self.result() == ServiceResult::Success,
@@ -941,32 +956,43 @@ impl ServiceMng {
 }
 
 impl ServiceMng {
-    pub(super) fn sigchld_event(&self, pid: Pid, code: i32, status: Signal) {
-        self.do_sigchld_event(pid, code, status);
+    pub(super) fn sigchld_event(&self, wait_status: WaitStatus) {
+        self.do_sigchld_event(wait_status);
         self.db_update();
     }
 
-    fn do_sigchld_event(&self, pid: Pid, code: i32, status: Signal) {
-        log::debug!(
-            "ServiceUnit sigchld exit, pid: {:?} code:{}, status:{}",
-            pid,
-            code,
-            status
-        );
+    fn sigchld_result(&self, wait_status: WaitStatus) -> ServiceResult {
+        match wait_status {
+            WaitStatus::Exited(_, status) => {
+                if status == 0 {
+                    ServiceResult::Success
+                } else {
+                    ServiceResult::FailureExitCode
+                }
+            }
+            WaitStatus::Signaled(_, _, core_dump) => {
+                if core_dump {
+                    ServiceResult::FailureCoreDump
+                } else {
+                    ServiceResult::FailureSignal
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn do_sigchld_event(&self, wait_status: WaitStatus) {
+        log::debug!("ServiceUnit sigchld exit wait status: {:?}", wait_status);
         log::debug!(
             "main_pid: {:?}, control_pid: {:?}, state: {:?}",
             self.pid.main(),
             self.pid.control(),
             self.state()
         );
-        let res: ServiceResult;
-        if code == 0 {
-            res = ServiceResult::Success;
-        } else if status != Signal::SIGCHLD {
-            res = ServiceResult::FailureSignal;
-        } else {
-            res = ServiceResult::Success
-        }
+
+        // none has been filter after waitpid, unwrap is safe here
+        let pid = wait_status.pid().unwrap();
+        let res = self.sigchld_result(wait_status);
 
         if self.pid.main() == Some(pid) {
             // for main pid updated by the process before its exited, updated the main pid.
@@ -977,6 +1003,7 @@ impl ServiceMng {
             }
 
             self.pid.reset_main();
+            self.rd.set_wait_status(wait_status);
 
             if self.result() == ServiceResult::Success {
                 self.set_result(res);
@@ -1383,6 +1410,14 @@ impl RunningData {
     pub(self) fn restarts(&self) -> u32 {
         self.data.borrow().restarts()
     }
+
+    pub(super) fn set_wait_status(&self, wait_status: WaitStatus) {
+        self.data.borrow_mut().set_wait_status(wait_status);
+    }
+
+    pub(self) fn wait_status(&self) -> WaitStatus {
+        self.data.borrow().wait_status()
+    }
 }
 
 struct Rtdata {
@@ -1394,6 +1429,8 @@ struct Rtdata {
     reset_restarts: bool,
     restarts: u32,
     timer: Option<Rc<ServiceTimer>>,
+
+    exec_status: WaitStatus,
 }
 
 impl Rtdata {
@@ -1406,6 +1443,7 @@ impl Rtdata {
             reset_restarts: false,
             restarts: 0,
             timer: None,
+            exec_status: WaitStatus::StillAlive,
         }
     }
 
@@ -1476,6 +1514,14 @@ impl Rtdata {
 
     pub(self) fn restarts(&self) -> u32 {
         self.restarts
+    }
+
+    pub(super) fn set_wait_status(&mut self, wait_status: WaitStatus) {
+        self.exec_status = wait_status;
+    }
+
+    pub(self) fn wait_status(&self) -> WaitStatus {
+        self.exec_status
     }
 }
 

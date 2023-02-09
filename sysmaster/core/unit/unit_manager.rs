@@ -1045,7 +1045,7 @@ mod tests {
     use libevent::Events;
     use libutils::logger;
     use nix::errno::Errno;
-    use nix::sys::signal::Signal;
+    use nix::sys::wait::WaitStatus;
     use std::thread;
     use std::time::Duration;
     use sysmaster::unit::UnitActiveState;
@@ -1127,7 +1127,8 @@ mod tests {
         assert!(ret.is_ok());
 
         thread::sleep(Duration::from_secs(4));
-        u.sigchld_events(Pid::from_raw(-1), 0, Signal::SIGCHLD);
+        let wait_status = WaitStatus::Exited(Pid::from_raw(-1), 0);
+        u.sigchld_events(wait_status);
         assert_eq!(u.active_state(), UnitActiveState::UnitActive);
 
         let ret = u.stop(false);
@@ -1136,7 +1137,7 @@ mod tests {
 
         thread::sleep(Duration::from_secs(4));
         assert_eq!(u.active_state(), UnitActiveState::UnitDeActivating);
-        u.sigchld_events(Pid::from_raw(-1), 0, Signal::SIGCHLD);
+        u.sigchld_events(wait_status);
 
         assert_eq!(u.active_state(), UnitActiveState::UnitInActive);
     }

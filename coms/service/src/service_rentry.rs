@@ -1,10 +1,14 @@
 #![allow(non_snake_case)]
 use confique::Config;
 use libutils::serialize::DeserializeWith;
+use nix::sys::signal::Signal;
+use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::num::ParseIntError;
 use std::rc::Rc;
+use std::str::FromStr;
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use sysmaster::unit::{ExecCommand, KillMode};
 
@@ -84,6 +88,70 @@ impl Default for ServiceRestart {
         ServiceRestart::No
     }
 }
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ExitStatusSet {
+    status: Vec<u8>,
+    signal: Vec<String>,
+}
+
+impl ExitStatusSet {
+    fn add_status(&mut self, status: u8) {
+        self.status.push(status);
+    }
+
+    fn add_signal(&mut self, sig: String) {
+        self.signal.push(sig);
+    }
+
+    pub fn exit_status_enabled(&self, wait_status: WaitStatus) -> bool {
+        log::debug!(
+            "exit status enabled***************************** {:?}",
+            wait_status
+        );
+        match wait_status {
+            WaitStatus::Exited(_, status) => self.status.contains(&(status as u8)),
+            WaitStatus::Signaled(_, sig, _) => self.signal.contains(&sig.as_str().to_string()),
+            _ => false,
+        }
+    }
+}
+
+fn exit_status_from_string(status: &str) -> Result<u8, ParseIntError> {
+    let s = status.parse::<u8>()?;
+
+    Ok(s)
+}
+
+impl DeserializeWith for ExitStatusSet {
+    type Item = Self;
+    fn deserialize_with<'de, D>(de: D) -> Result<Self::Item, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(de)?;
+
+        let mut status_set = ExitStatusSet::default();
+
+        for cmd in s.split_whitespace() {
+            if cmd.is_empty() {
+                continue;
+            }
+
+            if let Ok(v) = exit_status_from_string(cmd) {
+                status_set.add_status(v);
+                continue;
+            }
+
+            if let Ok(_sig) = Signal::from_str(cmd) {
+                status_set.add_signal(cmd.to_string());
+                continue;
+            }
+            log::warn!("RestartPreventExitStatus: invalid config value {}", cmd);
+        }
+
+        Ok(status_set)
+    }
+}
 
 #[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
 pub(super) struct SectionService {
@@ -126,7 +194,8 @@ pub(super) struct SectionService {
     pub UMask: String,
     #[config(default = "no")]
     pub Restart: ServiceRestart,
-    pub RestartPreventExitStatus: Option<String>,
+    #[config(deserialize_with = ExitStatusSet::deserialize_with)]
+    pub RestartPreventExitStatus: ExitStatusSet,
     #[config(default = 0)]
     pub RestartSec: u64,
 }
@@ -218,6 +287,34 @@ pub(super) enum NotifyState {
     Stopping,
 }
 
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
+pub(super) enum ExitStatus {
+    Status(i32, i32),
+}
+
+impl From<ExitStatus> for WaitStatus {
+    fn from(exit: ExitStatus) -> WaitStatus {
+        match exit {
+            ExitStatus::Status(pid, status) => {
+                if let Ok(wait) = WaitStatus::from_raw(Pid::from_raw(pid), status) {
+                    return wait;
+                }
+                WaitStatus::Exited(Pid::from_raw(-1), 0)
+            }
+        }
+    }
+}
+
+impl From<WaitStatus> for ExitStatus {
+    fn from(wait_status: WaitStatus) -> Self {
+        match wait_status {
+            WaitStatus::Exited(pid, status) => ExitStatus::Status(i32::from(pid), status),
+            WaitStatus::Signaled(pid, sig, _) => ExitStatus::Status(i32::from(pid), sig as i32),
+            _ => ExitStatus::Status(0, 0),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct ServiceReMng {
     state: ServiceState,
@@ -231,6 +328,7 @@ struct ServiceReMng {
     forbid_restart: bool,
     reset_restart: bool,
     restarts: u32,
+    exit_status: ExitStatus,
 }
 
 impl ServiceReMng {
@@ -247,6 +345,7 @@ impl ServiceReMng {
         forbid_restart: bool,
         reset_restart: bool,
         restarts: u32,
+        exit_status: ExitStatus,
     ) -> ServiceReMng {
         ServiceReMng {
             state,
@@ -260,6 +359,7 @@ impl ServiceReMng {
             forbid_restart,
             reset_restart,
             restarts,
+            exit_status,
         }
     }
 }
@@ -308,6 +408,7 @@ impl ServiceRe {
         forbid_restart: bool,
         reset_restart: bool,
         restarts: u32,
+        exit_status: ExitStatus,
     ) {
         let m_pid = main_pid.map(|x| x.as_raw());
         let c_pid = control_pid.map(|x| x.as_raw());
@@ -323,6 +424,7 @@ impl ServiceRe {
             forbid_restart,
             reset_restart,
             restarts,
+            exit_status,
         );
         self.mng.0.insert(unit_id.to_string(), mng);
     }
@@ -347,6 +449,7 @@ impl ServiceRe {
         bool,
         bool,
         u32,
+        ExitStatus,
     )> {
         let mng = self.mng.0.get(unit_id);
         mng.map(|m| {
@@ -362,6 +465,7 @@ impl ServiceRe {
                 m.forbid_restart,
                 m.reset_restart,
                 m.restarts,
+                m.exit_status,
             )
         })
     }
