@@ -4,7 +4,7 @@ use crate::core::unit::unit_rentry::{
 use nix::unistd::Pid;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use sysmaster::reliability::ReStation;
+use sysmaster::rel::ReStation;
 use sysmaster::unit::UnitType;
 
 pub(super) struct UeBase {

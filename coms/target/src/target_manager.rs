@@ -3,7 +3,7 @@ use super::target_comm::TargetUmComm;
 use libutils::logger;
 use std::rc::Rc;
 use std::sync::Arc;
-use sysmaster::reliability::{ReStation, Reliability};
+use sysmaster::rel::{ReStation, Reliability};
 use sysmaster::unit::{UmIf, UnitManagerObj, UnitMngUtil};
 struct TargetManager {
     comm: Arc<TargetUmComm>,

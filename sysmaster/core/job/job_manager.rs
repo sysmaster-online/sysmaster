@@ -13,7 +13,7 @@ use libevent::{EventState, EventType, Events, Source};
 use libutils::Result;
 use std::cell::RefCell;
 use std::rc::Rc;
-use sysmaster::reliability::{ReStation, ReliLastFrame, Reliability};
+use sysmaster::rel::{ReStation, ReliLastFrame, Reliability};
 use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
 #[derive(Debug)]

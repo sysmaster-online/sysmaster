@@ -16,7 +16,7 @@ use std::convert::TryFrom;
 use std::env::{self};
 use std::error::Error;
 use std::ffi::CString;
-use sysmaster::reliability;
+use sysmaster::rel;
 
 fn main() -> Result<(), Box<dyn Error>> {
     logger::init_log_with_console("sysmaster", log::LevelFilter::Debug);
@@ -34,8 +34,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         format!("failed to mount mount point, errno: {e}")
     })?;
 
-    reliability::reli_dir_prepare().expect("reliability directory prepare failed.");
-    let switch = reliability::reli_debug_get_switch();
+    rel::reli_dir_prepare().expect("reliability directory prepare failed.");
+    let switch = rel::reli_debug_get_switch();
     log::info!("sysmaster initialize with switch: {}.", switch);
 
     initialize_runtime(switch)?;

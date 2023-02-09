@@ -1,13 +1,11 @@
-use std::{path::PathBuf, rc::Rc};
-
+//! UnitManager interfaces
+use super::{ExecCmdError, ExecCommand, ExecContext, ExecParameters, UnitActiveState, UnitType};
+use super::{UnitDependencyMask, UnitRelationAtom, UnitRelations};
+use crate::error::{MngErrno, UnitActionError};
+use crate::rel::{ReStation, Reliability};
 use libevent::Events;
 use nix::unistd::Pid;
-
-use crate::reliability::{ReStation, Reliability};
-
-use super::{ExecCmdError, ExecCommand, ExecContext, ExecParameters, UnitActiveState, UnitType};
-use super::{MngErrno, UnitActionError};
-use super::{UnitDependencyMask, UnitRelationAtom, UnitRelations};
+use std::{path::PathBuf, rc::Rc};
 
 ///The trait Defining Shared Behavior of UnitManager
 ///

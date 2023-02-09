@@ -8,8 +8,9 @@ use libutils::logger;
 use nix::{sys::signal::Signal, unistd::Pid};
 use std::path::PathBuf;
 use std::rc::Rc;
-use sysmaster::reliability::{ReStation, Reliability};
-use sysmaster::unit::{SubUnit, UmIf, UnitActionError, UnitActiveState, UnitBase, UnitMngUtil};
+use sysmaster::error::UnitActionError;
+use sysmaster::rel::{ReStation, Reliability};
+use sysmaster::unit::{SubUnit, UmIf, UnitActiveState, UnitBase, UnitMngUtil};
 
 struct MountUnit {
     comm: Rc<MountUnitComm>,

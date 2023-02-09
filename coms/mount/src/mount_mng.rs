@@ -3,8 +3,9 @@
 use super::mount_comm::MountUnitComm;
 use super::mount_rentry::MountState;
 use std::{cell::RefCell, rc::Rc};
-use sysmaster::reliability::ReStation;
-use sysmaster::unit::{UnitActionError, UnitActiveState, UnitNotifyFlags};
+use sysmaster::error::UnitActionError;
+use sysmaster::rel::ReStation;
+use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
 impl MountState {
     fn mount_state_to_unit_state(&self) -> UnitActiveState {

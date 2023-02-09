@@ -1,7 +1,7 @@
 use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
-use sysmaster::reliability::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
+use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 
 const RELI_DB_HMOUNT_MNG: &str = "mntmng";
 const RELI_DB_HMOUNTM_FRAME: &str = "mntm-frame";
@@ -72,11 +72,11 @@ impl MountRe {
     }
 
     fn register(&self, relir: &Reliability) {
-        // reliability-db: RELI_DB_HMOUNT_MNG
+        // rel-db: RELI_DB_HMOUNT_MNG
         let db = Rc::clone(&self.mng);
         relir.history_db_register(RELI_DB_HMOUNT_MNG, db);
 
-        // reliability-db: RELI_DB_HMOUNTM_FRAME
+        // rel-db: RELI_DB_HMOUNTM_FRAME
         let db = Rc::clone(&self.frame);
         relir.history_db_register(RELI_DB_HMOUNTM_FRAME, db);
     }

@@ -10,10 +10,9 @@ use crate::{
 use libutils::logger;
 use nix::{sys::signal::Signal, unistd::Pid};
 use std::{error::Error, path::PathBuf, rc::Rc};
-use sysmaster::reliability::{ReStation, Reliability};
-use sysmaster::unit::{
-    ExecContext, SubUnit, UmIf, UnitActionError, UnitActiveState, UnitBase, UnitMngUtil,
-};
+use sysmaster::error::UnitActionError;
+use sysmaster::rel::{ReStation, Reliability};
+use sysmaster::unit::{ExecContext, SubUnit, UmIf, UnitActiveState, UnitBase, UnitMngUtil};
 
 // the structuer of the socket unit type
 struct SocketUnit {

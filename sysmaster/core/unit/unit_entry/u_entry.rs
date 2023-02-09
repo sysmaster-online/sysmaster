@@ -23,9 +23,10 @@ use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::rc::Rc;
-use sysmaster::reliability::ReStation;
+use sysmaster::error::UnitActionError;
+use sysmaster::rel::ReStation;
 use sysmaster::unit::{KillContext, KillMode, KillOperation, UnitNotifyFlags};
-use sysmaster::unit::{SubUnit, UnitActionError, UnitActiveState, UnitBase, UnitType};
+use sysmaster::unit::{SubUnit, UnitActiveState, UnitBase, UnitType};
 
 ///
 pub struct Unit {
@@ -659,7 +660,7 @@ mod tests {
     use crate::core::unit::unit_rentry::UnitRe;
     use libutils::{logger, path_lookup::LookupPaths};
     use std::rc::Rc;
-    use sysmaster::reliability::Reliability;
+    use sysmaster::rel::Reliability;
     use sysmaster::unit::UnitType;
 
     use crate::core::{plugin::Plugin, unit::data::DataManager, unit::uload_util::UnitFile};

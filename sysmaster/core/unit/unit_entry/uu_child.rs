@@ -3,7 +3,7 @@ use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
-use sysmaster::reliability::ReStation;
+use sysmaster::rel::ReStation;
 
 pub(super) struct UeChild {
     data: RefCell<UeChildData>,

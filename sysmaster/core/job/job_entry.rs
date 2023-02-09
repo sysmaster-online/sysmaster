@@ -2,8 +2,9 @@ use super::job_rentry::{self, JobAttr, JobKind, JobRe};
 use crate::core::unit::JobMode;
 use crate::core::unit::UnitRelationAtom;
 use crate::core::unit::UnitX;
-use sysmaster::reliability::Reliability;
-use sysmaster::unit::{UnitActionError, UnitActiveState, UnitNotifyFlags};
+use sysmaster::error::UnitActionError;
+use sysmaster::rel::Reliability;
+use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
 use std::cell::RefCell;
 use std::fmt;
@@ -439,6 +440,7 @@ fn job_trigger_err_to_result(err: UnitActionError) -> Option<JobResult> {
         UnitActionError::UnitActionEBusy => Some(JobResult::Failed),
         UnitActionError::UnitActionENoent => Some(JobResult::Failed),
         UnitActionError::UnitActionECanceled => Some(JobResult::Failed),
+        _ => Some(JobResult::Skipped),
     }
 }
 

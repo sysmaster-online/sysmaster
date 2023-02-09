@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::convert::TryFrom;
 use std::rc::Rc;
-use sysmaster::reliability::{ReStation, ReliLastFrame, Reliability};
+use sysmaster::rel::{ReStation, ReliLastFrame, Reliability};
 use sysmaster::unit::{UnitDependencyMask, UnitRelationAtom};
 
 //#[derive(Debug)]
@@ -353,7 +353,7 @@ mod tests {
     use crate::core::unit::test;
     use crate::core::unit::unit_rentry::UnitRe;
     use libutils::logger;
-    use sysmaster::reliability::Reliability;
+    use sysmaster::rel::Reliability;
 
     #[test]
     fn rt_push_load_queue() {

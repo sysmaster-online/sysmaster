@@ -4,8 +4,9 @@ use super::target_comm::TargetUnitComm;
 use super::target_rentry::TargetState;
 use libutils::IN_SET;
 use std::{cell::RefCell, rc::Rc};
-use sysmaster::reliability::ReStation;
-use sysmaster::unit::{UnitActionError, UnitActiveState, UnitNotifyFlags};
+use sysmaster::error::UnitActionError;
+use sysmaster::rel::ReStation;
+use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
 impl TargetState {
     fn to_unit_state(self) -> UnitActiveState {

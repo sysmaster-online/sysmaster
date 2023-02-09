@@ -15,7 +15,7 @@ use std::{
     cell::RefCell, collections::HashMap, fs, io::IoSliceMut, os::unix::prelude::RawFd,
     path::PathBuf, rc::Rc,
 };
-use sysmaster::reliability::{ReStation, ReliLastFrame, Reliability};
+use sysmaster::rel::{ReStation, ReliLastFrame, Reliability};
 
 const NOTIFY_SOCKET: &str = "/run/sysmaster/notify";
 

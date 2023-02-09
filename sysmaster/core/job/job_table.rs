@@ -977,7 +977,7 @@ mod tests {
     use crate::core::unit::DataManager;
     use crate::core::unit::UnitRe;
     use libutils::logger;
-    use sysmaster::reliability::Reliability;
+    use sysmaster::rel::Reliability;
 
     #[test]
     fn job_table_record_suspend() {

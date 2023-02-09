@@ -5,7 +5,7 @@ use nix::unistd::Pid;
 use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::rc::Rc;
-use sysmaster::reliability::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
+use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use sysmaster::unit::{ExecCommand, KillMode};
 
 struct ServiceReDb<K, V>(ReDb<K, V>);
@@ -311,11 +311,11 @@ impl ServiceRe {
     }
 
     fn register(&self, relir: &Reliability) {
-        // reliability-db: RELI_DB_HSERVICE_CONF
+        // rel-db: RELI_DB_HSERVICE_CONF
         let db = Rc::clone(&self.conf);
         relir.history_db_register(RELI_DB_HSERVICE_CONF, db);
 
-        // reliability-db: RELI_DB_HSERVICE_MNG
+        // rel-db: RELI_DB_HSERVICE_MNG
         let db = Rc::clone(&self.mng);
         relir.history_db_register(RELI_DB_HSERVICE_MNG, db);
     }

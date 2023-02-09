@@ -1,8 +1,8 @@
 use super::super::unit_entry::UnitX;
+use super::ReStation;
 use crate::core::butil::table::{Table, TableSubscribe};
 use std::cell::RefCell;
 use std::rc::Rc;
-use sysmaster::reliability::ReStation;
 
 pub(super) struct UnitSets {
     t: RefCell<Table<String, Rc<UnitX>>>,
@@ -77,7 +77,7 @@ mod tests {
     use crate::core::unit::test::test_utils;
     use crate::core::unit::unit_rentry::UnitRe;
     use libutils::logger;
-    use sysmaster::reliability::Reliability;
+    use sysmaster::rel::Reliability;
 
     #[test]
     fn sets_insert() {

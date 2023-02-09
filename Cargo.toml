@@ -6,12 +6,11 @@ edition = "2021"
 build = "build.rs"
 
 [lib]
-crate-type = ["rlib", "dylib"]
-path = "sysmaster/lib.rs"
+path = "sysmaster/libs/lib.rs"
+name = "sysmaster"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
-
 name = "sysmaster"
 path = "sysmaster/main.rs"
 
@@ -41,6 +40,7 @@ serde = "1.0.130"
 siphasher = { version = "0.3", features = ["serde"] }
 walkdir = "2"
 fnmatch-regex = "0.2.0"
+snafu = "0.7"
 
 # 此为 开发配置文件, 给 `cargo build` 所使用.
 [profile.dev]

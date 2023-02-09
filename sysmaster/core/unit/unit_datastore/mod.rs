@@ -7,7 +7,7 @@ use libutils::Result;
 use nix::unistd::Pid;
 use nix::NixPath;
 use std::rc::Rc;
-use sysmaster::reliability::ReStation;
+use sysmaster::rel::ReStation;
 use table::TableSubscribe;
 use unit_child::UnitChild;
 use unit_dep::UnitDep;

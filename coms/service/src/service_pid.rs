@@ -4,7 +4,7 @@ use nix::errno::Errno;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::rc::Rc;
-use sysmaster::unit::UnitActionError;
+use sysmaster::error::UnitActionError;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum MainState {

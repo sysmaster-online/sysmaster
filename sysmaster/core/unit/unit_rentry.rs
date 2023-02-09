@@ -12,7 +12,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
-use sysmaster::reliability::{ReDb, Reliability};
+use sysmaster::rel::{ReDb, Reliability};
 use sysmaster::unit::{UnitRelations, UnitType};
 
 pub(crate) fn unit_name_to_type(unit_name: &str) -> UnitType {

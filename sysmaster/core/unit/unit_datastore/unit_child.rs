@@ -134,7 +134,7 @@ mod tests {
     use crate::core::unit::test::test_utils;
     use crate::core::unit::unit_rentry::UnitRe;
     use libutils::logger;
-    use sysmaster::reliability::Reliability;
+    use sysmaster::rel::Reliability;
 
     #[test]
     #[should_panic]

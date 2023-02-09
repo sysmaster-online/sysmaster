@@ -12,8 +12,9 @@ use std::error::Error;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
-use sysmaster::reliability::ReStation;
-use sysmaster::unit::{SubUnit, UnitActionError, UnitActiveState, UnitRelations, UnitType};
+use sysmaster::error::UnitActionError;
+use sysmaster::rel::ReStation;
+use sysmaster::unit::{SubUnit, UnitActiveState, UnitRelations, UnitType};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(in crate::core) struct UnitX(Rc<Unit>);
