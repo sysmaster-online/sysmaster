@@ -212,6 +212,42 @@ impl SocketPort {
                 log::warn!("set socket send buffer errno: {}", e);
             }
         }
+
+        if let Some(v) = self.config.config_data().borrow().Socket.KeepAlive {
+            if let Err(e) = socket_util::set_keepalive_state(fd, v) {
+                log::warn!("set keepalive state errno: {}", e);
+            }
+        }
+
+        if let Some(v) = self.config.config_data().borrow().Socket.KeepAliveTimeSec {
+            if let Err(e) = socket_util::set_keepalive_timesec(fd, v) {
+                log::warn!("set keepalive time errno: {}", e);
+            }
+        }
+
+        if let Some(v) = self
+            .config
+            .config_data()
+            .borrow()
+            .Socket
+            .KeepAliveIntervalSec
+        {
+            if let Err(e) = socket_util::set_keepalive_intervalsec(fd, v) {
+                log::warn!("set keepalive interval errno: {}", e);
+            }
+        }
+
+        if let Some(v) = self.config.config_data().borrow().Socket.KeepAliveProbes {
+            if let Err(e) = socket_util::set_keepalive_probes(fd, v) {
+                log::warn!("set keepalive probe count errno: {}", e);
+            }
+        }
+
+        if let Some(v) = self.config.config_data().borrow().Socket.Broadcast {
+            if let Err(e) = socket_util::set_broadcast_state(fd, v) {
+                log::warn!("set broadcast state errno: {}", e);
+            }
+        }
     }
 
     pub(super) fn fd(&self) -> RawFd {
