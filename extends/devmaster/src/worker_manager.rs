@@ -1,8 +1,8 @@
 //! worker manager
 //!
+use crate::error::Error;
 use crate::job_queue::{DeviceJob, JobState};
-use crate::utils::{log_debug, log_info, Error};
-use crate::{log_error, JobQueue};
+use crate::JobQueue;
 use libdevice::{Device, DeviceMonitor, MonitorNetlinkGroup};
 use libevent::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
@@ -83,7 +83,7 @@ impl Worker {
 
         let handler = std::thread::spawn(move || loop {
             let msg = rx.recv().unwrap_or_else(|error| {
-                log_error(format!("Worker {id}: panic at recv \"{error}\"\n"));
+                log::error!("Worker {id}: panic at recv \"{error}\"");
                 panic!();
             });
 
@@ -91,51 +91,44 @@ impl Worker {
 
             match msg {
                 WorkerMessage::Job(device) => {
-                    log_info(format!(
-                        "Worker {id}: received device \"{}\"\n",
-                        device.devname
-                    ));
+                    log::info!("Worker {id}: received device \"{}\"", device.devname);
 
                     Self::worker_process_device(id, device.as_ref());
 
-                    log_info(format!("Worker {id}: finished job\n"));
+                    log::info!("Worker {id}: finished job");
 
                     broadcaster.send_device(device.as_ref(), None);
 
                     let mut tcp_stream =
                         TcpStream::connect(tcp_address.as_str()).unwrap_or_else(|error| {
-                            log_error(format!("Worker {id}: failed to connect {error}\n"));
+                            log::error!("Worker {id}: failed to connect {error}");
                             panic!();
                         });
 
                     tcp_stream
                         .write_all(format!("finished {id}").as_bytes())
                         .unwrap_or_else(|error| {
-                            log_error(format!(
-                                "Worker {id}: failed to send ack to manager \"{error}\"\n"
-                            ));
+                            log::error!("Worker {id}: failed to send ack to manager \"{error}\"");
                         });
                 }
                 WorkerMessage::Cmd(cmd) => {
-                    log_info(format!("Worker {id} received cmd: {cmd}\n"));
+                    log::info!("Worker {id} received cmd: {cmd}");
                     match cmd.as_str() {
                         "kill" => {
                             let mut tcp_stream = TcpStream::connect(tcp_address.as_str())
                                 .unwrap_or_else(|error| {
-                                    log_error(format!(
-                                        "Worker {id}: failed to connect \"{error}\"\n"
-                                    ));
+                                    log::error!("Worker {id}: failed to connect \"{error}\"");
                                     panic!();
                                 });
                             let _ret = tcp_stream
                                 .write(format!("killed {id}").as_bytes())
                                 .unwrap_or_else(|error| {
-                                    log_error(format!(
-                                        "Worker {id}: failed to send killed message to manager \"{error}\"\n"
-                                    ));
+                                    log::error!(
+                                        "Worker {id}: failed to send killed message to manager \"{error}\""
+                                    );
                                     0
                                 });
-                            log_debug(format!("Worker {id}: is killed\n"));
+                            log::debug!("Worker {id}: is killed");
                             break;
                         }
                         _ => {
@@ -167,16 +160,16 @@ impl Worker {
 
     /// process a device
     fn worker_process_device(id: u32, device: &Device) {
-        log_info(format!("Worker {id}: Processing: {}\n", device.devpath));
+        log::info!("Worker {id}: Processing: {}", device.devpath);
     }
 
     /// send message to the worker thread
     fn worker_send_message(&self, msg: WorkerMessage) {
         self.tx.send(msg).unwrap_or_else(|error| {
-            log_error(format!(
-                "Worker Manager: failed to send message to worker {}, {error}\n",
+            log::error!(
+                "Worker Manager: failed to send message to worker {}, {error}",
                 self.id
-            ))
+            )
         });
     }
 
@@ -194,18 +187,23 @@ impl Worker {
 impl WorkerManager {
     ///
     pub fn new(workers_capacity: u32, listen_addr: String, events: Rc<Events>) -> WorkerManager {
+        let listener = RefCell::new(TcpListener::bind(listen_addr.as_str()).unwrap_or_else(
+            |error| {
+                log::error!("Worker Manager: failed to bind listener \"{error}\"");
+                panic!();
+            },
+        ));
+
+        listener
+            .borrow()
+            .set_nonblocking(true)
+            .expect("Cannot set non-blocking");
+
         WorkerManager {
             workers_capacity,
             workers: RefCell::new(HashMap::new()),
-            listen_addr: listen_addr.clone(),
-            listener: RefCell::new(TcpListener::bind(listen_addr.as_str()).unwrap_or_else(
-                |error| {
-                    log_error(format!(
-                        "Worker Manager: failed to bind listener \"{error}\"\n"
-                    ));
-                    panic!();
-                },
-            )),
+            listen_addr,
+            listener,
             kill_idle_workers: RefCell::new(None),
             job_queue: RefCell::new(Weak::new()),
             events,
@@ -248,7 +246,7 @@ impl WorkerManager {
                         self.listen_addr.clone(),
                     )),
                 );
-                log_debug(format!("Worker Manager: created new worker {id}\n"));
+                log::debug!("Worker Manager: created new worker {id}");
                 self.set_worker_state(id, WorkerState::Idle);
                 return Some(id);
             }
@@ -262,22 +260,19 @@ impl WorkerManager {
         self: &Rc<WorkerManager>,
         device_job: Rc<DeviceJob>,
     ) -> Result<Rc<Worker>, Error> {
-        log_debug(format!(
-            "Worker Manager: start dispatch job {}\n",
-            device_job.seqnum
-        ));
+        log::debug!("Worker Manager: start dispatch job {}", device_job.seqnum);
 
         if *device_job.state.borrow() == JobState::Running {
-            log_debug(format!(
-                "Worker Manager: skip job {} as it is running\n",
+            log::debug!(
+                "Worker Manager: skip job {} as it is running",
                 device_job.seqnum
-            ));
+            );
         }
 
         for (id, worker) in self.workers.borrow().iter() {
             let state = *worker.state.borrow();
             if state == WorkerState::Idle {
-                log_debug(format!("Worker Manager: find idle worker {}\n", worker.id));
+                log::debug!("Worker Manager: find idle worker {}", worker.id);
                 self.set_worker_state(*id, WorkerState::Running);
                 worker.worker_send_message(WorkerMessage::Job(Box::new(device_job.device.clone())));
                 return Ok(worker.clone());
@@ -295,7 +290,7 @@ impl WorkerManager {
         }
 
         Err(Error::WorkerManagerError {
-            msg: "failed to get an idle worker for job\n",
+            msg: "failed to get an idle worker for job",
         })
     }
 
@@ -317,7 +312,7 @@ impl WorkerManager {
         match ack_kind {
             "killed" => {
                 // cleanup the killed worker from the manager
-                log_debug(format!("Worker Manager: cleanup worker {id}\n"));
+                log::debug!("Worker Manager: cleanup worker {id}");
 
                 self.workers
                     .borrow_mut()
@@ -356,7 +351,7 @@ impl WorkerManager {
 
     /// set the state of the worker
     fn set_worker_state(&self, id: u32, state: WorkerState) {
-        log_debug(format!("Worker Manager: set Idle on worker {id}\n"));
+        log::debug!("Worker Manager: set Idle on worker {id}");
         let workers = self.workers.borrow();
         let worker = workers.get(&id).unwrap();
 
@@ -412,11 +407,20 @@ impl Source for WorkerManager {
 
     /// start dispatching after the event arrives
     fn dispatch(&self, _: &libevent::Events) -> Result<i32, libevent::Error> {
-        let (mut stream, _) = self.listener.borrow_mut().accept().unwrap();
+        let (mut stream, _) = match self.listener.borrow_mut().accept() {
+            Ok((s, sa)) => (s, sa),
+            Err(e) => {
+                // WouldBlock error is expected when a large number of uevents are triggered in a shot interval
+                if e.kind() != std::io::ErrorKind::WouldBlock {
+                    log::error!("failed to listen worker ack ({})", e.kind());
+                }
+                return Ok(0);
+            }
+        };
         let mut ack = String::new();
         stream.read_to_string(&mut ack).unwrap();
 
-        log_debug(format!("Worker Manager: received message \"{ack}\"\n"));
+        log::debug!("Worker Manager: received message \"{ack}\"");
         self.worker_response_dispose(ack);
 
         Ok(0)
@@ -477,7 +481,7 @@ impl Source for WorkerManagerKillWorkers {
 
     /// kill workers if job queue keeps empty for an interval
     fn dispatch(&self, _: &Events) -> Result<i32, libevent::Error> {
-        log_info("Worker Manager Kill Workers timeout!\n".to_string());
+        log::info!("Worker Manager Kill Workers timeout!");
         self.worker_manager
             .upgrade()
             .unwrap()

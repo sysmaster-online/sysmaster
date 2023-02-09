@@ -3,6 +3,7 @@
 use crate::JobQueue;
 use libdevice::*;
 use libevent::*;
+use nix::errno::Errno;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
 
@@ -55,10 +56,25 @@ impl Source for Monitor {
     /// receive device from socket and insert into job queue
     fn dispatch(&self, _: &Events) -> Result<i32, libevent::Error> {
         let device = match self.device_monitor.receive_device() {
-            Some(d) => d,
-            None => {
-                return Ok(0);
-            }
+            Ok(ret) => ret,
+            Err(e) => match e {
+                libdevice::Error::Syscall {
+                    syscall: _,
+                    errno: Errno::EAGAIN,
+                } => {
+                    return Ok(0);
+                }
+                libdevice::Error::Syscall {
+                    syscall: _,
+                    errno: _,
+                } => {
+                    log::error!("{}", e);
+                    return Ok(0);
+                }
+                _ => {
+                    return Ok(0);
+                }
+            },
         };
 
         self.job_queue.job_queue_insert(device);

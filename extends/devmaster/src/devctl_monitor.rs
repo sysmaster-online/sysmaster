@@ -4,9 +4,8 @@
 use libdevice::{DeviceMonitor, MonitorNetlinkGroup};
 use libevent::{EventState, EventType, Events, Source};
 use libutils::socket_util::set_receive_buffer_force;
+use nix::errno::Errno;
 use std::{os::unix::prelude::RawFd, rc::Rc};
-
-use crate::log_error;
 
 /// wrapper of DeviceMonitor
 struct DevctlMonitorX {
@@ -41,8 +40,25 @@ impl Source for DevctlMonitorX {
     /// print device messages from kernel and userspace
     fn dispatch(&self, _e: &Events) -> Result<i32, libevent::Error> {
         let device = match self.device_monitor.receive_device() {
-            Some(d) => d,
-            None => return Ok(0),
+            Ok(ret) => ret,
+            Err(e) => match e {
+                libdevice::Error::Syscall {
+                    syscall: _,
+                    errno: Errno::EAGAIN,
+                } => {
+                    return Ok(0);
+                }
+                libdevice::Error::Syscall {
+                    syscall: _,
+                    errno: _,
+                } => {
+                    log::error!("{}", e);
+                    return Ok(0);
+                }
+                _ => {
+                    return Ok(0);
+                }
+            },
         };
 
         println!(
@@ -75,11 +91,11 @@ pub fn subcommand_monitor() {
     });
 
     if let Err(errno) = set_receive_buffer_force(kernel_monitor.fd(), 1024 * 1024 * 128) {
-        log_error(format!("Failed to set receive buffer forcely ({errno:?})"));
+        log::error!("Failed to set receive buffer forcely ({errno:?})");
     }
 
     if let Err(errno) = set_receive_buffer_force(userspace_monitor.fd(), 1024 * 1024 * 128) {
-        log_error(format!("Failed to set receive buffer forcely ({errno:?})"));
+        log::error!("Failed to set receive buffer forcely ({errno:?})");
     }
 
     let events = Events::new().unwrap();

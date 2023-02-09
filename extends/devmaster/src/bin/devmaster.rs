@@ -1,10 +1,13 @@
 //! devmaster daemon
 use libdevmaster::*;
 use libevent::{EventState, Events};
+use libutils::logger::*;
+use log::LevelFilter;
 use std::rc::Rc;
 
 fn main() {
-    println!("devmaster start");
+    init_log_with_console("devmaster", LevelFilter::Debug);
+    log::info!("daemon start");
 
     let events = Rc::new(Events::new().unwrap());
 
