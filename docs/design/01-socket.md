@@ -64,20 +64,20 @@ socket类型用来创建套接字，与service解耦， 可以单独启动，当
 
 ### 4.2    socket状态转换图
 
- ![avatar](../res/socket_state_trans.jpg)
+ ![avatar](assets/socket_state_trans.jpg)
 
     状态转换包括子类内部的状态转换以及unit整体的状态转换，具体的对应关系如图中所示。
 
 ### 4.3    socket_load模块设计
 
- ![avatar](../res/socket_load.jpg)
+ ![avatar](assets/socket_load.jpg)
 
     socket_load模块负责Socket Section字段的解析。除了字段的解析之外， 还要建立socket与对应的service的对应的关系。
 具体的流程见上图。
 
 ### 4.4    socket_start模块设计
 
- ![avatar](../res/socket_start.jpg)
+ ![avatar](assets/socket_start.jpg)
 
     socket的start主要分为两步：
 

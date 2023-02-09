@@ -20,7 +20,7 @@ sysmaster是标现有systemd的提供的一号进程对系统进行管理的功�
 
 Sysmaster核心架构包含UnitManager，DataStore，JobEngine，EventEngine，ProtoServer，Cli命令行。以及基于核心架构扩展出来的SubUnit，以及相关的服务，整体架构如下图：
 
-![avatar](../assets/architecture.jpg)
+![avatar](assets/architecture.jpg)
 
 sysmaster整体架构如上图，包含以下模块：
 
@@ -40,4 +40,4 @@ sysmaster-extends，sysmaster的扩展功能
 ## 源码目录结构
 
 sysmaster工程代码目录组织如下图：
-![avatar](../assets/sysmaster-sourced.png)
+![avatar](assets/sysmaster-sourced.png)
