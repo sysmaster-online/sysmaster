@@ -47,3 +47,28 @@ pub fn set_send_buffer(fd: RawFd, v: usize) -> Result<(), Errno> {
 pub fn set_receive_buffer_force(fd: RawFd, v: usize) -> Result<(), Errno> {
     socket::setsockopt(fd, sockopt::RcvBufForce, &v)
 }
+
+/// Set keepalive properties
+pub fn set_keepalive_state(fd: RawFd, v: bool) -> Result<(), Errno> {
+    socket::setsockopt(fd, sockopt::KeepAlive, &v)
+}
+
+/// Set the interval between the last data packet sent and the first keepalive probe
+pub fn set_keepalive_timesec(fd: RawFd, v: u32) -> Result<(), Errno> {
+    socket::setsockopt(fd, sockopt::TcpKeepIdle, &v)
+}
+
+/// Set the interval between subsequential keepalive probes
+pub fn set_keepalive_intervalsec(fd: RawFd, v: u32) -> Result<(), Errno> {
+    socket::setsockopt(fd, sockopt::TcpKeepInterval, &v)
+}
+
+/// Set the number of unacknowledged probes to send
+pub fn set_keepalive_probes(fd: RawFd, v: u32) -> Result<(), Errno> {
+    socket::setsockopt(fd, sockopt::TcpKeepCount, &v)
+}
+
+/// Set Broadcast state
+pub fn set_broadcast_state(fd: RawFd, v: bool) -> Result<(), Errno> {
+    socket::setsockopt(fd, sockopt::Broadcast, &v)
+}
