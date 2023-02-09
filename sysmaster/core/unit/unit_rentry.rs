@@ -4,6 +4,7 @@ use crate::core::manager::rentry::{
     RELI_DB_HUM_NOTIFY, RELI_DB_HUNIT_BASE, RELI_DB_HUNIT_CGROUP, RELI_DB_HUNIT_CHILD,
     RELI_DB_HUNIT_CONFIG, RELI_DB_HUNIT_DEP, RELI_DB_HUNIT_LOAD, RELI_DB_HUNIT_PPS,
 };
+use crate::core::unit::unit_entry::UnitEmergencyAction;
 use bitflags::bitflags;
 use confique::Config;
 use libutils::serialize::DeserializeWith;
@@ -152,6 +153,15 @@ pub(crate) struct UeConfigUnit {
     pub StartLimitInterval: u64,
     #[config(default = 0)]
     pub StartLimitBurst: u32,
+    #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]
+    #[config(default = "none")]
+    pub SuccessAction: UnitEmergencyAction,
+    #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]
+    #[config(default = "none")]
+    pub FailureAction: UnitEmergencyAction,
+    #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]
+    #[config(default = "none")]
+    pub StartLimitAction: UnitEmergencyAction,
 }
 
 #[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]

@@ -1,6 +1,7 @@
 use super::unit_dep_conf::UnitDepConf;
 use super::unit_state::UnitState;
 use crate::core::butil::table::{Table, TableSubscribe};
+use crate::core::unit::unit_entry::StartLimitResult;
 use std::cell::RefCell;
 use std::rc::Rc;
 use sysmaster::rel::ReStation;
@@ -8,8 +9,9 @@ use sysmaster::rel::ReStation;
 #[allow(clippy::type_complexity)]
 pub struct DataManager {
     tables: (
-        RefCell<Table<String, UnitDepConf>>, // [0]unit-dep-config
-        RefCell<Table<String, UnitState>>,   // [1]unit-state
+        RefCell<Table<String, UnitDepConf>>,      // [0]unit-dep-config
+        RefCell<Table<String, UnitState>>,        // [1]unit-state
+        RefCell<Table<String, StartLimitResult>>, // [2]unit-start-limit-hit
     ),
 }
 
@@ -35,7 +37,11 @@ impl Drop for DataManager {
 impl DataManager {
     pub fn new() -> DataManager {
         DataManager {
-            tables: (RefCell::new(Table::new()), RefCell::new(Table::new())),
+            tables: (
+                RefCell::new(Table::new()),
+                RefCell::new(Table::new()),
+                RefCell::new(Table::new()),
+            ),
         }
     }
 
@@ -74,6 +80,24 @@ impl DataManager {
         subscriber: Rc<dyn TableSubscribe<String, UnitState>>,
     ) -> Option<Rc<dyn TableSubscribe<String, UnitState>>> {
         let mut table = self.tables.1.borrow_mut();
+        table.subscribe(name.to_string(), subscriber)
+    }
+
+    pub(in crate::core) fn insert_start_limit_result(
+        &self,
+        u_name: String,
+        start_limit_res: StartLimitResult,
+    ) -> Option<StartLimitResult> {
+        let mut table = self.tables.2.borrow_mut();
+        table.insert(u_name, start_limit_res)
+    }
+
+    pub(in crate::core) fn register_start_limit_result(
+        &self,
+        name: &str,
+        subscriber: Rc<dyn TableSubscribe<String, StartLimitResult>>,
+    ) -> Option<Rc<dyn TableSubscribe<String, StartLimitResult>>> {
+        let mut table = self.tables.2.borrow_mut();
         table.subscribe(name.to_string(), subscriber)
     }
 

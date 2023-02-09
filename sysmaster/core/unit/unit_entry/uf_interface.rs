@@ -1,4 +1,5 @@
 use super::u_entry::Unit;
+use super::UnitEmergencyAction;
 
 use super::uu_config::UeConfig;
 use crate::core::unit::data::DataManager;
@@ -50,6 +51,10 @@ impl UnitX {
         subclass: Box<dyn SubUnit>,
     ) -> UnitX {
         let unit = Unit::new(unit_type, name, dmr, rentryr, filer, subclass);
+        UnitX(unit)
+    }
+
+    pub(in crate::core::unit) fn from_unit(unit: Rc<Unit>) -> UnitX {
         UnitX(unit)
     }
 
@@ -121,6 +126,18 @@ impl UnitX {
     // pub(in crate::manager::unit) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
     //     self.0.get_config(item)
     // }
+
+    pub(in crate::core) fn get_success_action(&self) -> UnitEmergencyAction {
+        self.0.get_success_action()
+    }
+
+    pub(in crate::core) fn get_failure_action(&self) -> UnitEmergencyAction {
+        self.0.get_failure_action()
+    }
+
+    pub(in crate::core) fn get_start_limit_action(&self) -> UnitEmergencyAction {
+        self.0.get_start_limit_action()
+    }
 
     pub(in crate::core) fn active_state(&self) -> UnitActiveState {
         //UnitActiveState::UnitActive
