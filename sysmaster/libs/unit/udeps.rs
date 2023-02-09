@@ -1,6 +1,5 @@
-use std::{convert::TryFrom, num::ParseIntError, str::FromStr};
-
 use serde::{Deserialize, Serialize};
+use std::{convert::TryFrom, num::ParseIntError, str::FromStr};
 
 #[allow(missing_docs)]
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]

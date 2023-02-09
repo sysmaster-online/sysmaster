@@ -1,5 +1,5 @@
 //!
-pub use exec::{ExecCmdError, ExecCommand, ExecContext, ExecFlags, ExecParameters};
+pub use exec::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
 pub use ubase::{SubUnit, UnitBase};
 pub use udeps::{UnitDependencyMask, UnitRelationAtom, UnitRelations, UnitType};
 pub use ukill::{KillContext, KillMode, KillOperation};

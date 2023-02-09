@@ -1,7 +1,7 @@
 //! UnitManager interfaces
-use super::{ExecCmdError, ExecCommand, ExecContext, ExecParameters, UnitActiveState, UnitType};
+use super::{ExecCommand, ExecContext, ExecParameters, UnitActiveState, UnitType};
 use super::{UnitDependencyMask, UnitRelationAtom, UnitRelations};
-use crate::error::{MngErrno, UnitActionError};
+use crate::error::{ExecCmdError, MngErrno, UnitActionError};
 use crate::rel::{ReStation, Reliability};
 use libevent::Events;
 use nix::unistd::Pid;
