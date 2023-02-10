@@ -1,5 +1,6 @@
 //! device monitor
 //!
+use crate::{Device, Error};
 use nix::{
     errno::Errno,
     sys::socket::{
@@ -7,8 +8,6 @@ use nix::{
     },
 };
 use std::io::IoSlice;
-
-use crate::{Device, Error};
 
 /// netlink group of device monitor
 pub enum MonitorNetlinkGroup {
@@ -64,7 +63,7 @@ impl DeviceMonitor {
             Ok(ret) => ret,
             Err(errno) => {
                 return Err(Error::Syscall {
-                    syscall: "recv",
+                    syscall: "libdevice: recv".to_string(),
                     errno,
                 })
             }
@@ -81,31 +80,37 @@ impl DeviceMonitor {
         let prefix = std::str::from_utf8(&buf[..prefix_split_idx]).unwrap();
 
         if prefix.contains("@/") {
-            return Ok(Device::from_buffer(&buf[prefix_split_idx + 1..n]));
+            return Device::from_nulstr(&buf[prefix_split_idx + 1..n]);
         } else if prefix == "libdevm" {
-            return Ok(Device::from_buffer(&buf[40..n]));
+            return Device::from_nulstr(&buf[40..n]);
         }
 
         Err(Error::Other {
-            msg: "Ignore invalid buffer data",
+            msg: "libdevice: invalid nulstr data".to_string(),
             errno: Some(Errno::EINVAL),
         })
     }
 
     /// send device
-    pub fn send_device(&self, device: &Device, destination: Option<NetlinkAddr>) {
+    pub fn send_device(
+        &self,
+        device: &mut Device,
+        destination: Option<NetlinkAddr>,
+    ) -> Result<(), Error> {
         let dest = match destination {
             Some(addr) => addr,
             None => NetlinkAddr::new(0, 2),
         };
 
-        let properties_nulstr_len = device.properties_nulstr_len.to_be_bytes();
+        let (nulstr, len) = device.get_properties_nulstr()?;
+
+        let len_bytes = len.to_be_bytes();
         let iov = [
             IoSlice::new(b"libdevm\0"),
             IoSlice::new(&[254, 237, 190, 239]),
             IoSlice::new(&[40, 0, 0, 0]),
             IoSlice::new(&[40, 0, 0, 0]),
-            IoSlice::new(&properties_nulstr_len[0..4]),
+            IoSlice::new(&len_bytes[0..4]),
             // todo: supply subsystem hash
             IoSlice::new(&[0, 0, 0, 0]),
             // todo: supply devtype hash
@@ -113,19 +118,21 @@ impl DeviceMonitor {
             // todo: supply tag bloom high and low bytes
             IoSlice::new(&[0, 0, 0, 0]),
             IoSlice::new(&[0, 0, 0, 0]),
-            IoSlice::new(&device.properties_nulstr),
+            IoSlice::new(nulstr),
         ];
 
         sendmsg(self.fd(), &iov, &[], MsgFlags::empty(), Some(&dest)).unwrap();
+
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{os::unix::prelude::RawFd, rc::Rc};
-
     use super::*;
+    use crate::device::*;
     use libevent::*;
+    use std::{os::unix::prelude::RawFd, rc::Rc, thread::spawn};
 
     /// wrapper of DeviceMonitor
     struct Monitor {
@@ -169,7 +176,7 @@ mod tests {
         }
     }
 
-    /// require implementation of `devctl trigger`, ignore this test case temporarily
+    /// test whether device monitor can receive uevent from kernel normally
     #[ignore]
     #[test]
     fn test_monitor_kernel() {
@@ -178,15 +185,23 @@ mod tests {
             device_monitor: DeviceMonitor::new(MonitorNetlinkGroup::Kernel, None),
         });
         e.add_source(s.clone()).unwrap();
-
         e.set_enabled(s.clone(), EventState::On).unwrap();
+
+        spawn(|| {
+            let mut device = Device::from_devname("/dev/sda".to_string()).unwrap();
+            device
+                .set_sysattr_value("uevent".to_string(), Some("change".to_string()))
+                .unwrap();
+        })
+        .join()
+        .unwrap();
 
         e.rloop().unwrap();
 
         e.del_source(s.clone()).unwrap();
     }
 
-    /// require implementation of `devctl trigger`, ignore this test case temporarily
+    /// test whether device monitor can receive device message from userspace normally
     #[ignore]
     #[test]
     fn test_monitor_userspace() {
@@ -195,8 +210,15 @@ mod tests {
             device_monitor: DeviceMonitor::new(MonitorNetlinkGroup::Userspace, None),
         });
         e.add_source(s.clone()).unwrap();
-
         e.set_enabled(s.clone(), EventState::On).unwrap();
+
+        spawn(|| {
+            let mut device = Device::from_devname("/dev/sda".to_string()).unwrap();
+            let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
+            broadcaster.send_device(&mut device, None).unwrap();
+        })
+        .join()
+        .unwrap();
 
         e.rloop().unwrap();
 

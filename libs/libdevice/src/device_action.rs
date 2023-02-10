@@ -31,7 +31,7 @@ impl FromStr for DeviceAction {
             "bind" => Ok(Self::Bind),
             "unbind" => Ok(Self::Unbind),
             _ => Err(Self::Err::Other {
-                msg: "Invalid action string {s}",
+                msg: "libdevice: invalid action string".to_string(),
                 errno: None,
             }),
         }
@@ -59,6 +59,7 @@ impl Display for DeviceAction {
 mod tests {
     use crate::DeviceAction;
 
+    /// test whether device action parse and display normally
     #[test]
     fn test_device_action() {
         let action_add: DeviceAction = "add".parse().unwrap();

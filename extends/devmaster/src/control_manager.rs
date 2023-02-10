@@ -1,7 +1,7 @@
 //! control manager
 //!
+use crate::job_queue::JobQueue;
 use crate::worker_manager::WorkerManager;
-use crate::JobQueue;
 use libdevice::Device;
 use libevent::*;
 use std::time::SystemTime;

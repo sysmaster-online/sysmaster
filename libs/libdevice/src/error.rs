@@ -16,7 +16,7 @@ pub enum Error {
     ))]
     Syscall {
         /// syscall
-        syscall: &'static str,
+        syscall: String,
         /// errno
         errno: Errno,
     },
@@ -25,7 +25,7 @@ pub enum Error {
     #[snafu(display("Error(libdevice): Got an error {}", msg,))]
     Other {
         /// message
-        msg: &'static str,
+        msg: String,
         /// errno
         errno: Option<Errno>,
     },
