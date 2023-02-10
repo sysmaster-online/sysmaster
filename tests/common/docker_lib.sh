@@ -1,9 +1,8 @@
 #!/bin/bash
 # Description: docker common functions
 
-OS_VER="openEuler-22.09"
-#DOCKER_IMG_URL="http://121.36.84.172/dailybuild/${OS_VER}/${OS_VER}/docker_img/$(arch)/"
-DOCKER_IMG_URL="http://121.36.84.172/dailybuild/${OS_VER}/openeuler-2022-12-05-20-54-44/docker_img/$(arch)"
+OS_VER="openEuler-22.03-LTS-SP1"
+DOCKER_IMG_URL="http://121.36.84.172/dailybuild/${OS_VER}/${OS_VER}/docker_img/$(arch)/"
 DOCKER_TAR="openEuler-docker.$(arch).tar"
 BASE_IMG="${OS_VER,,}"
 SYSMST_BASE_IMG="sysmaster_base-${BASE_IMG}"
@@ -25,26 +24,14 @@ function load_docker_img() {
 }
 
 function build_base_img() {
-    mkdir "${TMP_DIR}"/bin "${TMP_DIR}"/lib
-    pushd "${SYSMST_INSTALL_SOURCE}" || return 1
-    cp -arf ${BIN_LIST} "${TMP_DIR}"/bin || { popd; return 1;}
-    cp -arf ${LIB_LIST} "${TMP_DIR}"/lib || { popd; return 1;}
-    cp -arf conf/plugin.conf "${TMP_DIR}" || { popd; return 1;}
-    popd
-    pushd "${TMP_DIR}"
-    chmod 755 bin/*
-    chmod 644 lib/*
-    chmod 644 plugin.conf
-    strip lib/lib*.so
+    cp -arf ${BUILD_PATH}/target/install "${TMP_DIR}"
 
+    pushd "${TMP_DIR}"
     cat << EOF > Dockerfile
 FROM ${BASE_IMG} as ${SYSMST_BASE_IMG}
-RUN mkdir -p ${SYSMST_INSTALL_PATH}/plugin
-COPY plugin.conf ${SYSMST_INSTALL_PATH}/plugin/
-COPY lib/* ${SYSMST_INSTALL_PATH}/plugin/
-COPY bin/* ${SYSMST_INSTALL_PATH}/
-RUN mv ${SYSMST_INSTALL_PATH}/sctl /usr/bin/
-RUN rm -rf ${SYSMST_INSTALL_PATH}/sctl
+COPY install/usr/bin/sctl /usr/bin/
+RUN mkdir /usr/lib/sysmaster
+COPY install/usr/lib/sysmaster /usr/lib/sysmaster/
 EOF
     cat Dockerfile
     if ! docker build -t "${SYSMST_BASE_IMG}:latest" .; then
