@@ -18,7 +18,7 @@ pub enum DeviceAction {
 }
 
 impl FromStr for DeviceAction {
-    type Err = crate::Error;
+    type Err = crate::error::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -57,7 +57,7 @@ impl Display for DeviceAction {
 
 #[cfg(test)]
 mod tests {
-    use crate::DeviceAction;
+    use crate::device_action::DeviceAction;
 
     /// test whether device action parse and display normally
     #[test]

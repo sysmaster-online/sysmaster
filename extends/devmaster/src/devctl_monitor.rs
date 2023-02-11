@@ -1,6 +1,6 @@
 //! subcommand for devctl monitor
 //!
-use libdevice::{DeviceMonitor, MonitorNetlinkGroup};
+use libdevice::{device_monitor::DeviceMonitor, device_monitor::MonitorNetlinkGroup};
 use libevent::{EventState, EventType, Events, Source};
 use libutils::socket_util::set_receive_buffer_force;
 use nix::errno::Errno;
@@ -41,13 +41,13 @@ impl Source for DevctlMonitorX {
         let device = match self.device_monitor.receive_device() {
             Ok(ret) => ret,
             Err(e) => match e {
-                libdevice::Error::Syscall {
+                libdevice::error::Error::Syscall {
                     syscall: _,
                     errno: Errno::EAGAIN,
                 } => {
                     return Ok(0);
                 }
-                libdevice::Error::Syscall {
+                libdevice::error::Error::Syscall {
                     syscall: _,
                     errno: _,
                 } => {

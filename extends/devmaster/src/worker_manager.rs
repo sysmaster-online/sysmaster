@@ -1,8 +1,9 @@
 //! worker manager
 //!
-use crate::error::Error;
-use crate::job_queue::{DeviceJob, JobQueue, JobState};
-use libdevice::{Device, DeviceMonitor, MonitorNetlinkGroup};
+use libdevice::{
+    device::Device,
+    device_monitor::{DeviceMonitor, MonitorNetlinkGroup},
+};
 use libevent::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -14,6 +15,9 @@ use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::rc::{Rc, Weak};
 use std::sync::mpsc;
 use std::thread::JoinHandle;
+
+use crate::error::Error;
+use crate::job_queue::{DeviceJob, JobQueue, JobState};
 
 /// worker manager listen address
 pub const WORKER_MANAGER_LISTEN_ADDR: &str = "0.0.0.0:1223";
@@ -89,9 +93,10 @@ impl Display for WorkerState {
     }
 }
 
+/// public methods
 impl Worker {
     /// create a new worker, start running the worker thread
-    fn new(id: u32, state: WorkerState, tcp_address: String) -> Worker {
+    pub(crate) fn new(id: u32, state: WorkerState, tcp_address: String) -> Worker {
         let (tx, rx) = mpsc::channel::<WorkerMessage>();
 
         let handler = std::thread::spawn(move || loop {
@@ -160,7 +165,10 @@ impl Worker {
             device_job: RefCell::new(None),
         }
     }
+}
 
+/// internal methods
+impl Worker {
     /// get the id of the worker
     pub(crate) fn get_id(&self) -> u32 {
         self.id
@@ -172,12 +180,12 @@ impl Worker {
     }
 
     /// process a device
-    fn worker_process_device(id: u32, device: &Device) {
+    pub(crate) fn worker_process_device(id: u32, device: &Device) {
         log::info!("Worker {id}: processing {}", device.devpath);
     }
 
     /// send message to the worker thread
-    fn worker_send_message(&self, msg: WorkerMessage) {
+    pub(crate) fn worker_send_message(&self, msg: WorkerMessage) {
         self.tx.send(msg).unwrap_or_else(|error| {
             log::error!(
                 "Worker Manager: failed to send message to worker {}, {error}",
@@ -197,6 +205,7 @@ impl Worker {
     }
 }
 
+/// public methods
 impl WorkerManager {
     /// create a worker manager
     pub fn new(workers_capacity: u32, listen_addr: String, events: Rc<Events>) -> WorkerManager {
@@ -246,7 +255,10 @@ impl WorkerManager {
     pub fn set_job_queue(&self, job_queue: &Rc<JobQueue>) {
         *self.job_queue.borrow_mut() = Rc::downgrade(job_queue);
     }
+}
 
+/// internal methods
+impl WorkerManager {
     /// create a new worker
     pub(crate) fn create_new_worker(self: &Rc<WorkerManager>) -> Option<u32> {
         for id in 0..self.workers_capacity {
@@ -269,7 +281,7 @@ impl WorkerManager {
     }
 
     /// dispatch job to a worker
-    pub fn job_dispatch(
+    pub(crate) fn job_dispatch(
         self: &Rc<WorkerManager>,
         device_job: Rc<DeviceJob>,
     ) -> Result<Rc<Worker>, Error> {
@@ -308,7 +320,7 @@ impl WorkerManager {
     }
 
     /// update the state of worker according to the ack
-    pub fn worker_response_dispose(&self, ack: String) {
+    pub(crate) fn worker_response_dispose(&self, ack: String) {
         let tokens: Vec<&str> = ack.split(' ').collect();
 
         if tokens.len() != 2 {
@@ -363,7 +375,7 @@ impl WorkerManager {
     }
 
     /// set the state of the worker
-    fn set_worker_state(&self, id: u32, state: WorkerState) {
+    pub(crate) fn set_worker_state(&self, id: u32, state: WorkerState) {
         log::debug!("Worker Manager: set worker {id} to state {}", state);
         let workers = self.workers.borrow();
         let worker = workers.get(&id).unwrap();
@@ -372,7 +384,7 @@ impl WorkerManager {
     }
 
     /// kill all workers
-    fn manager_kill_workers(&self) {
+    pub(crate) fn manager_kill_workers(&self) {
         for (id, worker) in self.workers.borrow().iter() {
             self.set_worker_state(*id, WorkerState::Killing);
             worker.worker_send_message(WorkerMessage::Cmd(String::from("kill")));
@@ -380,7 +392,7 @@ impl WorkerManager {
     }
 
     /// start kill workers timer
-    pub fn start_kill_workers_timer(self: &Rc<WorkerManager>) {
+    pub(crate) fn start_kill_workers_timer(self: &Rc<WorkerManager>) {
         self.events
             .set_enabled(self.get_kill_workers_timer().unwrap(), EventState::Off)
             .unwrap();
@@ -389,12 +401,12 @@ impl WorkerManager {
             .unwrap();
     }
 
-    /// stop kill workers timer
-    pub fn stop_kill_workers_timer(self: &Rc<WorkerManager>) {
-        self.events
-            .set_enabled(self.get_kill_workers_timer().unwrap(), EventState::Off)
-            .unwrap();
-    }
+    // /// stop kill workers timer
+    // pub(crate) fn stop_kill_workers_timer(self: &Rc<WorkerManager>) {
+    //     self.events
+    //         .set_enabled(self.get_kill_workers_timer().unwrap(), EventState::Off)
+    //         .unwrap();
+    // }
 }
 
 impl Source for WorkerManager {
@@ -456,9 +468,10 @@ pub struct WorkerManagerKillWorkers {
     worker_manager: Weak<WorkerManager>,
 }
 
+/// internal methods
 impl WorkerManagerKillWorkers {
     /// create a timer instance to recycle workers
-    fn new(time: u64, worker_manager: Rc<WorkerManager>) -> WorkerManagerKillWorkers {
+    pub(crate) fn new(time: u64, worker_manager: Rc<WorkerManager>) -> WorkerManagerKillWorkers {
         WorkerManagerKillWorkers {
             time,
             worker_manager: Rc::downgrade(&worker_manager),
