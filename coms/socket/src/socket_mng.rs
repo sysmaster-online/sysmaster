@@ -12,9 +12,8 @@ use libevent::EventState;
 use libevent::{EventType, Events, Source};
 use libutils::Error;
 use libutils::IN_SET;
-use nix::errno::Errno;
 use nix::libc::{self};
-use nix::{sys::signal::Signal, unistd::Pid};
+use nix::{errno::Errno, sys::wait::WaitStatus};
 use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
@@ -120,8 +119,8 @@ impl SocketMng {
         state.to_string()
     }
 
-    pub(super) fn sigchld_event(&self, _pid: Pid, code: i32, status: Signal) {
-        self.data.sigchld_event(_pid, code, status);
+    pub(super) fn sigchld_event(&self, wait_status: WaitStatus) {
+        self.data.sigchld_event(wait_status);
         self.db_update();
     }
 
@@ -754,15 +753,28 @@ impl SocketMngData {
 
 // the declaration "pub(self)" is for identification only.
 impl SocketMngData {
-    pub(self) fn sigchld_event(&self, _pid: Pid, code: i32, status: Signal) {
-        let res: SocketResult;
-        if code == 0 {
-            res = SocketResult::Success;
-        } else if status != Signal::SIGCHLD {
-            res = SocketResult::FailureSignal;
-        } else {
-            res = SocketResult::Success
+    fn sigchld_result(&self, wait_status: WaitStatus) -> SocketResult {
+        match wait_status {
+            WaitStatus::Exited(_, status) => {
+                if status == 0 {
+                    SocketResult::Success
+                } else {
+                    SocketResult::FailureExitCode
+                }
+            }
+            WaitStatus::Signaled(_, _, core_dump) => {
+                if core_dump {
+                    SocketResult::FailureCoreDump
+                } else {
+                    SocketResult::FailureSignal
+                }
+            }
+            _ => unreachable!(),
         }
+    }
+
+    pub(self) fn sigchld_event(&self, wait_status: WaitStatus) {
+        let res = self.sigchld_result(wait_status);
 
         if !self.control_command.borrow().is_empty() && res == SocketResult::Success {
             self.run_next();

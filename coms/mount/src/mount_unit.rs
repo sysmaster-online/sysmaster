@@ -5,7 +5,7 @@ use super::mount_base::PLUGIN_NAME;
 use super::mount_comm::MountUnitComm;
 use super::mount_mng::MountMng;
 use libutils::logger;
-use nix::{sys::signal::Signal, unistd::Pid};
+use nix::sys::wait::WaitStatus;
 use std::path::PathBuf;
 use std::rc::Rc;
 use sysmaster::error::UnitActionError;
@@ -101,7 +101,7 @@ impl SubUnit for MountUnit {
 
     fn release_resources(&self) {}
 
-    fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {}
+    fn sigchld_events(&self, _wait_status: WaitStatus) {}
 
     fn reset_failed(&self) {}
 }

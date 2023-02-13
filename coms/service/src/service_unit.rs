@@ -8,9 +8,8 @@ use super::service_rentry::{NotifyAccess, ServiceCommand, ServiceType};
 use libutils::error::Error as ServiceError;
 use libutils::logger;
 use libutils::special::{BASIC_TARGET, SHUTDOWN_TARGET, SYSINIT_TARGET};
-use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
-use nix::unistd::Pid;
+use nix::sys::wait::WaitStatus;
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
@@ -116,8 +115,8 @@ impl SubUnit for ServiceUnit {
         todo!()
     }
 
-    fn sigchld_events(&self, pid: Pid, code: i32, status: Signal) {
-        self.mng.sigchld_event(pid, code, status)
+    fn sigchld_events(&self, wait_status: WaitStatus) {
+        self.mng.sigchld_event(wait_status)
     }
 
     fn reset_failed(&self) {
