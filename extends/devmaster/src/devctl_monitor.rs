@@ -1,6 +1,5 @@
 //! subcommand for devctl monitor
 //!
-
 use libdevice::{DeviceMonitor, MonitorNetlinkGroup};
 use libevent::{EventState, EventType, Events, Source};
 use libutils::socket_util::set_receive_buffer_force;
@@ -62,7 +61,7 @@ impl Source for DevctlMonitorX {
         };
 
         println!(
-            "{} >> {:?} {} ({})",
+            "{} >> {} {} ({})",
             self.prefix,
             device.action.unwrap(),
             device.devpath,
@@ -80,6 +79,13 @@ impl Source for DevctlMonitorX {
 
 /// subcommand for monitoring device messages from kernel and userspace
 pub fn subcommand_monitor() {
+    println!(
+        "start monitoring device events:
+KERNEL - the kernel uevent
+USERSPACE - broadcasted by devmaster after successful process on device
+",
+    );
+
     let kernel_monitor = Rc::new(DevctlMonitorX {
         device_monitor: DeviceMonitor::new(MonitorNetlinkGroup::Kernel, None),
         prefix: "KERNEL []".to_string(),

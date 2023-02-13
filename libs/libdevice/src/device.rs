@@ -1,11 +1,9 @@
 //! struct Device
 //!
-use kobject_uevent::{ActionType, UEvent};
 use nix::errno::Errno;
-use std::{
-    collections::{HashMap, HashSet},
-    str::FromStr,
-};
+use std::collections::{HashMap, HashSet};
+
+use crate::DeviceAction;
 
 /// Device
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -55,7 +53,7 @@ pub struct Device {
 
     // only set when device is passed through netlink
     /// uevent action
-    pub action: Option<ActionType>,
+    pub action: Option<DeviceAction>,
     /// uevent seqnum
     pub seqnum: Option<u64>,
 
@@ -129,47 +127,6 @@ impl Device {
         }
     }
 
-    /// create Device instance from UEvent
-    pub fn from_uevent(uevent: UEvent) -> Device {
-        let mut device = Device::new();
-        for (key, value) in uevent.env.iter() {
-            match key.as_str() {
-                "DEVPATH" => {
-                    device.devpath = value.clone();
-                }
-                "ACTION" => {
-                    device.action = Some(ActionType::from_str(value).unwrap());
-                }
-                "SUBSYSTEM" => {
-                    device.subsystem = value.clone();
-                }
-                "DEVTYPE" => {
-                    device.devtype = value.clone();
-                }
-                "MINOR" => {
-                    device.minor = value.parse().unwrap();
-                }
-                "MAJOR" => {
-                    device.major = value.parse().unwrap();
-                }
-                "PARTN" => {}
-                "SYNTH_UUID" => {}
-                "DEVNAME" => {
-                    device.devname = value.clone();
-                }
-                "SEQNUM" => {
-                    device.seqnum = Some(value.parse().unwrap());
-                }
-
-                _ => {}
-            }
-
-            device.properties.insert(key.clone(), value.clone());
-        }
-
-        device
-    }
-
     /// create Device from buffer
     pub fn from_buffer(buffer: &[u8]) -> Device {
         let mut device = Device::new();
@@ -187,7 +144,7 @@ impl Device {
                     device.devpath = value.to_string();
                 }
                 "ACTION" => {
-                    device.action = Some(ActionType::from_str(value).unwrap());
+                    device.action = Some(value.parse::<DeviceAction>().unwrap());
                 }
                 "SUBSYSTEM" => {
                     device.subsystem = value.to_string();
