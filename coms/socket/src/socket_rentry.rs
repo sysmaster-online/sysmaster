@@ -49,7 +49,6 @@ pub(super) struct SectionSocket {
     pub KeepAliveIntervalSec: Option<u32>,
     pub KeepAliveProbes: Option<u32>,
     pub Broadcast: Option<bool>,
-
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub Symlinks: Option<Vec<String>>,
     pub PassSecurity: Option<bool>,

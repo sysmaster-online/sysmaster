@@ -289,6 +289,7 @@ mod tests {
     use crate::socket_base::NetlinkProtocol;
     use crate::socket_comm::SocketUnitComm;
     use crate::socket_config::{SocketAddress, SocketConfig, SocketPortConf};
+    use libtests::get_project_root;
     use nix::sys::socket::{
         AddressFamily, NetlinkAddr, SockProtocol, SockType, SockaddrIn, UnixAddr,
     };
@@ -389,6 +390,101 @@ mod tests {
         assert_ne!(port.fd(), SOCKET_INVALID_FD);
         assert_eq!(port.family(), AddressFamily::Netlink);
 
+        port.flush_accept();
+        port.flush_fd();
+        port.close(false);
+    }
+
+    #[test]
+    fn test_apply_sock_opt() {
+        let recv_buff_size = 4096;
+        let send_buff_size = 4096;
+        let mut file_path = get_project_root().unwrap();
+        file_path.push("tests/test_units/test.socket.toml");
+        let paths = vec![file_path];
+        let comm = Rc::new(SocketUnitComm::new());
+        let config = Rc::new(SocketConfig::new(&comm));
+        let result = config.load(paths, false);
+
+        // Check fileload result
+        assert!(result.is_ok());
+
+        let sock_addr = SockaddrIn::from(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 31457));
+        let socket_addr = SocketAddress::new(Box::new(sock_addr), SockType::Stream, None);
+        let p_conf = Rc::new(SocketPortConf::new(
+            PortType::Socket,
+            socket_addr,
+            "0.0.0.0:31457",
+        ));
+
+        let p = SocketPort::new(&comm, &config, &p_conf);
+        let port = Rc::new(p);
+
+        let ret = port.open_port(false);
+        assert!(ret.is_ok());
+        assert_ne!(port.fd(), SOCKET_INVALID_FD);
+        assert_eq!(port.family(), AddressFamily::Inet);
+
+        port.apply_sock_opt(port.fd());
+
+        let pass_packet_info = socket::getsockopt(port.fd(), sockopt::Ipv4PacketInfo);
+        match pass_packet_info {
+            Ok(v) => assert!(!v),
+            Err(e) => println!("Error get PassPacketInfo: {:?}", e),
+        }
+
+        let passcredentials_state = socket::getsockopt(port.fd(), sockopt::PassCred);
+        match passcredentials_state {
+            Ok(v) => assert!(v),
+            Err(e) => println!("Error get PassCredentials: {:?}", e),
+        }
+
+        /*
+           Notice:
+               The kernel doubles this value (to allow space for bookkeeping
+               overhead) when it is set using setsockopt, and this doubled
+               value is returned by getsockopt.(Reference: https://man7.org/linux/man-pages/man7/socket.7.html)
+           So we also need to double it in our testcases.
+        */
+        let recv_buff = socket::getsockopt(port.fd(), sockopt::RcvBuf);
+        match recv_buff {
+            Ok(v) => assert_eq!(v, recv_buff_size * 2),
+            Err(e) => println!("Error get ReceiveBuffer: {:?}", e),
+        }
+
+        let send_buff = socket::getsockopt(port.fd(), sockopt::SndBuf);
+        match send_buff {
+            Ok(v) => assert_eq!(v, send_buff_size * 2),
+            Err(e) => println!("Error get SendBuffer: {:?}", e),
+        }
+
+        let keepalive_state = socket::getsockopt(port.fd(), sockopt::KeepAlive);
+        match keepalive_state {
+            Ok(v) => assert!(v),
+            Err(e) => println!("Error get keepalive state: {:?}", e),
+        }
+        let keepalive_timesec = socket::getsockopt(port.fd(), sockopt::TcpKeepIdle);
+        match keepalive_timesec {
+            Ok(v) => assert_eq!(v, 7000),
+            Err(e) => println!("Error get keepalive timeseconds: {:?}", e),
+        }
+        let keepalive_intervalsec = socket::getsockopt(port.fd(), sockopt::TcpKeepInterval);
+        match keepalive_intervalsec {
+            Ok(v) => assert_eq!(v, 70),
+            Err(e) => println!("Error get keepalive interval: {:?}", e),
+        }
+        let keepalive_probes = socket::getsockopt(port.fd(), sockopt::TcpKeepCount);
+        match keepalive_probes {
+            Ok(v) => assert_eq!(v, 10),
+            Err(e) => println!("Error get keepalive probes: {:?}", e),
+        }
+        let broadcast_state = socket::getsockopt(port.fd(), sockopt::Broadcast);
+        match broadcast_state {
+            Ok(v) => assert!(v),
+            Err(e) => println!("Error get broadcast state: {:?}", e),
+        }
+
+        // Rosource reclaim
         port.flush_accept();
         port.flush_fd();
         port.close(false);
