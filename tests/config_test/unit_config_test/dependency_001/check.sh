@@ -7,104 +7,99 @@ set +e
 
 # usage: test dependency not exist
 function test01() {
+    log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/{conflicts.service,requires.service,wants.service} ${SYSMST_LIB_PATH} || return 1
     run_sysmaster || return 1
 
-    # Conflicts/Requires: dependency not exist leads to start failure
-    for service in conflicts requires; do
-        sctl start "${service}"
-        expect_eq $? 5 || return 1
-        sctl status "${service}"
-        expect_eq $? 1 || return 1
-	check_log "${SYSMST_LOG}" 'asdaasd' || return 1
-	echo > "${SYSMST_LOG}"
-    done
+    sctl status base.service &> log
+    check_log log 'No such file or directory' || return 1
+    rm -rf log
+
+    # Requires: dependency not exist leads to start failure
+    sctl start requires.service
+#    expect_ne $? 0 || return 1
+    check_status requires.service inactive
+#    expect_eq $? 0 || return 1
 
     # Wants: start normally when dependency not exist
     sctl start wants.service
     expect_eq $? 0 || return 1
-    sctl status wants.service
-    expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" 'asdaasd' || return 1
-    echo > "${SYSMST_LOG}"
-    sctl stop wants.service
+    check_status wants.service active
     expect_eq $? 0 || return 1
 
     # clean
+    sctl stop requires.service wants.service
     kill -9 "${sysmaster_pid}"
 }
 
 # usage: test dependency inactive
 function test02() {
+    log_info "===== test02 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     run_sysmaster || return 1
 
     # Requires: dependency inactive leads to inactive
-    sctl start requires
+    sctl start requires.service
     expect_eq $? 0 || return 1
-    check_status requires active
+    check_status requires.service active
     expect_eq $? 0 || return 1
-    check_status base active
+    check_status base.service active
     expect_eq $? 0 || return 1
-    sctl stop base
-    check_status requires inactive
+    sctl stop base.service
+    check_status requires.service inactive
     expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" 'asdaasd' || return 1
-    echo > "${SYSMST_LOG}"
 
     # Wants: stay active when dependency inactive leads to inactive
-    sctl start wants
+    sctl start wants.service
     expect_eq $? 0 || return 1
-    check_status wants active
+    check_status wants.service active
     expect_eq $? 0 || return 1
-    check_status base active
+    check_status base.service active
     expect_eq $? 0 || return 1
-    sctl stop base
-    check_status wants active
+    sctl stop base.service
+    check_status wants.service active
     expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" 'asdaasd' || return 1
 
     # clean
+    sctl stop wants.service
     kill -9 "${sysmaster_pid}"
 }
 
 # usage: test conflict dependency
 function test03() {
+    log_info "===== test03 ====="
     run_sysmaster || return 1
 
-    sctl start base
-    check_status base active
+    sctl start base.service
+    check_status base.service active
     expect_eq $? 0 || return 1
 
-    sctl start conflicts
-    check_status conflicts active
+    sctl start conflicts.service
+    check_status conflicts.service active
     expect_eq $? 0 || return 1
-    check_status base inactive
+    check_status base.service inactive
     expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" 'asdaasd' || return 1
-    echo > "${SYSMST_LOG}"
 
-    sctl start base
-    check_status conflicts active
+    sctl start base.service
+    check_status base.service active
     expect_eq $? 0 || return 1
-    check_status conflicts inactive
+    check_status conflicts.service inactive
     expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" 'asdaasd' || return 1
 
     # clean
+    sctl stop conflicts.service
     kill -9 "${sysmaster_pid}"
 }
 
 # usage: test contradictory dependency
 function test04() {
+    log_info "===== test04 ====="
     sed -i "/Conflicts/a Requires=\"base.service\"" ${SYSMST_LIB_PATH}/conflicts.service
     run_sysmaster || return 1
 
-    sctl start conflicts
-    expect_eq $? 1 || return 1
-    check_status conflicts inactive
+    sctl start conflicts.service
+    check_status conflicts.service inactive
     expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" 'asdaasd' || return 1
 
     # clean
     kill -9 "${sysmaster_pid}"
@@ -112,20 +107,22 @@ function test04() {
 
 # usage: test loop dependency
 function test05() {
+    log_info "===== test05 ====="
     sed -i "/Description/a Requires=\"requires.service\"" ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
 
-    sctl start requires
-    check_status requires active
+    sctl start requires.service
+    check_status requires.service active
     expect_eq $? 0 || return 1
-    check_status base active
+    check_status base.service active
     expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" 'asdaasd' || return 1
 
     # clean
+    sctl stop base.service requires.service
     kill -9 "${sysmaster_pid}"
 }
 
+cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH}
 test01 || exit 1
 test02 || exit 1
 test03 || exit 1

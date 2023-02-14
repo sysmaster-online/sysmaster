@@ -81,6 +81,7 @@ function runtest() {
         fi
     fi
 
+    log_info "===== test_run begin ====="
     if test_run; then
         log_info "===== test_run OK ====="
         ret=0

@@ -101,6 +101,8 @@ function expect_str_eq() {
 function run_sysmaster() {
     /usr/lib/sysmaster/sysmaster &> "${SYSMST_LOG}" &
     sysmaster_pid=$!
+    # wait sysmaster init done
+    sleep 3
     ps aux | grep -v grep | grep sysmaster | grep -w "${sysmaster_pid}" && return 0
     cat "${SYSMST_LOG}"
     return 1

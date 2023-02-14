@@ -12,6 +12,7 @@ function test_pre() {
     pushd "${TEST_SCRIPT_PATH}"
     rm -rf tmp_units
     mkdir tmp_units
+    cp -arf "${TEST_PATH}"/test_units/{shutdown.target,sysinit.target} tmp_units
     cp -arf "${TEST_PATH}"/test_units/tests/base.service tmp_units
     popd
 }
