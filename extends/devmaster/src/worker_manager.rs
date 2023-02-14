@@ -91,7 +91,7 @@ impl Worker {
 
             match msg {
                 WorkerMessage::Job(device) => {
-                    log::info!("Worker {id}: received device \"{}\"", device.devname);
+                    log::info!("Worker {id}: received device {}", device.devpath);
 
                     Self::worker_process_device(id, device.as_ref());
 
@@ -160,7 +160,7 @@ impl Worker {
 
     /// process a device
     fn worker_process_device(id: u32, device: &Device) {
-        log::info!("Worker {id}: Processing: {}", device.devpath);
+        log::info!("Worker {id}: processing {}", device.devpath);
     }
 
     /// send message to the worker thread
@@ -351,7 +351,7 @@ impl WorkerManager {
 
     /// set the state of the worker
     fn set_worker_state(&self, id: u32, state: WorkerState) {
-        log::debug!("Worker Manager: set Idle on worker {id}");
+        log::debug!("Worker Manager: set worker {id} to state {}", state);
         let workers = self.workers.borrow();
         let worker = workers.get(&id).unwrap();
 

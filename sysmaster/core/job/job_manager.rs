@@ -193,6 +193,16 @@ impl JobManager {
         self.data.get_suspends(unit).is_some()
     }
 
+    pub(in crate::core) fn has_start_like_job(&self, unit: &Rc<UnitX>) -> bool {
+        self.data.jobs.get_suspend(unit, JobKind::Start).is_some()
+            | self
+                .data
+                .jobs
+                .get_suspend(unit, JobKind::ReloadOrStart)
+                .is_some()
+            | self.data.jobs.get_suspend(unit, JobKind::Restart).is_some()
+    }
+
     fn try_enable(&self) {
         // prepare for async-running
         if self.data.calc_jobs_ready() && !self.data.up_ready() {

@@ -1,24 +1,17 @@
 #!/bin/bash
 # Description: global variables and common functions
 
-BUILD_PATH="$(dirname "${TEST_PATH}")"
-SYSMST_INSTALL_PATH='/usr/lib/sysmaster'
-BIN_LIST='sctl init sysmaster fstab sysmonitor random_seed rc-local-generator'
-LIB_LIST='libmount.so libservice.so libsocket.so libtarget.so'
-if test -f "${BUILD_PATH}/target/release/sysmaster" && test -f "${BUILD_PATH}/target/release/libmount.so"; then
-    SYSMST_INSTALL_SOURCE="${BUILD_PATH}/target/release"
-elif test -f "${BUILD_PATH}/target/debug/sysmaster" && test -f "${BUILD_PATH}/target/debug/libmount.so"; then
-    SYSMST_INSTALL_SOURCE="${BUILD_PATH}/target/debug"
+if test -f "${BUILD_PATH}/target/release/sysmaster"; then
+    MODE='release'
+elif test -f "${BUILD_PATH}/target/debug/sysmaster"; then
+    MODE='debug'
 else
     exit 1
 fi
 
-function deploy_sysmaster() {
-    mkdir -p "${SYSMST_INSTALL_PATH}"/plugin
-    pushd "${SYSMST_INSTALL_PATH}"
-    cp -arf ${BIN_LIST} "${SYSMST_INSTALL_PATH}" || { popd; return 1;}
-    cp -arf ${LIB_LIST} "${SYSMST_INSTALL_PATH}"/plugin || { popd; return 1;}
-    cp -arf conf/plugin.conf "${SYSMST_INSTALL_PATH}"/plugin || { popd; return 1;}
+function install_sysmaster() {
+    test -d "${BUILD_PATH}"/target/install && return 0
+    pushd "${BUILD_PATH}"
+    sh -x install.sh "${MODE}" || { popd; return 1;}
     popd
-    return 0
 }

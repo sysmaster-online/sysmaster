@@ -1,0 +1,10 @@
+[Unit]
+Description="After service"
+After="fork.service"
+
+[Service]
+Type="forking"
+ExecStart="/bin/sleep 1"
+
+[Install]
+WantedBy="dbus.service"

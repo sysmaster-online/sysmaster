@@ -501,11 +501,7 @@ fn job_process_unit_reload(
 }
 
 fn job_merge_unit(kind: JobKind, unit: &UnitX) -> JobKind {
-    let us_is_active_or_reloading = matches!(
-        unit.active_state(),
-        UnitActiveState::UnitActive | UnitActiveState::UnitReloading
-    );
-    match (kind, us_is_active_or_reloading) {
+    match (kind, unit.active_state().is_active_or_reloading()) {
         (JobKind::TryReload, false) => JobKind::Nop,
         (JobKind::TryReload, true) => JobKind::Reload,
         (JobKind::TryRestart, false) => JobKind::Nop,

@@ -5,6 +5,12 @@ pub(super) struct StartLimit {
     start_limit: RefCell<RateLimit>,
 }
 
+#[derive(PartialEq, Eq)]
+pub(in crate::core) enum StartLimitResult {
+    StartLimitNotHit,
+    StartLimitHit,
+}
+
 impl StartLimit {
     pub(super) fn new() -> Self {
         StartLimit {

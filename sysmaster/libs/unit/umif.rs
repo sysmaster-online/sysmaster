@@ -155,6 +155,11 @@ pub trait UmIf {
     fn get_subunit_state(&self, _unit_name: &str) -> String {
         String::new()
     }
+
+    /// add restart job
+    fn restart_unit(&self, _unit_name: &str) -> Result<(), MngErrno> {
+        Ok(())
+    }
 }
 
 /// the trait used for attach UnitManager to sub unit

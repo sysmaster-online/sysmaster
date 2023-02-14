@@ -5,6 +5,7 @@ use super::uu_condition::{assert_keys::*, condition_keys::*, UeCondition};
 use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use super::uu_ratelimit::StartLimit;
+use super::UnitEmergencyAction;
 use crate::core::unit::data::{DataManager, UnitDepConf, UnitState};
 use crate::core::unit::uload_util::UnitFile;
 use crate::core::unit::unit_rentry::{UnitLoadState, UnitRe};
@@ -15,6 +16,7 @@ use libutils::process_util::my_child;
 use libutils::Result;
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
+use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use nix::NixPath;
 use std::cmp::Ordering;
@@ -295,6 +297,7 @@ impl Unit {
                 new_state
             );
         }
+
         let u_state = UnitState::new(original_state, new_state, flags);
         self.dm.insert_unit_state(self.id().clone(), u_state);
     }
@@ -494,6 +497,21 @@ impl Unit {
     }
 
     ///
+    pub fn get_success_action(&self) -> UnitEmergencyAction {
+        self.config.config_data().borrow().Unit.SuccessAction
+    }
+
+    ///
+    pub fn get_failure_action(&self) -> UnitEmergencyAction {
+        self.config.config_data().borrow().Unit.FailureAction
+    }
+
+    ///
+    pub fn get_start_limit_action(&self) -> UnitEmergencyAction {
+        self.config.config_data().borrow().Unit.StartLimitAction
+    }
+
+    ///
     pub fn current_active_state(&self) -> UnitActiveState {
         self.sub.current_active_state()
     }
@@ -516,12 +534,16 @@ impl Unit {
 
         if self.start_limit.ratelimit_below() {
             self.start_limit.set_hit(false);
+            self.dm.insert_start_limit_result(
+                self.id().clone(),
+                super::StartLimitResult::StartLimitNotHit,
+            );
             return true;
         }
 
         self.start_limit.set_hit(true);
-        // todo emergency action
-
+        self.dm
+            .insert_start_limit_result(self.id().clone(), super::StartLimitResult::StartLimitHit);
         false
     }
 
@@ -573,12 +595,7 @@ impl Unit {
     ///
     pub fn start(&self) -> Result<(), UnitActionError> {
         let active_state = self.current_active_state();
-        let us_is_active_or_reloading = matches!(
-            active_state,
-            UnitActiveState::UnitActive | UnitActiveState::UnitReloading
-        );
-
-        if us_is_active_or_reloading {
+        if active_state.is_active_or_reloading() {
             return Err(UnitActionError::UnitActionEAlready);
         }
 
@@ -618,8 +635,8 @@ impl Unit {
         self.sub.stop(force)
     }
 
-    pub(super) fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
-        self.sub.sigchld_events(pid, code, signal)
+    pub(super) fn sigchld_events(&self, wait_status: WaitStatus) {
+        self.sub.sigchld_events(wait_status)
     }
 
     pub(super) fn load_state(&self) -> UnitLoadState {

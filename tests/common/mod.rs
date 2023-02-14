@@ -1,10 +1,10 @@
 use std::{env, process::Command};
 
-pub fn run_script(suit: &str, name: &str) {
+pub fn run_script(suit: &str, name: &str, docker_flg: &str) {
     let m_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let testpath = format!("{m_dir}/tests/{suit}/{name}/{name}.sh");
     let logpath = format!("{m_dir}/tests/{suit}/{name}/{name}.log");
-    let cmd = format!("sh -x {testpath} &> {logpath}");
+    let cmd = format!("BUILD_PATH={m_dir} DOCKER_TEST={docker_flg} sh -x {testpath} &> {logpath}");
     println!("[ {name} ]: {cmd}");
 
     let status = Command::new("/bin/bash")

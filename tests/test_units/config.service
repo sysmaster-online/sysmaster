@@ -10,6 +10,9 @@ ExecStartPre="/usr/bin/echo test"
 ExecStart="/bin/echo 'test'"
 ExecStop="/bin/kill $MAINPID"
 WatchdogUSec=10
+Restart="always"
+RestartPreventExitStatus="1 2 SIGKILL"
+RestartSec=5
 
 
 [Install]

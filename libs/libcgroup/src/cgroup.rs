@@ -9,7 +9,6 @@ use nix::libc;
 use nix::sys::signal::Signal;
 use nix::sys::statfs::{statfs, FsType};
 use nix::unistd::Pid;
-use regex::Regex;
 use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
@@ -295,21 +294,24 @@ pub fn cg_controllers() -> Result<Vec<String>, IOError> {
     };
 
     let lines = io::BufReader::new(file).lines();
-    let var_regex = Regex::new(r"([a-zA-Z_]+)\s+(\d+)\s+(\d+)\s+(\d+)").unwrap();
     let mut controllers = Vec::new();
 
-    lines.for_each(|tmp| {
-        if let Ok(line) = tmp {
-            let cap = var_regex.captures(&line);
-            if let Some(cap) = cap {
-                let match_result = { cap.get(1).map(|mat| mat.as_str()) };
-
-                if let Some(val) = match_result {
-                    controllers.push(val.to_string());
-                }
-            }
+    for line in lines.flatten() {
+        if line.starts_with('#') {
+            continue;
         }
-    });
+
+        let r: Vec<&str> = line.split_whitespace().collect();
+        if r.len() != 4 {
+            continue;
+        }
+
+        // the controller was disabled
+        if r[3] != "1" {
+            continue;
+        }
+        controllers.push(r[0].to_string());
+    }
 
     Ok(controllers)
 }

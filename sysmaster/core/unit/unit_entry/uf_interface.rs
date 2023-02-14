@@ -1,4 +1,5 @@
 use super::u_entry::Unit;
+use super::UnitEmergencyAction;
 
 use super::uu_config::UeConfig;
 use crate::core::unit::data::DataManager;
@@ -6,7 +7,7 @@ use crate::core::unit::uload_util::UnitFile;
 use crate::core::unit::unit_rentry::{UnitLoadState, UnitRe};
 use crate::core::unit::UnitErrno;
 use libutils::IN_SET;
-use nix::sys::signal::Signal;
+use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::error::Error;
 use std::ops::Deref;
@@ -53,6 +54,10 @@ impl UnitX {
         UnitX(unit)
     }
 
+    pub(in crate::core::unit) fn from_unit(unit: Rc<Unit>) -> UnitX {
+        UnitX(unit)
+    }
+
     #[allow(dead_code)]
     pub(in crate::core) fn init(&self) {}
     #[allow(dead_code)]
@@ -82,8 +87,8 @@ impl UnitX {
     pub(in crate::core) fn kill(&self) {}
     #[allow(dead_code)]
     pub(in crate::core) fn release_resources(&self) {}
-    pub(in crate::core) fn sigchld_events(&self, pid: Pid, code: i32, signal: Signal) {
-        self.0.sigchld_events(pid, code, signal)
+    pub(in crate::core) fn sigchld_events(&self, wait_status: WaitStatus) {
+        self.0.sigchld_events(wait_status)
     }
     #[allow(dead_code)]
     pub(in crate::core) fn reset_failed(&self) {}
@@ -121,6 +126,18 @@ impl UnitX {
     // pub(in crate::manager::unit) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {
     //     self.0.get_config(item)
     // }
+
+    pub(in crate::core) fn get_success_action(&self) -> UnitEmergencyAction {
+        self.0.get_success_action()
+    }
+
+    pub(in crate::core) fn get_failure_action(&self) -> UnitEmergencyAction {
+        self.0.get_failure_action()
+    }
+
+    pub(in crate::core) fn get_start_limit_action(&self) -> UnitEmergencyAction {
+        self.0.get_start_limit_action()
+    }
 
     pub(in crate::core) fn active_state(&self) -> UnitActiveState {
         //UnitActiveState::UnitActive

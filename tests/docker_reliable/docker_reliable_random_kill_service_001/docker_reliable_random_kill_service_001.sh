@@ -2,10 +2,9 @@
 # Description: test for example
 
 TEST_SCRIPT="$(basename "$0")"
-TEST_SCRIPT_PATH="$(realpath "$0")"
-TEST_SCRIPT_PATH="$(dirname "${TEST_SCRIPT_PATH}")"
-TEST_PATH="$(cd ${TEST_SCRIPT_PATH}; cd ../../; pwd)"
-source "${TEST_PATH}"/common/test_frame_docker.sh
+TEST_SCRIPT_PATH="$(dirname "$0")"
+
+source "${BUILD_PATH}"/tests/common/test_frame_docker.sh
 set +e
 
 function test_run() {

@@ -1,67 +1,60 @@
 //! devctrl is the client of devmaster
 //!
+use clap::Parser;
 use libdevmaster::*;
 use libutils::logger::init_log_with_console;
 use log::LevelFilter;
-use std::{
-    io::{Read, Write},
-    net::{TcpListener, TcpStream},
-};
+use std::{io::Write, net::TcpStream};
 
-/// subcommand for testing communication
-fn subcommand_test(args: Vec<String>) {
-    let mut stream = TcpStream::connect(CONTROL_MANAGER_LISTEN_ADDR).unwrap();
-    println!("{args:?}");
-    let msg = args.join(" ");
-    let msg = format!("test {msg}");
-    println!("{msg}");
-    stream.write_all(msg.as_bytes()).unwrap();
+/// parse program arguments
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    /// Kinds of subcommands
+    #[clap(subcommand)]
+    subcmd: SubCmd,
 }
 
-/// subcommand for testing worker manager connection
-fn subcommand_test_tcp() {
-    let mut stream = TcpStream::connect(WORKER_MANAGER_LISTEN_ADDR).unwrap();
-    let msg = "test_tcp".to_string();
-    println!("{msg}");
+/// Kinds of subcommands
+#[derive(Parser, Debug)]
+enum SubCmd {
+    /// Monitor device events from kernel and userspace
+    #[clap(display_order = 1)]
+    Monitor {},
+
+    /// Kill all devmaster workers
+    #[clap(display_order = 2)]
+    Kill {},
+
+    /// Send a fake device to devmaster
+    #[clap(display_order = 3)]
+    Test {
+        /// the device name to be sent
+        #[clap(required = true)]
+        devname: String,
+    },
+}
+
+/// subcommand for testing communication
+fn subcommand_test(devname: String) {
+    let mut stream = TcpStream::connect(CONTROL_MANAGER_LISTEN_ADDR).unwrap();
+    let msg = format!("test {devname}");
     stream.write_all(msg.as_bytes()).unwrap();
 }
 
 /// subcommand for killing workers
-fn subcommand_kill(args: Vec<String>) {
+fn subcommand_kill() {
     let mut stream = TcpStream::connect(CONTROL_MANAGER_LISTEN_ADDR).unwrap();
-    println!("{args:?}");
-    let msg = args.join(" ");
-    let msg = format!("kill {msg}");
-    stream.write_all(msg.as_bytes()).unwrap();
-}
-
-/// subcommand for worker manager listen
-fn subcommand_listen() {
-    let listener = TcpListener::bind(WORKER_MANAGER_LISTEN_ADDR).unwrap();
-    for i in listener.incoming() {
-        let mut stream = i.unwrap();
-        let mut msg = String::new();
-        stream.read_to_string(&mut msg).unwrap();
-        println!("{msg}");
-    }
+    stream.write_all(b"kill ").unwrap();
 }
 
 fn main() {
     init_log_with_console("devctl", LevelFilter::Debug);
-    let mut args = std::env::args();
-    match args.nth(1).unwrap().as_str() {
-        "test" => subcommand_test(args.collect::<Vec<String>>()),
+    let args = Args::parse();
 
-        "kill" => subcommand_kill(args.collect::<Vec<String>>()),
-
-        "test_tcp" => subcommand_test_tcp(),
-
-        "listen" => subcommand_listen(),
-
-        "monitor" => subcommand_monitor(),
-
-        _ => {
-            todo!()
-        }
+    match args.subcmd {
+        SubCmd::Monitor {} => subcommand_monitor(),
+        SubCmd::Kill {} => subcommand_kill(),
+        SubCmd::Test { devname } => subcommand_test(devname),
     }
 }

@@ -196,8 +196,13 @@ impl Manager {
         let mut l_path = LookupPaths::new();
         l_path.init_lookup_paths();
         let lookup_path = Rc::new(l_path);
-        let um = Rc::new(UnitManagerX::new(&event, &reli, &lookup_path));
         let state = Rc::new(RefCell::new(State::Init));
+        let um = Rc::new(UnitManagerX::new(
+            &event,
+            &reli,
+            &lookup_path,
+            Rc::clone(&state),
+        ));
 
         Manager {
             event,

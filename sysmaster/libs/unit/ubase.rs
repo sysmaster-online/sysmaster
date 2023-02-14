@@ -5,10 +5,8 @@ use super::{super::rel::ReStation, UnitRelations};
 use crate::error::UnitActionError;
 use libutils::error::Error as ServiceError;
 use libutils::Result;
-use nix::{
-    sys::{signal::Signal, socket::UnixCredentials},
-    unistd::Pid,
-};
+use nix::sys::wait::WaitStatus;
+use nix::{sys::socket::UnixCredentials, unistd::Pid};
 use std::{collections::HashMap, error::Error, path::PathBuf, rc::Rc};
 
 ///The trait Defining Shared Behavior from Base Unit  to SUB unit
@@ -106,7 +104,7 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     fn release_resources(&self) {}
 
     ///
-    fn sigchld_events(&self, _pid: Pid, _code: i32, _status: Signal) {}
+    fn sigchld_events(&self, _wait_status: WaitStatus) {}
 
     ///
     fn reset_failed(&self) {}
