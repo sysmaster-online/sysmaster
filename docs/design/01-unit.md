@@ -68,3 +68,4 @@ sysmaster通过unit管理操作系统中各类服务的生命周期，每类服�
     整体模块划分包括：
     1. load模块，将配置文件转换成unit
     2. unit_dataStore，保存unit的状态
+    3. unit模块，包含unit属性

@@ -773,10 +773,8 @@ fn jobs_2_jobinfo(jobs: &[Rc<Job>]) -> Vec<JobInfo> {
 fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
     let kind = config.get_kind();
 
-    if mode == JobMode::Isolate {
-        if kind != JobKind::Start {
-            return Err(JobErrno::Input);
-        }
+    if mode == JobMode::Isolate && kind != JobKind::Start {
+        return Err(JobErrno::Input);
     }
 
     if mode == JobMode::Trigger && kind != JobKind::Stop {
