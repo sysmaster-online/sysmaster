@@ -1,6 +1,18 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 //! UnitManager interfaces
 use super::{UnitDependencyMask, UnitRelationAtom, UnitRelations};
-use crate::error::{ExecCmdError, MngErrno, UnitActionError};
+use crate::error::*;
 use crate::exec::{ExecCommand, ExecContext, ExecParameters};
 use crate::rel::{ReStation, Reliability};
 use crate::unit::{UnitActiveState, UnitType};
@@ -47,7 +59,7 @@ pub trait UmIf {
         _target_name: &str,
         _add_ref: bool,
         _mask: UnitDependencyMask,
-    ) -> Result<(), UnitActionError> {
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -63,7 +75,7 @@ pub trait UmIf {
         _target_name: &str,
         _add_ref: bool,
         _mask: UnitDependencyMask,
-    ) -> Result<(), UnitActionError> {
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -72,7 +84,7 @@ pub trait UmIf {
         false
     }
     /// check the unit active state of of reference name
-    fn unit_enabled(&self, _name: &str) -> Result<(), UnitActionError> {
+    fn unit_enabled(&self, _name: &str) -> Result<()> {
         Ok(())
     }
     /// check if there is already a stop job in process
@@ -85,17 +97,17 @@ pub trait UmIf {
         false
     }
     /// start the unit
-    fn start_unit(&self, _name: &str) -> Result<(), MngErrno> {
+    fn start_unit(&self, _name: &str) -> Result<()> {
         Ok(())
     }
 
     /// call the unit start function
-    fn unit_start(&self, _name: &str) -> Result<(), UnitActionError> {
+    fn unit_start(&self, _name: &str) -> Result<()> {
         Ok(())
     }
 
     /// call the unit stop function
-    fn unit_stop(&self, _name: &str, _force: bool) -> Result<(), UnitActionError> {
+    fn unit_stop(&self, _name: &str, _force: bool) -> Result<()> {
         Ok(())
     }
     /// why need events? need reconstruct
@@ -124,7 +136,7 @@ pub trait UmIf {
         _cmdline: &ExecCommand,
         _params: &ExecParameters,
         _ctx: Rc<ExecContext>,
-    ) -> Result<Pid, ExecCmdError> {
+    ) -> Result<Pid> {
         Ok(Pid::this())
     }
 
@@ -158,7 +170,7 @@ pub trait UmIf {
     }
 
     /// add restart job
-    fn restart_unit(&self, _unit_name: &str) -> Result<(), MngErrno> {
+    fn restart_unit(&self, _unit_name: &str) -> Result<()> {
         Ok(())
     }
 }

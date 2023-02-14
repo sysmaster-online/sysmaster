@@ -1,5 +1,16 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 //! sysmaster-core bin
-mod error;
 mod job;
 mod manager;
 ///
@@ -19,7 +30,6 @@ mod utils;
 
 #[macro_use]
 extern crate lazy_static;
-use crate::error::*;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
 use libc::{c_int, prctl, PR_SET_CHILD_SUBREAPER};
@@ -30,6 +40,7 @@ use nix::unistd::{self};
 use std::convert::TryFrom;
 use std::env::{self};
 use std::ffi::CString;
+use sysmaster::error::*;
 use sysmaster::rel;
 
 fn main() -> Result<()> {
@@ -45,7 +56,7 @@ fn main() -> Result<()> {
 
     setup::mount_setup()?;
 
-    rel::reli_dir_prepare().context(IoSnafu)?;
+    rel::reli_dir_prepare()?;
     let switch = rel::reli_debug_get_switch();
     log::info!("sysmaster initialize with switch: {}.", switch);
 
@@ -60,10 +71,10 @@ fn main() -> Result<()> {
         log::info!("debug: clear data restored.");
     }
 
-    manager.setup_cgroup().context(IoSnafu)?;
+    manager.setup_cgroup()?;
 
     // startup
-    manager.startup().context(UtilsSnafu)?;
+    manager.startup()?;
 
     // main loop
     let ret = manager.main_loop();

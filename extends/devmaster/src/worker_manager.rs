@@ -1,3 +1,15 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 //! worker manager
 //!
 use libdevice::{
@@ -431,7 +443,7 @@ impl Source for WorkerManager {
     }
 
     /// start dispatching after the event arrives
-    fn dispatch(&self, _: &libevent::Events) -> Result<i32, libevent::Error> {
+    fn dispatch(&self, _: &libevent::Events) -> i32 {
         let (mut stream, _) = match self.listener.borrow_mut().accept() {
             Ok((s, sa)) => (s, sa),
             Err(e) => {
@@ -439,7 +451,7 @@ impl Source for WorkerManager {
                 if e.kind() != std::io::ErrorKind::WouldBlock {
                     log::error!("failed to listen worker ack ({})", e.kind());
                 }
-                return Ok(0);
+                return 0;
             }
         };
         let mut ack = String::new();
@@ -448,7 +460,7 @@ impl Source for WorkerManager {
         log::debug!("Worker Manager: received message \"{ack}\"");
         self.worker_response_dispose(ack);
 
-        Ok(0)
+        0
     }
 
     /// Unless you can guarantee all types of token allocation, it is recommended to use the default implementation here
@@ -506,13 +518,13 @@ impl Source for WorkerManagerKillWorkers {
     }
 
     /// kill workers if job queue keeps empty for an interval
-    fn dispatch(&self, _: &Events) -> Result<i32, libevent::Error> {
+    fn dispatch(&self, _: &Events) -> i32 {
         log::info!("Worker Manager Kill Workers timeout!");
         self.worker_manager
             .upgrade()
             .unwrap()
             .manager_kill_workers();
-        Ok(0)
+        0
     }
 
     /// token of event source

@@ -1,14 +1,25 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 use super::alloc::JobAlloc;
 use super::entry::{self, Job, JobConf, JobResult};
 use super::rentry::JobKind;
 use super::table::JobTable;
-use crate::error::JobErrno;
 use crate::unit::JobMode;
 use crate::unit::UnitDb;
 use crate::unit::UnitRelationAtom;
 use crate::unit::UnitX;
 use std::rc::Rc;
-use sysmaster::error::UnitActionError;
+use sysmaster::error::*;
 
 pub(super) fn job_trans_expand(
     stage: &JobTable,
@@ -16,7 +27,7 @@ pub(super) fn job_trans_expand(
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
-) -> Result<(), JobErrno> {
+) -> Result<()> {
     // check input
     //trans_expand_check_input(config)?;
 
@@ -49,7 +60,7 @@ pub(super) fn job_trans_affect(
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
-) -> Result<(), JobErrno> {
+) -> Result<()> {
     match mode {
         JobMode::Isolate => trans_affect_isolate(stage, ja, db, mode),
         JobMode::Trigger => trans_affect_trigger(stage, ja, db, config, mode),
@@ -57,11 +68,7 @@ pub(super) fn job_trans_affect(
     }
 }
 
-pub(super) fn job_trans_verify(
-    stage: &JobTable,
-    jobs: &JobTable,
-    mode: JobMode,
-) -> Result<(), JobErrno> {
+pub(super) fn job_trans_verify(stage: &JobTable, jobs: &JobTable, mode: JobMode) -> Result<()> {
     // job-list + unit-list(from db) -> job-list' => stage
     // todo!(); transaction_activate: the other parts is waiting for future support
 
@@ -84,25 +91,25 @@ pub(super) fn job_trans_fallback(
 }
 
 #[allow(dead_code)]
-fn trans_expand_check_input(config: &JobConf) -> Result<(), JobErrno> {
+fn trans_expand_check_input(config: &JobConf) -> Result<()> {
     let kind = config.get_kind();
     let unit = config.get_unit();
 
     if !unit.is_load_complete() {
-        return Err(JobErrno::Input);
+        return Err(Error::Input);
     }
 
     if kind != JobKind::Stop {
         let err = match unit.try_load() {
             Ok(()) => Ok(()),
-            Err(UnitActionError::UnitActionEBadR) => Err(JobErrno::BadRequest),
-            Err(_) => Err(JobErrno::Input),
+            Err(Error::UnitActionEBadR) => Err(Error::BadRequest),
+            Err(_) => Err(Error::Input),
         };
         return err;
     }
 
     if !entry::job_is_unit_applicable(kind, unit) {
-        return Err(JobErrno::Input);
+        return Err(Error::Input);
     }
 
     Ok(())
@@ -114,17 +121,14 @@ fn trans_expand_start(
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
-) -> Result<(), JobErrno> {
+) -> Result<()> {
     let unit = config.get_unit();
 
     let atom = UnitRelationAtom::UnitAtomPullInStart;
     for other in db.dep_gets_atom(unit, atom).iter() {
         let conf = JobConf::new(other, JobKind::Start);
-        if let Err(err) = job_trans_expand(stage, ja, db, &conf, mode) {
+        if job_trans_expand(stage, ja, db, &conf, mode).is_err() {
             // debug
-            if JobErrno::BadRequest != err {
-                return Err(err);
-            }
         }
     }
 
@@ -139,22 +143,20 @@ fn trans_expand_start(
     let atom = UnitRelationAtom::UnitAtomPullInVerify;
     for other in db.dep_gets_atom(unit, atom).iter() {
         let conf = JobConf::new(other, JobKind::Verify);
-        if let Err(err) = job_trans_expand(stage, ja, db, &conf, mode) {
-            // debug
-            if JobErrno::BadRequest != err {
-                return Err(err);
-            }
+        match job_trans_expand(stage, ja, db, &conf, mode) {
+            Err(Error::BadRequest) => (),
+            Err(e) => return Err(e),
+            _ => (),
         }
     }
 
     let atom = UnitRelationAtom::UnitAtomPullInStop;
     for other in db.dep_gets_atom(unit, atom).iter() {
         let conf = JobConf::new(other, JobKind::Stop);
-        if let Err(err) = job_trans_expand(stage, ja, db, &conf, mode) {
-            // debug
-            if JobErrno::BadRequest != err {
-                return Err(err);
-            }
+        match job_trans_expand(stage, ja, db, &conf, mode) {
+            Err(Error::BadRequest) => (),
+            Err(e) => return Err(e),
+            _ => (),
         }
     }
 
@@ -175,7 +177,7 @@ fn trans_expand_stop(
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
-) -> Result<(), JobErrno> {
+) -> Result<()> {
     let unit = config.get_unit();
 
     let (expand_atom, expand_kind) = match config.get_kind() {
@@ -189,11 +191,10 @@ fn trans_expand_stop(
 
     for other in db.dep_gets_atom(unit, expand_atom).iter() {
         let conf = JobConf::new(other, expand_kind);
-        if let Err(err) = job_trans_expand(stage, ja, db, &conf, mode) {
-            // debug
-            if JobErrno::BadRequest != err {
-                return Err(err);
-            }
+        match job_trans_expand(stage, ja, db, &conf, mode) {
+            Err(Error::BadRequest) => (),
+            Err(e) => return Err(e),
+            _ => (),
         }
     }
 
@@ -206,7 +207,7 @@ fn trans_expand_reload(
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
-) -> Result<(), JobErrno> {
+) -> Result<()> {
     let unit = config.get_unit();
 
     let atom = UnitRelationAtom::UnitAtomPropagatesReloadTo;
@@ -240,12 +241,7 @@ fn trans_is_expand(config: &JobConf, new: bool, mode: JobMode) -> bool {
     true
 }
 
-fn trans_affect_isolate(
-    stage: &JobTable,
-    ja: &JobAlloc,
-    db: &UnitDb,
-    mode: JobMode,
-) -> Result<(), JobErrno> {
+fn trans_affect_isolate(stage: &JobTable, ja: &JobAlloc, db: &UnitDb, mode: JobMode) -> Result<()> {
     assert_eq!(mode, JobMode::Isolate);
 
     for other in db.units_get_all(None).iter() {
@@ -282,7 +278,7 @@ fn trans_affect_trigger(
     db: &UnitDb,
     config: &JobConf,
     mode: JobMode,
-) -> Result<(), JobErrno> {
+) -> Result<()> {
     assert_eq!(config.get_kind(), JobKind::Stop); // guaranteed by 'job_trans_check_input'
     assert_eq!(mode, JobMode::Trigger);
 
@@ -305,19 +301,15 @@ fn trans_affect_trigger(
     // the jobs expanded do not need to be reverted separately, which are reverted in the up-level caller 'JobManagerData->exec()' uniformly.
 }
 
-fn trans_verify_is_conflict(stage: &JobTable) -> Result<(), JobErrno> {
+fn trans_verify_is_conflict(stage: &JobTable) -> Result<()> {
     if stage.is_suspends_conflict() {
-        return Err(JobErrno::Conflict);
+        return Err(Error::Conflict);
     }
 
     Ok(())
 }
 
-fn trans_verify_is_destructive(
-    stage: &JobTable,
-    jobs: &JobTable,
-    mode: JobMode,
-) -> Result<(), JobErrno> {
+fn trans_verify_is_destructive(stage: &JobTable, jobs: &JobTable, mode: JobMode) -> Result<()> {
     assert!(!jobs.is_suspends_conflict());
 
     // non-conflicting
@@ -331,7 +323,7 @@ fn trans_verify_is_destructive(
     }
 
     // conflicting, and non-replaceable
-    Err(JobErrno::Conflict)
+    Err(Error::Conflict)
 }
 
 fn trans_fallback_body(

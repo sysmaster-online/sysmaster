@@ -1,3 +1,15 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 #[cfg(test)]
 pub(crate) use rentry::RELI_HISTORY_MAX_DBS;
 
@@ -6,17 +18,15 @@ pub(crate) mod config;
 pub(crate) mod pre_install;
 pub(crate) mod rentry;
 pub(crate) mod signals;
-
 use crate::unit::UnitManagerX;
 use commands::Commands;
+use libcgroup::CgController;
 use libcgroup::{cg_create_and_attach, CgFlags};
-use libcgroup::{CgController, CgroupErr};
-use libcmdproto::proto::execute::{ExecCmdErrno, ExecuterAction};
+use libcmdproto::proto::execute::ExecuterAction;
 use libevent::{EventState, Events};
 use libutils::path_lookup::LookupPaths;
 use libutils::process_util::{self};
 use libutils::special::{BASIC_TARGET, CGROUP_SYSMASTER};
-use libutils::Result;
 use nix::sys::reboot::{self, RebootMode};
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
@@ -24,9 +34,9 @@ use pre_install::{Install, PresetMode};
 use signals::{SignalDispatcher, Signals};
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::error::*;
 use sysmaster::rel::{ReliLastFrame, Reliability};
 
 /// maximal size of process's arguments
@@ -63,7 +73,7 @@ impl SignalDispatcher for SignalMgr {
             Signal::SIGALRM => todo!(),
             Signal::SIGTERM => todo!(),
             Signal::SIGSTKFLT => todo!(),
-            Signal::SIGCHLD => self.um.child_sigchld_enable(true),
+            Signal::SIGCHLD => Ok(self.um.child_sigchld_enable(true)),
             Signal::SIGCONT => todo!(),
             Signal::SIGSTOP => todo!(),
             Signal::SIGTSTP => todo!(),
@@ -101,74 +111,61 @@ impl CommandActionMgr {
 }
 
 impl ExecuterAction for CommandActionMgr {
-    fn start(&self, unit_name: &str) -> Result<(), ExecCmdErrno> {
-        match self.um.start_unit(unit_name) {
-            Ok(()) => Ok(()),
-            Err(err) => Err(ExecCmdErrno::from(err)),
-        }
+    type Error = sysmaster::error::Error;
+    // type Result<T, Error> = Result<T, E>;
+    fn start(&self, unit_name: &str) -> Result<(), Self::Error> {
+        self.um.start_unit(unit_name)
     }
 
-    fn stop(&self, unit_name: &str) -> Result<(), ExecCmdErrno> {
-        match self.um.stop_unit(unit_name) {
-            Ok(()) => Ok(()),
-            Err(err) => Err(ExecCmdErrno::from(err)),
-        }
+    fn stop(&self, unit_name: &str) -> Result<(), Self::Error> {
+        self.um.stop_unit(unit_name)
     }
 
-    fn restart(&self, unit_name: &str) -> Result<(), ExecCmdErrno> {
-        match self.um.restart_unit(unit_name) {
-            Ok(()) => Ok(()),
-            Err(err) => Err(ExecCmdErrno::from(err)),
-        }
+    fn restart(&self, unit_name: &str) -> Result<(), Self::Error> {
+        self.um.restart_unit(unit_name)
     }
 
-    fn status(&self, unit_name: &str) -> Result<String, ExecCmdErrno> {
-        match self.um.get_unit_status(unit_name) {
-            Ok(str) => Ok(str),
-            Err(err) => Err(ExecCmdErrno::from(err)),
-        }
+    fn status(&self, unit_name: &str) -> Result<String, Self::Error> {
+        self.um.get_unit_status(unit_name)
     }
 
-    fn list_units(&self) -> Result<String, ExecCmdErrno> {
-        match self.um.get_all_units() {
-            Ok(str) => Ok(str),
-            Err(err) => Err(ExecCmdErrno::from(err)),
-        }
+    fn list_units(&self) -> Result<String, Self::Error> {
+        self.um.get_all_units()
     }
 
-    fn suspend(&self) -> Result<i32> {
+    fn suspend(&self) -> Result<i32, Self::Error> {
         self.set_state(State::Suspend);
         Ok(0)
     }
 
-    fn poweroff(&self) -> Result<i32> {
+    fn poweroff(&self) -> Result<i32, Self::Error> {
         self.set_state(State::PowerOff);
         Ok(0)
     }
 
-    fn reboot(&self) -> Result<i32> {
+    fn reboot(&self) -> Result<i32, Self::Error> {
         self.set_state(State::Reboot);
         Ok(0)
     }
 
-    fn halt(&self) -> Result<i32> {
+    fn halt(&self) -> Result<i32, Self::Error> {
         self.set_state(State::Halt);
         Ok(0)
     }
 
-    fn disable(&self, unit_file: &str) -> Result<(), Error> {
+    fn disable(&self, unit_file: &str) -> Result<(), Self::Error> {
         self.um.disable_unit(unit_file)
     }
 
-    fn enable(&self, unit_file: &str) -> Result<(), Error> {
+    fn enable(&self, unit_file: &str) -> Result<(), Self::Error> {
         self.um.enable_unit(unit_file)
     }
 
-    fn mask(&self, unit_file: &str) -> Result<(), Error> {
+    fn mask(&self, unit_file: &str) -> Result<(), Self::Error> {
         self.um.mask_unit(unit_file)
     }
 
-    fn unmask(&self, unit_file: &str) -> Result<(), Error> {
+    fn unmask(&self, unit_file: &str) -> Result<(), Self::Error> {
         self.um.unmask_unit(unit_file)
     }
 }
@@ -244,7 +241,11 @@ impl Manager {
 
             // event
             self.reli.set_last_frame1(ReliLastFrame::OtherEvent as u32);
-            self.event.run(-1).unwrap();
+
+            let ret = self.event.run(-1);
+            if ret.is_err() {
+                log::error!("event run loop error is: {:?}", ret);
+            }
             self.reli.clear_last_frame();
         }
 
@@ -264,7 +265,7 @@ impl Manager {
         }
 
         // preset file before add default job
-        self.preset_all()?;
+        self.preset_all().unwrap();
 
         // setup external connections
         /* register entire external events */
@@ -310,15 +311,10 @@ impl Manager {
     }
 
     /// create cgroup and attach self to it
-    pub fn setup_cgroup(&self) -> Result<(), Error> {
+    pub fn setup_cgroup(&self) -> Result<()> {
         let cg_init = PathBuf::from(CGROUP_SYSMASTER);
 
-        cg_create_and_attach(&cg_init, Pid::from_raw(0)).map_err(|e| {
-            Error::new(
-                ErrorKind::Other,
-                format!("create and attach to sysmaster cgroup error: {e}"),
-            )
-        })?;
+        cg_create_and_attach(&cg_init, Pid::from_raw(0)).unwrap();
 
         log::debug!("kill all pids except sysmaster in the sysmaster cgroup");
         libcgroup::cg_kill_recursive(
@@ -327,11 +323,8 @@ impl Manager {
             CgFlags::IGNORE_SELF,
             HashSet::new(),
         )
-        .map_err(|e| {
-            Error::new(
-                ErrorKind::Other,
-                format!("failed to kill cgroup: {cg_init:?}, error: {e}"),
-            )
+        .map_err(|e| Error::Other {
+            msg: format!("failed to kill cgroup: {cg_init:?}, error: {e}"),
         })?;
 
         Ok(())
@@ -369,7 +362,7 @@ impl Manager {
         Ok(true)
     }
 
-    fn prepare_reexec(&self) -> Result<(), Error> {
+    fn prepare_reexec(&self) -> Result<()> {
         // restore external resource, like: fd, ...
         // do nothing now
         Ok(())
@@ -379,8 +372,8 @@ impl Manager {
         log::debug!("RebootMode: {:?}", reboot_mode);
         // self.start_unit("shutdown.target");
         if let Ok(mut cg_ctrl) = CgController::new("sysmaster", Pid::from_raw(0)) {
-            if let Err(CgroupErr::IoError(err)) = cg_ctrl.trim(false) {
-                log::debug!("CgController trim err: {err}");
+            if let Err(e) = cg_ctrl.trim(false) {
+                log::debug!("CgController trim err: {}", e.to_string());
             }
         }
 
@@ -453,22 +446,22 @@ type JobId = i32;
 
 impl Manager {
     #[allow(dead_code)]
-    pub(crate) fn get_job(&self, _id: JobId) -> Result<(), Error> {
+    pub(crate) fn get_job(&self, _id: JobId) -> Result<()> {
         todo!()
     }
 
     #[allow(dead_code)]
-    pub(crate) fn get_unit(&self, _name: &str) -> Result<(), Error> {
+    pub(crate) fn get_unit(&self, _name: &str) -> Result<()> {
         todo!()
     }
 
     #[allow(dead_code)]
-    pub(crate) fn clear_jobs(&self) -> Result<(), Error> {
+    pub(crate) fn clear_jobs(&self) -> Result<()> {
         todo!()
     }
 
     #[allow(dead_code)]
-    pub(crate) fn reset_failed(&mut self) -> Result<(), Error> {
+    pub(crate) fn reset_failed(&mut self) -> Result<()> {
         todo!()
     }
 
@@ -514,7 +507,7 @@ impl Manager {
     }
 
     #[allow(dead_code)]
-    pub(super) fn check_finished(&self) -> Result<(), Error> {
+    pub(super) fn check_finished(&self) -> Result<()> {
         todo!()
     }
 
@@ -526,13 +519,13 @@ impl Manager {
         *self.state.borrow()
     }
 
-    pub(crate) fn preset_all(&self) -> Result<(), Error> {
+    pub(crate) fn preset_all(&self) -> Result<()> {
         if self.mode != Mode::System {
             return Ok(());
         }
 
         let install = Install::new(PresetMode::Enable, self.lookup_path.clone());
-        install.preset_all()?;
+        install.preset_all().unwrap();
 
         Ok(())
     }

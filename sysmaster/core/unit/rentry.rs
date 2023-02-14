@@ -1,10 +1,22 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+//
 #![allow(non_snake_case)]
 
 use crate::manager::rentry::{
     RELI_DB_HUM_NOTIFY, RELI_DB_HUNIT_BASE, RELI_DB_HUNIT_CGROUP, RELI_DB_HUNIT_CHILD,
     RELI_DB_HUNIT_CONFIG, RELI_DB_HUNIT_DEP, RELI_DB_HUNIT_LOAD, RELI_DB_HUNIT_PPS,
 };
-use crate::unit::unit_entry::UnitEmergencyAction;
+use crate::unit::entry::UnitEmergencyAction;
 use bitflags::bitflags;
 use confique::Config;
 use libutils::serialize::DeserializeWith;
@@ -133,6 +145,15 @@ pub(crate) struct UeConfigUnit {
     pub Requires: Vec<String>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
+    pub BindsTo: Vec<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    #[config(default = "")]
+    pub Requisite: Vec<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    #[config(default = "")]
+    pub PartOf: Vec<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    #[config(default = "")]
     pub Before: Vec<String>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
@@ -152,9 +173,9 @@ pub(crate) struct UeConfigUnit {
     pub ConditionFirstBoot: String,
     #[config(default = "")]
     pub AssertPathExists: String,
-    #[config(default = 0)]
+    #[config(default = 10)]
     pub StartLimitInterval: u64,
-    #[config(default = 0)]
+    #[config(default = 5)]
     pub StartLimitBurst: u32,
     #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]
     #[config(default = "none")]

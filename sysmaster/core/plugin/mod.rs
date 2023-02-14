@@ -1,3 +1,15 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 //! Plugin provides a plug-in management mechanism, completes the dynamic loading of unit subclasses,
 //!  and loads the so files in the specified directory. The priority of the specified directory is as follows:
 //! a. First find the dynamic library under the /usr/lib/sysmaster/plugin/ path
@@ -27,7 +39,6 @@
 //! ````
 //! plugin or find the corresponding so according to the name of the corresponding unit configuration file, and load it dynamically, such as XXX.service to find libservice.so, XXX.socket to find libsocket.so
 //!
-use crate::error::*;
 use dy_re::Lib;
 use dy_re::Symbol;
 use dynamic_reload as dy_re;
@@ -44,6 +55,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use sysmaster::error::*;
 use sysmaster::unit::UmIf;
 use sysmaster::unit::{SubUnit, UnitManagerObj, UnitType};
 use walkdir::{DirEntry, WalkDir};
@@ -441,11 +453,9 @@ impl Plugin {
                     })
                 }
             }
-            Err(_) => {
-                return Err(Error::PluginLoad {
-                    msg: format!("create unit, the {unit_type:?} plugin is not exist"),
-                })
-            }
+            Err(_) => Err(Error::PluginLoad {
+                msg: format!("create unit, the {unit_type:?} plugin is not exist"),
+            }),
         }
     }
     /// Create a  obj for subclasses of unit manager
@@ -471,11 +481,9 @@ impl Plugin {
                     })
                 }
             }
-            Err(_) => {
-                return Err(Error::PluginLoad {
-                    msg: format!("create um, the {unit_type:?} plugin is not exist"),
-                })
-            }
+            Err(_) => Err(Error::PluginLoad {
+                msg: format!("create um, the {unit_type:?} plugin is not exist"),
+            }),
         }
     }
 

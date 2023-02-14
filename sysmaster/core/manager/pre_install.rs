@@ -1,3 +1,15 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+//
 #![allow(non_snake_case)]
 use crate::unit::{unit_name_to_type, UeConfigInstall, UnitType};
 use bitflags::bitflags;
@@ -9,11 +21,12 @@ use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
     fs::{self, File},
-    io::{self, BufRead, Error, ErrorKind},
+    io::{self, BufRead},
     path::{Path, PathBuf},
     rc::Rc,
     str::FromStr,
 };
+use sysmaster::error::*;
 use walkdir::{DirEntry, WalkDir};
 
 #[derive(PartialEq, Eq)]
@@ -289,7 +302,7 @@ impl InstallContext {
         install: Rc<UnitInstall>,
         target_path: &str,
         symlinks: Vec<String>,
-    ) -> Result<i32, Error> {
+    ) -> Result<i32> {
         let mut n = 0;
         if symlinks.is_empty() {
             return Ok(0);
@@ -319,7 +332,7 @@ impl InstallContext {
         target_path: &str,
         suffix: String,
         symlinks: Vec<String>,
-    ) -> Result<i32, Error> {
+    ) -> Result<i32> {
         if symlinks.is_empty() {
             return Ok(0);
         }
@@ -334,7 +347,7 @@ impl InstallContext {
             let parent_path = path.parent();
             if let Err(e) = fs::create_dir_all(parent_path.unwrap()) {
                 if e.kind() != io::ErrorKind::AlreadyExists {
-                    return Err(e);
+                    return Err(Error::Io { source: e });
                 }
             }
 
@@ -380,7 +393,7 @@ impl Install {
     }
 
     /// preset all files depend on .preset files
-    pub fn preset_all(&self) -> Result<(), Error> {
+    pub fn preset_all(&self) -> Result<()> {
         let target_path = &self.lookup_path.persistent_path;
 
         let presets = self.read_presets();
@@ -418,7 +431,7 @@ impl Install {
     }
 
     /// enable one unit file
-    pub fn unit_enable_files(&self, file: &str) -> Result<(), Error> {
+    pub fn unit_enable_files(&self, file: &str) -> Result<()> {
         log::debug!("unit enable file: {}", file);
         let target_path = &self.lookup_path.persistent_path;
 
@@ -429,7 +442,7 @@ impl Install {
     }
 
     /// disable one unit file
-    pub fn unit_disable_files(&self, file: &str) -> Result<(), Error> {
+    pub fn unit_disable_files(&self, file: &str) -> Result<()> {
         self.unit_install_discover(file, self.disable_ctx.clone())?;
 
         let mut removal_symlinks = HashSet::new();
@@ -441,7 +454,7 @@ impl Install {
         Ok(())
     }
 
-    fn preset_one_file(&self, unit: &str, presets: &Presets) -> Result<(), Error> {
+    fn preset_one_file(&self, unit: &str, presets: &Presets) -> Result<()> {
         log::debug!("preset one unit file {}", unit);
         if self.installed_unit(unit) {
             return Ok(());
@@ -461,7 +474,7 @@ impl Install {
         Ok(())
     }
 
-    fn unit_install_discover(&self, unit: &str, ctx: Rc<InstallContext>) -> Result<(), Error> {
+    fn unit_install_discover(&self, unit: &str, ctx: Rc<InstallContext>) -> Result<()> {
         let unit_install = self.prepare_unit_install(unit, ctx.clone());
 
         self.unit_file_search(unit_install, ctx)?;
@@ -489,7 +502,7 @@ impl Install {
         &self,
         unit_install: Rc<UnitInstall>,
         ctx: Rc<InstallContext>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if unit_install.u_type() != UnitFileType::Invalid {
             return Ok(());
         }
@@ -526,7 +539,7 @@ impl Install {
         path: &str,
         unit_install: Rc<UnitInstall>,
         ctx: Rc<InstallContext>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         log::debug!("unit enable function file load: {}", path);
         let path = Path::new(&path);
 
@@ -541,7 +554,7 @@ impl Install {
 
         let canon_path = path.canonicalize()?;
         let tmp = format!("{}.toml", canon_path.as_path().display());
-        if let Err(e) = std::fs::copy(canon_path, &tmp) {
+        if let Err(e) = std::fs::copy(canon_path, &tmp).context(IoSnafu) {
             log::warn!("copy file content to toml file error: {}", e);
             return Err(e);
         }
@@ -576,9 +589,7 @@ impl Install {
             }
         }
 
-        let configer = builder
-            .load()
-            .map_err(|e| Error::new(ErrorKind::Other, e))?;
+        let configer = builder.load().context(ConfiqueSnafu)?;
         unit_install.fill_struct(&configer);
 
         for also in configer.Install.Also {

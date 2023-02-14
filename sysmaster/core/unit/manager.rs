@@ -1,3 +1,15 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 ///sysmaster entry
 /// 1. Load all unit need loaded in a system
 /// 2. Drive unit status through job engine;
@@ -8,14 +20,14 @@
 ///                      ---->rentry
 ///
 use super::super::job::{JobAffect, JobConf, JobKind, JobManager};
+use super::datastore::UnitDb;
+use super::entry::{StartLimitResult, Unit, UnitEmergencyAction, UnitX};
 use super::execute::ExecSpawn;
 use super::notify::NotifyManager;
 use super::rentry::{JobMode, UnitLoadState, UnitRe};
 use super::runtime::UnitRT;
 use super::sigchld::Sigchld;
 use super::uload::UnitLoad;
-use super::unit_datastore::UnitDb;
-use super::unit_entry::{StartLimitResult, Unit, UnitEmergencyAction, UnitX};
 use super::UnitRelationAtom;
 use super::UnitRelations;
 use crate::manager::pre_install::{Install, PresetMode};
@@ -27,15 +39,13 @@ use libutils::path_lookup::LookupPaths;
 use libutils::proc_cmdline::get_process_cmdline;
 use libutils::process_util;
 use libutils::show_table::ShowTable;
-use libutils::Result;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::convert::TryFrom;
-use std::io::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
-use sysmaster::error::{MngErrno, UnitActionError};
-use sysmaster::exec::{ExecCmdError, ExecParameters};
+use sysmaster::error::*;
+use sysmaster::exec::ExecParameters;
 use sysmaster::exec::{ExecCommand, ExecContext};
 use sysmaster::rel::{ReStation, ReStationKind, ReliLastFrame, Reliability};
 use sysmaster::unit::{UmIf, UnitActiveState, UnitDependencyMask, UnitType};
@@ -100,27 +110,27 @@ impl UnitManagerX {
         self.data.entry_coldplug();
     }
 
-    pub(crate) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub(crate) fn start_unit(&self, name: &str) -> Result<()> {
         self.data.start_unit(name)
     }
 
-    pub(crate) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub(crate) fn stop_unit(&self, name: &str) -> Result<()> {
         self.data.stop_unit(name)
     }
 
-    pub(crate) fn restart_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub(crate) fn restart_unit(&self, name: &str) -> Result<()> {
         self.data.restart_unit(name)
     }
 
-    pub(crate) fn get_unit_status(&self, name: &str) -> Result<String, MngErrno> {
+    pub(crate) fn get_unit_status(&self, name: &str) -> Result<String> {
         self.data.get_unit_status(name)
     }
 
-    pub(crate) fn get_all_units(&self) -> Result<String, MngErrno> {
+    pub(crate) fn get_all_units(&self) -> Result<String> {
         self.data.get_all_units()
     }
 
-    pub(crate) fn child_sigchld_enable(&self, enable: bool) -> Result<i32> {
+    pub(crate) fn child_sigchld_enable(&self, enable: bool) -> i32 {
         self.data.sigchld.enable(enable)
     }
 
@@ -144,36 +154,34 @@ impl UnitManagerX {
         relir.station_register(&String::from("UnitManager"), kind, station);
     }
 
-    pub(crate) fn enable_unit(&self, unit_file: &str) -> Result<(), Error> {
+    pub(crate) fn enable_unit(&self, unit_file: &str) -> Result<()> {
         log::debug!("unit enable file {}", unit_file);
         let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
         install.unit_enable_files(unit_file)?;
         Ok(())
     }
 
-    pub(crate) fn disable_unit(&self, unit_file: &str) -> Result<(), Error> {
+    pub(crate) fn disable_unit(&self, unit_file: &str) -> Result<()> {
         log::debug!("unit disable file {}", unit_file);
         let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
         install.unit_disable_files(unit_file)?;
         Ok(())
     }
 
-    pub(crate) fn mask_unit(&self, unit_file: &str) -> Result<(), Error> {
+    pub(crate) fn mask_unit(&self, unit_file: &str) -> Result<()> {
         log::debug!("unit mask file {}", unit_file);
         let link_name_path =
             std::path::Path::new(libutils::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
         let target_path = std::path::Path::new("/dev/null");
-        match libutils::fs_util::symlink(
+        libutils::fs_util::symlink(
             target_path.to_str().unwrap(),
             link_name_path.to_str().unwrap(),
             false,
-        ) {
-            Ok(()) => Ok(()),
-            Err(e) => Err(Error::from(e)),
-        }
+        )
+        .context(NixSnafu)
     }
 
-    pub(crate) fn unmask_unit(&self, unit_file: &str) -> Result<(), Error> {
+    pub(crate) fn unmask_unit(&self, unit_file: &str) -> Result<()> {
         log::debug!("unit unmask file {}", unit_file);
         let link_name_path =
             std::path::Path::new(libutils::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
@@ -203,7 +211,7 @@ impl UnitManagerX {
                 link_name_path.to_str().unwrap(),
                 e
             );
-            return Err(Error::from(e));
+            return Err(e).context(NixSnafu);
         }
 
         Ok(())
@@ -246,7 +254,7 @@ impl UmIf for UnitManager {
         target_name: &str,
         add_ref: bool,
         mask: UnitDependencyMask,
-    ) -> Result<(), UnitActionError> {
+    ) -> Result<()> {
         self.unit_add_dependency(unit_name, relation, target_name, add_ref, mask)
     }
 
@@ -262,7 +270,7 @@ impl UmIf for UnitManager {
         target_name: &str,
         add_ref: bool,
         mask: UnitDependencyMask,
-    ) -> Result<(), UnitActionError> {
+    ) -> Result<()> {
         self.unit_add_dependency(unit_name, ra, target_name, add_ref, mask)?;
 
         self.unit_add_dependency(unit_name, rb, target_name, add_ref, mask)
@@ -273,20 +281,20 @@ impl UmIf for UnitManager {
         self.load_unit_success(name)
     }
 
-    fn unit_enabled(&self, name: &str) -> Result<(), UnitActionError> {
+    fn unit_enabled(&self, name: &str) -> Result<()> {
         let u = if let Some(unit) = self.db.units_get(name) {
             unit
         } else {
-            return Err(UnitActionError::UnitActionENoent);
+            return Err(Error::UnitActionENoent);
         };
 
         if u.load_state() != UnitLoadState::UnitLoaded {
             log::error!("related service unit: {} is not loaded", name);
-            return Err(UnitActionError::UnitActionENoent);
+            return Err(Error::UnitActionENoent);
         }
 
         if u.activated() {
-            return Err(UnitActionError::UnitActionEBusy);
+            return Err(Error::UnitActionEBusy);
         }
 
         Ok(())
@@ -301,7 +309,7 @@ impl UmIf for UnitManager {
     }
 
     /// start the unit
-    fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+    fn start_unit(&self, name: &str) -> Result<()> {
         self.start_unit(name)
     }
 
@@ -329,12 +337,12 @@ impl UmIf for UnitManager {
         cmdline: &ExecCommand,
         params: &ExecParameters,
         ctx: Rc<ExecContext>,
-    ) -> Result<Pid, ExecCmdError> {
+    ) -> Result<Pid> {
         let unit = self.units_get(unit);
         if let Some(u) = unit {
             self.exec.spawn(&u, cmdline, params, ctx)
         } else {
-            Err(ExecCmdError::SpawnError)
+            Err(Error::SpawnError)
         }
     }
 
@@ -393,23 +401,23 @@ impl UmIf for UnitManager {
         s_unit.get_subunit_state()
     }
 
-    fn unit_start(&self, _name: &str) -> Result<(), UnitActionError> {
+    fn unit_start(&self, _name: &str) -> Result<()> {
         if let Some(unit) = self.db.units_get(_name) {
             unit.start()
         } else {
-            Err(UnitActionError::UnitActionENoent)
+            Err(Error::UnitActionENoent)
         }
     }
 
-    fn unit_stop(&self, _name: &str, force: bool) -> Result<(), UnitActionError> {
+    fn unit_stop(&self, _name: &str, force: bool) -> Result<()> {
         if let Some(unit) = self.db.units_get(_name) {
             unit.stop(force)
         } else {
-            Err(UnitActionError::UnitActionENoent)
+            Err(Error::UnitActionENoent)
         }
     }
 
-    fn restart_unit(&self, name: &str) -> Result<(), MngErrno> {
+    fn restart_unit(&self, name: &str) -> Result<()> {
         self.restart_unit(name)
     }
 }
@@ -493,16 +501,16 @@ impl UnitManager {
         target_name: &str,
         add_ref: bool,
         mask: UnitDependencyMask,
-    ) -> Result<(), UnitActionError> {
+    ) -> Result<()> {
         let s_unit = if let Some(unit) = self.load_unitx(unit_name) {
             unit
         } else {
-            return Err(UnitActionError::UnitActionENoent);
+            return Err(Error::UnitActionENoent);
         };
         let t_unit = if let Some(unit) = self.load_unitx(target_name) {
             unit
         } else {
-            return Err(UnitActionError::UnitActionENoent);
+            return Err(Error::UnitActionENoent);
         };
 
         self.rt
@@ -657,7 +665,7 @@ impl UnitManager {
         false
     }
 
-    fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+    fn start_unit(&self, name: &str) -> Result<()> {
         if let Some(unit) = self.load_unitx(name) {
             log::debug!("load unit {} success, send to job manager", name);
 
@@ -669,7 +677,7 @@ impl UnitManager {
             log::debug!("job exec success");
             Ok(())
         } else {
-            Err(MngErrno::Internal)
+            Err(Error::Internal)
         }
     }
 
@@ -693,7 +701,7 @@ impl UnitManager {
         self.db.get_unit_by_pid(pid)
     }
 
-    pub(self) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub(self) fn stop_unit(&self, name: &str) -> Result<()> {
         if let Some(unit) = self.load_unitx(name) {
             self.jm.exec(
                 &JobConf::new(&unit, JobKind::Stop),
@@ -702,11 +710,11 @@ impl UnitManager {
             )?;
             Ok(())
         } else {
-            Err(MngErrno::Internal)
+            Err(Error::Internal)
         }
     }
 
-    pub(self) fn restart_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub(self) fn restart_unit(&self, name: &str) -> Result<()> {
         if let Some(unit) = self.load_unitx(name) {
             self.jm.exec(
                 &JobConf::new(&unit, JobKind::Restart),
@@ -715,7 +723,7 @@ impl UnitManager {
             )?;
             Ok(())
         } else {
-            Err(MngErrno::Internal)
+            Err(Error::Internal)
         }
     }
 
@@ -747,11 +755,11 @@ impl UnitManager {
         res
     }
 
-    pub(self) fn get_unit_status(&self, name: &str) -> Result<String, MngErrno> {
+    pub(self) fn get_unit_status(&self, name: &str) -> Result<String> {
         let unit = match self.units_get(name) {
             Some(unit) => unit,
             None => {
-                return Err(MngErrno::NotExisted);
+                return Err(Error::NotExisted);
             }
         };
         let mut status_table = ShowTable::new();
@@ -780,7 +788,7 @@ impl UnitManager {
         Ok(first_line + &status_table.to_string())
     }
 
-    pub(self) fn get_all_units(&self) -> Result<String, MngErrno> {
+    pub(self) fn get_all_units(&self) -> Result<String> {
         let mut list_units_table = ShowTable::new();
         list_units_table.add_line(vec![
             "UNIT".to_string(),
@@ -794,7 +802,7 @@ impl UnitManager {
                 let unit = match self.units_get(&unit_name) {
                     Some(unit) => unit,
                     None => {
-                        return Err(MngErrno::NotExisted);
+                        return Err(Error::NotExisted);
                     }
                 };
                 let load_state = self.load_unit_success(&unit_name).to_string();
@@ -1190,7 +1198,6 @@ mod tests {
     use crate::mount::setup;
     use libevent::Events;
     use libutils::logger;
-    use nix::errno::Errno;
     use nix::sys::wait::WaitStatus;
     use std::thread;
     use std::time::Duration;
@@ -1211,16 +1218,8 @@ mod tests {
     }
 
     #[allow(dead_code)]
-    fn setup_mount_point() -> Result<(), Errno> {
-        setup::mount_setup().map_err(|e| {
-            if let crate::error::Error::Nix { source } = e {
-                source
-            } else {
-                nix::errno::Errno::EPFNOSUPPORT
-            }
-        })?;
-
-        Ok(())
+    fn setup_mount_point() -> Result<()> {
+        setup::mount_setup()
     }
 
     #[test]

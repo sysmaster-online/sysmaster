@@ -1,7 +1,21 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
+use crate::error::*;
 use bitflags::bitflags;
 use nix::sys::stat::Mode;
 use nix::unistd::{Group, Uid, User};
-use std::{cell::RefCell, collections::HashMap, error::Error, ffi::CString, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, collections::HashMap};
+use std::{ffi::CString, path::PathBuf, rc::Rc};
 
 /// the exec context that was parse from the unit file.
 /// like parsed from Environment field.
@@ -48,6 +62,8 @@ pub struct ExecParameters {
     user: Option<User>,
     group: Option<Group>,
     umask: Option<Mode>,
+    watchdog_usec: u64,
+    flags: ExecFlags,
 }
 
 struct EnvData {
@@ -97,6 +113,8 @@ impl ExecParameters {
             user: None,
             group: None,
             umask: None,
+            watchdog_usec: 0,
+            flags: ExecFlags::CONTROL,
         }
     }
 
@@ -131,10 +149,7 @@ impl ExecParameters {
     }
 
     /// add WorkingDirectory
-    pub fn add_working_directory(
-        &mut self,
-        working_directory_str: String,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn add_working_directory(&mut self, working_directory_str: String) -> Result<()> {
         if working_directory_str.is_empty() {
             return Ok(());
         }
@@ -147,12 +162,7 @@ impl ExecParameters {
         let mut working_directory_str = working_directory_str.trim_start_matches('-').to_string();
 
         if working_directory_str == *"~".to_string() {
-            working_directory_str = match std::env::var("HOME") {
-                Err(e) => {
-                    return Err(Box::new(e));
-                }
-                Ok(v) => v,
-            };
+            working_directory_str = std::env::var("HOME").context(VarSnafu)?
         }
 
         let working_directory = PathBuf::from(&working_directory_str);
@@ -160,10 +170,7 @@ impl ExecParameters {
             if miss_ok {
                 return Ok(());
             } else {
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Specified directory is invalid.",
-                )));
+                return Err(Error::InvalidData);
             }
         }
 
@@ -177,7 +184,7 @@ impl ExecParameters {
     }
 
     /// add User
-    pub fn add_user(&mut self, user_str: String) -> Result<(), Box<dyn Error>> {
+    pub fn add_user(&mut self, user_str: String) -> Result<()> {
         // 1. If user_str is empty, treat it as UID 0
         if user_str.is_empty() {
             self.user = User::from_uid(Uid::from_raw(0)).unwrap();
@@ -193,10 +200,7 @@ impl ExecParameters {
             self.user = Some(user);
             return Ok(());
         }
-        Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "Invalid user configuration",
-        )))
+        Err(Error::InvalidData)
     }
 
     /// get User
@@ -205,7 +209,7 @@ impl ExecParameters {
     }
 
     /// add Group
-    pub fn add_group(&mut self, group_str: String) -> Result<(), Box<dyn Error>> {
+    pub fn add_group(&mut self, group_str: String) -> Result<()> {
         // add_user should be called before add_group
         assert!(self.get_user().is_some());
         // 1. Group is not configured, use the primary group of user
@@ -224,10 +228,7 @@ impl ExecParameters {
             self.group = Some(group);
             return Ok(());
         }
-        Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "Invalid group configuration",
-        )))
+        Err(Error::InvalidData)
     }
 
     /// get Group
@@ -236,25 +237,19 @@ impl ExecParameters {
     }
 
     /// add UMask
-    pub fn add_umask(&mut self, umask_str: String) -> Result<(), Box<dyn Error>> {
+    pub fn add_umask(&mut self, umask_str: String) -> Result<()> {
         let mut umask_str = umask_str;
         if umask_str.is_empty() {
             umask_str = "0022".to_string();
         }
         for c in umask_str.as_bytes() {
             if !(b'0'..b'8').contains(c) {
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Invalid UMask Configuration",
-                )));
+                return Err(Error::InvalidData);
             }
         }
         let mode = match u32::from_str_radix(&umask_str, 8) {
-            Err(e) => {
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    e.to_string(),
-                )));
+            Err(_) => {
+                return Err(Error::InvalidData);
             }
             Ok(v) => v,
         };
@@ -267,6 +262,26 @@ impl ExecParameters {
     pub fn get_umask(&self) -> Option<Mode> {
         self.umask
     }
+
+    /// set the software watchdog time
+    pub fn set_watchdog_usec(&mut self, usec: u64) {
+        self.watchdog_usec = usec;
+    }
+
+    /// return the software watchdog time
+    pub fn watchdog_usec(&self) -> u64 {
+        self.watchdog_usec
+    }
+
+    /// set the exec command flags
+    pub fn set_exec_flags(&mut self, flags: ExecFlags) {
+        self.flags = flags;
+    }
+
+    /// return the exec command flags
+    pub fn exec_flags(&self) -> ExecFlags {
+        self.flags
+    }
 }
 
 bitflags! {
@@ -276,6 +291,8 @@ bitflags! {
         const CONTROL = 1 << 1;
         /// need pass fds to the command
         const PASS_FDS = 1 << 2;
+        /// enable software watchdog
+        const SOFT_WATCHDOG = 1 << 3;
     }
 }
 

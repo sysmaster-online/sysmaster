@@ -1,10 +1,22 @@
-use crate::CgType;
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
 
 use super::CgFlags;
-use super::CgroupErr;
+use crate::error::*;
+use crate::CgType;
 use libutils::special::CGROUP_SYSMASTER;
 use libutils::special::INIT_SCOPE;
 use libutils::special::SYSMASTER_SLICE;
+use libutils::IN_SET;
 use nix::libc;
 use nix::sys::signal::Signal;
 use nix::sys::statfs::{statfs, FsType};
@@ -14,12 +26,9 @@ use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
-use std::io::{Error as IOError, ErrorKind};
 use std::path::Path;
 use std::path::PathBuf;
 use walkdir::{DirEntry, WalkDir};
-
-use libutils::IN_SET;
 
 #[cfg(target_env = "musl")]
 type FsTypeT = libc::c_ulong;
@@ -43,38 +52,36 @@ pub const CG_BASE_DIR: &str = "/run/sysmaster/cgroup";
 const CGROUP_PROCS: &str = "procs";
 
 /// return the cgroup mounted type, if not support cgroup return CgroupErr.
-pub fn cg_type() -> Result<CgType, CgroupErr> {
-    let stat = statfs(CG_BASE_DIR).map_err(|_e| CgroupErr::NotSupported)?;
+pub fn cg_type() -> Result<CgType> {
+    let stat = statfs(CG_BASE_DIR).map_err(|_| Error::NotSupported)?;
 
     if stat.filesystem_type() == FsType(libc::CGROUP2_SUPER_MAGIC as FsTypeT) {
         return Ok(CgType::UnifiedV2);
     }
 
-    if stat.filesystem_type() == FsType(libc::TMPFS_MAGIC as FsTypeT) {
-        if let Ok(s) = statfs(CG_UNIFIED_DIR) {
-            if s.filesystem_type() == FsType(libc::CGROUP2_SUPER_MAGIC as FsTypeT) {
-                return Ok(CgType::UnifiedV1);
-            }
-        }
+    if stat.filesystem_type() != FsType(libc::TMPFS_MAGIC as FsTypeT) {
+        return Err(Error::NotSupported);
+    }
 
-        match statfs(CG_V1_DIR) {
-            Ok(s) => {
-                let fy = s.filesystem_type();
-                if fy == FsType(libc::CGROUP2_SUPER_MAGIC as FsTypeT) {
-                    return Ok(CgType::UnifiedV1);
-                } else if fy == FsType(libc::CGROUP_SUPER_MAGIC as FsTypeT) {
-                    return Ok(CgType::Legacy);
-                } else {
-                    return Ok(CgType::None);
-                }
-            }
-            Err(_) => {
-                return Err(CgroupErr::NotSupported);
-            }
+    if let Ok(s) = statfs(CG_UNIFIED_DIR) {
+        if s.filesystem_type() == FsType(libc::CGROUP2_SUPER_MAGIC as FsTypeT) {
+            return Ok(CgType::UnifiedV1);
         }
     }
 
-    Err(CgroupErr::NotSupported)
+    match statfs(CG_V1_DIR) {
+        Ok(s) => {
+            let fy = s.filesystem_type();
+            if fy == FsType(libc::CGROUP2_SUPER_MAGIC as FsTypeT) {
+                Ok(CgType::UnifiedV1)
+            } else if fy == FsType(libc::CGROUP_SUPER_MAGIC as FsTypeT) {
+                Ok(CgType::Legacy)
+            } else {
+                Ok(CgType::None)
+            }
+        }
+        Err(_) => Err(Error::NotSupported),
+    }
 }
 
 #[allow(dead_code)]
@@ -88,7 +95,7 @@ fn cgtype_to_path(cg_type: CgType) -> &'static str {
 }
 
 #[cfg(feature = "linux")]
-fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf, CgroupErr> {
+fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf> {
     let cg_type = cg_type()?;
     let base_path = cgtype_to_path(cg_type);
     let path_buf: PathBuf = PathBuf::from(base_path);
@@ -96,20 +103,20 @@ fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf, CgroupErr
 }
 
 #[cfg(feature = "hongmeng")]
-fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf, CgroupErr> {
+fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf> {
     let path_buf: PathBuf = PathBuf::from(CG_BASE_DIR);
     Ok(path_buf.join(cg_path).join(suffix))
 }
 
 /// attach the pid to the controller which is depend the cg_path
-pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<(), CgroupErr> {
+pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<()> {
     log::debug!("attach pid {} to path {:?}", pid, cg_path);
     let cg_procs = cg_abs_path(cg_path, &PathBuf::from(CGROUP_PROCS))?;
 
     if !cg_procs.exists() {
-        return Err(CgroupErr::IoError(std::io::Error::from(
-            std::io::ErrorKind::NotFound,
-        )));
+        return Err(Error::NotFound {
+            what: cg_procs.to_string_lossy().to_string(),
+        });
     }
 
     let p = if pid == Pid::from_raw(0) {
@@ -118,16 +125,16 @@ pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<(), CgroupErr> {
         pid
     };
 
-    fs::write(cg_procs, format!("{p}\n")).map_err(CgroupErr::IoError)?;
+    fs::write(cg_procs, format!("{p}\n")).context(IoSnafu)?;
 
     Ok(())
 }
 
 /// create the cg_path which is relative to cg_abs_path.
-pub fn cg_create(cg_path: &PathBuf) -> Result<(), CgroupErr> {
+pub fn cg_create(cg_path: &PathBuf) -> Result<()> {
     log::debug!("cgroup create path {:?}", cg_path);
     let abs_cg_path: PathBuf = cg_abs_path(cg_path, &PathBuf::from(""))?;
-    fs::create_dir_all(abs_cg_path).map_err(CgroupErr::IoError)?;
+    fs::create_dir_all(abs_cg_path).context(IoSnafu)?;
 
     Ok(())
 }
@@ -137,21 +144,21 @@ pub fn cg_escape(id: &str) -> &str {
     id
 }
 
-fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>, CgroupErr> {
+fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>> {
     let path = cg_abs_path(cg_path, &PathBuf::from(item))?;
     let file = fs::OpenOptions::new()
         .read(true)
         .open(path)
-        .map_err(CgroupErr::IoError)?;
+        .context(IoSnafu)?;
 
     let reader = BufReader::new(file);
     let mut pids = Vec::new();
     for line in reader.lines() {
-        let line = line.map_err(CgroupErr::IoError)?;
+        let line = line.context(IoSnafu)?;
         let pid = Pid::from_raw(
             line.trim_matches(|c: char| !c.is_numeric())
                 .parse::<i32>()
-                .unwrap(),
+                .context(ParseIntSnafu)?,
         );
 
         pids.push(pid);
@@ -168,7 +175,7 @@ pub fn cg_get_pids(cg_path: &PathBuf) -> Vec<Pid> {
     }
 }
 
-fn remove_dir(cg_path: &PathBuf) -> Result<(), CgroupErr> {
+fn remove_dir(cg_path: &PathBuf) -> Result<()> {
     let abs_cg_path: PathBuf = cg_abs_path(cg_path, &PathBuf::from(""))?;
 
     match fs::remove_dir_all(abs_cg_path.clone()) {
@@ -191,7 +198,7 @@ fn cg_kill_process(
     mut flags: CgFlags,
     pids: HashSet<Pid>,
     item: &str,
-) -> Result<(), CgroupErr> {
+) -> Result<()> {
     if IN_SET!(signal, Signal::SIGCONT, Signal::SIGKILL) {
         flags &= !CgFlags::SIGCONT;
     }
@@ -200,17 +207,17 @@ fn cg_kill_process(
     let file = fs::OpenOptions::new()
         .read(true)
         .open(path)
-        .map_err(CgroupErr::IoError)?;
+        .context(IoSnafu)?;
 
     let cur_pid = nix::unistd::getpid();
 
     let reader = BufReader::new(file);
     for line in reader.lines() {
-        let line = line.map_err(CgroupErr::IoError)?;
+        let line = line.context(IoSnafu)?;
         let pid = Pid::from_raw(
             line.trim_matches(|c: char| !c.is_numeric())
                 .parse::<i32>()
-                .unwrap(),
+                .context(ParseIntSnafu)?,
         );
 
         if flags.contains(CgFlags::IGNORE_SELF) && cur_pid == pid {
@@ -235,7 +242,9 @@ fn cg_kill_process(
             }
             Err(e) => {
                 log::warn!("Failed to kill control service: error: {}", e);
-                return Err(CgroupErr::KillError(e));
+                return Err(Error::KillControlService {
+                    what: e.to_string(),
+                });
             }
         }
     }
@@ -243,12 +252,7 @@ fn cg_kill_process(
     Ok(())
 }
 
-fn cg_kill(
-    cg_path: &PathBuf,
-    signal: Signal,
-    flags: CgFlags,
-    pids: HashSet<Pid>,
-) -> Result<(), CgroupErr> {
+fn cg_kill(cg_path: &PathBuf, signal: Signal, flags: CgFlags, pids: HashSet<Pid>) -> Result<()> {
     cg_kill_process(cg_path, signal, flags, pids, CGROUP_PROCS)?;
 
     Ok(())
@@ -264,7 +268,7 @@ pub fn cg_kill_recursive(
     signal: Signal,
     flags: CgFlags,
     pids: HashSet<Pid>,
-) -> Result<(), CgroupErr> {
+) -> Result<()> {
     // kill cgroups
     // todo kill sub cgroups
     cg_kill(cg_path, signal, flags, pids)?;
@@ -282,16 +286,8 @@ pub fn cg_kill_recursive(
 }
 
 /// return the supported controllers, read from /proc/cgroups, if failed return the IOError.
-pub fn cg_controllers() -> Result<Vec<String>, IOError> {
-    let file = match File::open("/proc/cgroups") {
-        Err(why) => {
-            return Err(IOError::new(
-                ErrorKind::Other,
-                format!("Error: Open file failed detail {}{}!", why, "/proc/cgroups"),
-            ))
-        }
-        Ok(file) => file,
-    };
+pub fn cg_controllers() -> Result<Vec<String>> {
+    let file = File::open("/proc/cgroups").context(IoSnafu)?;
 
     let lines = io::BufReader::new(file).lines();
     let mut controllers = Vec::new();
@@ -317,13 +313,13 @@ pub fn cg_controllers() -> Result<Vec<String>, IOError> {
 }
 
 #[allow(dead_code)]
-fn cg_read_event(cg_path: &PathBuf, event: &str) -> Result<String, CgroupErr> {
+fn cg_read_event(cg_path: &PathBuf, event: &str) -> Result<String> {
     let events_path = cg_abs_path(cg_path, &PathBuf::from("cgroup.events"))?;
-    let file = File::open(events_path).map_err(CgroupErr::IoError)?;
+    let file = File::open(events_path).context(IoSnafu)?;
     let reader = BufReader::new(file);
 
     for line in reader.lines() {
-        let content = line.map_err(CgroupErr::IoError)?;
+        let content = line.context(IoSnafu)?;
         let words: Vec<String> = content.split_whitespace().map(|c| c.to_string()).collect();
 
         if words.len() != 2 {
@@ -369,64 +365,54 @@ fn is_dir(entry: &DirEntry) -> bool {
 
 /// whether the cg_path cgroup is empty, return true if empty.
 #[cfg(feature = "linux")]
-pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
+pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool> {
     if cg_path == &PathBuf::from("") || cg_path == &PathBuf::from("/") {
         return Ok(true);
     }
 
-    let cg_type = cg_type()?;
-    if cg_type < CgType::Legacy {
+    if !cg_is_empty(cg_path) {
         return Ok(false);
     }
 
-    if cg_type == CgType::UnifiedV2 || cg_type == CgType::UnifiedV1 {
-        match cg_read_event(cg_path, "populated") {
+    match cg_type()? {
+        CgType::UnifiedV1 | CgType::UnifiedV2 => match cg_read_event(cg_path, "populated") {
             Ok(v) => {
                 log::debug!("cg read event value:{}", v);
-                return Ok(v == "0");
+                Ok(v == "0")
             }
             Err(e) => match e {
-                CgroupErr::IoError(_e) => {
-                    if _e.kind() == ErrorKind::NotFound {
-                        return Ok(true);
-                    }
-                }
-                _ => return Err(e),
+                Error::NotFound { what: _ } => Ok(true),
+                _ => Err(e),
             },
-        }
-    } else {
-        if !cg_is_empty(cg_path) {
-            return Ok(false);
-        }
+        },
+        CgType::Legacy => {
+            let cgroup_path = cg_abs_path(cg_path, &PathBuf::from(""))?;
 
-        let cgroup_path = cg_abs_path(cg_path, &PathBuf::from(""))?;
+            for entry in WalkDir::new(cgroup_path)
+                .min_depth(1)
+                .max_depth(1)
+                .into_iter()
+                .filter_entry(|e| !is_dir(e))
+            {
+                if entry.is_err() {
+                    continue;
+                }
 
-        for entry in WalkDir::new(cgroup_path)
-            .min_depth(1)
-            .max_depth(1)
-            .into_iter()
-            .filter_entry(|e| !is_dir(e))
-        {
-            if entry.is_err() {
-                continue;
+                let sub_cg = cg_path.join(entry.unwrap().path());
+                if cg_is_empty_recursive(&sub_cg)? {
+                    return Ok(false);
+                }
             }
 
-            let sub_cg = cg_path.join(entry.unwrap().path());
-            let exist = cg_is_empty_recursive(&sub_cg)?;
-            if exist {
-                return Ok(false);
-            }
+            Ok(true)
         }
-
-        return Ok(true);
+        CgType::None => Ok(false),
     }
-
-    Ok(false)
 }
 
 /// whether the cg_path cgroup is empty, return true if empty.
 #[cfg(feature = "hongmeng")]
-pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
+pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool> {
     if cg_path == &PathBuf::from("") || cg_path == &PathBuf::from("/") {
         return Ok(true);
     }
@@ -458,7 +444,7 @@ pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool, CgroupErr> {
 }
 
 /// create cgroup path and attach pid to this cgroup
-pub fn cg_create_and_attach(cg_path: &PathBuf, pid: Pid) -> Result<bool, CgroupErr> {
+pub fn cg_create_and_attach(cg_path: &PathBuf, pid: Pid) -> Result<bool> {
     cg_create(cg_path)?;
 
     cg_attach(pid, cg_path)?;
@@ -476,7 +462,7 @@ pub struct CgController {
 
 impl CgController {
     /// create the controller instance
-    pub fn new(controller: &str, pid: Pid) -> io::Result<Self> {
+    pub fn new(controller: &str, pid: Pid) -> Result<Self> {
         let controller = if let Some(str) = controller.strip_prefix("name=") {
             str
         } else {
@@ -493,12 +479,12 @@ impl CgController {
     }
 
     /// checks whether valid
-    pub fn valid(&self) -> io::Result<()> {
+    pub fn valid(&self) -> Result<()> {
         self.cg_pid_get_path()?;
         Ok(())
     }
 
-    fn cg_pid_get_path(&self) -> io::Result<String> {
+    fn cg_pid_get_path(&self) -> Result<String> {
         self.cg_get_path(self.get_procfs_path())
     }
 
@@ -510,25 +496,27 @@ impl CgController {
         }
     }
 
-    fn cg_get_path<P: AsRef<Path>>(&self, path: P) -> io::Result<String> {
-        let file = fs::OpenOptions::new().read(true).open(path)?;
+    fn cg_get_path<P: AsRef<Path>>(&self, path: P) -> Result<String> {
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .open(path)
+            .context(IoSnafu)?;
 
         let reader = BufReader::new(file);
         for line in reader.lines() {
             let str = match line {
                 Ok(str) => str,
-                Err(err) => {
-                    log::debug!("read line err: {}", err);
-                    return Err(err);
+                Err(e) => {
+                    log::debug!("read line err: {}", e.to_string());
+                    return Err(Error::ReadLine {
+                        line: e.to_string(),
+                    });
                 }
             };
 
             let vec: Vec<&str> = str.split(':').collect();
             if vec.len() != 3 {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("data format error:{str}"),
-                ));
+                return Err(Error::DataFormat { data: str });
             }
             for ctrl in vec[1].split(',') {
                 if ctrl.contains(&self.controller) {
@@ -536,10 +524,9 @@ impl CgController {
                 }
             }
         }
-        Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            format!("not find: {}", self.controller),
-        ))
+        Err(Error::NotFound {
+            what: self.controller.to_string(),
+        })
     }
 
     fn cg_strip_suffix<'a>(&self, str: &'a str) -> &'a str {
@@ -558,7 +545,7 @@ impl CgController {
         str
     }
 
-    fn cg_get_root_path(&self) -> io::Result<String> {
+    fn cg_get_root_path(&self) -> Result<String> {
         let path = match self.cg_pid_get_path() {
             Ok(str) => str,
             Err(err) => {
@@ -569,52 +556,45 @@ impl CgController {
         Ok(self.cg_strip_suffix(&path).to_string())
     }
 
-    fn get_abs_path_by_cgtype(&self, path: &str, cg_type: CgType) -> Result<String, CgroupErr> {
+    fn get_abs_path_by_cgtype(&self, path: &str, cg_type: CgType) -> Result<String> {
         match cg_type {
             CgType::UnifiedV2 => Ok(format!("{CG_BASE_DIR}/{path}")),
             CgType::UnifiedV1 => Ok(format!("{CG_UNIFIED_DIR}/{path}")),
             CgType::Legacy => Ok(format!("{}/{}/{}", CG_BASE_DIR, self.controller, path)),
-            _ => Err(CgroupErr::NotSupported),
+            _ => Err(Error::NotSupported),
         }
     }
 
     /// trim the dir
-    pub fn trim(&mut self, delete_root: bool) -> Result<(), CgroupErr> {
-        let path = match self.cg_get_root_path() {
-            Ok(path) => path,
-            Err(err) => {
-                return Err(CgroupErr::IoError(err));
-            }
-        };
-
+    pub fn trim(&mut self, delete_root: bool) -> Result<()> {
+        let path = self.cg_get_root_path()?;
         let cg_type = cg_type()?;
         let path = self.get_abs_path_by_cgtype(&path, cg_type)?;
         // let path = cg_abs_path(&PathBuf::from(path),&PathBuf::from(""))?;
-        if let Err(err) = Self::cg_remove_dir(&PathBuf::from(path), delete_root) {
-            return Err(CgroupErr::IoError(err));
-        }
-
+        Self::cg_remove_dir(&PathBuf::from(path), delete_root)?;
         Ok(())
     }
 
-    fn cg_remove_dir(path: &PathBuf, delete_root: bool) -> io::Result<()> {
+    fn cg_remove_dir(path: &PathBuf, delete_root: bool) -> Result<()> {
         if !path.exists() {
             return Ok(());
         }
 
         if !path.is_dir() {
-            return Err(io::Error::new(io::ErrorKind::Other, "NotADirectory"));
+            return Err(Error::NotADirectory {
+                path: path.to_string_lossy().to_string(),
+            });
         }
 
         if delete_root {
-            fs::remove_dir_all(path)?;
+            fs::remove_dir_all(path).context(IoSnafu)?;
         } else {
-            for entry in fs::read_dir(path)? {
-                let path = entry?.path();
-                if path.symlink_metadata()?.is_dir() {
+            for entry in (fs::read_dir(path).context(IoSnafu)?).flatten() {
+                let path = entry.path();
+                if path.symlink_metadata().context(IoSnafu)?.is_dir() {
                     Self::cg_remove_dir(&path, true)?;
                 } else {
-                    fs::remove_file(path)?;
+                    fs::remove_file(path).context(IoSnafu)?;
                 }
             }
         }

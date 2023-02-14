@@ -1,19 +1,28 @@
-//! Provide commands that cli can call
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
 
+//! Provide commands that cli can call
 #[allow(missing_docs)]
 #[allow(clippy::all)]
 pub mod abi;
 pub mod execute;
 pub mod frame;
 
-use std::fmt;
-
 pub use abi::command_request::RequestData;
 pub use abi::*;
 pub use frame::ProstClientStream;
 pub use frame::ProstServerStream;
 pub use http::StatusCode;
-// use prost::Message;
+use std::fmt;
 
 impl CommandRequest {
     /// Create a new command request for unit
@@ -46,11 +55,11 @@ impl CommandRequest {
     }
 
     /// Create a new command request for unit file
-    pub fn new_unitfile(action: unit_file::Action, unitfile: impl Into<String>) -> Self {
+    pub fn new_unitfile(action: unit_file::Action, unitfile: Vec<String>) -> Self {
         Self {
             request_data: Some(RequestData::Ufile(UnitFile {
                 action: action.into(),
-                unitname: unitfile.into(),
+                unitname: unitfile,
             })),
         }
     }

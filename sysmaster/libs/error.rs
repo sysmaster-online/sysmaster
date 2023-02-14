@@ -1,31 +1,123 @@
-//! Error define
-use libcmdproto::proto::execute::ExecCmdErrno;
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
+//! Error define, There is no globally defined error library, and each crate defines its own error.rs.
+//! Within a crate, only this unified Error can be used, and attention should be paid to avoiding semantic duplication.
+//! In sysmaster, the unit  components and sysmaster-core share one Error in terms of logic and functionality to avoid frequent conversions.
+//! todo: We can re-split it in the future to make it at a reasonable granularity, such as defining an error for each crate.
+
+/// Reuse the Errno from the nix library:
+/// Errno is an enumeration type that defines error codes that may be returned by Linux system calls
+/// and other system interfaces. The nix library provides an implementation of this type and its associated error messages.
+pub use nix::errno::Errno;
 use snafu::prelude::*;
 #[allow(unused_imports)]
 pub use snafu::ResultExt;
+/// Reuse the Errorkind from the std::io library:
+/// Errorkind is an enumeration type defined in the std::io library that represents different types of errors
+/// that can occur during input and output operations. Reusing Errorkind can provide a consistent error handling
+/// mechanism across different parts of the codebase.
+pub use std::io::ErrorKind;
+use std::sync::Arc;
 
-/// Error for exec command
+/// Libsysmaster Error:
+/// Here, errors inherited from underlying crates (such as nix/io, etc.) are utilized, and some new unique error codes
+/// related to the sysmaster project are defined.
 #[allow(missing_docs)]
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 #[non_exhaustive]
-pub enum ExecCmdError {
+pub enum Error {
+    #[snafu(display("Unexpected end of file"))]
+    EOF,
+
+    #[snafu(display("Error parsing from string: {}", source))]
+    Parse {
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+
+    #[snafu(display("plugin load error"))]
+    PluginLoad {
+        msg: String,
+    },
+
+    #[snafu(display("Confique  error"))]
+    Confique {
+        source: confique::Error,
+    },
+
+    #[snafu(display("cgroup error:{}", source))]
+    Cgroup {
+        source: libcgroup::error::Error,
+    },
+
+    #[snafu(display("VarError(libsysmaster)"))]
+    Var {
+        source: std::env::VarError,
+    },
+
+    #[snafu(display("IoError(libsysmaster)"))]
+    Io {
+        source: std::io::Error,
+    },
+
+    #[snafu(display("NixError(libsysmaster)"))]
+    Nix {
+        source: nix::Error,
+    },
+
+    #[snafu(display("HeedError(libsysmaster)"))]
+    Heed {
+        source: heed::Error,
+    },
+
+    #[snafu(display("InvalidData(libsysmaster)"))]
+    InvalidData,
+
+    #[snafu(display("NotFound(libsysmaster): '{}'.", what))]
+    NotFound {
+        what: String,
+    },
+
+    #[snafu(display("OtherError(libsysmaster): '{}'.", msg))]
+    Other {
+        msg: String,
+    },
+
+    #[snafu(display("Shared"))]
+    Shared {
+        source: Arc<Error>,
+    },
+
+    #[snafu(display("ConvertError"))]
+    ConvertToSysmaster,
+
+    /// Job errno
+    Input,
+    Conflict,
+    NotExisted,
+    Internal,
+    NotSupported,
+    BadRequest,
+
+    /// Error for exec command
     #[snafu(display("Timeout(ExecCmdError)"))]
     Timeout,
     #[snafu(display("NoCmdFound(ExecCmdError)"))]
     NoCmdFound,
     #[snafu(display("SpawnError(ExecCmdError)"))]
     SpawnError,
-    #[snafu(display("CgroupError(ExecCmdError): {}", msg))]
-    CgroupError { msg: String },
-}
 
-/// UnitAction Error
-#[allow(missing_docs)]
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
-#[non_exhaustive]
-pub enum UnitActionError {
+    /// UnitAction Error
     #[snafu(display("EAgain(UnitActionError)"))]
     UnitActionEAgain,
     #[snafu(display("EAlready(UnitActionError)"))]
@@ -56,47 +148,74 @@ pub enum UnitActionError {
     UnitActionECanceled,
 }
 
-/// error number of manager
-#[allow(missing_docs)]
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
-#[non_exhaustive]
-pub enum MngErrno {
-    #[snafu(display("Input(ManagerError)"))]
-    Input,
-    #[snafu(display("NotExisted(ManagerError)"))]
-    NotExisted,
-    #[snafu(display("Internal(ManagerError)"))]
-    Internal,
-    #[snafu(display("NotSupported(ManagerError)"))]
-    NotSupported,
-}
-
-impl From<MngErrno> for ExecCmdErrno {
-    fn from(err: MngErrno) -> Self {
-        match err {
-            MngErrno::Input => ExecCmdErrno::Input,
-            MngErrno::NotExisted => ExecCmdErrno::NotExisted,
-            MngErrno::NotSupported => ExecCmdErrno::NotSupported,
-            _ => ExecCmdErrno::Internal,
+impl From<Error> for nix::errno::Errno {
+    fn from(e: Error) -> Self {
+        match e {
+            Error::Nix { source } => source,
+            _ => nix::errno::Errno::ENOTSUP,
         }
     }
 }
 
-/// libsysmaster Error
-#[allow(missing_docs)]
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
-#[non_exhaustive]
-pub enum Error {
-    #[snafu(display("UnitActionError(libsysmaster)"))]
-    UnitAction { source: UnitActionError },
+impl From<Error> for std::io::Error {
+    fn from(e: Error) -> Self {
+        match e {
+            Error::Io { source } => source,
+            _ => std::io::ErrorKind::Other.into(),
+        }
+    }
+}
 
-    #[snafu(display("ManagerError(libsysmaster)"))]
-    Manager { source: MngErrno },
+#[allow(unused_macros)]
+macro_rules! errfrom {
+    ($($st:ty),* => $variant:ident) => (
+        $(
+            impl From<$st> for Error {
+                fn from(e: $st) -> Error {
+                    Error::$variant { source: e.into() }
+                }
+            }
+        )*
+    )
+}
 
-    #[snafu(display("OtherError(libsysmaster): '{}'.", msg))]
-    Other { msg: String },
+errfrom!(std::num::ParseIntError, std::string::ParseError => Parse);
+
+impl From<libutils::error::Error> for Error {
+    fn from(e: libutils::Error) -> Error {
+        match e {
+            libutils::Error::Io(e) => Error::Io { source: e },
+            libutils::Error::Proc(_) => todo!(),
+            libutils::Error::ParseInt(_) => todo!(),
+            libutils::Error::ParseFloat(_) => todo!(),
+            libutils::Error::ParseBoolError(_) => todo!(),
+            libutils::Error::FromUTF8(_) => todo!(),
+            libutils::Error::Other { msg } => Error::Other {
+                msg: msg.to_string(),
+            },
+            _ => Error::Other {
+                msg: "unspport".to_string(),
+            },
+        }
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(source: std::io::Error) -> Error {
+        Error::Io { source }
+    }
+}
+
+impl From<String> for Error {
+    fn from(msg: String) -> Error {
+        Error::Other { msg }
+    }
+}
+
+impl From<Arc<Error>> for Error {
+    fn from(source: Arc<Error>) -> Error {
+        Error::Shared { source }
+    }
 }
 
 /// new Result

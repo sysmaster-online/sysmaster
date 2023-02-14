@@ -1,3 +1,15 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 //! uevent_monitor
 //!
 use libdevice::device_monitor::{DeviceMonitor, MonitorNetlinkGroup};
@@ -56,7 +68,7 @@ impl Source for Monitor {
     }
 
     /// receive device from socket and insert into job queue
-    fn dispatch(&self, _: &Events) -> Result<i32, libevent::Error> {
+    fn dispatch(&self, _: &Events) -> i32 {
         let device = match self.device_monitor.receive_device() {
             Ok(ret) => ret,
             Err(e) => match e {
@@ -64,17 +76,17 @@ impl Source for Monitor {
                     syscall: _,
                     errno: Errno::EAGAIN,
                 } => {
-                    return Ok(0);
+                    return 0;
                 }
                 libdevice::error::Error::Syscall {
                     syscall: _,
                     errno: _,
                 } => {
                     log::error!("{}", e);
-                    return Ok(0);
+                    return 0;
                 }
                 _ => {
-                    return Ok(0);
+                    return 0;
                 }
             },
         };
@@ -83,7 +95,7 @@ impl Source for Monitor {
 
         self.job_queue.job_queue_insert(device);
         self.job_queue.job_queue_start();
-        Ok(0)
+        0
     }
 
     /// token of event source

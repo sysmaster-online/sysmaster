@@ -1,7 +1,19 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 use libevent::{EventType, Events, Source};
-use libutils::Result;
 use nix::sys::signal::Signal;
 use std::{convert::TryFrom, rc::Rc};
+use sysmaster::error::*;
 use sysmaster::rel::{ReliLastFrame, Reliability};
 
 pub(super) struct Signals<T> {
@@ -35,7 +47,7 @@ impl<T: SignalDispatcher> Source for Signals<T> {
         (libc::EPOLLIN) as u32
     }
 
-    fn dispatch(&self, e: &Events) -> libevent::Result<i32> {
+    fn dispatch(&self, e: &Events) -> i32 {
         log::debug!("Dispatching signals!");
 
         self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);
@@ -52,7 +64,7 @@ impl<T: SignalDispatcher> Source for Signals<T> {
         }
         self.reli.clear_last_frame();
 
-        Ok(0)
+        0
     }
 
     fn token(&self) -> u64 {

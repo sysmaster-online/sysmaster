@@ -1,12 +1,24 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 use super::alloc::JobAlloc;
 use super::entry::{Job, JobConf, JobInfo, JobResult};
 use super::junit::JobUnit;
 use super::rentry::JobKind;
-use crate::error::JobErrno;
 use crate::unit::{JobMode, UnitDb, UnitRelationAtom, UnitX};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
+use sysmaster::error::*;
 
 pub(super) struct JobTable {
     // associated objects
@@ -88,11 +100,11 @@ impl JobTable {
         &self,
         other: &Self,
         mode: JobMode,
-    ) -> Result<(Vec<Rc<Job>>, Vec<Rc<Job>>, Vec<Rc<Job>>), JobErrno> {
+    ) -> Result<(Vec<Rc<Job>>, Vec<Rc<Job>>, Vec<Rc<Job>>)> {
         // check other-jobs-id first: make rollback simple
         for (o_id, _) in other.t_id.borrow().iter() {
             if self.t_id.borrow().get(o_id).is_some() {
-                return Err(JobErrno::Internal);
+                return Err(Error::Internal);
             }
         }
 
@@ -415,17 +427,17 @@ impl JobTable {
         (add_jobs, del_jobs, update_jobs)
     }
 
-    fn insert_suspend(&self, job: Rc<Job>) -> Result<(), JobErrno> {
+    fn insert_suspend(&self, job: Rc<Job>) -> Result<()> {
         // check job-id
         let id = job.get_id();
         if self.t_id.borrow().get(&id).is_some() {
-            return Err(JobErrno::Internal);
+            return Err(Error::Internal);
         }
 
         // table-unit
         let old = self.t_unit.borrow_mut().insert_suspend(Rc::clone(&job));
         if old.is_some() {
-            return Err(JobErrno::Input);
+            return Err(Error::Input);
         }
 
         // table-id
@@ -434,17 +446,17 @@ impl JobTable {
         Ok(())
     }
 
-    fn insert_trigger(&self, job: Rc<Job>) -> Result<(), JobErrno> {
+    fn insert_trigger(&self, job: Rc<Job>) -> Result<()> {
         // check job-id
         let id = job.get_id();
         if self.t_id.borrow().get(&id).is_some() {
-            return Err(JobErrno::Internal);
+            return Err(Error::Internal);
         }
 
         // table-unit
         let old = self.t_unit.borrow_mut().insert_trigger(Rc::clone(&job));
         if old.is_some() {
-            return Err(JobErrno::Input);
+            return Err(Error::Input);
         }
 
         // table-id

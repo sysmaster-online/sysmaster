@@ -1,12 +1,22 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
+use crate::error::*;
 use crate::utils::fd as fd_util;
 use heed::types::{OwnedType, SerdeBincode};
 use heed::{Database, Env, EnvOpenOptions};
-use nix::errno::Errno;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::fs;
-use std::io::Error;
 use std::path::Path;
+use std::{fmt, fs};
 
 const RELI_PENDING_DIR: &str = "pending.mdb";
 const RELI_PENDING_MAX_DBS: u32 = 1;
@@ -76,7 +86,7 @@ impl ReliPending {
         self.data_clear();
     }
 
-    pub fn fd_cloexec(&self, fd: i32, cloexec: bool) -> Result<(), Errno> {
+    pub fn fd_cloexec(&self, fd: i32, cloexec: bool) -> Result<()> {
         match cloexec {
             true => self.fd_remove(fd),
             false => self.fd_retain(fd),
@@ -88,18 +98,20 @@ impl ReliPending {
         fd
     }
 
-    fn fd_retain(&self, fd: i32) -> Result<(), Errno> {
+    fn fd_retain(&self, fd: i32) -> Result<()> {
         // repeatable protect
         if self.fd_contains(fd) {
             // error
-            return Err(Errno::EBADR);
+            return Err(Error::Nix {
+                source: nix::errno::Errno::EBADR,
+            });
         }
 
         // mark pending with retaining
         self.fd_add(fd, ReliPState::Retaining);
 
         // action
-        let ret = fd_util::fd_cloexec(fd, false);
+        let ret = fd_util::fd_cloexec(fd, false).context(NixSnafu);
         if ret.is_err() {
             self.fd_del(fd);
             return ret;
@@ -112,7 +124,7 @@ impl ReliPending {
         Ok(())
     }
 
-    fn fd_remove(&self, fd: i32) -> Result<(), Errno> {
+    fn fd_remove(&self, fd: i32) -> Result<()> {
         // close-on-exec
         if fd_util::fd_is_cloexec(fd) {
             // debug
@@ -124,7 +136,7 @@ impl ReliPending {
         self.fd_add(fd, ReliPState::Removing);
 
         // action
-        let ret = fd_util::fd_cloexec(fd, true);
+        let ret = fd_util::fd_cloexec(fd, true).context(NixSnafu);
         if ret.is_err() {
             self.fd_del(fd);
             return ret;
@@ -161,16 +173,16 @@ impl ReliPending {
         contains.is_some()
     }
 
-    fn fd_len(&self) -> heed::Result<u64> {
-        let rtxn = self.env.read_txn()?;
-        self.fd.len(&rtxn)
+    fn fd_len(&self) -> Result<u64> {
+        let rtxn = self.env.read_txn().context(HeedSnafu)?;
+        self.fd.len(&rtxn).context(HeedSnafu)
     }
 }
 
-pub fn prepare(dir_str: &str) -> Result<(), Error> {
+pub fn prepare(dir_str: &str) -> Result<()> {
     let pending = Path::new(dir_str).join(RELI_PENDING_DIR);
     if !pending.exists() {
-        fs::create_dir_all(&pending)?;
+        fs::create_dir_all(&pending).context(IoSnafu)?;
     }
 
     Ok(())

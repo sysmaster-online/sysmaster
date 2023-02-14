@@ -1,3 +1,15 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 //! # Target is the entry of sysmaster's control startup mode. The earliest concept of startup mode comes from the concept of sysvint in Linux system. In sysvinit, startup mode includes 0-6 6 modes
 //!  Sysmaster refers to systemd, and uses target as the entry of the startup mode. It is the unit that sysmaster loads by default during startup. Target has no actual action to execute,
 //!  Target can be understood as the logical grouping of units to be started during system startup
@@ -21,9 +33,9 @@
 //! +  Conflicts = shutdown. Dependence between target and Before=shutdown.target
 
 // dependency: target_base -> target_rentry -> target_comm -> {target_mng} -> target_unit -> target_manager
-mod target_base;
-mod target_comm;
-mod target_manager;
-mod target_mng;
-mod target_rentry;
-mod target_unit;
+mod base;
+mod comm;
+mod manager;
+mod mng;
+mod rentry;
+mod unit;
