@@ -1,4 +1,5 @@
 use super::super::unit_entry::Unit;
+
 use libutils::fd_util;
 use nix::fcntl::FcntlArg;
 use nix::sys::stat::Mode;
@@ -8,10 +9,8 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::process;
 use std::rc::Rc;
-use std::thread;
-use std::time::Duration;
 use sysmaster::error::ExecCmdError;
-use sysmaster::exec::{ExecCommand, ExecContext, ExecParameters};
+use sysmaster::exec::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
 use walkdir::DirEntry;
 use walkdir::WalkDir;
 
@@ -39,7 +38,6 @@ impl ExecSpawn {
                 Ok(child)
             }
             Ok(ForkResult::Child) => {
-                thread::sleep(Duration::from_secs(2));
                 exec_child(unit, cmdline, params, ctx);
                 process::exit(0);
             }
@@ -157,7 +155,7 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
         args
     );
 
-    let mut envs = build_environment(unit, params.fds().len());
+    let mut envs = build_environment(unit, params);
     envs.append(&mut params.envs());
 
     log::debug!("exec child env env is: {:?}", envs);
@@ -234,13 +232,22 @@ fn build_run_args(
     (cmd, args)
 }
 
-fn build_environment(_unit: &Unit, fds: usize) -> Vec<std::ffi::CString> {
+fn build_environment(_unit: &Unit, ep: &ExecParameters) -> Vec<std::ffi::CString> {
     let mut envs = Vec::new();
 
+    let fds = ep.fds().len();
     if fds > 0 {
         envs.push(std::ffi::CString::new(format!("LISTEN_PID={}", nix::unistd::getpid())).unwrap());
 
         envs.push(std::ffi::CString::new(format!("LISTEN_FDS={fds}")).unwrap());
+    }
+
+    if ep.exec_flags().contains(ExecFlags::SOFT_WATCHDOG) && ep.watchdog_usec() > 0 {
+        envs.push(
+            std::ffi::CString::new(format!("WATCHDOG_PID={}", nix::unistd::getpid())).unwrap(),
+        );
+
+        envs.push(std::ffi::CString::new(format!("WATCHDOG_USEC={}", ep.watchdog_usec())).unwrap());
     }
     envs
 }

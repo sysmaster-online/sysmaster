@@ -1,3 +1,5 @@
+use crate::service_monitor::ServiceMonitor;
+
 use super::service_comm::ServiceUnitComm;
 use super::service_config::ServiceConfig;
 use super::service_pid::ServicePid;
@@ -45,6 +47,7 @@ pub(super) struct ServiceMng {
     control_cmd_type: RefCell<Option<ServiceCommand>>,
     control_command: RefCell<Vec<ExecCommand>>,
     rd: Rc<RunningData>,
+    monitor: RefCell<ServiceMonitor>,
 }
 
 impl ReStation for ServiceMng {
@@ -67,6 +70,7 @@ impl ReStation for ServiceMng {
             reset_restart,
             restarts,
             exit_status,
+            monitor,
         )) = self.comm.rentry_mng_get()
         {
             *self.state.borrow_mut() = state;
@@ -80,6 +84,7 @@ impl ReStation for ServiceMng {
             self.rd.set_reset_restart(reset_restart);
             self.rd.set_restarts(restarts);
             self.rd.set_wait_status(WaitStatus::from(exit_status));
+            *self.monitor.borrow_mut() = monitor;
         }
     }
 
@@ -98,6 +103,7 @@ impl ReStation for ServiceMng {
             self.rd.reset_restart(),
             self.rd.restarts(),
             exit_status,
+            *self.monitor.borrow(),
         );
     }
 
@@ -112,6 +118,7 @@ impl ServiceMng {
         exec_ctx: &Rc<ExecContext>,
     ) -> ServiceMng {
         let _pid = Rc::new(ServicePid::new(commr));
+
         ServiceMng {
             comm: Rc::clone(commr),
             config: Rc::clone(configr),
@@ -123,6 +130,7 @@ impl ServiceMng {
             control_cmd_type: RefCell::new(None),
             control_command: RefCell::new(Vec::new()),
             rd: rd.clone(),
+            monitor: RefCell::new(ServiceMonitor::new()),
         }
     }
 
@@ -283,9 +291,11 @@ impl ServiceMng {
             return;
         }
 
-        let ret = self
-            .spawn
-            .start_service(&cmd.unwrap(), 0, ExecFlags::PASS_FDS);
+        let ret = self.spawn.start_service(
+            &cmd.unwrap(),
+            0,
+            ExecFlags::PASS_FDS | ExecFlags::SOFT_WATCHDOG,
+        );
 
         if ret.is_err() {
             log::error!(
@@ -328,6 +338,9 @@ impl ServiceMng {
     fn enter_start_post(&self) {
         log::debug!("enter running service startpost command");
         self.pid.unwatch_control();
+
+        self.restart_watchdog();
+
         self.control_command_fill(ServiceCommand::StartPost);
         match self.control_command_pop() {
             Some(cmd) => {
@@ -646,7 +659,10 @@ impl ServiceMng {
 
     fn run_next_main(&self) {
         if let Some(cmd) = self.main_command_pop() {
-            match self.spawn.start_service(&cmd, 0, ExecFlags::PASS_FDS) {
+            match self
+                .spawn
+                .start_service(&cmd, 0, ExecFlags::PASS_FDS | ExecFlags::SOFT_WATCHDOG)
+            {
                 Ok(pid) => {
                     let _ = self.pid.set_main(pid);
                 }
@@ -952,6 +968,54 @@ impl ServiceMng {
         events.add_source(timer.clone()).unwrap();
         events.set_enabled(timer, EventState::OneShot).unwrap();
     }
+
+    fn restart_watchdog(&self) {
+        self.monitor
+            .borrow_mut()
+            .set_original_watchdog(self.config.config_data().borrow().Service.WatchdogSec);
+        let watchdog_usec = self.monitor.borrow().watchdog_usec();
+        if watchdog_usec == 0 || watchdog_usec == u64::MAX {
+            self.stop_watchdog();
+            return;
+        }
+
+        log::debug!("service create watchdog timer: {}", watchdog_usec);
+        if self.rd.armd_watchdog() {
+            let events = self.comm.um().events();
+            let watchdog = self.rd.watchdog();
+            events.del_source(watchdog.clone()).unwrap();
+
+            watchdog.set_time(watchdog_usec);
+            events.add_source(watchdog.clone()).unwrap();
+            events.set_enabled(watchdog, EventState::OneShot).unwrap();
+            return;
+        }
+
+        let watchdog = Rc::new(ServiceMonitorData::new(watchdog_usec));
+        self.rd.attach_watchdog(watchdog.clone());
+
+        let events = self.comm.um().events();
+        events.add_source(watchdog.clone()).unwrap();
+        events.set_enabled(watchdog, EventState::OneShot).unwrap();
+    }
+
+    fn force_watchdog(&self) {
+        //todo!("check the global service_watchdogs was enabled")
+
+        self.enter_signal(ServiceState::StopWatchdog, ServiceResult::FailureWatchdog);
+    }
+
+    fn override_watchdog_usec(&self, usec: u64) {
+        self.monitor.borrow_mut().override_watchdog_usec(usec);
+        self.restart_watchdog()
+    }
+
+    fn stop_watchdog(&self) {
+        if self.rd.armd_watchdog() {
+            let events = self.comm.um().events();
+            events.del_source(self.rd.watchdog()).unwrap();
+        }
+    }
 }
 
 impl ServiceMng {
@@ -1255,6 +1319,27 @@ impl ServiceMng {
 
                 self.rd.set_errno(err.unwrap());
             }
+
+            if key == "WATCHDOG" {
+                if value == "1" {
+                    self.restart_watchdog();
+                } else if value == "trigger" {
+                    self.force_watchdog();
+                } else {
+                    log::warn!(
+                        "{} send WATCHDOG= field is invalid, ignoring.",
+                        self.comm.owner().unwrap().id()
+                    );
+                }
+            }
+            if key == "WATCHDOG_USEC" {
+                let watchdog_override_usec = value.parse::<u64>();
+                if let Ok(v) = watchdog_override_usec {
+                    self.override_watchdog_usec(v);
+                    continue;
+                }
+                log::warn!("failed to parse notify message of WATCGDOG_USEC item");
+            }
         }
 
         Ok(())
@@ -1417,6 +1502,19 @@ impl RunningData {
     pub(self) fn wait_status(&self) -> WaitStatus {
         self.data.borrow().wait_status()
     }
+
+    pub(self) fn attach_watchdog(&self, watchdog: Rc<ServiceMonitorData>) {
+        watchdog.attach_mng(self.mng.borrow_mut().clone());
+        self.data.borrow_mut().attach_watchdog(watchdog);
+    }
+
+    pub(self) fn watchdog(&self) -> Rc<ServiceMonitorData> {
+        self.data.borrow().watchdog()
+    }
+
+    pub(self) fn armd_watchdog(&self) -> bool {
+        self.data.borrow().armd_watchdog()
+    }
 }
 
 struct Rtdata {
@@ -1430,6 +1528,8 @@ struct Rtdata {
     timer: Option<Rc<ServiceTimer>>,
 
     exec_status: WaitStatus,
+
+    watchdog: Option<Rc<ServiceMonitorData>>,
 }
 
 impl Rtdata {
@@ -1438,11 +1538,13 @@ impl Rtdata {
             errno: 0,
             notify_state: NotifyState::Unknown,
             path_inotify: None,
+
             forbid_restart: false,
             reset_restarts: false,
             restarts: 0,
             timer: None,
             exec_status: WaitStatus::StillAlive,
+            watchdog: None,
         }
     }
 
@@ -1521,6 +1623,18 @@ impl Rtdata {
 
     pub(self) fn wait_status(&self) -> WaitStatus {
         self.exec_status
+    }
+
+    pub(self) fn attach_watchdog(&mut self, watchdog: Rc<ServiceMonitorData>) {
+        self.watchdog = Some(watchdog)
+    }
+
+    pub(self) fn watchdog(&self) -> Rc<ServiceMonitorData> {
+        self.watchdog.as_ref().unwrap().clone()
+    }
+
+    pub(self) fn armd_watchdog(&self) -> bool {
+        self.watchdog.is_some()
     }
 }
 
@@ -1779,6 +1893,78 @@ impl ServiceTimer {
 }
 
 impl Source for ServiceTimer {
+    fn fd(&self) -> RawFd {
+        0
+    }
+
+    fn event_type(&self) -> EventType {
+        EventType::TimerMonotonic
+    }
+
+    fn epoll_event(&self) -> u32 {
+        (libc::EPOLLIN) as u32
+    }
+
+    fn time_relative(&self) -> u64 {
+        *self.time.borrow() * 1000000
+    }
+
+    fn dispatch(&self, _: &Events) -> Result<i32, libevent::Error> {
+        self.do_dispatch()
+    }
+
+    fn token(&self) -> u64 {
+        let data: u64 = unsafe { std::mem::transmute(self) };
+        data
+    }
+}
+
+struct ServiceMonitorData {
+    mng: RefCell<Weak<ServiceMng>>,
+    // owned objects
+    time: RefCell<u64>,
+}
+
+// the declaration "pub(self)" is for identification only.
+#[allow(dead_code)]
+impl ServiceMonitorData {
+    pub(super) fn new(usec: u64) -> ServiceMonitorData {
+        ServiceMonitorData {
+            mng: RefCell::new(Weak::new()),
+            time: RefCell::new(usec),
+        }
+    }
+
+    pub(self) fn attach_mng(&self, mng: Weak<ServiceMng>) {
+        log::debug!("attach service mng to path watchdog");
+        *self.mng.borrow_mut() = mng;
+    }
+
+    pub(self) fn mng(&self) -> Rc<ServiceMng> {
+        self.mng.borrow().clone().upgrade().unwrap()
+    }
+
+    pub(super) fn set_time(&self, usec: u64) {
+        *self.time.borrow_mut() = usec
+    }
+
+    pub(super) fn time(&self) -> u64 {
+        *self.time.borrow()
+    }
+
+    fn do_dispatch(&self) -> libevent::Result<i32> {
+        log::debug!(
+            "dispatch service watchdog, watchdog timer is: {}",
+            self.time()
+        );
+
+        self.mng()
+            .enter_signal(ServiceState::StopWatchdog, ServiceResult::FailureWatchdog);
+        Ok(0)
+    }
+}
+
+impl Source for ServiceMonitorData {
     fn fd(&self) -> RawFd {
         0
     }

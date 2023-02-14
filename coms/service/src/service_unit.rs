@@ -3,7 +3,6 @@ use super::service_comm::ServiceUnitComm;
 use super::service_config::ServiceConfig;
 use super::service_mng::RunningData;
 use super::service_mng::ServiceMng;
-use super::service_monitor::ServiceMonitor;
 use super::service_rentry::{NotifyAccess, ServiceCommand, ServiceType};
 use libutils::error::Error as ServiceError;
 use libutils::logger;
@@ -26,7 +25,6 @@ struct ServiceUnit {
     comm: Rc<ServiceUnitComm>,
     config: Rc<ServiceConfig>,
     mng: Rc<ServiceMng>,
-    monitor: ServiceMonitor,
     exec_ctx: Rc<ExecContext>,
 }
 
@@ -85,7 +83,6 @@ impl SubUnit for ServiceUnit {
             return Ok(());
         }
 
-        self.monitor.start_action();
         self.mng.start_action();
 
         Ok(())
@@ -176,7 +173,6 @@ impl ServiceUnit {
             comm: Rc::clone(&comm),
             config: Rc::clone(&config),
             mng: Rc::clone(&_mng),
-            monitor: ServiceMonitor::new(&config),
             exec_ctx: Rc::clone(&context),
         }
     }

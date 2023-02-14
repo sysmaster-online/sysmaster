@@ -244,7 +244,11 @@ impl Manager {
 
             // event
             self.reli.set_last_frame1(ReliLastFrame::OtherEvent as u32);
-            self.event.run(-1).unwrap();
+
+            let ret = self.event.run(-1);
+            if ret.is_err() {
+                log::error!("event run loop error is: {:?}", ret);
+            }
             self.reli.clear_last_frame();
         }
 

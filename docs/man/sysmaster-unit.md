@@ -16,4 +16,9 @@ sysmaster兼容systemd的SuccessAction、FailureAction、StartLimitAction等配�
 
 触发启动限制指：sysmaster最多允许单个unit在`StartLimitInterval`时间内启动`StartLimitBurst`次。
 
+### WatchdogSec
+
+配置软件狗的定时时间， 当值大于0时，启用软件狗，应用通过发送notify消息喂狗， 定时时间内收到"WATCHDOG=1"消息代表应用正常， 收到“WATCHDOG=trigger"消息停止应用，收到
+“WATCHDOG_USEC=15”消息表示将定时时间修改为15秒。
+
 ## 顺序和依赖

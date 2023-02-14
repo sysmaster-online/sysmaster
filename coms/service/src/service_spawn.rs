@@ -37,6 +37,7 @@ impl ServiceSpawn {
         ec_flags: ExecFlags,
     ) -> Result<Pid, Box<dyn Error>> {
         let mut params = ExecParameters::new();
+        params.set_exec_flags(ec_flags);
 
         params.add_env(
             "PATH",
@@ -61,7 +62,9 @@ impl ServiceSpawn {
             params.insert_fds(self.collect_socket_fds());
         }
 
-        if self.config.service_type() == ServiceType::Notify {
+        if self.config.service_type() == ServiceType::Notify
+            || self.config.config_data().borrow().Service.WatchdogSec > 0
+        {
             let notify_sock = um.notify_socket().unwrap();
             log::debug!("add NOTIFY_SOCKET env: {}", notify_sock.to_str().unwrap());
             params.add_env("NOTIFY_SOCKET", notify_sock.to_str().unwrap().to_string());
@@ -104,6 +107,8 @@ impl ServiceSpawn {
             return Err(e);
         }
 
+        params.set_watchdog_usec(self.watchdog_timer());
+
         log::debug!("begin to exec spawn");
         match um.exec_spawn(unit.id(), cmdline, &params, self.exec_ctx.clone()) {
             Ok(pid) => {
@@ -119,5 +124,9 @@ impl ServiceSpawn {
 
     fn collect_socket_fds(&self) -> Vec<i32> {
         self.comm.um().collect_socket_fds(&self.comm.get_owner_id())
+    }
+
+    fn watchdog_timer(&self) -> u64 {
+        self.config.config_data().borrow().Service.WatchdogSec
     }
 }

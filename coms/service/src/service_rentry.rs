@@ -13,6 +13,8 @@ use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use sysmaster::serialize::DeserializeWith;
 use sysmaster::unit::KillMode;
 
+use crate::service_monitor::ServiceMonitor;
+
 struct ServiceReDb<K, V>(ReDb<K, V>);
 
 const RELI_DB_HSERVICE_CONF: &str = "svcconf";
@@ -105,10 +107,7 @@ impl ExitStatusSet {
     }
 
     pub fn exit_status_enabled(&self, wait_status: WaitStatus) -> bool {
-        log::debug!(
-            "exit status enabled***************************** {:?}",
-            wait_status
-        );
+        log::debug!("exit status enabled: {:?}", wait_status);
         match wait_status {
             WaitStatus::Exited(_, status) => self.status.contains(&(status as u8)),
             WaitStatus::Signaled(_, sig, _) => self.signal.contains(&sig.as_str().to_string()),
@@ -175,7 +174,8 @@ pub(super) struct SectionService {
     pub ExecCondition: Option<Vec<ExecCommand>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub Sockets: Option<Vec<String>>,
-    pub WatchdogUSec: Option<u64>,
+    #[config(default = 0)]
+    pub WatchdogSec: u64,
     pub PIDFile: Option<String>,
     #[config(default = false)]
     pub RemainAfterExit: bool,
@@ -331,6 +331,7 @@ struct ServiceReMng {
     reset_restart: bool,
     restarts: u32,
     exit_status: ExitStatus,
+    monitor: ServiceMonitor,
 }
 
 impl ServiceReMng {
@@ -348,6 +349,7 @@ impl ServiceReMng {
         reset_restart: bool,
         restarts: u32,
         exit_status: ExitStatus,
+        monitor: ServiceMonitor,
     ) -> ServiceReMng {
         ServiceReMng {
             state,
@@ -362,6 +364,7 @@ impl ServiceReMng {
             reset_restart,
             restarts,
             exit_status,
+            monitor,
         }
     }
 }
@@ -411,6 +414,7 @@ impl ServiceRe {
         reset_restart: bool,
         restarts: u32,
         exit_status: ExitStatus,
+        monitor: ServiceMonitor,
     ) {
         let m_pid = main_pid.map(|x| x.as_raw());
         let c_pid = control_pid.map(|x| x.as_raw());
@@ -427,6 +431,7 @@ impl ServiceRe {
             reset_restart,
             restarts,
             exit_status,
+            monitor,
         );
         self.mng.0.insert(unit_id.to_string(), mng);
     }
@@ -452,6 +457,7 @@ impl ServiceRe {
         bool,
         u32,
         ExitStatus,
+        ServiceMonitor,
     )> {
         let mng = self.mng.0.get(unit_id);
         mng.map(|m| {
@@ -468,6 +474,7 @@ impl ServiceRe {
                 m.reset_restart,
                 m.restarts,
                 m.exit_status,
+                m.monitor,
             )
         })
     }
