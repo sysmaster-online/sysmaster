@@ -5,7 +5,7 @@ function finish() {
     echo "--- PLEASE RUN sh -x ci/01-pre-commit.sh FIRST IN YOUR LOCALHOST!!! ---"
     # remove tmp
     set +x
-    for rustlist in `git diff origin/master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
+    for rustlist in `git diff origin/master --name-only | grep \.rs$ | tr '\n' ' '`
     do
         sed -i '/#!\[deny(missing_docs)]/d' $rustlist 2>/dev/null || true
         sed -i '/#!\[deny(clippy::all)]/d' $rustlist 2>/dev/null || true
@@ -15,7 +15,7 @@ function finish() {
 
 trap finish EXIT
 
-for rustlist in `git diff origin/master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
+for rustlist in `git diff origin/master --name-only | grep \.rs$ | tr '\n' ' '`
 do
     grep -Pn '[\p{Han}]' $rustlist  && echo "DO NOT USE CHANESE CHARACTERS in code, 不要在源码中使用中文!" && exit 1
 done
@@ -32,7 +32,7 @@ pip3 install pre-commit ruamel.yaml || pip3 install pre-commit ruamel.yaml -i ht
 # changenum=$[newnum - oldnum]
 
 # add doc for src code
-for rustlist in `git diff origin/master --stat | awk '{print $1}' | grep \.rs$ | tr '\n' ' '`
+for rustlist in `git diff origin/master --name-only | grep \.rs$ | tr '\n' ' '`
 do
     # do not use global #!allow, exclude non_snake_case
     sed -i 's/#!\[allow(/\/\/#!\[allow(/g' $rustlist 2>/dev/null || true

@@ -17,9 +17,10 @@ use std::rc::Rc;
 use sysmaster::error::UnitActionError;
 use sysmaster::rel::{ReStation, Reliability};
 use sysmaster::unit::{
-    ExecContext, SubUnit, UmIf, UnitActiveState, UnitBase, UnitDependencyMask, UnitMngUtil,
-    UnitRelations,
+    SubUnit, UmIf, UnitActiveState, UnitBase, UnitDependencyMask, UnitMngUtil, UnitRelations,
 };
+
+use sysmaster::exec::ExecContext;
 
 struct ServiceUnit {
     comm: Rc<ServiceUnitComm>,

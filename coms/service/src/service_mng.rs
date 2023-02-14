@@ -27,10 +27,9 @@ use std::{
     rc::Weak,
 };
 use sysmaster::error::UnitActionError;
+use sysmaster::exec::{ExecCommand, ExecContext, ExecFlags};
 use sysmaster::rel::ReStation;
-use sysmaster::unit::{
-    ExecCommand, ExecContext, ExecFlags, KillOperation, UnitActiveState, UnitNotifyFlags,
-};
+use sysmaster::unit::{KillOperation, UnitActiveState, UnitNotifyFlags};
 
 pub(super) struct ServiceMng {
     // associated objects

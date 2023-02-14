@@ -1,13 +1,11 @@
 //!
-pub use exec::{ExecCmdError, ExecCommand, ExecContext, ExecFlags, ExecParameters};
-pub use ubase::{SubUnit, UnitBase};
-pub use udeps::{UnitDependencyMask, UnitRelationAtom, UnitRelations, UnitType};
-pub use ukill::{KillContext, KillMode, KillOperation};
+pub use base::{SubUnit, UnitBase};
+pub use deps::{UnitDependencyMask, UnitRelationAtom, UnitRelations, UnitType};
+pub use kill::{KillContext, KillMode, KillOperation};
+pub use state::{UnitActiveState, UnitNotifyFlags};
 pub use umif::{UmIf, UnitManagerObj, UnitMngUtil};
-pub use ustate::{UnitActiveState, UnitNotifyFlags};
-pub mod exec;
-mod ubase;
-mod udeps;
-mod ukill;
+mod base;
+mod deps;
+mod kill;
+mod state;
 mod umif;
-mod ustate;

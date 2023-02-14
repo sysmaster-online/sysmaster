@@ -1,11 +1,10 @@
-use std::path::Path;
-
 use libutils::serialize::DeserializeWith;
 use regex::Regex;
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer, Serialize,
 };
+use std::path::Path;
 
 /// the exec command that was parsed from the unit file
 #[derive(PartialEq, Clone, Eq, Debug, Serialize, Deserialize)]

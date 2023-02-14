@@ -1,6 +1,6 @@
-use super::ukill::{KillContext, KillOperation};
+use super::kill::{KillContext, KillOperation};
+use super::state::{UnitActiveState, UnitNotifyFlags};
 use super::umif::UnitMngUtil;
-use super::ustate::{UnitActiveState, UnitNotifyFlags};
 use super::{super::rel::ReStation, UnitRelations};
 use crate::error::UnitActionError;
 use libutils::error::Error as ServiceError;

@@ -6,8 +6,9 @@ use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Serialize};
 use std::os::unix::prelude::RawFd;
 use std::rc::Rc;
+use sysmaster::exec::ExecCommand;
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
-use sysmaster::unit::{ExecCommand, KillMode};
+use sysmaster::unit::KillMode;
 
 struct SocketReDb<K, V>(ReDb<K, V>);
 

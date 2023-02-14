@@ -19,8 +19,9 @@ use std::fs;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::exec::ExecCommand;
 use sysmaster::rel::ReStation;
-use sysmaster::unit::{ExecCommand, KillContext};
+use sysmaster::unit::KillContext;
 
 ///
 #[derive(Default)]
