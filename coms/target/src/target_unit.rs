@@ -1,3 +1,4 @@
+//! TargetUnit is used grouping units and as a synchronization points during startup
 //! TargetUnit is the entrance of the sub unit，implement the trait UnitObj,UnitMngUtil and UnitSubClass.
 //! Trait UnitObj defines the behavior of the sub unit.
 //! Trait UnitMngUtil is used to attach the Unitmanager to the sub unit.

@@ -109,7 +109,10 @@ pub(crate) struct UeConfigUnit {
     pub Description: String,
     #[config(default = "")]
     pub Documentation: String,
-    #[config(default = false)]
+    // systemctl isolate is a command used to change target
+    // AllowIsolate is option for systemctl isolate command,default is false
+    // The systemctl isolate is almost never used  in actually, so delete it
+    //#[config(default = false)]
     pub AllowIsolate: bool,
     //When set to true, the unit will not be stopped when systemctl isolate is executed. For service, target, socket timer and path, the default value is false. For other units, the default value is true
     #[config(default = false)]
