@@ -1,7 +1,7 @@
 use std::{error::Error, rc::Rc};
 
 use nix::unistd::Pid;
-use sysmaster::unit::{ExecCommand, ExecContext, ExecParameters};
+use sysmaster::exec::{ExecCommand, ExecContext, ExecParameters};
 
 use crate::socket_comm::SocketUnitComm;
 

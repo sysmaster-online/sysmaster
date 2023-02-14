@@ -9,8 +9,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::num::ParseIntError;
 use std::rc::Rc;
 use std::str::FromStr;
+use sysmaster::exec::ExecCommand;
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
-use sysmaster::unit::{ExecCommand, KillMode};
+use sysmaster::unit::KillMode;
 
 struct ServiceReDb<K, V>(ReDb<K, V>);
 

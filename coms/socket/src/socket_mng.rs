@@ -18,11 +18,10 @@ use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
 use sysmaster::error::UnitActionError;
+use sysmaster::exec::{ExecCommand, ExecContext};
+use sysmaster::rel::ReliLastFrame;
 use sysmaster::rel::{ReStation, Reliability};
-use sysmaster::{
-    rel::ReliLastFrame,
-    unit::{ExecCommand, ExecContext, KillOperation, UnitActiveState, UnitNotifyFlags, UnitType},
-};
+use sysmaster::unit::{KillOperation, UnitActiveState, UnitNotifyFlags, UnitType};
 
 impl SocketState {
     pub(super) fn to_unit_active_state(self) -> UnitActiveState {

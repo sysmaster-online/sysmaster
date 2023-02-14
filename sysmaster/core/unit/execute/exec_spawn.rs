@@ -11,7 +11,7 @@ use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
 use sysmaster::error::ExecCmdError;
-use sysmaster::unit::{ExecCommand, ExecContext, ExecParameters};
+use sysmaster::exec::{ExecCommand, ExecContext, ExecParameters};
 use walkdir::DirEntry;
 use walkdir::WalkDir;
 
