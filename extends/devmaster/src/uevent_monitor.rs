@@ -1,6 +1,6 @@
 //! uevent_monitor
 //!
-use crate::JobQueue;
+use crate::job_queue::JobQueue;
 use libdevice::*;
 use libevent::*;
 use nix::errno::Errno;

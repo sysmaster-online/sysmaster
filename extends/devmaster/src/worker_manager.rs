@@ -1,8 +1,7 @@
 //! worker manager
 //!
 use crate::error::Error;
-use crate::job_queue::{DeviceJob, JobState};
-use crate::JobQueue;
+use crate::job_queue::{DeviceJob, JobQueue, JobState};
 use libdevice::{Device, DeviceMonitor, MonitorNetlinkGroup};
 use libevent::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
@@ -30,37 +29,50 @@ pub(crate) enum WorkerMessage {
 /// worker manager
 #[derive(Debug)]
 pub struct WorkerManager {
-    // events: Rc<libevent::Events>,
+    /// max number of workers
     workers_capacity: u32,
+    /// container of workers
     workers: RefCell<HashMap<u32, Rc<Worker>>>,
+    /// listening socket address
     listen_addr: String,
+    /// listening socket
     listener: RefCell<TcpListener>,
-
+    /// timer source for killing all workers
     kill_idle_workers: RefCell<Option<Rc<WorkerManagerKillWorkers>>>,
-
+    /// reference to job queue
     job_queue: RefCell<Weak<JobQueue>>,
+    /// reference to events
     events: Rc<Events>,
 }
 
 /// worker
 #[derive(Debug)]
 pub struct Worker {
+    /// worker unique id
     id: u32,
+    /// channel transfer
     tx: mpsc::Sender<WorkerMessage>,
+    /// worker state
     state: RefCell<WorkerState>,
+    /// thread handler
     handler: RefCell<Option<JoinHandle<()>>>,
-
+    /// can only bind to unique device job in job queue
     device_job: RefCell<Option<Weak<DeviceJob>>>,
 }
 
 /// state of worker
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) enum WorkerState {
+    /// undefined, immediately transfer to idle
     Undef,
+    /// idle, wait for a job
     Idle,
+    /// running, can only process single device at the same time
     Running,
-    Killing, // no longer dispatch device job to this worker, waiting for its ack
-    _Killed, // this worker is dead, waiting to recycle it from worker manager
+    /// wait for killing, worker manager will no longer dispatch device job to this worker, waiting for its ack
+    Killing,
+    /// this worker is already killed, waiting to recycle it from worker manager
+    _Killed,
 }
 
 impl Display for WorkerState {
@@ -78,6 +90,7 @@ impl Display for WorkerState {
 }
 
 impl Worker {
+    /// create a new worker, start running the worker thread
     fn new(id: u32, state: WorkerState, tcp_address: String) -> Worker {
         let (tx, rx) = mpsc::channel::<WorkerMessage>();
 
@@ -90,14 +103,14 @@ impl Worker {
             let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
 
             match msg {
-                WorkerMessage::Job(device) => {
+                WorkerMessage::Job(mut device) => {
                     log::info!("Worker {id}: received device {}", device.devpath);
 
                     Self::worker_process_device(id, device.as_ref());
 
                     log::info!("Worker {id}: finished job");
 
-                    broadcaster.send_device(device.as_ref(), None);
+                    broadcaster.send_device(device.as_mut(), None).unwrap();
 
                     let mut tcp_stream =
                         TcpStream::connect(tcp_address.as_str()).unwrap_or_else(|error| {
@@ -185,7 +198,7 @@ impl Worker {
 }
 
 impl WorkerManager {
-    ///
+    /// create a worker manager
     pub fn new(workers_capacity: u32, listen_addr: String, events: Rc<Events>) -> WorkerManager {
         let listener = RefCell::new(TcpListener::bind(listen_addr.as_str()).unwrap_or_else(
             |error| {

@@ -6,6 +6,7 @@ pub mod logger;
 pub mod macros;
 pub mod path_lookup;
 
+pub mod devnum_util;
 pub mod env_cargo;
 pub mod fd_util;
 pub mod file_util;

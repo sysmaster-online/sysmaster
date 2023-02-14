@@ -1,7 +1,10 @@
 //! devctrl is the client of devmaster
 //!
 use clap::Parser;
-use libdevmaster::*;
+use libdevmaster::{
+    control_manager::CONTROL_MANAGER_LISTEN_ADDR, devctl_monitor::subcommand_monitor,
+    devctl_trigger::subcommand_trigger,
+};
 use libutils::logger::init_log_with_console;
 use log::LevelFilter;
 use std::{io::Write, net::TcpStream};
@@ -33,6 +36,18 @@ enum SubCmd {
         #[clap(required = true)]
         devname: String,
     },
+
+    /// Trigger a fake device action, then the kernel will report an uevent
+    #[clap(display_order = 4)]
+    Trigger {
+        /// the kind of device action to trigger
+        #[clap(short, long)]
+        action: Option<String>,
+
+        /// the devices to be triggered
+        #[clap(required = false)]
+        devices: Vec<String>,
+    },
 }
 
 /// subcommand for testing communication
@@ -56,5 +71,6 @@ fn main() {
         SubCmd::Monitor {} => subcommand_monitor(),
         SubCmd::Kill {} => subcommand_kill(),
         SubCmd::Test { devname } => subcommand_test(devname),
+        SubCmd::Trigger { action, devices } => subcommand_trigger(devices, action),
     }
 }
