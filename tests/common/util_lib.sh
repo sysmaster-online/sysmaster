@@ -1,5 +1,6 @@
 #!/bin/bash
 
+EXPECT_FAIL=0
 SYSMST_LIB_PATH='/usr/lib/sysmaster'
 SYSMST_LOG='/opt/sysmaster.log'
 
@@ -26,12 +27,21 @@ function get_file_line() {
     echo "$(basename "${BASH_SOURCE[2]}")": ${BASH_LINENO[1]}
 }
 
+function add_failure() {
+    local msg=${1:-}
+
+    ((++EXPECT_FAIL))
+    log_error "add_failure(msg=${msg}) - $(get_file_line)"
+    return 1
+}
+
 function expect_eq() {
     local actual=${1:-1}
     local expect=${2:-0}
     local msg=${3:-}
 
     [ "${actual}" -eq "${expect}" ] && return 0
+    ((++EXPECT_FAIL))
     log_error "expect_eq(${actual}, ${expect}, msg=${msg}) - $(get_file_line)"
     return 1
 }
@@ -42,6 +52,7 @@ function expect_ne() {
     local msg=${3:-}
 
     [ "${actual}" -ne "${expect}" ] && return 0
+    ((++EXPECT_FAIL))
     log_error "expect_ne(${actual}, ${expect}, msg=${msg}) - $(get_file_line)"
     return 1
 }
@@ -52,6 +63,7 @@ function expect_gt() {
     local msg=${3:-}
 
     [ "${actual}" -gt "${expect}" ] && return 0
+    ((++EXPECT_FAIL))
     log_error "expect_gt(${actual}, ${expect}, msg=${msg}) - $(get_file_line)"
     return 1
 }
@@ -62,6 +74,7 @@ function expect_ge() {
     local msg=${3:-}
 
     [ "${actual}" -ge "${expect}" ] && return 0
+    ((++EXPECT_FAIL))
     log_error "expect_ge(${actual}, ${expect}, msg=${msg}) - $(get_file_line)"
     return 1
 }
@@ -72,6 +85,7 @@ function expect_lt() {
     local msg=${3:-}
 
     [ "${actual}" -lt "${expect}" ] && return 0
+    ((++EXPECT_FAIL))
     log_error "expect_lt(${actual}, ${expect}, msg=${msg}) - $(get_file_line)"
     return 1
 }
@@ -82,6 +96,7 @@ function expect_le() {
     local msg=${3:-}
 
     [ "${actual}" -le "${expect}" ] && return 0
+    ((++EXPECT_FAIL))
     log_error "expect_le(${actual}, ${expect}, msg=${msg}) - $(get_file_line)"
     return 1
 }
@@ -92,6 +107,7 @@ function expect_str_eq() {
     local msg=$3
 
     [ "${actual}" = "${expect}" ] && return 0
+    ((++EXPECT_FAIL))
     log_error "expect_str_eq(${actual}, ${expect}, msg=${msg}) - $(get_file_line)"
     return 1
 }
@@ -140,6 +156,8 @@ function check_status() {
         sctl status "${service}"
         sctl status "${service}" | grep -w 'Active:' | head -n1 | awk '{print $2}' | grep -qw "${exp_status}" && return 0 || sleep 1
     done
+    add_failure
+    # debug
     sctl status "${service}"
     return 1
 }

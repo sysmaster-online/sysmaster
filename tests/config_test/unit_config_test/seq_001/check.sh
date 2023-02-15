@@ -13,26 +13,17 @@ function test01() {
 
     sctl start fork.service after.service before.service &
     sleep 1
-    check_status before.service activating
-    expect_eq $? 0 || return 1
-    check_status fork.service inactive
-    expect_eq $? 0 || return 1
-    check_status after.service inactive
-    expect_eq $? 0 || return 1
+    check_status before.service activating || return 1
+    check_status fork.service inactive || return 1
+    check_status after.service inactive || return 1
     sleep 5
-    check_status before.service inactive
-    expect_eq $? 0 || return 1
-    check_status fork.service activating
-    expect_eq $? 0 || return 1
-    check_status after.service inactive
-    expect_eq $? 0 || return 1
+    check_status before.service inactive || return 1
+    check_status fork.service activating || return 1
+    check_status after.service inactive || return 1
     sleep 5
-    check_status before.service inactive
-    expect_eq $? 0 || return 1
-    check_status fork.service inactive
-    expect_eq $? 0 || return 1
-    check_status after.service activating
-    expect_eq $? 0 || return 1
+    check_status before.service inactive || return 1
+    check_status fork.service inactive || return 1
+    check_status after.service activating || return 1
 
     # clean
     sctl stop before.service fork.service after.service
@@ -48,8 +39,7 @@ function test02() {
     # self-loop
     sctl start after.service
     expect_eq $? 0 || return 1
-    check_status after.service activating
-    expect_eq $? 0 || return 1
+    check_status after.service activating || return 1
 
     # clean
     sctl stop after.service
@@ -71,3 +61,4 @@ function test02() {
 cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH}
 test01 || exit 1
 test02 || exit 1
+exit "${EXPECT_FAIL}"

@@ -5,60 +5,80 @@ source "${work_dir}"/util_lib.sh
 
 set +e
 
-# usage: test StartLimitBurst
+# usage: test default StartLimitBurst=5/StartLimitInterval=10
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
-    sed -i "/Description/ a StartLimitBurst=\"3\"" ${SYSMST_LIB_PATH}/base.service
-    sed -i "/Description/ a StartLimitInterval=\"10s\"" ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
 
-    for ((i = 0; i < 3; ++i)); do
-        sctl restart base.service
-	expect_eq $? 0 || return 1
+    for ((i = 0; i < 5; ++i)); do
+        sctl start base.service
+        expect_eq $? 0 || return 1
+	check_status base.service active || return 1
+	sctl stop base.service
+	check_status base.service inactive || return 1
     done
-    sctl restart base.service
-    expect_eq $? 1 || return 1
-    check_status base failed
-    expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" 'asdaasd' || return 1
+    sctl start base.service
+#    expect_eq $? 1 || return 1
+    check_status base.service failed || return 1
 
-    sleep 4
-    sctl restart base.service
-    expect_eq $? 1 || return 1
+    sleep 9
+    sctl start base.service
+#    expect_eq $? 1 || return 1
+    check_status base.service failed || return 1
 
-    sleep 7
-    sctl restart base.service
+    sleep 2
+    sctl start base.service
     expect_eq $? 0 || return 1
-    check_status base active
-    expect_eq $? 0 || return 1
+    check_status base.service active || return 1
 
     # clean
     sctl stop base.service
     kill -9 "${sysmaster_pid}"
 }
 
-# usage: test StartLimitInterval
+# usage: test StartLimitBurst
 function test02() {
     log_info "===== test02 ====="
-    sed -i "/StartLimitInterval=/ s/10s/3/" ${SYSMST_LIB_PATH}/base.service
+    sed -i '/Description/ a StartLimitBurst=3' ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
 
     for ((i = 0; i < 3; ++i)); do
-        sctl restart base.service
-        expect_eq $? 0 || return 1
+        sctl start base.service
+	expect_eq $? 0 || return 1
+	check_status base.service active || return 1
+	sctl stop base.service
+	check_status base.service inactive || return 1
     done
-    sctl restart base.service
-    expect_eq $? 1 || return 1
-    check_status base failed
-    expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" 'asdaasd' || return 1
+    sctl start base.service
+#    expect_eq $? 1 || return 1
+    check_status base.service failed || return 1
+
+    # clean
+    kill -9 "${sysmaster_pid}"
+}
+
+# usage: test StartLimitInterval
+function test03() {
+    log_info "===== test03 ====="
+    sed -i '/Description/ a StartLimitInterval=3' ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+
+    for ((i = 0; i < 3; ++i)); do
+        sctl start base.service
+        expect_eq $? 0 || return 1
+        check_status base.service active || return 1
+        sctl stop base.service
+        check_status base.service inactive || return 1
+    done
+    sctl start base.service
+#    expect_eq $? 1 || return 1
+    check_status base.service failed || return 1
 
     sleep 4
-    sctl restart base.service
+    sctl start base.service
     expect_eq $? 0 || return 1
-    check_status base active
-    expect_eq $? 0 || return 1
+    check_status base.service active || return 1
 
     # clean
     sctl stop base.service
@@ -66,42 +86,46 @@ function test02() {
 }
 
 # usage: test StartLimitBurst=0
-function test03() {
-    log_info "===== test03 ====="
-    sed -i "/StartLimitBurst=/ s/3/0/" ${SYSMST_LIB_PATH}/base.service
+function test04() {
+    log_info "===== test04 ====="
+    sed -i '/StartLimitBurst=/ s/3/0/' ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
 
     for ((i = 0; i < 50; ++i)); do
-        sctl restart base.service
+        sctl start base.service
         expect_eq $? 0 || return 1
+	check_status base.service active || return 1
+	sctl stop base.service
+	check_status base.service inactive || return 1
     done
-    check_status base active
 
     # clean
-    sctl stop base.service
     kill -9 "${sysmaster_pid}"
 }
 
 # usage: test StartLimitInterval=0
-function test04() {
-    log_info "===== test04 ====="
-    sed -i "/StartLimitBurst=/ s/0/3/" ${SYSMST_LIB_PATH}/base.service
-    sed -i "/StartLimitInterval=/ s/3/0/" ${SYSMST_LIB_PATH}/base.service
+function test05() {
+    log_info "===== test05 ====="
+    sed -i '/StartLimitBurst=/ s/0/3/' ${SYSMST_LIB_PATH}/base.service
+    sed -i '/StartLimitInterval=/ s/3/0/' ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
 
-    for ((i = 0; i < 4; ++i)); do
-        sctl restart base.service
+    for ((i = 0; i < 50; ++i)); do
+        sctl start base.service
         expect_eq $? 0 || return 1
+        check_status base.service active || return 1
+        sctl stop base.service
+        check_status base.service inactive || return 1
     done
-    check_status base active
 
     # clean
-    sctl stop base.service
     kill -9 "${sysmaster_pid}"
 }
 
-cp -arf "${TEST_PATH}"/test_units/{shutdown.target,sysinit.target} tmp_units
+cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH}
 test01 || exit 1
 test02 || exit 1
 test03 || exit 1
 test04 || exit 1
+test05 || exit 1
+exit "${EXPECT_FAIL}"

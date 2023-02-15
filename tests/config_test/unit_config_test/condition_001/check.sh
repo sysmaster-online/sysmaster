@@ -19,8 +19,7 @@ function test01() {
 
     # path not exist
     sctl start base.service
-    check_status base.service inactive
-    expect_eq $? 0 || return 1
+    check_status base.service inactive || return 1
     grep 'asdasda' "${SYSMST_LOG}"
     expect_eq $? "${condition_test}" || return 1
 
@@ -28,16 +27,14 @@ function test01() {
     touch /tmp/path_exist
     sctl stop base.service
     sctl start base.service
-    check_status base.service active
-    expect_eq $? 0 || return 1
+    check_status base.service active || return 1
 
     # dir path
     sctl stop base.service
     rm -rf /tmp/path_exist
     mkdir /tmp/path_exist
     sctl start base.service
-    check_status base.service active
-    expect_eq $? 0 || return 1
+    check_status base.service active || return 1
 
     # clean
     sctl stop base.service
@@ -47,3 +44,4 @@ function test01() {
 
 cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH}
 test01 || exit 1
+exit "${EXPECT_FAIL}"
