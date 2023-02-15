@@ -195,6 +195,7 @@ pub(super) struct SectionService {
     #[config(default = "no")]
     pub Restart: ServiceRestart,
     #[config(deserialize_with = ExitStatusSet::deserialize_with)]
+    #[config(default = "")]
     pub RestartPreventExitStatus: ExitStatusSet,
     #[config(default = 0)]
     pub RestartSec: u64,
