@@ -1,0 +1,1 @@
+../../reliable_test/random_kill_001/check.sh
