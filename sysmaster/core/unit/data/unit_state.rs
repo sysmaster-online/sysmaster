@@ -1,14 +1,14 @@
 use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
 #[derive(Debug)]
-pub(in crate::core) struct UnitState {
-    pub(in crate::core) os: UnitActiveState,
-    pub(in crate::core) ns: UnitActiveState,
-    pub(in crate::core) flags: UnitNotifyFlags,
+pub(crate) struct UnitState {
+    pub(crate) os: UnitActiveState,
+    pub(crate) ns: UnitActiveState,
+    pub(crate) flags: UnitNotifyFlags,
 }
 
 impl UnitState {
-    pub(in crate::core) fn new(
+    pub(crate) fn new(
         os: UnitActiveState,
         ns: UnitActiveState,
         flags: UnitNotifyFlags,

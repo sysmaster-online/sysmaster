@@ -38,17 +38,17 @@ impl TryFrom<u32> for ReliLastQue {
 #[allow(dead_code)]
 const RELI_DB_HMNG: &str = "manager";
 /* job */
-pub(in crate::core) const RELI_DB_HJOB_TRIGGER: &str = "jtrigger";
-pub(in crate::core) const RELI_DB_HJOB_SUSPENDS: &str = "jsuspends";
+pub(crate) const RELI_DB_HJOB_TRIGGER: &str = "jtrigger";
+pub(crate) const RELI_DB_HJOB_SUSPENDS: &str = "jsuspends";
 /* unit */
-pub(in crate::core) const RELI_DB_HUNIT_BASE: &str = "ubase";
-pub(in crate::core) const RELI_DB_HUNIT_LOAD: &str = "uload";
-pub(in crate::core) const RELI_DB_HUNIT_CONFIG: &str = "uconfig";
-pub(in crate::core) const RELI_DB_HUNIT_CGROUP: &str = "ucgroup";
-pub(in crate::core) const RELI_DB_HUNIT_CHILD: &str = "uchild";
-pub(in crate::core) const RELI_DB_HUNIT_PPS: &str = "upps";
-pub(in crate::core) const RELI_DB_HUNIT_DEP: &str = "udep";
-pub(in crate::core) const RELI_DB_HUM_NOTIFY: &str = "um-notify";
+pub(crate) const RELI_DB_HUNIT_BASE: &str = "ubase";
+pub(crate) const RELI_DB_HUNIT_LOAD: &str = "uload";
+pub(crate) const RELI_DB_HUNIT_CONFIG: &str = "uconfig";
+pub(crate) const RELI_DB_HUNIT_CGROUP: &str = "ucgroup";
+pub(crate) const RELI_DB_HUNIT_CHILD: &str = "uchild";
+pub(crate) const RELI_DB_HUNIT_PPS: &str = "upps";
+pub(crate) const RELI_DB_HUNIT_DEP: &str = "udep";
+pub(crate) const RELI_DB_HUM_NOTIFY: &str = "um-notify";
 /* service */
 #[allow(dead_code)]
 const RELI_DB_HSERVICE_CONF: &str = "svcconf";

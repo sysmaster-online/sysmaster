@@ -4,7 +4,7 @@ use std::fmt;
 use std::hash::Hash;
 use std::rc::Rc;
 
-pub(super) struct ReliStation {
+pub struct ReliStation {
     t_name: RefCell<HashMap<String, Rc<dyn ReStation>>>, // key: name, value: station
     #[allow(clippy::type_complexity)]
     t_kind: RefCell<HashMap<ReStationKind, HashMap<String, Rc<dyn ReStation>>>>, // key: kind, value: stations
@@ -19,19 +19,14 @@ impl fmt::Debug for ReliStation {
 }
 
 impl ReliStation {
-    pub(super) fn new() -> ReliStation {
+    pub fn new() -> ReliStation {
         ReliStation {
             t_name: RefCell::new(HashMap::new()),
             t_kind: RefCell::new(HashMap::new()),
         }
     }
 
-    pub(super) fn station_register(
-        &self,
-        name: &str,
-        kind: ReStationKind,
-        station: Rc<dyn ReStation>,
-    ) {
+    pub fn station_register(&self, name: &str, kind: ReStationKind, station: Rc<dyn ReStation>) {
         let sta = Rc::clone(&station);
         if self
             .t_name
@@ -46,13 +41,13 @@ impl ReliStation {
         }
     }
 
-    pub(super) fn input_rebuild(&self) {
+    pub fn input_rebuild(&self) {
         for (_, station) in self.t_name.borrow().iter() {
             station.input_rebuild();
         }
     }
 
-    pub(super) fn db_compensate(
+    pub fn db_compensate(
         &self,
         lframe: Option<(u32, Option<u32>, Option<u32>)>,
         lunit: Option<String>,
@@ -71,7 +66,7 @@ impl ReliStation {
         }
     }
 
-    pub(super) fn db_map(&self) {
+    pub fn db_map(&self) {
         // level 1
         for station in self.get_kind(ReStationKind::Level1).iter() {
             station.db_map();
@@ -83,7 +78,7 @@ impl ReliStation {
         }
     }
 
-    pub(super) fn make_consistent(
+    pub fn make_consistent(
         &self,
         lframe: Option<(u32, Option<u32>, Option<u32>)>,
         lunit: Option<String>,
@@ -103,7 +98,7 @@ impl ReliStation {
         }
     }
 
-    pub(super) fn clear(&self) {
+    pub fn clear(&self) {
         self.t_name.borrow_mut().clear();
         self.t_kind.borrow_mut().clear();
     }

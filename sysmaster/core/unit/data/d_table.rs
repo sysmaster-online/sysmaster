@@ -1,7 +1,7 @@
 use super::unit_dep_conf::UnitDepConf;
 use super::unit_state::UnitState;
-use crate::core::butil::table::{Table, TableSubscribe};
-use crate::core::unit::unit_entry::StartLimitResult;
+use crate::unit::unit_entry::StartLimitResult;
+use crate::utils::table::{Table, TableSubscribe};
 use std::cell::RefCell;
 use std::rc::Rc;
 use sysmaster::rel::ReStation;
@@ -45,7 +45,7 @@ impl DataManager {
         }
     }
 
-    pub(in crate::core) fn insert_ud_config(
+    pub(crate) fn insert_ud_config(
         &self,
         u_name: String,
         ud_config: UnitDepConf,
@@ -56,7 +56,7 @@ impl DataManager {
         }
     }
 
-    pub(in crate::core) fn register_ud_config(
+    pub(crate) fn register_ud_config(
         &self,
         name: &str,
         subscriber: Rc<dyn TableSubscribe<String, UnitDepConf>>,
@@ -65,7 +65,7 @@ impl DataManager {
         table.subscribe(name.to_string(), subscriber)
     }
 
-    pub(in crate::core) fn insert_unit_state(
+    pub(crate) fn insert_unit_state(
         &self,
         u_name: String,
         u_state: UnitState,
@@ -74,7 +74,7 @@ impl DataManager {
         table.insert(u_name, u_state)
     }
 
-    pub(in crate::core) fn register_unit_state(
+    pub(crate) fn register_unit_state(
         &self,
         name: &str,
         subscriber: Rc<dyn TableSubscribe<String, UnitState>>,
@@ -83,7 +83,7 @@ impl DataManager {
         table.subscribe(name.to_string(), subscriber)
     }
 
-    pub(in crate::core) fn insert_start_limit_result(
+    pub(crate) fn insert_start_limit_result(
         &self,
         u_name: String,
         start_limit_res: StartLimitResult,
@@ -92,7 +92,7 @@ impl DataManager {
         table.insert(u_name, start_limit_res)
     }
 
-    pub(in crate::core) fn register_start_limit_result(
+    pub(crate) fn register_start_limit_result(
         &self,
         name: &str,
         subscriber: Rc<dyn TableSubscribe<String, StartLimitResult>>,
@@ -102,7 +102,7 @@ impl DataManager {
     }
 
     // repeating protection
-    pub(in crate::core) fn clear(&self) {
+    pub(crate) fn clear(&self) {
         self.tables.0.borrow_mut().clear();
         self.tables.1.borrow_mut().clear();
     }
@@ -111,8 +111,8 @@ impl DataManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::butil::table::TableOp;
-    use crate::core::unit::UnitRelations;
+    use crate::unit::UnitRelations;
+    use crate::utils::table::TableOp;
     use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
     #[test]

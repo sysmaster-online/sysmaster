@@ -1,8 +1,8 @@
 use super::uu_base::UeBase;
 use super::uu_config::UeConfig;
-use crate::core::unit::data::{DataManager, UnitDepConf};
-use crate::core::unit::uload_util::UnitFile;
-use crate::core::unit::unit_rentry::{UnitLoadState, UnitRePps};
+use crate::unit::data::{DataManager, UnitDepConf};
+use crate::unit::uload_util::UnitFile;
+use crate::unit::unit_rentry::{UnitLoadState, UnitRePps};
 use std::cell::RefCell;
 use std::error::Error as stdError;
 use std::path::PathBuf;

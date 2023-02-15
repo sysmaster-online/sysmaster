@@ -1,8 +1,8 @@
 #[cfg(test)]
-pub(in crate::core) mod test_utils {
+pub(crate) mod test_utils {
     use std::rc::Rc;
 
-    use crate::core::{
+    use crate::{
         plugin::Plugin,
         unit::{data::DataManager, unit_name_to_type},
         unit::{uload_util::UnitFile, unit_entry::UnitX, unit_rentry::UnitRe},
@@ -10,10 +10,10 @@ pub(in crate::core) mod test_utils {
     use libutils::path_lookup::LookupPaths;
     use sysmaster::rel::Reliability;
     use sysmaster::unit::UmIf;
-    pub(in crate::core) struct UmIfD;
+    pub(crate) struct UmIfD;
     impl UmIf for UmIfD {}
 
-    pub(in crate::core) fn create_unit_for_test_pub(
+    pub(crate) fn create_unit_for_test_pub(
         dmr: &Rc<DataManager>,
         relir: &Rc<Reliability>,
         rentryr: &Rc<UnitRe>,

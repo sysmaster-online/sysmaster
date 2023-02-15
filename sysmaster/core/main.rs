@@ -1,12 +1,27 @@
-//!
+//! sysmaster-core bin
+mod error;
+mod job;
+mod manager;
+mod plugin;
+mod unit;
+///
+
+/// dependency:
+///    [manager]
+///       ↑
+///[reliability] → [unit   job  plugin]
+///            ↖  ↗
+///            [butil]
+///
+mod utils;
+
+// mount not to be here;
+mod mount;
 
 #[macro_use]
 extern crate lazy_static;
-
-mod core;
-
-use crate::core::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
-use crate::core::mount::mount_setup;
+use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
+use crate::mount::mount_setup;
 use libc::{c_int, prctl, PR_SET_CHILD_SUBREAPER};
 use libutils::logger::{self};
 use log::{self};

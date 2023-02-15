@@ -1,7 +1,7 @@
 use super::unit_datastore::UnitDb;
 use super::unit_entry::UnitX;
 use super::unit_rentry::UnitRe;
-use crate::core::job::JobManager;
+use crate::job::JobManager;
 use libevent::{EventState, EventType, Events, Source};
 use libutils::fd_util;
 use libutils::Error;

@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 use confique::Config;
-use libutils::serialize::DeserializeWith;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
@@ -11,6 +10,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 use sysmaster::exec::ExecCommand;
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
+use sysmaster::serialize::DeserializeWith;
 use sysmaster::unit::KillMode;
 
 struct ServiceReDb<K, V>(ReDb<K, V>);

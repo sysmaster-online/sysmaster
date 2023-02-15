@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::rc::Rc;
 
-pub(in crate::core) enum TableOp<'a, K, V> {
+pub enum TableOp<'a, K, V> {
     TableInsert(&'a K, &'a V),
     TableRemove(&'a K, &'a V),
 }
 
-pub(in crate::core) trait TableSubscribe<K, V> {
+pub trait TableSubscribe<K, V> {
     fn filter(&self, _op: &TableOp<K, V>) -> bool {
         // default: everything is allowed
         true
@@ -17,7 +17,7 @@ pub(in crate::core) trait TableSubscribe<K, V> {
 }
 
 //#[derive(Debug)]
-pub(in crate::core) struct Table<K, V> {
+pub struct Table<K, V> {
     data: HashMap<K, V>,                                        // key + value
     subscribers: HashMap<String, Rc<dyn TableSubscribe<K, V>>>, // key: name, value: subscriber
 }
@@ -26,25 +26,25 @@ impl<K, V> Table<K, V>
 where
     K: Eq + Hash + Clone,
 {
-    pub(in crate::core) fn new() -> Table<K, V> {
+    pub fn new() -> Table<K, V> {
         Table {
             data: HashMap::new(),
             subscribers: HashMap::new(),
         }
     }
 
-    pub(in crate::core) fn data_clear(&mut self) {
+    pub fn data_clear(&mut self) {
         // clear all data without notifying subscribers
         self.data.clear();
     }
 
-    pub(in crate::core) fn clear(&mut self) {
+    pub fn clear(&mut self) {
         // clear all, including data and subscribers
         self.subscribers.clear();
         self.data.clear();
     }
 
-    pub(in crate::core) fn insert(&mut self, k: K, v: V) -> Option<V> {
+    pub fn insert(&mut self, k: K, v: V) -> Option<V> {
         let key = k.clone();
         let ret = self.data.insert(k, v);
         let value = self
@@ -57,7 +57,7 @@ where
     }
 
     #[allow(dead_code)]
-    pub(in crate::core) fn remove(&mut self, k: &K) -> Option<V> {
+    pub fn remove(&mut self, k: &K) -> Option<V> {
         let ret = self.data.remove(k);
         if let Some(v) = &ret {
             let op = TableOp::TableRemove(k, v);
@@ -66,15 +66,15 @@ where
         ret
     }
 
-    pub(in crate::core) fn get(&self, k: &K) -> Option<&V> {
+    pub fn get(&self, k: &K) -> Option<&V> {
         self.data.get(k)
     }
 
-    pub(in crate::core) fn get_all(&self) -> Vec<&V> {
+    pub fn get_all(&self) -> Vec<&V> {
         self.data.values().collect::<Vec<_>>()
     }
 
-    pub(in crate::core) fn subscribe(
+    pub fn subscribe(
         &mut self,
         name: String,
         subscriber: Rc<dyn TableSubscribe<K, V>>,
@@ -83,10 +83,7 @@ where
     }
 
     #[allow(dead_code)]
-    pub(in crate::core) fn unsubscribe(
-        &mut self,
-        name: &str,
-    ) -> Option<Rc<dyn TableSubscribe<K, V>>> {
+    pub fn unsubscribe(&mut self, name: &str) -> Option<Rc<dyn TableSubscribe<K, V>>> {
         self.subscribers.remove(name)
     }
 

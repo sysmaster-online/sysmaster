@@ -1,4 +1,4 @@
-pub(in crate::core) use d_table::DataManager;
+pub(crate) use d_table::DataManager;
 pub(super) use unit_dep_conf::UnitDepConf;
 pub(super) use unit_state::UnitState;
 

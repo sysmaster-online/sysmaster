@@ -1,10 +1,9 @@
 //! reliability module
-use std::convert::TryFrom;
-
 pub use api::{reli_debug_enable_switch, reli_debug_get_switch, Reliability};
 pub use base::{reli_dir_prepare, ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable};
 use serde::{Deserialize, Serialize};
 pub use station::{ReStation, ReStationKind};
+use std::convert::TryFrom;
 
 // dependency: base -> {enable | last | history | pending | station} -> api
 mod api;

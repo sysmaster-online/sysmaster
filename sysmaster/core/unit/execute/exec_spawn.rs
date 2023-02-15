@@ -15,14 +15,14 @@ use sysmaster::exec::{ExecCommand, ExecContext, ExecParameters};
 use walkdir::DirEntry;
 use walkdir::WalkDir;
 
-pub(in crate::core::unit) struct ExecSpawn;
+pub(in crate::unit) struct ExecSpawn;
 
 impl ExecSpawn {
-    pub(in crate::core::unit) fn new() -> ExecSpawn {
+    pub(in crate::unit) fn new() -> ExecSpawn {
         ExecSpawn
     }
 
-    pub(in crate::core::unit) fn spawn(
+    pub(in crate::unit) fn spawn(
         &self,
         unit: &Unit,
         cmdline: &ExecCommand,
