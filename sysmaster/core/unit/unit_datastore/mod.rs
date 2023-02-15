@@ -2,7 +2,7 @@ use super::unit_entry::UnitX;
 use super::unit_rentry::UnitRe;
 use super::UnitErrno;
 use super::{UnitRelationAtom, UnitRelations, UnitType};
-use crate::core::butil::table;
+use crate::utils::table;
 use libutils::Result;
 use nix::unistd::Pid;
 use nix::NixPath;
@@ -14,7 +14,7 @@ use unit_dep::UnitDep;
 use unit_sets::UnitSets;
 
 //#[derive(Debug)]
-pub(in crate::core) struct UnitDb {
+pub(crate) struct UnitDb {
     units: Rc<UnitSets>,
     dep: UnitDep,
     child: UnitChild,

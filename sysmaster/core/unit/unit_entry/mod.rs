@@ -27,9 +27,9 @@
 //!  uu_config is the configuration of unit
 //!
 pub use u_entry::Unit;
-pub(in crate::core) use uf_interface::UnitX;
-pub(in crate::core) use uu_config::UnitEmergencyAction;
-pub(in crate::core) use uu_ratelimit::StartLimitResult;
+pub(crate) use uf_interface::UnitX;
+pub(crate) use uu_config::UnitEmergencyAction;
+pub(crate) use uu_ratelimit::StartLimitResult;
 // pub(super) use uu_config::UnitConfigItem;
 
 // dependency:

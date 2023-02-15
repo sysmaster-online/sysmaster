@@ -1,4 +1,4 @@
-use libutils::serialize::DeserializeWith;
+use crate::serialize::DeserializeWith;
 use nix::sys::signal::Signal;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::RefCell;

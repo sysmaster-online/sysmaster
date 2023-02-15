@@ -1,6 +1,6 @@
 use super::super::unit_entry::UnitX;
 use super::ReStation;
-use crate::core::butil::table::{Table, TableSubscribe};
+use crate::utils::table::{Table, TableSubscribe};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -72,10 +72,10 @@ impl UnitSets {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::data::DataManager;
-    use crate::core::unit::test::test_utils;
-    use crate::core::unit::unit_rentry::UnitRe;
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::unit::data::DataManager;
+    use crate::unit::test::test_utils;
+    use crate::unit::unit_rentry::UnitRe;
     use libutils::logger;
     use sysmaster::rel::Reliability;
 

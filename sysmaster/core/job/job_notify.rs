@@ -1,9 +1,9 @@
 use super::job_entry::JobConf;
 use super::job_rentry::JobKind;
-use crate::core::unit::JobMode;
-use crate::core::unit::UnitDb;
-use crate::core::unit::UnitRelationAtom;
-use crate::core::unit::UnitX;
+use crate::unit::JobMode;
+use crate::unit::UnitDb;
+use crate::unit::UnitRelationAtom;
+use crate::unit::UnitX;
 use std::rc::Rc;
 
 pub(super) fn job_notify_result(
@@ -126,13 +126,13 @@ fn notify_event_reload(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::test_utils;
-    use crate::core::unit::DataManager;
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::unit::test_utils;
+    use crate::unit::DataManager;
 
-    use crate::core::unit::UnitDb;
-    use crate::core::unit::UnitRe;
-    use crate::core::unit::UnitX;
+    use crate::unit::UnitDb;
+    use crate::unit::UnitRe;
+    use crate::unit::UnitX;
 
     use libutils::logger;
     use sysmaster::rel::Reliability;

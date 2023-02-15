@@ -5,7 +5,7 @@ use snafu::prelude::*;
 /// Error for exec command
 #[allow(missing_docs)]
 #[derive(Debug, Snafu)]
-#[snafu(visibility(pub(crate)))]
+#[snafu(visibility(pub))]
 #[non_exhaustive]
 pub enum ExecCmdError {
     #[snafu(display("Timeout(ExecCmdError)"))]
@@ -21,7 +21,7 @@ pub enum ExecCmdError {
 /// UnitAction Error
 #[allow(missing_docs)]
 #[derive(Debug, Snafu)]
-#[snafu(visibility(pub(crate)))]
+#[snafu(visibility(pub))]
 #[non_exhaustive]
 pub enum UnitActionError {
     #[snafu(display("EAgain(UnitActionError)"))]
@@ -57,7 +57,7 @@ pub enum UnitActionError {
 /// error number of manager
 #[allow(missing_docs)]
 #[derive(Debug, Snafu)]
-#[snafu(visibility(pub(crate)))]
+#[snafu(visibility(pub))]
 #[non_exhaustive]
 pub enum MngErrno {
     #[snafu(display("Input(ManagerError)"))]

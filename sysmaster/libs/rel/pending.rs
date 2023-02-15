@@ -1,6 +1,6 @@
+use crate::utils::fd as fd_util;
 use heed::types::{OwnedType, SerdeBincode};
 use heed::{Database, Env, EnvOpenOptions};
-use libutils::fd_util;
 use nix::errno::Errno;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -22,7 +22,7 @@ enum ReliPState {
     Removed,
 }
 
-pub(super) struct ReliPending {
+pub struct ReliPending {
     // data
     /* environment */
     env: Env,
@@ -41,7 +41,7 @@ impl fmt::Debug for ReliPending {
 }
 
 impl ReliPending {
-    pub(super) fn new(dir_str: &str) -> ReliPending {
+    pub fn new(dir_str: &str) -> ReliPending {
         // init environment
         let path = Path::new(dir_str).join(RELI_PENDING_DIR);
         let env = EnvOpenOptions::new()
@@ -56,13 +56,13 @@ impl ReliPending {
         ReliPending { env, fd }
     }
 
-    pub(super) fn data_clear(&self) {
+    pub fn data_clear(&self) {
         let mut wtxn = self.env.write_txn().expect("pending.write_txn");
         self.fd.clear(&mut wtxn).expect("clear.put");
         wtxn.commit().expect("pending.commit");
     }
 
-    pub(super) fn make_consistent(&self) {
+    pub fn make_consistent(&self) {
         // release
         let rtxn = self.env.read_txn().expect("pending.read_txn");
         /* fd */
@@ -76,14 +76,14 @@ impl ReliPending {
         self.data_clear();
     }
 
-    pub(super) fn fd_cloexec(&self, fd: i32, cloexec: bool) -> Result<(), Errno> {
+    pub fn fd_cloexec(&self, fd: i32, cloexec: bool) -> Result<(), Errno> {
         match cloexec {
             true => self.fd_remove(fd),
             false => self.fd_retain(fd),
         }
     }
 
-    pub(super) fn fd_take(&self, fd: i32) -> i32 {
+    pub fn fd_take(&self, fd: i32) -> i32 {
         self.fd_del(fd);
         fd
     }
@@ -167,7 +167,7 @@ impl ReliPending {
     }
 }
 
-pub(super) fn prepare(dir_str: &str) -> Result<(), Error> {
+pub fn prepare(dir_str: &str) -> Result<(), Error> {
     let pending = Path::new(dir_str).join(RELI_PENDING_DIR);
     if !pending.exists() {
         fs::create_dir_all(&pending)?;

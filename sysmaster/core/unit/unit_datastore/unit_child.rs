@@ -129,10 +129,10 @@ impl UnitChildData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::manager::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::data::DataManager;
-    use crate::core::unit::test::test_utils;
-    use crate::core::unit::unit_rentry::UnitRe;
+    use crate::manager::RELI_HISTORY_MAX_DBS;
+    use crate::unit::data::DataManager;
+    use crate::unit::test::test_utils;
+    use crate::unit::unit_rentry::UnitRe;
     use libutils::logger;
     use sysmaster::rel::Reliability;
 

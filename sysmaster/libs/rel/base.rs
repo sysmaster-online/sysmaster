@@ -1,18 +1,16 @@
-use heed::{Env, RoTxn, RwTxn};
-use serde::de::DeserializeOwned;
-use std::env;
-use std::fs;
-use std::io::{Error, ErrorKind};
-use std::path::Path;
-
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-
 use heed::types::SerdeBincode;
 use heed::Database;
+use heed::{Env, RoTxn, RwTxn};
+use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::env;
 use std::fmt::Debug;
+use std::fs;
 use std::hash::Hash;
+use std::io::{Error, ErrorKind};
+use std::path::Path;
 
 use super::Reliability;
 
@@ -195,19 +193,21 @@ where
 }
 
 /// reliability writeable transaction
-pub struct ReDbRwTxn<'e, 'p>(pub(super) RwTxn<'e, 'p>);
+pub struct ReDbRwTxn<'e, 'p>(pub RwTxn<'e, 'p>);
 
 impl<'e, 'p> ReDbRwTxn<'e, 'p> {
-    pub(super) fn new(env: &'e Env) -> heed::Result<ReDbRwTxn> {
+    ///
+    pub fn new(env: &'e Env) -> heed::Result<ReDbRwTxn> {
         env.write_txn().map(ReDbRwTxn)
     }
 }
 
 /// reliability read-only transaction
-pub struct ReDbRoTxn<'e>(pub(super) RoTxn<'e>);
+pub struct ReDbRoTxn<'e>(pub RoTxn<'e>);
 
 impl<'e> ReDbRoTxn<'e> {
-    pub(super) fn new(env: &'e Env) -> heed::Result<ReDbRoTxn> {
+    ///
+    pub fn new(env: &'e Env) -> heed::Result<ReDbRoTxn> {
         env.read_txn().map(ReDbRoTxn)
     }
 }
@@ -226,7 +226,7 @@ pub trait ReDbTable {
 
 const RELI_PATH_DIR: &str = "/run/sysmaster/reliability";
 
-pub(super) fn reli_dir_get() -> Result<String, Error> {
+pub fn reli_dir_get() -> Result<String, Error> {
     // /run/sysmaster/reliability/
     let ret_run = reli_dir_get_run();
     if ret_run.is_ok() {

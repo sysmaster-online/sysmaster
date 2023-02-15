@@ -132,7 +132,7 @@ fn foo() -> Result<(), FooError> {
 
 - **thiserror + anyhow**
 
-***注意事项：\******thiserror\******是给lib使用的，而\******anyhow\******是给bin程序使用，当然bin程序可以使用\******thiser\******+\******anyhow\******，但是切记\******anyhow\******不要在lib里面使用。\***
+*注意事项：thiserror是给lib使用的，而anyhow是给bin程序使用，当然bin程序可以使用thiser+anyhow，但是切记anyhow不要在lib里面使用。*
 
 ```rust
 use thiserror::Error;
@@ -225,7 +225,7 @@ fn unpack_config(data: &str) -> &str {
 
 下面重点阐述如何在项目中应用这些原则.
 
-- 不会定义全局的error lib, 需要lib crate内部单独自行定义相应的Error, 比较通用的Error可以放在libutils crate中.
+- 不会定义全局的error lib, 每个crate定义自己的error.rs, crate内容只能引用这个统一的Error, 在其他rs文件中,引用std::io::Error等其他Error类型.
 
 ```rust
 //! Error define

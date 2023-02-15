@@ -1,7 +1,7 @@
 use super::job_rentry::{self, JobAttr, JobKind, JobRe};
-use crate::core::unit::JobMode;
-use crate::core::unit::UnitRelationAtom;
-use crate::core::unit::UnitX;
+use crate::unit::JobMode;
+use crate::unit::UnitRelationAtom;
+use crate::unit::UnitX;
 use sysmaster::error::UnitActionError;
 use sysmaster::rel::Reliability;
 use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
@@ -12,7 +12,7 @@ use std::rc::Rc;
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(in crate::core) enum JobResult {
+pub(crate) enum JobResult {
     Done,
     Cancelled,
     TimeOut,
@@ -28,7 +28,7 @@ pub(in crate::core) enum JobResult {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(in crate::core) enum JobStage {
+pub(crate) enum JobStage {
     Init,
     Wait,
     Running,
@@ -36,13 +36,13 @@ pub(in crate::core) enum JobStage {
 }
 
 #[derive(Clone)]
-pub(in crate::core) struct JobConf {
+pub(crate) struct JobConf {
     unit: Rc<UnitX>,
     kind: JobKind,
 }
 
 impl JobConf {
-    pub(in crate::core) fn new(unitr: &Rc<UnitX>, kind: JobKind) -> JobConf {
+    pub(crate) fn new(unitr: &Rc<UnitX>, kind: JobKind) -> JobConf {
         JobConf {
             unit: Rc::clone(unitr),
             kind,
@@ -64,13 +64,13 @@ impl JobConf {
 }
 
 #[derive(Clone)]
-pub(in crate::core) struct JobInfo {
-    pub(in crate::core) id: u32,
-    pub(in crate::core) unit: Rc<UnitX>,
-    pub(in crate::core) kind: JobKind,
-    pub(in crate::core) attr: JobAttr,
-    pub(in crate::core) run_kind: JobKind,
-    pub(in crate::core) stage: JobStage,
+pub(crate) struct JobInfo {
+    pub(crate) id: u32,
+    pub(crate) unit: Rc<UnitX>,
+    pub(crate) kind: JobKind,
+    pub(crate) attr: JobAttr,
+    pub(crate) run_kind: JobKind,
+    pub(crate) stage: JobStage,
 }
 
 impl fmt::Debug for JobInfo {

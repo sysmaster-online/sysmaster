@@ -430,12 +430,12 @@ fn value_try_sub(value: &mut usize, sub: usize) -> bool {
 mod tests {
     use super::super::job_rentry::JobRe;
     use super::*;
-    use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::test_utils;
-    use crate::core::unit::DataManager;
-    use crate::core::unit::UnitDb;
-    use crate::core::unit::UnitRe;
-    use crate::core::unit::UnitX;
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::unit::test_utils;
+    use crate::unit::DataManager;
+    use crate::unit::UnitDb;
+    use crate::unit::UnitRe;
+    use crate::unit::UnitX;
     use libutils::logger;
     use sysmaster::rel::Reliability;
 

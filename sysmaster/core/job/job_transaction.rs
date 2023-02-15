@@ -3,10 +3,10 @@ use super::job_entry::{self, Job, JobConf, JobResult};
 use super::job_rentry::JobKind;
 use super::job_table::JobTable;
 use super::JobErrno;
-use crate::core::unit::JobMode;
-use crate::core::unit::UnitDb;
-use crate::core::unit::UnitRelationAtom;
-use crate::core::unit::UnitX;
+use crate::unit::JobMode;
+use crate::unit::UnitDb;
+use crate::unit::UnitRelationAtom;
+use crate::unit::UnitX;
 use std::rc::Rc;
 use sysmaster::error::UnitActionError;
 
@@ -411,10 +411,10 @@ fn trans_fallback(
 mod tests {
     use super::super::job_rentry::JobRe;
     use super::*;
-    use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::test_utils;
-    use crate::core::unit::DataManager;
-    use crate::core::unit::{UnitRe, UnitRelations};
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::unit::test_utils;
+    use crate::unit::DataManager;
+    use crate::unit::{UnitRe, UnitRelations};
     use libutils::logger;
     use sysmaster::rel::Reliability;
 

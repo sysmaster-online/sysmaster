@@ -3,7 +3,7 @@ use super::commands::Commands;
 use super::pre_install::{Install, PresetMode};
 use super::rentry::RELI_HISTORY_MAX_DBS;
 use super::signals::{SignalDispatcher, Signals};
-use crate::core::unit::UnitManagerX;
+use crate::unit::UnitManagerX;
 use libcgroup::{cg_create_and_attach, CgFlags};
 use libcgroup::{CgController, CgroupErr};
 use libcmdproto::proto::execute::{ExecCmdErrno, ExecuterAction};

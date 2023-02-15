@@ -6,10 +6,10 @@ use super::uu_config::UeConfig;
 use super::uu_load::UeLoad;
 use super::uu_ratelimit::StartLimit;
 use super::UnitEmergencyAction;
-use crate::core::unit::data::{DataManager, UnitDepConf, UnitState};
-use crate::core::unit::uload_util::UnitFile;
-use crate::core::unit::unit_rentry::{UnitLoadState, UnitRe};
-use crate::core::unit::UnitRelations;
+use crate::unit::data::{DataManager, UnitDepConf, UnitState};
+use crate::unit::uload_util::UnitFile;
+use crate::unit::unit_rentry::{UnitLoadState, UnitRe};
+use crate::unit::UnitRelations;
 use libcgroup::{self, CgFlags};
 use libutils::error::Error as ServiceError;
 use libutils::process_util::my_child;
@@ -659,7 +659,7 @@ impl Unit {
         self.sub.collect_fds()
     }
 
-    pub(in crate::core) fn notify_message(
+    pub(crate) fn notify_message(
         &self,
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
@@ -672,15 +672,15 @@ impl Unit {
 #[cfg(test)]
 mod tests {
     use super::Unit;
-    use crate::core::manager::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::test::test_utils::UmIfD;
-    use crate::core::unit::unit_rentry::UnitRe;
+    use crate::manager::RELI_HISTORY_MAX_DBS;
+    use crate::unit::test::test_utils::UmIfD;
+    use crate::unit::unit_rentry::UnitRe;
     use libutils::{logger, path_lookup::LookupPaths};
     use std::rc::Rc;
     use sysmaster::rel::Reliability;
     use sysmaster::unit::UnitType;
 
-    use crate::core::{plugin::Plugin, unit::data::DataManager, unit::uload_util::UnitFile};
+    use crate::{plugin::Plugin, unit::data::DataManager, unit::uload_util::UnitFile};
     fn unit_init() -> Rc<Unit> {
         logger::init_log_with_console("test_unit_entry", log::LevelFilter::Trace);
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));

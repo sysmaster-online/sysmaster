@@ -1,6 +1,6 @@
 use super::unit_datastore::UnitDb;
 /// need to move to other directory,maybe manager
-use crate::core::job::JobManager;
+use crate::job::JobManager;
 use libevent::{EventState, EventType, Events, Source};
 use libutils::Result;
 use nix::errno::Errno;
