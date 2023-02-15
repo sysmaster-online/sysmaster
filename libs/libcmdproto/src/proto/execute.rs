@@ -89,9 +89,19 @@ where
 impl Executer for UnitComm {
     fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
         let mut reply = String::new();
+        let mut units: Vec<String> = Vec::new();
+        for unit_name in &self.units {
+            // If users didn't specify the unit type, treat it as service
+            if !unit_name.contains('.') {
+                units.push(unit_name.to_string() + ".service");
+            } else {
+                units.push(unit_name.to_string());
+            }
+        }
+
         match self.action() {
             unit_comm::Action::Status => {
-                for unit in self.units {
+                for unit in units {
                     new_line_break(&mut reply);
                     match manager.status(&unit) {
                         Ok(status) => {
@@ -108,7 +118,7 @@ impl Executer for UnitComm {
                 }
             }
             unit_comm::Action::Start => {
-                for unit in self.units {
+                for unit in units {
                     if let Err(e) = manager.start(&unit) {
                         new_line_break(&mut reply);
                         reply = reply + "Failed to start " + &unit + ": " + &String::from(e);
@@ -116,7 +126,7 @@ impl Executer for UnitComm {
                 }
             }
             unit_comm::Action::Stop => {
-                for unit in self.units {
+                for unit in units {
                     if let Err(e) = manager.stop(&unit) {
                         new_line_break(&mut reply);
                         reply = reply + "Failed to stop " + &unit + ": " + &String::from(e);
@@ -124,7 +134,7 @@ impl Executer for UnitComm {
                 }
             }
             unit_comm::Action::Restart => {
-                for unit in self.units {
+                for unit in units {
                     if let Err(e) = manager.restart(&unit) {
                         new_line_break(&mut reply);
                         reply = reply + "Failed to restart " + &unit + ": " + &String::from(e);
