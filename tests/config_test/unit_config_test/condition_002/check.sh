@@ -7,13 +7,14 @@ set +e
 
 # usage: test ConditionFileNotEmpty
 function test01() {
+    log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     sed -i "/Description=/ a ConditionFileNotEmpty=\"/tmp\"" ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
 
     # path is directory
-    sctl restart base.service
-    check_status base inactive
+    sctl start base.service
+    check_status base.service inactive
     expect_eq $? 0 || return 1
     grep 'asdasda' "${SYSMST_LOG}"
     expect_eq $? "${condition_test}" || return 1
@@ -26,24 +27,26 @@ function test01() {
     run_sysmaster || return 1
 
     # path not exist
-    sctl restart base.service
-    check_status base inactive
+    sctl start base.service
+    check_status base.service inactive
     expect_eq $? 0 || return 1
     grep 'asdasda' "${SYSMST_LOG}"
     expect_eq $? "${condition_test}" || return 1
 
     # path is an empty file
     touch /tmp/file_not_empty
-    sctl restart base.service
-    check_status base inactive
+    sctl stop base.service
+    sctl start base.service
+    check_status base.service inactive
     expect_eq $? 0 || return 1
     grep 'asdasda' "${SYSMST_LOG}"
     expect_eq $? "${condition_test}" || return 1
 
     # valid file path
     echo 1 > /tmp/file_not_empty
-    sctl restart base.service
-    check_status base active
+    sctl stop base.service
+    sctl start base.service
+    check_status base.service active
     expect_eq $? 0 || return 1
 
     # clean
@@ -52,4 +55,5 @@ function test01() {
     kill -9 "${sysmaster_pid}"
 }
 
+cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH}
 test01 || exit 1

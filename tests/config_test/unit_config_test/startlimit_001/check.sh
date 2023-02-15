@@ -7,6 +7,7 @@ set +e
 
 # usage: test StartLimitBurst
 function test01() {
+    log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     sed -i "/Description/ a StartLimitBurst=\"3\"" ${SYSMST_LIB_PATH}/base.service
     sed -i "/Description/ a StartLimitInterval=\"10s\"" ${SYSMST_LIB_PATH}/base.service
@@ -39,6 +40,7 @@ function test01() {
 
 # usage: test StartLimitInterval
 function test02() {
+    log_info "===== test02 ====="
     sed -i "/StartLimitInterval=/ s/10s/3/" ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
 
@@ -65,6 +67,7 @@ function test02() {
 
 # usage: test StartLimitBurst=0
 function test03() {
+    log_info "===== test03 ====="
     sed -i "/StartLimitBurst=/ s/3/0/" ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
 
@@ -81,6 +84,7 @@ function test03() {
 
 # usage: test StartLimitInterval=0
 function test04() {
+    log_info "===== test04 ====="
     sed -i "/StartLimitBurst=/ s/0/3/" ${SYSMST_LIB_PATH}/base.service
     sed -i "/StartLimitInterval=/ s/3/0/" ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
@@ -96,6 +100,7 @@ function test04() {
     kill -9 "${sysmaster_pid}"
 }
 
+cp -arf "${TEST_PATH}"/test_units/{shutdown.target,sysinit.target} tmp_units
 test01 || exit 1
 test02 || exit 1
 test03 || exit 1
