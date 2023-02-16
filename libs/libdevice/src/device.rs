@@ -1,6 +1,5 @@
 //! struct Device
 //!
-use crate::{DeviceAction, Error};
 use libc::{dev_t, mode_t, S_IFBLK, S_IFCHR, S_IFMT};
 use libutils::devnum_util::device_path_parse_major_minor;
 use nix::errno::Errno;
@@ -10,6 +9,8 @@ use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::result::Result;
+
+use crate::{device_action::DeviceAction, error::Error};
 
 /// Device
 #[derive(Debug, Clone, Eq, PartialEq)]

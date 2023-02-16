@@ -1,6 +1,5 @@
 //! device monitor
 //!
-use crate::{Device, Error};
 use nix::{
     errno::Errno,
     sys::socket::{
@@ -8,6 +7,8 @@ use nix::{
     },
 };
 use std::io::IoSlice;
+
+use crate::{device::Device, error::Error};
 
 /// netlink group of device monitor
 pub enum MonitorNetlinkGroup {
