@@ -2,8 +2,6 @@
 mod error;
 mod job;
 mod manager;
-mod plugin;
-mod unit;
 ///
 
 /// dependency:
@@ -13,15 +11,17 @@ mod unit;
 ///            ↖  ↗
 ///            [butil]
 ///
-mod utils;
-
 // mount not to be here;
 mod mount;
+mod plugin;
+mod unit;
+mod utils;
 
 #[macro_use]
 extern crate lazy_static;
+use crate::error::*;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
-use crate::mount::mount_setup;
+use crate::mount::setup;
 use libc::{c_int, prctl, PR_SET_CHILD_SUBREAPER};
 use libutils::logger::{self};
 use log::{self};
@@ -29,11 +29,10 @@ use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use nix::unistd::{self};
 use std::convert::TryFrom;
 use std::env::{self};
-use std::error::Error;
 use std::ffi::CString;
 use sysmaster::rel;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
     logger::init_log_with_console("sysmaster", log::LevelFilter::Debug);
     log::info!("sysmaster running in system mode.");
 
@@ -44,12 +43,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     //     format!("failed to mount early mount point, errno: {}", e)
     // })?;
 
-    mount_setup::mount_setup().map_err(|e| {
-        log::error!("failed to mount mount point, errno: {}", e);
-        format!("failed to mount mount point, errno: {e}")
-    })?;
+    setup::mount_setup()?;
 
-    rel::reli_dir_prepare().expect("reliability directory prepare failed.");
+    rel::reli_dir_prepare().context(IoSnafu)?;
     let switch = rel::reli_debug_get_switch();
     log::info!("sysmaster initialize with switch: {}.", switch);
 
@@ -64,10 +60,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         log::info!("debug: clear data restored.");
     }
 
-    manager.setup_cgroup()?;
+    manager.setup_cgroup().context(IoSnafu)?;
 
     // startup
-    manager.startup().unwrap();
+    manager.startup().context(UtilsSnafu)?;
 
     // main loop
     let ret = manager.main_loop();
@@ -84,16 +80,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn initialize_runtime(switch: bool) -> Result<(), Box<dyn Error>> {
+fn initialize_runtime(switch: bool) -> Result<()> {
     if switch {
         install_crash_handler();
         log::info!("install crash handler.");
     }
 
     #[cfg(feature = "linux")]
-    {
-        mount_setup::mount_cgroup_controllers()?;
-    }
+    setup::mount_cgroup_controllers().map_err(|_| Error::Other {
+        msg: "mount cgroup controllers failed: {e}".to_string(),
+    })?;
 
     set_child_reaper();
 

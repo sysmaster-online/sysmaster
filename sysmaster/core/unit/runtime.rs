@@ -1,7 +1,7 @@
+use super::rentry::UnitLoadState;
+use super::rentry::{UnitRe, UnitRePps};
 use super::unit_datastore::UnitDb;
 use super::unit_entry::UnitX;
-use super::unit_rentry::UnitLoadState;
-use super::unit_rentry::{UnitRe, UnitRePps};
 use super::{UnitRelations, UnitType};
 use crate::manager::rentry::ReliLastQue;
 use crate::utils::table::{TableOp, TableSubscribe};
@@ -350,8 +350,8 @@ mod tests {
     use super::*;
     use crate::manager::RELI_HISTORY_MAX_DBS;
     use crate::unit::data::DataManager;
+    use crate::unit::rentry::UnitRe;
     use crate::unit::test;
-    use crate::unit::unit_rentry::UnitRe;
     use libutils::logger;
     use sysmaster::rel::Reliability;
 

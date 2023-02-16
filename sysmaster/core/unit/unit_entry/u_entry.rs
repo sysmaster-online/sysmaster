@@ -7,8 +7,8 @@ use super::uu_load::UeLoad;
 use super::uu_ratelimit::StartLimit;
 use super::UnitEmergencyAction;
 use crate::unit::data::{DataManager, UnitDepConf, UnitState};
+use crate::unit::rentry::{UnitLoadState, UnitRe};
 use crate::unit::uload_util::UnitFile;
-use crate::unit::unit_rentry::{UnitLoadState, UnitRe};
 use crate::unit::UnitRelations;
 use libcgroup::{self, CgFlags};
 use libutils::error::Error as ServiceError;
@@ -673,8 +673,8 @@ impl Unit {
 mod tests {
     use super::Unit;
     use crate::manager::RELI_HISTORY_MAX_DBS;
+    use crate::unit::rentry::UnitRe;
     use crate::unit::test::test_utils::UmIfD;
-    use crate::unit::unit_rentry::UnitRe;
     use libutils::{logger, path_lookup::LookupPaths};
     use std::rc::Rc;
     use sysmaster::rel::Reliability;

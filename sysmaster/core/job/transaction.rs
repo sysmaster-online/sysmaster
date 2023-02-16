@@ -1,8 +1,8 @@
-use super::job_alloc::JobAlloc;
-use super::job_entry::{self, Job, JobConf, JobResult};
-use super::job_rentry::JobKind;
-use super::job_table::JobTable;
-use super::JobErrno;
+use super::alloc::JobAlloc;
+use super::entry::{self, Job, JobConf, JobResult};
+use super::rentry::JobKind;
+use super::table::JobTable;
+use crate::error::JobErrno;
 use crate::unit::JobMode;
 use crate::unit::UnitDb;
 use crate::unit::UnitRelationAtom;
@@ -101,7 +101,7 @@ fn trans_expand_check_input(config: &JobConf) -> Result<(), JobErrno> {
         return err;
     }
 
-    if !job_entry::job_is_unit_applicable(kind, unit) {
+    if !entry::job_is_unit_applicable(kind, unit) {
         return Err(JobErrno::Input);
     }
 
@@ -409,7 +409,7 @@ fn trans_fallback(
 
 #[cfg(test)]
 mod tests {
-    use super::super::job_rentry::JobRe;
+    use super::super::rentry::JobRe;
     use super::*;
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::unit::test_utils;

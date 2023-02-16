@@ -1,4 +1,4 @@
-use super::job_rentry::{self, JobAttr, JobKind, JobRe};
+use super::rentry::{self, JobAttr, JobKind, JobRe};
 use crate::unit::JobMode;
 use crate::unit::UnitRelationAtom;
 use crate::unit::UnitX;
@@ -308,7 +308,7 @@ impl Job {
     }
 
     pub(super) fn is_basic_op(&self) -> bool {
-        job_rentry::job_is_basic_op(self.kind)
+        rentry::job_is_basic_op(self.kind)
     }
 
     pub(super) fn is_order_with(&self, other: &Self, atom: UnitRelationAtom) -> i8 {

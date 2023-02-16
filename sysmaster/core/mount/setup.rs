@@ -1,6 +1,7 @@
 //! mount the cgroup systems
-
+use crate::error::*;
 use bitflags::bitflags;
+use libcgroup::{self, CgType, CG_BASE_DIR};
 use libutils::{fs_util, mount_util, path_util, proc_cmdline};
 use nix::{
     errno::Errno,
@@ -9,9 +10,7 @@ use nix::{
     sys::stat::Mode,
     unistd::AccessFlags,
 };
-use std::{collections::HashMap, error::Error, fs, path::Path};
-
-use libcgroup::{self, CgType, CG_BASE_DIR};
+use std::{collections::HashMap, fs, path::Path};
 
 const EARLY_MOUNT_NUM: u8 = 3;
 // const CGROUP_ROOT: &str = "/sys/fs/cgroup/";
@@ -229,7 +228,7 @@ impl MountPoint {
         self.target = target.to_string();
     }
 
-    fn mount(&self) -> Result<(), Errno> {
+    fn mount(&self) -> Result<()> {
         if self.callback.is_some() && !self.callback.unwrap()() {
             log::debug!("callback is not satisfied");
             return Ok(());
@@ -246,7 +245,8 @@ impl MountPoint {
                         Some(self.fs_type.as_str()),
                         self.flags,
                         None,
-                    )?;
+                    )
+                    .context(NixSnafu)?;
 
                     return Ok(());
                 } else if v || self.flags.intersects(MsFlags::MS_REMOUNT) {
@@ -256,14 +256,16 @@ impl MountPoint {
             }
             Err(e) => {
                 log::debug!("invalid mount point errno: {}", e);
-                if e != Errno::ENOENT && self.mode.contains(MountMode::MNT_FATAL) {
-                    return Err(e);
+                if let Error::Nix { source } = e {
+                    if source != Errno::ENOENT && self.mode.contains(MountMode::MNT_FATAL) {
+                        return Err(e);
+                    }
                 }
             }
         }
 
         log::debug!("create target dir: {}", self.target.to_string());
-        fs::create_dir_all(&self.target).map_err(|_e| Errno::EINVAL)?;
+        fs::create_dir_all(&self.target).context(IoSnafu)?;
 
         let source = self.source.as_str();
         let target = self.target.as_str();
@@ -283,19 +285,19 @@ impl MountPoint {
             self.flags,
             options
         );
-        nix::mount::mount(Some(source), target, Some(fs_type), self.flags, options)?;
+        nix::mount::mount(Some(source), target, Some(fs_type), self.flags, options)
+            .context(NixSnafu)?;
 
         if let Err(e) = nix::unistd::access(target, AccessFlags::W_OK) {
-            nix::mount::umount(target)?;
-            fs::remove_dir(Path::new(target)).map_err(|_e| Errno::EBUSY)?;
-
-            return Err(e);
+            nix::mount::umount(target).context(NixSnafu)?;
+            fs::remove_dir(Path::new(target)).context(IoSnafu)?;
+            return Err(Error::Nix { source: e });
         }
 
         Ok(())
     }
 
-    fn invalid_mount_point(&self, flags: AtFlags) -> Result<bool, Errno> {
+    fn invalid_mount_point(&self, flags: AtFlags) -> Result<bool> {
         if path_util::path_equal(&self.target, "/") {
             return Ok(true);
         }
@@ -308,11 +310,13 @@ impl MountPoint {
             path,
             OFlag::O_PATH | OFlag::O_CLOEXEC,
             Mode::from_bits(0).unwrap(),
-        )?;
+        )
+        .context(NixSnafu)?;
 
         let last_file_name = path.file_name().unwrap_or_default();
 
-        let ret = mount_util::mount_point_fd_valid(ret, last_file_name.to_str().unwrap(), flags)?;
+        let ret = mount_util::mount_point_fd_valid(ret, last_file_name.to_str().unwrap(), flags)
+            .context(NixSnafu)?;
 
         Ok(ret)
     }
@@ -321,7 +325,7 @@ impl MountPoint {
 #[allow(dead_code)]
 /// need use feature
 /// mount the minimal mount point for enable the most basic function
-pub fn mount_setup_early() -> Result<(), Errno> {
+pub fn mount_setup_early() -> Result<()> {
     for i in 0..EARLY_MOUNT_NUM {
         MOUNT_TABLE[i as usize].mount()?;
     }
@@ -330,7 +334,7 @@ pub fn mount_setup_early() -> Result<(), Errno> {
 }
 
 /// mount the point of all the mount_table
-pub fn mount_setup() -> Result<(), Errno> {
+pub fn mount_setup() -> Result<()> {
     for table in MOUNT_TABLE.iter() {
         table.mount()?;
     }
@@ -340,12 +344,12 @@ pub fn mount_setup() -> Result<(), Errno> {
 
 #[allow(dead_code)]
 /// mount all the cgroup controller subsystem
-pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
+pub fn mount_cgroup_controllers() -> Result<()> {
     if !cg_legacy_wanted() {
         return Ok(());
     }
 
-    let mut controllers = libcgroup::cg_controllers()?;
+    let mut controllers = libcgroup::cg_controllers().context(IoSnafu)?;
     let mut index = 0_usize;
 
     while index < controllers.len() {
@@ -379,16 +383,8 @@ pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
         m_point.mount()?;
 
         if pair {
-            symlink_controller(target.to_string(), other.to_string())
-                .map_err(|e| format!("create symlink  from {target} to {other} error: {e}"))?;
-            symlink_controller(target.to_string(), controllers[index].to_string()).map_err(
-                |e| {
-                    format!(
-                        "create symlink  from {} to {} error: {}",
-                        target, controllers[index], e
-                    )
-                },
-            )?;
+            symlink_controller(target.to_string(), other.to_string())?;
+            symlink_controller(target.to_string(), controllers[index].to_string())?;
         }
 
         index += 1;
@@ -405,7 +401,8 @@ pub fn mount_cgroup_controllers() -> Result<(), Box<dyn Error>> {
             | MsFlags::MS_STRICTATIME
             | MsFlags::MS_RDONLY,
         Some("mode=755,size=4m,nr_inodes=1k"),
-    )?;
+    )
+    .context(NixSnafu)?;
 
     Ok(())
 }
@@ -431,7 +428,7 @@ fn pair_controller(controller: &str) -> Option<String> {
 }
 
 #[allow(dead_code)]
-fn symlink_controller(source: String, alias: String) -> Result<(), Errno> {
+fn symlink_controller(source: String, alias: String) -> Result<()> {
     let target_path = Path::new(CG_BASE_DIR).join(alias);
     let target = target_path.to_str().unwrap();
     match fs_util::symlink(&source, target, false) {

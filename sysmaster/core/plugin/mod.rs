@@ -27,21 +27,23 @@
 //! ````
 //! plugin or find the corresponding so according to the name of the corresponding unit configuration file, and load it dynamically, such as XXX.service to find libservice.so, XXX.socket to find libsocket.so
 //!
+use crate::error::*;
 use dy_re::Lib;
 use dy_re::Symbol;
 use dynamic_reload as dy_re;
 use log::*;
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
+use std::env;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
-use std::{env, io};
 use sysmaster::unit::UmIf;
 use sysmaster::unit::{SubUnit, UnitManagerObj, UnitType};
 use walkdir::{DirEntry, WalkDir};
@@ -71,7 +73,7 @@ pub struct Plugin {
     lib_type: RwLock<Vec<(String, String)>>,
     library_dir: RwLock<Vec<String>>,
     load_libs: RwLock<HashMap<UnitType, Arc<dy_re::Lib>>>,
-    _loaded: RwLock<bool>,
+    loaded: RwLock<bool>,
 }
 
 impl Plugin {
@@ -81,7 +83,7 @@ impl Plugin {
             lib_type: RwLock::new(Vec::new()),
             library_dir: RwLock::new(Vec::new()),
             load_libs: RwLock::new(HashMap::new()),
-            _loaded: RwLock::new(false),
+            loaded: RwLock::new(false),
         }
     }
 
@@ -212,7 +214,7 @@ impl Plugin {
                     .unwrap_or(false)
         };
 
-        if *(self._loaded.read().unwrap()) {
+        if *(self.loaded.read().unwrap()) {
             log::info!("load_lib plugin is already loaded");
             return;
         }
@@ -241,7 +243,7 @@ impl Plugin {
 
         for file_item in lib_path.iter() {
             log::debug!(
-                "begin loading  plugin library in library path [{:?}]",
+                "begin loading plugin library in library path [{:?}]",
                 file_item
             );
             for entry in WalkDir::new(file_item)
@@ -254,69 +256,70 @@ impl Plugin {
                 let path = entry.path();
                 if path.is_dir() {
                     continue;
-                } else {
-                    let file_name = path.file_name();
-                    let result = Self::load_plugin(self, file_name.unwrap(), &mut reload_handler);
-                    if let Ok(_r) = result {
-                        log::info!("Plugin load unit plugin[{:?}] successful", file_name);
-                    } else if let Err(_e) = result {
-                        log::error!(
-                            "Plugin load unit plugin[{:?}] failed, detail is {}",
-                            file_name,
-                            _e.to_string()
-                        );
+                } else if let Some(file_name) = path.file_name() {
+                    match Self::load_plugin(self, file_name, &mut reload_handler) {
+                        Ok(_) => {
+                            log::info!("Plugin load unit plugin[{:?}] successful", file_name);
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "Plugin load unit plugin[{:?}] failed, detail is {}",
+                                file_name,
+                                e.to_string()
+                            );
+                        }
                     }
                 }
             }
         }
 
-        let mut _load = self._loaded.write().unwrap();
-        (*_load) = true;
+        *self.loaded.write().unwrap() = true;
     }
 
     fn load_plugin(
         &self,
         filename: &OsStr,
         reload_handler: &mut dynamic_reload::DynamicReload,
-    ) -> io::Result<()> {
+    ) -> Result<()> {
         if let Some(v) = filename.to_str() {
             let unit_type = self.get_unit_type(v);
             if unit_type == UnitType::UnitTypeInvalid {
-                log::error!("lib name {} is invalid skip it", v);
+                log::error!("lib name {} is invalid, skip it", v);
                 return Ok(());
             }
 
             match unsafe { reload_handler.add_library(v, dynamic_reload::PlatformName::No) } {
                 Ok(lib) => {
                     #[allow(clippy::type_complexity)]
-                    let _symunit: Result<
-                        Symbol<fn() -> *mut dyn SubUnit>,
-                        &str,
-                    > = unsafe {
+                    let symunit: Result<Symbol<fn() -> *mut dyn SubUnit>> = unsafe {
                         lib.lib
                             .get(CONSTRUCTOR_NAME_DEFAULT)
-                            .map_err(|_e| "Invalid")
+                            .map_err(|e| Error::PluginLoad { msg: e.to_string() })
                     };
-                    if _symunit.is_err() {
+                    if symunit.is_err() {
                         log::warn!("Lib {} not contain __unit_obj_create_default try  __unit_obj_create_with_params", v);
                         type SymType = fn(um: Rc<dyn UmIf>, level: LevelFilter) -> *mut dyn SubUnit;
                         #[allow(clippy::type_complexity)]
-                        let _symunit: Result<Symbol<SymType>, &str> = unsafe {
+                        let symunit: Result<Symbol<SymType>> = unsafe {
                             lib.lib
                                 .get(CONSTRUCTOR_NAME_WITH_PARAM)
-                                .map_err(|_e| "Invalid")
+                                .map_err(|e| Error::PluginLoad { msg: e.to_string() })
                         };
-                        if _symunit.is_err() {
+                        if symunit.is_err() {
                             log::error!("Lib {} not contain __unit_obj_create_default and __unit_obj_create_with_params skip it", v);
                             return Ok(());
                         }
                     }
+
                     #[allow(clippy::type_complexity)]
-                    let _symum: Result<
+                    let symum: Result<
                         Symbol<fn(level: LevelFilter) -> *mut dyn SubUnit>,
-                        &str,
-                    > = unsafe { lib.lib.get(b"__um_obj_create").map_err(|_e| "Invalid") };
-                    if _symum.is_err() {
+                    > = unsafe {
+                        lib.lib
+                            .get(b"__um_obj_create")
+                            .map_err(|e| Error::PluginLoad { msg: e.to_string() })
+                    };
+                    if symum.is_err() {
                         log::error!("Lib {} not contain __um_obj_create sym um skip it", v);
                         return Ok(());
                     }
@@ -397,7 +400,7 @@ impl Plugin {
                 }
             }
             if set_flag {
-                let mut _load = self._loaded.write().unwrap();
+                let mut _load = self.loaded.write().unwrap();
                 (*_load) = false;
             }
             set_flag
@@ -415,73 +418,92 @@ impl Plugin {
         &self,
         unit_type: UnitType,
         um: Rc<dyn UmIf>,
-    ) -> Result<Box<dyn SubUnit>, Box<dyn Error>> {
-        let ret = self.get_lib(unit_type);
-        if ret.is_err() {
-            return Err(format!("create unit, the {unit_type:?} plugin is not exist").into());
-        }
-
+    ) -> Result<Box<dyn SubUnit>> {
         type SymType = fn(um: Rc<dyn UmIf>, level: LevelFilter) -> *mut dyn SubUnit;
-        let dy_lib = ret.unwrap();
-        let _sym: Result<Symbol<SymType>, &str> = unsafe {
-            dy_lib
-                .lib
-                .get(CONSTRUCTOR_NAME_WITH_PARAM)
-                .map_err(|_e| "Invalid")
-        };
-        log::debug!(
-            "create unit obj with param level filter: {:?}",
-            log::max_level()
-        );
-        if let Ok(fun) = _sym {
-            let boxed_raw = fun(um, log::max_level());
-            Ok(unsafe { Box::from_raw(boxed_raw) })
-        } else {
-            Err(format!("The library of {:?} is {:?}", unit_type, _sym.err()).into())
+        match self.get_lib(unit_type) {
+            Ok(dy_lib) => {
+                let sym: Result<Symbol<SymType>> = unsafe {
+                    dy_lib
+                        .lib
+                        .get(CONSTRUCTOR_NAME_WITH_PARAM)
+                        .map_err(|e| Error::PluginLoad { msg: e.to_string() })
+                };
+                log::debug!(
+                    "create unit obj with param level filter: {:?}",
+                    log::max_level()
+                );
+                if let Ok(fun) = sym {
+                    let boxed_raw = fun(um, log::max_level());
+                    Ok(unsafe { Box::from_raw(boxed_raw) })
+                } else {
+                    Err(Error::PluginLoad {
+                        msg: format!("The library of {:?} is {:?}", unit_type, sym.err()),
+                    })
+                }
+            }
+            Err(_) => {
+                return Err(Error::PluginLoad {
+                    msg: format!("create unit, the {unit_type:?} plugin is not exist"),
+                })
+            }
         }
     }
     /// Create a  obj for subclasses of unit manager
     /// each sub unit manager need reference of declure_umobj_plugin
-    pub fn create_um_obj(
-        &self,
-        unit_type: UnitType,
-    ) -> Result<Box<dyn UnitManagerObj>, Box<dyn Error>> {
-        let ret = self.get_lib(unit_type);
-        if ret.is_err() {
-            return Err(format!("create um, the {unit_type:?} plugin is not exist").into());
-        }
-
-        let dy_lib = ret.unwrap();
-        #[allow(clippy::type_complexity)]
-        let _sym: Result<Symbol<fn(level: LevelFilter) -> *mut dyn UnitManagerObj>, &str> =
-            unsafe { dy_lib.lib.get(b"__um_obj_create").map_err(|_e| "Invalid") };
-        if let Ok(fun) = _sym {
-            let boxed_raw = fun(log::max_level());
-            Ok(unsafe { Box::from_raw(boxed_raw) })
-        } else {
-            Err(format!("The library of {:?} is {:?}", unit_type, _sym.err()).into())
+    pub fn create_um_obj(&self, unit_type: UnitType) -> Result<Box<dyn UnitManagerObj>> {
+        match self.get_lib(unit_type) {
+            Ok(dy_lib) => {
+                #[allow(clippy::type_complexity)]
+                let sym: Result<
+                    Symbol<fn(level: LevelFilter) -> *mut dyn UnitManagerObj>,
+                > = unsafe {
+                    dy_lib
+                        .lib
+                        .get(b"__um_obj_create")
+                        .map_err(|e| Error::PluginLoad { msg: e.to_string() })
+                };
+                if let Ok(fun) = sym {
+                    let boxed_raw = fun(log::max_level());
+                    Ok(unsafe { Box::from_raw(boxed_raw) })
+                } else {
+                    Err(Error::PluginLoad {
+                        msg: format!("The library of {:?} is {:?}", unit_type, sym.err()),
+                    })
+                }
+            }
+            Err(_) => {
+                return Err(Error::PluginLoad {
+                    msg: format!("create um, the {unit_type:?} plugin is not exist"),
+                })
+            }
         }
     }
 
-    fn get_lib(&self, unit_type: UnitType) -> Result<Arc<Lib>, String> {
-        if !(*(self._loaded.read().unwrap())) {
+    fn get_lib(&self, unit_type: UnitType) -> Result<Arc<Lib>> {
+        if !(*(self.loaded.read().unwrap())) {
             log::info!("plugin is not loaded");
-            return Err("plugin is not loaded".to_string());
+            return Err(Error::PluginLoad {
+                msg: "plugin is not loaded".to_string(),
+            });
         }
+
         let mut retry_count = 0;
         let dy_lib = loop {
-            let dy_lib: Result<Arc<Lib>, String> =
-                match (*self.load_libs.read().unwrap()).get(&unit_type) {
-                    Some(lib) => Ok(lib.clone()),
-                    None => Err(format!("the {unit_type:?} plugin is not exist")),
-                };
+            let dy_lib: Result<Arc<Lib>> = match (*self.load_libs.read().unwrap()).get(&unit_type) {
+                Some(lib) => Ok(lib.clone()),
+                None => Err(Error::PluginLoad {
+                    msg: format!("the {unit_type:?} plugin is not exist"),
+                }),
+            };
             if dy_lib.is_err() {
                 if retry_count < 2 {
                     retry_count += 1;
                     self.load_lib();
                     continue;
                 } else {
-                    return Err(format!("the {unit_type:?} plugin is not exist"));
+                    return Err(Error::PluginLoad {
+                        msg: format!("the {unit_type:?} plugin is not exist"),
+                    });
                 }
             }
             break dy_lib;

@@ -1,6 +1,8 @@
 //! Error define
 use libcmdproto::proto::execute::ExecCmdErrno;
 use snafu::prelude::*;
+#[allow(unused_imports)]
+pub use snafu::ResultExt;
 
 /// Error for exec command
 #[allow(missing_docs)]
@@ -93,12 +95,8 @@ pub enum Error {
     #[snafu(display("ManagerError(libsysmaster)"))]
     Manager { source: MngErrno },
 
-    /// Other
-    #[snafu(display("OtherError(libsysmaster): '{}'.", word))]
-    Other {
-        /// some words
-        word: &'static str,
-    },
+    #[snafu(display("OtherError(libsysmaster): '{}'.", msg))]
+    Other { msg: String },
 }
 
 /// new Result
