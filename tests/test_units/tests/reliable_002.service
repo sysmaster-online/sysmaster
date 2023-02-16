@@ -1,0 +1,8 @@
+[Unit]
+Description="reliable test 002"
+
+[Service]
+ExecStart="/bin/sleep 999"
+
+[Install]
+WantedBy="dbus.service"

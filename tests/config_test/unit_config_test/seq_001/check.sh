@@ -58,7 +58,6 @@ function test02() {
     kill -9 "${sysmaster_pid}"
 }
 
-cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH}
 test01 || exit 1
 test02 || exit 1
 exit "${EXPECT_FAIL}"

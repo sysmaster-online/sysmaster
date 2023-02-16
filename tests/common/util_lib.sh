@@ -3,6 +3,9 @@
 EXPECT_FAIL=0
 SYSMST_LIB_PATH='/usr/lib/sysmaster'
 SYSMST_LOG='/opt/sysmaster.log'
+RELIAB_SWITCH_PATH='/run/sysmaster/reliability'
+RELIAB_SWITCH='switch.debug'
+RELIAB_CLR='clear.debug'
 
 # ================== log function ==================
 function log_info() {
@@ -115,6 +118,7 @@ function expect_str_eq() {
 # ================== util ==================
 # usage: run sysmaster as daemon
 function run_sysmaster() {
+    cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH} || return 1
     /usr/lib/sysmaster/sysmaster &> "${SYSMST_LOG}" &
     sysmaster_pid=$!
     # wait sysmaster init done
@@ -134,12 +138,12 @@ function check_log() {
 
     # debug
     sync
-    cat "${file_name}" || return 1
+    cat "${file_name}" | sed "s/\x00//g" || return 1
 
     shift 1
     expect_gt $# 0 'Parameter missing: key log info not defined!' || return 1
     while [ $# -gt 0 ]; do
-        grep -aE "$1" "${file_name}"
+        cat "${file_name}" | sed "s/\x00//g" | grep -aE "$1"
         expect_eq $? 0 "check log failed, '$1' not found in ${file_name}!" || return 1
         shift 1
     done
@@ -160,4 +164,12 @@ function check_status() {
     # debug
     sctl status "${service}"
     return 1
+}
+
+# usage: get unit pids
+# input: $1: unit name
+function get_pids() {
+    local service="$1"
+
+    sctl status "${service}" | sed -n '/PID:/,$p' | sed 's/PID://' | awk '{print $1}'
 }
