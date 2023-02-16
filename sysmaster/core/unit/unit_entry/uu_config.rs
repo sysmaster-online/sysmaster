@@ -140,12 +140,12 @@ impl UeConfig {
         let mut configer = builder.load()?;
 
         // dropin
-        for v in files.get_unit_id_dropin_wants(name) {
+        for v in files.get_unit_wants_symlink_units(name) {
             configer.Unit.Wants.push(v.to_string_lossy().to_string());
             configer.Unit.After.push(v.to_string_lossy().to_string());
         }
 
-        for v in files.get_unit_id_dropin_requires(name) {
+        for v in files.get_unit_requires_symlink_units(name) {
             configer.Unit.Requires.push(v.to_string_lossy().to_string());
             configer.Unit.After.push(v.to_string_lossy().to_string());
         }
