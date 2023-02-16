@@ -6,8 +6,9 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::exec::ExecCommand;
 use sysmaster::rel::ReStation;
-use sysmaster::unit::{ExecCommand, KillContext};
+use sysmaster::unit::KillContext;
 
 pub(super) struct ServiceConfig {
     // associated objects
@@ -143,7 +144,8 @@ mod tests {
     #[test]
     fn test_service_parse() {
         let mut file_path = get_project_root().unwrap();
-        file_path.push("test_units/config.service.toml");
+        file_path.push("tests/test_units/config.service.toml");
+
         let paths = vec![file_path];
 
         let comm = Rc::new(ServiceUnitComm::new());

@@ -3,7 +3,7 @@ use super::job_entry::{Job, JobConf, JobInfo, JobResult};
 use super::job_rentry::JobKind;
 use super::job_unit_entry::JobUnit;
 use super::JobErrno;
-use crate::core::unit::{JobMode, UnitDb, UnitRelationAtom, UnitX};
+use crate::unit::{JobMode, UnitDb, UnitRelationAtom, UnitX};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
@@ -972,10 +972,10 @@ pub(super) fn jobs_2_units(jobs: &[Rc<Job>]) -> Vec<Rc<UnitX>> {
 mod tests {
     use super::super::job_rentry::JobRe;
     use super::*;
-    use crate::core::manager::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::test_utils;
-    use crate::core::unit::DataManager;
-    use crate::core::unit::UnitRe;
+    use crate::manager::RELI_HISTORY_MAX_DBS;
+    use crate::unit::test_utils;
+    use crate::unit::DataManager;
+    use crate::unit::UnitRe;
     use libutils::logger;
     use sysmaster::rel::Reliability;
 

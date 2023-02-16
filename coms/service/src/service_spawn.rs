@@ -6,7 +6,7 @@ use nix::unistd::Pid;
 use std::env;
 use std::error::Error;
 use std::rc::Rc;
-use sysmaster::unit::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
+use sysmaster::exec::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
 
 pub(super) struct ServiceSpawn {
     comm: Rc<ServiceUnitComm>,

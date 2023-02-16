@@ -1,7 +1,7 @@
 use super::job_entry::{Job, JobInfo, JobResult};
 use super::job_rentry::JobKind;
-use crate::core::unit::UnitRelationAtom;
-use crate::core::unit::UnitX;
+use crate::unit::UnitRelationAtom;
+use crate::unit::UnitX;
 use std::cell::RefCell;
 use std::collections::{HashMap, LinkedList};
 use std::rc::Rc;
@@ -797,12 +797,12 @@ pub(super) fn job_merge_trigger_iskeep(kind: JobKind) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::job::job_rentry::JobRe;
-    use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::test_utils;
-    use crate::core::unit::DataManager;
-    use crate::core::unit::UnitX;
-    use crate::core::unit::{JobMode, UnitRe};
+    use crate::job::job_rentry::JobRe;
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::unit::test_utils;
+    use crate::unit::DataManager;
+    use crate::unit::UnitX;
+    use crate::unit::{JobMode, UnitRe};
     use libutils::logger;
     use sysmaster::rel::Reliability;
 

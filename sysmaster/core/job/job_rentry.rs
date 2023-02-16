@@ -1,11 +1,11 @@
-use crate::core::manager::rentry::{RELI_DB_HJOB_SUSPENDS, RELI_DB_HJOB_TRIGGER};
+use crate::manager::rentry::{RELI_DB_HJOB_SUSPENDS, RELI_DB_HJOB_TRIGGER};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use std::rc::Rc;
 use sysmaster::rel::{ReDb, Reliability};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
-pub(in crate::core) enum JobKind {
+pub(crate) enum JobKind {
     // 'type' is better, but it's keyword in rust
     // basic kind
     /* mut: the stage of unit can be changed */
@@ -33,11 +33,11 @@ pub(super) fn job_is_basic_op(kind: JobKind) -> bool {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(in crate::core) struct JobAttr {
-    pub(in crate::core) ignore_order: bool,
-    pub(in crate::core) irreversible: bool,
-    pub(in crate::core) force: bool,
-    pub(in crate::core) no_relevancy: bool,
+pub(crate) struct JobAttr {
+    pub(crate) ignore_order: bool,
+    pub(crate) irreversible: bool,
+    pub(crate) force: bool,
+    pub(crate) no_relevancy: bool,
 }
 
 impl JobAttr {

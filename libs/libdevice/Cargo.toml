@@ -11,7 +11,6 @@ libutils = { path = "../libutils" }
 libevent = { path = "../libevent" }
 
 # third libraries
-kobject-uevent = "0.1.0"
 nix = "0.24"
 libc = "0.2.*"
 snafu = "0.7"

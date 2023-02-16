@@ -1,8 +1,9 @@
 //! UnitManager interfaces
-use super::{ExecCmdError, ExecCommand, ExecContext, ExecParameters, UnitActiveState, UnitType};
 use super::{UnitDependencyMask, UnitRelationAtom, UnitRelations};
-use crate::error::{MngErrno, UnitActionError};
+use crate::error::{ExecCmdError, MngErrno, UnitActionError};
+use crate::exec::{ExecCommand, ExecContext, ExecParameters};
 use crate::rel::{ReStation, Reliability};
+use crate::unit::{UnitActiveState, UnitType};
 use libevent::Events;
 use nix::unistd::Pid;
 use std::{path::PathBuf, rc::Rc};
@@ -154,6 +155,11 @@ pub trait UmIf {
     /// get the subunit state of one unit. i.e. running(service), listening(socket)
     fn get_subunit_state(&self, _unit_name: &str) -> String {
         String::new()
+    }
+
+    /// add restart job
+    fn restart_unit(&self, _unit_name: &str) -> Result<(), MngErrno> {
+        Ok(())
     }
 }
 

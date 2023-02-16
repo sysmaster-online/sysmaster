@@ -10,7 +10,7 @@ use std::rc::Rc;
 
 const RELI_HISTORY_DIR: &str = "history.mdb";
 
-pub(super) struct ReliHistory {
+pub struct ReliHistory {
     // control
     ignore: RefCell<bool>,
 
@@ -31,7 +31,7 @@ impl fmt::Debug for ReliHistory {
 }
 
 impl ReliHistory {
-    pub(super) fn new(dir_str: &str, max: u32) -> ReliHistory {
+    pub fn new(dir_str: &str, max: u32) -> ReliHistory {
         // init environment
         let path = Path::new(dir_str).join(RELI_HISTORY_DIR);
         let env = EnvOpenOptions::new().max_dbs(max).open(path).unwrap();
@@ -44,7 +44,7 @@ impl ReliHistory {
         }
     }
 
-    pub(super) fn data_clear(&self) {
+    pub fn data_clear(&self) {
         let mut db_wtxn = ReDbRwTxn::new(&self.env).expect("history.write_txn");
         for (_, db) in self.dbs.borrow().iter() {
             db.clear(&mut db_wtxn);
@@ -52,11 +52,11 @@ impl ReliHistory {
         db_wtxn.0.commit().expect("history.commit");
     }
 
-    pub(super) fn db_register(&self, name: &str, db: Rc<dyn ReDbTable>) {
+    pub fn db_register(&self, name: &str, db: Rc<dyn ReDbTable>) {
         self.dbs.borrow_mut().insert(name.to_string(), db);
     }
 
-    pub(super) fn commit(&self) {
+    pub fn commit(&self) {
         // create transaction
         let mut db_wtxn = ReDbRwTxn::new(&self.env).expect("history.write_txn");
 
@@ -69,7 +69,7 @@ impl ReliHistory {
         db_wtxn.0.commit().expect("history.commit");
     }
 
-    pub(super) fn import(&self) {
+    pub fn import(&self) {
         let db_rtxn = ReDbRoTxn::new(&self.env).expect("history.write_txn");
 
         // import from db
@@ -78,7 +78,7 @@ impl ReliHistory {
         }
     }
 
-    pub(super) fn ignore_set(&self, ignore: bool) {
+    pub fn ignore_set(&self, ignore: bool) {
         // set ignore
         *self.ignore.borrow_mut() = ignore;
         for (_, db) in self.dbs.borrow().iter() {
@@ -86,20 +86,20 @@ impl ReliHistory {
         }
     }
 
-    pub(super) fn env(&self) -> &Env {
+    pub fn env(&self) -> &Env {
         &self.env
     }
 
-    pub(super) fn clear(&self) {
+    pub fn clear(&self) {
         self.dbs.borrow_mut().clear();
     }
 
-    pub(super) fn ignore(&self) -> bool {
+    pub fn ignore(&self) -> bool {
         *self.ignore.borrow()
     }
 }
 
-pub(super) fn prepare(dir_str: &str) -> Result<(), Error> {
+pub fn prepare(dir_str: &str) -> Result<(), Error> {
     let history = Path::new(dir_str).join(RELI_HISTORY_DIR);
     if !history.exists() {
         fs::create_dir_all(&history)?;

@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use super::uu_base::UeBase;
-use crate::core::unit::uload_util::UnitFile;
-use crate::core::unit::unit_rentry::{UeConfigInstall, UeConfigUnit};
+use crate::unit::uload_util::UnitFile;
+use crate::unit::unit_rentry::{UeConfigInstall, UeConfigUnit};
 use confique::Config;
 use libutils::serialize::DeserializeWith;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -184,9 +184,9 @@ mod tests {
     use confique::Config;
     use libtests::get_project_root;
 
-    use crate::core::unit::unit_entry::uu_config::UeConfigData;
+    use crate::unit::unit_entry::uu_config::UeConfigData;
     #[test]
-    fn test_service_parse() {
+    fn test_unit_parse() {
         let mut file_path = get_project_root().unwrap();
         file_path.push("test_units/config.service.toml");
 

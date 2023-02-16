@@ -1,7 +1,7 @@
 //! Error definition of libdevice
 //!
 use nix::errno::Errno;
-use snafu::prelude::*;
+use snafu::prelude::Snafu;
 
 /// libdevice error
 #[derive(Debug, Snafu)]
@@ -16,7 +16,7 @@ pub enum Error {
     ))]
     Syscall {
         /// syscall
-        syscall: &'static str,
+        syscall: String,
         /// errno
         errno: Errno,
     },
@@ -25,7 +25,7 @@ pub enum Error {
     #[snafu(display("Error(libdevice): Got an error {}", msg,))]
     Other {
         /// message
-        msg: &'static str,
+        msg: String,
         /// errno
         errno: Option<Errno>,
     },

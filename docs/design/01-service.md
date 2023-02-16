@@ -53,20 +53,20 @@ service是服务管理的主要实现， 用于实现进程或应用的拉起、
 
 ### 4.2    service状态转换图
 
- ![avatar](../res/servcie_state_trans.jpg)
+ ![avatar](assets/service_state_trans.jpg)
 
     状态转换包括子类内部的状态转换以及unit整体的状态转换，具体的对应关系如图中所示。
 
 ### 4.3    service_forking启动设计
 
- ![avatar](../res/service_forking.jpg)
+ ![avatar](assets/service_forking.jpg)
 
 启动类型为forking模式时， sysmaster fork出来的子进程为中间管理进程，中间管理进程退出认为服务启动完成， 中间管理进程
 退出后再启动对应的主进程。
 
 ## 4.4    service_notify启动设计
 
- ![avatar](../res/service_notify.jpg)
+ ![avatar](assets/service_notify.jpg)
 
 1. sysmaster启动inotify监听套接子， 并将unix套接子的路径传递给子进程。
 

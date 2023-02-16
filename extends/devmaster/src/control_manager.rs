@@ -1,9 +1,7 @@
 //! control manager
 //!
-use crate::worker_manager::WorkerManager;
-use crate::JobQueue;
-use libdevice::Device;
-use libevent::*;
+use libdevice::device::Device;
+use libevent::Source;
 use std::time::SystemTime;
 use std::{
     cell::RefCell,
@@ -12,6 +10,9 @@ use std::{
     os::unix::prelude::{AsRawFd, RawFd},
     rc::Rc,
 };
+
+use crate::job_queue::JobQueue;
+use crate::worker_manager::WorkerManager;
 
 /// listening address for control manager
 pub const CONTROL_MANAGER_LISTEN_ADDR: &str = "0.0.0.0:1224";
@@ -28,6 +29,7 @@ pub struct ControlManager {
     // events: Rc<Events>,
 }
 
+/// public methods
 impl ControlManager {
     /// create a control manager instance
     pub fn new(
@@ -41,9 +43,12 @@ impl ControlManager {
             job_queue,
         }
     }
+}
 
+/// internal methods
+impl ControlManager {
     /// process command from devctl
-    pub fn cmd_process(&self, cmd: String) {
+    pub(crate) fn cmd_process(&self, cmd: String) {
         let tokens: Vec<&str> = cmd.split(' ').collect();
 
         let (cmd_kind, devname) = (tokens[0], tokens[1]);

@@ -9,7 +9,6 @@ use heed::Error as heedError;
 use nix::errno::Errno;
 use std::fmt::Debug;
 use std::fs::{self, File};
-
 use std::io::Error;
 use std::path::Path;
 use std::rc::Rc;

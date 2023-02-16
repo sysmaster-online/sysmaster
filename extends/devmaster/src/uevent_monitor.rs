@@ -1,11 +1,12 @@
 //! uevent_monitor
 //!
-use crate::JobQueue;
-use libdevice::*;
-use libevent::*;
+use libdevice::device_monitor::{DeviceMonitor, MonitorNetlinkGroup};
+use libevent::{EventType, Events, Source};
 use nix::errno::Errno;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
+
+use crate::job_queue::JobQueue;
 
 /// uevent monitor
 #[derive(Debug)]
@@ -17,6 +18,7 @@ pub struct Monitor {
     job_queue: Rc<JobQueue>,
 }
 
+/// public methods
 impl Monitor {
     /// create a monitor instance for monitoring uevent from kernel
     pub fn new(job_queue: Rc<JobQueue>) -> Monitor {
@@ -58,13 +60,13 @@ impl Source for Monitor {
         let device = match self.device_monitor.receive_device() {
             Ok(ret) => ret,
             Err(e) => match e {
-                libdevice::Error::Syscall {
+                libdevice::error::Error::Syscall {
                     syscall: _,
                     errno: Errno::EAGAIN,
                 } => {
                     return Ok(0);
                 }
-                libdevice::Error::Syscall {
+                libdevice::error::Error::Syscall {
                     syscall: _,
                     errno: _,
                 } => {

@@ -1,13 +1,14 @@
 #![allow(non_snake_case)]
 use confique::Config;
-use libutils::serialize::DeserializeWith;
 use nix::unistd::Pid;
 use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Serialize};
 use std::os::unix::prelude::RawFd;
 use std::rc::Rc;
+use sysmaster::exec::ExecCommand;
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
-use sysmaster::unit::{ExecCommand, KillMode};
+use sysmaster::serialize::DeserializeWith;
+use sysmaster::unit::KillMode;
 
 struct SocketReDb<K, V>(ReDb<K, V>);
 
@@ -49,7 +50,6 @@ pub(super) struct SectionSocket {
     pub KeepAliveIntervalSec: Option<u32>,
     pub KeepAliveProbes: Option<u32>,
     pub Broadcast: Option<bool>,
-
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub Symlinks: Option<Vec<String>>,
     pub PassSecurity: Option<bool>,

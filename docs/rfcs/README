@@ -1,0 +1,26 @@
+# 0000-rfc template
+
+- submit: by someone on date (首次提交记录)
+- change: by someone on date (修改记录)
+- change: by someone on date
+- issue or PR:
+
+## 介绍(二级标题)
+
+正文
+
+## 目的
+
+## 详细设计
+
+### A模块(三级标题)
+
+### B模块(三级标题)
+
+## 特殊事项
+
+## 当前进展
+
+## 待完成
+
+## 附件

@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use crate::core::unit::{unit_name_to_type, UeConfigInstall, UnitType};
+use crate::unit::{unit_name_to_type, UeConfigInstall, UnitType};
 use bitflags::bitflags;
 use confique::Config;
 use libutils::fs_util;

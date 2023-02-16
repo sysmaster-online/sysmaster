@@ -18,10 +18,10 @@ use super::unit_rentry::{JobMode, UnitLoadState, UnitRe};
 use super::unit_runtime::UnitRT;
 use super::UnitRelationAtom;
 use super::UnitRelations;
-use crate::core::butil::table::{TableOp, TableSubscribe};
-use crate::core::manager::manager::State;
-use crate::core::manager::pre_install::{Install, PresetMode};
-use crate::core::unit::data::{DataManager, UnitState};
+use crate::manager::manager::State;
+use crate::manager::pre_install::{Install, PresetMode};
+use crate::unit::data::{DataManager, UnitState};
+use crate::utils::table::{TableOp, TableSubscribe};
 use libevent::Events;
 use libutils::path_lookup::LookupPaths;
 use libutils::proc_cmdline::get_process_cmdline;
@@ -42,7 +42,7 @@ use sysmaster::unit::{UmIf, UnitActiveState, UnitDependencyMask, UnitType};
 use unit_submanager::UnitSubManagers;
 
 //#[derive(Debug)]
-pub(in crate::core) struct UnitManagerX {
+pub(crate) struct UnitManagerX {
     dm: Rc<DataManager>,
     sub_name: String, // key for table-subscriber: UnitState
     data: Rc<UnitManager>,
@@ -59,7 +59,7 @@ impl Drop for UnitManagerX {
 }
 
 impl UnitManagerX {
-    pub(in crate::core) fn new(
+    pub(crate) fn new(
         eventr: &Rc<Events>,
         relir: &Rc<Reliability>,
         lookup_path: &Rc<LookupPaths>,
@@ -87,7 +87,7 @@ impl UnitManagerX {
         *self.state.borrow_mut() = state;
     }
 
-    pub(in crate::core) fn register_ex(&self) {
+    pub(crate) fn register_ex(&self) {
         self.data.register_ex();
     }
 
@@ -96,35 +96,35 @@ impl UnitManagerX {
         self.data.entry_clear();
     }
 
-    pub(in crate::core) fn entry_coldplug(&self) {
+    pub(crate) fn entry_coldplug(&self) {
         self.data.entry_coldplug();
     }
 
-    pub(in crate::core) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub(crate) fn start_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.data.start_unit(name)
     }
 
-    pub(in crate::core) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub(crate) fn stop_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.data.stop_unit(name)
     }
 
-    pub(in crate::core) fn restart_unit(&self, name: &str) -> Result<(), MngErrno> {
+    pub(crate) fn restart_unit(&self, name: &str) -> Result<(), MngErrno> {
         self.data.restart_unit(name)
     }
 
-    pub(in crate::core) fn get_unit_status(&self, name: &str) -> Result<String, MngErrno> {
+    pub(crate) fn get_unit_status(&self, name: &str) -> Result<String, MngErrno> {
         self.data.get_unit_status(name)
     }
 
-    pub(in crate::core) fn get_all_units(&self) -> Result<String, MngErrno> {
+    pub(crate) fn get_all_units(&self) -> Result<String, MngErrno> {
         self.data.get_all_units()
     }
 
-    pub(in crate::core) fn child_sigchld_enable(&self, enable: bool) -> Result<i32> {
+    pub(crate) fn child_sigchld_enable(&self, enable: bool) -> Result<i32> {
         self.data.sigchld.enable(enable)
     }
 
-    pub(in crate::core) fn dispatch_load_queue(&self) {
+    pub(crate) fn dispatch_load_queue(&self) {
         self.data.rt.dispatch_load_queue()
     }
 
@@ -144,21 +144,21 @@ impl UnitManagerX {
         relir.station_register(&String::from("UnitManager"), kind, station);
     }
 
-    pub(in crate::core) fn enable_unit(&self, unit_file: &str) -> Result<(), Error> {
+    pub(crate) fn enable_unit(&self, unit_file: &str) -> Result<(), Error> {
         log::debug!("unit enable file {}", unit_file);
         let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
         install.unit_enable_files(unit_file)?;
         Ok(())
     }
 
-    pub(in crate::core) fn disable_unit(&self, unit_file: &str) -> Result<(), Error> {
+    pub(crate) fn disable_unit(&self, unit_file: &str) -> Result<(), Error> {
         log::debug!("unit disable file {}", unit_file);
         let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
         install.unit_disable_files(unit_file)?;
         Ok(())
     }
 
-    pub(in crate::core) fn mask_unit(&self, unit_file: &str) -> Result<(), Error> {
+    pub(crate) fn mask_unit(&self, unit_file: &str) -> Result<(), Error> {
         log::debug!("unit mask file {}", unit_file);
         let link_name_path =
             std::path::Path::new(libutils::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
@@ -173,7 +173,7 @@ impl UnitManagerX {
         }
     }
 
-    pub(in crate::core) fn unmask_unit(&self, unit_file: &str) -> Result<(), Error> {
+    pub(crate) fn unmask_unit(&self, unit_file: &str) -> Result<(), Error> {
         log::debug!("unit unmask file {}", unit_file);
         let link_name_path =
             std::path::Path::new(libutils::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
@@ -407,6 +407,10 @@ impl UmIf for UnitManager {
         } else {
             Err(UnitActionError::UnitActionENoent)
         }
+    }
+
+    fn restart_unit(&self, name: &str) -> Result<(), MngErrno> {
+        self.restart_unit(name)
     }
 }
 
@@ -685,7 +689,7 @@ impl UnitManager {
     }
 
     #[allow(dead_code)]
-    pub(in crate::core) fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {
+    pub(crate) fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {
         self.db.get_unit_by_pid(pid)
     }
 
@@ -1050,7 +1054,7 @@ impl ReStation for UnitManager {
 }*/
 
 mod unit_submanager {
-    use crate::core::plugin::Plugin;
+    use crate::plugin::Plugin;
 
     use super::UnitManager;
     use std::cell::RefCell;
@@ -1182,12 +1186,12 @@ mod unit_submanager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::mount::mount_setup;
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::mount::mount_setup;
     use libevent::Events;
     use libutils::logger;
     use nix::errno::Errno;
-    use nix::sys::signal::Signal;
+    use nix::sys::wait::WaitStatus;
     use std::thread;
     use std::time::Duration;
     use sysmaster::unit::UnitActiveState;
@@ -1270,7 +1274,8 @@ mod tests {
         assert!(ret.is_ok());
 
         thread::sleep(Duration::from_secs(4));
-        u.sigchld_events(Pid::from_raw(-1), 0, Signal::SIGCHLD);
+        let wait_status = WaitStatus::Exited(Pid::from_raw(-1), 0);
+        u.sigchld_events(wait_status);
         assert_eq!(u.active_state(), UnitActiveState::UnitActive);
 
         let ret = u.stop(false);
@@ -1279,7 +1284,7 @@ mod tests {
 
         thread::sleep(Duration::from_secs(4));
         assert_eq!(u.active_state(), UnitActiveState::UnitDeActivating);
-        u.sigchld_events(Pid::from_raw(-1), 0, Signal::SIGCHLD);
+        u.sigchld_events(wait_status);
 
         assert_eq!(u.active_state(), UnitActiveState::UnitInActive);
     }

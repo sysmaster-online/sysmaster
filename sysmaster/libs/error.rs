@@ -2,10 +2,26 @@
 use libcmdproto::proto::execute::ExecCmdErrno;
 use snafu::prelude::*;
 
+/// Error for exec command
+#[allow(missing_docs)]
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub))]
+#[non_exhaustive]
+pub enum ExecCmdError {
+    #[snafu(display("Timeout(ExecCmdError)"))]
+    Timeout,
+    #[snafu(display("NoCmdFound(ExecCmdError)"))]
+    NoCmdFound,
+    #[snafu(display("SpawnError(ExecCmdError)"))]
+    SpawnError,
+    #[snafu(display("CgroupError(ExecCmdError): {}", msg))]
+    CgroupError { msg: String },
+}
+
 /// UnitAction Error
 #[allow(missing_docs)]
 #[derive(Debug, Snafu)]
-#[snafu(visibility(pub(crate)))]
+#[snafu(visibility(pub))]
 #[non_exhaustive]
 pub enum UnitActionError {
     #[snafu(display("EAgain(UnitActionError)"))]
@@ -41,7 +57,7 @@ pub enum UnitActionError {
 /// error number of manager
 #[allow(missing_docs)]
 #[derive(Debug, Snafu)]
-#[snafu(visibility(pub(crate)))]
+#[snafu(visibility(pub))]
 #[non_exhaustive]
 pub enum MngErrno {
     #[snafu(display("Input(ManagerError)"))]

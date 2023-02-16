@@ -3,8 +3,8 @@ use super::unit_entry::UnitX;
 use super::unit_rentry::UnitLoadState;
 use super::unit_rentry::{UnitRe, UnitRePps};
 use super::{UnitRelations, UnitType};
-use crate::core::butil::table::{TableOp, TableSubscribe};
-use crate::core::manager::rentry::ReliLastQue;
+use crate::manager::rentry::ReliLastQue;
+use crate::utils::table::{TableOp, TableSubscribe};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::convert::TryFrom;
@@ -348,10 +348,10 @@ fn dispatch_target_dep_unit(db: &Rc<UnitDb>, unit: &Rc<UnitX>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::manager::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::data::DataManager;
-    use crate::core::unit::test;
-    use crate::core::unit::unit_rentry::UnitRe;
+    use crate::manager::RELI_HISTORY_MAX_DBS;
+    use crate::unit::data::DataManager;
+    use crate::unit::test;
+    use crate::unit::unit_rentry::UnitRe;
     use libutils::logger;
     use sysmaster::rel::Reliability;
 

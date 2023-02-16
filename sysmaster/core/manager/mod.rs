@@ -1,11 +1,11 @@
 pub use manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 
 #[cfg(test)]
-pub(in crate::core) use rentry::RELI_HISTORY_MAX_DBS;
+pub(crate) use rentry::RELI_HISTORY_MAX_DBS;
 
-pub(in crate::core) mod commands;
-pub(in crate::core) mod config;
-pub(in crate::core) mod manager;
-pub(in crate::core) mod pre_install;
-pub(in crate::core) mod rentry;
-pub(in crate::core) mod signals;
+pub(crate) mod commands;
+pub(crate) mod config;
+pub(crate) mod manager;
+pub(crate) mod pre_install;
+pub(crate) mod rentry;
+pub(crate) mod signals;

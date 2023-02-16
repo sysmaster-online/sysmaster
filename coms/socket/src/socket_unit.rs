@@ -8,11 +8,12 @@ use crate::{
     socket_load::SocketLoad, socket_mng::SocketMng,
 };
 use libutils::logger;
-use nix::{sys::signal::Signal, unistd::Pid};
+use nix::sys::wait::WaitStatus;
 use std::{error::Error, path::PathBuf, rc::Rc};
 use sysmaster::error::UnitActionError;
+use sysmaster::exec::ExecContext;
 use sysmaster::rel::{ReStation, Reliability};
-use sysmaster::unit::{ExecContext, SubUnit, UmIf, UnitActiveState, UnitBase, UnitMngUtil};
+use sysmaster::unit::{SubUnit, UmIf, UnitActiveState, UnitBase, UnitMngUtil};
 
 // the structuer of the socket unit type
 struct SocketUnit {
@@ -95,8 +96,8 @@ impl SubUnit for SocketUnit {
 
     fn reload(&self) {}
 
-    fn sigchld_events(&self, pid: Pid, code: i32, status: Signal) {
-        self.mng.sigchld_event(pid, code, status)
+    fn sigchld_events(&self, wait_status: WaitStatus) {
+        self.mng.sigchld_event(wait_status)
     }
 
     fn current_active_state(&self) -> UnitActiveState {

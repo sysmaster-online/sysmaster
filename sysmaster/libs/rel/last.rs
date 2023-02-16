@@ -14,7 +14,7 @@ const RELI_DB_LFRAME: &str = "frame";
 static RELI_LAST_DB_NAME: [&str; RELI_LAST_MAX_DBS as usize] = [RELI_DB_LUNIT, RELI_DB_LFRAME];
 const RELI_LAST_KEY: u32 = 0; // singleton
 
-pub(super) struct ReliLast {
+pub struct ReliLast {
     // control
     ignore: RefCell<bool>,
 
@@ -38,7 +38,7 @@ impl fmt::Debug for ReliLast {
 }
 
 impl ReliLast {
-    pub(super) fn new(dir_str: &str) -> ReliLast {
+    pub fn new(dir_str: &str) -> ReliLast {
         // init environment
         let path = Path::new(dir_str).join(RELI_LAST_DIR);
         let env = EnvOpenOptions::new()
@@ -59,18 +59,18 @@ impl ReliLast {
         }
     }
 
-    pub(super) fn data_clear(&self) {
+    pub fn data_clear(&self) {
         let mut wtxn = self.env.write_txn().expect("last.write_txn");
         self.unit.clear(&mut wtxn).expect("clear.put");
         self.frame.clear(&mut wtxn).expect("clear.put");
         wtxn.commit().expect("last.commit");
     }
 
-    pub(super) fn ignore_set(&self, ignore: bool) {
+    pub fn ignore_set(&self, ignore: bool) {
         *self.ignore.borrow_mut() = ignore;
     }
 
-    pub(super) fn set_unit(&self, unit_id: &str) {
+    pub fn set_unit(&self, unit_id: &str) {
         if self.ignore() {
             return;
         }
@@ -82,7 +82,7 @@ impl ReliLast {
         wtxn.commit().expect("last.commit");
     }
 
-    pub(super) fn clear_unit(&self) {
+    pub fn clear_unit(&self) {
         if self.ignore() {
             return;
         }
@@ -94,7 +94,7 @@ impl ReliLast {
         wtxn.commit().expect("last.commit");
     }
 
-    pub(super) fn set_frame(&self, f1: u32, f2: Option<u32>, f3: Option<u32>) {
+    pub fn set_frame(&self, f1: u32, f2: Option<u32>, f3: Option<u32>) {
         if self.ignore() {
             return;
         }
@@ -111,7 +111,7 @@ impl ReliLast {
         wtxn.commit().expect("last.commit");
     }
 
-    pub(super) fn clear_frame(&self) {
+    pub fn clear_frame(&self) {
         if self.ignore() {
             return;
         }
@@ -128,13 +128,13 @@ impl ReliLast {
         wtxn.commit().expect("last.commit");
     }
 
-    pub(super) fn unit(&self) -> Option<String> {
+    pub fn unit(&self) -> Option<String> {
         let rtxn = self.env.read_txn().expect("last.read_txn");
         let unit_id = self.unit.get(&rtxn, &RELI_LAST_KEY).unwrap_or(None);
         unit_id.map(|u| u.to_string())
     }
 
-    pub(super) fn frame(&self) -> Option<ReliFrame> {
+    pub fn frame(&self) -> Option<ReliFrame> {
         let rtxn = self.env.read_txn().expect("last.read_txn");
         let frame = self.frame.get(&rtxn, &RELI_LAST_KEY).unwrap_or(None);
         match frame {
@@ -143,7 +143,7 @@ impl ReliLast {
         }
     }
 
-    pub(super) fn ignore(&self) -> bool {
+    pub fn ignore(&self) -> bool {
         *self.ignore.borrow()
     }
 
@@ -163,7 +163,7 @@ impl ReliLast {
     }
 }
 
-pub(super) fn prepare(dir_str: &str) -> Result<(), Error> {
+pub fn prepare(dir_str: &str) -> Result<(), Error> {
     let last = Path::new(dir_str).join(RELI_LAST_DIR);
     if !last.exists() {
         fs::create_dir_all(&last)?;

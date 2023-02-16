@@ -6,7 +6,7 @@ pub(super) struct StartLimit {
 }
 
 #[derive(PartialEq, Eq)]
-pub(in crate::core) enum StartLimitResult {
+pub(crate) enum StartLimitResult {
     StartLimitNotHit,
     StartLimitHit,
 }

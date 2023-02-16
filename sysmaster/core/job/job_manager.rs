@@ -7,8 +7,8 @@ use super::job_table::{self, JobTable};
 use super::job_transaction::{self};
 use super::job_unit_entry::{self};
 use super::JobErrno;
-use crate::core::butil::table::{TableOp, TableSubscribe};
-use crate::core::unit::{JobMode, UnitDb, UnitRelationAtom, UnitX};
+use crate::unit::{JobMode, UnitDb, UnitRelationAtom, UnitX};
+use crate::utils::table::{TableOp, TableSubscribe};
 use libevent::{EventState, EventType, Events, Source};
 use libutils::Result;
 use std::cell::RefCell;
@@ -17,18 +17,18 @@ use sysmaster::rel::{ReStation, ReliLastFrame, Reliability};
 use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
 #[derive(Debug)]
-pub(in crate::core) struct JobAffect {
+pub(crate) struct JobAffect {
     // data
-    pub(in crate::core) adds: Vec<JobInfo>,
-    pub(in crate::core) dels: Vec<JobInfo>,
-    pub(in crate::core) updates: Vec<JobInfo>,
+    pub(crate) adds: Vec<JobInfo>,
+    pub(crate) dels: Vec<JobInfo>,
+    pub(crate) updates: Vec<JobInfo>,
 
     // control
     interested: bool,
 }
 
 impl JobAffect {
-    pub(in crate::core) fn new(interested: bool) -> JobAffect {
+    pub(crate) fn new(interested: bool) -> JobAffect {
         JobAffect {
             adds: Vec::new(),
             dels: Vec::new(),
@@ -49,7 +49,7 @@ impl JobAffect {
     }
 }
 
-pub(in crate::core) struct JobManager {
+pub(crate) struct JobManager {
     // associated objects
     event: Rc<Events>,
 
@@ -118,7 +118,7 @@ impl Drop for JobManager {
 }
 
 impl JobManager {
-    pub(in crate::core) fn new(
+    pub(crate) fn new(
         eventr: &Rc<Events>,
         relir: &Rc<Reliability>,
         dbr: &Rc<UnitDb>,
@@ -132,22 +132,22 @@ impl JobManager {
         jm
     }
 
-    pub(in crate::core) fn coldplug_unit(&self, unit: &UnitX) {
+    pub(crate) fn coldplug_unit(&self, unit: &UnitX) {
         self.data.coldplug_unit(unit);
     }
 
-    pub(in crate::core) fn rentry_trigger_merge(&self, unit_id: &str, force: bool) {
+    pub(crate) fn rentry_trigger_merge(&self, unit_id: &str, force: bool) {
         self.data.rentry_trigger_merge(unit_id, force);
     }
 
-    pub(in crate::core) fn trigger_unit(&self, lunit: &str) {
+    pub(crate) fn trigger_unit(&self, lunit: &str) {
         let unit = self.data.db.units_get(lunit).unwrap();
         let cnt = self.data.run(Some(&unit));
         assert_ne!(cnt, 0); // something must be triggered
         self.try_enable();
     }
 
-    pub(in crate::core) fn exec(
+    pub(crate) fn exec(
         &self,
         config: &JobConf,
         mode: JobMode,
@@ -159,13 +159,13 @@ impl JobManager {
     }
 
     #[allow(dead_code)]
-    pub(in crate::core) fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
+    pub(crate) fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
         self.data.notify(config, mode)?;
         self.try_enable();
         Ok(())
     }
 
-    pub(in crate::core) fn try_finish(
+    pub(crate) fn try_finish(
         &self,
         unit: &Rc<UnitX>,
         os: UnitActiveState,
@@ -178,22 +178,22 @@ impl JobManager {
     }
 
     #[allow(dead_code)]
-    pub(in crate::core) fn remove(&self, id: u32) -> Result<(), JobErrno> {
+    pub(crate) fn remove(&self, id: u32) -> Result<(), JobErrno> {
         self.data.remove(id)?;
         self.try_enable();
         Ok(())
     }
 
     #[allow(dead_code)]
-    pub(in crate::core) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
+    pub(crate) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
         self.data.get_jobinfo(id)
     }
 
-    pub(in crate::core) fn has_stop_job(&self, unit: &Rc<UnitX>) -> bool {
+    pub(crate) fn has_stop_job(&self, unit: &Rc<UnitX>) -> bool {
         self.data.get_suspends(unit).is_some()
     }
 
-    pub(in crate::core) fn has_start_like_job(&self, unit: &Rc<UnitX>) -> bool {
+    pub(crate) fn has_start_like_job(&self, unit: &Rc<UnitX>) -> bool {
         self.data.jobs.get_suspend(unit, JobKind::Start).is_some()
             | self
                 .data
@@ -797,10 +797,10 @@ fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno
 mod tests {
     use super::super::JobStage;
     use super::*;
-    use crate::core::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::core::unit::test_utils;
-    use crate::core::unit::DataManager;
-    use crate::core::unit::{UnitRe, UnitRelations};
+    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::unit::test_utils;
+    use crate::unit::DataManager;
+    use crate::unit::{UnitRe, UnitRelations};
     use libutils::logger;
 
     //#[test]

@@ -1,6 +1,4 @@
 use super::super::unit_entry::Unit;
-use sysmaster::unit::{ExecCmdError, ExecCommand, ExecContext, ExecParameters};
-
 use libutils::fd_util;
 use nix::fcntl::FcntlArg;
 use nix::sys::stat::Mode;
@@ -12,17 +10,19 @@ use std::process;
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
+use sysmaster::error::ExecCmdError;
+use sysmaster::exec::{ExecCommand, ExecContext, ExecParameters};
 use walkdir::DirEntry;
 use walkdir::WalkDir;
 
-pub(in crate::core::unit) struct ExecSpawn;
+pub(in crate::unit) struct ExecSpawn;
 
 impl ExecSpawn {
-    pub(in crate::core::unit) fn new() -> ExecSpawn {
+    pub(in crate::unit) fn new() -> ExecSpawn {
         ExecSpawn
     }
 
-    pub(in crate::core::unit) fn spawn(
+    pub(in crate::unit) fn spawn(
         &self,
         unit: &Unit,
         cmdline: &ExecCommand,
@@ -35,7 +35,7 @@ impl ExecSpawn {
             Ok(ForkResult::Parent { child }) => {
                 log::debug!("child pid is :{}", child);
                 libcgroup::cg_attach(child, &unit.cg_path())
-                    .map_err(|e| ExecCmdError::CgroupError(e.to_string()))?;
+                    .map_err(|e| ExecCmdError::CgroupError { msg: e.to_string() })?;
                 Ok(child)
             }
             Ok(ForkResult::Child) => {

@@ -1,10 +1,10 @@
 #![allow(non_snake_case)]
 
-use crate::core::manager::rentry::{
+use crate::manager::rentry::{
     RELI_DB_HUM_NOTIFY, RELI_DB_HUNIT_BASE, RELI_DB_HUNIT_CGROUP, RELI_DB_HUNIT_CHILD,
     RELI_DB_HUNIT_CONFIG, RELI_DB_HUNIT_DEP, RELI_DB_HUNIT_LOAD, RELI_DB_HUNIT_PPS,
 };
-use crate::core::unit::unit_entry::UnitEmergencyAction;
+use crate::unit::unit_entry::UnitEmergencyAction;
 use bitflags::bitflags;
 use confique::Config;
 use libutils::serialize::DeserializeWith;
@@ -264,7 +264,7 @@ impl UmReNotify {
     }
 }
 
-pub(in crate::core) struct UnitRe {
+pub(crate) struct UnitRe {
     // database: multi-instance(N)
     base: Rc<ReDb<String, UnitReBase>>, // RELI_DB_HUNIT_BASE; key: unit_id, data: unit_type;
     load: Rc<ReDb<String, UnitReLoad>>, // RELI_DB_HUNIT_LOAD; key: unit_id, data: load_state;

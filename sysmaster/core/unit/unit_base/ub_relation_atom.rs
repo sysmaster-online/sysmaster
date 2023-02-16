@@ -1,9 +1,7 @@
 use super::super::{UnitRelationAtom, UnitRelations};
 
 #[allow(dead_code)]
-pub(in crate::core::unit) fn unit_relation_to_atom(
-    relation: UnitRelations,
-) -> Vec<UnitRelationAtom> {
+pub(in crate::unit) fn unit_relation_to_atom(relation: UnitRelations) -> Vec<UnitRelationAtom> {
     let mut atoms = Vec::new();
     match relation {
         UnitRelations::UnitRequires => {
@@ -134,7 +132,7 @@ pub(in crate::core::unit) fn unit_relation_to_atom(
     atoms
 }
 
-pub(in crate::core::unit) fn unit_relation_from_unique_atom(
+pub(in crate::unit) fn unit_relation_from_unique_atom(
     atom: UnitRelationAtom,
 ) -> Vec<UnitRelations> {
     let mut deps = Vec::new();

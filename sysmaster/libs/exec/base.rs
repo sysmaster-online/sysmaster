@@ -3,19 +3,6 @@ use nix::sys::stat::Mode;
 use nix::unistd::{Group, Uid, User};
 use std::{cell::RefCell, collections::HashMap, error::Error, ffi::CString, path::PathBuf, rc::Rc};
 
-/// the error
-#[derive(Debug)]
-pub enum ExecCmdError {
-    /// exec command error for timeout
-    Timeout,
-    /// exec error for not found command
-    NoCmdFound,
-    /// exec error for fork child error
-    SpawnError,
-    /// exec error for create cgroup error
-    CgroupError(String),
-}
-
 /// the exec context that was parse from the unit file.
 /// like parsed from Environment field.
 pub struct ExecContext {

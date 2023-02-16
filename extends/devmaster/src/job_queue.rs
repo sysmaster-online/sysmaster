@@ -1,12 +1,13 @@
 //! job queue
 //!
-use crate::worker_manager::{Worker, WorkerManager};
-use libdevice::Device;
+use libdevice::device::Device;
 use std::cell::RefCell;
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use std::collections::VecDeque;
 use std::fmt::{self, Display};
 use std::rc::{Rc, Weak};
+
+use crate::worker_manager::{Worker, WorkerManager};
 
 /// state of device job
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -46,6 +47,7 @@ pub struct DeviceJob {
     pub worker: RefCell<Option<Weak<Worker>>>,
 }
 
+/// public methods
 impl DeviceJob {
     /// create a device job
     pub fn new(device: Device, state: JobState, seqnum: u64) -> DeviceJob {
@@ -56,15 +58,18 @@ impl DeviceJob {
             worker: RefCell::new(None),
         }
     }
+}
 
+/// internal methods
+impl DeviceJob {
     /// bind a device job to a unique worker
-    pub fn bind(self: &Rc<DeviceJob>, worker: &Rc<Worker>) {
+    pub(crate) fn bind(self: &Rc<DeviceJob>, worker: &Rc<Worker>) {
         *self.worker.borrow_mut() = Some(Rc::downgrade(worker));
         worker.bind(self);
     }
 
     /// free a device job
-    pub fn job_free(self: &Rc<DeviceJob>) {
+    pub(crate) fn job_free(self: &Rc<DeviceJob>) {
         self.worker
             .borrow()
             .as_ref()
@@ -76,12 +81,12 @@ impl DeviceJob {
     }
 
     /// get the state of device job
-    pub fn get_state(&self) -> JobState {
+    pub(crate) fn get_state(&self) -> JobState {
         *self.state.borrow()
     }
 
     /// set state of device job
-    pub fn set_state(&self, state: JobState) {
+    pub(crate) fn set_state(&self, state: JobState) {
         *self.state.borrow_mut() = state;
     }
 }
@@ -119,17 +124,21 @@ pub struct JobQueue {
     worker_manager: Rc<WorkerManager>,
 }
 
+/// public methods
 impl JobQueue {
-    ///
+    /// create a job queue
     pub fn new(worker_manager: Rc<WorkerManager>) -> JobQueue {
         JobQueue {
             jobs: RefCell::new(VecDeque::new()),
             worker_manager,
         }
     }
+}
 
+/// internal methods
+impl JobQueue {
     /// dispatch job to worker manager
-    pub fn job_queue_start(&self) {
+    pub(crate) fn job_queue_start(&self) {
         if self.jobs.borrow().is_empty() {
             log::debug!("Job Queue: job queue is empty");
             return;
@@ -138,7 +147,7 @@ impl JobQueue {
         // self.job_queue_show_state();
 
         for job in self.jobs.borrow().iter() {
-            match *job.state.borrow() {
+            match job.get_state() {
                 JobState::Queued => {}
                 JobState::Running | JobState::Undef => {
                     continue;
@@ -150,7 +159,7 @@ impl JobQueue {
 
             match self.worker_manager.job_dispatch(job.clone()) {
                 Ok(worker) => {
-                    *job.state.borrow_mut() = JobState::Running;
+                    job.set_state(JobState::Running);
                     job.bind(&worker);
                     log::debug!(
                         "Job Queue: dispatch job {} to worker {}",
@@ -167,7 +176,7 @@ impl JobQueue {
     }
 
     /// encapsulate device into a device job and insert it into job queue
-    pub fn job_queue_insert(&self, device: Device) {
+    pub(crate) fn job_queue_insert(&self, device: Device) {
         let seqnum: u64 = match device.get_seqnum() {
             Some(seqnum) => seqnum,
             None => {
@@ -201,21 +210,21 @@ impl JobQueue {
         log::debug!("Job Queue: insert job {seqnum}");
     }
 
-    /// cleanup the job queue, if match_state is Undef, cleanup all jobs, otherwise just retain the unmatched jobs
-    pub fn job_queue_cleanup(&self, match_state: JobState) {
-        self.jobs.borrow_mut().retain_mut(|job| {
-            if match_state != JobState::Undef && match_state != *job.state.borrow() {
-                return true;
-            }
+    // /// cleanup the job queue, if match_state is Undef, cleanup all jobs, otherwise just retain the unmatched jobs
+    // pub(crate) fn job_queue_cleanup(&self, match_state: JobState) {
+    //     self.jobs.borrow_mut().retain_mut(|job| {
+    //         if match_state != JobState::Undef && match_state != job.get_state() {
+    //             return true;
+    //         }
 
-            false
-        });
+    //         false
+    //     });
 
-        log::debug!("Job Queue: cleanup");
-    }
+    //     log::debug!("Job Queue: cleanup");
+    // }
 
     /// free a job from job queue
-    pub fn job_free(&self, job: &Rc<DeviceJob>) {
+    pub(crate) fn job_free(&self, job: &Rc<DeviceJob>) {
         job.job_free();
 
         let idx = match self.jobs.borrow().binary_search(job) {
@@ -236,10 +245,10 @@ impl JobQueue {
         }
     }
 
-    /// show states of each device job in the job queue
-    pub fn job_queue_show_state(&self) {
-        for job in self.jobs.borrow().iter() {
-            log::debug!("{job:?}");
-        }
-    }
+    // /// show states of each device job in the job queue
+    // pub(crate) fn job_queue_show_state(&self) {
+    //     for job in self.jobs.borrow().iter() {
+    //         log::debug!("{job:?}");
+    //     }
+    // }
 }

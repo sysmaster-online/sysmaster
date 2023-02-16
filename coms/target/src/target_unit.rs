@@ -6,6 +6,7 @@ use super::target_base::PLUGIN_NAME;
 use super::target_comm::TargetUnitComm;
 use super::target_mng::TargetMng;
 use libutils::logger;
+use nix::sys::wait::WaitStatus;
 use std::cell::RefCell;
 use std::{path::PathBuf, rc::Rc};
 use sysmaster::error::UnitActionError;
@@ -153,13 +154,7 @@ impl SubUnit for Target {
 
     fn release_resources(&self) {}
 
-    fn sigchld_events(
-        &self,
-        _pid: nix::unistd::Pid,
-        _code: i32,
-        _status: nix::sys::signal::Signal,
-    ) {
-    }
+    fn sigchld_events(&self, _wait_status: WaitStatus) {}
 
     fn reset_failed(&self) {}
 }

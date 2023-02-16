@@ -1,6 +1,6 @@
 use super::unit_datastore::UnitDb;
 /// need to move to other directory,maybe manager
-use crate::core::job::JobManager;
+use crate::job::JobManager;
 use libevent::{EventState, EventType, Events, Source};
 use libutils::Result;
 use nix::errno::Errno;
@@ -186,7 +186,7 @@ impl SigchldData {
         }
 
         // check
-        let (pid, code, signal) = si.unwrap();
+        let (pid, _code, _signal) = si.unwrap();
         if pid.as_raw() <= 0 {
             log::debug!("invalid pid in signal: {:?}", pid);
             return false; // turn_off
@@ -195,7 +195,7 @@ impl SigchldData {
         // record + action
         if let Some(unit) = self.db.get_unit_by_pid(pid) {
             self.reli.set_last_unit(unit.id());
-            unit.sigchld_events(pid, code, signal);
+            unit.sigchld_events(wait_status);
             self.db.child_unwatch_pid(unit.id(), pid);
             self.reli.clear_last_unit();
         } else {
