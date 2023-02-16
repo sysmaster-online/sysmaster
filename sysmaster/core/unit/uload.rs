@@ -1,17 +1,16 @@
-use libutils::path_lookup::LookupPaths;
-use sysmaster::unit::UnitType;
-
-use super::unit_manager::UnitManager;
+use super::manager::UnitManager;
 use crate::plugin::Plugin;
 use crate::unit::data::{DataManager, UnitDepConf};
+use crate::unit::rentry::{self, UnitRe};
+use crate::unit::runtime::UnitRT;
 use crate::unit::uload_util::UnitFile;
 use crate::unit::unit_datastore::UnitDb;
 use crate::unit::unit_entry::UnitX;
-use crate::unit::unit_rentry::{self, UnitRe};
-use crate::unit::unit_runtime::UnitRT;
 use crate::utils::table::{TableOp, TableSubscribe};
+use libutils::path_lookup::LookupPaths;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
+use sysmaster::unit::UnitType;
 
 //#[derive(Debug)]
 pub(super) struct UnitLoad {
@@ -129,7 +128,7 @@ impl UnitLoadData {
     }
 
     pub(self) fn try_new_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-        let unit_type = unit_rentry::unit_name_to_type(name);
+        let unit_type = rentry::unit_name_to_type(name);
         if unit_type == UnitType::UnitTypeInvalid {
             return None;
         }

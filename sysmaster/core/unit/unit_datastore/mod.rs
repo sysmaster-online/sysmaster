@@ -1,5 +1,5 @@
+use super::rentry::UnitRe;
 use super::unit_entry::UnitX;
-use super::unit_rentry::UnitRe;
 use super::UnitErrno;
 use super::{UnitRelationAtom, UnitRelations, UnitType};
 use crate::utils::table;

@@ -8,21 +8,21 @@
 //!  [unit_entry]: Definition of unit related objects
 //!  [unit_manager]: Manager all Unit Instances in sysmaster
 //!  [um_interface]: Share api of unit_manager for subunit
+pub(super) use manager::UnitManagerX;
+pub use rentry::UeConfigInstall;
+pub(super) use rentry::{unit_name_to_type, JobMode};
 pub(crate) use sysmaster::unit::UnitRelationAtom;
 pub(crate) use sysmaster::unit::{UnitRelations, UnitType};
 pub(super) use unit_datastore::UnitDb;
 pub(super) use unit_entry::UnitX;
-pub(super) use unit_manager::UnitManagerX;
-pub use unit_rentry::UeConfigInstall;
-pub(super) use unit_rentry::{unit_name_to_type, JobMode};
 
 #[cfg(test)]
 pub(super) use data::DataManager;
 
 #[cfg(test)]
-pub(super) use test::test_utils;
+pub(super) use rentry::UnitRe;
 #[cfg(test)]
-pub(super) use unit_rentry::UnitRe;
+pub(super) use test::test_utils;
 
 ///
 #[allow(dead_code)]
@@ -45,15 +45,15 @@ pub enum UnitErrno {
 
 mod data;
 mod execute;
+mod manager;
 mod notify;
+mod rentry;
+mod runtime;
 mod sigchld;
 #[cfg(test)]
 mod test;
+mod uload;
 mod uload_util;
 mod unit_base;
 mod unit_datastore;
 mod unit_entry;
-mod unit_load;
-mod unit_manager;
-mod unit_rentry;
-mod unit_runtime;

@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use super::uu_base::UeBase;
+use crate::unit::rentry::{UeConfigInstall, UeConfigUnit};
 use crate::unit::uload_util::UnitFile;
-use crate::unit::unit_rentry::{UeConfigInstall, UeConfigUnit};
 use confique::Config;
 use libutils::serialize::DeserializeWith;
 use serde::{Deserialize, Deserializer, Serialize};

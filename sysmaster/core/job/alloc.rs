@@ -1,5 +1,5 @@
-use super::job_entry::{Job, JobConf};
-use super::job_rentry::{JobKind, JobRe};
+use super::entry::{Job, JobConf};
+use super::rentry::{JobKind, JobRe};
 use crate::unit::UnitX;
 use std::cell::RefCell;
 use std::collections::HashSet;

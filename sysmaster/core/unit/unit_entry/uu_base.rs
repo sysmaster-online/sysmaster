@@ -1,4 +1,4 @@
-use crate::unit::unit_rentry::{UeConfigInstall, UeConfigUnit, UnitLoadState, UnitRe, UnitRePps};
+use crate::unit::rentry::{UeConfigInstall, UeConfigUnit, UnitLoadState, UnitRe, UnitRePps};
 use nix::unistd::Pid;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;

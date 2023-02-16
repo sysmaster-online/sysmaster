@@ -1,5 +1,5 @@
-use super::job_entry::JobConf;
-use super::job_rentry::JobKind;
+use super::entry::JobConf;
+use super::rentry::JobKind;
 use crate::unit::JobMode;
 use crate::unit::UnitDb;
 use crate::unit::UnitRelationAtom;

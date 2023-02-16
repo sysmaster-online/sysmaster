@@ -1,5 +1,5 @@
-use super::job_entry::{Job, JobResult, JobStage};
-use super::job_rentry::JobKind;
+use super::entry::{Job, JobResult, JobStage};
+use super::rentry::JobKind;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -428,7 +428,7 @@ fn value_try_sub(value: &mut usize, sub: usize) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::super::job_rentry::JobRe;
+    use super::super::rentry::JobRe;
     use super::*;
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::unit::test_utils;

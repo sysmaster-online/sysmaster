@@ -10,16 +10,16 @@
 use super::super::job::{JobAffect, JobConf, JobKind, JobManager};
 use super::execute::ExecSpawn;
 use super::notify::NotifyManager;
+use super::rentry::{JobMode, UnitLoadState, UnitRe};
+use super::runtime::UnitRT;
 use super::sigchld::Sigchld;
+use super::uload::UnitLoad;
 use super::unit_datastore::UnitDb;
 use super::unit_entry::{StartLimitResult, Unit, UnitEmergencyAction, UnitX};
-use super::unit_load::UnitLoad;
-use super::unit_rentry::{JobMode, UnitLoadState, UnitRe};
-use super::unit_runtime::UnitRT;
 use super::UnitRelationAtom;
 use super::UnitRelations;
-use crate::manager::manager::State;
 use crate::manager::pre_install::{Install, PresetMode};
+use crate::manager::State;
 use crate::unit::data::{DataManager, UnitState};
 use crate::utils::table::{TableOp, TableSubscribe};
 use libevent::Events;
@@ -1187,7 +1187,7 @@ mod unit_submanager {
 mod tests {
     use super::*;
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
-    use crate::mount::mount_setup;
+    use crate::mount::setup;
     use libevent::Events;
     use libutils::logger;
     use nix::errno::Errno;
@@ -1212,7 +1212,13 @@ mod tests {
 
     #[allow(dead_code)]
     fn setup_mount_point() -> Result<(), Errno> {
-        mount_setup::mount_setup()?;
+        setup::mount_setup().map_err(|e| {
+            if let crate::error::Error::Nix { source } = e {
+                source
+            } else {
+                nix::errno::Errno::EPFNOSUPPORT
+            }
+        })?;
 
         Ok(())
     }

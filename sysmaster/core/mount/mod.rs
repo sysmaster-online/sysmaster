@@ -1,18 +1,18 @@
-//! # 主要负责系统启动过程中系统目录的创建和文件系统的挂载
+//! # Mainly responsible for the creation of the system directory and the mounting of the file system during the system startup process
 //!
-//! # 创建cgroupv2子系统
+//! # Create cgroupv2 subsystem
 //!
-//! 若/proc/cmdline文件中设置sysmaster.unified_cgroup_hierarchy=y或cgroup_no_v1=all, 则表示系统使用cgroupv2.
-//! 系统挂载/sys/fs/cgroup目录的文件系统类型为cgroup2.
+//! If sysmaster.unified_cgroup_hierarchy=y or cgroup_no_v1=all is set in the /proc/cmdline file, it means that the system uses cgroupv2.
+//! The file system type of the /sys/fs/cgroup directory mounted by the system is cgroup2.
 //!
-//! # 创建cgorupv1子系统
+//! # Create cgorupv1 subsystem
 //!
-//! 否则挂载/sys/fs/cgroup目录的文件系统类型为tmpfs.
+//! Otherwise, the file system type of the mounted /sys/fs/cgroup directory is tmpfs.
 //!
-//! 若/proc/cmdline文件中设置sysmaster.unified_v1_controller=y. 则挂载/sys/fs/cgroup/unified为cgroup2.
+//! If sysmaster.unified_v1_controller=y is set in the /proc/cmdline file, mount /sys/fs/cgroup/unified as cgroup2.
 //!
-//! 在/sys/fs/cgroup/目录下创建不属于任何cgroup子系统的目录sysmaster, 并挂载为文件系统类型为cgroup.
+//! Create a directory sysmaster in the /sys/fs/cgroup/ directory that does not belong to any cgroup subsystem, and mount it as a file system type cgroup.
 //!
-//! 读取/proc/cgroups目录，查询当前系统支持的子系统，并在/sys/fs/cgroup目录下挂载对应的子系统类型。
+//! Read the /proc/cgroups directory, query the subsystems supported by the current system, and mount the corresponding subsystem type in the /sys/fs/cgroup directory.
 
-pub mod mount_setup;
+pub mod setup;
