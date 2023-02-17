@@ -2,6 +2,7 @@
 
 EXPECT_FAIL=0
 SYSMST_LIB_PATH='/usr/lib/sysmaster'
+SYSMST_ETC_PATH='/etc/sysmaster'
 SYSMST_LOG='/opt/sysmaster.log'
 RELIAB_SWITCH_PATH='/run/sysmaster/reliability'
 RELIAB_SWITCH='switch.debug'
@@ -123,9 +124,14 @@ function run_sysmaster() {
     sysmaster_pid=$!
     # wait sysmaster init done
     sleep 3
-    ps aux | grep -v grep | grep sysmaster | grep -w "${sysmaster_pid}" && return 0
-    cat "${SYSMST_LOG}"
-    return 1
+
+    if ps aux | grep -v grep | grep sysmaster | grep -w "${sysmaster_pid}"; then
+        echo > "${SYSMST_LOG}"
+        return 0
+    else
+        cat "${SYSMST_LOG}"
+        return 1
+    fi
 }
 
 # usage: check log info.
@@ -149,9 +155,9 @@ function check_log() {
     done
 }
 
-# usage: check unit status/state
+# usage: check unit status
 # input: $1: unit name
-#        $2: expect status/state
+#        $2: expect status
 function check_status() {
     local service="$1"
     local exp_status="$2"
@@ -159,6 +165,23 @@ function check_status() {
     for ((cnt = 0; cnt < 3; ++cnt)); do
         sctl status "${service}"
         sctl status "${service}" | grep -w 'Active:' | head -n1 | awk '{print $2}' | grep -qw "${exp_status}" && return 0 || sleep 1
+    done
+    add_failure
+    # debug
+    sctl status "${service}"
+    return 1
+}
+
+# usage: check unit load status
+# input: $1: unit name
+#        $2: expect load status
+function check_load() {
+    local service="$1"
+    local exp_status="$2"
+
+    for ((cnt = 0; cnt < 3; ++cnt)); do
+        sctl status "${service}"
+        sctl status "${service}" | grep -w 'Loaded:' | head -n1 | awk '{print $2}' | grep -qw "${exp_status}" && return 0 || sleep 1
     done
     add_failure
     # debug
