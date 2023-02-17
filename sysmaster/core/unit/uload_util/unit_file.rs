@@ -27,20 +27,20 @@ impl UnitFile {
         self.data.borrow().get_unit_id_fragment_pathbuf(name)
     }
 
-    pub fn get_unit_id_dropin_wants(&self, name: &String) -> Vec<PathBuf> {
-        self.data.borrow().get_unit_id_dropin_wants(name)
+    pub fn get_unit_wants_symlink_units(&self, name: &String) -> Vec<PathBuf> {
+        self.data.borrow().get_unit_wants_symlink_units(name)
     }
 
-    pub fn get_unit_id_dropin_requires(&self, name: &String) -> Vec<PathBuf> {
-        self.data.borrow().get_unit_id_dropin_requires(name)
+    pub fn get_unit_requires_symlink_units(&self, name: &String) -> Vec<PathBuf> {
+        self.data.borrow().get_unit_requires_symlink_units(name)
     }
 }
 
 #[derive(Debug)]
 struct UnitFileData {
     pub unit_id_fragment: HashMap<String, Vec<PathBuf>>,
-    pub unit_id_dropin_wants: HashMap<String, Vec<PathBuf>>,
-    pub unit_id_dropin_requires: HashMap<String, Vec<PathBuf>>,
+    pub unit_wants_symlink_units: HashMap<String, Vec<PathBuf>>,
+    pub unit_requires_symlink_units: HashMap<String, Vec<PathBuf>>,
     _unit_name_map: HashMap<String, String>,
     last_updated_timestamp_hash: u64,
     lookup_path: Rc<LookupPaths>,
@@ -51,8 +51,8 @@ impl UnitFileData {
     pub(self) fn new(lookup_path: &Rc<LookupPaths>) -> UnitFileData {
         UnitFileData {
             unit_id_fragment: HashMap::new(),
-            unit_id_dropin_wants: HashMap::new(),
-            unit_id_dropin_requires: HashMap::new(),
+            unit_wants_symlink_units: HashMap::new(),
+            unit_requires_symlink_units: HashMap::new(),
             _unit_name_map: HashMap::new(),
             lookup_path: lookup_path.clone(),
             last_updated_timestamp_hash: 0,
@@ -66,15 +66,15 @@ impl UnitFileData {
         }
     }
 
-    pub(self) fn get_unit_id_dropin_wants(&self, name: &String) -> Vec<PathBuf> {
-        match self.unit_id_dropin_wants.get(name) {
+    pub(self) fn get_unit_wants_symlink_units(&self, name: &String) -> Vec<PathBuf> {
+        match self.unit_wants_symlink_units.get(name) {
             Some(v) => v.to_vec(),
             None => Vec::<PathBuf>::new(),
         }
     }
 
-    pub(self) fn get_unit_id_dropin_requires(&self, name: &String) -> Vec<PathBuf> {
-        match self.unit_id_dropin_requires.get(name) {
+    pub(self) fn get_unit_requires_symlink_units(&self, name: &String) -> Vec<PathBuf> {
+        match self.unit_requires_symlink_units.get(name) {
             Some(v) => v.to_vec(),
             None => Vec::<PathBuf>::new(),
         }
@@ -142,9 +142,9 @@ impl UnitFileData {
             let dir = Path::new(&path);
             if dir.is_dir() {
                 for entry in dir.read_dir().unwrap() {
-                    let dropin = entry.unwrap().path();
-                    if dropin.is_symlink() {
-                        if let Ok(abs_path) = dropin.canonicalize() {
+                    let symlink_unit = entry.unwrap().path();
+                    if symlink_unit.is_symlink() {
+                        if let Ok(abs_path) = symlink_unit.canonicalize() {
                             let mut file_name = PathBuf::new();
                             file_name.push(abs_path.file_name().unwrap());
                             pathbuf_dropin.push(file_name);
@@ -156,10 +156,10 @@ impl UnitFileData {
 
         match suffix.as_str() {
             "wants" => self
-                .unit_id_dropin_wants
+                .unit_wants_symlink_units
                 .insert(name.to_string(), pathbuf_dropin),
             "requires" => self
-                .unit_id_dropin_requires
+                .unit_requires_symlink_units
                 .insert(name.to_string(), pathbuf_dropin),
             _ => unimplemented!(),
         };
