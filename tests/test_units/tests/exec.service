@@ -1,0 +1,9 @@
+[Unit]
+Description="exec service"
+
+[Service]
+ExecStartPre="/usr/bin/echo echo_start_pre_1; /usr/bin/echo echo_start_pre_2; /usr/bin/echo echo_start_pre_3"
+ExecStart="/usr/bin/echo echo_start_1"
+ExecStartPost="/usr/bin/echo echo_start_post_1; /usr/bin/echo echo_start_post_2; /usr/bin/echo echo_start_post_3"
+ExecStop="/usr/bin/echo echo_stop_1"
+ExecStopPost="/usr/bin/echo echo_stop_post_1; /usr/bin/echo echo_stop_post_2; /usr/bin/echo echo_stop_post_3"
