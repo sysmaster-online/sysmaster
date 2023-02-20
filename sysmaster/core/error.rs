@@ -52,6 +52,12 @@ pub enum Error {
     #[snafu(display("job error:{}", source))]
     JobErrno { source: JobErrno },
 
+    #[snafu(display("cgroup error:{}", source))]
+    Cgroup { source: libcgroup::error::Error },
+
+    #[snafu(display("Manager error:{}", source))]
+    Manager { source: sysmaster::error::MngErrno },
+
     #[snafu(display("other error:'{}'", msg))]
     Other { msg: String },
 }

@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod test {
-    use libevent::Error;
     use libevent::Events;
     use libevent::Source;
     use libevent::{EventState, EventType};
@@ -37,10 +36,10 @@ mod test {
             100000
         }
 
-        fn dispatch(&self, e: &Events) -> Result<i32, Error> {
+        fn dispatch(&self, e: &Events) -> i32 {
             println!("Dispatching timer!");
             e.set_exit();
-            Ok(0)
+            0
         }
 
         fn token(&self) -> u64 {

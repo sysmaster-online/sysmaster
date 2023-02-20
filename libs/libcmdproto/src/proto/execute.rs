@@ -4,35 +4,9 @@ use super::{
     SysComm, UnitComm, UnitFile,
 };
 
+use crate::error::*;
 use http::StatusCode;
-use libutils::string::new_line_break;
-use libutils::{error, Result};
-use std::io::Error;
-use std::io::ErrorKind;
-use std::rc::Rc;
-
-/// CMD error
-pub enum ExecCmdErrno {
-    /// invalid input
-    Input,
-    /// not existed
-    NotExisted,
-    /// Internal error
-    Internal,
-    /// not supported
-    NotSupported,
-}
-
-impl From<ExecCmdErrno> for String {
-    fn from(errno: ExecCmdErrno) -> Self {
-        match errno {
-            ExecCmdErrno::Input => "Invalid input".into(),
-            ExecCmdErrno::NotExisted => "No such file or directory".into(),
-            ExecCmdErrno::Internal => "Unexpected internal error".into(),
-            ExecCmdErrno::NotSupported => "Unsupported action".into(),
-        }
-    }
-}
+use std::{fmt::Display, rc::Rc};
 
 pub(crate) trait Executer {
     /// deal Command，return Response
@@ -41,32 +15,34 @@ pub(crate) trait Executer {
 
 /// ExecuterAction
 pub trait ExecuterAction {
+    #[allow(missing_docs)]
+    type Error: Display;
     /// start the unit_name
-    fn start(&self, unit_name: &str) -> Result<(), ExecCmdErrno>;
+    fn start(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// stop the unit_name
-    fn stop(&self, unit_name: &str) -> Result<(), ExecCmdErrno>;
+    fn stop(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// restart the unit_name
-    fn restart(&self, unit_name: &str) -> Result<(), ExecCmdErrno>;
+    fn restart(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// show the status of unit_name
-    fn status(&self, unit_name: &str) -> Result<String, ExecCmdErrno>;
+    fn status(&self, unit_name: &str) -> Result<String, Self::Error>;
     /// list all units
-    fn list_units(&self) -> Result<String, ExecCmdErrno>;
+    fn list_units(&self) -> Result<String, Self::Error>;
     /// suspend host
-    fn suspend(&self) -> Result<i32>;
+    fn suspend(&self) -> Result<i32, Self::Error>;
     /// poweroff host
-    fn poweroff(&self) -> Result<i32>;
+    fn poweroff(&self) -> Result<i32, Self::Error>;
     /// reboot host
-    fn reboot(&self) -> Result<i32>;
+    fn reboot(&self) -> Result<i32, Self::Error>;
     /// halt host
-    fn halt(&self) -> Result<i32>;
+    fn halt(&self) -> Result<i32, Self::Error>;
     /// disable unit_name
-    fn disable(&self, unit_name: &str) -> Result<(), Error>;
+    fn disable(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// enable unit_name
-    fn enable(&self, unit_name: &str) -> Result<(), Error>;
+    fn enable(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// mask unit_name
-    fn mask(&self, unit_name: &str) -> Result<(), Error>;
+    fn mask(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// unmask unit_name
-    fn unmask(&self, unit_name: &str) -> Result<(), Error>;
+    fn unmask(&self, unit_name: &str) -> Result<(), Self::Error>;
 }
 
 /// Depending on the type of request
@@ -84,6 +60,12 @@ where
     };
     println!("CommandResponse :{res:?}");
     res
+}
+
+fn new_line_break(s: &mut String) {
+    if !s.is_empty() {
+        *s += "\n";
+    }
 }
 
 impl Executer for UnitComm {
@@ -108,11 +90,7 @@ impl Executer for UnitComm {
                             reply += &status;
                         }
                         Err(e) => {
-                            reply = reply
-                                + "Failed to show the status of "
-                                + &unit
-                                + ": "
-                                + &String::from(e);
+                            reply = format!("{reply} Failed to show the status of {unit}: {e}");
                         }
                     }
                 }
@@ -121,7 +99,7 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.start(&unit) {
                         new_line_break(&mut reply);
-                        reply = reply + "Failed to start " + &unit + ": " + &String::from(e);
+                        reply = format!("{reply} Failed to start {unit}: {e}");
                     }
                 }
             }
@@ -129,7 +107,7 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.stop(&unit) {
                         new_line_break(&mut reply);
-                        reply = reply + "Failed to stop " + &unit + ": " + &String::from(e);
+                        reply = format!("{reply} Failed to stop {unit}: {e}");
                     }
                 }
             }
@@ -137,7 +115,7 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.restart(&unit) {
                         new_line_break(&mut reply);
-                        reply = reply + "Failed to restart " + &unit + ": " + &String::from(e);
+                        reply = format!("{reply} Failed to restart {unit}: {e}");
                     }
                 }
             }
@@ -166,8 +144,7 @@ impl Executer for MngrComm {
                     mngr_comm::Action::Listunits => String::from("list all units"),
                     _ => String::from("process"),
                 };
-                let error_message =
-                    String::from("Failed to ") + &action_str + ": " + &String::from(e);
+                let error_message = format!("Failed to {action_str}:{e}");
                 CommandResponse {
                     status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
                     message: error_message,
@@ -183,10 +160,7 @@ impl Executer for SysComm {
             let unit_name = self.action().to_string() + ".target";
             match manager.start(&unit_name) {
                 Ok(_) => Ok(0),
-                Err(e) => Err(error::Error::Io(std::io::Error::new(
-                    ErrorKind::Other,
-                    "Failed to start ".to_string() + &unit_name + ": " + &String::from(e),
-                ))),
+                Err(e) => Err(e),
             }
         } else {
             match self.action() {
@@ -235,11 +209,7 @@ impl Executer for UnitFile {
                     #[allow(unreachable_patterns)]
                     _ => String::from("process"),
                 };
-                let error_message = String::from("Failed to ")
-                    + &action_str
-                    + &self.unitname
-                    + ": "
-                    + &e.to_string();
+                let error_message = format!("Failed to {action_str} {}:{e}", self.unitname);
                 CommandResponse {
                     status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
                     message: error_message,

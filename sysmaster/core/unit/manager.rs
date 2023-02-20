@@ -120,7 +120,7 @@ impl UnitManagerX {
         self.data.get_all_units()
     }
 
-    pub(crate) fn child_sigchld_enable(&self, enable: bool) -> Result<i32> {
+    pub(crate) fn child_sigchld_enable(&self, enable: bool) -> i32 {
         self.data.sigchld.enable(enable)
     }
 

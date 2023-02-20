@@ -101,13 +101,13 @@ impl Events {
                 println!("set_enabled Off: {top:?}");
             }
             EventState::On => {
-                top.dispatch(self)?;
+                top.dispatch(self);
                 if top.event_type() == EventType::Defer {
                     self.data.borrow_mut().pending_push(top.clone());
                 }
             }
             EventState::OneShot => {
-                top.dispatch(self)?;
+                top.dispatch(self);
                 self.data
                     .borrow_mut()
                     .set_enabled(top.clone(), EventState::Off)?;

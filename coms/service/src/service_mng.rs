@@ -1782,27 +1782,28 @@ impl PathIntofy {
         self.mng.borrow().clone().upgrade().unwrap()
     }
 
-    fn do_dispatch(&self) -> libevent::Result<i32> {
+    fn do_dispatch(&self) -> i32 {
         log::debug!("dispatch initify pid file: {:?}", self.path);
         match self.read_fd_event() {
             Ok(_) => {
                 if let Ok(_v) = self.mng().retry_pid_file() {
-                    return Ok(0);
+                    return 0;
                 }
 
                 if let Ok(_v) = self.mng().watch_pid_file() {
-                    return Ok(0);
+                    return 0;
                 }
             }
             Err(e) => {
                 log::error!("in inotify dispatch, read event error: {}", e);
+                return -1;
             }
         }
 
         self.mng().unwatch_pid_file();
         self.mng()
             .enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
-        Ok(0)
+        0
     }
 }
 
@@ -1823,7 +1824,7 @@ impl Source for PathIntofy {
         0i8
     }
 
-    fn dispatch(&self, _: &Events) -> libevent::Result<i32> {
+    fn dispatch(&self, _: &Events) -> i32 {
         let ret = self.do_dispatch();
         self.mng().db_update();
         ret
@@ -1860,7 +1861,7 @@ impl ServiceTimer {
         self.mng.borrow().clone().upgrade().unwrap()
     }
 
-    fn do_dispatch(&self) -> libevent::Result<i32> {
+    fn do_dispatch(&self) -> i32 {
         log::debug!("dispatch service timer");
 
         match self.mng().state() {
@@ -1888,7 +1889,7 @@ impl ServiceTimer {
             ServiceState::Failed => todo!(),
             ServiceState::Cleaning => todo!(),
         }
-        Ok(0)
+        0
     }
 }
 
@@ -1909,7 +1910,7 @@ impl Source for ServiceTimer {
         *self.time.borrow() * 1000000
     }
 
-    fn dispatch(&self, _: &Events) -> Result<i32, libevent::Error> {
+    fn dispatch(&self, _: &Events) -> i32 {
         self.do_dispatch()
     }
 
@@ -1952,7 +1953,7 @@ impl ServiceMonitorData {
         *self.time.borrow()
     }
 
-    fn do_dispatch(&self) -> libevent::Result<i32> {
+    fn do_dispatch(&self) -> i32 {
         log::debug!(
             "dispatch service watchdog, watchdog timer is: {}",
             self.time()
@@ -1960,7 +1961,7 @@ impl ServiceMonitorData {
 
         self.mng()
             .enter_signal(ServiceState::StopWatchdog, ServiceResult::FailureWatchdog);
-        Ok(0)
+        0
     }
 }
 
@@ -1981,7 +1982,7 @@ impl Source for ServiceMonitorData {
         *self.time.borrow() * 1000000
     }
 
-    fn dispatch(&self, _: &Events) -> Result<i32, libevent::Error> {
+    fn dispatch(&self, _: &Events) -> i32 {
         self.do_dispatch()
     }
 

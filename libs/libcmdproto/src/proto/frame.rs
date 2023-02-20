@@ -1,8 +1,9 @@
 //! Encapsulate the command request into a frame
+use crate::error::*;
 use prost::bytes::{BufMut, BytesMut};
 use prost::Message;
 use std::{
-    io::{Error, Read, Write},
+    io::{Read, Write},
     rc::Rc,
 };
 
@@ -20,14 +21,14 @@ where
     Self: Message + Sized + Default,
 {
     /// Encode message into frame
-    fn encode_frame(&self, buf: &mut BytesMut) -> Result<(), Error> {
-        self.encode(buf)?;
+    fn encode_frame(&self, buf: &mut BytesMut) -> Result<()> {
+        self.encode(buf).context(EncodeSnafu)?;
         Ok(())
     }
 
     /// frame decode frame into Message
-    fn decode_frame(buf: &mut BytesMut) -> Result<Self, Error> {
-        let msg = Self::decode(&buf[..])?;
+    fn decode_frame(buf: &mut BytesMut) -> Result<Self> {
+        let msg = Self::decode(&buf[..]).context(DecodeSnafu)?;
         Ok(msg)
     }
 }
@@ -36,13 +37,13 @@ impl FrameCoder for CommandRequest {}
 impl FrameCoder for CommandResponse {}
 
 /// read frame from stream
-pub fn read_frame<S>(stream: &mut S, buf: &mut BytesMut) -> Result<(), Error>
+pub fn read_frame<S>(stream: &mut S, buf: &mut BytesMut) -> Result<()>
 where
     S: Read + Unpin + Send,
 {
     // 1. Got the message length
     let mut msg_len = [0_u8; USIZE_TO_U8_LENGTH];
-    stream.read_exact(&mut msg_len)?;
+    stream.read_exact(&mut msg_len).context(IoSnafu)?;
     let msg_len = get_msg_len(msg_len);
 
     // 2. Got the message
@@ -58,7 +59,7 @@ where
                 }
             }
             Err(e) => {
-                return Err(e);
+                return Err(Error::ReadStream { msg: e.to_string() });
             }
         }
     }
@@ -100,7 +101,7 @@ where
     }
 
     /// process frame in server-side
-    pub fn process(mut self) -> Result<(), Error> {
+    pub fn process(mut self) -> Result<()> {
         if let Ok(cmd) = self.recv() {
             let res = execute::dispatch(cmd, Rc::clone(&self.manager));
             self.send(res)?;
@@ -108,18 +109,18 @@ where
         Ok(())
     }
 
-    fn send(&mut self, msg: CommandResponse) -> Result<(), Error> {
+    fn send(&mut self, msg: CommandResponse) -> Result<()> {
         let mut buf = BytesMut::new();
         msg.encode_frame(&mut buf)?;
         let encoded = buf.freeze();
         let msg_len = msg_len_vec(encoded.len());
-        self.inner.write_all(&msg_len)?;
-        self.inner.write_all(&encoded)?;
-        self.inner.flush()?;
+        self.inner.write_all(&msg_len).context(IoSnafu)?;
+        self.inner.write_all(&encoded).context(IoSnafu)?;
+        self.inner.flush().context(IoSnafu)?;
         Ok(())
     }
 
-    fn recv(&mut self) -> Result<CommandRequest, Error> {
+    fn recv(&mut self) -> Result<CommandRequest> {
         let mut buf = BytesMut::new();
         let stream = &mut self.inner;
         read_frame(stream, &mut buf)?;
@@ -138,23 +139,23 @@ where
     }
 
     /// process frame in client-side
-    pub fn execute(&mut self, cmd: CommandRequest) -> Result<CommandResponse, Error> {
+    pub fn execute(&mut self, cmd: CommandRequest) -> Result<CommandResponse> {
         self.send(cmd)?;
         self.recv()
     }
 
-    fn send(&mut self, msg: CommandRequest) -> Result<(), Error> {
+    fn send(&mut self, msg: CommandRequest) -> Result<()> {
         let mut buf = BytesMut::new();
         msg.encode_frame(&mut buf)?;
         let encoded = buf.freeze();
         let msg_len = msg_len_vec(encoded.len());
-        self.inner.write_all(&msg_len)?;
-        self.inner.write_all(&encoded)?;
-        self.inner.flush()?;
+        self.inner.write_all(&msg_len).context(IoSnafu)?;
+        self.inner.write_all(&encoded).context(IoSnafu)?;
+        self.inner.flush().context(IoSnafu)?;
         Ok(())
     }
 
-    fn recv(&mut self) -> Result<CommandResponse, Error> {
+    fn recv(&mut self) -> Result<CommandResponse> {
         let mut buf = BytesMut::new();
         let stream = &mut self.inner;
         read_frame(stream, &mut buf)?;

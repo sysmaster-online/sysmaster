@@ -37,7 +37,7 @@ impl Source for DevctlMonitorX {
     }
 
     /// print device messages from kernel and userspace
-    fn dispatch(&self, _e: &Events) -> Result<i32, libevent::Error> {
+    fn dispatch(&self, _e: &Events) -> i32 {
         let device = match self.device_monitor.receive_device() {
             Ok(ret) => ret,
             Err(e) => match e {
@@ -45,17 +45,17 @@ impl Source for DevctlMonitorX {
                     syscall: _,
                     errno: Errno::EAGAIN,
                 } => {
-                    return Ok(0);
+                    return 0;
                 }
                 libdevice::error::Error::Syscall {
                     syscall: _,
                     errno: _,
                 } => {
                     log::error!("{}", e);
-                    return Ok(0);
+                    return 0;
                 }
                 _ => {
-                    return Ok(0);
+                    return 0;
                 }
             },
         };
@@ -67,7 +67,7 @@ impl Source for DevctlMonitorX {
             device.devpath,
             device.subsystem
         );
-        Ok(0)
+        0
     }
 
     /// source token

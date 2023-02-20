@@ -60,10 +60,10 @@ fn main() -> Result<()> {
         log::info!("debug: clear data restored.");
     }
 
-    manager.setup_cgroup().context(IoSnafu)?;
+    manager.setup_cgroup()?;
 
     // startup
-    manager.startup().context(UtilsSnafu)?;
+    manager.startup()?;
 
     // main loop
     let ret = manager.main_loop();

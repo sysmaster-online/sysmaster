@@ -1,19 +1,16 @@
 //! Provide commands that cli can call
-
 #[allow(missing_docs)]
 #[allow(clippy::all)]
 pub mod abi;
 pub mod execute;
 pub mod frame;
 
-use std::fmt;
-
 pub use abi::command_request::RequestData;
 pub use abi::*;
 pub use frame::ProstClientStream;
 pub use frame::ProstServerStream;
 pub use http::StatusCode;
-// use prost::Message;
+use std::fmt;
 
 impl CommandRequest {
     /// Create a new command request for unit

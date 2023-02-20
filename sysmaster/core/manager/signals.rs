@@ -11,7 +11,7 @@ pub(super) struct Signals<T> {
 }
 
 pub(super) trait SignalDispatcher {
-    fn dispatch_signal(&self, signal: &Signal) -> Result<i32>;
+    fn dispatch_signal(&self, signal: &Signal) -> Result<i32, crate::error::Error>;
 }
 impl<T> Signals<T> {
     pub(super) fn new(relir: &Rc<Reliability>, data_handler: T) -> Self {
@@ -35,7 +35,7 @@ impl<T: SignalDispatcher> Source for Signals<T> {
         (libc::EPOLLIN) as u32
     }
 
-    fn dispatch(&self, e: &Events) -> libevent::Result<i32> {
+    fn dispatch(&self, e: &Events) -> i32 {
         log::debug!("Dispatching signals!");
 
         self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);
@@ -52,7 +52,7 @@ impl<T: SignalDispatcher> Source for Signals<T> {
         }
         self.reli.clear_last_frame();
 
-        Ok(0)
+        0
     }
 
     fn token(&self) -> u64 {

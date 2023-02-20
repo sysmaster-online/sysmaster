@@ -163,11 +163,11 @@ mod tests {
         }
 
         ///
-        fn dispatch(&self, e: &Events) -> Result<i32, libevent::Error> {
+        fn dispatch(&self, e: &Events) -> i32 {
             let device = self.device_monitor.receive_device().unwrap();
             println!("{device:?}");
             e.set_exit();
-            Ok(0)
+            0
         }
 
         ///

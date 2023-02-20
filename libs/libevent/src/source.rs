@@ -1,6 +1,4 @@
 //! # Events must implement the Source trait
-use crate::Result;
-
 use crate::EventType;
 use crate::Events;
 use std::fmt::Debug;
@@ -62,7 +60,7 @@ pub trait Source {
     }
 
     /// The code of callback
-    fn dispatch(&self, event: &Events) -> Result<i32>;
+    fn dispatch(&self, event: &Events) -> i32;
 }
 
 // for HashSet

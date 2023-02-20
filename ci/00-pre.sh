@@ -14,6 +14,7 @@ done
 # install needed tools
 rpm -qi gcc openssl-libs python3-pip musl-gcc
 if [ $? -ne 0 ]; then
+sudo yum clean all
 sudo yum install --disablerepo EPOL --disablerepo source --disablerepo update --disablerepo EPOL-UPDATE --disablerepo debuginfo  -y gcc openssl-libs python3-pip musl-gcc
 fi
 

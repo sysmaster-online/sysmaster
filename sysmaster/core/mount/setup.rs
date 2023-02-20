@@ -349,7 +349,7 @@ pub fn mount_cgroup_controllers() -> Result<()> {
         return Ok(());
     }
 
-    let mut controllers = libcgroup::cg_controllers().context(IoSnafu)?;
+    let mut controllers = libcgroup::cg_controllers().context(CgroupSnafu)?;
     let mut index = 0_usize;
 
     while index < controllers.len() {

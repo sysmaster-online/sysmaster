@@ -845,7 +845,7 @@ impl Source for SocketMngPort {
         0i8
     }
 
-    fn dispatch(&self, _: &Events) -> libevent::Result<i32> {
+    fn dispatch(&self, _: &Events) -> i32 {
         println!("Dispatching IO!");
 
         self.reli().set_last_frame2(
@@ -861,7 +861,7 @@ impl Source for SocketMngPort {
         self.reli().clear_last_unit();
         self.rentry().clear_last_frame();
         self.reli().clear_last_frame();
-        ret
+        ret.unwrap_or(-1)
     }
 
     fn token(&self) -> u64 {

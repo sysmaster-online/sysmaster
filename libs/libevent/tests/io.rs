@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod test {
-    use libevent::Error;
     use libevent::Events;
     use libevent::Source;
     use libevent::{EventState, EventType};
@@ -42,9 +41,9 @@ mod test {
             0i8
         }
 
-        fn dispatch(&self, _: &Events) -> Result<i32, Error> {
+        fn dispatch(&self, _: &Events) -> i32 {
             println!("Dispatching IO!");
-            Ok(0)
+            0
         }
 
         fn token(&self) -> u64 {
