@@ -48,6 +48,8 @@ pub struct ExecParameters {
     user: Option<User>,
     group: Option<Group>,
     umask: Option<Mode>,
+    watchdog_usec: u64,
+    flags: ExecFlags,
 }
 
 struct EnvData {
@@ -97,6 +99,8 @@ impl ExecParameters {
             user: None,
             group: None,
             umask: None,
+            watchdog_usec: 0,
+            flags: ExecFlags::CONTROL,
         }
     }
 
@@ -267,6 +271,26 @@ impl ExecParameters {
     pub fn get_umask(&self) -> Option<Mode> {
         self.umask
     }
+
+    /// set the software watchdog time
+    pub fn set_watchdog_usec(&mut self, usec: u64) {
+        self.watchdog_usec = usec;
+    }
+
+    /// return the software watchdog time
+    pub fn watchdog_usec(&self) -> u64 {
+        self.watchdog_usec
+    }
+
+    /// set the exec command flags
+    pub fn set_exec_flags(&mut self, flags: ExecFlags) {
+        self.flags = flags;
+    }
+
+    /// return the exec command flags
+    pub fn exec_flags(&self) -> ExecFlags {
+        self.flags
+    }
 }
 
 bitflags! {
@@ -276,6 +300,8 @@ bitflags! {
         const CONTROL = 1 << 1;
         /// need pass fds to the command
         const PASS_FDS = 1 << 2;
+        /// enable software watchdog
+        const SOFT_WATCHDOG = 1 << 3;
     }
 }
 

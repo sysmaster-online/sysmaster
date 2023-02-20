@@ -441,11 +441,9 @@ impl Plugin {
                     })
                 }
             }
-            Err(_) => {
-                return Err(Error::PluginLoad {
-                    msg: format!("create unit, the {unit_type:?} plugin is not exist"),
-                })
-            }
+            Err(_) => Err(Error::PluginLoad {
+                msg: format!("create unit, the {unit_type:?} plugin is not exist"),
+            }),
         }
     }
     /// Create a  obj for subclasses of unit manager
@@ -471,11 +469,9 @@ impl Plugin {
                     })
                 }
             }
-            Err(_) => {
-                return Err(Error::PluginLoad {
-                    msg: format!("create um, the {unit_type:?} plugin is not exist"),
-                })
-            }
+            Err(_) => Err(Error::PluginLoad {
+                msg: format!("create um, the {unit_type:?} plugin is not exist"),
+            }),
         }
     }
 

@@ -1,3 +1,4 @@
+use crate::service_monitor::ServiceMonitor;
 use crate::service_rentry::ExitStatus;
 
 use super::service_rentry::{
@@ -83,6 +84,7 @@ impl ServiceUnitComm {
         reset_restart: bool,
         restarts: u32,
         exit_status: ExitStatus,
+        monitor: ServiceMonitor,
     ) {
         if let Some(u) = self.owner() {
             self.rentry().mng_insert(
@@ -99,6 +101,7 @@ impl ServiceUnitComm {
                 reset_restart,
                 restarts,
                 exit_status,
+                monitor,
             )
         }
     }
@@ -119,6 +122,7 @@ impl ServiceUnitComm {
         bool,
         u32,
         ExitStatus,
+        ServiceMonitor,
     )> {
         self.owner().map(|u| self.rentry().mng_get(u.id()))?
     }
