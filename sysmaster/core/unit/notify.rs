@@ -328,16 +328,14 @@ impl Source for Notify {
         0i8
     }
 
-    fn dispatch(&self, _e: &Events) -> libevent::Result<i32> {
+    fn dispatch(&self, _e: &Events) -> i32 {
         log::debug!("begin to dispatch notify event");
 
         self.reli.set_last_frame1(ReliLastFrame::Notify as u32);
-        let ret = self.notify_dispatch().map_err(|_| libevent::Error::Other {
-            word: "Dispatch notify event failed!",
-        });
+        let ret = self.notify_dispatch();
         self.reli.clear_last_frame();
 
-        ret
+        ret.unwrap_or(-1)
     }
 
     fn token(&self) -> u64 {

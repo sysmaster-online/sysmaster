@@ -42,7 +42,7 @@ where
         (libc::EPOLLIN) as u32
     }
 
-    fn dispatch(&self, _e: &Events) -> libevent::Result<i32> {
+    fn dispatch(&self, _e: &Events) -> i32 {
         println!("Dispatching Command!");
 
         self.reli.set_last_frame1(ReliLastFrame::CmdOp as u32);
@@ -56,7 +56,7 @@ where
         }
         self.reli.clear_last_frame();
 
-        Ok(0)
+        0
     }
 
     fn token(&self) -> u64 {

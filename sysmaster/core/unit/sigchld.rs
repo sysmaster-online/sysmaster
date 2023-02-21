@@ -2,7 +2,6 @@ use super::unit_datastore::UnitDb;
 /// need to move to other directory,maybe manager
 use crate::job::JobManager;
 use libevent::{EventState, EventType, Events, Source};
-use libutils::Result;
 use nix::errno::Errno;
 use nix::sys::signal::Signal;
 use nix::sys::wait::{self, Id, WaitPidFlag, WaitStatus};
@@ -21,7 +20,7 @@ pub(super) struct Sigchld {
 impl ReStation for Sigchld {
     // input
     fn input_rebuild(&self) {
-        self.enable(true).unwrap();
+        self.enable(true);
     }
 
     // compensate
@@ -57,7 +56,7 @@ impl Sigchld {
         }
     }
 
-    pub(super) fn enable(&self, enable: bool) -> Result<i32> {
+    pub(super) fn enable(&self, enable: bool) -> i32 {
         self.sub.enable(enable)
     }
 }
@@ -87,15 +86,14 @@ impl SigchldSub {
         sub
     }
 
-    pub(self) fn enable(&self, enable: bool) -> Result<i32> {
+    pub(self) fn enable(&self, enable: bool) -> i32 {
         println!("sigchild enable.");
         let source = Rc::clone(&self.data);
         let state = match enable {
             true => EventState::On,
             false => EventState::Off,
         };
-        self.event.set_enabled(source, state).unwrap();
-        Ok(0)
+        self.event.set_enabled(source, state).unwrap_or(-1)
     }
 
     fn register(&self) {
@@ -126,7 +124,7 @@ impl Source for SigchldData {
         data
     }
 
-    fn dispatch(&self, _event: &Events) -> libevent::Result<i32> {
+    fn dispatch(&self, _event: &Events) -> i32 {
         println!("sigchld dispatch");
 
         self.reli.set_last_frame1(ReliLastFrame::SigChld as u32);
@@ -134,10 +132,10 @@ impl Source for SigchldData {
         self.reli.clear_last_frame();
 
         if !enable {
-            self.sub().enable(false).unwrap();
+            self.sub().enable(false);
         }
 
-        Ok(0)
+        0
     }
 }
 

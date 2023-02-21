@@ -1,10 +1,8 @@
 use libevent::EventState;
 // These tests cannot run as a regular test because cargo would spawn a thread to run it,
 // failing the signal masking. So we make our own, non-threaded harnessing
-use libevent::Error;
 use libevent::EventType;
 use libevent::Events;
-use libevent::Result;
 use libevent::Source;
 use nix::unistd::fork;
 use nix::unistd::ForkResult;
@@ -36,7 +34,7 @@ impl Source for Signals {
         0i8
     }
 
-    fn dispatch(&self, e: &Events) -> Result<i32, Error> {
+    fn dispatch(&self, e: &Events) -> i32 {
         println!("Dispatching signal!");
         match e.read_signals() {
             Ok(Some(info)) => {
@@ -47,7 +45,7 @@ impl Source for Signals {
                 println!("{e:?}");
             }
         }
-        Ok(0)
+        0
     }
 
     fn token(&self) -> u64 {

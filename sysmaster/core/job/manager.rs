@@ -246,7 +246,7 @@ impl Source for JobManagerData {
         data
     }
 
-    fn dispatch(&self, _event: &Events) -> libevent::Result<i32> {
+    fn dispatch(&self, _event: &Events) -> i32 {
         log::debug!("job manager data dispatch");
 
         self.reli.set_last_frame1(ReliLastFrame::JobManager as u32);
@@ -256,7 +256,7 @@ impl Source for JobManagerData {
         self.update_up_ready();
         assert!(!self.calc_jobs_ready());
 
-        Ok(0)
+        0
     }
 }
 

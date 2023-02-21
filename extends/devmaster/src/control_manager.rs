@@ -100,7 +100,7 @@ impl Source for ControlManager {
     }
 
     /// start dispatching after the event arrives
-    fn dispatch(&self, _: &libevent::Events) -> Result<i32, libevent::Error> {
+    fn dispatch(&self, _: &libevent::Events) -> i32 {
         let (mut stream, _) = self.listener.borrow_mut().accept().unwrap();
         let mut cmd = String::new();
         stream.read_to_string(&mut cmd).unwrap();
@@ -109,7 +109,7 @@ impl Source for ControlManager {
 
         self.cmd_process(cmd);
 
-        Ok(0)
+        0
     }
 
     /// Unless you can guarantee all types of token allocation, it is recommended to use the default implementation here

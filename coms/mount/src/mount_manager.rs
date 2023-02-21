@@ -24,7 +24,7 @@ struct MountManager {
 impl ReStation for MountManager {
     // input
     fn input_rebuild(&self) {
-        self.monitor.defer_enable(true).unwrap();
+        self.monitor.defer_enable(true);
     }
 
     // compensate
@@ -136,7 +136,7 @@ impl MountMonitor {
         events.set_enabled(io, EventState::On).unwrap();
     }
 
-    pub(self) fn defer_enable(&self, enable: bool) -> libevent::Result<i32> {
+    pub(self) fn defer_enable(&self, enable: bool) -> i32 {
         self.io.defer_enable(enable)
     }
 
@@ -167,15 +167,17 @@ impl MountMonitorIo {
         }
     }
 
-    pub(self) fn defer_enable(&self, enable: bool) -> libevent::Result<i32> {
+    pub(self) fn defer_enable(&self, enable: bool) -> i32 {
         let source = Rc::clone(&self.defer);
         let state = match enable {
             true => EventState::OneShot,
             false => EventState::Off,
         };
         let events = self.data.comm.um().events();
-        events.set_enabled(source, state)?;
-        Ok(0)
+        match events.set_enabled(source, state) {
+            Ok(_) => 0,
+            Err(_) => -1,
+        }
     }
 
     fn reli(&self) -> Rc<Reliability> {
@@ -196,7 +198,7 @@ impl Source for MountMonitorIo {
         (libc::EPOLLIN) as u32
     }
 
-    fn dispatch(&self, _e: &Events) -> libevent::Result<i32> {
+    fn dispatch(&self, _e: &Events) -> i32 {
         drain_out(self.data.epfd);
 
         self.reli()
@@ -210,8 +212,7 @@ impl Source for MountMonitorIo {
             log::error!("Failed to dispatch mountinfo, ignoring: {:?}", e);
         }
 
-        self.defer_enable(false)?;
-        Ok(0)
+        self.defer_enable(false)
     }
 
     fn token(&self) -> u64 {
@@ -260,7 +261,7 @@ impl Source for MountMonitorDefer {
         data
     }
 
-    fn dispatch(&self, _event: &Events) -> libevent::Result<i32> {
+    fn dispatch(&self, _event: &Events) -> i32 {
         println!("mount monitor dispatch");
 
         self.reli()
@@ -270,11 +271,10 @@ impl Source for MountMonitorDefer {
         self.rentry().clear_last_frame();
         self.reli().clear_last_frame();
 
-        if let Err(_e) = ret {
-            // debug
+        match ret {
+            Ok(_) => 0,
+            Err(_) => -1,
         }
-
-        Ok(0)
     }
 }
 

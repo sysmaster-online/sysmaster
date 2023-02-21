@@ -5,10 +5,19 @@
 compile_error!("feature linux and hongmeng cannot be enabled at the same time");
 
 use bitflags::bitflags;
-use nix::errno::Errno;
-use std::io::Error;
-
 mod cgroup;
+pub mod error;
+pub use crate::cgroup::cg_attach;
+pub use crate::cgroup::cg_controllers;
+pub use crate::cgroup::cg_create;
+pub use crate::cgroup::cg_create_and_attach;
+pub use crate::cgroup::cg_escape;
+pub use crate::cgroup::cg_get_pids;
+pub use crate::cgroup::cg_is_empty_recursive;
+pub use crate::cgroup::cg_kill_recursive;
+pub use crate::cgroup::cg_type;
+pub use crate::cgroup::CgController;
+pub use crate::cgroup::CG_BASE_DIR;
 
 bitflags! {
     /// the flag that operate on the cgroup controller
@@ -34,37 +43,3 @@ pub enum CgType {
     /// cgroup v2 mounted to /sys/fs/cgroup/
     UnifiedV2,
 }
-
-/// the error returned of the cgroup operation
-#[derive(Debug)]
-pub enum CgroupErr {
-    /// error from IoError
-    IoError(Error),
-    /// kill process error contain Errno
-    KillError(Errno),
-    /// cgroup is not supported
-    NotSupported,
-}
-
-impl std::fmt::Display for CgroupErr {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let info = match self {
-            CgroupErr::IoError(e) => format!("Io error: {e}"),
-            CgroupErr::KillError(e) => format!("kill error no: {e}"),
-            CgroupErr::NotSupported => "cgroup is not supported".to_string(),
-        };
-        fmt.write_str(info.as_str())
-    }
-}
-
-pub use crate::cgroup::cg_attach;
-pub use crate::cgroup::cg_controllers;
-pub use crate::cgroup::cg_create;
-pub use crate::cgroup::cg_create_and_attach;
-pub use crate::cgroup::cg_escape;
-pub use crate::cgroup::cg_get_pids;
-pub use crate::cgroup::cg_is_empty_recursive;
-pub use crate::cgroup::cg_kill_recursive;
-pub use crate::cgroup::cg_type;
-pub use crate::cgroup::CgController;
-pub use crate::cgroup::CG_BASE_DIR;

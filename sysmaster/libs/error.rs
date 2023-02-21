@@ -1,5 +1,4 @@
 //! Error define
-use libcmdproto::proto::execute::ExecCmdErrno;
 use snafu::prelude::*;
 #[allow(unused_imports)]
 pub use snafu::ResultExt;
@@ -70,17 +69,6 @@ pub enum MngErrno {
     Internal,
     #[snafu(display("NotSupported(ManagerError)"))]
     NotSupported,
-}
-
-impl From<MngErrno> for ExecCmdErrno {
-    fn from(err: MngErrno) -> Self {
-        match err {
-            MngErrno::Input => ExecCmdErrno::Input,
-            MngErrno::NotExisted => ExecCmdErrno::NotExisted,
-            MngErrno::NotSupported => ExecCmdErrno::NotSupported,
-            _ => ExecCmdErrno::Internal,
-        }
-    }
 }
 
 /// libsysmaster Error
