@@ -2012,7 +2012,7 @@ impl Source for ServiceMonitorData {
 #[cfg(test)]
 mod tests {
     use super::{RunningData, ServiceMng};
-    use crate::{service_comm::ServiceUnitComm, service_config::ServiceConfig};
+    use crate::{comm::ServiceUnitComm, config::ServiceConfig};
     use std::{collections::HashMap, rc::Rc};
     use sysmaster::{exec::ExecContext, UmIf};
 
