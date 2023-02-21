@@ -43,11 +43,11 @@ impl CommandRequest {
     }
 
     /// Create a new command request for unit file
-    pub fn new_unitfile(action: unit_file::Action, unitfile: impl Into<String>) -> Self {
+    pub fn new_unitfile(action: unit_file::Action, unitfile: Vec<String>) -> Self {
         Self {
             request_data: Some(RequestData::Ufile(UnitFile {
                 action: action.into(),
-                unitname: unitfile.into(),
+                unitname: unitfile,
             })),
         }
     }

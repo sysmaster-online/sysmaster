@@ -10,7 +10,11 @@ use std::{fmt::Display, rc::Rc};
 
 pub(crate) trait Executer {
     /// deal Command，return Response
-    fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse;
+    fn execute(
+        self,
+        manager: Rc<impl ExecuterAction>,
+        call_back: Option<fn(&str) -> String>,
+    ) -> CommandResponse;
 }
 
 /// ExecuterAction
@@ -51,11 +55,21 @@ where
     T: ExecuterAction,
 {
     println!("commandRequest :{cmd:?}");
+    let call_back = |unit_name: &str| {
+        // If users didn't specify the unit type, treat it as
+
+        if !unit_name.contains('.') {
+            unit_name.to_string() + ".service"
+        } else {
+            unit_name.to_string()
+        }
+    };
+
     let res = match cmd.request_data {
-        Some(RequestData::Ucomm(param)) => param.execute(manager),
-        Some(RequestData::Mcomm(param)) => param.execute(manager),
-        Some(RequestData::Syscomm(param)) => param.execute(manager),
-        Some(RequestData::Ufile(param)) => param.execute(manager),
+        Some(RequestData::Ucomm(param)) => param.execute(manager, Some(call_back)),
+        Some(RequestData::Mcomm(param)) => param.execute(manager, None),
+        Some(RequestData::Syscomm(param)) => param.execute(manager, Some(call_back)),
+        Some(RequestData::Ufile(param)) => param.execute(manager, Some(call_back)),
         _ => CommandResponse::default(),
     };
     println!("CommandResponse :{res:?}");
@@ -69,16 +83,20 @@ fn new_line_break(s: &mut String) {
 }
 
 impl Executer for UnitComm {
-    fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
+    fn execute(
+        self,
+        manager: Rc<impl ExecuterAction>,
+        call_back: Option<fn(&str) -> String>,
+    ) -> CommandResponse {
         let mut reply = String::new();
         let mut units: Vec<String> = Vec::new();
         for unit_name in &self.units {
-            // If users didn't specify the unit type, treat it as service
-            if !unit_name.contains('.') {
-                units.push(unit_name.to_string() + ".service");
-            } else {
+            if call_back.is_none() {
                 units.push(unit_name.to_string());
+                continue;
             }
+
+            units.push(call_back.unwrap()(unit_name));
         }
 
         match self.action() {
@@ -129,7 +147,11 @@ impl Executer for UnitComm {
 }
 
 impl Executer for MngrComm {
-    fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
+    fn execute(
+        self,
+        manager: Rc<impl ExecuterAction>,
+        _call_back: Option<fn(&str) -> String>,
+    ) -> CommandResponse {
         let ret = match self.action() {
             mngr_comm::Action::Listunits => manager.list_units(),
             _ => todo!(),
@@ -155,7 +177,11 @@ impl Executer for MngrComm {
 }
 
 impl Executer for SysComm {
-    fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
+    fn execute(
+        self,
+        manager: Rc<impl ExecuterAction>,
+        _call_back: Option<fn(&str) -> String>,
+    ) -> CommandResponse {
         let ret = if self.force {
             let unit_name = self.action().to_string() + ".target";
             match manager.start(&unit_name) {
@@ -187,34 +213,60 @@ impl Executer for SysComm {
 }
 
 impl Executer for UnitFile {
-    fn execute(self, manager: Rc<impl ExecuterAction>) -> CommandResponse {
-        let ret = match self.action() {
-            super::unit_file::Action::Enable => manager.enable(&self.unitname),
-            super::unit_file::Action::Disable => manager.disable(&self.unitname),
-            super::unit_file::Action::Mask => manager.mask(&self.unitname),
-            super::unit_file::Action::Unmask => manager.unmask(&self.unitname),
-            _ => todo!(),
-        };
-        match ret {
-            Ok(_) => CommandResponse {
-                status: StatusCode::OK.as_u16() as _,
-                message: String::new(),
-            },
-            Err(e) => {
-                let action_str = match self.action() {
-                    super::unit_file::Action::Enable => String::from("enable "),
-                    super::unit_file::Action::Disable => String::from("disable "),
-                    super::unit_file::Action::Mask => String::from("mask "),
-                    super::unit_file::Action::Unmask => String::from("unmask "),
-                    #[allow(unreachable_patterns)]
-                    _ => String::from("process"),
-                };
-                let error_message = format!("Failed to {action_str} {}:{e}", self.unitname);
-                CommandResponse {
-                    status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
-                    message: error_message,
+    fn execute(
+        self,
+        manager: Rc<impl ExecuterAction>,
+        call_back: Option<fn(&str) -> String>,
+    ) -> CommandResponse {
+        let mut reply = String::new();
+        let mut units: Vec<String> = Vec::new();
+        for unit_name in &self.unitname {
+            if call_back.is_none() {
+                units.push(unit_name.to_string());
+                continue;
+            }
+
+            units.push(call_back.unwrap()(unit_name));
+        }
+        match self.action() {
+            super::unit_file::Action::Enable => {
+                for unit in units {
+                    if let Err(e) = manager.enable(&unit) {
+                        new_line_break(&mut reply);
+                        reply = format!("{reply} Failed to enable {unit}: {e}");
+                    }
                 }
             }
+            super::unit_file::Action::Disable => {
+                for unit in units {
+                    if let Err(e) = manager.disable(&unit) {
+                        new_line_break(&mut reply);
+                        reply = format!("{reply} Failed to disable {unit}: {e}");
+                    }
+                }
+            }
+            super::unit_file::Action::Mask => {
+                for unit in units {
+                    if let Err(e) = manager.mask(&unit) {
+                        new_line_break(&mut reply);
+                        reply = format!("{reply} Failed to mask {unit}: {e}");
+                    }
+                }
+            }
+            super::unit_file::Action::Unmask => {
+                for unit in units {
+                    if let Err(e) = manager.unmask(&unit) {
+                        new_line_break(&mut reply);
+                        reply = format!("{reply} Failed to unmask {unit}: {e}");
+                    }
+                }
+            }
+            _ => todo!(),
+        };
+
+        CommandResponse {
+            status: StatusCode::OK.as_u16() as _,
+            message: reply,
         }
     }
 }
