@@ -1,9 +1,8 @@
-use super::uu_base::UeBase;
-use libutils::Error;
-use libutils::Result;
+use super::base::UeBase;
 use nix::NixPath;
 use std::rc::Rc;
 use std::{cell::RefCell, path::PathBuf};
+use sysmaster::error::*;
 use sysmaster::rel::ReStation;
 
 pub(super) struct UeCgroup {
@@ -88,9 +87,7 @@ impl UnitCgroupData {
 
     pub(self) fn prepare_cg_exec(&mut self) -> Result<()> {
         log::debug!("cgroup: prepare cg exec");
-        libcgroup::cg_create(&self.cg_path).map_err(|_e| Error::Other {
-            msg: "prepare cgroup failed",
-        })?;
+        libcgroup::cg_create(&self.cg_path).context(CgroupSnafu)?;
 
         Ok(())
     }

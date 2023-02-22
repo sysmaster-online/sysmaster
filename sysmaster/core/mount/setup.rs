@@ -1,5 +1,4 @@
 //! mount the cgroup systems
-use crate::error::*;
 use bitflags::bitflags;
 use libcgroup::{self, CgType, CG_BASE_DIR};
 use libutils::{fs_util, mount_util, path_util, proc_cmdline};
@@ -11,6 +10,7 @@ use nix::{
     unistd::AccessFlags,
 };
 use std::{collections::HashMap, fs, path::Path};
+use sysmaster::error::*;
 
 const EARLY_MOUNT_NUM: u8 = 3;
 // const CGROUP_ROOT: &str = "/sys/fs/cgroup/";

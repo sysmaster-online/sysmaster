@@ -1,4 +1,4 @@
-use super::super::unit_entry::UnitX;
+use super::super::entry::UnitX;
 use super::ReStation;
 use crate::utils::table::{Table, TableSubscribe};
 use std::cell::RefCell;

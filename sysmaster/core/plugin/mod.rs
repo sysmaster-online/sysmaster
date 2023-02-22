@@ -27,7 +27,6 @@
 //! ````
 //! plugin or find the corresponding so according to the name of the corresponding unit configuration file, and load it dynamically, such as XXX.service to find libservice.so, XXX.socket to find libsocket.so
 //!
-use crate::error::*;
 use dy_re::Lib;
 use dy_re::Symbol;
 use dynamic_reload as dy_re;
@@ -44,6 +43,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use sysmaster::error::*;
 use sysmaster::unit::UmIf;
 use sysmaster::unit::{SubUnit, UnitManagerObj, UnitType};
 use walkdir::{DirEntry, WalkDir};

@@ -1,19 +1,18 @@
 #![allow(non_snake_case)]
+use crate::service_monitor::ServiceMonitor;
 use confique::Config;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::num::ParseIntError;
 use std::rc::Rc;
 use std::str::FromStr;
+use sysmaster::error::*;
 use sysmaster::exec::ExecCommand;
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use sysmaster::serialize::DeserializeWith;
 use sysmaster::unit::KillMode;
-
-use crate::service_monitor::ServiceMonitor;
 
 struct ServiceReDb<K, V>(ReDb<K, V>);
 
@@ -116,7 +115,7 @@ impl ExitStatusSet {
     }
 }
 
-fn exit_status_from_string(status: &str) -> Result<u8, ParseIntError> {
+fn exit_status_from_string(status: &str) -> Result<u8> {
     let s = status.parse::<u8>()?;
 
     Ok(s)

@@ -1,10 +1,9 @@
+use super::datastore::UnitDb;
+use super::entry::UnitX;
 use super::rentry::UnitRe;
-use super::unit_datastore::UnitDb;
-use super::unit_entry::UnitX;
 use crate::job::JobManager;
 use libevent::{EventState, EventType, Events, Source};
 use libutils::fd_util;
-use libutils::Error;
 use nix::cmsg_space;
 use nix::errno::Errno;
 use nix::sys::socket::{
@@ -15,6 +14,7 @@ use std::{
     cell::RefCell, collections::HashMap, fs, io::IoSliceMut, os::unix::prelude::RawFd,
     path::PathBuf, rc::Rc,
 };
+use sysmaster::error::*;
 use sysmaster::rel::{ReStation, ReliLastFrame, Reliability};
 
 const NOTIFY_SOCKET: &str = "/run/sysmaster/notify";
@@ -169,14 +169,11 @@ impl Notify {
         Ok(())
     }
 
-    fn notify_dispatch(&self) -> Result<i32, Error> {
+    fn notify_dispatch(&self) -> Result<i32> {
         let flags = MsgFlags::MSG_DONTWAIT | MsgFlags::MSG_CMSG_CLOEXEC | MsgFlags::MSG_TRUNC;
 
         // peek
-        let pid = notify_peek_pid(self.rawfd(), flags).map_err(|_e| Error::Other {
-            msg: "failed to peek notify message",
-        })?;
-
+        let pid = notify_peek_pid(self.rawfd(), flags)?;
         //  record + pop + action
         let ret;
         if let Some(unit) = self.db.get_unit_by_pid(Pid::from_raw(pid)) {
@@ -195,30 +192,27 @@ impl Notify {
         flags: MsgFlags,
         pid: libc::pid_t,
         unit: Option<Rc<UnitX>>,
-    ) -> Result<i32, Error> {
+    ) -> Result<i32> {
         let mut buffer = [0u8; 4096];
         let mut iov = [IoSliceMut::new(&mut buffer)];
         let mut space = cmsg_space!(libc::ucred, RawFd);
 
         // pop
-        let msgs = socket::recvmsg::<()>(self.rawfd(), &mut iov, Some(&mut space), flags).map_err(
-            |_e| Error::Other {
-                msg: "failed to receive notify message",
-            },
-        )?;
+        let msgs = socket::recvmsg::<()>(self.rawfd(), &mut iov, Some(&mut space), flags)
+            .context(NixSnafu)?;
 
         // check: peek == pop
         let (received_cred, received_fds) = notify_trans_recvmsg(&msgs);
         if get_pid_from_cred(&received_cred) != pid {
             log::error!("the received notify message has been destroyed");
             return Err(Error::Other {
-                msg: "the received notify message has been destroyed",
+                msg: "the received notify message has been destroyed".to_string(),
             });
         }
 
         // build input
         let ucred = received_cred.unwrap();
-        let contents = String::from_utf8(buffer.to_vec()).map_err(Error::from)?;
+        let contents = String::from_utf8(buffer.to_vec()).unwrap();
         let mut messages = HashMap::new();
         for line in contents.lines() {
             let content: Vec<&str> = line
@@ -236,7 +230,7 @@ impl Notify {
         // action
         if let Some(u) = unit {
             log::debug!("[notify] unit: {:?}", u.id());
-            u.notify_message(&ucred, &messages, received_fds)?;
+            let _ = u.notify_message(&ucred, &messages, received_fds);
         }
 
         Ok(0)
@@ -252,18 +246,15 @@ impl Notify {
     }
 }
 
-fn notify_peek_pid(fd: RawFd, flags: MsgFlags) -> Result<libc::pid_t, Error> {
+fn notify_peek_pid(fd: RawFd, flags: MsgFlags) -> Result<libc::pid_t> {
     let mut buffer = [0u8; 4096];
     let mut iov = [IoSliceMut::new(&mut buffer)];
     let mut space = cmsg_space!(libc::ucred, RawFd);
 
     // peek
     let peek_flags = flags | MsgFlags::MSG_PEEK;
-    let msgs = socket::recvmsg::<()>(fd, &mut iov, Some(&mut space), peek_flags).map_err(|_e| {
-        Error::Other {
-            msg: "failed to peek notify message",
-        }
-    })?;
+    let msgs =
+        socket::recvmsg::<()>(fd, &mut iov, Some(&mut space), peek_flags).context(NixSnafu)?;
 
     // get message information
     let (received_cred, received_fds) = notify_trans_recvmsg(&msgs);
@@ -276,7 +267,7 @@ fn notify_peek_pid(fd: RawFd, flags: MsgFlags) -> Result<libc::pid_t, Error> {
     if pid < 0 {
         log::error!("there is no credentials in the received notify message");
         return Err(Error::Other {
-            msg: "no credentials in the received notify message",
+            msg: "no credentials in the received notify message".to_string(),
         });
     }
 

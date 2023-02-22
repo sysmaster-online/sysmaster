@@ -1,19 +1,17 @@
-use super::uu_base::UeBase;
-use super::uu_cgroup::UeCgroup;
-use super::uu_child::UeChild;
-use super::uu_condition::{assert_keys::*, condition_keys::*, UeCondition};
-use super::uu_config::UeConfig;
-use super::uu_load::UeLoad;
-use super::uu_ratelimit::StartLimit;
+use super::base::UeBase;
+use super::cgroup::UeCgroup;
+use super::child::UeChild;
+use super::condition::{assert_keys::*, condition_keys::*, UeCondition};
+use super::config::UeConfig;
+use super::load::UeLoad;
+use super::ratelimit::StartLimit;
 use super::UnitEmergencyAction;
 use crate::unit::data::{DataManager, UnitDepConf, UnitState};
 use crate::unit::rentry::{UnitLoadState, UnitRe};
-use crate::unit::uload_util::UnitFile;
+use crate::unit::util::UnitFile;
 use crate::unit::UnitRelations;
 use libcgroup::{self, CgFlags};
-use libutils::error::Error as ServiceError;
 use libutils::process_util::my_child;
-use libutils::Result;
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
@@ -21,11 +19,10 @@ use nix::unistd::Pid;
 use nix::NixPath;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::rc::Rc;
-use sysmaster::error::UnitActionError;
+use sysmaster::error::*;
 use sysmaster::rel::ReStation;
 use sysmaster::unit::{KillContext, KillMode, KillOperation, UnitNotifyFlags};
 use sysmaster::unit::{SubUnit, UnitActiveState, UnitBase, UnitType};
@@ -123,7 +120,7 @@ impl UnitBase for Unit {
         m_pid: Option<Pid>,
         c_pid: Option<Pid>,
         ko: KillOperation,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         self.kill_context(k_context, m_pid, c_pid, ko)
     }
 
@@ -144,12 +141,7 @@ impl UnitBase for Unit {
         self.default_dependencies()
     }
 
-    fn insert_two_deps(
-        &self,
-        ra: UnitRelations,
-        rb: UnitRelations,
-        u_name: String,
-    ) -> Result<(), Box<dyn Error>> {
+    fn insert_two_deps(&self, ra: UnitRelations, rb: UnitRelations, u_name: String) -> Result<()> {
         self.insert_two_deps(ra, rb, u_name);
         Ok(())
     }
@@ -168,7 +160,7 @@ impl UnitBase for Unit {
         self.set_ignore_on_isolate(ignore_on_isolate);
     }
 
-    fn guess_main_pid(&self) -> Result<Pid, Box<dyn Error>> {
+    fn guess_main_pid(&self) -> Result<Pid> {
         self.guess_main_pid()
     }
 }
@@ -322,7 +314,9 @@ impl Unit {
         log::debug!("prepare exec cgroup");
         self.cgroup.setup_cg_path();
 
-        self.cgroup.prepare_cg_exec()
+        self.cgroup
+            .prepare_cg_exec()
+            .map_err(|_| sysmaster::error::Error::ConvertToSysmaster)
     }
 
     /// return the cgroup name of the unit
@@ -337,7 +331,7 @@ impl Unit {
         m_pid: Option<Pid>,
         c_pid: Option<Pid>,
         ko: KillOperation,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         let sig = ko.to_signal();
         if let Some(pid) = m_pid {
             match nix::sys::signal::kill(pid, sig) {
@@ -423,7 +417,7 @@ impl Unit {
     }
 
     /// guess main pid from the cgroup path
-    pub fn guess_main_pid(&self) -> Result<Pid, Box<dyn Error>> {
+    pub fn guess_main_pid(&self) -> Result<Pid> {
         let cg_path = self.cgroup.cg_path();
 
         if cg_path.is_empty() {
@@ -568,7 +562,7 @@ impl Unit {
         self.load.set_in_target_dep_queue(t);
     }
 
-    pub(super) fn load_unit(&self) -> Result<(), Box<dyn Error>> {
+    pub(super) fn load_unit(&self) -> Result<()> {
         self.set_in_load_queue(false);
         // Mount unit doesn't have config file, set its loadstate to
         // UnitLoaded directly.
@@ -593,33 +587,33 @@ impl Unit {
     }
 
     ///
-    pub fn start(&self) -> Result<(), UnitActionError> {
+    pub fn start(&self) -> Result<()> {
         let active_state = self.current_active_state();
         if active_state.is_active_or_reloading() {
-            return Err(UnitActionError::UnitActionEAlready);
+            return Err(Error::UnitActionEAlready);
         }
 
         if active_state == UnitActiveState::UnitMaintenance {
-            return Err(UnitActionError::UnitActionEAgain);
+            return Err(Error::UnitActionEAgain);
         }
 
         if self.load_state() != UnitLoadState::UnitLoaded {
-            return Err(UnitActionError::UnitActionEInval);
+            return Err(Error::UnitActionEInval);
         }
         if active_state != UnitActiveState::UnitActivating && !self.conditions().conditions_test() {
             log::debug!("Starting failed because condition test failed");
-            return Err(UnitActionError::UnitActionEInval);
+            return Err(Error::UnitActionEInval);
         }
         if active_state != UnitActiveState::UnitActivating && !self.conditions().asserts_test() {
             log::error!("Starting failed because assert test failed");
-            return Err(UnitActionError::UnitActionEInval);
+            return Err(Error::UnitActionEInval);
         }
 
         self.sub.start()
     }
 
     ///
-    pub fn stop(&self, force: bool) -> Result<(), UnitActionError> {
+    pub fn stop(&self, force: bool) -> Result<()> {
         if !force {
             let active_state = self.current_active_state();
             let inactive_or_failed = matches!(
@@ -628,7 +622,7 @@ impl Unit {
             );
 
             if inactive_or_failed {
-                return Err(UnitActionError::UnitActionEAlready);
+                return Err(Error::UnitActionEAlready);
             }
         }
 
@@ -664,7 +658,7 @@ impl Unit {
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
         fds: Vec<i32>,
-    ) -> Result<(), ServiceError> {
+    ) -> Result<()> {
         self.sub.notify_message(ucred, messages, fds)
     }
 }
@@ -680,7 +674,7 @@ mod tests {
     use sysmaster::rel::Reliability;
     use sysmaster::unit::UnitType;
 
-    use crate::{plugin::Plugin, unit::data::DataManager, unit::uload_util::UnitFile};
+    use crate::{plugin::Plugin, unit::data::DataManager, unit::util::UnitFile};
     fn unit_init() -> Rc<Unit> {
         logger::init_log_with_console("test_unit_entry", log::LevelFilter::Trace);
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));

@@ -10,14 +10,13 @@ use super::{
 };
 use libevent::EventState;
 use libevent::{EventType, Events, Source};
-use libutils::Error;
 use libutils::IN_SET;
 use nix::libc::{self};
 use nix::{errno::Errno, sys::wait::WaitStatus};
 use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
-use sysmaster::error::UnitActionError;
+use sysmaster::error::*;
 use sysmaster::exec::{ExecCommand, ExecContext};
 use sysmaster::rel::ReliLastFrame;
 use sysmaster::rel::{ReStation, Reliability};
@@ -95,7 +94,7 @@ impl SocketMng {
         }
     }
 
-    pub(super) fn start_check(&self) -> Result<bool, UnitActionError> {
+    pub(super) fn start_check(&self) -> Result<bool> {
         self.data.start_check()
     }
 
@@ -104,7 +103,7 @@ impl SocketMng {
         self.db_update();
     }
 
-    pub(super) fn stop_check(&self) -> Result<bool, UnitActionError> {
+    pub(super) fn stop_check(&self) -> Result<bool> {
         self.data.stop_check()
     }
 
@@ -197,7 +196,7 @@ impl SocketMngData {
         self.watch_fds();
     }
 
-    pub(self) fn start_check(&self) -> Result<bool, UnitActionError> {
+    pub(self) fn start_check(&self) -> Result<bool> {
         if IN_SET!(
             self.state(),
             SocketState::StopPre,
@@ -208,7 +207,7 @@ impl SocketMngData {
             SocketState::FinalSigkill,
             SocketState::Cleaning
         ) {
-            return Err(UnitActionError::UnitActionEAgain);
+            return Err(Error::UnitActionEAgain);
         }
 
         if IN_SET!(
@@ -229,7 +228,7 @@ impl SocketMngData {
         let ret = self.comm.owner().map(|u| u.test_start_limit());
         if ret.is_none() || !ret.unwrap() {
             self.enter_dead(SocketResult::FailureStartLimitHit);
-            return Err(UnitActionError::UnitActionECanceled);
+            return Err(Error::UnitActionECanceled);
         }
         Ok(false)
     }
@@ -242,7 +241,7 @@ impl SocketMngData {
         self.enter_stop_pre(SocketResult::Success);
     }
 
-    pub(self) fn stop_check(&self) -> Result<bool, UnitActionError> {
+    pub(self) fn stop_check(&self) -> Result<bool> {
         if IN_SET!(
             self.state(),
             SocketState::StopPre,
@@ -262,7 +261,7 @@ impl SocketMngData {
             SocketState::StartPost
         ) {
             self.enter_signal(SocketState::StopPreSigterm, SocketResult::Success);
-            return Err(UnitActionError::UnitActionEAgain);
+            return Err(Error::UnitActionEAgain);
         }
 
         Ok(false)
@@ -879,7 +878,7 @@ impl SocketMngPort {
         }
     }
 
-    fn dispatch_io(&self) -> Result<i32, Error> {
+    fn dispatch_io(&self) -> Result<i32> {
         let afd: i32 = -1;
 
         if self.mng().state() != SocketState::Listening {
@@ -890,10 +889,9 @@ impl SocketMngPort {
             && self.port.p_type() == PortType::Socket
             && self.port.sa().can_accept()
         {
-            let afd = self
-                .port
-                .accept()
-                .map_err(|_e| Error::Other { msg: "accept err" })?;
+            let afd = self.port.accept().map_err(|_e| Error::Other {
+                msg: "accept err".to_string(),
+            })?;
 
             self.port.apply_sock_opt(afd)
         }

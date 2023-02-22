@@ -1,17 +1,16 @@
+use super::entry::UnitX;
 use super::rentry::UnitRe;
-use super::unit_entry::UnitX;
-use super::UnitErrno;
 use super::{UnitRelationAtom, UnitRelations, UnitType};
 use crate::utils::table;
-use libutils::Result;
+use child::UnitChild;
+use deps::UnitDep;
 use nix::unistd::Pid;
 use nix::NixPath;
+use sets::UnitSets;
 use std::rc::Rc;
+use sysmaster::error::*;
 use sysmaster::rel::ReStation;
 use table::TableSubscribe;
-use unit_child::UnitChild;
-use unit_dep::UnitDep;
-use unit_sets::UnitSets;
 
 //#[derive(Debug)]
 pub(crate) struct UnitDb {
@@ -99,7 +98,7 @@ impl UnitDb {
         dest: Rc<UnitX>,
         reference: bool,
         source_mask: u16,
-    ) -> Result<(), UnitErrno> {
+    ) -> Result<()> {
         self.dep
             .insert(source, relation, dest, reference, source_mask)
     }
@@ -162,6 +161,6 @@ impl UnitDb {
 }
 
 // dependency: unit_sets -> {unit_dep | unit_child}
-mod unit_child;
-mod unit_dep;
-mod unit_sets;
+mod child;
+mod deps;
+mod sets;

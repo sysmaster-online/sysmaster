@@ -9,7 +9,7 @@ use super::service_rentry::{
 use super::service_spawn::ServiceSpawn;
 use crate::service_rentry::ExitStatus;
 use libevent::{EventState, EventType, Events, Source};
-use libutils::{fd_util, Error, IN_SET};
+use libutils::{fd_util, IN_SET};
 use libutils::{file_util, process_util};
 use nix::errno::Errno;
 use nix::libc;
@@ -28,7 +28,7 @@ use std::{
     path::PathBuf,
     rc::Weak,
 };
-use sysmaster::error::UnitActionError;
+use sysmaster::error::*;
 use sysmaster::exec::{ExecCommand, ExecContext, ExecFlags};
 use sysmaster::rel::ReStation;
 use sysmaster::unit::{KillOperation, UnitActiveState, UnitNotifyFlags};
@@ -134,7 +134,7 @@ impl ServiceMng {
         }
     }
 
-    pub(super) fn start_check(&self) -> Result<bool, UnitActionError> {
+    pub(super) fn start_check(&self) -> Result<bool> {
         if IN_SET!(
             self.state(),
             ServiceState::Stop,
@@ -147,7 +147,7 @@ impl ServiceMng {
             ServiceState::FinalSigkill,
             ServiceState::Cleaning
         ) {
-            return Err(UnitActionError::UnitActionEAgain);
+            return Err(Error::UnitActionEAgain);
         }
 
         // service is in starting
@@ -163,7 +163,7 @@ impl ServiceMng {
         let ret = self.comm.owner().map(|u| u.test_start_limit());
         if ret.is_none() || !ret.unwrap() {
             self.enter_dead(ServiceResult::FailureStartLimitHit, false);
-            return Err(UnitActionError::UnitActionECanceled);
+            return Err(Error::UnitActionECanceled);
         }
 
         Ok(false)
@@ -179,7 +179,7 @@ impl ServiceMng {
         self.db_update();
     }
 
-    pub(super) fn stop_check(&self) -> Result<(), UnitActionError> {
+    pub(super) fn stop_check(&self) -> Result<()> {
         if IN_SET!(
             self.state(),
             ServiceState::Stop,
@@ -733,7 +733,7 @@ impl ServiceMng {
         }
     }
 
-    fn load_pid_file(&self) -> Result<bool, Error> {
+    fn load_pid_file(&self) -> Result<bool> {
         let pid_file = self
             .config
             .config_data()
@@ -744,7 +744,7 @@ impl ServiceMng {
             .map(|s| s.to_string());
         if pid_file.is_none() {
             return Err(Error::Other {
-                msg: "pid file is not configured",
+                msg: "pid file is not configured".to_string(),
             });
         }
 
@@ -752,7 +752,7 @@ impl ServiceMng {
         let pid_file_path = Path::new(file);
         if !pid_file_path.exists() || !pid_file_path.is_file() {
             return Err(Error::Other {
-                msg: "pid file is not a file or not exist",
+                msg: "pid file is not a file or not exist".to_string(),
             });
         }
 
@@ -768,7 +768,7 @@ impl ServiceMng {
                 pid
             );
             return Err(Error::Other {
-                msg: "parsed the pid from pid file failed",
+                msg: "parsed the pid from pid file failed".to_string(),
             });
         }
 
@@ -781,7 +781,7 @@ impl ServiceMng {
 
         self.pid.unwatch_main();
         self.pid.set_main(pid).map_err(|_e| Error::Other {
-            msg: "invalid main pid",
+            msg: "invalid main pid".to_string(),
         })?;
 
         self.comm
@@ -791,22 +791,22 @@ impl ServiceMng {
         Ok(true)
     }
 
-    fn valid_main_pid(&self, pid: Pid) -> Result<bool, Error> {
+    fn valid_main_pid(&self, pid: Pid) -> Result<bool> {
         if pid == nix::unistd::getpid() {
             return Err(Error::Other {
-                msg: "main pid is the sysmaster's pid",
+                msg: "main pid is the sysmaster's pid".to_string(),
             });
         }
 
         if self.pid.control().is_some() && self.pid.control().unwrap() == pid {
             return Err(Error::Other {
-                msg: "main pid is the control process",
+                msg: "main pid is the control process".to_string(),
             });
         }
 
         if !process_util::alive(pid) {
             return Err(Error::Other {
-                msg: "main pid is not alive",
+                msg: "main pid is not alive".to_string(),
             });
         }
         if self
@@ -820,7 +820,7 @@ impl ServiceMng {
         Ok(false)
     }
 
-    fn demand_pid_file(&self) -> Result<(), Error> {
+    fn demand_pid_file(&self) -> Result<()> {
         let pid_file_inotify = PathIntofy::new(PathBuf::from(
             self.config
                 .config_data()
@@ -836,7 +836,7 @@ impl ServiceMng {
         self.watch_pid_file()
     }
 
-    fn watch_pid_file(&self) -> Result<(), Error> {
+    fn watch_pid_file(&self) -> Result<()> {
         let pid_file_inotify = self.rd.path_inotify();
         log::debug!("watch pid file: {}", pid_file_inotify);
         match pid_file_inotify.add_watch_path() {
@@ -871,7 +871,7 @@ impl ServiceMng {
         self.rd.path_inotify().unwatch();
     }
 
-    fn retry_pid_file(&self) -> Result<bool, Error> {
+    fn retry_pid_file(&self) -> Result<bool> {
         log::debug!("retry loading pid file: {}", self.rd.path_inotify());
         self.load_pid_file()?;
 
@@ -1258,7 +1258,7 @@ impl ServiceMng {
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
         _fds: Vec<i32>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let ret = self.do_notify_message(ucred, messages, _fds);
         self.db_update();
         ret
@@ -1269,7 +1269,7 @@ impl ServiceMng {
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
         _fds: Vec<i32>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if let Some(&pidr) = messages.get("MAINPID") {
             if IN_SET!(
                 self.state(),
@@ -1680,11 +1680,11 @@ impl PathIntofy {
         *self.mng.borrow_mut() = mng;
     }
 
-    fn add_watch_path(&self) -> Result<bool, Error> {
+    fn add_watch_path(&self) -> Result<bool> {
         self.unwatch();
 
         let inotify = Inotify::init(InitFlags::all()).map_err(|_e| Error::Other {
-            msg: "create initofy fd err",
+            msg: "create initofy fd err".to_string(),
         })?;
         *self.inotify.borrow_mut() = inotify.as_raw_fd();
 
@@ -1738,7 +1738,7 @@ impl PathIntofy {
 
         if !exist {
             return Err(Error::Other {
-                msg: "watch on any of the ancestor failed",
+                msg: "watch on any of the ancestor failed".to_string(),
             });
         }
 
@@ -1750,7 +1750,7 @@ impl PathIntofy {
         *self.inotify.borrow_mut() = -1;
     }
 
-    fn read_fd_event(&self) -> Result<bool, Error> {
+    fn read_fd_event(&self) -> Result<bool> {
         let inotify = unsafe { Inotify::from_raw_fd(*self.inotify.borrow_mut()) };
         let events = match inotify.read_events() {
             Ok(events) => events,
@@ -1760,7 +1760,7 @@ impl PathIntofy {
                 }
 
                 return Err(Error::Other {
-                    msg: "read evnets from inotify error",
+                    msg: "read evnets from inotify error".to_string(),
                 });
             }
         };

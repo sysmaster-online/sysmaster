@@ -1,14 +1,12 @@
 //! socket_load mod parse the field of section Socket and add the extra dependency。
 //!
-
 use crate::socket_comm::SocketUnitComm;
 use crate::socket_config::SocketConfig;
 use crate::socket_rentry::PortType;
-use libutils::error::Error as SocketError;
 use libutils::special::{SHUTDOWN_TARGET, SOCKETS_TARGET, SYSINIT_TARGET};
 use std::path::Path;
-use std::{error::Error, rc::Rc};
-use sysmaster::error::UnitActionError;
+use std::rc::Rc;
+use sysmaster::error::*;
 use sysmaster::unit::{UnitDependencyMask, UnitRelations, UnitType};
 
 pub(super) struct SocketLoad {
@@ -24,7 +22,7 @@ impl SocketLoad {
         }
     }
 
-    pub(super) fn socket_add_extras(&self) -> Result<(), Box<dyn Error>> {
+    pub(super) fn socket_add_extras(&self) -> Result<()> {
         log::debug!("socket add extras");
         if self.can_accept() {
             if self.config.unit_ref_target().is_none() {
@@ -40,20 +38,16 @@ impl SocketLoad {
             });
         }
 
-        self.add_default_dependencies().map_err(|_e| {
-            Box::new(SocketError::Other {
-                msg: "add default dependency error",
-            })
-        })?;
+        self.add_default_dependencies()?;
 
         Ok(())
     }
 
-    pub(super) fn socket_verify(&self) -> Result<(), Box<dyn Error>> {
+    pub(super) fn socket_verify(&self) -> Result<()> {
         Ok(())
     }
 
-    fn load_related_unit(&self, related_type: UnitType) -> Result<(), Box<dyn Error>> {
+    fn load_related_unit(&self, related_type: UnitType) -> Result<()> {
         let unit_name = self.comm.owner().map(|u| u.id().to_string());
         let suffix = String::from(related_type);
         if suffix.is_empty() {
@@ -91,7 +85,7 @@ impl SocketLoad {
         false
     }
 
-    pub(self) fn add_default_dependencies(&self) -> Result<(), UnitActionError> {
+    pub(self) fn add_default_dependencies(&self) -> Result<()> {
         if let Some(u) = self.comm.owner() {
             log::debug!("add default dependencies for socket [{}]", u.id());
             if !u.default_dependencies() {

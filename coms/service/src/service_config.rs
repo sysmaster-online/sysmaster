@@ -3,9 +3,9 @@ use super::service_comm::ServiceUnitComm;
 use super::service_rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
 use confique::Config;
 use std::cell::RefCell;
-use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::error::*;
 use sysmaster::exec::ExecCommand;
 use sysmaster::rel::ReStation;
 use sysmaster::unit::KillContext;
@@ -47,7 +47,7 @@ impl ServiceConfig {
         }
     }
 
-    pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<(), Box<dyn Error>> {
+    pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<()> {
         let mut builder = ServiceConfigData::builder().env();
 
         log::debug!("service load path: {:?}", paths);
@@ -56,7 +56,7 @@ impl ServiceConfig {
             builder = builder.file(v);
         }
 
-        *self.data.borrow_mut() = builder.load()?;
+        *self.data.borrow_mut() = builder.load().context(ConfiqueSnafu)?;
 
         if update {
             self.db_update();

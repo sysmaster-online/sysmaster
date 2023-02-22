@@ -2,13 +2,12 @@ use super::rentry::{self, JobAttr, JobKind, JobRe};
 use crate::unit::JobMode;
 use crate::unit::UnitRelationAtom;
 use crate::unit::UnitX;
-use sysmaster::error::UnitActionError;
-use sysmaster::rel::Reliability;
-use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
-
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
+use sysmaster::error::*;
+use sysmaster::rel::Reliability;
+use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -409,12 +408,12 @@ fn job_trigger_unit(unit: &UnitX, run_kind: JobKind, force: bool) -> Result<(), 
         JobKind::Reload => unit.reload(),
         JobKind::Verify => match unit.active_state() {
             UnitActiveState::UnitActive | UnitActiveState::UnitReloading => {
-                Err(UnitActionError::UnitActionEAlready)
+                Err(Error::UnitActionEAlready)
             }
-            UnitActiveState::UnitActivating => Err(UnitActionError::UnitActionEAgain),
-            _ => Err(UnitActionError::UnitActionEBadR),
+            UnitActiveState::UnitActivating => Err(Error::UnitActionEAgain),
+            _ => Err(Error::UnitActionEBadR),
         },
-        JobKind::Nop => Err(UnitActionError::UnitActionEAlready), // do nothing
+        JobKind::Nop => Err(Error::UnitActionEAlready), // do nothing
         _ => unreachable!("Invalid job run-kind: {:?}.", run_kind),
     };
 
@@ -424,22 +423,22 @@ fn job_trigger_unit(unit: &UnitX, run_kind: JobKind, force: bool) -> Result<(), 
     }
 }
 
-fn job_trigger_err_to_result(err: UnitActionError) -> Option<JobResult> {
+fn job_trigger_err_to_result(err: Error) -> Option<JobResult> {
     match err {
-        UnitActionError::UnitActionEAgain => None, // re-trigger again
-        UnitActionError::UnitActionEAlready => Some(JobResult::Done), // over already
-        UnitActionError::UnitActionEComm => Some(JobResult::Done), // convention
-        UnitActionError::UnitActionEBadR => Some(JobResult::Skipped),
-        UnitActionError::UnitActionENoExec => Some(JobResult::Invalid),
-        UnitActionError::UnitActionEProto => Some(JobResult::Assert),
-        UnitActionError::UnitActionEOpNotSupp => Some(JobResult::UnSupported),
-        UnitActionError::UnitActionENolink => Some(JobResult::Dependency),
-        UnitActionError::UnitActionEStale => Some(JobResult::Once),
-        UnitActionError::UnitActionEFailed => Some(JobResult::Failed),
-        UnitActionError::UnitActionEInval => Some(JobResult::Failed),
-        UnitActionError::UnitActionEBusy => Some(JobResult::Failed),
-        UnitActionError::UnitActionENoent => Some(JobResult::Failed),
-        UnitActionError::UnitActionECanceled => Some(JobResult::Failed),
+        Error::UnitActionEAgain => None, // re-trigger again
+        Error::UnitActionEAlready => Some(JobResult::Done), // over already
+        Error::UnitActionEComm => Some(JobResult::Done), // convention
+        Error::UnitActionEBadR => Some(JobResult::Skipped),
+        Error::UnitActionENoExec => Some(JobResult::Invalid),
+        Error::UnitActionEProto => Some(JobResult::Assert),
+        Error::UnitActionEOpNotSupp => Some(JobResult::UnSupported),
+        Error::UnitActionENolink => Some(JobResult::Dependency),
+        Error::UnitActionEStale => Some(JobResult::Once),
+        Error::UnitActionEFailed => Some(JobResult::Failed),
+        Error::UnitActionEInval => Some(JobResult::Failed),
+        Error::UnitActionEBusy => Some(JobResult::Failed),
+        Error::UnitActionENoent => Some(JobResult::Failed),
+        Error::UnitActionECanceled => Some(JobResult::Failed),
         _ => Some(JobResult::Skipped),
     }
 }

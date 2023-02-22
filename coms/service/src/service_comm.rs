@@ -1,9 +1,8 @@
-use crate::service_monitor::ServiceMonitor;
-use crate::service_rentry::ExitStatus;
-
 use super::service_rentry::{
     NotifyState, SectionService, ServiceCommand, ServiceRe, ServiceResult, ServiceState,
 };
+use crate::service_monitor::ServiceMonitor;
+use crate::service_rentry::ExitStatus;
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;

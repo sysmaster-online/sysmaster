@@ -9,8 +9,8 @@ use crate::{
 };
 use libutils::logger;
 use nix::sys::wait::WaitStatus;
-use std::{error::Error, path::PathBuf, rc::Rc};
-use sysmaster::error::UnitActionError;
+use std::{path::PathBuf, rc::Rc};
+use sysmaster::error::*;
 use sysmaster::exec::ExecContext;
 use sysmaster::rel::{ReStation, Reliability};
 use sysmaster::unit::{SubUnit, UmIf, UnitActiveState, UnitBase, UnitMngUtil};
@@ -52,7 +52,7 @@ impl ReStation for SocketUnit {
 }
 
 impl SubUnit for SocketUnit {
-    fn load(&self, paths: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
+    fn load(&self, paths: Vec<PathBuf>) -> Result<()> {
         log::debug!("socket begin to load conf file");
         self.config.load(paths, true)?;
 
@@ -68,7 +68,7 @@ impl SubUnit for SocketUnit {
     }
 
     // the function entrance to start the unit
-    fn start(&self) -> Result<(), UnitActionError> {
+    fn start(&self) -> Result<()> {
         let starting = self.mng.start_check()?;
         if starting {
             log::debug!("socket already in start");
@@ -80,7 +80,7 @@ impl SubUnit for SocketUnit {
         Ok(())
     }
 
-    fn stop(&self, force: bool) -> Result<(), UnitActionError> {
+    fn stop(&self, force: bool) -> Result<()> {
         if !force {
             let stopping = self.mng.stop_check()?;
             if stopping {

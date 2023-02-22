@@ -2,12 +2,10 @@ use super::kill::{KillContext, KillOperation};
 use super::state::{UnitActiveState, UnitNotifyFlags};
 use super::umif::UnitMngUtil;
 use super::{super::rel::ReStation, UnitRelations};
-use crate::error::UnitActionError;
-use libutils::error::Error as ServiceError;
-use libutils::Result;
+use crate::error::*;
 use nix::sys::wait::WaitStatus;
 use nix::{sys::socket::UnixCredentials, unistd::Pid};
-use std::{collections::HashMap, error::Error, path::PathBuf, rc::Rc};
+use std::{collections::HashMap, path::PathBuf, rc::Rc};
 
 ///The trait Defining Shared Behavior from Base Unit  to SUB unit
 ///
@@ -25,7 +23,7 @@ pub trait UnitBase {
         m_pid: Option<Pid>,
         c_pid: Option<Pid>,
         ko: KillOperation,
-    ) -> Result<(), Box<dyn Error>>;
+    ) -> Result<()>;
 
     ///
     fn notify(
@@ -42,12 +40,7 @@ pub trait UnitBase {
     fn default_dependencies(&self) -> bool;
 
     ///
-    fn insert_two_deps(
-        &self,
-        ra: UnitRelations,
-        rb: UnitRelations,
-        u_name: String,
-    ) -> Result<(), Box<dyn Error>>;
+    fn insert_two_deps(&self, ra: UnitRelations, rb: UnitRelations, u_name: String) -> Result<()>;
     ///
     fn insert_dep(&self, ra: UnitRelations, u_name: String);
 
@@ -61,7 +54,7 @@ pub trait UnitBase {
     fn set_ignore_on_isolate(&self, ignore_on_isolate: bool);
 
     /// guess main pid from the cgroup path
-    fn guess_main_pid(&self) -> Result<Pid, Box<dyn Error>>;
+    fn guess_main_pid(&self) -> Result<Pid>;
 }
 
 ///The trait Defining Shared Behavior of sub unit
@@ -76,7 +69,7 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     fn done(&self) {}
 
     ///
-    fn load(&self, conf: Vec<PathBuf>) -> Result<(), Box<dyn Error>>;
+    fn load(&self, conf: Vec<PathBuf>) -> Result<()>;
 
     ///
     fn dump(&self) {}
@@ -84,13 +77,13 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     /// Start a Unit
     /// Each Sub Unit need to implement its own start function
     ///
-    fn start(&self) -> Result<(), UnitActionError> {
+    fn start(&self) -> Result<()> {
         Ok(())
     }
 
     ///
     // process reentrant with force
-    fn stop(&self, _force: bool) -> Result<(), UnitActionError> {
+    fn stop(&self, _force: bool) -> Result<()> {
         Ok(())
     }
 
@@ -132,7 +125,7 @@ pub trait SubUnit: ReStation + UnitMngUtil {
         _ucred: &UnixCredentials,
         _events: &HashMap<&str, &str>,
         _fds: Vec<i32>,
-    ) -> Result<(), ServiceError> {
+    ) -> Result<()> {
         Ok(())
     }
 }

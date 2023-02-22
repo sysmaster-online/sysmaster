@@ -75,11 +75,9 @@ impl SocketPort {
         };
 
         if update {
-            let ret = self.comm.reli().fd_cloexec(fd, false);
-            if ret.is_err() {
-                // error
+            if let Err(e) = self.comm.reli().fd_cloexec(fd, false) {
                 self.close(update);
-                return ret;
+                return Err(e.into());
             }
         }
         self.set_fd(fd);

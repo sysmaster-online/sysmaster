@@ -1,9 +1,8 @@
 //!  The core logic of the mount subclass
-
 use super::mount_comm::MountUnitComm;
 use super::mount_rentry::MountState;
 use std::{cell::RefCell, rc::Rc};
-use sysmaster::error::UnitActionError;
+use sysmaster::error::*;
 use sysmaster::rel::ReStation;
 use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
@@ -57,11 +56,11 @@ impl MountMng {
         self.set_state(MountState::Mounted, notify);
     }
 
-    pub(super) fn start_check(&self) -> Result<bool, UnitActionError> {
+    pub(super) fn start_check(&self) -> Result<bool> {
         let ret = self.comm.owner().map_or(false, |u| u.test_start_limit());
         if !ret {
             self.enter_dead(true);
-            return Err(UnitActionError::UnitActionECanceled);
+            return Err(Error::UnitActionECanceled);
         }
 
         Ok(false)

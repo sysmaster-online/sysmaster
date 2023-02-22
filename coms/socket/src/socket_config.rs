@@ -13,12 +13,12 @@ use nix::sys::socket::{
     SockaddrLike, UnixAddr,
 };
 use std::cell::RefCell;
-use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::error::*;
 use sysmaster::exec::ExecCommand;
 use sysmaster::rel::ReStation;
 use sysmaster::unit::KillContext;
@@ -111,13 +111,13 @@ impl SocketConfig {
         self.db_update();
     }
 
-    pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<(), Box<dyn Error>> {
+    pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<()> {
         // get original configuration
         let mut builder = SocketConfigData::builder().env();
         for v in paths {
             builder = builder.file(v);
         }
-        let data = builder.load()?;
+        let data = builder.load().context(ConfiqueSnafu)?;
 
         self.parse_kill_context();
 
@@ -147,7 +147,7 @@ impl SocketConfig {
         self.data.borrow().get_exec_cmds(cmd_type)
     }
 
-    pub(super) fn set_unit_ref(&self, service: String) -> Result<(), Box<dyn Error>> {
+    pub(super) fn set_unit_ref(&self, service: String) -> Result<()> {
         if !self.comm.um().load_unit_success(&service) {
             return Err(format!("failed to load unit {service}").into());
         }
@@ -166,7 +166,7 @@ impl SocketConfig {
         self.ports.borrow().iter().cloned().collect::<_>()
     }
 
-    fn parse_service(&self) -> Result<(), Box<dyn Error>> {
+    fn parse_service(&self) -> Result<()> {
         if let Some(service) = self.config_data().borrow().Socket.Service.clone() {
             if !service.ends_with(".service") {
                 return Err("socket service must be end with .service"
@@ -180,7 +180,7 @@ impl SocketConfig {
         Ok(())
     }
 
-    fn parse_port(&self) -> Result<(), Box<dyn Error>> {
+    fn parse_port(&self) -> Result<()> {
         log::debug!("begin to parse socket section");
 
         let config = &self.data;
@@ -197,7 +197,7 @@ impl SocketConfig {
         &self,
         item: ListeningItem,
         socket_conf: Rc<RefCell<SocketConfigData>>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         // let sock_addr
         match item {
             ListeningItem::Stream => {
@@ -240,11 +240,7 @@ impl SocketConfig {
         Ok(())
     }
 
-    fn parse_sockets(
-        &self,
-        listens: Vec<String>,
-        socket_type: SockType,
-    ) -> Result<(), Box<dyn Error>> {
+    fn parse_sockets(&self, listens: Vec<String>, socket_type: SockType) -> Result<()> {
         for v in &listens {
             if v.is_empty() {
                 continue;
@@ -479,7 +475,7 @@ impl fmt::Display for SocketAddress {
     }
 }
 
-fn parse_netlink_address(item: &str) -> Result<SocketAddress, Box<dyn Error>> {
+fn parse_netlink_address(item: &str) -> Result<SocketAddress> {
     let words: Vec<String> = item.split_whitespace().map(|s| s.to_string()).collect();
     if words.len() != 2 {
         return Err(format!("Netlink configuration format is not correct: {item}").into());
@@ -505,17 +501,14 @@ fn parse_netlink_address(item: &str) -> Result<SocketAddress, Box<dyn Error>> {
     ))
 }
 
-fn parse_socket_address(
-    item: &str,
-    socket_type: SockType,
-) -> Result<SocketAddress, Box<dyn Error>> {
+fn parse_socket_address(item: &str, socket_type: SockType) -> Result<SocketAddress> {
     if item.starts_with('/') {
-        let unix_addr = UnixAddr::new(&PathBuf::from(item))?;
+        let unix_addr = UnixAddr::new(&PathBuf::from(item)).context(NixSnafu)?;
         return Ok(SocketAddress::new(Box::new(unix_addr), socket_type, None));
     }
 
     if item.starts_with('@') {
-        let unix_addr = UnixAddr::new_abstract(item.as_bytes())?;
+        let unix_addr = UnixAddr::new_abstract(item.as_bytes()).context(NixSnafu)?;
 
         return Ok(SocketAddress::new(Box::new(unix_addr), socket_type, None));
     }

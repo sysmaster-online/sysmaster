@@ -1,9 +1,8 @@
-use std::{error::Error, rc::Rc};
-
-use nix::unistd::Pid;
-use sysmaster::exec::{ExecCommand, ExecContext, ExecParameters};
-
 use crate::socket_comm::SocketUnitComm;
+use nix::unistd::Pid;
+use std::rc::Rc;
+use sysmaster::error::*;
+use sysmaster::exec::{ExecCommand, ExecContext, ExecParameters};
 
 pub(super) struct SocketSpawn {
     comm: Rc<SocketUnitComm>,
@@ -18,7 +17,7 @@ impl SocketSpawn {
         }
     }
 
-    pub(super) fn start_socket(&self, cmdline: &ExecCommand) -> Result<Pid, Box<dyn Error>> {
+    pub(super) fn start_socket(&self, cmdline: &ExecCommand) -> Result<Pid> {
         let params = ExecParameters::new();
 
         if let Some(unit) = self.comm.owner() {

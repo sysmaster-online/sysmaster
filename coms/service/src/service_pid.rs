@@ -4,7 +4,7 @@ use nix::errno::Errno;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::rc::Rc;
-use sysmaster::error::UnitActionError;
+use sysmaster::error::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum MainState {
@@ -90,7 +90,7 @@ impl ServicePid {
         self.data.borrow().control()
     }
 
-    pub(super) fn main_alive(&self) -> Result<bool, UnitActionError> {
+    pub(super) fn main_alive(&self) -> Result<bool> {
         self.data.borrow().main_alive()
     }
 }
@@ -140,9 +140,9 @@ impl ServicePidData {
         self.control.as_ref().cloned()
     }
 
-    pub(self) fn main_alive(&self) -> Result<bool, UnitActionError> {
+    pub(self) fn main_alive(&self) -> Result<bool> {
         match self.state {
-            MainState::Unknown => Err(UnitActionError::UnitActionEAgain),
+            MainState::Unknown => Err(Error::UnitActionEAgain),
             MainState::Known => {
                 if self.main.is_none() {
                     return Ok(false);

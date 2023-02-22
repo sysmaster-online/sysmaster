@@ -1,8 +1,7 @@
-use super::super::unit_base;
-use super::super::UnitErrno;
+use super::super::base;
 use super::super::UnitRelationAtom;
+use super::sets::UnitSets;
 use super::table::{TableOp, TableSubscribe};
-use super::unit_sets::UnitSets;
 use super::ReStation;
 use super::UnitRe;
 use super::UnitRelations;
@@ -10,6 +9,7 @@ use super::UnitX;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use sysmaster::error::*;
 
 pub(super) struct UnitDep {
     sub_name: String, // key for table-subscriber: UnitSets
@@ -47,7 +47,7 @@ impl UnitDep {
         dest: Rc<UnitX>,
         reference: bool,
         source_mask: u16,
-    ) -> Result<(), UnitErrno> {
+    ) -> Result<()> {
         source.dep_check(relation, &dest)?;
         self.sub
             .data
@@ -72,7 +72,7 @@ impl UnitDep {
 
     pub(super) fn gets_atom(&self, source: &UnitX, atom: UnitRelationAtom) -> Vec<Rc<UnitX>> {
         let mut dests = Vec::new();
-        for relation in unit_base::unit_relation_from_unique_atom(atom).iter() {
+        for relation in base::unit_relation_from_unique_atom(atom).iter() {
             dests.append(&mut self.gets(source, *relation));
         }
         dests
@@ -93,7 +93,7 @@ impl UnitDep {
         atom: UnitRelationAtom,
         dest: &UnitX,
     ) -> bool {
-        for relation in unit_base::unit_relation_from_unique_atom(atom).iter() {
+        for relation in base::unit_relation_from_unique_atom(atom).iter() {
             if self.is_dep_with(source, *relation, dest) {
                 // something hits
                 return true;
@@ -180,7 +180,7 @@ impl UnitDepData {
             let mask = UnitDepMask::new(0, 0);
             for (relation, dest) in self.rentry.dep_get(source).iter() {
                 let r_src = *relation;
-                let r_dst = unit_base::unit_relation_to_inverse(r_src);
+                let r_dst = base::unit_relation_to_inverse(r_src);
                 let dst = self.units.get(dest).unwrap();
                 self.insert_one_way(Rc::clone(&src), r_src, Rc::clone(&dst), mask);
                 self.insert_one_way(Rc::clone(&dst), r_dst, Rc::clone(&src), mask);
@@ -205,7 +205,7 @@ impl UnitDepData {
 
         let mask = UnitDepMask::new(source_mask, 0);
         let mask_inverse = UnitDepMask::new(0, source_mask);
-        let relation_inverse = unit_base::unit_relation_to_inverse(relation);
+        let relation_inverse = base::unit_relation_to_inverse(relation);
 
         // insert in two-directions way
         self.insert_one_way(Rc::clone(&source), relation, Rc::clone(&dest), mask);
@@ -219,7 +219,7 @@ impl UnitDepData {
         // process reference in two-directions way
         if reference {
             let ref_relation = UnitRelations::UnitReferences;
-            let ref_relation_inverse = unit_base::unit_relation_to_inverse(ref_relation);
+            let ref_relation_inverse = base::unit_relation_to_inverse(ref_relation);
             self.insert_one_way(Rc::clone(&source), ref_relation, Rc::clone(&dest), mask);
             self.insert_one_way(
                 Rc::clone(&dest),
@@ -236,7 +236,7 @@ impl UnitDepData {
 
     pub(self) fn remove(&mut self, source: &UnitX, relation: UnitRelations, dest: &UnitX) {
         // remove in two-directions way
-        let relation_inverse = unit_base::unit_relation_to_inverse(relation);
+        let relation_inverse = base::unit_relation_to_inverse(relation);
         self.remove_one_way(source, relation, dest);
         self.remove_one_way(dest, relation_inverse, source);
 

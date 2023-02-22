@@ -1,13 +1,13 @@
 #![allow(non_snake_case)]
-use super::uu_base::UeBase;
+use super::base::UeBase;
 use crate::unit::rentry::{UeConfigInstall, UeConfigUnit};
-use crate::unit::uload_util::UnitFile;
+use crate::unit::util::UnitFile;
 use confique::Config;
 use libutils::serialize::DeserializeWith;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::RefCell;
-use std::error::Error as stdError;
 use std::rc::Rc;
+use sysmaster::error::*;
 use sysmaster::rel::ReStation;
 
 pub(crate) struct UeConfig {
@@ -116,11 +116,7 @@ impl UeConfig {
         conf
     }
 
-    pub(super) fn load_fragment_and_dropin(
-        &self,
-        files: &UnitFile,
-        name: &String,
-    ) -> Result<(), Box<dyn stdError>> {
+    pub(super) fn load_fragment_and_dropin(&self, files: &UnitFile, name: &String) -> Result<()> {
         let mut builder = UeConfigData::builder().env();
 
         let unit_conf_frag = files.get_unit_id_fragment_pathbuf(name);
@@ -137,7 +133,7 @@ impl UeConfig {
             builder = builder.file(&v);
         }
 
-        let mut configer = builder.load()?;
+        let mut configer = builder.load().context(ConfiqueSnafu)?;
 
         // dropin
         for v in files.get_unit_wants_symlink_units(name) {
@@ -184,7 +180,7 @@ mod tests {
     use confique::Config;
     use libtests::get_project_root;
 
-    use crate::unit::unit_entry::uu_config::UeConfigData;
+    use crate::unit::entry::config::UeConfigData;
     #[test]
     fn test_unit_parse() {
         let mut file_path = get_project_root().unwrap();

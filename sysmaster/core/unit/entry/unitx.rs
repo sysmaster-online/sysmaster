@@ -1,19 +1,17 @@
-use super::u_entry::Unit;
+use super::uentry::Unit;
 use super::UnitEmergencyAction;
 
-use super::uu_config::UeConfig;
+use super::config::UeConfig;
 use crate::unit::data::DataManager;
 use crate::unit::rentry::{UnitLoadState, UnitRe};
-use crate::unit::uload_util::UnitFile;
-use crate::unit::UnitErrno;
+use crate::unit::util::UnitFile;
 use libutils::IN_SET;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
-use std::error::Error;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
-use sysmaster::error::UnitActionError;
+use sysmaster::error::*;
 use sysmaster::rel::ReStation;
 use sysmaster::unit::{SubUnit, UnitActiveState, UnitRelations, UnitType};
 
@@ -63,23 +61,23 @@ impl UnitX {
     #[allow(dead_code)]
     pub(crate) fn done(&self) {}
     #[allow(dead_code)]
-    pub(crate) fn load(&self) -> Result<(), Box<dyn Error>> {
+    pub(crate) fn load(&self) -> Result<()> {
         self.0.load_unit()
     }
     #[allow(dead_code)]
-    pub(crate) fn try_load(&self) -> Result<(), UnitActionError> {
+    pub(crate) fn try_load(&self) -> Result<()> {
         // transaction_add_job_and_dependencies: bus_unit_validate_load_state + manager_unit_cache_should_retry_load + unit_load + bus_unit_validate_load_state
         todo!();
     }
-    pub(crate) fn start(&self) -> Result<(), UnitActionError> {
+    pub(crate) fn start(&self) -> Result<()> {
         log::debug!("unitx start the unit {}", self.id());
         self.0.start()
     }
 
-    pub(crate) fn stop(&self, force: bool) -> Result<(), UnitActionError> {
+    pub(crate) fn stop(&self, force: bool) -> Result<()> {
         self.0.stop(force)
     }
-    pub(crate) fn reload(&self) -> Result<(), UnitActionError> {
+    pub(crate) fn reload(&self) -> Result<()> {
         todo!();
     }
 
@@ -109,11 +107,7 @@ impl UnitX {
         self.0.set_in_target_dep_queue(t);
     }
 
-    pub(crate) fn dep_check(
-        &self,
-        _relation: UnitRelations,
-        _other: &UnitX,
-    ) -> Result<(), UnitErrno> {
+    pub(crate) fn dep_check(&self, _relation: UnitRelations, _other: &UnitX) -> Result<()> {
         // unit_add_dependency: check input
 
         Ok(())

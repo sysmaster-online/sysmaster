@@ -4,7 +4,7 @@ use crate::manager::rentry::{
     RELI_DB_HUM_NOTIFY, RELI_DB_HUNIT_BASE, RELI_DB_HUNIT_CGROUP, RELI_DB_HUNIT_CHILD,
     RELI_DB_HUNIT_CONFIG, RELI_DB_HUNIT_DEP, RELI_DB_HUNIT_LOAD, RELI_DB_HUNIT_PPS,
 };
-use crate::unit::unit_entry::UnitEmergencyAction;
+use crate::unit::entry::UnitEmergencyAction;
 use bitflags::bitflags;
 use confique::Config;
 use libutils::serialize::DeserializeWith;

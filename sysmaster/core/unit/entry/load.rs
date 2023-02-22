@@ -1,12 +1,12 @@
-use super::uu_base::UeBase;
-use super::uu_config::UeConfig;
+use super::base::UeBase;
+use super::config::UeConfig;
 use crate::unit::data::{DataManager, UnitDepConf};
 use crate::unit::rentry::{UnitLoadState, UnitRePps};
-use crate::unit::uload_util::UnitFile;
+use crate::unit::util::UnitFile;
 use std::cell::RefCell;
-use std::error::Error as stdError;
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::error::*;
 use sysmaster::rel::ReStation;
 use sysmaster::unit::UnitRelations;
 //#[derive(Debug)]
@@ -98,7 +98,7 @@ impl UeLoad {
         *self.in_load_queue.borrow()
     }
 
-    pub(super) fn load_unit_confs(&self) -> Result<(), Box<dyn stdError>> {
+    pub(super) fn load_unit_confs(&self) -> Result<()> {
         self.file.build_name_map(
             self.base.id().clone(),
             self.load_state() == UnitLoadState::UnitLoaded,

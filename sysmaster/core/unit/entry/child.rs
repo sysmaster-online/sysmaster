@@ -1,4 +1,4 @@
-use super::uu_base::UeBase;
+use super::base::UeBase;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::collections::HashSet;

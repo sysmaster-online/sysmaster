@@ -1,7 +1,7 @@
 use libevent::{EventType, Events, Source};
-use libutils::Result;
 use nix::sys::signal::Signal;
 use std::{convert::TryFrom, rc::Rc};
+use sysmaster::error::*;
 use sysmaster::rel::{ReliLastFrame, Reliability};
 
 pub(super) struct Signals<T> {
@@ -11,7 +11,7 @@ pub(super) struct Signals<T> {
 }
 
 pub(super) trait SignalDispatcher {
-    fn dispatch_signal(&self, signal: &Signal) -> Result<i32, crate::error::Error>;
+    fn dispatch_signal(&self, signal: &Signal) -> Result<i32>;
 }
 impl<T> Signals<T> {
     pub(super) fn new(relir: &Rc<Reliability>, data_handler: T) -> Self {

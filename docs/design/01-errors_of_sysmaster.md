@@ -225,7 +225,7 @@ fn unpack_config(data: &str) -> &str {
 
 下面重点阐述如何在项目中应用这些原则.
 
-- 不会定义全局的error lib, 每个crate定义自己的error.rs, crate内只能使用这个统一的Error, 注意语义不能重复.
+- 不会定义全局的error lib, 每个crate定义自己的error.rs, crate内只能使用这个统一的Error, 注意语义不能重复.**sysmaster中,unit coms组件和sysmaster-core在逻辑和功能上共用一个Error,避免频繁的转换**
 
 ```rust
 //! Error define
@@ -253,7 +253,7 @@ pub enum Error {
 }
 ```
 
-- 统一使用snafu来简化Error的定义, 并控制好作用域.
+- 统一使用snafu来简化Error的定义, 并控制好作用域, 错误尽量在调用的地方同步处理掉, 尽量避免`?`和`unwrap()`.
 
 ```rust
 //! a_crate/error.rs

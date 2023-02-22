@@ -1,15 +1,13 @@
-use super::super::unit_entry::Unit;
-
+use super::super::entry::Unit;
 use libutils::fd_util;
 use nix::fcntl::FcntlArg;
 use nix::sys::stat::Mode;
 use nix::unistd::{self, setresgid, setresuid, ForkResult, Gid, Group, Pid, Uid, User};
 use regex::Regex;
-use std::error::Error;
 use std::path::PathBuf;
 use std::process;
 use std::rc::Rc;
-use sysmaster::error::ExecCmdError;
+use sysmaster::error::*;
 use sysmaster::exec::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
 use walkdir::DirEntry;
 use walkdir::WalkDir;
@@ -27,21 +25,20 @@ impl ExecSpawn {
         cmdline: &ExecCommand,
         params: &ExecParameters,
         ctx: Rc<ExecContext>,
-    ) -> Result<Pid, ExecCmdError> {
+    ) -> Result<Pid> {
         let ret = unsafe { unistd::fork() };
 
         match ret {
             Ok(ForkResult::Parent { child }) => {
                 log::debug!("child pid is :{}", child);
-                libcgroup::cg_attach(child, &unit.cg_path())
-                    .map_err(|e| ExecCmdError::CgroupError { msg: e.to_string() })?;
+                libcgroup::cg_attach(child, &unit.cg_path()).context(CgroupSnafu)?;
                 Ok(child)
             }
             Ok(ForkResult::Child) => {
                 exec_child(unit, cmdline, params, ctx);
                 process::exit(0);
             }
-            Err(_e) => Err(ExecCmdError::SpawnError),
+            Err(_e) => Err(Error::SpawnError),
         }
     }
 }
@@ -50,23 +47,17 @@ fn apply_user_and_group(
     user: Option<User>,
     group: Option<Group>,
     params: &ExecParameters,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let user = match user {
         // ExecParameters.add_user() has already assigned valid user if the configuration is correct
         None => {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Invalid user",
-            )));
+            return Err(Error::InvalidData);
         }
         Some(v) => v,
     };
     let group = match group {
         None => {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Invalid group",
-            )));
+            return Err(Error::InvalidData);
         }
         Some(v) => v,
     };
@@ -76,44 +67,29 @@ fn apply_user_and_group(
     }
     // Careful: set group first, or we may get EPERM when setting group
     log::debug!("Setting process group to {}", group.name);
-    if let Err(e) = setresgid(group.gid, group.gid, group.gid) {
-        return Err(Box::new(e));
-    }
+    setresgid(group.gid, group.gid, group.gid).context(NixSnafu)?;
     // Set environment
     params.add_env("LOGNAME", user.name.clone());
     params.add_env("USER", user.name.clone());
     // Set user
     log::debug!("Setting process user to {}", user.name);
-    if let Err(e) = setresuid(user.uid, user.uid, user.uid) {
-        return Err(Box::new(e));
-    }
-    Ok(())
+    setresuid(user.uid, user.uid, user.uid).context(NixSnafu)
 }
 
-fn apply_working_directory(working_directory: Option<PathBuf>) -> Result<(), Box<dyn Error>> {
+fn apply_working_directory(working_directory: Option<PathBuf>) -> Result<()> {
     let working_directory = match working_directory {
         None => {
             return Ok(());
         }
         Some(v) => v,
     };
-    if let Err(e) = std::env::set_current_dir(&working_directory) {
-        log::error!(
-            "Failed to change working directory: {}",
-            working_directory.to_string_lossy()
-        );
-        return Err(Box::new(e));
-    }
-    Ok(())
+    std::env::set_current_dir(working_directory).context(IoSnafu)
 }
 
-fn apply_umask(umask: Option<Mode>) -> Result<(), Box<dyn Error>> {
+fn apply_umask(umask: Option<Mode>) -> Result<()> {
     let umask = match umask {
         None => {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Invalid umask",
-            )));
+            return Err(Error::InvalidData);
         }
         Some(v) => v,
     };

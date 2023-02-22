@@ -4,8 +4,8 @@ use super::service_pid::ServicePid;
 use super::service_rentry::ServiceType;
 use nix::unistd::Pid;
 use std::env;
-use std::error::Error;
 use std::rc::Rc;
+use sysmaster::error::*;
 use sysmaster::exec::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
 
 pub(super) struct ServiceSpawn {
@@ -35,7 +35,7 @@ impl ServiceSpawn {
         cmdline: &ExecCommand,
         _time_out: u64,
         ec_flags: ExecFlags,
-    ) -> Result<Pid, Box<dyn Error>> {
+    ) -> Result<Pid> {
         let mut params = ExecParameters::new();
         params.set_exec_flags(ec_flags);
 

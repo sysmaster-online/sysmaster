@@ -9,7 +9,7 @@ use libutils::logger;
 use nix::sys::wait::WaitStatus;
 use std::cell::RefCell;
 use std::{path::PathBuf, rc::Rc};
-use sysmaster::error::UnitActionError;
+use sysmaster::error::*;
 use sysmaster::rel::{ReStation, Reliability};
 use sysmaster::unit::UnitBase;
 use sysmaster::unit::{
@@ -104,7 +104,7 @@ impl Target {
 }
 
 impl SubUnit for Target {
-    fn load(&self, _conf_str: Vec<PathBuf>) -> libutils::Result<(), Box<dyn std::error::Error>> {
+    fn load(&self, _conf_str: Vec<PathBuf>) -> Result<()> {
         //todo add default dependency funnction need add
         log::debug!("load for target");
         self.add_default_dependencies();
@@ -131,7 +131,7 @@ impl SubUnit for Target {
 
     fn dump(&self) {}
 
-    fn start(&self) -> libutils::Result<(), UnitActionError> {
+    fn start(&self) -> Result<()> {
         //if current state is not valid, just return.
         self.mng.start_check()?;
 
@@ -139,7 +139,7 @@ impl SubUnit for Target {
         Ok(())
     }
 
-    fn stop(&self, force: bool) -> libutils::Result<(), UnitActionError> {
+    fn stop(&self, force: bool) -> Result<()> {
         if !force {
             self.mng.stop_check()?;
         }

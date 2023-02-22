@@ -4,7 +4,7 @@ use super::target_comm::TargetUnitComm;
 use super::target_rentry::TargetState;
 use libutils::IN_SET;
 use std::{cell::RefCell, rc::Rc};
-use sysmaster::error::UnitActionError;
+use sysmaster::error::*;
 use sysmaster::rel::ReStation;
 use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
@@ -47,9 +47,9 @@ impl TargetMng {
         }
     }
 
-    pub(super) fn start_check(&self) -> Result<(), UnitActionError> {
+    pub(super) fn start_check(&self) -> Result<()> {
         if IN_SET!(self.state(), TargetState::Active) {
-            return Err(UnitActionError::UnitActionEAgain);
+            return Err(Error::UnitActionEAgain);
         }
         Ok(())
     }
@@ -59,9 +59,9 @@ impl TargetMng {
         self.set_state(TargetState::Active, notify);
     }
 
-    pub(super) fn stop_check(&self) -> Result<(), UnitActionError> {
+    pub(super) fn stop_check(&self) -> Result<()> {
         if IN_SET!(self.state(), TargetState::Dead) {
-            return Err(UnitActionError::UnitActionEAgain);
+            return Err(Error::UnitActionEAgain);
         }
         Ok(())
     }

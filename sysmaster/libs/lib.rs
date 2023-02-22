@@ -15,3 +15,4 @@ pub mod rel;
 pub mod serialize;
 pub mod unit;
 pub mod utils;
+pub use error::*;

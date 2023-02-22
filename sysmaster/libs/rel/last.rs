@@ -1,10 +1,9 @@
+use crate::error::*;
 use heed::types::{OwnedType, SerdeBincode, Str};
 use heed::{Database, Env, EnvOpenOptions};
 use std::cell::RefCell;
-use std::fmt;
-use std::fs;
-use std::io::Error;
 use std::path::Path;
+use std::{fmt, fs};
 
 const RELI_LAST_DIR: &str = "last.mdb";
 const RELI_LAST_MAX_DBS: u32 = 2;
@@ -147,13 +146,13 @@ impl ReliLast {
         *self.ignore.borrow()
     }
 
-    fn unit_len(&self) -> heed::Result<u64> {
-        let rtxn = self.env.read_txn()?;
-        self.unit.len(&rtxn)
+    fn unit_len(&self) -> Result<u64> {
+        let rtxn = self.env.read_txn().context(HeedSnafu)?;
+        self.unit.len(&rtxn).context(HeedSnafu)
     }
 
-    fn frame_len(&self) -> heed::Result<u64> {
-        let rtxn = self.env.read_txn()?;
+    fn frame_len(&self) -> Result<u64> {
+        let rtxn = self.env.read_txn().context(HeedSnafu)?;
         let frame = self.frame.get(&rtxn, &RELI_LAST_KEY).unwrap_or(None);
         let len = match frame {
             Some(f) => f.len(),
@@ -163,10 +162,10 @@ impl ReliLast {
     }
 }
 
-pub fn prepare(dir_str: &str) -> Result<(), Error> {
+pub fn prepare(dir_str: &str) -> Result<()> {
     let last = Path::new(dir_str).join(RELI_LAST_DIR);
     if !last.exists() {
-        fs::create_dir_all(&last)?;
+        fs::create_dir_all(&last).context(IoSnafu)?;
     }
 
     Ok(())

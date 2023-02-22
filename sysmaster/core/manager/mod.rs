@@ -1,14 +1,11 @@
 #[cfg(test)]
 pub(crate) use rentry::RELI_HISTORY_MAX_DBS;
-use snafu::ResultExt;
 
 pub(crate) mod commands;
 pub(crate) mod config;
 pub(crate) mod pre_install;
 pub(crate) mod rentry;
 pub(crate) mod signals;
-
-use crate::error::*;
 use crate::unit::UnitManagerX;
 use commands::Commands;
 use libcgroup::CgController;
@@ -27,6 +24,7 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::rc::Rc;
+use sysmaster::error::*;
 use sysmaster::rel::{ReliLastFrame, Reliability};
 
 /// maximal size of process's arguments
@@ -101,26 +99,26 @@ impl CommandActionMgr {
 }
 
 impl ExecuterAction for CommandActionMgr {
-    type Error = crate::error::Error;
+    type Error = sysmaster::error::Error;
     // type Result<T, Error> = Result<T, E>;
     fn start(&self, unit_name: &str) -> Result<(), Self::Error> {
-        self.um.start_unit(unit_name).context(ManagerSnafu)
+        self.um.start_unit(unit_name)
     }
 
     fn stop(&self, unit_name: &str) -> Result<(), Self::Error> {
-        self.um.stop_unit(unit_name).context(ManagerSnafu)
+        self.um.stop_unit(unit_name)
     }
 
     fn restart(&self, unit_name: &str) -> Result<(), Self::Error> {
-        self.um.restart_unit(unit_name).context(ManagerSnafu)
+        self.um.restart_unit(unit_name)
     }
 
     fn status(&self, unit_name: &str) -> Result<String, Self::Error> {
-        self.um.get_unit_status(unit_name).context(ManagerSnafu)
+        self.um.get_unit_status(unit_name)
     }
 
     fn list_units(&self) -> Result<String, Self::Error> {
-        self.um.get_all_units().context(ManagerSnafu)
+        self.um.get_all_units()
     }
 
     fn suspend(&self) -> Result<i32, Self::Error> {
@@ -144,19 +142,19 @@ impl ExecuterAction for CommandActionMgr {
     }
 
     fn disable(&self, unit_file: &str) -> Result<(), Self::Error> {
-        self.um.disable_unit(unit_file).context(IoSnafu)
+        self.um.disable_unit(unit_file)
     }
 
     fn enable(&self, unit_file: &str) -> Result<(), Self::Error> {
-        self.um.enable_unit(unit_file).context(IoSnafu)
+        self.um.enable_unit(unit_file)
     }
 
     fn mask(&self, unit_file: &str) -> Result<(), Self::Error> {
-        self.um.mask_unit(unit_file).context(IoSnafu)
+        self.um.mask_unit(unit_file)
     }
 
     fn unmask(&self, unit_file: &str) -> Result<(), Self::Error> {
-        self.um.unmask_unit(unit_file).context(IoSnafu)
+        self.um.unmask_unit(unit_file)
     }
 }
 
@@ -352,7 +350,7 @@ impl Manager {
         Ok(true)
     }
 
-    fn prepare_reexec(&self) -> Result<(), Error> {
+    fn prepare_reexec(&self) -> Result<()> {
         // restore external resource, like: fd, ...
         // do nothing now
         Ok(())
@@ -436,22 +434,22 @@ type JobId = i32;
 
 impl Manager {
     #[allow(dead_code)]
-    pub(crate) fn get_job(&self, _id: JobId) -> Result<(), Error> {
+    pub(crate) fn get_job(&self, _id: JobId) -> Result<()> {
         todo!()
     }
 
     #[allow(dead_code)]
-    pub(crate) fn get_unit(&self, _name: &str) -> Result<(), Error> {
+    pub(crate) fn get_unit(&self, _name: &str) -> Result<()> {
         todo!()
     }
 
     #[allow(dead_code)]
-    pub(crate) fn clear_jobs(&self) -> Result<(), Error> {
+    pub(crate) fn clear_jobs(&self) -> Result<()> {
         todo!()
     }
 
     #[allow(dead_code)]
-    pub(crate) fn reset_failed(&mut self) -> Result<(), Error> {
+    pub(crate) fn reset_failed(&mut self) -> Result<()> {
         todo!()
     }
 
@@ -497,7 +495,7 @@ impl Manager {
     }
 
     #[allow(dead_code)]
-    pub(super) fn check_finished(&self) -> Result<(), Error> {
+    pub(super) fn check_finished(&self) -> Result<()> {
         todo!()
     }
 
@@ -509,7 +507,7 @@ impl Manager {
         *self.state.borrow()
     }
 
-    pub(crate) fn preset_all(&self) -> Result<(), Error> {
+    pub(crate) fn preset_all(&self) -> Result<()> {
         if self.mode != Mode::System {
             return Ok(());
         }

@@ -1,7 +1,7 @@
+use super::datastore::UnitDb;
+use super::entry::UnitX;
 use super::rentry::UnitLoadState;
 use super::rentry::{UnitRe, UnitRePps};
-use super::unit_datastore::UnitDb;
-use super::unit_entry::UnitX;
 use super::{UnitRelations, UnitType};
 use crate::manager::rentry::ReliLastQue;
 use crate::utils::table::{TableOp, TableSubscribe};

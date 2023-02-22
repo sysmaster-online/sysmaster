@@ -5,7 +5,7 @@ pub(crate) mod test_utils {
     use crate::{
         plugin::Plugin,
         unit::{data::DataManager, unit_name_to_type},
-        unit::{rentry::UnitRe, uload_util::UnitFile, unit_entry::UnitX},
+        unit::{entry::UnitX, rentry::UnitRe, util::UnitFile},
     };
     use libutils::path_lookup::LookupPaths;
     use sysmaster::rel::Reliability;

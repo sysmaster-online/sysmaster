@@ -4,13 +4,13 @@ use super::mount_rentry::{MountRe, MountReFrame};
 use libevent::{EventState, EventType, Events, Source};
 use libmount::mountinfo;
 use libutils::logger;
-use libutils::{Error, Result};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::rc::Rc;
 use std::sync::Arc;
+use sysmaster::error::*;
 use sysmaster::rel::{ReStation, ReliLastFrame, Reliability};
 use sysmaster::unit::{UmIf, UnitActiveState, UnitManagerObj, UnitMngUtil, UnitType};
 
@@ -78,7 +78,7 @@ impl MountManager {
         }
     }
 
-    fn _parser(&self) -> Result<i32, Error> {
+    fn _parser(&self) -> Result<i32> {
         let mut mount_data = String::new();
         File::open("/proc/self/mountinfo")
             .unwrap()

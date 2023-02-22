@@ -8,7 +8,7 @@ use libutils::logger;
 use nix::sys::wait::WaitStatus;
 use std::path::PathBuf;
 use std::rc::Rc;
-use sysmaster::error::UnitActionError;
+use sysmaster::error::*;
 use sysmaster::rel::{ReStation, Reliability};
 use sysmaster::unit::{SubUnit, UmIf, UnitActiveState, UnitBase, UnitMngUtil};
 
@@ -52,7 +52,7 @@ impl MountUnit {
 }
 
 impl SubUnit for MountUnit {
-    fn load(&self, _paths: Vec<PathBuf>) -> libutils::Result<(), Box<dyn std::error::Error>> {
+    fn load(&self, _paths: Vec<PathBuf>) -> Result<()> {
         if let Some(u) = self.comm.owner() {
             u.set_ignore_on_isolate(true)
         }
@@ -78,7 +78,7 @@ impl SubUnit for MountUnit {
 
     fn dump(&self) {}
 
-    fn start(&self) -> libutils::Result<(), UnitActionError> {
+    fn start(&self) -> Result<()> {
         let started = self.mng.start_check()?;
         if started {
             log::debug!("mount already in starting, just return immediately");
@@ -90,7 +90,7 @@ impl SubUnit for MountUnit {
         Ok(())
     }
 
-    fn stop(&self, _force: bool) -> libutils::Result<(), UnitActionError> {
+    fn stop(&self, _force: bool) -> Result<()> {
         self.mng.enter_dead(true);
         Ok(())
     }

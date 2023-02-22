@@ -4,16 +4,14 @@ use super::service_config::ServiceConfig;
 use super::service_mng::RunningData;
 use super::service_mng::ServiceMng;
 use super::service_rentry::{NotifyAccess, ServiceCommand, ServiceType};
-use libutils::error::Error as ServiceError;
 use libutils::logger;
 use libutils::special::{BASIC_TARGET, SHUTDOWN_TARGET, SYSINIT_TARGET};
 use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
 use std::collections::HashMap;
-use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
-use sysmaster::error::UnitActionError;
+use sysmaster::error::*;
 use sysmaster::rel::{ReStation, Reliability};
 use sysmaster::unit::{
     SubUnit, UmIf, UnitActiveState, UnitBase, UnitDependencyMask, UnitMngUtil, UnitRelations,
@@ -65,7 +63,7 @@ impl SubUnit for ServiceUnit {
         todo!()
     }
 
-    fn load(&self, paths: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
+    fn load(&self, paths: Vec<PathBuf>) -> Result<()> {
         self.config.load(paths, true)?;
 
         self.parse()?;
@@ -75,7 +73,7 @@ impl SubUnit for ServiceUnit {
         self.service_verify()
     }
 
-    fn start(&self) -> Result<(), UnitActionError> {
+    fn start(&self) -> Result<()> {
         log::debug!("begin to start the service unit.");
         let started = self.mng.start_check()?;
         if started {
@@ -92,7 +90,7 @@ impl SubUnit for ServiceUnit {
         todo!()
     }
 
-    fn stop(&self, force: bool) -> Result<(), UnitActionError> {
+    fn stop(&self, force: bool) -> Result<()> {
         log::debug!("begin to stop the service unit, force: {}.", force);
         if !force {
             self.mng.stop_check()?;
@@ -139,7 +137,7 @@ impl SubUnit for ServiceUnit {
         ucred: &UnixCredentials,
         messages: &HashMap<&str, &str>,
         fds: Vec<i32>,
-    ) -> Result<(), ServiceError> {
+    ) -> Result<()> {
         log::debug!(
             "begin to start service notify message, ucred: {:?}, pids: {:?}, messages: {:?}",
             ucred,
@@ -183,7 +181,7 @@ impl ServiceUnit {
             .set_kill_mode(self.config.config_data().borrow().Service.KillMode);
     }
 
-    fn parse(&self) -> Result<(), Box<dyn Error>> {
+    fn parse(&self) -> Result<()> {
         if let Some(envs) = self.config.environments() {
             for env in envs {
                 let content: Vec<&str> = env.split('=').map(|s| s.trim()).collect();
@@ -215,21 +213,17 @@ impl ServiceUnit {
         Ok(())
     }
 
-    fn service_add_extras(&self) -> Result<(), Box<dyn Error>> {
+    fn service_add_extras(&self) -> Result<()> {
         if self.config.service_type() == ServiceType::Notify {
             self.config.set_notify_access(NotifyAccess::Main);
         }
 
-        self.add_default_dependencies().map_err(|_e| {
-            Box::new(ServiceError::Other {
-                msg: "add default dependency error",
-            })
-        })?;
+        self.add_default_dependencies()?;
 
         Ok(())
     }
 
-    fn service_verify(&self) -> Result<(), Box<dyn Error>> {
+    fn service_verify(&self) -> Result<()> {
         if !self.config.config_data().borrow().Service.RemainAfterExit
             && self
                 .config
@@ -239,17 +233,17 @@ impl ServiceUnit {
                 .ExecStart
                 .is_none()
         {
-            return Err(Box::new(ServiceError::Other {
-                msg: "No ExecStart command is configured and RemainAfterExit if false",
-            }));
+            return Err(Error::Other {
+                msg: "No ExecStart command is configured and RemainAfterExit if false".to_string(),
+            });
         }
 
         if self.config.service_type() != ServiceType::Oneshot
             && self.config.get_exec_cmds(ServiceCommand::Start).is_none()
         {
-            return Err(Box::new(ServiceError::Other {
-                msg: "No ExecStart command is configured, service type is not oneshot",
-            }));
+            return Err(Error::Other {
+                msg: "No ExecStart command is configured, service type is not oneshot".to_string(),
+            });
         }
 
         if self.config.service_type() != ServiceType::Oneshot
@@ -260,16 +254,17 @@ impl ServiceUnit {
                 .len()
                 > 1
         {
-            return Err(Box::new(ServiceError::Other {
+            return Err(Error::Other {
                 msg:
-                    "More than Oneshot ExecStart command is configured, service type is not oneshot",
-            }));
+                    "More than Oneshot ExecStart command is configured, service type is not oneshot"
+                        .to_string(),
+            });
         }
 
         Ok(())
     }
 
-    pub(self) fn add_default_dependencies(&self) -> Result<(), UnitActionError> {
+    pub(self) fn add_default_dependencies(&self) -> Result<()> {
         if let Some(u) = self.comm.owner() {
             log::debug!("add default dependencies for service [{}]", u.id());
             if !u.default_dependencies() {
