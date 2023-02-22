@@ -15,7 +15,7 @@ impl StartLimit {
     pub(super) fn new() -> Self {
         StartLimit {
             hit: RefCell::new(false),
-            start_limit: RefCell::new(RateLimit::new(10, 5)),
+            start_limit: RefCell::new(RateLimit::new(0, 0)),
         }
     }
 

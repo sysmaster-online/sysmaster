@@ -149,9 +149,9 @@ pub(crate) struct UeConfigUnit {
     pub ConditionFirstBoot: String,
     #[config(default = "")]
     pub AssertPathExists: String,
-    #[config(default = 0)]
+    #[config(default = 10)]
     pub StartLimitInterval: u64,
-    #[config(default = 0)]
+    #[config(default = 5)]
     pub StartLimitBurst: u32,
     #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]
     #[config(default = "none")]
