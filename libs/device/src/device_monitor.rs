@@ -75,9 +75,9 @@ impl DeviceMonitor {
         let n = match recv(self.socket, &mut buf, MsgFlags::empty()) {
             Ok(ret) => ret,
             Err(errno) => {
-                return Err(Error::Syscall {
-                    syscall: "device: recv".to_string(),
-                    errno,
+                return Err(Error::Nix {
+                    msg: "syscall recv failed".to_string(),
+                    source: errno,
                 })
             }
         };
@@ -96,11 +96,16 @@ impl DeviceMonitor {
             return Device::from_nulstr(&buf[prefix_split_idx + 1..n]);
         } else if prefix == "libdevm" {
             return Device::from_nulstr(&buf[40..n]);
+        } else if prefix == "libudev" {
+            return Err(Error::Nix {
+                msg: "origin from udev".to_string(),
+                source: Errno::EINVAL,
+            });
         }
 
-        Err(Error::Other {
-            msg: "device: invalid nulstr data".to_string(),
-            errno: Some(Errno::EINVAL),
+        Err(Error::Nix {
+            msg: format!("invalid nulstr data ({:?})", buf),
+            source: Errno::EINVAL,
         })
     }
 

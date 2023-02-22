@@ -15,30 +15,29 @@
 use nix::errno::Errno;
 use snafu::prelude::Snafu;
 
-/// device error
+/// libdevice error
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 #[non_exhaustive]
 pub enum Error {
-    /// error from syscall
-    #[snafu(display(
-        "Error(device): Got an error for syscall {} (errno={})",
-        syscall,
-        errno,
-    ))]
-    Syscall {
-        /// syscall
-        syscall: String,
-        /// errno
-        errno: Errno,
-    },
-
     /// other error
-    #[snafu(display("Error(device): Got an error {}", msg,))]
-    Other {
+    #[snafu(display("Error(device): {}", msg,))]
+    Nix {
         /// message
         msg: String,
         /// errno
-        errno: Option<Errno>,
+        source: nix::Error,
     },
+}
+
+impl Error {
+    /// extract the errno from error
+    pub fn get_errno(&self) -> Errno {
+        match self {
+            Error::Nix {
+                msg: _,
+                source: errno,
+            } => *errno,
+        }
+    }
 }

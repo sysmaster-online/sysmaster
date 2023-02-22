@@ -53,16 +53,13 @@ impl Source for DevctlMonitorX {
         let device = match self.device_monitor.receive_device() {
             Ok(ret) => ret,
             Err(e) => match e {
-                device::error::Error::Syscall {
-                    syscall: _,
-                    errno: Errno::EAGAIN,
+                device::error::Error::Nix {
+                    msg: _,
+                    source: Errno::EAGAIN,
                 } => {
                     return 0;
                 }
-                device::error::Error::Syscall {
-                    syscall: _,
-                    errno: _,
-                } => {
+                device::error::Error::Nix { msg: _, source: _ } => {
                     log::error!("{}", e);
                     return 0;
                 }

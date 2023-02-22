@@ -10,13 +10,19 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! device
-//!
-pub mod device;
-pub mod device_action;
-pub mod device_enumerator;
-pub mod device_monitor;
-pub mod error;
+//! example for using enumerator
+use device::{device_action::DeviceAction, device_enumerator::DeviceEnumerator};
 
-pub use crate::device::*;
-pub use crate::device_action::*;
+fn main() {
+    let enumerator = DeviceEnumerator::new();
+
+    for device in enumerator {
+        println!("{}", device.as_ref().lock().unwrap().get_devpath().unwrap());
+        device
+            .as_ref()
+            .lock()
+            .unwrap()
+            .trigger(DeviceAction::Change)
+            .unwrap();
+    }
+}

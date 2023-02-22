@@ -12,7 +12,7 @@
 
 //! subcommand for devctl trigger
 //!
-use device::{device::Device, device_action::DeviceAction};
+use device::{Device, DeviceAction};
 
 /// subcommand for trigger a fake device action, then the kernel will report an uevent
 pub fn subcommand_trigger(devices: Vec<String>, action: Option<String>) {
