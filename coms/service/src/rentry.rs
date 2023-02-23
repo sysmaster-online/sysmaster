@@ -211,6 +211,9 @@ pub(super) struct SectionService {
     pub RestartPreventExitStatus: ExitStatusSet,
     #[config(default = 0)]
     pub RestartSec: u64,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    #[config(default = "")]
+    pub EnvironmentFile: Vec<String>,
 }
 
 impl SectionService {

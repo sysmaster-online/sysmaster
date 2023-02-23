@@ -212,6 +212,16 @@ impl ServiceUnit {
                     .insert_env(content[0].to_string(), content[1].to_string());
             }
         }
+
+        self.exec_ctx.insert_envs_files(
+            self.config
+                .config_data()
+                .borrow()
+                .Service
+                .EnvironmentFile
+                .clone(),
+        );
+
         if let Some(owner) = self.comm.owner() {
             if let Some(sockets) = self.config.sockets() {
                 for socket in sockets {
