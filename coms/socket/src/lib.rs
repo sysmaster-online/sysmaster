@@ -1,3 +1,15 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 //!  Socket is a kind of sysmaster startup type. It can accelerate startup by creating a socket socket first, and then pulling the corresponding service when the socket socket receives a request.
 //!  The socket configuration file contains three sections: Unit, Socket, and Install.
 //!
@@ -70,14 +82,14 @@
 // {socket_pid | socket_spawn | socket_port} ->
 // {socket_mng | socket_load} -> socket_unit -> socket_manager
 
-mod socket_base;
-mod socket_comm;
-mod socket_config;
-mod socket_load;
-mod socket_manager;
-mod socket_mng;
-mod socket_pid;
-mod socket_port;
-mod socket_rentry;
-mod socket_spawn;
-mod socket_unit;
+mod base;
+mod comm;
+mod config;
+mod load;
+mod manager;
+mod mng;
+mod pid;
+mod port;
+mod rentry;
+mod spawn;
+mod unit;

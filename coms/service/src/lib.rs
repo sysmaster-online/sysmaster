@@ -1,3 +1,15 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 //! Service is one of the unit types supported in sysmaster. Service is used to pull up services and manage them.
 //! The service configuration file contains three sections: Unit, Socket, and Install.
 //!
@@ -61,13 +73,13 @@
 // {service_pid | service_spawn} ->
 // {service_mng} ->
 // {service_monitor} -> service_unit -> service_manager
-mod service_base;
-mod service_comm;
-mod service_config;
-mod service_manager;
-mod service_mng;
-mod service_monitor;
-mod service_pid;
-mod service_rentry;
-mod service_spawn;
-mod service_unit;
+mod base;
+mod comm;
+mod config;
+mod manager;
+mod mng;
+mod monitor;
+mod pid;
+mod rentry;
+mod spawn;
+mod unit;

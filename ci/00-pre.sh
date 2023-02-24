@@ -22,13 +22,15 @@ fi
 fi
 
 #git加速并安装rust工具链
-# git config --global url."https://gh.api.99988866.xyz/https://github.com/".insteadOf "https://github.com/"
+repo="https://github.com/rust-lang/release-team.git"
+git config --global http.lowSpeedLimit 5
+git config --global http.lowSpeedTime 10
 git config --global url."https://gitclone.com/github.com/".insteadOf "https://github.com/"
-git clone https://github.com/rust-unofficial/awesome-rust.git
+git clone $repo
 if [ $? -ne 0 ]; then
     git config --unset --global url."https://gitclone.com/github.com/".insteadOf "https://github.com/"
     git config --global url."https://gh.api.99988866.xyz/https://github.com/".insteadOf "https://github.com/"
-    git clone https://github.com/rust-unofficial/awesome-rust.git
+    git clone $repo
     if [ $? -ne 0 ]; then
       git config --unset --global url."https://gh.api.99988866.xyz/https://github.com/".insteadOf "https://github.com/"
     fi
