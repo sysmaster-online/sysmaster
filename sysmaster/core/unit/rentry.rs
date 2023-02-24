@@ -142,6 +142,15 @@ pub(crate) struct UeConfigUnit {
     pub Requires: Vec<String>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
+    pub BindsTo: Vec<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    #[config(default = "")]
+    pub Requisite: Vec<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    #[config(default = "")]
+    pub PartOf: Vec<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    #[config(default = "")]
     pub Before: Vec<String>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]

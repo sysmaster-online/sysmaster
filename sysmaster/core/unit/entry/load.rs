@@ -21,6 +21,7 @@ use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::rel::ReStation;
 use sysmaster::unit::UnitRelations;
+
 //#[derive(Debug)]
 pub(super) struct UeLoad {
     // associated objects
@@ -136,27 +137,45 @@ impl UeLoad {
 
     fn parse(&self) {
         let mut ud_conf = UnitDepConf::new(); // need get config from config database,and update depends hereW
+        let config_data = self.config.config_data();
+        let ud_conf_insert_table = vec![
+            (
+                UnitRelations::UnitWants,
+                config_data.borrow().Unit.Wants.clone(),
+            ),
+            (
+                UnitRelations::UnitAfter,
+                config_data.borrow().Unit.After.clone(),
+            ),
+            (
+                UnitRelations::UnitBefore,
+                config_data.borrow().Unit.Before.clone(),
+            ),
+            (
+                UnitRelations::UnitRequires,
+                config_data.borrow().Unit.Requires.clone(),
+            ),
+            (
+                UnitRelations::UnitBindsTo,
+                config_data.borrow().Unit.BindsTo.clone(),
+            ),
+            (
+                UnitRelations::UnitRequisite,
+                config_data.borrow().Unit.Requisite.clone(),
+            ),
+            (
+                UnitRelations::UnitPartOf,
+                config_data.borrow().Unit.PartOf.clone(),
+            ),
+            (
+                UnitRelations::UnitConflicts,
+                config_data.borrow().Unit.Conflicts.clone(),
+            ),
+        ];
 
-        ud_conf.deps.insert(
-            UnitRelations::UnitWants,
-            self.config.config_data().borrow().Unit.Wants.clone(),
-        );
-        ud_conf.deps.insert(
-            UnitRelations::UnitAfter,
-            self.config.config_data().borrow().Unit.After.clone(),
-        );
-        ud_conf.deps.insert(
-            UnitRelations::UnitBefore,
-            self.config.config_data().borrow().Unit.Before.clone(),
-        );
-        ud_conf.deps.insert(
-            UnitRelations::UnitRequires,
-            self.config.config_data().borrow().Unit.Requires.clone(),
-        );
-        ud_conf.deps.insert(
-            UnitRelations::UnitConflicts,
-            self.config.config_data().borrow().Unit.Conflicts.clone(),
-        );
+        for ud_conf_relation in ud_conf_insert_table {
+            ud_conf.deps.insert(ud_conf_relation.0, ud_conf_relation.1);
+        }
 
         self.dm.insert_ud_config(self.base.id().clone(), ud_conf);
     }
