@@ -1,12 +1,23 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 use super::base::{ReDbRoTxn, ReDbRwTxn, ReDbTable};
+use crate::error::*;
 use heed::{Env, EnvOpenOptions};
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt;
-use std::fs;
-use std::io::Error;
 use std::path::Path;
 use std::rc::Rc;
+use std::{fmt, fs};
 
 const RELI_HISTORY_DIR: &str = "history.mdb";
 
@@ -99,10 +110,10 @@ impl ReliHistory {
     }
 }
 
-pub fn prepare(dir_str: &str) -> Result<(), Error> {
+pub fn prepare(dir_str: &str) -> Result<()> {
     let history = Path::new(dir_str).join(RELI_HISTORY_DIR);
     if !history.exists() {
-        fs::create_dir_all(&history)?;
+        fs::create_dir_all(&history).context(IoSnafu)?;
     }
 
     Ok(())

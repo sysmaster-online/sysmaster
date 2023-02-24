@@ -1,16 +1,27 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 use super::alloc::JobAlloc;
 use super::entry::{Job, JobConf, JobInfo, JobResult};
 use super::rentry::{JobAttr, JobKind, JobRe};
 use super::stat::JobStat;
 use super::table::JobTable;
 use super::{entry, junit, notify, table, transaction};
-use crate::error::JobErrno;
 use crate::unit::{JobMode, UnitDb, UnitRelationAtom, UnitX};
 use crate::utils::table::{TableOp, TableSubscribe};
 use libevent::{EventState, EventType, Events, Source};
-use libutils::Result;
 use std::cell::RefCell;
 use std::rc::Rc;
+use sysmaster::error::*;
 use sysmaster::rel::{ReStation, ReliLastFrame, Reliability};
 use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
@@ -150,14 +161,14 @@ impl JobManager {
         config: &JobConf,
         mode: JobMode,
         affect: &mut JobAffect,
-    ) -> Result<(), JobErrno> {
+    ) -> Result<()> {
         self.data.exec(config, mode, affect)?;
         self.try_enable();
         Ok(())
     }
 
     #[allow(dead_code)]
-    pub(crate) fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
+    pub(crate) fn notify(&self, config: &JobConf, mode: JobMode) -> Result<()> {
         self.data.notify(config, mode)?;
         self.try_enable();
         Ok(())
@@ -169,14 +180,14 @@ impl JobManager {
         os: UnitActiveState,
         ns: UnitActiveState,
         flags: UnitNotifyFlags,
-    ) -> Result<(), JobErrno> {
+    ) -> Result<()> {
         self.data.try_finish(unit, os, ns, flags)?;
         self.try_enable();
         Ok(())
     }
 
     #[allow(dead_code)]
-    pub(crate) fn remove(&self, id: u32) -> Result<(), JobErrno> {
+    pub(crate) fn remove(&self, id: u32) -> Result<()> {
         self.data.remove(id)?;
         self.try_enable();
         Ok(())
@@ -378,7 +389,7 @@ impl JobManagerData {
         config: &JobConf,
         mode: JobMode,
         affect: &mut JobAffect,
-    ) -> Result<(), JobErrno> {
+    ) -> Result<()> {
         job_trans_check_input(config, mode)?;
 
         self.stage.clear(); // clear stage first: make rollback simple
@@ -406,9 +417,9 @@ impl JobManagerData {
     }
 
     #[allow(dead_code)]
-    pub(self) fn notify(&self, config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
+    pub(self) fn notify(&self, config: &JobConf, mode: JobMode) -> Result<()> {
         if config.get_kind() != JobKind::Reload {
-            return Err(JobErrno::Input);
+            return Err(Error::Input);
         }
 
         self.do_notify(config, Some(mode));
@@ -464,13 +475,13 @@ impl JobManagerData {
         os: UnitActiveState,
         ns: UnitActiveState,
         flags: UnitNotifyFlags,
-    ) -> Result<(), JobErrno> {
+    ) -> Result<()> {
         // in order to simplify the mechanism, the running(trigger) and ending(finish) processes need to be isolated.
         if *self.running.borrow() {
             // (synchronous)finish in context
             if self.text.borrow().is_some() {
                 // the unit has been finished already
-                return Err(JobErrno::Input);
+                return Err(Error::Input);
             }
 
             *self.text.borrow_mut() = Some((Rc::clone(unit), os, ns, flags));
@@ -484,21 +495,21 @@ impl JobManagerData {
     }
 
     #[allow(dead_code)]
-    pub(self) fn remove(&self, id: u32) -> Result<(), JobErrno> {
+    pub(self) fn remove(&self, id: u32) -> Result<()> {
         assert!(!*self.running.borrow());
 
         let jinfo = self.jobs.get(id);
         if jinfo.is_none() {
-            return Err(JobErrno::NotExisted);
+            return Err(Error::NotExisted);
         }
         let job_info = jinfo.unwrap();
 
         if self.jobs.is_trigger(id) {
-            return Err(JobErrno::NotSupported);
+            return Err(Error::NotSupported);
         }
 
         if !self.jobs.is_suspend(id) {
-            return Err(JobErrno::Internal);
+            return Err(Error::Internal);
         }
 
         // remove it from outside(command) directly
@@ -770,22 +781,22 @@ fn jobs_2_jobinfo(jobs: &[Rc<Job>]) -> Vec<JobInfo> {
     jobs.iter().map(|jr| JobInfo::map(jr)).collect::<Vec<_>>()
 }
 
-fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<(), JobErrno> {
+fn job_trans_check_input(config: &JobConf, mode: JobMode) -> Result<()> {
     let kind = config.get_kind();
     let unit = config.get_unit();
 
     if mode == JobMode::Isolate {
         if kind != JobKind::Start {
-            return Err(JobErrno::Input);
+            return Err(Error::Input);
         }
 
         if let false = unit.get_config().config_data().borrow().Unit.AllowIsolate {
-            return Err(JobErrno::Input);
+            return Err(Error::Input);
         }
     }
 
     if mode == JobMode::Trigger && kind != JobKind::Stop {
-        return Err(JobErrno::Input);
+        return Err(Error::Input);
     }
 
     Ok(())

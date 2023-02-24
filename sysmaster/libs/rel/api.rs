@@ -1,19 +1,32 @@
-use super::base::{self, ReDbTable};
-use super::enable::{self, ReliEnable};
-use super::history::{self, ReliHistory};
-use super::last::{self, ReliLast};
-use super::pending::{self, ReliPending};
-use super::station::{ReStation, ReStationKind, ReliStation};
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
+use super::{
+    enable::{self, ReliEnable},
+    history::{self, ReliHistory},
+    last::{self, ReliLast},
+    pending::{self, ReliPending},
+    station::ReliStation,
+    ReDbTable, ReStation, ReStationKind,
+};
+use crate::{error::*, rel::base};
 use heed::Database;
-use heed::Error as heedError;
-use nix::errno::Errno;
-use std::fmt::Debug;
-use std::fs::{self, File};
-use std::io::Error;
-use std::path::Path;
-use std::rc::Rc;
-use std::thread;
-use std::time::Duration;
+use std::{
+    fs::{self, File},
+    path::Path,
+    rc::Rc,
+    thread,
+    time::Duration,
+};
 
 const RELI_DEBUG_SWITCH_FILE: &str = "switch.debug";
 const RELI_DEBUG_CLEAR_FILE: &str = "clear.debug";
@@ -69,12 +82,12 @@ impl Reliability {
     }
 
     /// create data base for reliability
-    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>, heedError>
+    pub fn create_database<KC, DC>(&self, name: Option<&str>) -> Result<Database<KC, DC>>
     where
         KC: 'static,
         DC: 'static,
     {
-        self.history.env().create_database(name)
+        self.history.env().create_database(name).context(HeedSnafu)
     }
     /// set the last unit
     pub fn set_last_unit(&self, unit_id: &str) {
@@ -114,7 +127,7 @@ impl Reliability {
     }
 
     /// set the fd's 'cloexec' flag and record it
-    pub fn fd_cloexec(&self, fd: i32, cloexec: bool) -> Result<(), Errno> {
+    pub fn fd_cloexec(&self, fd: i32, cloexec: bool) -> Result<()> {
         self.pending.fd_cloexec(fd, cloexec)
     }
 
@@ -291,7 +304,7 @@ impl Reliability {
 
 /// do the debug action: enable or disable switch flag. effective after restart.
 #[allow(dead_code)]
-pub fn reli_debug_enable_switch(enable: bool) -> Result<(), Error> {
+pub fn reli_debug_enable_switch(enable: bool) -> Result<()> {
     log::info!("reliability debug: enable[{}] switch.", enable);
 
     // [enable]touch switch.debug or [disable]rm -rf switch.debug
@@ -299,10 +312,10 @@ pub fn reli_debug_enable_switch(enable: bool) -> Result<(), Error> {
     let switch = Path::new(&dir_string).join(RELI_DEBUG_SWITCH_FILE);
     if enable {
         if !switch.exists() {
-            File::create(&switch)?;
+            File::create(&switch).context(IoSnafu)?;
         }
     } else if switch.exists() {
-        fs::remove_file(&switch)?;
+        fs::remove_file(&switch).context(IoSnafu)?;
     }
 
     Ok(())
@@ -316,7 +329,7 @@ pub fn reli_debug_get_switch() -> bool {
     switch.exists()
 }
 
-fn reli_prepare() -> Result<String, Error> {
+fn reli_prepare() -> Result<String> {
     // directory
     base::reli_dir_prepare()?; // again
     let dir_string = base::reli_dir_get().unwrap();

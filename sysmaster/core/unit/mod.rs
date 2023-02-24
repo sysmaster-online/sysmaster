@@ -1,3 +1,15 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
 //!  Unit is the main module for process 1 to manage and abstract system services
 //!  The module contains:
 //!  [execute]: unit Object data structure definition to be executed.
@@ -8,13 +20,13 @@
 //!  [unit_entry]: Definition of unit related objects
 //!  [unit_manager]: Manager all Unit Instances in sysmaster
 //!  [um_interface]: Share api of unit_manager for subunit
+pub(super) use datastore::UnitDb;
+pub(super) use entry::UnitX;
 pub(super) use manager::UnitManagerX;
 pub use rentry::UeConfigInstall;
 pub(super) use rentry::{unit_name_to_type, JobMode};
 pub(crate) use sysmaster::unit::UnitRelationAtom;
 pub(crate) use sysmaster::unit::{UnitRelations, UnitType};
-pub(super) use unit_datastore::UnitDb;
-pub(super) use unit_entry::UnitX;
 
 #[cfg(test)]
 pub(super) use data::DataManager;
@@ -43,7 +55,10 @@ pub enum UnitErrno {
 // unit_entry -> {unit_datastore -> unit_runtime} -> job ->
 // {execute | sigchld | notify} -> unit_manager -> um_interface
 
+mod base;
 mod data;
+mod datastore;
+mod entry;
 mod execute;
 mod manager;
 mod notify;
@@ -53,7 +68,4 @@ mod sigchld;
 #[cfg(test)]
 mod test;
 mod uload;
-mod uload_util;
-mod unit_base;
-mod unit_datastore;
-mod unit_entry;
+mod util;

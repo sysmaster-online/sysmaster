@@ -1,9 +1,20 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
+use crate::error::*;
 use heed::types::{OwnedType, SerdeBincode};
 use heed::{Database, Env, EnvOpenOptions};
-use std::fmt;
-use std::fs;
-use std::io::Error;
 use std::path::Path;
+use std::{fmt, fs};
 
 const RELI_ENABLE_DIR: &str = "enable.mdb";
 const RELI_ENABLE_MAX_DBS: u32 = 1;
@@ -66,16 +77,16 @@ impl ReliEnable {
         enable.unwrap_or(false)
     }
 
-    fn enable_len(&self) -> heed::Result<u64> {
-        let rtxn = self.env.read_txn()?;
-        self.enable.len(&rtxn)
+    fn enable_len(&self) -> Result<u64> {
+        let rtxn = self.env.read_txn().context(HeedSnafu)?;
+        self.enable.len(&rtxn).context(HeedSnafu)
     }
 }
 
-pub fn prepare(dir_str: &str) -> Result<(), Error> {
+pub fn prepare(dir_str: &str) -> Result<()> {
     let enable = Path::new(dir_str).join(RELI_ENABLE_DIR);
     if !enable.exists() {
-        fs::create_dir_all(&enable)?;
+        fs::create_dir_all(&enable).context(IoSnafu)?;
     }
 
     Ok(())

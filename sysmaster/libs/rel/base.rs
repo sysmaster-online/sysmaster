@@ -1,3 +1,17 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
+use super::Reliability;
+use crate::error::*;
 use heed::types::SerdeBincode;
 use heed::Database;
 use heed::{Env, RoTxn, RwTxn};
@@ -5,14 +19,10 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::env;
 use std::fmt::Debug;
-use std::fs;
 use std::hash::Hash;
-use std::io::{Error, ErrorKind};
 use std::path::Path;
-
-use super::Reliability;
+use std::{env, fs};
 
 /// the reliability database
 /// K & V that can be deserialized without borrowing any data from the deserializer.
@@ -226,7 +236,7 @@ pub trait ReDbTable {
 
 const RELI_PATH_DIR: &str = "/run/sysmaster/reliability";
 
-pub fn reli_dir_get() -> Result<String, Error> {
+pub fn reli_dir_get() -> Result<String> {
     // /run/sysmaster/reliability/
     let ret_run = reli_dir_get_run();
     if ret_run.is_ok() {
@@ -246,7 +256,9 @@ pub fn reli_dir_get() -> Result<String, Error> {
     }
 
     // nothing exists, return failure.
-    Err(Error::from(ErrorKind::NotFound))
+    Err(Error::NotFound {
+        what: "reli dir".to_string(),
+    })
 }
 
 /// prepare the directory for reliability.
@@ -254,8 +266,8 @@ pub fn reli_dir_get() -> Result<String, Error> {
 /// 1. /run/sysmaster/reliability/: the real running directory.
 /// 2. OUT_DIR/../reliability/: make CI happy, which is target/debug/reliability/ or target/release/reliability/ usually.
 /// 3. PROCESS_RELI_PATH: the path customized.
-pub fn reli_dir_prepare() -> Result<(), Error> {
-    // /run/sysmaster/reliability/
+pub fn reli_dir_prepare() -> Result<()> {
+    // // /run/sysmaster/reliability/
     let ret_run = reli_dir_prepare_run();
     if ret_run.is_ok() {
         return ret_run; // ok
@@ -277,19 +289,19 @@ pub fn reli_dir_prepare() -> Result<(), Error> {
     let err_customize = ret_customize.unwrap_err();
 
     // nothing has been prepared, return failure.
-    if err_customize.kind() != ErrorKind::NotFound {
+    if let Error::NotFound { what: _ } = err_customize {
         Err(err_customize)
-    } else if err_out.kind() != ErrorKind::NotFound {
+    } else if let Error::NotFound { what: _ } = err_out {
         Err(err_out)
     } else {
         Err(err_run)
     }
 }
 
-fn reli_dir_prepare_run() -> Result<(), Error> {
+fn reli_dir_prepare_run() -> Result<()> {
     let dir = Path::new(RELI_PATH_DIR);
     if !dir.exists() {
-        fs::create_dir_all(dir)?;
+        fs::create_dir_all(dir).context(IoSnafu)?;
     }
 
     log::info!(
@@ -299,7 +311,7 @@ fn reli_dir_prepare_run() -> Result<(), Error> {
     Ok(())
 }
 
-fn reli_dir_get_run() -> Result<String, Error> {
+fn reli_dir_get_run() -> Result<String> {
     let dir = Path::new(RELI_PATH_DIR);
     if dir.exists() {
         log::info!(
@@ -308,59 +320,65 @@ fn reli_dir_get_run() -> Result<String, Error> {
         );
         Ok(String::from(RELI_PATH_DIR))
     } else {
-        Err(Error::from(ErrorKind::NotFound))
+        Err(Error::NotFound {
+            what: dir.to_string_lossy().to_string(),
+        })
     }
 }
 
-fn reli_dir_prepare_out() -> Result<(), Error> {
+fn reli_dir_prepare_out() -> Result<()> {
     let dir_string = out_dir_string_get();
     if let Some(d_str) = dir_string {
         let dir = Path::new(&d_str);
         if !dir.exists() {
-            fs::create_dir_all(dir)?;
+            fs::create_dir_all(dir).context(IoSnafu)?;
         }
 
         log::info!("prepare reliability out directory successfully: {}.", d_str);
-        Ok(())
-    } else {
-        Err(Error::from(ErrorKind::NotFound))
+        return Ok(());
     }
+
+    Err(Error::NotFound {
+        what: "prepare reliability out directory".to_string(),
+    })
 }
 
-fn reli_dir_get_out() -> Result<String, Error> {
+fn reli_dir_get_out() -> Result<String> {
     let dir_string = out_dir_string_get();
     if let Some(d_str) = dir_string {
         let dir = Path::new(&d_str);
         if dir.exists() {
             log::info!("get reliability out directory successfully: {}.", d_str);
-            Ok(d_str)
-        } else {
-            Err(Error::from(ErrorKind::NotFound))
+            return Ok(d_str);
         }
-    } else {
-        Err(Error::from(ErrorKind::NotFound))
     }
+
+    Err(Error::NotFound {
+        what: "get reliability out directory".to_string(),
+    })
 }
 
-fn reli_dir_prepare_customize() -> Result<(), Error> {
+fn reli_dir_prepare_customize() -> Result<()> {
     let dir_string = env::var("PROCESS_LIB_LOAD_PATH").ok();
     if let Some(d_str) = dir_string {
         let dir = Path::new(&d_str);
         if !dir.exists() {
-            fs::create_dir_all(dir)?;
+            fs::create_dir_all(dir).context(IoSnafu)?;
         }
 
         log::info!(
             "prepare reliability customized directory successfully: {}.",
             d_str
         );
-        Ok(())
-    } else {
-        Err(Error::from(ErrorKind::NotFound))
+        return Ok(());
     }
+
+    Err(Error::NotFound {
+        what: "prepare reliability customized directory".to_string(),
+    })
 }
 
-fn reli_dir_get_customize() -> Result<String, Error> {
+fn reli_dir_get_customize() -> Result<String> {
     let dir_string = env::var("PROCESS_LIB_LOAD_PATH").ok();
     if let Some(d_str) = dir_string {
         let dir = Path::new(&d_str);
@@ -369,13 +387,13 @@ fn reli_dir_get_customize() -> Result<String, Error> {
                 "get reliability customized directory successfully: {}.",
                 d_str
             );
-            Ok(d_str)
-        } else {
-            Err(Error::from(ErrorKind::NotFound))
+            return Ok(d_str);
         }
-    } else {
-        Err(Error::from(ErrorKind::NotFound))
     }
+
+    Err(Error::NotFound {
+        what: "get reliability customized directory".to_string(),
+    })
 }
 
 fn out_dir_string_get() -> Option<String> {
