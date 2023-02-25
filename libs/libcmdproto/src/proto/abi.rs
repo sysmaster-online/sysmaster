@@ -65,8 +65,8 @@ pub mod unit_comm {
 pub struct UnitFile {
     #[prost(enumeration="unit_file::Action", tag="1")]
     pub action: i32,
-    #[prost(string, tag="2")]
-    pub unitname: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag="2")]
+    pub unitname: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Nested message and enum types in `UnitFile`.
 pub mod unit_file {

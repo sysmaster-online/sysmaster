@@ -94,25 +94,25 @@ enum SubCmd {
     /// enable one unit file
     Enable {
         #[clap(required = true)]
-        unit_file: String,
+        unit_file: Vec<String>,
     },
 
     /// enable one unit file
     Disable {
         #[clap(required = true)]
-        unit_file: String,
+        unit_file: Vec<String>,
     },
 
     // mask one unit file
     Mask {
         #[clap(required = true)]
-        unit_file: String,
+        unit_file: Vec<String>,
     },
 
     // unmask one unit file
     Unmask {
         #[clap(required = true)]
-        unit_file: String,
+        unit_file: Vec<String>,
     },
 }
 

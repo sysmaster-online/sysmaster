@@ -50,7 +50,7 @@ message UnitFile {
     SETDEF = 6;
   }
   Action action = 1;
-  string unitname = 2;
+  repeated string unitname = 2;
 }
 
 message JobComm {
