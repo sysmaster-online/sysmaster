@@ -178,7 +178,7 @@ impl UnitManagerX {
             link_name_path.to_str().unwrap(),
             false,
         )
-        .context(NixSnafu)
+        .context(UtilSnafu)
     }
 
     pub(crate) fn unmask_unit(&self, unit_file: &str) -> Result<()> {

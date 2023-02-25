@@ -10,118 +10,69 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//!
-#[allow(dead_code)]
-enum ErrKind {
-    Unit,
-    Syscall,
-    Http,
-    Proc,
-    ParseInt,
-    ParseFloat,
-    FromUTF8,
-    ParseBoolean,
-    Other,
-}
+//! error definitions
+use snafu::prelude::*;
+#[allow(unused_imports)]
+pub use snafu::ResultExt;
 
-impl std::fmt::Display for ErrKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let err_kind = match self {
-            ErrKind::Unit => "unit",
-            ErrKind::Syscall => "syscall",
-            ErrKind::Http => "http",
-            ErrKind::Proc => "procfs",
-            ErrKind::ParseInt => "parseint",
-            ErrKind::FromUTF8 => "fromutf8",
-            ErrKind::Other => "other",
-            ErrKind::ParseBoolean => "parse_boolean",
-            ErrKind::ParseFloat => "parsefloat",
-        };
-        write!(f, "{err_kind}")
-    }
-}
-
-///
-#[derive(Debug, thiserror::Error)]
+#[allow(missing_docs)]
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub))]
+#[non_exhaustive]
 pub enum Error {
-    /// An error from syscall
-    #[error(
-        "{}: Got an error: (ret={}, errno={}) for syscall: {}",
-        ErrKind::Syscall,
+    #[snafu(display(
+        "Got an error: (ret={}, errno={}) for syscall: {}",
         ret,
         errno,
         syscall
-    )]
-    ///
+    ))]
     Syscall {
-        ///
         syscall: &'static str,
-        ///
         ret: i32,
-        ///
         errno: i32,
     },
 
-    /// An error writing the cargo instructions to stdout
-    #[error("{}: There was an error writing the cargo instructions to stdout: {}", ErrKind::Unit, .0)]
-    Io(#[from] std::io::Error),
+    #[snafu(display("Io"))]
+    Io { source: std::io::Error },
 
-    /// An error from procfs
-    #[error("{}: Got an error from: {}", ErrKind::Proc, .0)]
-    Proc(#[from] procfs::ProcError),
+    #[snafu(display("Errno"))]
+    Nix { source: nix::Error },
 
-    /// An error from parse int
-    #[error("{}: Got an error from: {}", ErrKind::ParseInt, .0)]
-    ParseInt(#[from] std::num::ParseIntError),
+    #[snafu(display("Var"))]
+    Var { source: std::env::VarError },
 
-    /// An error from parse float
-    #[error("{}: Got an error from: {}", ErrKind::ParseFloat, .0)]
-    ParseFloat(#[from] std::num::ParseFloatError),
+    #[snafu(display("procfs"))]
+    Proc { source: procfs::ProcError },
 
-    /// An error from parse string to boolean
-    #[error("{}: Got an error from: {}", ErrKind::ParseBoolean, .0)]
-    ParseBoolError(String),
-
-    /// An error from utf8
-    #[error("{}: Got an error from: {}", ErrKind::FromUTF8, .0)]
-    FromUTF8(#[from] std::string::FromUtf8Error),
-
-    /// An error getting the current pid
-    #[error("{}: Got an error: {} for unit: {}", ErrKind::Unit, msg, unit)]
-    Unit {
-        ///
-        msg: &'static str,
-        ///
-        unit: &'static str,
+    #[snafu(display("Error parsing from string: {}", source))]
+    Parse {
+        source: Box<dyn std::error::Error + Send + Sync>,
     },
 
-    /// An error getting the current pid
-    #[error(
-        "{}: Unable to determine the current process pid: {}",
-        ErrKind::Other,
-        msg
-    )]
-    Other {
-        ///
-        msg: &'static str,
-    },
+    #[snafu(display("Not exist): '{}'.", what))]
+    NotExisted { what: String },
+
+    #[snafu(display("Invalid: '{}'.", what))]
+    Invalid { what: String },
+
+    #[snafu(display("OtherError): '{}'.", msg))]
+    Other { msg: String },
 }
+
+#[allow(unused_macros)]
+macro_rules! errfrom {
+    ($($st:ty),* => $variant:ident) => (
+        $(
+            impl From<$st> for Error {
+                fn from(e: $st) -> Error {
+                    Error::$variant { source: e.into() }
+                }
+            }
+        )*
+    )
+}
+
+errfrom!(std::num::ParseIntError, std::string::ParseError, std::num::ParseFloatError, std::str::ParseBoolError, std::string::FromUtf8Error => Parse);
 
 ///
-pub type Result<T, E = Error> = anyhow::Result<T, E>;
-
-#[cfg(test)]
-mod test {
-    use std::io::{self, ErrorKind};
-
-    use super::Error;
-
-    #[test]
-    fn io_error() {
-        let err: Error = io::Error::new(ErrorKind::Other, "testing").into();
-        assert_eq!(
-            "unit: There was an error writing the cargo instructions to stdout: testing",
-            format!("{err}")
-        );
-    }
-}
+pub type Result<T, E = Error> = std::result::Result<T, E>;

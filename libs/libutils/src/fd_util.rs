@@ -11,16 +11,14 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-use nix::{
-    errno::Errno,
-    fcntl::{FcntlArg, FdFlag, OFlag},
-};
+use crate::error::*;
+use nix::fcntl::{FcntlArg, FdFlag, OFlag};
 
 ///
-pub fn fd_nonblock(fd: i32, nonblock: bool) -> Result<(), Errno> {
+pub fn fd_nonblock(fd: i32, nonblock: bool) -> Result<()> {
     assert!(fd >= 0);
 
-    let flags = nix::fcntl::fcntl(fd, FcntlArg::F_GETFL)?;
+    let flags = nix::fcntl::fcntl(fd, FcntlArg::F_GETFL).context(NixSnafu)?;
     let fd_flag = unsafe { OFlag::from_bits_unchecked(flags) };
 
     let n_block = match nonblock {
@@ -29,16 +27,16 @@ pub fn fd_nonblock(fd: i32, nonblock: bool) -> Result<(), Errno> {
     };
     let nflag = fd_flag & n_block;
 
-    nix::fcntl::fcntl(fd, FcntlArg::F_SETFL(nflag))?;
+    nix::fcntl::fcntl(fd, FcntlArg::F_SETFL(nflag)).context(NixSnafu)?;
 
     Ok(())
 }
 
 ///
-pub fn fd_cloexec(fd: i32, cloexec: bool) -> Result<(), Errno> {
+pub fn fd_cloexec(fd: i32, cloexec: bool) -> Result<()> {
     assert!(fd >= 0);
 
-    let flags = nix::fcntl::fcntl(fd, FcntlArg::F_GETFD)?;
+    let flags = nix::fcntl::fcntl(fd, FcntlArg::F_GETFD).context(NixSnafu)?;
 
     let fd_flag = unsafe { FdFlag::from_bits_unchecked(flags) };
 
@@ -47,7 +45,7 @@ pub fn fd_cloexec(fd: i32, cloexec: bool) -> Result<(), Errno> {
         false => fd_flag & !FdFlag::FD_CLOEXEC,
     };
 
-    nix::fcntl::fcntl(fd, FcntlArg::F_SETFD(nflag))?;
+    nix::fcntl::fcntl(fd, FcntlArg::F_SETFD(nflag)).context(NixSnafu)?;
 
     Ok(())
 }

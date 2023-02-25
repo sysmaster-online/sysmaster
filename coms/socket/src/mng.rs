@@ -24,7 +24,7 @@ use libevent::EventState;
 use libevent::{EventType, Events, Source};
 use libutils::IN_SET;
 use nix::libc::{self};
-use nix::{errno::Errno, sys::wait::WaitStatus};
+use nix::sys::wait::WaitStatus;
 use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
@@ -548,12 +548,12 @@ impl SocketMngData {
         }
     }
 
-    fn open_fds(&self) -> Result<(), Errno> {
+    fn open_fds(&self) -> Result<()> {
         for port in self.ports().iter() {
-            let ret1 = port.open_port(true);
-            if ret1.is_err() {
+            let ret = port.open_port(true);
+            if ret.is_err() {
                 self.close_fds();
-                return ret1.map(|_| ());
+                return ret;
             }
 
             port.apply_sock_opt(port.fd());

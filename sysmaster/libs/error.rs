@@ -65,6 +65,11 @@ pub enum Error {
         source: std::env::VarError,
     },
 
+    #[snafu(display("UtilError(libsysmaster)"))]
+    Util {
+        source: libutils::error::Error,
+    },
+
     #[snafu(display("IoError(libsysmaster)"))]
     Io {
         source: std::io::Error,
@@ -184,15 +189,8 @@ errfrom!(std::num::ParseIntError, std::string::ParseError => Parse);
 impl From<libutils::error::Error> for Error {
     fn from(e: libutils::Error) -> Error {
         match e {
-            libutils::Error::Io(e) => Error::Io { source: e },
-            libutils::Error::Proc(_) => todo!(),
-            libutils::Error::ParseInt(_) => todo!(),
-            libutils::Error::ParseFloat(_) => todo!(),
-            libutils::Error::ParseBoolError(_) => todo!(),
-            libutils::Error::FromUTF8(_) => todo!(),
-            libutils::Error::Other { msg } => Error::Other {
-                msg: msg.to_string(),
-            },
+            libutils::Error::Io { source } => Error::Io { source },
+            libutils::Error::Nix { source } => Error::Nix { source },
             _ => Error::Other {
                 msg: "unspport".to_string(),
             },

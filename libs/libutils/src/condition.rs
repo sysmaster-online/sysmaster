@@ -11,7 +11,6 @@
 // See the Mulan PSL v2 for more details.
 
 //! the utils to test the conditions
-//!
 use crate::{conf_parser, proc_cmdline, user_group_util};
 use std::{path::Path, string::String};
 

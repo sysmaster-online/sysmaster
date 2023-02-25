@@ -770,7 +770,11 @@ impl ServiceMng {
 
         let pid = match file_util::read_first_line(pid_file_path) {
             Ok(line) => line.trim().parse::<i32>(),
-            Err(e) => return Err(Error::from(e)),
+            Err(e) => {
+                return Err(Error::Parse {
+                    source: Box::new(e),
+                })
+            }
         };
 
         if pid.is_err() {

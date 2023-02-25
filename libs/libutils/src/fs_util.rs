@@ -12,43 +12,42 @@
 
 //! the utils of the file operation
 //!
-use nix::{errno::Errno, fcntl::OFlag, sys::stat::Mode};
+use crate::error::*;
+use nix::{fcntl::OFlag, sys::stat::Mode};
 use pathdiff::diff_paths;
 use std::path::Path;
 
 /// open the parent directory of path
-pub fn open_parent(path: &Path, flags: OFlag, mode: Mode) -> Result<i32, Errno> {
-    let parent = path.parent();
+pub fn open_parent(path: &Path, flags: OFlag, mode: Mode) -> Result<i32> {
+    let parent = path.parent().ok_or(Error::Nix {
+        source: nix::errno::Errno::EINVAL,
+    })?;
 
-    if parent.is_none() {
-        return Err(Errno::EINVAL);
-    }
-
-    let fd = nix::fcntl::open(parent.unwrap(), flags, mode)?;
-
-    Ok(fd)
+    nix::fcntl::open(parent, flags, mode).context(NixSnafu)
 }
 
 /// create symlink link_name -> target
-pub fn symlink(target: &str, link_name: &str, relative: bool) -> Result<(), Errno> {
-    let link_name_path = Path::new(&link_name);
+pub fn symlink(target: &str, link: &str, relative: bool) -> Result<()> {
+    let link_path = Path::new(&link);
     let target_path = Path::new(&target);
+
     let (target_path, fd) = if relative {
-        let link_name_path_parent = link_name_path.parent().unwrap();
-        let rel_path = diff_paths(target_path, link_name_path_parent).unwrap();
-        let fd = nix::fcntl::open(&rel_path, OFlag::O_DIRECT, Mode::from_bits(0).unwrap())?;
+        let link_path_parent = link_path.parent().ok_or(Error::NotExisted {
+            what: format!("{}'s parent", link_path.to_string_lossy()),
+        })?;
+
+        let rel_path = diff_paths(target_path, link_path_parent).unwrap();
+        let fd = nix::fcntl::open(&rel_path, OFlag::O_DIRECT, Mode::from_bits(0).unwrap())
+            .context(NixSnafu)?;
         (rel_path, Some(fd))
     } else {
         (target_path.to_path_buf(), None)
     };
 
-    match nix::unistd::symlinkat(target_path.as_path(), fd, link_name_path) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            log::debug!("Failed to create symlink: {} -> {}", link_name, target);
-            Err(e)
-        }
-    }
+    nix::unistd::symlinkat(target_path.as_path(), fd, link_path).map_err(|e| {
+        log::debug!("Failed to create symlink: {} -> {}", link, target);
+        Error::Nix { source: e }
+    })
 }
 
 #[cfg(test)]

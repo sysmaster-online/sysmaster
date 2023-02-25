@@ -322,13 +322,11 @@ impl MountPoint {
             path,
             OFlag::O_PATH | OFlag::O_CLOEXEC,
             Mode::from_bits(0).unwrap(),
-        )
-        .context(NixSnafu)?;
+        )?;
 
         let last_file_name = path.file_name().unwrap_or_default();
 
-        let ret = mount_util::mount_point_fd_valid(ret, last_file_name.to_str().unwrap(), flags)
-            .context(NixSnafu)?;
+        let ret = mount_util::mount_point_fd_valid(ret, last_file_name.to_str().unwrap(), flags)?;
 
         Ok(ret)
     }
@@ -445,7 +443,9 @@ fn symlink_controller(source: String, alias: String) -> Result<()> {
     let target = target_path.to_str().unwrap();
     match fs_util::symlink(&source, target, false) {
         Ok(()) => Ok(()),
-        Err(Errno::EEXIST) => Ok(()),
+        Err(libutils::Error::Nix {
+            source: Errno::EEXIST,
+        }) => Ok(()),
         Err(e) => {
             log::debug!(
                 "Failed to symlink controller from {} to {}: {}",

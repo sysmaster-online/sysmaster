@@ -11,14 +11,14 @@
 // See the Mulan PSL v2 for more details.
 
 //!
+use crate::error::*;
 use nix::{
-    errno::Errno,
     fcntl::AtFlags,
     sys::stat::{fstatat, SFlag},
 };
 
 ///
-pub fn mount_point_fd_valid(fd: i32, file_name: &str, flags: AtFlags) -> Result<bool, Errno> {
+pub fn mount_point_fd_valid(fd: i32, file_name: &str, flags: AtFlags) -> Result<bool> {
     assert!(fd >= 0);
 
     let flags = if flags.contains(AtFlags::AT_SYMLINK_FOLLOW) {
@@ -27,12 +27,12 @@ pub fn mount_point_fd_valid(fd: i32, file_name: &str, flags: AtFlags) -> Result<
         flags | AtFlags::AT_SYMLINK_FOLLOW
     };
 
-    let f_stat = fstatat(fd, file_name, flags)?;
+    let f_stat = fstatat(fd, file_name, flags).context(NixSnafu)?;
     if SFlag::S_IFLNK.bits() & f_stat.st_mode == SFlag::S_IFLNK.bits() {
         return Ok(false);
     }
 
-    let d_stat = fstatat(fd, "", AtFlags::AT_EMPTY_PATH)?;
+    let d_stat = fstatat(fd, "", AtFlags::AT_EMPTY_PATH).context(NixSnafu)?;
 
     if f_stat.st_dev == d_stat.st_dev && f_stat.st_ino == d_stat.st_ino {
         return Ok(true);

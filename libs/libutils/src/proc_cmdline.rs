@@ -11,34 +11,21 @@
 // See the Mulan PSL v2 for more details.
 
 //!
+use crate::conf_parser;
+use crate::error::*;
+use nix::unistd::Pid;
 use std::fs::File;
-use std::io::{BufReader, Error as IOError, ErrorKind, Read};
+use std::io::{BufReader, Read};
 use std::path::Path;
 
-use nix::unistd::Pid;
-
-use crate::conf_parser;
-use crate::Error;
-
-fn cmdline_content() -> Result<String, IOError> {
-    let mut file = match File::open("/proc/cmdline") {
-        Err(why) => {
-            return Err(IOError::new(
-                ErrorKind::Other,
-                format!("Error: Open file failed detail {why}!"),
-            ))
-        }
-        Ok(file) => file,
-    };
+fn cmdline_content() -> Result<String> {
+    let mut file = File::open("/proc/cmdline").context(IoSnafu)?;
 
     let mut buf = String::new();
     match file.read_to_string(&mut buf) {
         Ok(s) => s,
-        Err(why) => {
-            return Err(IOError::new(
-                ErrorKind::Other,
-                format!("Error: read file buf error reason is {why}"),
-            ));
+        Err(e) => {
+            return Err(Error::Io { source: e });
         }
     };
     Ok(buf)

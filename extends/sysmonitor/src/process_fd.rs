@@ -13,7 +13,7 @@
 //! Monitor the number of process fds
 use serde_derive::Deserialize;
 
-use libutils::Error;
+use libutils::{Error, IoSnafu, ResultExt};
 use std::fs::OpenOptions;
 use std::io::Write;
 
@@ -57,8 +57,8 @@ impl Monitor for ProcessFd {
 
     fn check_status(&mut self) -> Result<(), Error> {
         // Write the value to procfs, turn on monitoring, the real monitoring is implemented by the kernel
-        write_file(PROC_FDTHRESHOLD, self.alarm.to_string())?;
-        write_file(PROC_FDENABLE, 1.to_string())?;
+        write_file(PROC_FDTHRESHOLD, self.alarm.to_string()).context(IoSnafu)?;
+        write_file(PROC_FDENABLE, 1.to_string()).context(IoSnafu)?;
         Ok(())
     }
 

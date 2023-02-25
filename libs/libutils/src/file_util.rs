@@ -12,19 +12,18 @@
 
 //! the utils of the file operation
 //!
+use crate::error::*;
 use std::io::BufRead;
 use std::io::BufReader;
-use std::io::Error;
 use std::path::Path;
 
 /// read first line from a file
-pub fn read_first_line(path: &Path) -> Result<String, Error> {
-    let file = std::fs::File::open(path)?;
+pub fn read_first_line(path: &Path) -> Result<String> {
+    let file = std::fs::File::open(path).context(IoSnafu)?;
 
     let mut buffer = BufReader::new(file);
     let mut first_line = String::with_capacity(1024);
-
-    let _length = buffer.read_line(&mut first_line);
+    let _ = buffer.read_line(&mut first_line);
 
     Ok(first_line)
 }

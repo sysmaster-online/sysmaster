@@ -11,20 +11,20 @@
 // See the Mulan PSL v2 for more details.
 
 //!
+use crate::error::*;
 use nix::{
-    errno::Errno,
     libc,
     poll::{self, PollFd, PollFlags},
     sys::{signal::SigSet, time::TimeSpec},
 };
 use std::os::unix::prelude::RawFd;
 
-fn ppoll_timeout(fds: &mut [PollFd], timeout: Option<TimeSpec>) -> Result<libc::c_int, Errno> {
+fn ppoll_timeout(fds: &mut [PollFd], timeout: Option<TimeSpec>) -> Result<libc::c_int> {
     if fds.is_empty() {
         return Ok(0);
     }
 
-    let ret = poll::ppoll(fds, timeout, SigSet::empty())?;
+    let ret = poll::ppoll(fds, timeout, SigSet::empty()).context(NixSnafu)?;
 
     if ret == 0 {
         return Ok(0);
@@ -36,7 +36,9 @@ fn ppoll_timeout(fds: &mut [PollFd], timeout: Option<TimeSpec>) -> Result<libc::
         }
 
         if item.revents().unwrap().eq(&PollFlags::POLLNVAL) {
-            return Err(Errno::EBADF);
+            return Err(Error::Nix {
+                source: nix::errno::Errno::EBADF,
+            });
         }
     }
 
@@ -44,7 +46,7 @@ fn ppoll_timeout(fds: &mut [PollFd], timeout: Option<TimeSpec>) -> Result<libc::
 }
 
 ///
-pub fn wait_for_events(fd: RawFd, event: PollFlags, time_out: i64) -> Result<libc::c_int, Errno> {
+pub fn wait_for_events(fd: RawFd, event: PollFlags, time_out: i64) -> Result<libc::c_int> {
     let poll_fd = PollFd::new(fd, event);
     let time_spec = TimeSpec::from_timespec(libc::timespec {
         tv_sec: time_out,

@@ -29,6 +29,7 @@ use nix::{
     },
 };
 use std::{cell::RefCell, fmt, os::unix::prelude::RawFd, rc::Rc};
+use sysmaster::error::*;
 
 pub(super) const SOCKET_INVALID_FD: RawFd = -1;
 
@@ -61,15 +62,13 @@ impl SocketPort {
         *self.fd.borrow_mut() = fd;
     }
 
-    pub(super) fn accept(&self) -> Result<i32, Errno> {
-        match socket::accept4(self.fd(), SockFlag::SOCK_NONBLOCK | SockFlag::SOCK_CLOEXEC) {
-            Ok(fd) => Ok(fd),
-            Err(e) => Err(e),
-        }
+    pub(super) fn accept(&self) -> Result<i32> {
+        socket::accept4(self.fd(), SockFlag::SOCK_NONBLOCK | SockFlag::SOCK_CLOEXEC)
+            .context(NixSnafu)
     }
 
     // process reentrant
-    pub(super) fn open_port(&self, update: bool) -> Result<(), Errno> {
+    pub(super) fn open_port(&self, update: bool) -> Result<()> {
         // process reentrant protection
         if self.fd() >= 0 {
             // debug: process reentrant
@@ -80,7 +79,10 @@ impl SocketPort {
             PortType::Socket => {
                 let flag = SockFlag::SOCK_CLOEXEC | SockFlag::SOCK_NONBLOCK;
 
-                self.p_conf.sa().socket_listen(flag, 128)?
+                self.p_conf
+                    .sa()
+                    .socket_listen(flag, 128)
+                    .context(NixSnafu)?
             }
             PortType::Fifo => todo!(),
             PortType::Invalid => todo!(),
@@ -89,7 +91,7 @@ impl SocketPort {
         if update {
             if let Err(e) = self.comm.reli().fd_cloexec(fd, false) {
                 self.close(update);
-                return Err(e.into());
+                return Err(e);
             }
         }
         self.set_fd(fd);
@@ -125,41 +127,25 @@ impl SocketPort {
     }
 
     pub(super) fn flush_accept(&self) {
-        let accept_conn = socket::getsockopt(self.fd(), sockopt::AcceptConn);
-        if accept_conn.is_err() {
-            return;
-        }
-
-        if !accept_conn.unwrap() {
-            return;
-        }
-
-        for _i in 1..1024 {
-            match io_util::wait_for_events(self.fd(), PollFlags::POLLIN, 0) {
-                Ok(v) => {
-                    if v == 0 {
-                        return;
-                    }
-                }
-                Err(e) => {
-                    if e == Errno::EINTR {
+        if let Ok(true) = socket::getsockopt(self.fd(), sockopt::AcceptConn) {
+            for _i in 1..1024 {
+                while let Err(e) = io_util::wait_for_events(self.fd(), PollFlags::POLLIN, 0) {
+                    if let libutils::Error::Nix {
+                        source: Errno::EINTR,
+                    } = e
+                    {
                         continue;
                     }
                     return;
                 }
-            }
-
-            match socket::accept4(self.fd(), SockFlag::SOCK_NONBLOCK | SockFlag::SOCK_CLOEXEC) {
-                Ok(_) => {
-                    fd_util::close(self.fd());
-                }
-                Err(e) => {
-                    if e == Errno::EAGAIN {
+                match socket::accept4(self.fd(), SockFlag::SOCK_NONBLOCK | SockFlag::SOCK_CLOEXEC)
+                    .map(|_| fd_util::close(self.fd()))
+                {
+                    Ok(_) => {}
+                    Err(_e) => {
+                        // todo!(): if e == Errno::EAGAIN { return; }
                         return;
                     }
-
-                    // todo!() err is to continue
-                    return;
                 }
             }
         }
@@ -167,33 +153,23 @@ impl SocketPort {
 
     pub(super) fn flush_fd(&self) {
         loop {
-            match io_util::wait_for_events(self.fd(), PollFlags::POLLIN, 0) {
-                Ok(v) => {
-                    if v == 0 {
-                        return;
-                    }
+            let v = io_util::wait_for_events(self.fd(), PollFlags::POLLIN, 0).unwrap_or(0);
+            if v == 0 {
+                return;
+            };
 
-                    let mut buf = [0; 2048];
-                    match nix::unistd::read(self.fd(), &mut buf) {
-                        Ok(v) => {
-                            if v == 0 {
-                                return;
-                            }
-                        }
-                        Err(e) => {
-                            if e == Errno::EINTR {
-                                continue;
-                            }
-                            return;
-                        }
-                    }
+            let mut buf = [0; 2048];
+            // Use unwrap_or_else to handle errors
+            let v = nix::unistd::read(self.fd(), &mut buf).unwrap_or_else(|e| {
+                if e == Errno::EINTR {
+                    // Retry on EINTR
+                    1
+                } else {
+                    0
                 }
-                Err(e) => {
-                    if e == Errno::EINTR {
-                        continue;
-                    }
-                    return;
-                }
+            });
+            if v == 0 {
+                return;
             }
         }
     }

@@ -12,18 +12,16 @@
 
 //! Common used functions to parse user and group
 
+use crate::error::*;
 use nix::libc::uid_t;
 use nix::unistd::{Gid, Group, Uid, User};
-use std::error::Error;
-use std::result::Result;
 
 /// Parse a string as UID
-pub fn parse_uid(uid_str: &String) -> Result<User, Box<dyn Error>> {
+pub fn parse_uid(uid_str: &String) -> Result<User> {
     if uid_str.is_empty() {
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "UID is empty",
-        )));
+        return Err(Error::Invalid {
+            what: "UID is empty".to_string(),
+        });
     }
 
     if uid_str.eq("0") {
@@ -42,43 +40,40 @@ pub fn parse_uid(uid_str: &String) -> Result<User, Box<dyn Error>> {
             first = false;
             continue;
         }
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "UID must only contains 0-9 and shouldn't starts with 0",
-        )));
+        return Err(Error::Invalid {
+            what: "UID must only contains 0-9 and shouldn't starts with 0".to_string(),
+        });
     }
 
     let uid = match uid_str.parse::<u32>() {
         Err(e) => {
-            return Err(Box::new(e));
+            return Err(e.into());
         }
         Ok(v) => v,
     };
 
     let user = match User::from_uid(Uid::from_raw(uid)) {
         Err(e) => {
-            return Err(Box::new(e));
+            return Err(Error::Nix { source: e });
         }
         Ok(v) => v,
     };
 
     match user {
-        None => Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "No matched UID",
-        ))),
+        None => Err(Error::Invalid {
+            what: "No matched UID".to_string(),
+        }),
         Some(v) => Ok(v),
     }
 }
 
 /// Parse a string as UID
-pub fn parse_gid(gid_str: &String) -> Result<Group, Box<dyn Error>> {
+pub fn parse_gid(gid_str: &String) -> Result<Group> {
     // Same logic as parse_uid()
     if gid_str.is_empty() {
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "GID is empty",
-        )));
+        return Err(Error::Invalid {
+            what: "GID is empty".to_string(),
+        });
     }
 
     if gid_str.eq("0") {
@@ -94,55 +89,51 @@ pub fn parse_gid(gid_str: &String) -> Result<Group, Box<dyn Error>> {
             first = false;
             continue;
         }
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "GID must only contains 0-9 and shouldn't starts with 0",
-        )));
+        return Err(Error::Invalid {
+            what: "GID must only contains 0-9 and shouldn't starts with 0".to_string(),
+        });
     }
 
     let gid = match gid_str.parse::<u32>() {
         Err(e) => {
-            return Err(Box::new(e));
+            return Err(e.into());
         }
         Ok(v) => v,
     };
 
     let group = match Group::from_gid(Gid::from_raw(gid)) {
         Err(e) => {
-            return Err(Box::new(e));
+            return Err(Error::Nix { source: e });
         }
         Ok(v) => v,
     };
 
     match group {
-        None => Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "No matched GID",
-        ))),
+        None => Err(Error::Invalid {
+            what: "No matched GID".to_string(),
+        }),
         Some(v) => Ok(v),
     }
 }
 
 /// Parse a string as Username
-pub fn parse_name(name_str: &String) -> Result<User, Box<dyn Error>> {
+pub fn parse_name(name_str: &String) -> Result<User> {
     if name_str.is_empty() {
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "Username is empty",
-        )));
+        return Err(Error::Invalid {
+            what: "Username is empty".to_string(),
+        });
     }
 
-    let user = match User::from_name(name_str) {
+    let user = match User::from_name(name_str).context(NixSnafu) {
         Err(e) => {
-            return Err(Box::new(e));
+            return Err(e);
         }
         Ok(v) => v,
     };
     match user {
-        None => Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "No matched username",
-        ))),
+        None => Err(Error::Invalid {
+            what: "No matched username".to_string(),
+        }),
         Some(v) => Ok(v),
     }
 }

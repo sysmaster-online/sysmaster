@@ -14,7 +14,7 @@
 use procfs::sys::kernel::pid_max;
 use serde_derive::Deserialize;
 
-use libutils::Error;
+use libutils::{Error, ProcSnafu, ResultExt};
 use std::cmp::max;
 
 use crate::{Monitor, Switch, SysMonitor};
@@ -102,7 +102,7 @@ impl Monitor for ProcessCount {
     /// Implement the real business process
     fn check_status(&mut self) -> Result<(), Error> {
         // List all processes with procfs crate
-        let all_processes = procfs::process::all_processes()?;
+        let all_processes = procfs::process::all_processes().context(ProcSnafu)?;
         let proc_num = all_processes.len() as u32;
 
         let mut thread_num = proc_num;
@@ -115,10 +115,10 @@ impl Monitor for ProcessCount {
         }
 
         println!("{proc_num} {thread_num}");
-        let pid_max = pid_max()?;
+        let pid_max = pid_max().context(ProcSnafu)?;
         if pid_max == 0 {
             return Err(Error::Other {
-                msg: "pid_max is 0",
+                msg: "pid_max is 0".to_string(),
             });
         }
         let real_alarm = max(

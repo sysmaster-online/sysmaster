@@ -11,6 +11,8 @@
 // See the Mulan PSL v2 for more details.
 
 //!
+use crate::error::*;
+use crate::file_util;
 use nix::errno::errno;
 use nix::libc::{kill, ESRCH};
 use nix::sys::wait::{waitpid, WaitPidFlag};
@@ -18,15 +20,12 @@ use nix::unistd::Pid;
 use procfs::process::Stat;
 use std::collections::HashSet;
 use std::fs::{read_dir, File};
-use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 
-use crate::file_util;
-
 ///
-pub fn process_state(pid: Pid) -> Result<char, Error> {
+pub fn process_state(pid: Pid) -> Result<char> {
     if pid == Pid::from_raw(0) || pid == nix::unistd::getpid() {
         return Ok('R');
     }
@@ -40,19 +39,17 @@ pub fn process_state(pid: Pid) -> Result<char, Error> {
         .collect();
 
     if stat.len() < 3 {
-        return Err(Error::new(
-            ErrorKind::Other,
-            "invalid process stat format".to_string(),
-        ));
+        return Err(Error::Invalid {
+            what: "process stat format".to_string(),
+        });
     }
 
     let p_stat: Vec<char> = stat[3].trim().chars().collect();
 
     if p_stat.is_empty() {
-        return Err(Error::new(
-            ErrorKind::Other,
-            "invalid process state".to_string(),
-        ));
+        return Err(Error::Invalid {
+            what: "process state".to_string(),
+        });
     }
     Ok(p_stat[0])
 }
@@ -174,7 +171,7 @@ fn get_ppid(pid: Pid) -> Result<Pid, Error> {
 
     let path = PathBuf::from(format!("/proc/{pid}/stat"));
 
-    let stat = Stat::from_reader(File::open(path)?).map_err(|e| Error::new(ErrorKind::Other, e))?;
+    let stat = Stat::from_reader(File::open(path).context(IoSnafu)?).context(ProcSnafu)?;
 
     Ok(Pid::from_raw(stat.ppid))
 }

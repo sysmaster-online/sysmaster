@@ -11,9 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 //! the utils can be used to parse unit conf file
-//!
-use crate::Error;
-use crate::Result;
+use crate::error::*;
 
 /// the base that will be translate from str
 #[derive(Debug, Eq, PartialEq)]
@@ -30,9 +28,9 @@ pub fn parse_boolean(item: &str) -> Result<bool> {
     match &item.to_lowercase() as &str {
         "1" | "yes" | "y" | "true" | "t" | "on" => Ok(true),
         "0" | "no" | "n" | "false" | "f" | "off" => Ok(false),
-        _ => Err(Error::ParseBoolError(
-            "invalid string to boolean".to_string(),
-        )),
+        _ => Err(Error::Parse {
+            source: "wrong boolean value".into(),
+        }),
     }
 }
 
@@ -41,14 +39,14 @@ pub fn parse_boolean(item: &str) -> Result<bool> {
 pub fn parse_size(item: &str, base: Base) -> Result<u64> {
     let item = item.trim();
     if item.is_empty() {
-        return Err(Error::Other {
-            msg: "empty string",
+        return Err(Error::Parse {
+            source: "empty string".into(),
         });
     }
 
     if item.starts_with('-') {
-        return Err(Error::Other {
-            msg: "invalue string",
+        return Err(Error::Parse {
+            source: "invalue string".into(),
         });
     }
 
@@ -110,16 +108,16 @@ pub fn parse_size(item: &str, base: Base) -> Result<u64> {
         }
 
         if start == usize::MAX {
-            return Err(Error::Other {
-                msg: "invalid unit",
+            return Err(Error::Parse {
+                source: "invalid unit".into(),
             });
         }
 
         let cur = item[..i].to_string().parse::<f64>()?;
 
         if cur > (u64::MAX / table[start].1) as f64 {
-            return Err(Error::Other {
-                msg: "value is out of range",
+            return Err(Error::Parse {
+                source: "value is out of range".into(),
             });
         }
 
