@@ -458,6 +458,11 @@ impl ServiceMng {
     fn enter_dead(&self, res: ServiceResult, force_restart: bool) {
         log::debug!("Running into dead state, res: {:?}", res);
         let mut restart = force_restart;
+
+        if self.comm.owner().is_none() {
+            return;
+        }
+
         if self.comm.um().has_stop_job(self.comm.owner().unwrap().id()) {
             restart = false;
         }
@@ -2001,5 +2006,85 @@ impl Source for ServiceMonitorData {
     fn token(&self) -> u64 {
         let data: u64 = unsafe { std::mem::transmute(self) };
         data
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{RunningData, ServiceMng};
+    use crate::{comm::ServiceUnitComm, config::ServiceConfig};
+    use std::{collections::HashMap, rc::Rc};
+    use sysmaster::{exec::ExecContext, UmIf};
+
+    use libtests::get_project_root;
+
+    struct UmIfD;
+    impl UmIf for UmIfD {}
+
+    fn create_mng() -> (Rc<ServiceMng>, Rc<RunningData>, Rc<ServiceConfig>) {
+        let mut file_path = get_project_root().unwrap();
+        file_path.push("tests/test_units/config.service.toml");
+        let paths = vec![file_path];
+
+        let comm = Rc::new(ServiceUnitComm::new());
+        comm.attach_um(Rc::new(UmIfD));
+
+        let config = Rc::new(ServiceConfig::new(&comm));
+        let context = Rc::new(ExecContext::new());
+
+        let result = config.load(paths, false);
+        assert!(result.is_ok());
+
+        let rt = Rc::new(RunningData::new());
+        let mng = Rc::new(ServiceMng::new(&comm, &config, &rt, &context));
+        rt.attach_mng(mng.clone());
+        (mng, rt, config)
+    }
+
+    #[test]
+    fn test_watchdog_on() {
+        use nix::sys::socket::UnixCredentials;
+        let (mng, rt, config) = create_mng();
+
+        let ucred = UnixCredentials::new();
+        let mut messages = HashMap::new();
+
+        messages.insert("WATCHDOG", "1");
+        let fds = vec![];
+
+        assert!(mng.notify_message(&ucred, &messages, fds).is_ok());
+        assert!(rt.armd_watchdog());
+        assert_eq!(
+            rt.watchdog().time(),
+            config.config_data().borrow().Service.WatchdogSec
+        );
+    }
+
+    #[test]
+    fn test_watchdog_reset_usec() {
+        use nix::sys::socket::UnixCredentials;
+
+        let (mng, rt, config) = create_mng();
+
+        let ucred = UnixCredentials::new();
+        let mut messages = HashMap::new();
+        messages.insert("WATCHDOG", "1");
+        let fds = vec![];
+
+        assert!(mng.notify_message(&ucred, &messages, fds).is_ok());
+        assert!(rt.armd_watchdog());
+        assert_eq!(
+            rt.watchdog().time(),
+            config.config_data().borrow().Service.WatchdogSec
+        );
+
+        messages.remove("WATCHDOG");
+        messages.insert("WATCHDOG_USEC", "15");
+
+        let fds2 = vec![];
+        assert!(mng.notify_message(&ucred, &messages, fds2).is_ok());
+
+        assert!(rt.armd_watchdog());
+        assert_eq!(rt.watchdog().time(), 15);
     }
 }

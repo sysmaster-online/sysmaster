@@ -1,4 +1,4 @@
-# sysmaster [Unit] 配置
+# [Unit] 配置
 
 ## 条件动作
 
@@ -23,12 +23,6 @@ sysmaster兼容systemd的SuccessAction、FailureAction、StartLimitAction等配�
 ### StartLimitBurst
 
 单位时间内最多的启动次数， 默认值为5。 只要`StartLimitInterval`与`StartLimitBurst`其中一项配置为0时不启动限速。
-
-
-### WatchdogSec
-
-配置软件狗的定时时间， 当值大于0时，启用软件狗，应用通过发送notify消息喂狗， 定时时间内收到"WATCHDOG=1"消息代表应用正常， 收到“WATCHDOG=trigger"消息停止应用，收到
-“WATCHDOG_USEC=15”消息表示将定时时间修改为15秒。
 
 ## 顺序和依赖
 
@@ -66,3 +60,29 @@ sysmaster支持配置单元之间的依赖关系，可以配置的值为`;`分�
 `Conflicts`：`foo.service`与`bar.service`的状态相反。启动`foo.service`将关闭`bar.service`，关闭`foo.service`会启动`bar.service`。
 
 `Wants`和`Requires`除了支持通过`.service/.target/.socket`等单元配置文件配置，也允许在`/etc/sysmaster/`或`/usr/lib/sysmaster`目录下创建`单元名.wants/单元名.requires`目录，并在里面添加指向依赖单元的软链接。例如为了给`foo.service`配置`Wants="bar.service"`，可以创建`/etc/sysmaster/foo.service.wants`目录，并在该目录内创建`bar.service -> /etc/sysmaster/bar.service`的软链接。
+
+# [Service] 配置
+
+### WatchdogSec
+
+配置软件狗的定时时间，时间单位为秒， 当值大于0时，启用软件狗，应用通过发送notify消息喂狗， 定时时间内收到"WATCHDOG=1"消息代表应用正常， 收到“WATCHDOG=trigger"消息停止应用，收到“WATCHDOG_USEC=15”消息表示将定时时间修改为15秒。
+
+### Restart
+
+配置在服务退出或终止时，是否重新启动服务，可以配置为`no`。`on-success`，`on-failure`，`on-watchdog`, `on-abnormal`, `on-abort`, `always`, 默认值为`no`。
+    `no`: 代表服务启动时， 不重新启动服务。
+    `on-success`: 当服务正常退出时重新启动服务。 1、退出码为0。 2、其他符合预期的退出码或信号。
+    `on-failure`: 当服务非正常退出时重新启动服务。 1、退出码非0。 2、非预期的信号或超时导致服务退出等。
+    `on-watchdog`: 当watchdog超时导致进程退出时重新启动服务。
+    `on-abnormal`: 当服务超时或接收到异常的退出信号时候，重新启动服务。
+    `on-abort`: 当服务因未捕获的异常退出时重新拉起服务。
+    `always`: 无论服务因何原因退出都重新拉起服务。
+
+### RestartSec
+
+当服务退出时， 间隔多长时间重新拉起服务， 配置为正整数， 单位为秒。
+
+### RestartPreventExitStatus
+
+配置进程的退出码或信号， 当服务进程的退出码或信号符合此选项时不重新拉起服务， 此时忽略Restart的配置。 可以配置为整数或信号名， 中间以空格分开默， 默认为空字符串。
+如RestartPreventExitStatus=“1 2 SIGKILL”， 当前信号仅支持以SIG开头的信号。
