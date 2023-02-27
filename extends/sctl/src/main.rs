@@ -13,7 +13,7 @@
 //!
 
 use clap::Parser;
-use libcmdproto::proto::{
+use cmdproto::proto::{
     abi::{sys_comm, unit_comm, CommandRequest},
     mngr_comm, unit_file, ProstClientStream,
 };

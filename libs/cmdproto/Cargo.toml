@@ -1,5 +1,5 @@
 [package]
-name = "libcmdproto"
+name = "cmdproto"
 version = "0.2.0"
 authors = ["overweight <hexiaowen@huawei.com>"]
 edition = "2021"

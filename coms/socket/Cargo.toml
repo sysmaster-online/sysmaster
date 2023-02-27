@@ -12,7 +12,7 @@ name = "socket"
 [dependencies]
 libutils = { path = "../../libs/libutils" }
 event = { path = "../../libs/event" }
-proc_macro_utils = { path = "../../libs/libproc_macro_utils" }
+proc_macro_utils = { path = "../../libs/proc_macro_utils" }
 sysmaster = { path = "../../" }
 nix = "0.24"
 log = "0.4"

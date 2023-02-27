@@ -15,7 +15,7 @@ use snafu::prelude::*;
 #[allow(unused_imports)]
 pub use snafu::ResultExt;
 
-/// Libcmdproto Error
+/// cmdproto Error
 #[allow(missing_docs)]
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]

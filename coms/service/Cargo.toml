@@ -11,10 +11,10 @@ name = "service"
 
 [dependencies]
 libutils = { path = "../../libs/libutils" }
-proc_macro_utils = { path = "../../libs/libproc_macro_utils" }
+proc_macro_utils = { path = "../../libs/proc_macro_utils" }
 cgroup = { path = "../../libs/cgroup" }
 event = { path = "../../libs/event" }
-libwatchdog = { path = "../../libs/libwatchdog" }
+watchdog = { path = "../../libs/watchdog" }
 sysmaster = { path = "../../" }
 nix = "0.24"
 log = "0.4"

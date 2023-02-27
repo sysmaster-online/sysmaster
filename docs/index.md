@@ -96,7 +96,7 @@ daemon类型的bin crate的目录以d结尾。
 |...libs (对外接口)
 |      |...libtest (test lib crate)
 |      |...libcgroup (cgroup lib crate)
-|      |...libcmdproto(cmd proto lib crate)
+|      |...cmdproto(cmd proto lib crate)
 |...extends (sysmaster-extends组件)
 |     |...sysmaster (daemon,and libsysmaster
 |     |...udevd (daemon)

@@ -11,7 +11,7 @@ name = "mount"
 
 [dependencies]
 event = { path = "../../libs/event" }
-proc_macro_utils = { path = "../../libs/libproc_macro_utils" }
+proc_macro_utils = { path = "../../libs/proc_macro_utils" }
 libutils = { path = "../../libs/libutils" }
 sysmaster = { path = "../../" }
 nix = "0.24"

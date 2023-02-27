@@ -23,7 +23,7 @@ path = "libs/libtests"
 cgroup = { path = "libs/cgroup" }
 event = { path = "libs/event" }
 libutils = { path = "libs/libutils" }
-libcmdproto = { path = "libs/libcmdproto" }
+cmdproto = { path = "libs/cmdproto" }
 
 # third libraries
 bitflags = "1.3.2"
@@ -117,13 +117,13 @@ members = [
   "extends/sysmonitor",
   "extends/devmaster",
   #internal libraries crates
-  "libs/libcmdproto",
+  "libs/cmdproto",
   #external libraries crates
   "libs/cgroup",
   "libs/event",
   "libs/libutils",
   "libs/libtests",
-  "libs/libwatchdog",
+  "libs/watchdog",
   "libs/libdevice",
   #components crates
   "coms/service",
