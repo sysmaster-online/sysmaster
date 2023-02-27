@@ -109,13 +109,13 @@ overflow-checks = false
 [workspace]
 members = [
   # external binaries
-  "extends/fstab",
-  "extends/init",
-  "extends/sctl",
-  "extends/random_seed",
-  "extends/rc-local-generator",
-  "extends/sysmonitor",
-  "extends/devmaster",
+  "exts/fstab",
+  "exts/init",
+  "exts/sctl",
+  "exts/random_seed",
+  "exts/rc-local-generator",
+  "exts/sysmonitor",
+  "exts/devmaster",
   #internal libraries crates
   "libs/cmdproto",
   #external libraries crates
