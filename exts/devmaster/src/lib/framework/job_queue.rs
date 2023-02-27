@@ -19,7 +19,7 @@ use std::collections::VecDeque;
 use std::fmt::{self, Display};
 use std::rc::{Rc, Weak};
 
-use crate::worker_manager::{Worker, WorkerManager};
+use crate::framework::worker_manager::{Worker, WorkerManager};
 
 /// state of device job
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

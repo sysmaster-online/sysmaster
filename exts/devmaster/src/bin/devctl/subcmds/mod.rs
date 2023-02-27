@@ -10,13 +10,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! libdevmaster
+//! the module of devctl subcommands
 //!
-pub mod control_manager;
-pub mod error;
-pub mod job_queue;
-pub mod uevent_monitor;
-pub mod worker_manager;
 
-pub mod devctl_monitor;
-pub mod devctl_trigger;
+pub(crate) mod devctl_monitor;
+pub(crate) mod devctl_trigger;
