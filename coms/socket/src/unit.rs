@@ -105,8 +105,6 @@ impl SubUnit for SocketUnit {
         Ok(())
     }
 
-    fn reload(&self) {}
-
     fn sigchld_events(&self, wait_status: WaitStatus) {
         self.mng.sigchld_event(wait_status)
     }

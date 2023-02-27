@@ -160,8 +160,6 @@ impl SubUnit for Target {
         Ok(())
     }
 
-    fn reload(&self) {}
-
     fn kill(&self) {}
 
     fn release_resources(&self) {}

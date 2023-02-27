@@ -101,6 +101,8 @@ impl std::fmt::Display for UnitActiveState {
 bitflags! {
     /// notify unit state to manager
     pub struct UnitNotifyFlags: u8 {
+        /// notify reload success to manager
+        const UNIT_NOTIFY_SUCCESS = 0;
         /// notify reload failure to manager
         const UNIT_NOTIFY_RELOAD_FAILURE = 1 << 0;
         /// notify auto restart to manager

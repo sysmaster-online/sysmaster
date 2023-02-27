@@ -118,6 +118,10 @@ impl UnitManagerX {
         self.data.stop_unit(name)
     }
 
+    pub(crate) fn reload(&self, name: &str) -> Result<()> {
+        self.data.reload(name)
+    }
+
     pub(crate) fn restart_unit(&self, name: &str) -> Result<()> {
         self.data.restart_unit(name)
     }
@@ -705,6 +709,19 @@ impl UnitManager {
         if let Some(unit) = self.load_unitx(name) {
             self.jm.exec(
                 &JobConf::new(&unit, JobKind::Stop),
+                JobMode::Replace,
+                &mut JobAffect::new(false),
+            )?;
+            Ok(())
+        } else {
+            Err(Error::Internal)
+        }
+    }
+
+    pub(self) fn reload(&self, name: &str) -> Result<()> {
+        if let Some(unit) = self.load_unitx(name) {
+            self.jm.exec(
+                &JobConf::new(&unit, JobKind::Reload),
                 JobMode::Replace,
                 &mut JobAffect::new(false),
             )?;

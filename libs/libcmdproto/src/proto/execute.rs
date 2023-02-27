@@ -39,6 +39,8 @@ pub trait ExecuterAction {
     fn stop(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// restart the unit_name
     fn restart(&self, unit_name: &str) -> Result<(), Self::Error>;
+    /// reload the unit_name
+    fn reload(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// show the status of unit_name
     fn status(&self, unit_name: &str) -> Result<String, Self::Error>;
     /// list all units
@@ -146,6 +148,14 @@ impl Executer for UnitComm {
                     if let Err(e) = manager.restart(&unit) {
                         new_line_break(&mut reply);
                         reply = format!("{reply} Failed to restart {unit}: {e}");
+                    }
+                }
+            }
+            unit_comm::Action::Reload => {
+                for unit in units {
+                    if let Err(e) = manager.reload(&unit) {
+                        new_line_break(&mut reply);
+                        reply = format!("{reply} Failed to reload {unit}: {e}");
                     }
                 }
             }

@@ -90,7 +90,7 @@ impl UnitX {
         self.0.stop(force)
     }
     pub(crate) fn reload(&self) -> Result<()> {
-        todo!();
+        self.0.reload()
     }
 
     #[allow(dead_code)]
