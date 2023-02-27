@@ -12,13 +12,13 @@
 
 //!
 
+use basic::Error;
+use basic::Result;
 use clap::Parser;
 use cmdproto::proto::{
     abi::{sys_comm, unit_comm, CommandRequest},
     mngr_comm, unit_file, ProstClientStream,
 };
-use libutils::Error;
-use libutils::Result;
 use std::net::{SocketAddr, TcpStream};
 
 /// parse program arguments

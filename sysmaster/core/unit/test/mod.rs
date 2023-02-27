@@ -19,7 +19,7 @@ pub(crate) mod test_utils {
         unit::{data::DataManager, unit_name_to_type},
         unit::{entry::UnitX, rentry::UnitRe, util::UnitFile},
     };
-    use libutils::path_lookup::LookupPaths;
+    use basic::path_lookup::LookupPaths;
     use sysmaster::rel::Reliability;
     use sysmaster::unit::UmIf;
     pub(crate) struct UmIfD;

@@ -1,5 +1,5 @@
 [package]
-name = "libdevice"
+name = "device"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 # internal libraries
-libutils = { path = "../libutils" }
+basic = { path = "../basic" }
 event = { path = "../event" }
 
 # third libraries

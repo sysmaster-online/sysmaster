@@ -14,8 +14,8 @@
 use super::base::UeBase;
 use crate::unit::rentry::{UeConfigInstall, UeConfigUnit};
 use crate::unit::util::UnitFile;
+use basic::serialize::DeserializeWith;
 use confique::Config;
-use libutils::serialize::DeserializeWith;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;

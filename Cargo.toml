@@ -22,7 +22,7 @@ path = "libs/libtests"
 # internal libraries
 cgroup = { path = "libs/cgroup" }
 event = { path = "libs/event" }
-libutils = { path = "libs/libutils" }
+basic = { path = "libs/basic" }
 cmdproto = { path = "libs/cmdproto" }
 
 # third libraries
@@ -121,10 +121,10 @@ members = [
   #external libraries crates
   "libs/cgroup",
   "libs/event",
-  "libs/libutils",
+  "libs/basic",
   "libs/libtests",
   "libs/watchdog",
-  "libs/libdevice",
+  "libs/device",
   #components crates
   "coms/service",
   "coms/socket",

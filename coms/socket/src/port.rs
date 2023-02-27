@@ -18,7 +18,7 @@ use crate::{
     config::{SocketAddress, SocketConfig, SocketPortConf},
     rentry::PortType,
 };
-use libutils::{fd_util, io_util, socket_util};
+use basic::{fd_util, io_util, socket_util};
 use nix::{
     errno::Errno,
     poll::PollFlags,
@@ -130,7 +130,7 @@ impl SocketPort {
         if let Ok(true) = socket::getsockopt(self.fd(), sockopt::AcceptConn) {
             for _i in 1..1024 {
                 while let Err(e) = io_util::wait_for_events(self.fd(), PollFlags::POLLIN, 0) {
-                    if let libutils::Error::Nix {
+                    if let basic::Error::Nix {
                         source: Errno::EINTR,
                     } = e
                     {

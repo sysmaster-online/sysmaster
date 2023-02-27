@@ -12,11 +12,11 @@
 
 //! worker manager
 //!
-use event::{EventState, EventType, Events, Source};
-use libdevice::{
+use device::{
     device::Device,
     device_monitor::{DeviceMonitor, MonitorNetlinkGroup},
 };
+use event::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{self, Display};

@@ -19,14 +19,14 @@ pub(crate) mod pre_install;
 pub(crate) mod rentry;
 pub(crate) mod signals;
 use crate::unit::UnitManagerX;
+use basic::path_lookup::LookupPaths;
+use basic::process_util::{self};
+use basic::special::{BASIC_TARGET, CGROUP_SYSMASTER};
 use cgroup::CgController;
 use cgroup::{cg_create_and_attach, CgFlags};
 use cmdproto::proto::execute::ExecuterAction;
 use commands::Commands;
 use event::{EventState, Events};
-use libutils::path_lookup::LookupPaths;
-use libutils::process_util::{self};
-use libutils::special::{BASIC_TARGET, CGROUP_SYSMASTER};
 use nix::sys::reboot::{self, RebootMode};
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
@@ -534,7 +534,7 @@ impl Manager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use libutils::logger;
+    use basic::logger;
 
     //#[test]
     #[allow(dead_code)]

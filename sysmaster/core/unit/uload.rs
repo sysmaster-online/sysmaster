@@ -19,7 +19,7 @@ use crate::unit::rentry::{self, UnitRe};
 use crate::unit::runtime::UnitRT;
 use crate::unit::util::UnitFile;
 use crate::utils::table::{TableOp, TableSubscribe};
-use libutils::path_lookup::LookupPaths;
+use basic::path_lookup::LookupPaths;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use sysmaster::unit::UnitType;

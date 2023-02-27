@@ -145,7 +145,7 @@ mod tests {
     use crate::unit::data::DataManager;
     use crate::unit::rentry::UnitRe;
     use crate::unit::test::test_utils;
-    use libutils::logger;
+    use basic::logger;
     use sysmaster::rel::Reliability;
 
     #[test]

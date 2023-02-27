@@ -12,12 +12,12 @@
 
 //! devctrl is the client of devmaster
 //!
+use basic::logger::init_log_with_console;
 use clap::Parser;
 use libdevmaster::{
     control_manager::CONTROL_MANAGER_LISTEN_ADDR, devctl_monitor::subcommand_monitor,
     devctl_trigger::subcommand_trigger,
 };
-use libutils::logger::init_log_with_console;
 use log::LevelFilter;
 use std::{io::Write, net::TcpStream};
 

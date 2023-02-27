@@ -13,9 +13,9 @@
 use super::base::PLUGIN_NAME;
 use super::comm::MountUmComm;
 use super::rentry::{MountRe, MountReFrame};
+use basic::logger;
 use event::{EventState, EventType, Events, Source};
 use libmount::mountinfo;
-use libutils::logger;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;

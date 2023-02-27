@@ -815,7 +815,7 @@ mod tests {
     use crate::unit::DataManager;
     use crate::unit::UnitX;
     use crate::unit::{JobMode, UnitRe};
-    use libutils::logger;
+    use basic::logger;
     use sysmaster::rel::Reliability;
 
     #[test]

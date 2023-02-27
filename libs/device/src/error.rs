@@ -10,19 +10,19 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! Error definition of libdevice
+//! Error definition of device
 //!
 use nix::errno::Errno;
 use snafu::prelude::Snafu;
 
-/// libdevice error
+/// device error
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 #[non_exhaustive]
 pub enum Error {
     /// error from syscall
     #[snafu(display(
-        "Error(libdevice): Got an error for syscall {} (errno={})",
+        "Error(device): Got an error for syscall {} (errno={})",
         syscall,
         errno,
     ))]
@@ -34,7 +34,7 @@ pub enum Error {
     },
 
     /// other error
-    #[snafu(display("Error(libdevice): Got an error {}", msg,))]
+    #[snafu(display("Error(device): Got an error {}", msg,))]
     Other {
         /// message
         msg: String,

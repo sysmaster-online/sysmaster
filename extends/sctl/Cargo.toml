@@ -8,4 +8,4 @@ edition = "2021"
 [dependencies]
 clap = { version = "3.1.8", features = ["derive"] }
 cmdproto = { path = "../../libs/cmdproto" }
-libutils = { path = "../../libs/libutils" }
+basic = { path = "../../libs/basic" }

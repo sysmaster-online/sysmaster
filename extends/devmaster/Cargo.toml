@@ -20,9 +20,9 @@ path = "src/lib.rs"
 
 [dependencies]
 # internal libraries
-libdevice = { path = "../../libs/libdevice" }
+device = { path = "../../libs/device" }
 event = { path = "../../libs/event" }
-libutils = { path = "../../libs/libutils" }
+basic = { path = "../../libs/basic" }
 
 # third libraries
 libc = "0.2.*"

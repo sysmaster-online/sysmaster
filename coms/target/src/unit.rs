@@ -17,7 +17,7 @@
 use super::base::PLUGIN_NAME;
 use super::comm::TargetUnitComm;
 use super::mng::TargetMng;
-use libutils::logger;
+use basic::logger;
 use nix::sys::wait::WaitStatus;
 use std::cell::RefCell;
 use std::{path::PathBuf, rc::Rc};

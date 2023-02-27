@@ -12,7 +12,7 @@
 
 //! job queue
 //!
-use libdevice::device::Device;
+use device::device::Device;
 use std::cell::RefCell;
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use std::collections::VecDeque;

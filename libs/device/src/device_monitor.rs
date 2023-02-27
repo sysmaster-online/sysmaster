@@ -76,7 +76,7 @@ impl DeviceMonitor {
             Ok(ret) => ret,
             Err(errno) => {
                 return Err(Error::Syscall {
-                    syscall: "libdevice: recv".to_string(),
+                    syscall: "device: recv".to_string(),
                     errno,
                 })
             }
@@ -99,7 +99,7 @@ impl DeviceMonitor {
         }
 
         Err(Error::Other {
-            msg: "libdevice: invalid nulstr data".to_string(),
+            msg: "device: invalid nulstr data".to_string(),
             errno: Some(Errno::EINVAL),
         })
     }

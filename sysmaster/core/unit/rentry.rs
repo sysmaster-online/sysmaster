@@ -17,9 +17,9 @@ use crate::manager::rentry::{
     RELI_DB_HUNIT_CONFIG, RELI_DB_HUNIT_DEP, RELI_DB_HUNIT_LOAD, RELI_DB_HUNIT_PPS,
 };
 use crate::unit::entry::UnitEmergencyAction;
+use basic::serialize::DeserializeWith;
 use bitflags::bitflags;
 use confique::Config;
-use libutils::serialize::DeserializeWith;
 use nix::unistd::Pid;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};

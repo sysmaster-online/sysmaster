@@ -43,7 +43,7 @@ impl FromStr for DeviceAction {
             "bind" => Ok(Self::Bind),
             "unbind" => Ok(Self::Unbind),
             _ => Err(Self::Err::Other {
-                msg: "libdevice: invalid action string".to_string(),
+                msg: "device: invalid action string".to_string(),
                 errno: None,
             }),
         }

@@ -524,7 +524,7 @@ impl Plugin {
 #[cfg(test)]
 mod tests {
 
-    use libutils::logger;
+    use basic::logger;
     use sysmaster::unit::UmIf;
 
     use super::*;

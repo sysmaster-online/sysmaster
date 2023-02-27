@@ -34,11 +34,11 @@ use crate::manager::pre_install::{Install, PresetMode};
 use crate::manager::State;
 use crate::unit::data::{DataManager, UnitState};
 use crate::utils::table::{TableOp, TableSubscribe};
+use basic::path_lookup::LookupPaths;
+use basic::proc_cmdline::get_process_cmdline;
+use basic::process_util;
+use basic::show_table::ShowTable;
 use event::Events;
-use libutils::path_lookup::LookupPaths;
-use libutils::proc_cmdline::get_process_cmdline;
-use libutils::process_util;
-use libutils::show_table::ShowTable;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::convert::TryFrom;
@@ -171,9 +171,9 @@ impl UnitManagerX {
     pub(crate) fn mask_unit(&self, unit_file: &str) -> Result<()> {
         log::debug!("unit mask file {}", unit_file);
         let link_name_path =
-            std::path::Path::new(libutils::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
+            std::path::Path::new(basic::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
         let target_path = std::path::Path::new("/dev/null");
-        libutils::fs_util::symlink(
+        basic::fs_util::symlink(
             target_path.to_str().unwrap(),
             link_name_path.to_str().unwrap(),
             false,
@@ -184,7 +184,7 @@ impl UnitManagerX {
     pub(crate) fn unmask_unit(&self, unit_file: &str) -> Result<()> {
         log::debug!("unit unmask file {}", unit_file);
         let link_name_path =
-            std::path::Path::new(libutils::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
+            std::path::Path::new(basic::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
         if !link_name_path.exists() {
             return Ok(());
         }
@@ -1196,8 +1196,8 @@ mod tests {
     use super::*;
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::mount::setup;
+    use basic::logger;
     use event::Events;
-    use libutils::logger;
     use nix::sys::wait::WaitStatus;
     use std::thread;
     use std::time::Duration;

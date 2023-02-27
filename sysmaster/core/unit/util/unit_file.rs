@@ -10,8 +10,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use libutils::path_lookup::LookupPaths;
-use libutils::time_util;
+use basic::path_lookup::LookupPaths;
+use basic::time_util;
 use siphasher::sip::SipHasher24;
 use std::cell::RefCell;
 use std::collections::HashMap;

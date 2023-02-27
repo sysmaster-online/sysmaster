@@ -20,9 +20,9 @@ use super::rentry::{
 };
 use super::spawn::ServiceSpawn;
 use crate::rentry::ExitStatus;
+use basic::{fd_util, IN_SET};
+use basic::{file_util, process_util};
 use event::{EventState, EventType, Events, Source};
-use libutils::{fd_util, IN_SET};
-use libutils::{file_util, process_util};
 use nix::errno::Errno;
 use nix::libc;
 use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};

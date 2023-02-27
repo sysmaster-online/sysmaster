@@ -14,8 +14,8 @@ use super::datastore::UnitDb;
 use super::entry::UnitX;
 use super::rentry::UnitRe;
 use crate::job::JobManager;
+use basic::fd_util;
 use event::{EventState, EventType, Events, Source};
-use libutils::fd_util;
 use nix::cmsg_space;
 use nix::errno::Errno;
 use nix::sys::socket::{

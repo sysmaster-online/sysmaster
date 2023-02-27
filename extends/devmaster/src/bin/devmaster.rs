@@ -11,6 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 //! devmaster daemon
+use basic::logger::*;
 use event::{EventState, Events};
 use libdevmaster::{
     control_manager::{ControlManager, CONTROL_MANAGER_LISTEN_ADDR},
@@ -18,7 +19,6 @@ use libdevmaster::{
     uevent_monitor::Monitor,
     worker_manager::{WorkerManager, WORKER_MANAGER_LISTEN_ADDR},
 };
-use libutils::logger::*;
 use log::LevelFilter;
 use std::rc::Rc;
 

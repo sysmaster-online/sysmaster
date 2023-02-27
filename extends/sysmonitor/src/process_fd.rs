@@ -13,7 +13,7 @@
 //! Monitor the number of process fds
 use serde_derive::Deserialize;
 
-use libutils::{Error, IoSnafu, ResultExt};
+use basic::{Error, IoSnafu, ResultExt};
 use std::fs::OpenOptions;
 use std::io::Write;
 

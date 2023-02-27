@@ -191,7 +191,7 @@ impl ExecParameters {
             return Ok(());
         }
         // 2. Try to parse user_str as UID
-        if let Ok(user) = libutils::user_group_util::parse_uid(&user_str) {
+        if let Ok(user) = basic::user_group_util::parse_uid(&user_str) {
             self.user = Some(user);
             return Ok(());
         }
@@ -219,7 +219,7 @@ impl ExecParameters {
             return Ok(());
         }
         // 2. Try to parse group_str as GID
-        if let Ok(group) = libutils::user_group_util::parse_gid(&group_str) {
+        if let Ok(group) = basic::user_group_util::parse_gid(&group_str) {
             self.group = Some(group);
             return Ok(());
         }

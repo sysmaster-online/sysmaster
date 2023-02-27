@@ -67,7 +67,7 @@ pub enum Error {
 
     #[snafu(display("UtilError(libsysmaster)"))]
     Util {
-        source: libutils::error::Error,
+        source: basic::error::Error,
     },
 
     #[snafu(display("IoError(libsysmaster)"))]
@@ -186,11 +186,11 @@ macro_rules! errfrom {
 
 errfrom!(std::num::ParseIntError, std::string::ParseError => Parse);
 
-impl From<libutils::error::Error> for Error {
-    fn from(e: libutils::Error) -> Error {
+impl From<basic::error::Error> for Error {
+    fn from(e: basic::Error) -> Error {
         match e {
-            libutils::Error::Io { source } => Error::Io { source },
-            libutils::Error::Nix { source } => Error::Nix { source },
+            basic::Error::Io { source } => Error::Io { source },
+            basic::Error::Nix { source } => Error::Nix { source },
             _ => Error::Other {
                 msg: "unspport".to_string(),
             },

@@ -988,7 +988,7 @@ mod tests {
     use crate::unit::test_utils;
     use crate::unit::DataManager;
     use crate::unit::UnitRe;
-    use libutils::logger;
+    use basic::logger;
     use sysmaster::rel::Reliability;
 
     #[test]

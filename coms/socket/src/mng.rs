@@ -20,9 +20,9 @@ use super::{
     rentry::{PortType, SocketCommand, SocketRe, SocketReFrame, SocketResult, SocketState},
     spawn::SocketSpawn,
 };
+use basic::IN_SET;
 use event::EventState;
 use event::{EventType, Events, Source};
-use libutils::IN_SET;
 use nix::libc::{self};
 use nix::sys::wait::WaitStatus;
 use std::cell::RefCell;

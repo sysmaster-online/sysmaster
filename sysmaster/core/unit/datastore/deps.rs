@@ -374,7 +374,7 @@ mod tests {
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::unit::data::DataManager;
     use crate::unit::test::test_utils;
-    use libutils::logger;
+    use basic::logger;
     use sysmaster::rel::Reliability;
 
     #[test]

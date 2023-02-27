@@ -12,10 +12,10 @@
 //
 #![allow(non_snake_case)]
 use crate::unit::{unit_name_to_type, UeConfigInstall, UnitType};
+use basic::fs_util;
+use basic::path_lookup::LookupPaths;
 use bitflags::bitflags;
 use confique::Config;
-use libutils::fs_util;
-use libutils::path_lookup::LookupPaths;
 use nix::unistd::UnlinkatFlags;
 use std::{
     cell::RefCell,
@@ -758,7 +758,7 @@ impl Install {
 #[cfg(test)]
 mod test {
     use super::{Install, PresetAction, PresetMode, PresetRule, Presets};
-    use libutils::path_lookup::LookupPaths;
+    use basic::path_lookup::LookupPaths;
     use std::rc::Rc;
 
     #[test]

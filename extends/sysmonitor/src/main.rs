@@ -15,7 +15,7 @@
 //! process fd number monitoring and key process monitoring.
 use serde_derive::Deserialize;
 
-use libutils::Error;
+use basic::Error;
 use std::default::Default;
 use std::fs;
 use std::fs::File;

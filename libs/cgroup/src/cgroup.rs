@@ -13,10 +13,10 @@
 use super::CgFlags;
 use crate::error::*;
 use crate::CgType;
-use libutils::special::CGROUP_SYSMASTER;
-use libutils::special::INIT_SCOPE;
-use libutils::special::SYSMASTER_SLICE;
-use libutils::IN_SET;
+use basic::special::CGROUP_SYSMASTER;
+use basic::special::INIT_SCOPE;
+use basic::special::SYSMASTER_SLICE;
+use basic::IN_SET;
 use nix::libc;
 use nix::sys::signal::Signal;
 use nix::sys::statfs::{statfs, FsType};

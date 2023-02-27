@@ -22,8 +22,8 @@ use crate::unit::data::{DataManager, UnitDepConf, UnitState};
 use crate::unit::rentry::{UnitLoadState, UnitRe};
 use crate::unit::util::UnitFile;
 use crate::unit::UnitRelations;
+use basic::process_util::my_child;
 use cgroup::{self, CgFlags};
-use libutils::process_util::my_child;
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
@@ -681,7 +681,7 @@ mod tests {
     use crate::manager::RELI_HISTORY_MAX_DBS;
     use crate::unit::rentry::UnitRe;
     use crate::unit::test::test_utils::UmIfD;
-    use libutils::{logger, path_lookup::LookupPaths};
+    use basic::{logger, path_lookup::LookupPaths};
     use std::rc::Rc;
     use sysmaster::rel::Reliability;
     use sysmaster::unit::UnitType;

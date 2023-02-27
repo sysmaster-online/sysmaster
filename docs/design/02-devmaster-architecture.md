@@ -48,7 +48,7 @@ devmaster包含两个可执行文件：常驻进程devmaster和客户端工具de
 
 1. 源码位置: extends/devmaster
 
-2. 公共函数库: libs/libdevice
+2. 公共函数库: libs/device
 
 3. 规则文件与配置文件：todo
 
@@ -185,7 +185,7 @@ WorkerManager模块负责管理调度worker，需要承担任务派发、状态�
 | 3        | WorkerManager       | 采用线程池模型创建并管理worker，当接收事件队列派发的任务时，从线程池中获取一个空闲的worker进行处理，如果不存在空闲worker，则创建一个新的worker线程进行处理,worker中进行规则处理，需要设计看门狗机制防止处理超时，当worker空闲过久时，需要进行线程回收 | 高     |
 | 4        | 规则处理            | 负责导入和管理规则文件，处理设备任务时需要执行规则解析动作，规则解析过程需要一些特殊设备组件与builtin工具的支持，并且需要实现hwdb对设备信息进行持久化存储                                                                                             | 中     |
 | 5        | 信号处理            | 接收SIGINT和SIGTERM信号时，进入进程退出流程，接收SIGHUP信号时，重新加载进程                                                                                                                                                                           | 中     |
-| 6        | libdevice           | 提供设备相关的公共函数、数据结构等支持                                                                                                                                                                                                                | 中     |
+| 6        | device           | 提供设备相关的公共函数、数据结构等支持                                                                                                                                                                                                                | 中     |
 | 7        | Watch               | 使用inotify机制监控设备节点的IN_CLOSE_WRITE操作，并通过sysfs机制模拟设备的change事件                                                                                                                                                                  | 低     |
 | 8        | ControlManager      | 使用UnixSocket机制，监听客户端程序devctl发起的连接请求，建立连接后进行报文交互，并根据控制请求进行控制响应                                                                                                                                            | 低     |
 | 9        | 控制响应            | 根据客户端程序的控制请求，进行配置设置、行为控制、延时控制等动作                                                                                                                                                                                      | 低     |

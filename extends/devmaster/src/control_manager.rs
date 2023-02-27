@@ -12,8 +12,8 @@
 
 //! control manager
 //!
+use device::device::Device;
 use event::Source;
-use libdevice::device::Device;
 use std::time::SystemTime;
 use std::{
     cell::RefCell,

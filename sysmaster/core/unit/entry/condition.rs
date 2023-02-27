@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use libutils::condition::{Condition, ConditionType};
+use basic::condition::{Condition, ConditionType};
 use std::cell::RefCell;
 
 pub(super) mod condition_keys {

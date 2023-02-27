@@ -18,7 +18,7 @@
 use crate::{
     base::PLUGIN_NAME, comm::SocketUnitComm, config::SocketConfig, load::SocketLoad, mng::SocketMng,
 };
-use libutils::logger;
+use basic::logger;
 use nix::sys::wait::WaitStatus;
 use std::{path::PathBuf, rc::Rc};
 use sysmaster::error::*;

@@ -13,7 +13,7 @@
 //! Monitoring the current number of zombie processes in the system
 use serde_derive::Deserialize;
 
-use libutils::{Error, IoSnafu, ResultExt};
+use basic::{Error, IoSnafu, ResultExt};
 use std::process::Command;
 
 use crate::{Monitor, Switch, SysMonitor};

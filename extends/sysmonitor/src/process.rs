@@ -17,7 +17,7 @@ use nix::sys::signal::Signal;
 use nix::unistd::Pid;
 use serde_derive::Deserialize;
 
-use libutils::Error;
+use basic::Error;
 use std::io;
 use std::os::unix::process::CommandExt;
 use std::process::{Child, Command, ExitStatus};

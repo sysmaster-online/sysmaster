@@ -12,8 +12,8 @@
 
 //! uevent_monitor
 //!
+use device::device_monitor::{DeviceMonitor, MonitorNetlinkGroup};
 use event::{EventType, Events, Source};
-use libdevice::device_monitor::{DeviceMonitor, MonitorNetlinkGroup};
 use nix::errno::Errno;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
@@ -42,7 +42,7 @@ impl Monitor {
 
     /// forcely set the size of socket receive buffer
     pub fn set_receive_buffer_force(&self, v: usize) {
-        libutils::socket_util::set_receive_buffer_force(self.device_monitor.fd(), v).unwrap();
+        basic::socket_util::set_receive_buffer_force(self.device_monitor.fd(), v).unwrap();
     }
 }
 
@@ -72,13 +72,13 @@ impl Source for Monitor {
         let device = match self.device_monitor.receive_device() {
             Ok(ret) => ret,
             Err(e) => match e {
-                libdevice::error::Error::Syscall {
+                device::error::Error::Syscall {
                     syscall: _,
                     errno: Errno::EAGAIN,
                 } => {
                     return 0;
                 }
-                libdevice::error::Error::Syscall {
+                device::error::Error::Syscall {
                     syscall: _,
                     errno: _,
                 } => {

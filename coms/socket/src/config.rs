@@ -16,8 +16,8 @@
 use super::comm::SocketUnitComm;
 use super::rentry::{PortType, SectionSocket, SocketCommand};
 use crate::base::NetlinkProtocol;
+use basic::socket_util;
 use confique::Config;
-use libutils::socket_util;
 use nix::errno::Errno;
 use nix::sys::socket::sockopt::ReuseAddr;
 use nix::sys::socket::{

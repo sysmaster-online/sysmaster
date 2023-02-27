@@ -11,9 +11,9 @@
 // See the Mulan PSL v2 for more details.
 
 //! mount the cgroup systems
+use basic::{fs_util, mount_util, path_util, proc_cmdline};
 use bitflags::bitflags;
 use cgroup::{self, CgType, CG_BASE_DIR};
-use libutils::{fs_util, mount_util, path_util, proc_cmdline};
 use nix::{
     errno::Errno,
     fcntl::{AtFlags, OFlag},
@@ -443,7 +443,7 @@ fn symlink_controller(source: String, alias: String) -> Result<()> {
     let target = target_path.to_str().unwrap();
     match fs_util::symlink(&source, target, false) {
         Ok(()) => Ok(()),
-        Err(libutils::Error::Nix {
+        Err(basic::Error::Nix {
             source: Errno::EEXIST,
         }) => Ok(()),
         Err(e) => {

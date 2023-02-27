@@ -12,8 +12,8 @@
 
 //! struct Device
 //!
+use basic::devnum_util::device_path_parse_major_minor;
 use libc::{dev_t, mode_t, S_IFBLK, S_IFCHR, S_IFMT};
-use libutils::devnum_util::device_path_parse_major_minor;
 use nix::errno::Errno;
 use nix::sys::stat::{major, makedev, minor, stat};
 use std::collections::{HashMap, HashSet};
@@ -208,14 +208,14 @@ impl Device {
             "block"
         } else {
             return Err(Error::Other {
-                msg: "libdevice: invalid mode".to_string(),
+                msg: "device: invalid mode".to_string(),
                 errno: Some(Errno::ENOTTY),
             });
         };
 
         if major(devnum) == 0 {
             return Err(Error::Other {
-                msg: "libdevice: invalid devnum".to_string(),
+                msg: "device: invalid devnum".to_string(),
                 errno: Some(Errno::ENODEV),
             });
         }
@@ -229,7 +229,7 @@ impl Device {
         let devnum_ret = device.get_devnum()?;
         if devnum_ret != devnum {
             return Err(Error::Other {
-                msg: "libdevice: return inconsistent devnum".to_string(),
+                msg: "device: return inconsistent devnum".to_string(),
                 errno: None,
             });
         }
@@ -238,7 +238,7 @@ impl Device {
         let subsystem_ret = device.get_subsystem()?;
         if (subsystem_ret == "block") != ((mode & S_IFMT) == S_IFBLK) {
             return Err(Error::Other {
-                msg: "libdevice: return inconsistent subsystem".to_string(),
+                msg: "device: return inconsistent subsystem".to_string(),
                 errno: None,
             });
         }
@@ -253,7 +253,7 @@ impl Device {
     pub fn from_devname(devname: String) -> Result<Device, Error> {
         if !devname.starts_with("/dev") {
             return Err(Error::Other {
-                msg: format!("libdevice: the devname does not start with /dev {devname}"),
+                msg: format!("device: the devname does not start with /dev {devname}"),
                 errno: Some(Errno::EINVAL),
             });
         }
@@ -265,7 +265,7 @@ impl Device {
                 Ok(st) => Device::from_mode_and_devnum(st.st_mode, st.st_rdev)?,
                 Err(e) => {
                     return Err(Error::Syscall {
-                        syscall: format!("libdevice: failed at stat {devname}"),
+                        syscall: format!("device: failed at stat {devname}"),
                         errno: e,
                     });
                 }
@@ -279,7 +279,7 @@ impl Device {
     pub fn from_syspath(syspath: String, strict: bool) -> Result<Device, Error> {
         if strict && !syspath.starts_with("/sys/") {
             return Err(Error::Other {
-                msg: format!("libdevice: syspath does not start with /sys/ {}", syspath),
+                msg: format!("device: syspath does not start with /sys/ {}", syspath),
                 errno: None,
             });
         }
@@ -317,7 +317,7 @@ impl Device {
             Ok(f) => f,
             Err(e) => {
                 return Err(Error::Other {
-                    msg: format!("libdevice: failed to open sysattr file {}", sysattr_path),
+                    msg: format!("device: failed to open sysattr file {}", sysattr_path),
                     errno: Some(Errno::from_i32(e.raw_os_error().unwrap_or_default())),
                 })
             }
@@ -326,7 +326,7 @@ impl Device {
         if let Err(e) = file.write(value.clone().unwrap().as_bytes()) {
             self.remove_cached_sysattr_value(sysattr)?;
             return Err(Error::Other {
-                msg: format!("libdevice: failed to write sysattr file {}", sysattr_path),
+                msg: format!("device: failed to write sysattr file {}", sysattr_path),
                 errno: Some(Errno::from_i32(e.raw_os_error().unwrap_or_default())),
             });
         };
@@ -356,13 +356,13 @@ impl Device {
                 Err(e) => match e.raw_os_error() {
                     Some(n) => {
                         return Err(Error::Other {
-                            msg: "libdevice: the syspath is invalid".to_string(),
+                            msg: "device: the syspath is invalid".to_string(),
                             errno: Some(Errno::from_i32(n)),
                         })
                     }
                     None => {
                         return Err(Error::Other {
-                            msg: "libdevice: invalid syspath".to_string(),
+                            msg: "device: invalid syspath".to_string(),
                             errno: None,
                         })
                     }
@@ -371,7 +371,7 @@ impl Device {
 
             if !path.starts_with("/sys") {
                 return Err(Error::Other {
-                    msg: "libdevice: the syspath does not start with /sys".to_string(),
+                    msg: "device: the syspath does not start with /sys".to_string(),
                     errno: Some(Errno::EINVAL),
                 });
             }
@@ -379,7 +379,7 @@ impl Device {
             if path.starts_with("/sys/devices/") {
                 if !path.is_dir() {
                     return Err(Error::Other {
-                        msg: "libdevice: the syspath is not a directory".to_string(),
+                        msg: "device: the syspath is not a directory".to_string(),
                         errno: Some(Errno::ENODEV),
                     });
                 }
@@ -387,13 +387,13 @@ impl Device {
                 let uevent_path = path.join("uevent");
                 if !uevent_path.exists() {
                     return Err(Error::Other {
-                        msg: "libdevice: the uevent file does not exist".to_string(),
+                        msg: "device: the uevent file does not exist".to_string(),
                         errno: Some(Errno::ENODEV),
                     });
                 }
             } else if !path.is_dir() {
                 return Err(Error::Other {
-                    msg: "libdevice: the syspath is not a directory".to_string(),
+                    msg: "device: the syspath is not a directory".to_string(),
                     errno: Some(Errno::ENODEV),
                 });
             }
@@ -405,7 +405,7 @@ impl Device {
                 Some(s) => s.to_string(),
                 None => {
                     return Err(Error::Other {
-                        msg: "libdevice: failed to change the syspath to string".to_string(),
+                        msg: "device: failed to change the syspath to string".to_string(),
                         errno: Some(Errno::EINVAL),
                     });
                 }
@@ -413,7 +413,7 @@ impl Device {
         } else {
             if !path.starts_with("/sys/") {
                 return Err(Error::Other {
-                    msg: "libdevice: invalid syspath".to_string(),
+                    msg: "device: invalid syspath".to_string(),
                     errno: Some(Errno::EINVAL),
                 });
             }
@@ -425,7 +425,7 @@ impl Device {
             Some(p) => p,
             None => {
                 return Err(Error::Other {
-                    msg: "libdevice: the syspath is not a subdirectory of /sys".to_string(),
+                    msg: "device: the syspath is not a subdirectory of /sys".to_string(),
                     errno: Some(Errno::EINVAL),
                 });
             }
@@ -433,7 +433,7 @@ impl Device {
 
         if !devpath.starts_with('/') {
             return Err(Error::Other {
-                msg: "libdevice: the device path is invalid without /sys as prefix".to_string(),
+                msg: "device: the device path is invalid without /sys as prefix".to_string(),
                 errno: Some(Errno::ENODEV),
             });
         }
@@ -468,7 +468,7 @@ impl Device {
     ) -> Result<(), Error> {
         if key.is_empty() {
             return Err(Error::Other {
-                msg: "libdevice: invalid key".to_string(),
+                msg: "device: invalid key".to_string(),
                 errno: Some(Errno::EINVAL),
             });
         }
@@ -503,7 +503,7 @@ impl Device {
 
         if major(self.devnum) == 0 {
             return Err(Error::Other {
-                msg: "libdevice: the devnum does not exist in uevent file".to_string(),
+                msg: "device: the devnum does not exist in uevent file".to_string(),
                 errno: Some(Errno::ENOENT),
             });
         }
@@ -526,13 +526,13 @@ impl Device {
                     Err(e) => match e.raw_os_error() {
                         Some(n) => {
                             return Err(Error::Other {
-                                msg: "libdevice: ".to_string() + e.to_string().as_str(),
+                                msg: "device: ".to_string() + e.to_string().as_str(),
                                 errno: Some(Errno::from_i32(n)),
                             });
                         }
                         None => {
                             return Err(Error::Other {
-                                msg: "libdevice: ".to_string() + e.to_string().as_str(),
+                                msg: "device: ".to_string() + e.to_string().as_str(),
                                 errno: None,
                             });
                         }
@@ -559,7 +559,7 @@ impl Device {
             Ok(self.subsystem.clone())
         } else {
             Err(Error::Other {
-                msg: "libdevice: failed to get subsystem".to_string(),
+                msg: "device: failed to get subsystem".to_string(),
                 errno: None,
             })
         }
@@ -613,7 +613,7 @@ impl Device {
 
         if subsystem.is_empty() {
             return Err(Error::Other {
-                msg: "libdevice: invalid driver subsystem".to_string(),
+                msg: "device: invalid driver subsystem".to_string(),
                 errno: None,
             });
         }
@@ -637,13 +637,13 @@ impl Device {
             Err(e) => match e.raw_os_error() {
                 Some(n) => {
                     return Err(Error::Other {
-                        msg: "libdevice: failed to open uevent file".to_string(),
+                        msg: "device: failed to open uevent file".to_string(),
                         errno: Some(Errno::from_i32(n)),
                     });
                 }
                 None => {
                     return Err(Error::Other {
-                        msg: "libdevice: failed to open uevent file".to_string(),
+                        msg: "device: failed to open uevent file".to_string(),
                         errno: None,
                     });
                 }
@@ -799,7 +799,7 @@ impl Device {
             Ok(a) => a,
             Err(_) => {
                 return Err(Error::Other {
-                    msg: format!("libdevice: invalid action string {}", action_s),
+                    msg: format!("device: invalid action string {}", action_s),
                     errno: None,
                 });
             }
@@ -815,7 +815,7 @@ impl Device {
             Err(_) => {
                 return Err(Error::Other {
                     msg: format!(
-                        "libdevice: invalid seqnum can not be parsed to u64 {}",
+                        "device: invalid seqnum can not be parsed to u64 {}",
                         seqnum_s
                     ),
                     errno: None,

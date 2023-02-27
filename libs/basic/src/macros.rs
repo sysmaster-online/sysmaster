@@ -18,9 +18,9 @@ macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
         let res = unsafe { libc::$fn($($arg, )*) };
         if res < 0 {
-            libutils::Result::Err(libutils::Error::Syscall { syscall: stringify!($fn), errno: unsafe { *libc::__errno_location() }, ret: res })
+            basic::Result::Err(basic::Error::Syscall { syscall: stringify!($fn), errno: unsafe { *libc::__errno_location() }, ret: res })
         } else {
-            libutils::Result::Ok(res)
+            basic::Result::Ok(res)
         }
     }};
 }

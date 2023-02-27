@@ -17,7 +17,7 @@
 use std::{env, process};
 mod random_seed;
 use crate::random_seed::run;
-use libutils::logger;
+use basic::logger;
 
 fn main() {
     logger::init_log_with_console("random-seed", log::LevelFilter::Debug);

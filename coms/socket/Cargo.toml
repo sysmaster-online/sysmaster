@@ -10,7 +10,7 @@ crate-type = ["dylib"]
 name = "socket"
 
 [dependencies]
-libutils = { path = "../../libs/libutils" }
+basic = { path = "../../libs/basic" }
 event = { path = "../../libs/event" }
 proc_macro_utils = { path = "../../libs/proc_macro_utils" }
 sysmaster = { path = "../../" }

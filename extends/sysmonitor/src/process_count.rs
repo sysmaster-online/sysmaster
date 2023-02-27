@@ -14,7 +14,7 @@
 use procfs::sys::kernel::pid_max;
 use serde_derive::Deserialize;
 
-use libutils::{Error, ProcSnafu, ResultExt};
+use basic::{Error, ProcSnafu, ResultExt};
 use std::cmp::max;
 
 use crate::{Monitor, Switch, SysMonitor};
