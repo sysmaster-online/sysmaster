@@ -989,6 +989,7 @@ mod tests {
     use crate::unit::DataManager;
     use crate::unit::UnitRe;
     use basic::logger;
+    use event::Events;
     use sysmaster::rel::Reliability;
 
     #[test]
@@ -1000,7 +1001,12 @@ mod tests {
         let job_rentry = Rc::new(JobRe::new(&reli));
         let name_test1 = String::from("test1.service");
         let unit_test1 = create_unit(&dm, &reli, &rentry, &name_test1);
-        let ja = JobAlloc::new(&reli, &job_rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &job_rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
         let table = JobTable::new(&db);
 
         let conf = JobConf::new(&unit_test1, JobKind::Nop);

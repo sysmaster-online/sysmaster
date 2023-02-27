@@ -12,7 +12,8 @@
 
 use super::entry::{Job, JobConf};
 use super::rentry::{JobKind, JobRe};
-use crate::unit::UnitX;
+use crate::unit::{DataManager, UnitX};
+use event::Events;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -22,16 +23,25 @@ pub(super) struct JobAlloc {
     // associated objects
     reli: Rc<Reliability>,
     rentry: Rc<JobRe>,
+    events: Rc<Events>,
+    dm: Rc<DataManager>,
 
     // owned objects
     data: RefCell<JobAllocData>,
 }
 
 impl JobAlloc {
-    pub(super) fn new(relir: &Rc<Reliability>, rentryr: &Rc<JobRe>) -> JobAlloc {
+    pub(super) fn new(
+        relir: &Rc<Reliability>,
+        rentryr: &Rc<JobRe>,
+        eventsr: &Rc<Events>,
+        dmr: &Rc<DataManager>,
+    ) -> JobAlloc {
         JobAlloc {
             reli: Rc::clone(relir),
             rentry: Rc::clone(rentryr),
+            events: Rc::clone(eventsr),
+            dm: Rc::clone(dmr),
             data: RefCell::new(JobAllocData::new()),
         }
     }
@@ -43,9 +53,14 @@ impl JobAlloc {
     pub(super) fn alloc(&self, config: &JobConf) -> Rc<Job> {
         let unit = config.get_unit();
         let kind = config.get_kind();
-        self.data
-            .borrow_mut()
-            .alloc(&self.reli, &self.rentry, Rc::clone(unit), kind)
+        self.data.borrow_mut().alloc(
+            &self.reli,
+            &self.rentry,
+            &self.events,
+            &self.dm,
+            Rc::clone(unit),
+            kind,
+        )
     }
 }
 
@@ -76,10 +91,23 @@ impl JobAllocData {
         &mut self,
         relir: &Rc<Reliability>,
         rentryr: &Rc<JobRe>,
+        eventsr: &Rc<Events>,
+        dmr: &Rc<DataManager>,
         unit: Rc<UnitX>,
         kind: JobKind,
     ) -> Rc<Job> {
-        Rc::new(Job::new(relir, rentryr, self.alloc_id(), unit, kind))
+        let job = Rc::new(Job::new(
+            relir,
+            rentryr,
+            eventsr,
+            dmr,
+            self.alloc_id(),
+            unit,
+            kind,
+        ));
+        job.get_timer().attach_job(&job);
+        job.set_timer();
+        job
     }
 
     fn alloc_id(&mut self) -> u32 {

@@ -30,6 +30,7 @@ use super::sigchld::Sigchld;
 use super::uload::UnitLoad;
 use super::UnitRelationAtom;
 use super::UnitRelations;
+use crate::job::JobResult;
 use crate::manager::pre_install::{Install, PresetMode};
 use crate::manager::State;
 use crate::unit::data::{DataManager, UnitState};
@@ -149,7 +150,10 @@ impl UnitManagerX {
         assert!(ret.is_none());
 
         // dm-start_limit_result
-        let ret = dm.register_start_limit_result(&self.sub_name, subscriber);
+        let ret = dm.register_start_limit_result(&self.sub_name, subscriber.clone());
+        assert!(ret.is_none());
+
+        let ret = dm.register_job_result(&self.sub_name, subscriber);
         assert!(ret.is_none());
 
         // reliability-station
@@ -852,7 +856,7 @@ impl UnitManager {
         let _rentry = Rc::new(UnitRe::new(relir));
         let _db = Rc::new(UnitDb::new(&_rentry));
         let _rt = Rc::new(UnitRT::new(relir, &_rentry, &_db));
-        let _jm = Rc::new(JobManager::new(eventr, relir, &_db));
+        let _jm = Rc::new(JobManager::new(eventr, relir, &_db, dmr));
         let um = Rc::new(UnitManager {
             events: Rc::clone(eventr),
             reli: Rc::clone(relir),
@@ -893,6 +897,15 @@ impl TableSubscribe<String, StartLimitResult> for UnitManager {
         match op {
             TableOp::TableInsert(name, config) => self.insert_start_limit_res(name, config),
             TableOp::TableRemove(name, _) => self.remove_start_limit_res(name),
+        }
+    }
+}
+
+impl TableSubscribe<String, JobResult> for UnitManager {
+    fn notify(&self, op: &TableOp<String, JobResult>) {
+        match op {
+            TableOp::TableInsert(name, config) => self.instert_job_result(name, config),
+            TableOp::TableRemove(name, _) => self.remove_job_result(name),
         }
     }
 }
@@ -947,6 +960,21 @@ impl UnitManager {
     }
 
     fn remove_start_limit_res(&self, _source: &str) {}
+
+    fn instert_job_result(&self, source: &str, job_result: &JobResult) {
+        if job_result != &JobResult::TimeOut {
+            return;
+        }
+        let unitx = if let Some(u) = self.db.units_get(source) {
+            u
+        } else {
+            return;
+        };
+        let reason = "the job of unit ".to_string() + source + " timedout";
+        self.unit_emergency_action(unitx.get_job_timeout_action(), reason)
+    }
+
+    fn remove_job_result(&self, _source: &str) {}
 }
 
 impl ReStation for UnitManager {

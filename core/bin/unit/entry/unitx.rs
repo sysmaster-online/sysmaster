@@ -145,6 +145,10 @@ impl UnitX {
         self.0.get_start_limit_action()
     }
 
+    pub(crate) fn get_job_timeout_action(&self) -> UnitEmergencyAction {
+        self.0.get_job_timeout_action()
+    }
+
     pub(crate) fn active_state(&self) -> UnitActiveState {
         //UnitActiveState::UnitActive
         self.0.current_active_state()

@@ -183,6 +183,11 @@ pub(crate) struct UeConfigUnit {
     #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]
     #[config(default = "none")]
     pub StartLimitAction: UnitEmergencyAction,
+    #[config(default = 0)]
+    pub JobTimeoutSec: u64,
+    #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]
+    #[config(default = "none")]
+    pub JobTimeoutAction: UnitEmergencyAction,
 }
 
 #[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]

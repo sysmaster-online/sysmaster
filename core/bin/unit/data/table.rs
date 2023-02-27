@@ -12,6 +12,7 @@
 
 use super::dep_conf::UnitDepConf;
 use super::state::UnitState;
+use crate::job::JobResult;
 use crate::unit::entry::StartLimitResult;
 use crate::utils::table::{Table, TableSubscribe};
 use std::cell::RefCell;
@@ -24,6 +25,7 @@ pub struct DataManager {
         RefCell<Table<String, UnitDepConf>>,      // [0]unit-dep-config
         RefCell<Table<String, UnitState>>,        // [1]unit-state
         RefCell<Table<String, StartLimitResult>>, // [2]unit-start-limit-hit
+        RefCell<Table<String, JobResult>>,        // [3] unit-job-timeout
     ),
 }
 
@@ -50,6 +52,7 @@ impl DataManager {
     pub fn new() -> DataManager {
         DataManager {
             tables: (
+                RefCell::new(Table::new()),
                 RefCell::new(Table::new()),
                 RefCell::new(Table::new()),
                 RefCell::new(Table::new()),
@@ -110,6 +113,24 @@ impl DataManager {
         subscriber: Rc<dyn TableSubscribe<String, StartLimitResult>>,
     ) -> Option<Rc<dyn TableSubscribe<String, StartLimitResult>>> {
         let mut table = self.tables.2.borrow_mut();
+        table.subscribe(name.to_string(), subscriber)
+    }
+
+    pub(crate) fn insert_job_result(
+        &self,
+        u_name: String,
+        job_result: JobResult,
+    ) -> Option<JobResult> {
+        let mut table = self.tables.3.borrow_mut();
+        table.insert(u_name, job_result)
+    }
+
+    pub(crate) fn register_job_result(
+        &self,
+        name: &str,
+        subscriber: Rc<dyn TableSubscribe<String, JobResult>>,
+    ) -> Option<Rc<dyn TableSubscribe<String, JobResult>>> {
+        let mut table = self.tables.3.borrow_mut();
         table.subscribe(name.to_string(), subscriber)
     }
 
