@@ -6,13 +6,13 @@ edition = "2021"
 build = "build.rs"
 
 [lib]
-path = "sysmaster/libs/lib.rs"
 name = "sysmaster"
+path = "core/lib/lib.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
 name = "sysmaster"
-path = "sysmaster/core/main.rs"
+path = "core/bin/main.rs"
 
 [dev-dependencies.libtests]
 path = "libs/libtests"
