@@ -153,7 +153,7 @@ impl UnitDb {
             return;
         }
 
-        let pids = libcgroup::cg_get_pids(&cg_path);
+        let pids = cgroup::cg_get_pids(&cg_path);
         for pid in pids {
             log::debug!("watch all cgroup pids: {}", pid);
             self.child.add_watch_pid(id, pid)

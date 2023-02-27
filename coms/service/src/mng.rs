@@ -20,7 +20,7 @@ use super::rentry::{
 };
 use super::spawn::ServiceSpawn;
 use crate::rentry::ExitStatus;
-use libevent::{EventState, EventType, Events, Source};
+use event::{EventState, EventType, Events, Source};
 use libutils::{fd_util, IN_SET};
 use libutils::{file_util, process_util};
 use nix::errno::Errno;
@@ -901,7 +901,7 @@ impl ServiceMng {
         if let Some(Ok(v)) = self
             .comm
             .owner()
-            .map(|u| libcgroup::cg_is_empty_recursive(&u.cg_path()))
+            .map(|u| cgroup::cg_is_empty_recursive(&u.cg_path()))
         {
             return !v;
         }

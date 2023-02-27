@@ -12,9 +12,9 @@
 
 #[cfg(test)]
 mod test {
-    use libevent::Events;
-    use libevent::Source;
-    use libevent::{EventState, EventType};
+    use event::Events;
+    use event::Source;
+    use event::{EventState, EventType};
     use std::thread;
     use std::time::Duration;
     use std::{

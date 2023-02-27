@@ -112,7 +112,7 @@ daemon类型的bin crate的目录以d结尾。
 如：
 
 ```text
-  - lib crate: libs/libevent, libs/libutils
+  - lib crate: libs/event, libs/libutils
   - bin crate: extends/init, sysmaster
   - daemon crate: extends/udevd, extends/logind
 ```

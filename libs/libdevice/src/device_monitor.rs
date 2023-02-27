@@ -144,7 +144,7 @@ impl DeviceMonitor {
 mod tests {
     use super::*;
     use crate::device::*;
-    use libevent::*;
+    use event::*;
     use std::{os::unix::prelude::RawFd, rc::Rc, thread::spawn};
 
     /// wrapper of DeviceMonitor

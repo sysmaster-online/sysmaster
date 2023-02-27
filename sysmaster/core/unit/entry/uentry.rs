@@ -22,7 +22,7 @@ use crate::unit::data::{DataManager, UnitDepConf, UnitState};
 use crate::unit::rentry::{UnitLoadState, UnitRe};
 use crate::unit::util::UnitFile;
 use crate::unit::UnitRelations;
-use libcgroup::{self, CgFlags};
+use cgroup::{self, CgFlags};
 use libutils::process_util::my_child;
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
@@ -386,7 +386,7 @@ impl Unit {
         {
             let pids = self.pids_set(m_pid, c_pid);
 
-            match libcgroup::cg_kill_recursive(
+            match cgroup::cg_kill_recursive(
                 &self.cg_path(),
                 sig,
                 CgFlags::IGNORE_SELF | CgFlags::SIGCONT,
@@ -439,7 +439,7 @@ impl Unit {
                     .into(),
             );
         }
-        let pids = libcgroup::cg_get_pids(&cg_path);
+        let pids = cgroup::cg_get_pids(&cg_path);
         let mut main_pid = Pid::from_raw(0);
 
         for pid in pids {

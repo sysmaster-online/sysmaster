@@ -10,9 +10,9 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use event::{EventType, Events, Source};
 use libcmdproto::proto::execute::ExecuterAction;
 use libcmdproto::proto::ProstServerStream;
-use libevent::{EventType, Events, Source};
 use std::net::{SocketAddr, TcpListener};
 use std::os::unix::io::RawFd;
 use std::{os::unix::prelude::AsRawFd, rc::Rc};

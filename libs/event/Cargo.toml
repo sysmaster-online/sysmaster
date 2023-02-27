@@ -1,5 +1,5 @@
 [package]
-name = "libevent"
+name = "event"
 version = "0.1.0"
 authors = ["overweight <hexiaowen@huawei.com>"]
 edition = "2021"

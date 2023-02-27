@@ -18,7 +18,7 @@ use snafu::prelude::*;
 pub enum Error {
     /// An error from syscall
     #[snafu(display(
-        "Error(libevent): : Got an error: (ret={}, errno={}) for syscall: {}",
+        "Error(event): : Got an error: (ret={}, errno={}) for syscall: {}",
         ret,
         errno,
         syscall
@@ -33,7 +33,7 @@ pub enum Error {
     },
 
     /// Other
-    #[snafu(display("Error(libevent): '{}'.", word))]
+    #[snafu(display("Error(event): '{}'.", word))]
     Other {
         /// some words
         word: &'static str,

@@ -20,8 +20,8 @@ use super::{
     rentry::{PortType, SocketCommand, SocketRe, SocketReFrame, SocketResult, SocketState},
     spawn::SocketSpawn,
 };
-use libevent::EventState;
-use libevent::{EventType, Events, Source};
+use event::EventState;
+use event::{EventType, Events, Source};
 use libutils::IN_SET;
 use nix::libc::{self};
 use nix::sys::wait::WaitStatus;
@@ -866,7 +866,7 @@ impl Source for SocketMngPort {
         self.rentry().set_last_frame(SocketReFrame::FdListen(true));
         self.reli()
             .set_last_unit(self.mng().comm.owner().unwrap().id());
-        let ret = self.dispatch_io().map_err(|_| libevent::Error::Other {
+        let ret = self.dispatch_io().map_err(|_| event::Error::Other {
             word: "Dispatch IO failed!",
         });
         self.reli().clear_last_unit();

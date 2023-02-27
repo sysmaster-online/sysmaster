@@ -16,7 +16,7 @@ use crate::error::*;
 use crate::exec::{ExecCommand, ExecContext, ExecParameters};
 use crate::rel::{ReStation, Reliability};
 use crate::unit::{UnitActiveState, UnitType};
-use libevent::Events;
+use event::Events;
 use nix::unistd::Pid;
 use std::{path::PathBuf, rc::Rc};
 

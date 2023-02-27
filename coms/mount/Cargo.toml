@@ -10,7 +10,7 @@ crate-type = ["dylib"]
 name = "mount"
 
 [dependencies]
-libevent = { path = "../../libs/libevent" }
+event = { path = "../../libs/event" }
 proc_macro_utils = { path = "../../libs/libproc_macro_utils" }
 libutils = { path = "../../libs/libutils" }
 sysmaster = { path = "../../" }
@@ -20,4 +20,4 @@ epoll = "4.3.1"
 libmount = "0.1.15"
 libc = "0.2.*"
 serde = "1.0.130"
-once_cell = { version = "1.5.2"}
+once_cell = { version = "1.5.2" }

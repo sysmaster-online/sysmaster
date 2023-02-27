@@ -12,8 +12,8 @@
 
 //! uevent_monitor
 //!
+use event::{EventType, Events, Source};
 use libdevice::device_monitor::{DeviceMonitor, MonitorNetlinkGroup};
-use libevent::{EventType, Events, Source};
 use nix::errno::Errno;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;

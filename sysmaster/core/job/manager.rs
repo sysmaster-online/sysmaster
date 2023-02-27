@@ -18,7 +18,7 @@ use super::table::JobTable;
 use super::{entry, junit, notify, table, transaction};
 use crate::unit::{JobMode, UnitDb, UnitRelationAtom, UnitX};
 use crate::utils::table::{TableOp, TableSubscribe};
-use libevent::{EventState, EventType, Events, Source};
+use event::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
 use std::rc::Rc;
 use sysmaster::error::*;

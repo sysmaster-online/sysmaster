@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use libevent::{EventType, Events, Source};
+use event::{EventType, Events, Source};
 use nix::sys::signal::Signal;
 use std::{convert::TryFrom, rc::Rc};
 use sysmaster::error::*;

@@ -13,8 +13,8 @@ name = "target"
 [dependencies]
 libutils = { path = "../../libs/libutils" }
 proc_macro_utils = { path = "../../libs/libproc_macro_utils" }
-sysmaster = {path = "../../"}
+sysmaster = { path = "../../" }
 nix = "0.24"
 log = "0.4"
 serde = "1.0.130"
-once_cell = { version = "1.5.2"}
+once_cell = { version = "1.5.2" }

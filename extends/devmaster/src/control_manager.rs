@@ -12,8 +12,8 @@
 
 //! control manager
 //!
+use event::Source;
 use libdevice::device::Device;
-use libevent::Source;
 use std::time::SystemTime;
 use std::{
     cell::RefCell,
@@ -97,8 +97,8 @@ impl Source for ControlManager {
     }
 
     /// event type
-    fn event_type(&self) -> libevent::EventType {
-        libevent::EventType::Io
+    fn event_type(&self) -> event::EventType {
+        event::EventType::Io
     }
 
     /// epoll type
@@ -112,7 +112,7 @@ impl Source for ControlManager {
     }
 
     /// start dispatching after the event arrives
-    fn dispatch(&self, _: &libevent::Events) -> i32 {
+    fn dispatch(&self, _: &event::Events) -> i32 {
         let (mut stream, _) = self.listener.borrow_mut().accept().unwrap();
         let mut cmd = String::new();
         stream.read_to_string(&mut cmd).unwrap();

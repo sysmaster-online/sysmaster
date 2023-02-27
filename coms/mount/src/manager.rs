@@ -13,7 +13,7 @@
 use super::base::PLUGIN_NAME;
 use super::comm::MountUmComm;
 use super::rentry::{MountRe, MountReFrame};
-use libevent::{EventState, EventType, Events, Source};
+use event::{EventState, EventType, Events, Source};
 use libmount::mountinfo;
 use libutils::logger;
 use std::collections::HashSet;

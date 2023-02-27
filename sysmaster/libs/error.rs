@@ -57,7 +57,7 @@ pub enum Error {
 
     #[snafu(display("cgroup error:{}", source))]
     Cgroup {
-        source: libcgroup::error::Error,
+        source: cgroup::error::Error,
     },
 
     #[snafu(display("VarError(libsysmaster)"))]

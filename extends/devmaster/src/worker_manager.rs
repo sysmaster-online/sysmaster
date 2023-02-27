@@ -12,11 +12,11 @@
 
 //! worker manager
 //!
+use event::{EventState, EventType, Events, Source};
 use libdevice::{
     device::Device,
     device_monitor::{DeviceMonitor, MonitorNetlinkGroup},
 };
-use libevent::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
@@ -244,7 +244,7 @@ impl WorkerManager {
         }
     }
 
-    /// set the libevent source instance of kill workers timer
+    /// set the event source instance of kill workers timer
     pub fn set_kill_workers_timer(self: &Rc<WorkerManager>) {
         *self.kill_idle_workers.borrow_mut() = Some(Rc::new(WorkerManagerKillWorkers::new(
             WORKER_MAX_IDLE_INTERVAL,
@@ -252,7 +252,7 @@ impl WorkerManager {
         )));
     }
 
-    /// get the libevent source instance of kill workers timer
+    /// get the event source instance of kill workers timer
     pub fn get_kill_workers_timer(
         self: &Rc<WorkerManager>,
     ) -> Option<Rc<WorkerManagerKillWorkers>> {
@@ -428,8 +428,8 @@ impl Source for WorkerManager {
     }
 
     /// event type
-    fn event_type(&self) -> libevent::EventType {
-        libevent::EventType::Io
+    fn event_type(&self) -> event::EventType {
+        event::EventType::Io
     }
 
     /// epoll type
@@ -443,7 +443,7 @@ impl Source for WorkerManager {
     }
 
     /// start dispatching after the event arrives
-    fn dispatch(&self, _: &libevent::Events) -> i32 {
+    fn dispatch(&self, _: &event::Events) -> i32 {
         let (mut stream, _) = match self.listener.borrow_mut().accept() {
             Ok((s, sa)) => (s, sa),
             Err(e) => {
@@ -470,7 +470,7 @@ impl Source for WorkerManager {
     }
 }
 
-/// libevent source to kill workers
+/// event source to kill workers
 #[derive(Debug)]
 pub struct WorkerManagerKillWorkers {
     /// time interval

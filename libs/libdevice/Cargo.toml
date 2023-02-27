@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 # internal libraries
 libutils = { path = "../libutils" }
-libevent = { path = "../libevent" }
+event = { path = "../event" }
 
 # third libraries
 nix = "0.24"

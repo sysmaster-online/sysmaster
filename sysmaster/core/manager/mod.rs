@@ -19,11 +19,11 @@ pub(crate) mod pre_install;
 pub(crate) mod rentry;
 pub(crate) mod signals;
 use crate::unit::UnitManagerX;
+use cgroup::CgController;
+use cgroup::{cg_create_and_attach, CgFlags};
 use commands::Commands;
-use libcgroup::CgController;
-use libcgroup::{cg_create_and_attach, CgFlags};
+use event::{EventState, Events};
 use libcmdproto::proto::execute::ExecuterAction;
-use libevent::{EventState, Events};
 use libutils::path_lookup::LookupPaths;
 use libutils::process_util::{self};
 use libutils::special::{BASIC_TARGET, CGROUP_SYSMASTER};
@@ -317,7 +317,7 @@ impl Manager {
         cg_create_and_attach(&cg_init, Pid::from_raw(0)).unwrap();
 
         log::debug!("kill all pids except sysmaster in the sysmaster cgroup");
-        libcgroup::cg_kill_recursive(
+        cgroup::cg_kill_recursive(
             &cg_init,
             Signal::SIGKILL,
             CgFlags::IGNORE_SELF,

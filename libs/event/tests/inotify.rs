@@ -12,11 +12,15 @@
 
 #[cfg(test)]
 mod test {
-    use libevent::Events;
-    use libevent::Source;
-    use libevent::{EventState, EventType};
+    use event::Events;
+    use event::Source;
+    use event::{EventState, EventType};
+    use nix::sys::inotify::AddWatchFlags;
+    use std::fs::File;
     use std::os::unix::prelude::RawFd;
+    use std::path::Path;
     use std::rc::Rc;
+    use std::thread;
 
     #[derive(Debug)]
     struct Timer();
@@ -33,7 +37,7 @@ mod test {
         }
 
         fn event_type(&self) -> EventType {
-            EventType::TimerRealtime
+            EventType::Inotify
         }
 
         fn epoll_event(&self) -> u32 {
@@ -44,12 +48,8 @@ mod test {
             0i8
         }
 
-        fn time_relative(&self) -> u64 {
-            100000
-        }
-
         fn dispatch(&self, e: &Events) -> i32 {
-            println!("Dispatching timer!");
+            println!("Dispatching inotify!");
             e.set_exit();
             0
         }
@@ -62,13 +62,22 @@ mod test {
 
     #[test]
     fn test_timer() {
+        thread::spawn(move || loop {
+            let _ = File::create("/tmp/xxxxxxfoo.txt").unwrap();
+        });
+
         let e = Events::new().unwrap();
         let s: Rc<dyn Source> = Rc::new(Timer::new());
         e.add_source(s.clone()).unwrap();
 
         e.set_enabled(s.clone(), EventState::On).unwrap();
 
+        let watch = Path::new("/tmp");
+        let wd = e.add_watch(watch, AddWatchFlags::IN_ALL_EVENTS);
+
         e.rloop().unwrap();
+
+        e.rm_watch(wd);
 
         e.del_source(s.clone()).unwrap();
     }

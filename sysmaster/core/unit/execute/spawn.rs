@@ -43,7 +43,7 @@ impl ExecSpawn {
         match ret {
             Ok(ForkResult::Parent { child }) => {
                 log::debug!("child pid is :{}", child);
-                libcgroup::cg_attach(child, &unit.cg_path()).context(CgroupSnafu)?;
+                cgroup::cg_attach(child, &unit.cg_path()).context(CgroupSnafu)?;
                 Ok(child)
             }
             Ok(ForkResult::Child) => {

@@ -34,7 +34,7 @@ use crate::manager::pre_install::{Install, PresetMode};
 use crate::manager::State;
 use crate::unit::data::{DataManager, UnitState};
 use crate::utils::table::{TableOp, TableSubscribe};
-use libevent::Events;
+use event::Events;
 use libutils::path_lookup::LookupPaths;
 use libutils::proc_cmdline::get_process_cmdline;
 use libutils::process_util;
@@ -1196,7 +1196,7 @@ mod tests {
     use super::*;
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::mount::setup;
-    use libevent::Events;
+    use event::Events;
     use libutils::logger;
     use nix::sys::wait::WaitStatus;
     use std::thread;

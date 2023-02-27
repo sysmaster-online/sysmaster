@@ -12,7 +12,7 @@
 
 //! mount the cgroup systems
 use bitflags::bitflags;
-use libcgroup::{self, CgType, CG_BASE_DIR};
+use cgroup::{self, CgType, CG_BASE_DIR};
 use libutils::{fs_util, mount_util, path_util, proc_cmdline};
 use nix::{
     errno::Errno,
@@ -359,7 +359,7 @@ pub fn mount_cgroup_controllers() -> Result<()> {
         return Ok(());
     }
 
-    let mut controllers = libcgroup::cg_controllers().context(CgroupSnafu)?;
+    let mut controllers = cgroup::cg_controllers().context(CgroupSnafu)?;
     let mut index = 0_usize;
 
     while index < controllers.len() {
@@ -460,7 +460,7 @@ fn symlink_controller(source: String, alias: String) -> Result<()> {
 
 #[allow(dead_code)]
 fn cg_unified_wanted() -> bool {
-    let cg_ver = libcgroup::cg_type();
+    let cg_ver = cgroup::cg_type();
 
     if let Ok(v) = cg_ver {
         return v == CgType::UnifiedV2;
@@ -483,7 +483,7 @@ fn cg_unified_wanted() -> bool {
 
 #[allow(dead_code)]
 fn cg_legacy_wanted() -> bool {
-    let cg_ver = libcgroup::cg_type();
+    let cg_ver = cgroup::cg_type();
 
     if let Ok(v) = cg_ver {
         return v != CgType::UnifiedV2;
@@ -494,7 +494,7 @@ fn cg_legacy_wanted() -> bool {
 
 #[allow(dead_code)]
 fn cg_unifiedv1_wanted() -> bool {
-    let cg_ver = libcgroup::cg_type();
+    let cg_ver = cgroup::cg_type();
 
     if let Ok(v) = cg_ver {
         return v != CgType::UnifiedV2;

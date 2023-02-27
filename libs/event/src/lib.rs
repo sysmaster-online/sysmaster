@@ -24,14 +24,14 @@
 //! #     net::{TcpListener, TcpStream},
 //! #     os::unix::io::{AsRawFd, RawFd},
 //! #     rc::Rc};
-//! # use libevent::Error;
+//! # use event::Error;
 //! #
 //! # use std::thread;
 //! # use std::time::Duration;
 //! #
-//! # use libevent::Events;
-//! # use libevent::Source;
-//! # use libevent::{EventState, EventType};
+//! # use event::Events;
+//! # use event::Source;
+//! # use event::{EventState, EventType};
 //! #
 //! /// Define one struct, implement Source trait
 //! #[derive(Debug)]

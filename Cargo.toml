@@ -20,8 +20,8 @@ path = "libs/libtests"
 
 [dependencies]
 # internal libraries
-libcgroup = { path = "libs/libcgroup" }
-libevent = { path = "libs/libevent" }
+cgroup = { path = "libs/cgroup" }
+event = { path = "libs/event" }
 libutils = { path = "libs/libutils" }
 libcmdproto = { path = "libs/libcmdproto" }
 
@@ -119,8 +119,8 @@ members = [
   #internal libraries crates
   "libs/libcmdproto",
   #external libraries crates
-  "libs/libcgroup",
-  "libs/libevent",
+  "libs/cgroup",
+  "libs/event",
   "libs/libutils",
   "libs/libtests",
   "libs/libwatchdog",

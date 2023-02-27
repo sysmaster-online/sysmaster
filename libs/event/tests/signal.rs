@@ -10,12 +10,12 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use libevent::EventState;
+use event::EventState;
 // These tests cannot run as a regular test because cargo would spawn a thread to run it,
 // failing the signal masking. So we make our own, non-threaded harnessing
-use libevent::EventType;
-use libevent::Events;
-use libevent::Source;
+use event::EventType;
+use event::Events;
+use event::Source;
 use nix::unistd::fork;
 use nix::unistd::ForkResult;
 use std::rc::Rc;

@@ -12,8 +12,8 @@
 
 //! subcommand for devctl monitor
 //!
+use event::{EventState, EventType, Events, Source};
 use libdevice::{device_monitor::DeviceMonitor, device_monitor::MonitorNetlinkGroup};
-use libevent::{EventState, EventType, Events, Source};
 use libutils::socket_util::set_receive_buffer_force;
 use nix::errno::Errno;
 use std::{os::unix::prelude::RawFd, rc::Rc};
