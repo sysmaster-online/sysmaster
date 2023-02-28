@@ -132,6 +132,9 @@ pub(crate) struct UeConfigUnit {
     #[config(deserialize_with = JobMode::deserialize_with)]
     #[config(default = "replace")]
     pub OnFailureJobMode: JobMode,
+    #[config(deserialize_with = JobMode::deserialize_with)]
+    #[config(default = "replace")]
+    pub OnSuccessJobMode: JobMode,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
     pub Wants: Vec<String>,
@@ -147,6 +150,12 @@ pub(crate) struct UeConfigUnit {
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
     pub PartOf: Vec<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    #[config(default = "")]
+    pub OnFailure: Vec<String>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    #[config(default = "")]
+    pub OnSuccess: Vec<String>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
     pub Before: Vec<String>,

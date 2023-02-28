@@ -67,6 +67,10 @@ sysmaster支持配置单元之间的依赖关系，可以配置的值为`;`分�
 
 `Wants`和`Requires`除了支持通过`.service/.target/.socket`等单元配置文件配置，也允许在`/etc/sysmaster/`或`/usr/lib/sysmaster`目录下创建`单元名.wants/单元名.requires`目录，并在里面添加指向依赖单元的软链接。例如为了给`foo.service`配置`Wants="bar.service"`，可以创建`/etc/sysmaster/foo.service.wants`目录，并在该目录内创建`bar.service -> /etc/sysmaster/bar.service`的软链接。
 
+### OnFailure/OnSuccess
+
+`OnFailure`：配置当一个unit启动失败或成功结束后，对其他服务的影响。以`foo.service`配置`OnFailure/OnSuccess="bar.service"`为例，当`foo.service`启动失败或成功结束后，将自动拉起`bar.service`。拉起`bar.service`会生成一个Start类型的job,该job的模式可配置为`fail`， `replace`，`replace-irreversibly`，`isolate`，`flush`，`ignore-dependencies`或`ignore-requirements`。
+
 # [Service] 配置
 
 ### WatchdogSec
