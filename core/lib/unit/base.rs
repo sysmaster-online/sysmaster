@@ -99,8 +99,15 @@ pub trait SubUnit: ReStation + UnitMngUtil {
         Ok(())
     }
 
+    /// return UnitActionEOpNotSupp for default, if the sub unit not realizing the method
+    fn reload(&self) -> Result<()> {
+        Err(Error::UnitActionEOpNotSupp)
+    }
+
     ///
-    fn reload(&self) {}
+    fn can_reload(&self) -> bool {
+        false
+    }
 
     ///
     fn kill(&self) {}

@@ -125,6 +125,10 @@ impl ExecuterAction for CommandActionMgr {
         self.um.restart_unit(unit_name)
     }
 
+    fn reload(&self, unit_name: &str) -> Result<(), Self::Error> {
+        self.um.reload(unit_name)
+    }
+
     fn status(&self, unit_name: &str) -> Result<String, Self::Error> {
         self.um.get_unit_status(unit_name)
     }

@@ -641,6 +641,38 @@ impl Unit {
         self.sub.stop(force)
     }
 
+    /// reload the unit
+    pub fn reload(&self) -> Result<()> {
+        if !self.sub.can_reload() {
+            return Err(Error::UnitActionEBadR);
+        }
+
+        let active_state = self.current_active_state();
+        if active_state == UnitActiveState::UnitReloading {
+            return Err(Error::UnitActionEAgain);
+        }
+
+        if active_state != UnitActiveState::UnitActive {
+            log::warn!("{} unit is not active, no need to reload", self.id());
+            return Err(Error::UnitActionENoExec);
+        }
+
+        match self.sub.reload() {
+            Ok(_) => Ok(()),
+            Err(e) => match e {
+                Error::UnitActionEOpNotSupp => {
+                    self.notify(
+                        active_state,
+                        active_state,
+                        UnitNotifyFlags::UNIT_NOTIFY_SUCCESS,
+                    );
+                    Ok(())
+                }
+                _ => Err(e),
+            },
+        }
+    }
+
     pub(super) fn sigchld_events(&self, wait_status: WaitStatus) {
         self.sub.sigchld_events(wait_status)
     }

@@ -111,8 +111,15 @@ impl SubUnit for ServiceUnit {
         Ok(())
     }
 
-    fn reload(&self) {
+    fn reload(&self) -> Result<()> {
         self.mng.reload_action();
+        Ok(())
+    }
+
+    fn can_reload(&self) -> bool {
+        self.config
+            .get_exec_cmds(ServiceCommand::Reload)
+            .map_or(false, |cmds| !cmds.is_empty())
     }
 
     fn kill(&self) {

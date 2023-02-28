@@ -107,8 +107,6 @@ impl SubUnit for MountUnit {
         Ok(())
     }
 
-    fn reload(&self) {}
-
     fn kill(&self) {}
 
     fn release_resources(&self) {}

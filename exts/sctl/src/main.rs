@@ -61,6 +61,13 @@ enum SubCmd {
         units: Vec<String>,
     },
 
+    /// [units ...] reload the units
+    #[clap(display_order = 5)]
+    Reload {
+        #[clap(required = true)]
+        units: Vec<String>,
+    },
+
     /// [manager] list all units
     ListUnits {},
 
@@ -126,6 +133,8 @@ fn generate_command_request(args: Args) -> Option<CommandRequest> {
             CommandRequest::new_unitcomm(unit_comm::Action::Restart, units)
         }
         SubCmd::Status { units } => CommandRequest::new_unitcomm(unit_comm::Action::Status, units),
+
+        SubCmd::Reload { units } => CommandRequest::new_unitcomm(unit_comm::Action::Reload, units),
 
         SubCmd::Mask { unit_file } => {
             CommandRequest::new_unitfile(unit_file::Action::Mask, unit_file)
