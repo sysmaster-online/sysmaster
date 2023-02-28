@@ -13,11 +13,11 @@
 use crate::serialize::DeserializeWith;
 use nix::sys::signal::Signal;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 
 /// kill operation send to process
 #[allow(missing_docs)]
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum KillOperation {
     KillTerminate,
     KillTerminateAndLog,
@@ -29,11 +29,11 @@ pub enum KillOperation {
 
 impl KillOperation {
     ///
-    pub fn to_signal(&self) -> Signal {
+    pub fn to_signal(&self, kill_context: Rc<KillContext>) -> Signal {
         match *self {
             KillOperation::KillTerminate
             | KillOperation::KillTerminateAndLog
-            | KillOperation::KillRestart => Signal::SIGTERM,
+            | KillOperation::KillRestart => kill_context.kill_signal(),
             KillOperation::KillKill => Signal::SIGKILL,
             KillOperation::KillWatchdog => Signal::SIGABRT,
             _ => Signal::SIGTERM,
@@ -77,12 +77,14 @@ impl DeserializeWith for KillMode {
 /// kill method context of the unit
 pub struct KillContext {
     kill_mode: RefCell<KillMode>,
+    kill_signal: RefCell<Signal>,
 }
 
 impl Default for KillContext {
     fn default() -> Self {
         Self {
             kill_mode: RefCell::new(KillMode::default()),
+            kill_signal: RefCell::new(Signal::SIGTERM),
         }
     }
 }
@@ -96,5 +98,15 @@ impl KillContext {
     /// get the kill mode
     pub fn kill_mode(&self) -> KillMode {
         *self.kill_mode.borrow()
+    }
+
+    /// set the configured kill signal
+    pub fn set_kill_signal(&self, signal: Signal) {
+        *self.kill_signal.borrow_mut() = signal;
+    }
+
+    /// get the kill signal
+    fn kill_signal(&self) -> Signal {
+        *self.kill_signal.borrow()
     }
 }

@@ -69,6 +69,8 @@ pub(super) struct SectionSocket {
     #[config(deserialize_with = KillMode::deserialize_with)]
     #[config(default = "none")]
     pub KillMode: KillMode,
+    #[config(default = "SIGTERM")]
+    pub KillSignal: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -17,7 +17,7 @@ use std::env;
 ///
 pub fn env_path() -> Result<String> {
     let path = env::var("OUT_DIR")
-        .or(env::var("LD_LIBRARY_PATH"))
+        .or_else(|_| env::var("LD_LIBRARY_PATH"))
         .context(VarSnafu)?;
 
     let out_dir = path.split(':').collect::<Vec<_>>()[0]

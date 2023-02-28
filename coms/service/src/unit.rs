@@ -18,11 +18,13 @@ use super::mng::ServiceMng;
 use super::rentry::{NotifyAccess, ServiceCommand, ServiceType};
 use basic::logger;
 use basic::special::{BASIC_TARGET, SHUTDOWN_TARGET, SYSINIT_TARGET};
+use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::str::FromStr;
 use sysmaster::error::*;
 use sysmaster::rel::{ReStation, Reliability};
 use sysmaster::unit::{
@@ -194,10 +196,15 @@ impl ServiceUnit {
         }
     }
 
-    fn parse_kill_context(&self) {
+    fn parse_kill_context(&self) -> Result<()> {
         self.config
             .kill_context()
             .set_kill_mode(self.config.config_data().borrow().Service.KillMode);
+
+        let signal = Signal::from_str(&self.config.config_data().borrow().Service.KillSignal)?;
+
+        self.config.kill_context().set_kill_signal(signal);
+        Ok(())
     }
 
     fn parse(&self) -> Result<()> {
@@ -237,7 +244,7 @@ impl ServiceUnit {
             }
         }
 
-        self.parse_kill_context();
+        self.parse_kill_context()?;
 
         Ok(())
     }

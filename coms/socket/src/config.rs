@@ -19,6 +19,7 @@ use crate::base::NetlinkProtocol;
 use basic::socket_util;
 use confique::Config;
 use nix::errno::Errno;
+use nix::sys::signal::Signal;
 use nix::sys::socket::sockopt::ReuseAddr;
 use nix::sys::socket::{
     self, AddressFamily, NetlinkAddr, SockFlag, SockProtocol, SockType, SockaddrIn, SockaddrIn6,
@@ -30,6 +31,7 @@ use std::fs;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::str::FromStr;
 use sysmaster::error::*;
 use sysmaster::exec::ExecCommand;
 use sysmaster::rel::ReStation;
@@ -131,10 +133,10 @@ impl SocketConfig {
         }
         let data = builder.load().context(ConfiqueSnafu)?;
 
-        self.parse_kill_context();
-
         // record original configuration
         *self.data.borrow_mut() = data;
+
+        self.parse_kill_context()?;
 
         // parse and record processed configuration
         let ret1 = self.parse_service();
@@ -286,9 +288,13 @@ impl SocketConfig {
         self.kill_context.clone()
     }
 
-    fn parse_kill_context(&self) {
+    fn parse_kill_context(&self) -> Result<()> {
         self.kill_context
             .set_kill_mode(self.config_data().borrow().Socket.KillMode);
+
+        let signal = Signal::from_str(&self.config_data().borrow().Socket.KillSignal)?;
+        self.kill_context.set_kill_signal(signal);
+        Ok(())
     }
 }
 

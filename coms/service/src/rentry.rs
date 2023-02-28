@@ -214,6 +214,8 @@ pub(super) struct SectionService {
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
     pub EnvironmentFile: Vec<String>,
+    #[config(default = "SIGTERM")]
+    pub KillSignal: String,
 }
 
 impl SectionService {
