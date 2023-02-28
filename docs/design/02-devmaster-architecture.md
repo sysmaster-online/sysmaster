@@ -48,7 +48,7 @@ devmaster包含两个可执行文件：常驻进程devmaster和客户端工具de
 
 1. 源码位置: extends/devmaster
 
-2. 公共函数库: libs/libdevice
+2. 公共函数库: libs/device
 
 3. 规则文件与配置文件：todo
 
@@ -56,7 +56,7 @@ devmaster包含两个可执行文件：常驻进程devmaster和客户端工具de
 
 ## 3.3 基本框架
 
-devmaster采用基于epoll的libevent异步编程框架，当内核上报uevent事件或者用户通过devctl工具发送控制命令后，将激活devmaster进入设备处理流程。基本框架分成三个层次，第一层次包含ControlManager和Monitor模块，负责接收设备事件，ControlManager负责接收devctl发送的控制指令，用户可以通过devct对devmaster的框架功能进行调试，Monitor负责监听内核上报的uevent事件，第二层次为JobQueue模块，devmaster接收到设备事件后需要插入到任务队列中进行缓存，并等待派发给空闲worker进程设备处理，队列中的各个事件具有状态，JobQueue需要维护和刷新事件状态，第三层次为WorkerManager模块，当任务队列中存在待处理事件时，由WorkerManager分配或者创建空闲的worker，并派发事件给worker进行处理，WorkerManager需要维护和刷新worker的状态，worker接收到待处理事件时，会在日志中打印接收记录，处理成功后，向外广播设备信息，并向WorkerManager通过tcp发送应答消息。各模块间的依赖关系如下图所示，ControlManager和Monitor持有JobQueue的引用，当接收到设备事件后，插入到任务队列中，JobQueue和WorkerManager相互持有引用，JobQueue中存在待处理任务时，会向WorkerManager分发，如果获取到空闲worker，则更新任务状态，WorkerManager获取到空闲的worker时，会将设备任务发送给该worker进行处理，处理完成后，WorkerManager通过JobQueue更新任务状态。
+devmaster采用基于epoll的event异步编程框架，当内核上报uevent事件或者用户通过devctl工具发送控制命令后，将激活devmaster进入设备处理流程。基本框架分成三个层次，第一层次包含ControlManager和Monitor模块，负责接收设备事件，ControlManager负责接收devctl发送的控制指令，用户可以通过devct对devmaster的框架功能进行调试，Monitor负责监听内核上报的uevent事件，第二层次为JobQueue模块，devmaster接收到设备事件后需要插入到任务队列中进行缓存，并等待派发给空闲worker进程设备处理，队列中的各个事件具有状态，JobQueue需要维护和刷新事件状态，第三层次为WorkerManager模块，当任务队列中存在待处理事件时，由WorkerManager分配或者创建空闲的worker，并派发事件给worker进行处理，WorkerManager需要维护和刷新worker的状态，worker接收到待处理事件时，会在日志中打印接收记录，处理成功后，向外广播设备信息，并向WorkerManager通过tcp发送应答消息。各模块间的依赖关系如下图所示，ControlManager和Monitor持有JobQueue的引用，当接收到设备事件后，插入到任务队列中，JobQueue和WorkerManager相互持有引用，JobQueue中存在待处理任务时，会向WorkerManager分发，如果获取到空闲worker，则更新任务状态，WorkerManager获取到空闲的worker时，会将设备任务发送给该worker进行处理，处理完成后，WorkerManager通过JobQueue更新任务状态。
 
 <p align="center">
 <img src="./assets/devmaster_basic_framework.jpg" width="30%">
@@ -107,7 +107,7 @@ WorkerManager模块负责管理调度worker，需要承担任务派发、状态�
 <img src="./assets/devmaster_worker_state_machine.jpg" width="50%">
 </p>
 
-1. worker回收：在一些场景下需要回收正在运行的worker，比如事件队列空闲持续xx秒、控制块退出、控制块重新加载数据、收到devctl的特定控制命令等等。worker回收通过调用manager_kill_workers函数触发，该函数中会向所有worker发送kill控制命令，此时处于IDLE状态的worker进入KILLING状态并直接结束运行，处于RUNNING状态的worker会进入KILLING状态，然后等待当前任务完成再结束运行。当前仅支持使用devctl命令手动触发worker回收，自动回收功能需要等libevent支持on_post特性后再进行开发。
+1. worker回收：在一些场景下需要回收正在运行的worker，比如事件队列空闲持续xx秒、控制块退出、控制块重新加载数据、收到devctl的特定控制命令等等。worker回收通过调用manager_kill_workers函数触发，该函数中会向所有worker发送kill控制命令，此时处于IDLE状态的worker进入KILLING状态并直接结束运行，处于RUNNING状态的worker会进入KILLING状态，然后等待当前任务完成再结束运行。当前仅支持使用devctl命令手动触发worker回收，自动回收功能需要等event支持on_post特性后再进行开发。
 
 2. WorkerManager结构体对所有worker集中管理：为每个worker分配一个channel，worker持有发送端，worker内部执行的线程中持有接收端，worker处于空闲状态时，允许向其派发WorkerMessage，WorkerMessage可以是设备任务DeviceJob，也可以是控制命令Cmd；WorkerManager通过唯一的Tcp端口（"0.0.0.0:1223"）集中监听所有worker的响应消息，消息溯源通过消息内容进行区分，如果worker完成了设备任务，会返回finished id，当WorkerManager收到应答后，根据id找到worker并重置状态为IDLE，刷新与该worker绑定的DeviceJob事件状态，并从JobQueue中把对应的DeviceJob清除，如果worker线程退出了运行，会返回killed id，WorkerManager将该worker记录从控制块中清除。另外，worker在处理完设备后，会通过netlink向用户态进程广播设备信息，使用devctl monitor可以监听到该信息。
 
@@ -185,7 +185,7 @@ WorkerManager模块负责管理调度worker，需要承担任务派发、状态�
 | 3        | WorkerManager       | 采用线程池模型创建并管理worker，当接收事件队列派发的任务时，从线程池中获取一个空闲的worker进行处理，如果不存在空闲worker，则创建一个新的worker线程进行处理,worker中进行规则处理，需要设计看门狗机制防止处理超时，当worker空闲过久时，需要进行线程回收 | 高     |
 | 4        | 规则处理            | 负责导入和管理规则文件，处理设备任务时需要执行规则解析动作，规则解析过程需要一些特殊设备组件与builtin工具的支持，并且需要实现hwdb对设备信息进行持久化存储                                                                                             | 中     |
 | 5        | 信号处理            | 接收SIGINT和SIGTERM信号时，进入进程退出流程，接收SIGHUP信号时，重新加载进程                                                                                                                                                                           | 中     |
-| 6        | libdevice           | 提供设备相关的公共函数、数据结构等支持                                                                                                                                                                                                                | 中     |
+| 6        | device           | 提供设备相关的公共函数、数据结构等支持                                                                                                                                                                                                                | 中     |
 | 7        | Watch               | 使用inotify机制监控设备节点的IN_CLOSE_WRITE操作，并通过sysfs机制模拟设备的change事件                                                                                                                                                                  | 低     |
 | 8        | ControlManager      | 使用UnixSocket机制，监听客户端程序devctl发起的连接请求，建立连接后进行报文交互，并根据控制请求进行控制响应                                                                                                                                            | 低     |
 | 9        | 控制响应            | 根据客户端程序的控制请求，进行配置设置、行为控制、延时控制等动作                                                                                                                                                                                      | 低     |

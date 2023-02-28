@@ -1,0 +1,22 @@
+[package]
+name = "cmdproto"
+version = "0.2.0"
+authors = ["overweight <hexiaowen@huawei.com>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+prost = "0.11" # 处理 protobuf 的代码
+http = "0.2"   # 我们使用 HTTP status code 所以引入这个类型库
+snafu = "0.7"
+
+[build-dependencies]
+prost-build = "0.9" # 编译 protobuf
+
+[dev-dependencies]
+libtests = { path = "../../libs/libtests" }
+
+[[example]]
+name = "signals"
+path = "./examples/signal.rs"

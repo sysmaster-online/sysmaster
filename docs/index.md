@@ -90,18 +90,19 @@ daemon类型的bin crate的目录以d结尾。
 ```text
 / (根目录)
 |...coms (插件)
-|      |...service (unit type crate)
-|      |...socket  (unit type crate)
-|      |...target  (unit type crate)
+|     |...service (unit type crate)
+|     |...socket  (unit type crate)
+|     |...target  (unit type crate)
 |...libs (对外接口)
-|      |...libtest (test lib crate)
-|      |...libcgroup (cgroup lib crate)
-|      |...libcmdproto(cmd proto lib crate)
-|...extends (sysmaster-extends组件)
-|     |...sysmaster (daemon,and libsysmaster
-|     |...udevd (daemon)
+|     |...libtests (test lib crate)
+|     |...cgroup (cgroup lib crate)
+|     |...cmdproto(cmd proto lib crate)
+|...exts (sysmaster-extends组件)
+|     |...devmaster (daemon)
 |     |...random-seed (bin)
-|...sysmaster (sysmaster-core核心组件)
+|...core (sysmaster-core核心组件)
+|     |...sysmaster (bin)
+|     |...sysmaster (internal lib)
 |...tools
 |     |...musl_build
 |     |...run_with_sd
@@ -112,7 +113,7 @@ daemon类型的bin crate的目录以d结尾。
 如：
 
 ```text
-  - lib crate: libs/libevent, libs/libutils
+  - lib crate: libs/event, libs/basic
   - bin crate: extends/init, sysmaster
   - daemon crate: extends/udevd, extends/logind
 ```

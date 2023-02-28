@@ -16,7 +16,7 @@
 use super::base::PLUGIN_NAME;
 use super::comm::MountUnitComm;
 use super::mng::MountMng;
-use libutils::logger;
+use basic::logger;
 use nix::sys::wait::WaitStatus;
 use std::path::PathBuf;
 use std::rc::Rc;

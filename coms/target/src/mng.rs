@@ -14,7 +14,7 @@
 //!
 use super::comm::TargetUnitComm;
 use super::rentry::TargetState;
-use libutils::IN_SET;
+use basic::IN_SET;
 use std::{cell::RefCell, rc::Rc};
 use sysmaster::error::*;
 use sysmaster::rel::ReStation;

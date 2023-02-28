@@ -13,7 +13,7 @@
 use super::base::PLUGIN_NAME;
 use super::comm::SocketUmComm;
 use super::rentry::SocketReFrame;
-use libutils::logger;
+use basic::logger;
 use std::rc::Rc;
 use std::sync::Arc;
 use sysmaster::rel::{ReStation, Reliability};

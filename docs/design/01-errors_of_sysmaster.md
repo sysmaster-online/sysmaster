@@ -245,7 +245,7 @@ pub enum Error {
     },
 
     /// It cannot be processed at this level and needs to be thrown. Be careful not to repeat semantics
-    #[snafu(display("Error(libevent): '{}'.", word))]
+    #[snafu(display("Error(event): '{}'.", word))]
     InvalidLoad {
         /// some words
         msg: &'static str,
@@ -266,7 +266,7 @@ pub enum Error {
         words: &'static str,   // 额外的错误信息
         backtrace: Backtrace,
     },
-    #[snafu(display("Error(libevent): '{}'.", word))]
+    #[snafu(display("Error(event): '{}'.", word))]
     Other {
         words: &'static str,
     },

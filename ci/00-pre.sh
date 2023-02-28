@@ -24,7 +24,7 @@ fi
 #git加速并安装rust工具链
 repo="https://github.com/rust-lang/release-team.git"
 git config --global http.lowSpeedLimit 5
-git config --global http.lowSpeedTime 10
+git config --global http.lowSpeedTime 30
 git config --global url."https://gitclone.com/github.com/".insteadOf "https://github.com/"
 git clone $repo
 if [ $? -ne 0 ]; then

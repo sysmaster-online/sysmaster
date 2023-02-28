@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use super::comm::ServiceUnitComm;
-use libutils::process_util;
+use basic::process_util;
 use nix::errno::Errno;
 use nix::unistd::Pid;
 use std::cell::RefCell;
