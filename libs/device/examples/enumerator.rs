@@ -11,10 +11,13 @@
 // See the Mulan PSL v2 for more details.
 
 //! example for using enumerator
-use device::{device_action::DeviceAction, device_enumerator::DeviceEnumerator};
+use device::{
+    device_action::DeviceAction,
+    device_enumerator::{DeviceEnumerationType, DeviceEnumerator},
+};
 
 fn main() {
-    let enumerator = DeviceEnumerator::new();
+    let mut enumerator = DeviceEnumerator::new();
 
     for device in enumerator {
         println!("{}", device.as_ref().lock().unwrap().get_devpath().unwrap());
@@ -25,4 +28,6 @@ fn main() {
             .trigger(DeviceAction::Change)
             .unwrap();
     }
+
+    enumerator.set_enumerator_type(DeviceEnumerationType::Subsystems);
 }
