@@ -16,8 +16,8 @@ use super::config::ServiceConfig;
 use super::mng::RunningData;
 use super::mng::ServiceMng;
 use super::rentry::{NotifyAccess, ServiceCommand, ServiceType};
-use libutils::logger;
-use libutils::special::{BASIC_TARGET, SHUTDOWN_TARGET, SYSINIT_TARGET};
+use basic::logger;
+use basic::special::{BASIC_TARGET, SHUTDOWN_TARGET, SYSINIT_TARGET};
 use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
 use std::collections::HashMap;
@@ -111,8 +111,15 @@ impl SubUnit for ServiceUnit {
         Ok(())
     }
 
-    fn reload(&self) {
+    fn reload(&self) -> Result<()> {
         self.mng.reload_action();
+        Ok(())
+    }
+
+    fn can_reload(&self) -> bool {
+        self.config
+            .get_exec_cmds(ServiceCommand::Reload)
+            .map_or(false, |cmds| !cmds.is_empty())
     }
 
     fn kill(&self) {

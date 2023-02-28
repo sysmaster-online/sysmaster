@@ -15,7 +15,7 @@
 use crate::comm::SocketUnitComm;
 use crate::config::SocketConfig;
 use crate::rentry::PortType;
-use libutils::special::{SHUTDOWN_TARGET, SOCKETS_TARGET, SYSINIT_TARGET};
+use basic::special::{SHUTDOWN_TARGET, SOCKETS_TARGET, SYSINIT_TARGET};
 use std::path::Path;
 use std::rc::Rc;
 use sysmaster::error::*;

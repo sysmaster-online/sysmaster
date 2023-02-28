@@ -20,9 +20,9 @@ use super::rentry::{
 };
 use super::spawn::ServiceSpawn;
 use crate::rentry::ExitStatus;
-use libevent::{EventState, EventType, Events, Source};
-use libutils::{fd_util, IN_SET};
-use libutils::{file_util, process_util};
+use basic::{fd_util, IN_SET};
+use basic::{file_util, process_util};
+use event::{EventState, EventType, Events, Source};
 use nix::errno::Errno;
 use nix::libc;
 use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};
@@ -775,7 +775,11 @@ impl ServiceMng {
 
         let pid = match file_util::read_first_line(pid_file_path) {
             Ok(line) => line.trim().parse::<i32>(),
-            Err(e) => return Err(Error::from(e)),
+            Err(e) => {
+                return Err(Error::Parse {
+                    source: Box::new(e),
+                })
+            }
         };
 
         if pid.is_err() {
@@ -902,7 +906,7 @@ impl ServiceMng {
         if let Some(Ok(v)) = self
             .comm
             .owner()
-            .map(|u| libcgroup::cg_is_empty_recursive(&u.cg_path()))
+            .map(|u| cgroup::cg_is_empty_recursive(&u.cg_path()))
         {
             return !v;
         }

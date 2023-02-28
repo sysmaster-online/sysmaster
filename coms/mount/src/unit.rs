@@ -16,7 +16,7 @@
 use super::base::PLUGIN_NAME;
 use super::comm::MountUnitComm;
 use super::mng::MountMng;
-use libutils::logger;
+use basic::logger;
 use nix::sys::wait::WaitStatus;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -106,8 +106,6 @@ impl SubUnit for MountUnit {
         self.mng.enter_dead(true);
         Ok(())
     }
-
-    fn reload(&self) {}
 
     fn kill(&self) {}
 

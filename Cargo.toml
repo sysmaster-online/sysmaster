@@ -6,13 +6,13 @@ edition = "2021"
 build = "build.rs"
 
 [lib]
-path = "sysmaster/libs/lib.rs"
 name = "sysmaster"
+path = "core/lib/lib.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
 name = "sysmaster"
-path = "sysmaster/core/main.rs"
+path = "core/bin/main.rs"
 
 [dev-dependencies.libtests]
 path = "libs/libtests"
@@ -20,10 +20,10 @@ path = "libs/libtests"
 
 [dependencies]
 # internal libraries
-libcgroup = { path = "libs/libcgroup" }
-libevent = { path = "libs/libevent" }
-libutils = { path = "libs/libutils" }
-libcmdproto = { path = "libs/libcmdproto" }
+cgroup = { path = "libs/cgroup" }
+event = { path = "libs/event" }
+basic = { path = "libs/basic" }
+cmdproto = { path = "libs/cmdproto" }
 
 # third libraries
 bitflags = "1.3.2"
@@ -109,22 +109,22 @@ overflow-checks = false
 [workspace]
 members = [
   # external binaries
-  "extends/fstab",
-  "extends/init",
-  "extends/sctl",
-  "extends/random_seed",
-  "extends/rc-local-generator",
-  "extends/sysmonitor",
-  "extends/devmaster",
+  "exts/fstab",
+  "exts/init",
+  "exts/sctl",
+  "exts/random_seed",
+  "exts/rc-local-generator",
+  "exts/sysmonitor",
+  "exts/devmaster",
   #internal libraries crates
-  "libs/libcmdproto",
+  "libs/cmdproto",
   #external libraries crates
-  "libs/libcgroup",
-  "libs/libevent",
-  "libs/libutils",
+  "libs/cgroup",
+  "libs/event",
+  "libs/basic",
   "libs/libtests",
-  "libs/libwatchdog",
-  "libs/libdevice",
+  "libs/watchdog",
+  "libs/device",
   #components crates
   "coms/service",
   "coms/socket",

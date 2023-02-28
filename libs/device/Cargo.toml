@@ -1,0 +1,16 @@
+[package]
+name = "device"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# internal libraries
+basic = { path = "../basic" }
+event = { path = "../event" }
+
+# third libraries
+nix = "0.24"
+libc = "0.2.*"
+snafu = "0.7"

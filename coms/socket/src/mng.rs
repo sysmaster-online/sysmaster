@@ -20,11 +20,11 @@ use super::{
     rentry::{PortType, SocketCommand, SocketRe, SocketReFrame, SocketResult, SocketState},
     spawn::SocketSpawn,
 };
-use libevent::EventState;
-use libevent::{EventType, Events, Source};
-use libutils::IN_SET;
+use basic::IN_SET;
+use event::EventState;
+use event::{EventType, Events, Source};
 use nix::libc::{self};
-use nix::{errno::Errno, sys::wait::WaitStatus};
+use nix::sys::wait::WaitStatus;
 use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
@@ -548,12 +548,12 @@ impl SocketMngData {
         }
     }
 
-    fn open_fds(&self) -> Result<(), Errno> {
+    fn open_fds(&self) -> Result<()> {
         for port in self.ports().iter() {
-            let ret1 = port.open_port(true);
-            if ret1.is_err() {
+            let ret = port.open_port(true);
+            if ret.is_err() {
                 self.close_fds();
-                return ret1.map(|_| ());
+                return ret;
             }
 
             port.apply_sock_opt(port.fd());
@@ -866,7 +866,7 @@ impl Source for SocketMngPort {
         self.rentry().set_last_frame(SocketReFrame::FdListen(true));
         self.reli()
             .set_last_unit(self.mng().comm.owner().unwrap().id());
-        let ret = self.dispatch_io().map_err(|_| libevent::Error::Other {
+        let ret = self.dispatch_io().map_err(|_| event::Error::Other {
             word: "Dispatch IO failed!",
         });
         self.reli().clear_last_unit();
