@@ -45,7 +45,7 @@ pub struct Device {
     /// relative path under /sys/, e.g., /devices/pci0000:00/0000:00:10.0/host2/target2:0:1/2:0:1:0/block/sda
     pub devpath: String,
     /// sysnum
-    pub sysnum: Option<String>,
+    pub sysnum: String,
     /// sysname is the basename of syspath, e.g., sda
     pub sysname: String,
     /// device subsystem
@@ -122,7 +122,7 @@ impl Device {
             devnum: 0,
             syspath: String::new(),
             devpath: String::new(),
-            sysnum: None,
+            sysnum: String::new(),
             sysname: String::new(),
             subsystem: String::new(),
             driver_subsystem: String::new(),
@@ -742,7 +742,21 @@ impl Device {
 
     /// get device sysnum
     pub fn get_sysnum(&mut self) -> Result<&str, Error> {
-        todo!()
+        if self.sysname.is_empty() {
+            self.set_sysname_and_sysnum().map_err(|e| Error::Nix {
+                msg: format!("get_sysnum failed: get_sysnum ({})", e),
+                source: e.get_errno(),
+            })?;
+        }
+
+        if self.sysnum.is_empty() {
+            return Err(Error::Nix {
+                msg: "get_sysnum failed: no sysnum".to_string(),
+                source: Errno::ENOENT,
+            });
+        }
+
+        Ok(&self.sysnum)
     }
 
     /// get device action
@@ -999,17 +1013,21 @@ impl Device {
         let sysname = sysname.replace('!', "/");
 
         let mut ridx = sysname.len();
-        loop {
-            ridx = match sysname[0..ridx].rfind(char::is_numeric) {
-                Some(ridx) => ridx,
+        while ridx > 0 {
+            match sysname.chars().nth(ridx - 1) {
+                Some(c) => {
+                    if c.is_digit(10) {
+                        ridx = ridx - 1;
+                    } else {
+                        break;
+                    }
+                }
                 None => break,
             }
         }
 
-        if ridx == sysname.len() {
-            self.sysnum = None;
-        } else {
-            self.sysnum = Some(String::from(&sysname[ridx..]));
+        if ridx < sysname.len() {
+            self.sysnum = String::from(&sysname[ridx..]);
         }
 
         self.sysname = sysname;
