@@ -177,8 +177,6 @@ unit作为所管理的系统资源在sysmaster中的投影，unit在通过os接�
             #[config(default = "")]
             pub Documentation: String,
             #[config(default = false)]
-            pub AllowIsolate: bool,
-            #[config(default = false)]
             pub IgnoreOnIsolate: bool,
             // #[config(deserialize_with = JobMode::deserialize_with)]
             // #[config(default = "replace")]
