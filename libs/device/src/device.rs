@@ -100,6 +100,8 @@ pub struct Device {
     pub subsystem_set: bool,
     /// whether the parent is set
     pub parent_set: bool,
+    /// whether the driver is set
+    pub driver_set: bool,
 }
 
 impl Default for Device {
@@ -147,6 +149,7 @@ impl Device {
             diskseq: 0,
             parent: None,
             parent_set: false,
+            driver_set: false,
         }
     }
 
@@ -679,7 +682,43 @@ impl Device {
 
     /// get driver
     pub fn get_driver(&mut self) -> Result<&str, Error> {
-        todo!()
+        if !self.driver_set {
+            let syspath = self.get_syspath().unwrap().to_string();
+            let driver_path_str = syspath + "/driver";
+            let driver_path = Path::new(&driver_path_str);
+            let driver = match driver_path.canonicalize() {
+                Ok(p) => p.to_str().unwrap_or_default().to_string(),
+                Err(e) => {
+                    let errno = e.raw_os_error().unwrap_or_default();
+                    if errno != libc::ENOENT {
+                        return Err(Error::Nix {
+                            msg: format!(
+                                "get_driver failed: canonicalize failed {} ({})",
+                                driver_path_str, e
+                            ),
+                            source: Errno::from_i32(errno),
+                        });
+                    }
+
+                    String::new()
+                }
+            };
+
+            // if the device has no driver, clear it from internal property
+            self.set_driver(driver).map_err(|e| Error::Nix {
+                msg: format!("get_driver failed: set_driver ({})", e),
+                source: e.get_errno(),
+            })?;
+        }
+
+        if self.driver.is_empty() {
+            return Err(Error::Nix {
+                msg: "get_driver failed: no driver".to_string(),
+                source: Errno::ENOENT,
+            });
+        }
+
+        Ok(&self.driver)
     }
 
     /// get device name
@@ -1289,6 +1328,14 @@ impl Device {
     pub(crate) fn set_seqnum(&mut self, seqnum: u64) -> Result<(), Error> {
         self.add_property_internal("SEQNUM".to_string(), seqnum.to_string())?;
         self.seqnum = seqnum;
+        Ok(())
+    }
+
+    /// set driver
+    pub(crate) fn set_driver(&mut self, driver: String) -> Result<(), Error> {
+        self.add_property_internal("DRIVER".to_string(), driver.clone())?;
+        self.driver_set = true;
+        self.driver = driver;
         Ok(())
     }
 
