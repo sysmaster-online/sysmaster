@@ -641,7 +641,21 @@ impl Device {
 
     /// get the device type
     pub fn get_devtype(&mut self) -> Result<&str, Error> {
-        todo!()
+        match self.read_uevent_file() {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(e);
+            }
+        }
+
+        if self.devtype.is_empty() {
+            return Err(Error::Nix {
+                msg: "get_devtype failed: no available devname".to_string(),
+                source: Errno::ENOENT,
+            });
+        }
+
+        Ok(&self.devtype)
     }
 
     /// get devnum
