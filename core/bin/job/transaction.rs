@@ -408,6 +408,7 @@ mod tests {
     use crate::unit::DataManager;
     use crate::unit::{UnitRe, UnitRelations};
     use basic::logger;
+    use event::Events;
     use sysmaster::rel::Reliability;
 
     #[test]
@@ -419,7 +420,12 @@ mod tests {
         let (reli, db, unit_test1, _unit_test2) = prepare_unit_multi(relation);
         let rentry = Rc::new(JobRe::new(&reli));
         let table = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
 
         let conf = JobConf::new(&unit_test1, JobKind::Start);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
@@ -432,7 +438,12 @@ mod tests {
         let (reli, db, unit_test1) = prepare_unit_single();
         let rentry = Rc::new(JobRe::new(&reli));
         let table = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
 
         let conf = JobConf::new(&unit_test1, JobKind::Start);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
@@ -446,7 +457,12 @@ mod tests {
         let (reli, db, _unit_test1, unit_test2) = prepare_unit_multi(relation);
         let rentry = Rc::new(JobRe::new(&reli));
         let table = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
 
         let conf = JobConf::new(&unit_test2, JobKind::Stop);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
@@ -459,7 +475,12 @@ mod tests {
         let (reli, db, unit_test1) = prepare_unit_single();
         let rentry = Rc::new(JobRe::new(&reli));
         let table = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
 
         let conf = JobConf::new(&unit_test1, JobKind::Stop);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
@@ -473,7 +494,12 @@ mod tests {
         let (reli, db, unit_test1, _unit_test2) = prepare_unit_multi(relation);
         let rentry = Rc::new(JobRe::new(&reli));
         let table = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
 
         let conf = JobConf::new(&unit_test1, JobKind::Reload);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
@@ -486,7 +512,12 @@ mod tests {
         let (reli, db, unit_test1) = prepare_unit_single();
         let rentry = Rc::new(JobRe::new(&reli));
         let table = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
 
         let conf = JobConf::new(&unit_test1, JobKind::Reload);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
@@ -500,7 +531,12 @@ mod tests {
         let (reli, db, unit_test1, _unit_test2) = prepare_unit_multi(relation);
         let rentry = Rc::new(JobRe::new(&reli));
         let table = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
 
         let conf = JobConf::new(&unit_test1, JobKind::Start);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
@@ -514,7 +550,12 @@ mod tests {
         let (reli, db, unit_test1) = prepare_unit_single();
         let rentry = Rc::new(JobRe::new(&reli));
         let table = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
 
         let conf = JobConf::new(&unit_test1, JobKind::Start);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
@@ -529,7 +570,12 @@ mod tests {
         let (reli, db, unit_test1, _unit_test2) = prepare_unit_multi(relation);
         let rentry = Rc::new(JobRe::new(&reli));
         let table = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
 
         let conf = JobConf::new(&unit_test1, JobKind::Stop);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
@@ -543,7 +589,12 @@ mod tests {
         let (reli, db, unit_test1) = prepare_unit_single();
         let rentry = Rc::new(JobRe::new(&reli));
         let table = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
 
         let conf = JobConf::new(&unit_test1, JobKind::Stop);
         let ret = job_trans_expand(&table, &ja, &db, &conf, JobMode::Replace);
@@ -559,7 +610,12 @@ mod tests {
         let rentry = Rc::new(JobRe::new(&reli));
         let jobs = JobTable::new(&db);
         let stage = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
         let mode = JobMode::Replace;
         let runkind = JobKind::Start;
         let ret_rel = JobResult::Dependency;
@@ -586,7 +642,12 @@ mod tests {
         let rentry = Rc::new(JobRe::new(&reli));
         let jobs = JobTable::new(&db);
         let stage = JobTable::new(&db);
-        let ja = JobAlloc::new(&reli, &rentry);
+        let ja = JobAlloc::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+        );
         let mode = JobMode::Replace;
         let runkind = JobKind::Stop;
         let ret_rel = JobResult::Dependency;

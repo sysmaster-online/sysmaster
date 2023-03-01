@@ -11,12 +11,15 @@
 // See the Mulan PSL v2 for more details.
 
 use super::rentry::{self, JobAttr, JobKind, JobRe};
+use crate::unit::DataManager;
 use crate::unit::JobMode;
 use crate::unit::UnitRelationAtom;
 use crate::unit::UnitX;
+use event::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
+use std::os::unix::prelude::RawFd;
+use std::rc::{Rc, Weak};
 use sysmaster::error::*;
 use sysmaster::rel::Reliability;
 use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
@@ -74,6 +77,77 @@ impl JobConf {
     }
 }
 
+pub(crate) struct JobTimer {
+    time_usec: RefCell<u64>,
+    job: RefCell<Weak<Job>>,
+}
+
+impl JobTimer {
+    pub fn new(usec: u64) -> Self {
+        JobTimer {
+            time_usec: RefCell::new(usec),
+            job: RefCell::new(Weak::new()),
+        }
+    }
+
+    pub(super) fn attach_job(&self, job: &Rc<Job>) {
+        *self.job.borrow_mut() = Rc::downgrade(job);
+    }
+
+    pub(super) fn set_time(&self, usec: u64) {
+        *self.time_usec.borrow_mut() = usec
+    }
+
+    pub(super) fn get_time_usec(&self) -> u64 {
+        *self.time_usec.borrow()
+    }
+
+    pub(self) fn job(&self) -> Option<Rc<Job>> {
+        self.job.borrow().upgrade()
+    }
+
+    fn do_dispatch(&self) -> i32 {
+        let job = match self.job() {
+            None => {
+                log::info!("The job has already been removed, skipping.");
+                return 0;
+            }
+            Some(v) => v,
+        };
+        let unit_id = job.unit().unit().id().to_string();
+        log::info!("Job {:?} of unit {} timeout", job.kind(), unit_id);
+        job.dm.insert_job_result(unit_id, JobResult::TimeOut);
+        0
+    }
+}
+
+impl Source for JobTimer {
+    fn fd(&self) -> RawFd {
+        0
+    }
+
+    fn event_type(&self) -> EventType {
+        EventType::TimerMonotonic
+    }
+
+    fn epoll_event(&self) -> u32 {
+        (libc::EPOLLIN) as u32
+    }
+
+    fn time_relative(&self) -> u64 {
+        *self.time_usec.borrow()
+    }
+
+    fn dispatch(&self, _: &Events) -> i32 {
+        self.do_dispatch()
+    }
+
+    fn token(&self) -> u64 {
+        let data: u64 = unsafe { std::mem::transmute(self) };
+        data
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct JobInfo {
     pub(crate) id: u32,
@@ -114,10 +188,13 @@ pub(super) struct Job {
     // associated objects
     reli: Rc<Reliability>,
     rentry: Rc<JobRe>,
+    events: Rc<Events>,
+    dm: Rc<DataManager>,
 
     // owned objects
     // key: input
     id: u32,
+    timer: Rc<JobTimer>,
 
     // data
     /* config: input */
@@ -157,6 +234,8 @@ impl Job {
     pub(super) fn new(
         relir: &Rc<Reliability>,
         rentryr: &Rc<JobRe>,
+        eventsr: &Rc<Events>,
+        dmr: &Rc<DataManager>,
         id: u32,
         unit: Rc<UnitX>,
         kind: JobKind,
@@ -164,7 +243,10 @@ impl Job {
         Job {
             reli: Rc::clone(relir),
             rentry: Rc::clone(rentryr),
+            events: Rc::clone(eventsr),
+            dm: Rc::clone(dmr),
             id,
+            timer: Rc::new(JobTimer::new(0)),
             unit,
             kind,
             attr: RefCell::new(JobAttr::new(false, false, false, false)),
@@ -176,6 +258,25 @@ impl Job {
     pub(super) fn clear(&self) {
         // release external connection, like: timer, ...
         // do nothing now
+    }
+
+    pub(super) fn get_timer(&self) -> Rc<JobTimer> {
+        self.timer.clone()
+    }
+
+    pub(super) fn set_timer(&self) {
+        let sec = self
+            .unit()
+            .get_config()
+            .config_data()
+            .borrow()
+            .Unit
+            .JobTimeoutSec;
+        // No need to enable timer if JobTimeoutSec is set to 0
+        if sec == 0 {
+            return;
+        }
+        self.timer.set_time(sec * 1000000);
     }
 
     pub(super) fn rentry_map_trigger(&self) {
@@ -243,6 +344,19 @@ impl Job {
 
         // update stage
         *self.stage.borrow_mut() = JobStage::Running;
+
+        // Only enable the JobTimer event source if JobTimeoutSec is not 0
+        if self.get_timer().get_time_usec() != 0 {
+            if self.events.add_source(self.get_timer()).is_err() {
+                log::error!("Failed to add JobTimer event source, skipping.");
+            } else if self
+                .events
+                .set_enabled(self.get_timer(), EventState::OneShot)
+                .is_err()
+            {
+                log::error!("Failed to enable JobTimer event source, skipping.");
+            }
+        }
 
         // update reliability
         self.reli.set_last_unit(self.unit.id());

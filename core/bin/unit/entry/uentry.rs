@@ -517,6 +517,10 @@ impl Unit {
         self.config.config_data().borrow().Unit.StartLimitAction
     }
 
+    pub fn get_job_timeout_action(&self) -> UnitEmergencyAction {
+        self.config.config_data().borrow().Unit.JobTimeoutAction
+    }
+
     ///
     pub fn current_active_state(&self) -> UnitActiveState {
         self.sub.current_active_state()

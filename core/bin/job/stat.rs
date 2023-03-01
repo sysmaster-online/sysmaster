@@ -449,6 +449,7 @@ mod tests {
     use crate::unit::UnitRe;
     use crate::unit::UnitX;
     use basic::logger;
+    use event::Events;
     use sysmaster::rel::Reliability;
 
     #[test]
@@ -459,7 +460,15 @@ mod tests {
         let mut id: u32 = 0;
         id = id.wrapping_add(1); // ++
         let kind = JobKind::Start;
-        let job = Rc::new(Job::new(&reli, &rentry, id, Rc::clone(&unit_test1), kind));
+        let job = Rc::new(Job::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+            id,
+            Rc::clone(&unit_test1),
+            kind,
+        ));
 
         // nothing exists
         assert_eq!(stat.data.borrow().num.kind.total(), 0);

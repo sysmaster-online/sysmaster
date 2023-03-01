@@ -24,6 +24,12 @@ sysmaster兼容systemd的SuccessAction、FailureAction、StartLimitAction等配�
 
 单位时间内最多的启动次数， 默认值为5。 只要`StartLimitInterval`与`StartLimitBurst`其中一项配置为0时不启动限速。
 
+### JobTimeoutAction，JobTimeoutSec
+
+`JobTimeoutAction`配置unit的job运行超时时采取的动作，配置的值与采取的动作与`SuccessAction`、`FailureAction`一致。
+
+`JobTimeoutSec`配置unit的job运行超时时间，单位是`秒`。systemd禁用`JobTimeoutSec`的配置为`infinity`，sysmaster与之不同，禁用`JobTimeoutSec`需要配置为`0`。
+
 ## 顺序和依赖
 
 sysmaster支持配置单元之间的依赖关系，可以配置的值为`;`分隔的单元。如`After="foo.service;bar.target"`。需要注意：

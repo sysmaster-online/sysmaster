@@ -16,7 +16,7 @@ use super::rentry::{JobAttr, JobKind, JobRe};
 use super::stat::JobStat;
 use super::table::JobTable;
 use super::{entry, junit, notify, table, transaction};
-use crate::unit::{JobMode, UnitDb, UnitRelationAtom, UnitX};
+use crate::unit::{DataManager, JobMode, UnitDb, UnitRelationAtom, UnitX};
 use crate::utils::table::{TableOp, TableSubscribe};
 use event::{EventState, EventType, Events, Source};
 use std::cell::RefCell;
@@ -131,11 +131,12 @@ impl JobManager {
         eventr: &Rc<Events>,
         relir: &Rc<Reliability>,
         dbr: &Rc<UnitDb>,
+        dmr: &Rc<DataManager>,
     ) -> JobManager {
         let jm = JobManager {
             event: Rc::clone(eventr),
             sub_name: String::from("JobManager"),
-            data: Rc::new(JobManagerData::new(relir, dbr)),
+            data: Rc::new(JobManagerData::new(relir, dbr, eventr, dmr)),
         };
         jm.register(eventr, dbr);
         jm
@@ -307,14 +308,19 @@ struct JobManagerData {
 
 // the declaration "pub(self)" is for identification only.
 impl JobManagerData {
-    pub(self) fn new(relir: &Rc<Reliability>, dbr: &Rc<UnitDb>) -> JobManagerData {
+    pub(self) fn new(
+        relir: &Rc<Reliability>,
+        dbr: &Rc<UnitDb>,
+        eventsr: &Rc<Events>,
+        dmr: &Rc<DataManager>,
+    ) -> JobManagerData {
         let _rentry = Rc::new(JobRe::new(relir));
         JobManagerData {
             reli: Rc::clone(relir),
             db: Rc::clone(dbr),
 
             rentry: Rc::clone(&_rentry),
-            ja: JobAlloc::new(relir, &_rentry),
+            ja: JobAlloc::new(relir, &_rentry, eventsr, dmr),
 
             jobs: JobTable::new(dbr),
             stage: JobTable::new(dbr),
@@ -813,7 +819,8 @@ mod tests {
         let event = Rc::new(Events::new().unwrap());
         let rentry = Rc::new(UnitRe::new(&reli));
         let db = Rc::new(UnitDb::new(&rentry));
-        let jm = JobManager::new(&event, &reli, &db);
+        let dm = Rc::new(DataManager::new());
+        let jm = JobManager::new(&event, &reli, &db, &dm);
 
         log::debug!("job_reli, reli:{}.", Rc::strong_count(&reli)); // 3
         log::debug!("job_reli, event:{}.", Rc::strong_count(&event)); // 2
@@ -840,7 +847,7 @@ mod tests {
     #[test]
     fn job_exec_input_check() {
         let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
         let mut affect = JobAffect::new(true);
 
         let conf = JobConf::new(&unit_test1, JobKind::Stop);
@@ -855,7 +862,7 @@ mod tests {
     #[test]
     fn job_exec_single() {
         let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
 
         let mut affect = JobAffect::new(true);
         let conf = JobConf::new(&unit_test1, JobKind::Start);
@@ -876,7 +883,7 @@ mod tests {
     fn job_exec_multi() {
         let relation = Some(UnitRelations::UnitRequires);
         let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(relation);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
 
         let mut affect = JobAffect::new(true);
         let conf = JobConf::new(&unit_test1, JobKind::Start);
@@ -905,7 +912,7 @@ mod tests {
     #[test]
     fn job_notify() {
         let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
 
         let conf = JobConf::new(&unit_test1, JobKind::Start);
         let ret = jm.notify(&conf, JobMode::Replace);
@@ -919,7 +926,7 @@ mod tests {
     #[test]
     fn job_try_finish_async() {
         let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
         let os = UnitActiveState::UnitInActive;
         let ns = UnitActiveState::UnitActive;
         let flags = UnitNotifyFlags::empty();
@@ -931,7 +938,7 @@ mod tests {
     #[test]
     fn job_try_finish_sync() {
         let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
         let os = UnitActiveState::UnitInActive;
         let ns = UnitActiveState::UnitActive;
         let flags = UnitNotifyFlags::empty();
@@ -952,7 +959,7 @@ mod tests {
     #[test]
     fn job_run_finish_single() {
         let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
 
         let conf = JobConf::new(&unit_test1, JobKind::Nop);
         jm.exec(&conf, JobMode::Replace, &mut JobAffect::new(false))
@@ -968,7 +975,7 @@ mod tests {
     #[test]
     fn job_run_finish_multi() {
         let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
 
         let conf1 = JobConf::new(&unit_test1, JobKind::Nop);
         jm.exec(&conf1, JobMode::Replace, &mut JobAffect::new(false))
@@ -987,7 +994,7 @@ mod tests {
     #[test]
     fn job_run_unit_finish_single() {
         let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
 
         let conf = JobConf::new(&unit_test1, JobKind::Nop);
         jm.exec(&conf, JobMode::Replace, &mut JobAffect::new(false))
@@ -1007,7 +1014,7 @@ mod tests {
     #[test]
     fn job_run_unit_finish_multi() {
         let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
 
         let conf1 = JobConf::new(&unit_test1, JobKind::Nop);
         jm.exec(&conf1, JobMode::Replace, &mut JobAffect::new(false))
@@ -1030,7 +1037,7 @@ mod tests {
     #[test]
     fn job_remove() {
         let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
         let mut affect = JobAffect::new(true);
 
         // nothing exists
@@ -1051,7 +1058,7 @@ mod tests {
     #[test]
     fn job_get_jobinfo() {
         let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
         let mut affect = JobAffect::new(true);
 
         // nothing exists
@@ -1078,7 +1085,7 @@ mod tests {
     #[test]
     fn job_has_stop_job() {
         let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
         let mut affect = JobAffect::new(true);
 
         // nothing exists
@@ -1107,7 +1114,7 @@ mod tests {
     #[test]
     fn job_remove_unit() {
         let (event, reli, db, unit_test1, unit_test2) = prepare_unit_multi(None);
-        let jm = JobManager::new(&event, &reli, &db);
+        let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
         let mut affect = JobAffect::new(true);
 
         let conf = JobConf::new(&unit_test1, JobKind::Start);

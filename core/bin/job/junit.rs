@@ -816,6 +816,7 @@ mod tests {
     use crate::unit::UnitX;
     use crate::unit::{JobMode, UnitRe};
     use basic::logger;
+    use event::Events;
     use sysmaster::rel::Reliability;
 
     #[test]
@@ -826,7 +827,15 @@ mod tests {
         let mut id: u32 = 0;
         id = id.wrapping_add(1); // ++
         let kind = JobKind::Start;
-        let job = Rc::new(Job::new(&reli, &rentry, id, Rc::clone(&unit_test1), kind));
+        let job = Rc::new(Job::new(
+            &reli,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+            id,
+            Rc::clone(&unit_test1),
+            kind,
+        ));
         let uv = JobUnit::new(Rc::clone(&unit_test1));
 
         // nothing exists
@@ -1248,27 +1257,67 @@ mod tests {
 
         id = id.wrapping_add(1); // ++
         let kind = JobKind::Nop;
-        let job_nop = Rc::new(Job::new(relir, &rentry, id, Rc::clone(unit), kind));
+        let job_nop = Rc::new(Job::new(
+            relir,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+            id,
+            Rc::clone(unit),
+            kind,
+        ));
         job_nop.init_attr(mode);
 
         id = id.wrapping_add(1); // ++
         let kind = JobKind::Start;
-        let job_start = Rc::new(Job::new(relir, &rentry, id, Rc::clone(unit), kind));
+        let job_start = Rc::new(Job::new(
+            relir,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+            id,
+            Rc::clone(unit),
+            kind,
+        ));
         job_start.init_attr(mode);
 
         id = id.wrapping_add(1); // ++
         let kind = JobKind::Reload;
-        let job_reload = Rc::new(Job::new(relir, &rentry, id, Rc::clone(unit), kind));
+        let job_reload = Rc::new(Job::new(
+            relir,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+            id,
+            Rc::clone(unit),
+            kind,
+        ));
         job_reload.init_attr(mode);
 
         id = id.wrapping_add(1); // ++
         let kind = JobKind::Restart;
-        let job_restart = Rc::new(Job::new(relir, &rentry, id, Rc::clone(unit), kind));
+        let job_restart = Rc::new(Job::new(
+            relir,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+            id,
+            Rc::clone(unit),
+            kind,
+        ));
         job_restart.init_attr(mode);
 
         id = id.wrapping_add(1); // ++
         let kind = JobKind::Stop;
-        let job_stop = Rc::new(Job::new(relir, &rentry, id, Rc::clone(unit), kind));
+        let job_stop = Rc::new(Job::new(
+            relir,
+            &rentry,
+            &Rc::new(Events::new().unwrap()),
+            &Rc::new(DataManager::new()),
+            id,
+            Rc::clone(unit),
+            kind,
+        ));
         job_stop.init_attr(mode);
 
         (job_nop, job_start, job_reload, job_restart, job_stop)

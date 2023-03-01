@@ -20,6 +20,7 @@
 //!  [unit_entry]: Definition of unit related objects
 //!  [unit_manager]: Manager all Unit Instances in sysmaster
 //!  [um_interface]: Share api of unit_manager for subunit
+pub(super) use data::DataManager;
 pub(super) use datastore::UnitDb;
 pub(super) use entry::UnitX;
 pub(super) use manager::UnitManagerX;
@@ -27,9 +28,6 @@ pub use rentry::UeConfigInstall;
 pub(super) use rentry::{unit_name_to_type, JobMode};
 pub(crate) use sysmaster::unit::UnitRelationAtom;
 pub(crate) use sysmaster::unit::{UnitRelations, UnitType};
-
-#[cfg(test)]
-pub(super) use data::DataManager;
 
 #[cfg(test)]
 pub(super) use rentry::UnitRe;
