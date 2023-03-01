@@ -534,5 +534,8 @@ impl EventsData {
         self.state.clear();
         self.children.clear();
         self.timerfd.clear();
+        if nix::unistd::close(self.inotify.as_raw_fd()).is_err() {
+            println!("Failed to close inotify fd.");
+        }
     }
 }
