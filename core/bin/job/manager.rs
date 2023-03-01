@@ -722,19 +722,17 @@ impl JobManagerData {
             && !flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART)
             && ns == UnitActiveState::UnitFailed
         {
-            if let JobMode::Fail = unit
+            let job_mode = unit
                 .get_config()
                 .config_data()
                 .borrow()
                 .Unit
-                .OnFailureJobMode
-            {
-                self.exec_on(
-                    Rc::clone(unit),
-                    UnitRelationAtom::UnitAtomOnFailure,
-                    JobMode::Fail,
-                );
-            }
+                .OnFailureJobMode;
+            self.exec_on(
+                Rc::clone(unit),
+                UnitRelationAtom::UnitAtomOnFailure,
+                job_mode,
+            );
         }
 
         // OnSuccess=
@@ -746,19 +744,17 @@ impl JobManagerData {
                 | UnitActiveState::UnitInActive
                 | UnitActiveState::UnitMaintenance => {}
                 _ => {
-                    if let JobMode::Fail = unit
+                    let job_mode = unit
                         .get_config()
                         .config_data()
                         .borrow()
                         .Unit
-                        .OnFailureJobMode
-                    {
-                        self.exec_on(
-                            Rc::clone(unit),
-                            UnitRelationAtom::UnitAtomOnSuccess,
-                            JobMode::Fail,
-                        );
-                    }
+                        .OnSuccessJobMode;
+                    self.exec_on(
+                        Rc::clone(unit),
+                        UnitRelationAtom::UnitAtomOnSuccess,
+                        job_mode,
+                    );
                 }
             };
         }

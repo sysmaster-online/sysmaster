@@ -164,6 +164,14 @@ impl UeLoad {
                 config_data.borrow().Unit.Requisite.clone(),
             ),
             (
+                UnitRelations::UnitOnFailure,
+                config_data.borrow().Unit.OnFailure.clone(),
+            ),
+            (
+                UnitRelations::UnitOnSuccess,
+                config_data.borrow().Unit.OnSuccess.clone(),
+            ),
+            (
                 UnitRelations::UnitPartOf,
                 config_data.borrow().Unit.PartOf.clone(),
             ),
