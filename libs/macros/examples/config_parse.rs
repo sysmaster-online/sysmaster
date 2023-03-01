@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 /*
-use proc_macro_utils::ConfigParseM;
+use macros::ConfigParseM;
 use serde::{Deserialize, Serialize};
 use std::io::{Error as IoError, ErrorKind};
 use strum::Display;

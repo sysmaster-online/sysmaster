@@ -13,10 +13,10 @@
 #![allow(non_snake_case)]
 use crate::monitor::ServiceMonitor;
 use confique::Config;
+use macros::EnumDisplay;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
-use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::rc::Rc;
 use std::str::FromStr;

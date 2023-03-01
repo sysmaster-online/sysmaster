@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use proc_macro_utils::EnumDisplay;
+use macros::EnumDisplay;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
