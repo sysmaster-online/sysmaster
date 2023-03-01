@@ -50,7 +50,7 @@ pub struct Device {
     pub sysname: String,
     /// device subsystem
     pub subsystem: String,
-    /// only set for the 'drivers' subsystem
+    /// only set when subsystem is 'drivers'
     pub driver_subsystem: String,
     /// device driver
     pub driver: String,
@@ -337,6 +337,137 @@ impl Device {
         }
 
         Ok(dev)
+    }
+
+    /// create a Device instance from subsystem and sysname
+    /// if subsystem is 'drivers', sysname should be like 'xxx:yyy'
+    pub fn from_subsystem_sysname(subsystem: String, sysname: String) -> Result<Device, Error> {
+        let sysname = sysname.replace('/', "!");
+        if subsystem == "subsystem" {
+            match Device::from_syspath(format!("/sys/bus/{}", sysname), true) {
+                Ok(d) => return Ok(d),
+                Err(e) => {
+                    if e.get_errno() != Errno::ENODEV {
+                        return Err(Error::Nix {
+                            msg: format!("from_subsystem_sysname failed: from_syspath bus ({})", e),
+                            source: e.get_errno(),
+                        });
+                    }
+                }
+            }
+
+            match Device::from_syspath(format!("/sys/class/{}", sysname), true) {
+                Ok(d) => return Ok(d),
+                Err(e) => {
+                    if e.get_errno() != Errno::ENODEV {
+                        return Err(Error::Nix {
+                            msg: format!(
+                                "from_subsystem_sysname failed: from_syspath class ({})",
+                                e
+                            ),
+                            source: e.get_errno(),
+                        });
+                    }
+                }
+            }
+        } else if subsystem == "module" {
+            match Device::from_syspath(format!("/sys/module/{}", sysname), true) {
+                Ok(d) => return Ok(d),
+                Err(e) => {
+                    if e.get_errno() != Errno::ENODEV {
+                        return Err(Error::Nix {
+                            msg: format!(
+                                "from_subsystem_sysname failed: from_syspath module ({})",
+                                e
+                            ),
+                            source: e.get_errno(),
+                        });
+                    }
+                }
+            }
+        } else if subsystem == "drivers" {
+            if let Some(idx) = sysname.find(':') {
+                if idx < sysname.len() - 1 {
+                    let subsys = sysname[0..idx].to_string();
+                    let sep = sysname[idx + 1..].to_string();
+                    let syspath = if sep == "drivers" {
+                        format!("/sys/bus/{}/drivers", subsys)
+                    } else {
+                        format!("/sys/bus/{}/drivers/{}", subsys, sep)
+                    };
+                    match Device::from_syspath(syspath, true) {
+                        Ok(d) => return Ok(d),
+                        Err(e) => {
+                            if e.get_errno() != Errno::ENODEV {
+                                return Err(Error::Nix {
+                                    msg: format!(
+                                        "from_subsystem_sysname failed: from_syspath drivers ({})",
+                                        e
+                                    ),
+                                    source: e.get_errno(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let syspath = format!("/sys/bus/{}/devices/{}", subsystem, sysname);
+        match Device::from_syspath(syspath, true) {
+            Ok(d) => return Ok(d),
+            Err(e) => {
+                if e.get_errno() != Errno::ENODEV {
+                    return Err(Error::Nix {
+                        msg: format!(
+                            "from_subsystem_sysname failed: from_syspath drivers ({})",
+                            e
+                        ),
+                        source: e.get_errno(),
+                    });
+                }
+            }
+        }
+
+        let syspath = format!("/sys/class/{}/devices/{}", subsystem, sysname);
+        match Device::from_syspath(syspath, true) {
+            Ok(d) => return Ok(d),
+            Err(e) => {
+                if e.get_errno() != Errno::ENODEV {
+                    return Err(Error::Nix {
+                        msg: format!(
+                            "from_subsystem_sysname failed: from_syspath drivers ({})",
+                            e
+                        ),
+                        source: e.get_errno(),
+                    });
+                }
+            }
+        }
+
+        let syspath = format!("/sys/firmware/{}/devices/{}", subsystem, sysname);
+        match Device::from_syspath(syspath, true) {
+            Ok(d) => return Ok(d),
+            Err(e) => {
+                if e.get_errno() != Errno::ENODEV {
+                    return Err(Error::Nix {
+                        msg: format!(
+                            "from_subsystem_sysname failed: from_syspath drivers ({})",
+                            e
+                        ),
+                        source: e.get_errno(),
+                    });
+                }
+            }
+        }
+
+        Err(Error::Nix {
+            msg: format!(
+                "from_subsystem_sysname failed: subsystem {} or sysname {} is invalid",
+                subsystem, sysname
+            ),
+            source: Errno::ENODEV,
+        })
     }
 
     /// set sysattr value
@@ -681,6 +812,13 @@ impl Device {
             let path = match fs::canonicalize(path.clone()) {
                 Ok(pathbuf) => pathbuf,
                 Err(e) => {
+                    if let Some(libc::ENOENT) = e.raw_os_error() {
+                        return Err(Error::Nix {
+                            msg: format!("set_syspath failed: invalid syspath {}", path),
+                            source: Errno::ENODEV,
+                        });
+                    }
+
                     return Err(Error::Nix {
                         msg: format!("set_syspath failed: failed to canonicalize {}", path),
                         source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
@@ -908,7 +1046,7 @@ impl Device {
             });
         }
 
-        self.set_subsystem(subsystem.clone())?;
+        self.set_subsystem("drivers".to_string())?;
         self.driver_subsystem = subsystem;
 
         Ok(())
@@ -1213,7 +1351,7 @@ mod tests {
     fn test_device_one(device: &mut Device) {
         let syspath = device.get_syspath().unwrap().to_string();
         assert!(syspath.starts_with("/sys"));
-        device.get_sysname().unwrap();
+        let sysname = device.get_sysname().unwrap().to_string();
 
         // test Device::from_syspath()
         let device_new = Device::from_syspath(String::from(syspath.clone()), true).unwrap();
@@ -1225,12 +1363,11 @@ mod tests {
         let syspath_new = device_new.get_syspath().unwrap().to_string();
         assert_eq!(syspath, syspath_new);
 
-        // test Device::get_ifindex()
+        // test Device::from_ifindex()
         match device.get_ifindex() {
             Ok(ifindex) => match Device::from_ifindex(ifindex) {
-                Ok(device) => {
-                    let syspath = device.get_syspath().unwrap();
-                    assert_eq!(syspath_new, syspath);
+                Ok(dev) => {
+                    assert_eq!(syspath, dev.get_syspath().unwrap());
                 }
                 Err(e) => {
                     assert_eq!(e.get_errno(), Errno::ENODEV);
@@ -1243,13 +1380,29 @@ mod tests {
 
         let mut is_block = false;
 
-        match device.get_subsystem() {
-            Ok(subsystem) => {
-                is_block = subsystem == "block";
-                // todo: sd_device_new_from_subsystem_sysname
-            }
+        // test Device::from_subsystem_sysname
+        let subsystem = match device.get_subsystem() {
+            Ok(subsystem) => subsystem.to_string(),
             Err(e) => {
                 assert_eq!(e.get_errno(), Errno::ENOENT);
+                String::new()
+            }
+        };
+        if !subsystem.is_empty() && subsystem != "gpio" {
+            is_block = subsystem == "block";
+            let name = if subsystem == "drivers" {
+                format!("{}:{}", device.driver_subsystem, sysname)
+            } else {
+                sysname.to_string()
+            };
+
+            match Device::from_subsystem_sysname(subsystem.to_string(), name) {
+                Ok(dev) => {
+                    assert_eq!(syspath, dev.get_syspath().unwrap());
+                }
+                Err(e) => {
+                    assert_eq!(e.get_errno(), Errno::ENODEV);
+                }
             }
         }
 
