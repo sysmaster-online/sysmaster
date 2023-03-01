@@ -670,7 +670,21 @@ impl Device {
 
     /// get device name
     pub fn get_devname(&mut self) -> Result<&str, Error> {
-        todo!()
+        match self.read_uevent_file() {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(e);
+            }
+        }
+
+        if self.devname.is_empty() {
+            return Err(Error::Nix {
+                msg: "get_devname failed: no available devname".to_string(),
+                source: Errno::ENOENT,
+            });
+        }
+
+        Ok(&self.devname)
     }
 
     /// get device sysnum
