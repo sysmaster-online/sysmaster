@@ -14,6 +14,9 @@ use crate::error::*;
 use bitflags::bitflags;
 use nix::sys::stat::Mode;
 use nix::unistd::{Group, Uid, User};
+
+use std::fs::File;
+use std::io::{self, BufRead};
 use std::{cell::RefCell, collections::HashMap};
 use std::{ffi::CString, path::PathBuf, rc::Rc};
 
@@ -21,6 +24,7 @@ use std::{ffi::CString, path::PathBuf, rc::Rc};
 /// like parsed from Environment field.
 pub struct ExecContext {
     envs: RefCell<HashMap<String, String>>,
+    env_files: RefCell<Vec<PathBuf>>,
 }
 
 impl Default for ExecContext {
@@ -34,6 +38,7 @@ impl ExecContext {
     pub fn new() -> ExecContext {
         ExecContext {
             envs: RefCell::new(HashMap::new()),
+            env_files: RefCell::new(vec![]),
         }
     }
 
@@ -50,6 +55,46 @@ impl ExecContext {
             tmp.push((key.to_string(), value.to_string()));
         }
         tmp
+    }
+
+    /// insert environment files
+    pub fn insert_envs_files(&self, paths: Vec<String>) {
+        for path in paths {
+            self.env_files.borrow_mut().push(PathBuf::from(path));
+        }
+    }
+
+    /// load envirenment from file
+    pub fn load_env_from_file(&self) -> Result<(), Error> {
+        for path in &*self.env_files.borrow() {
+            if path.starts_with("-") {
+                log::info!("ignore environment file; {:?}", path);
+                continue;
+            }
+
+            if !path.exists() || !path.is_absolute() {
+                continue;
+            }
+
+            let f = File::open(path)?;
+
+            for line in io::BufReader::new(f).lines().flatten() {
+                if line.trim().starts_with('#') {
+                    continue;
+                }
+
+                let content: Vec<&str> = line.split('=').map(|s| s.trim()).collect();
+                if content.len() != 2 {
+                    continue;
+                }
+
+                self.envs
+                    .borrow_mut()
+                    .insert(content[0].to_string(), content[1].to_string());
+            }
+        }
+
+        Ok(())
     }
 }
 

@@ -127,6 +127,11 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
         return;
     }
 
+    if let Err(e) = ctx.load_env_from_file() {
+        log::error!("{}", e);
+        return;
+    }
+
     for (key, value) in ctx.envs() {
         params.add_env(&key, value.to_string());
     }
