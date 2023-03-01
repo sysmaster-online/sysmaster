@@ -12,7 +12,7 @@
 
 //! This crate provides Deserializ's function for sub unit conf.
 //! ```edition 2018
-//! # use proc_macro_utils::ConfigParseM;
+//! # use macros::ConfigParseM;
 //! # use std::io::{Error as IoError, ErrorKind};
 //! # use utils::config_parser::{toml_str_parse, ConfigParse};
 //! # use serde::{Deserialize, Serialize};

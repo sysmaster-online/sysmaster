@@ -1,6 +1,4 @@
 #!/bin/bash
-# try install 3 times
-
 function finish() {
     echo "--- PLEASE RUN sh -x ci/01-pre-commit.sh FIRST IN YOUR LOCALHOST!!! ---"
     # remove tmp
@@ -43,6 +41,7 @@ do
     egrep '#!\[deny\(warnings\)\]' $rustlist || sed -i '1i\#![deny(warnings)]' $rustlist 2>/dev/null || true
 done
 
+cargo clean
 #fix cargo clippy fail in pre-commit when build.rs is changed
 RUSTC_WRAPPER="" cargo clippy --all-targets --features "default" --all -- -Dwarnings || exit 1
 

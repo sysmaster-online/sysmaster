@@ -12,8 +12,8 @@
 //
 #![allow(non_snake_case)]
 use confique::Config;
+use macros::EnumDisplay;
 use nix::unistd::Pid;
-use proc_macro_utils::EnumDisplay;
 use serde::{Deserialize, Serialize};
 use std::os::unix::prelude::RawFd;
 use std::rc::Rc;

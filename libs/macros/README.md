@@ -9,7 +9,7 @@ Unit的配置文件以toml格式来组织，整体包含三段
 对于自定义的配置文件，只要定义好配置字段对应的结构体，就会可以自动将配置字符串转换成对应的结构体，例如:
 
 ```
-use proc_macro_utils::ConfigParseM;
+use macros::ConfigParseM;
 use std::io::{Error as IoError, ErrorKind};
 use utils::config_parser::{toml_str_parse, ConfigParse};
 use serde::{Deserialize, Serialize};

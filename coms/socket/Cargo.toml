@@ -12,8 +12,9 @@ name = "socket"
 [dependencies]
 basic = { path = "../../libs/basic" }
 event = { path = "../../libs/event" }
-proc_macro_utils = { path = "../../libs/proc_macro_utils" }
+macros = { path = "../../libs/macros" }
 sysmaster = { path = "../../" }
+
 nix = "0.24"
 log = "0.4"
 serde = "1.0.130"
