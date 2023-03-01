@@ -19,7 +19,7 @@ use device::{
 fn main() {
     let mut enumerator = DeviceEnumerator::new();
 
-    for device in enumerator {
+    for device in enumerator.into_iter() {
         println!("{}", device.as_ref().lock().unwrap().get_devpath().unwrap());
         device
             .as_ref()
@@ -28,6 +28,4 @@ fn main() {
             .trigger(DeviceAction::Change)
             .unwrap();
     }
-
-    enumerator.set_enumerator_type(DeviceEnumerationType::Subsystems);
 }

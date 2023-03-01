@@ -33,7 +33,7 @@ pub struct Device {
     /// the parent device
     pub parent: Option<Arc<Mutex<Device>>>,
     /// ifindex
-    pub ifindex: i32,
+    pub ifindex: u32,
     /// device type
     pub devtype: String,
     /// device name, e.g., /dev/sda
@@ -285,6 +285,60 @@ impl Device {
         )
     }
 
+    /// create a Device instance from ifindex
+    pub fn from_ifindex(ifindex: u32) -> Result<Device, Error> {
+        let mut buf = [0; 16];
+        let buf_ptr: *mut i8 = buf.as_mut_ptr();
+        unsafe {
+            if libc::if_indextoname(ifindex, buf_ptr) == std::ptr::null_mut() {
+                return Err(Error::Nix {
+                    msg: format!("from_ifindex failed: if_indextoname {} failed", ifindex),
+                    source: Errno::ENXIO,
+                });
+            }
+        };
+
+        let buf_trans: &[u8] =
+            unsafe { std::slice::from_raw_parts(&buf as *const i8 as *const u8, 16) };
+
+        let ifname = String::from_utf8(buf_trans.to_vec()).map_err(|e| Error::Nix {
+            msg: format!("from_ifindex failed: from_utf8 {:?} ({})", buf_trans, e),
+            source: Errno::EINVAL,
+        })?;
+
+        let syspath = format!("/sys/class/net/{}", ifname.trim_matches(char::from(0)));
+        let mut dev = Self::from_syspath(syspath.clone(), true).map_err(|e| Error::Nix {
+            msg: format!("from_ifindex failed: from_syspath {} ({})", syspath, e),
+            source: e.get_errno(),
+        })?;
+
+        let i = match dev.get_ifindex() {
+            Ok(i) => i,
+            Err(e) => {
+                if e.get_errno() == Errno::ENOENT {
+                    return Err(Error::Nix {
+                        msg: format!("from_ifindex failed: get_ifindex ({})", e),
+                        source: Errno::ENXIO,
+                    });
+                }
+
+                return Err(Error::Nix {
+                    msg: format!("from_ifindex failed: get_ifindex ({})", e),
+                    source: e.get_errno(),
+                });
+            }
+        };
+
+        if i != ifindex {
+            return Err(Error::Nix {
+                msg: "from_ifindex failed: ifindex inconsistent".to_string(),
+                source: Errno::ENXIO,
+            });
+        }
+
+        Ok(dev)
+    }
+
     /// set sysattr value
     pub fn set_sysattr_value(
         &mut self,
@@ -438,7 +492,7 @@ impl Device {
     }
 
     /// get the ifindex of device
-    pub fn get_ifindex(&mut self) -> Result<i32, Error> {
+    pub fn get_ifindex(&mut self) -> Result<u32, Error> {
         self.read_uevent_file().map_err(|e| Error::Nix {
             msg: format!("get_ifindex failed: read_uevent_file ({})", e),
             source: e.get_errno(),
@@ -872,6 +926,10 @@ impl Device {
             Ok(f) => f,
             Err(e) => match e.raw_os_error() {
                 Some(n) => {
+                    if [libc::EACCES, libc::ENODEV, libc::ENXIO, libc::ENOENT].contains(&n) {
+                        // the uevent file may be write-only, or the device may be already removed or the device has no uevent file
+                        return Ok(());
+                    }
                     return Err(Error::Nix {
                         msg: "failed to open uevent file".to_string(),
                         source: Errno::from_i32(n),
@@ -916,7 +974,9 @@ impl Device {
             }
         }
 
-        self.set_devnum(major, minor)?;
+        if !major.is_empty() {
+            self.set_devnum(major, minor)?;
+        }
 
         self.uevent_loaded = true;
 
@@ -1140,7 +1200,12 @@ impl Device {
 
 #[cfg(test)]
 mod tests {
-    use crate::device::*;
+    use std::borrow::BorrowMut;
+
+    use crate::{
+        device::*,
+        device_enumerator::{DeviceEnumerationType, DeviceEnumerator},
+    };
     use libc::S_IFBLK;
     use nix::sys::stat::makedev;
 
@@ -1162,9 +1227,15 @@ mod tests {
 
         // test Device::get_ifindex()
         match device.get_ifindex() {
-            Ok(_ifindex) => {
-                // todo: sd_device_new_from_ifindex
-            }
+            Ok(ifindex) => match Device::from_ifindex(ifindex) {
+                Ok(device) => {
+                    let syspath = device.get_syspath().unwrap();
+                    assert_eq!(syspath_new, syspath);
+                }
+                Err(e) => {
+                    assert_eq!(e.get_errno(), Errno::ENODEV);
+                }
+            },
             Err(e) => {
                 assert_eq!(e.get_errno(), Errno::ENOENT);
             }
@@ -1282,6 +1353,16 @@ mod tests {
         }
 
         // todo: test get_sysattr_value
+    }
+
+    #[ignore]
+    #[test]
+    fn test_devices_all() {
+        let mut enumerator = DeviceEnumerator::new();
+        enumerator.set_enumerator_type(DeviceEnumerationType::All);
+        for device in enumerator {
+            test_device_one(device.lock().unwrap().borrow_mut());
+        }
     }
 
     /// test whether Device::from_mode_and_devnum can create Device instance normally
