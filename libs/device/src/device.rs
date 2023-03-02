@@ -12,7 +12,7 @@
 
 //! struct Device
 //!
-use basic::devnum_util::device_path_parse_major_minor;
+use basic::parse_util::{device_path_parse_devnum, parse_devnum, parse_ifindex};
 use libc::{dev_t, mode_t, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT, S_IRUSR};
 use nix::errno::Errno;
 use nix::sys::stat::{lstat, major, makedev, minor, stat};
@@ -216,7 +216,7 @@ impl Device {
             });
         }
 
-        let device = if let Ok((mode, devnum)) = device_path_parse_major_minor(devname.clone()) {
+        let device = if let Ok((mode, devnum)) = device_path_parse_devnum(devname.clone()) {
             Device::from_mode_and_devnum(mode, devnum)?
         } else {
             match stat(Path::new(&devname)) {
@@ -292,9 +292,9 @@ impl Device {
     /// create a Device instance from ifindex
     pub fn from_ifindex(ifindex: u32) -> Result<Device, Error> {
         let mut buf = [0; 16];
-        let buf_ptr: *mut i8 = buf.as_mut_ptr();
+        let buf_ptr = buf.as_mut_ptr() as *mut libc::c_char;
         unsafe {
-            if libc::if_indextoname(ifindex, buf_ptr) == std::ptr::null_mut() {
+            if libc::if_indextoname(ifindex, buf_ptr).is_null() {
                 return Err(Error::Nix {
                     msg: format!("from_ifindex failed: if_indextoname {} failed", ifindex),
                     source: Errno::ENXIO,
@@ -302,8 +302,7 @@ impl Device {
             }
         };
 
-        let buf_trans: &[u8] =
-            unsafe { std::slice::from_raw_parts(&buf as *const i8 as *const u8, 16) };
+        let buf_trans: &[u8] = unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const _, 16) };
 
         let ifname = String::from_utf8(buf_trans.to_vec()).map_err(|e| Error::Nix {
             msg: format!("from_ifindex failed: from_utf8 {:?} ({})", buf_trans, e),
@@ -514,6 +513,74 @@ impl Device {
         Ok(())
     }
 
+    /// create a Device instance from device id
+    pub fn from_device_id(id: String) -> Result<Device, Error> {
+        if id.len() < 2 {
+            return Err(Error::Nix {
+                msg: format!("from_device_id failed: invalid id {}", id),
+                source: Errno::EINVAL,
+            });
+        }
+
+        match id.chars().next() {
+            Some('b') | Some('c') => {
+                let devnum = parse_devnum(id[1..].to_string()).map_err(|_| Error::Nix {
+                    msg: format!("from_device_id failed: parse_devnum {} failed", id),
+                    source: Errno::EINVAL,
+                })?;
+
+                return Device::from_devnum(id.chars().next().unwrap(), devnum).map_err(|e| {
+                    Error::Nix {
+                        msg: format!("from_device_id failed: from_devnum ({})", e),
+                        source: e.get_errno(),
+                    }
+                });
+            }
+            Some('n') => {
+                let ifindex = parse_ifindex(id[1..].to_string()).map_err(|_| Error::Nix {
+                    msg: format!("from_device_id failed: parse_ifindex {} failed", id),
+                    source: Errno::EINVAL,
+                })?;
+
+                Device::from_ifindex(ifindex).map_err(|e| Error::Nix {
+                    msg: format!("from_device_id failed: from_ifindex ({})", e),
+                    source: e.get_errno(),
+                })
+            }
+            Some('+') => {
+                let sep = match id.find(':') {
+                    Some(idx) => {
+                        if idx == id.len() - 1 {
+                            return Err(Error::Nix {
+                                msg: format!("from_device_id failed: invalid device id {}", id),
+                                source: Errno::EINVAL,
+                            });
+                        }
+
+                        idx
+                    }
+                    None => {
+                        return Err(Error::Nix {
+                            msg: format!("from_device_id failed: invalid device id {}", id),
+                            source: Errno::EINVAL,
+                        });
+                    }
+                };
+
+                let subsystem = id[1..sep].to_string();
+                let sysname = id[sep + 1..].to_string();
+                Device::from_subsystem_sysname(subsystem, sysname).map_err(|e| Error::Nix {
+                    msg: format!("from_device_id failed: from_subsystem_sysname ({})", e),
+                    source: e.get_errno(),
+                })
+            }
+            _ => Err(Error::Nix {
+                msg: format!("from_device_id failed: invalid id {}", id),
+                source: Errno::EINVAL,
+            }),
+        }
+    }
+
     /// trigger a fake device action, then kernel will report an uevent
     pub fn trigger(&mut self, action: DeviceAction) -> Result<(), Error> {
         self.set_sysattr_value("uevent".to_string(), Some(format!("{}", action)))
@@ -623,7 +690,7 @@ impl Device {
             source: e.get_errno(),
         })?;
 
-        if self.ifindex <= 0 {
+        if self.ifindex == 0 {
             return Err(Error::Nix {
                 msg: "get_ifindex failed: no ifindex".to_string(),
                 source: Errno::ENOENT,
@@ -1088,8 +1155,8 @@ impl Device {
         while ridx > 0 {
             match sysname.chars().nth(ridx - 1) {
                 Some(c) => {
-                    if c.is_digit(10) {
-                        ridx = ridx - 1;
+                    if c.is_ascii_digit() {
+                        ridx -= 1;
                     } else {
                         break;
                     }
@@ -1464,18 +1531,14 @@ impl Device {
         }
 
         match self.sysattr_values.get(&sysattr) {
-            Some(value) => {
-                return Ok(&value);
-            }
-            None => {
-                return Err(Error::Nix {
-                    msg: format!(
-                        "get_cached_sysattr_value failed: non-existing sysattr {}",
-                        sysattr
-                    ),
-                    source: Errno::ENOENT,
-                });
-            }
+            Some(value) => Ok(value),
+            None => Err(Error::Nix {
+                msg: format!(
+                    "get_cached_sysattr_value failed: non-existing sysattr {}",
+                    sysattr
+                ),
+                source: Errno::ENOENT,
+            }),
         }
     }
 
@@ -1531,6 +1594,52 @@ impl Device {
             parent = parent.unwrap().parent();
         }
     }
+
+    /// get the device id
+    /// device id is used to identify hwdb file in /run/devmaster/data/
+    #[allow(dead_code)]
+    pub(crate) fn get_device_id(&mut self) -> Result<&str, Error> {
+        if self.device_id.is_empty() {
+            let subsystem = self
+                .get_subsystem()
+                .map_err(|e| Error::Nix {
+                    msg: format!("get_device_id failed: get_subsystem ({})", e),
+                    source: e.get_errno(),
+                })?
+                .to_string();
+
+            let id: String;
+            if let Ok(devnum) = self.get_devnum() {
+                id = format!(
+                    "{}{}:{}",
+                    if subsystem == "block" { 'b' } else { 'c' },
+                    major(devnum),
+                    minor(devnum)
+                );
+            } else if let Ok(ifindex) = self.get_ifindex() {
+                id = format!("n{}", ifindex);
+            } else {
+                let sysname = match self.get_sysname() {
+                    Some(s) => s.to_string(),
+                    None => {
+                        return Err(Error::Nix {
+                            msg: "get_device_id failed: no sysname".to_string(),
+                            source: Errno::EINVAL,
+                        });
+                    }
+                };
+
+                if subsystem == "drivers" {
+                    id = format!("+drivers:{}:{}", self.driver_subsystem, sysname);
+                } else {
+                    id = format!("+{}:{}", subsystem, sysname);
+                }
+            }
+            self.device_id = id;
+        }
+
+        Ok(&self.device_id)
+    }
 }
 
 #[cfg(test)]
@@ -1551,12 +1660,12 @@ mod tests {
         let sysname = device.get_sysname().unwrap().to_string();
 
         // test Device::from_syspath()
-        let device_new = Device::from_syspath(String::from(syspath.clone()), true).unwrap();
+        let device_new = Device::from_syspath(syspath.clone(), true).unwrap();
         let syspath_new = device_new.get_syspath().unwrap().to_string();
         assert_eq!(syspath, syspath_new);
 
         // test Device::from_path()
-        let device_new = Device::from_path(String::from(syspath.clone())).unwrap();
+        let device_new = Device::from_path(syspath.clone()).unwrap();
         let syspath_new = device_new.get_syspath().unwrap().to_string();
         assert_eq!(syspath, syspath_new);
 
@@ -1578,30 +1687,42 @@ mod tests {
         let mut is_block = false;
 
         // test Device::from_subsystem_sysname
-        let subsystem = match device.get_subsystem() {
-            Ok(subsystem) => subsystem.to_string(),
+        match device.get_subsystem() {
+            Ok(subsystem) => {
+                let subsystem = subsystem.to_string();
+                if !subsystem.is_empty() && subsystem != "gpio" {
+                    is_block = subsystem == "block";
+                    let name = if subsystem == "drivers" {
+                        format!("{}:{}", device.driver_subsystem, sysname)
+                    } else {
+                        sysname
+                    };
+
+                    match Device::from_subsystem_sysname(subsystem, name) {
+                        Ok(dev) => {
+                            assert_eq!(syspath, dev.get_syspath().unwrap());
+                        }
+                        Err(e) => {
+                            assert_eq!(e.get_errno(), Errno::ENODEV);
+                        }
+                    }
+
+                    let device_id = device.get_device_id().unwrap().to_string();
+                    match Device::from_device_id(device_id.clone()) {
+                        Ok(mut dev) => {
+                            assert_eq!(device_id, dev.get_device_id().unwrap());
+                            assert_eq!(syspath, dev.get_syspath().unwrap());
+                        }
+                        Err(e) => {
+                            assert_eq!(e.get_errno(), Errno::ENODEV);
+                        }
+                    }
+                }
+            }
             Err(e) => {
                 assert_eq!(e.get_errno(), Errno::ENOENT);
-                String::new()
             }
         };
-        if !subsystem.is_empty() && subsystem != "gpio" {
-            is_block = subsystem == "block";
-            let name = if subsystem == "drivers" {
-                format!("{}:{}", device.driver_subsystem, sysname)
-            } else {
-                sysname.to_string()
-            };
-
-            match Device::from_subsystem_sysname(subsystem.to_string(), name) {
-                Ok(dev) => {
-                    assert_eq!(syspath, dev.get_syspath().unwrap());
-                }
-                Err(e) => {
-                    assert_eq!(e.get_errno(), Errno::ENODEV);
-                }
-            }
-        }
 
         match device.get_devname() {
             Ok(devname) => {
@@ -1668,7 +1789,7 @@ mod tests {
                 let syspath_new = device_new.get_syspath().unwrap().to_string();
                 assert_eq!(syspath, syspath_new);
 
-                let device_new = Device::from_path(devname.clone()).unwrap();
+                let device_new = Device::from_path(devname).unwrap();
                 let syspath_new = device_new.get_syspath().unwrap().to_string();
                 assert_eq!(syspath, syspath_new);
             }
