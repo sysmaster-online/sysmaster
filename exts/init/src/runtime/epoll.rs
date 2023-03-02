@@ -15,7 +15,7 @@ use nix::sys::epoll::{self, EpollEvent, EpollFlags, EpollOp};
 use nix::sys::socket;
 use nix::unistd;
 use std::cmp::max;
-use std::os::fd::RawFd;
+use std::os::unix::prelude::RawFd;
 use std::str;
 use std::sync::atomic::{AtomicUsize, Ordering};
 

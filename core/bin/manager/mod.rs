@@ -118,11 +118,11 @@ impl ExecuterAction for CommandActionMgr {
     type Error = sysmaster::error::Error;
     // type Result<T, Error> = Result<T, E>;
     fn start(&self, unit_name: &str) -> Result<(), Self::Error> {
-        self.um.start_unit(unit_name)
+        self.um.start_unit_manual(unit_name)
     }
 
     fn stop(&self, unit_name: &str) -> Result<(), Self::Error> {
-        self.um.stop_unit(unit_name)
+        self.um.stop_unit_manual(unit_name)
     }
 
     fn restart(&self, unit_name: &str) -> Result<(), Self::Error> {

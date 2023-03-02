@@ -16,8 +16,7 @@ use nix::sys::socket::{self, sockopt, AddressFamily, SockFlag, SockType, UnixAdd
 use nix::sys::time::{TimeSpec, TimeVal, TimeValLike};
 use nix::sys::timer::Expiration;
 use nix::sys::timerfd::{ClockId, TimerFd, TimerFlags, TimerSetTimeFlags};
-use std::os::fd::AsRawFd;
-use std::os::fd::RawFd;
+use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::rc::Rc;
 use std::{fs, path::PathBuf};
 

@@ -115,8 +115,17 @@ impl UnitManagerX {
         self.data.start_unit(name)
     }
 
+    pub(crate) fn start_unit_manual(&self, name: &str) -> Result<()> {
+        self.data.start_unit_manual(name)
+    }
+
+    #[allow(dead_code)]
     pub(crate) fn stop_unit(&self, name: &str) -> Result<()> {
         self.data.stop_unit(name)
+    }
+
+    pub(crate) fn stop_unit_manual(&self, name: &str) -> Result<()> {
+        self.data.stop_unit_manual(name)
     }
 
     pub(crate) fn reload(&self, name: &str) -> Result<()> {
@@ -675,7 +684,15 @@ impl UnitManager {
 
     fn start_unit(&self, name: &str) -> Result<()> {
         if let Some(unit) = self.load_unitx(name) {
-            log::debug!("load unit {} success, send to job manager", name);
+            if unit
+                .get_config()
+                .config_data()
+                .borrow()
+                .Unit
+                .RefuseManualStart
+            {
+                return Err(Error::UnitActionERefuseManualStart);
+            }
 
             self.jm.exec(
                 &JobConf::new(&unit, JobKind::Start),
@@ -687,6 +704,30 @@ impl UnitManager {
         } else {
             Err(Error::Internal)
         }
+    }
+
+    fn start_unit_manual(&self, name: &str) -> Result<()> {
+        let unit = match self.load_unitx(name) {
+            None => {
+                return Err(Error::Internal);
+            }
+            Some(v) => v,
+        };
+        if unit
+            .get_config()
+            .config_data()
+            .borrow()
+            .Unit
+            .RefuseManualStart
+        {
+            return Err(Error::UnitActionERefuseManualStart);
+        }
+        self.jm.exec(
+            &JobConf::new(&unit, JobKind::Start),
+            JobMode::Replace,
+            &mut JobAffect::new(false),
+        )?;
+        Ok(())
     }
 
     /// return the notify path
@@ -709,8 +750,19 @@ impl UnitManager {
         self.db.get_unit_by_pid(pid)
     }
 
+    #[allow(dead_code)]
     pub(self) fn stop_unit(&self, name: &str) -> Result<()> {
         if let Some(unit) = self.load_unitx(name) {
+            if unit
+                .get_config()
+                .config_data()
+                .borrow()
+                .Unit
+                .RefuseManualStop
+            {
+                return Err(Error::UnitActionERefuseManualStop);
+            }
+
             self.jm.exec(
                 &JobConf::new(&unit, JobKind::Stop),
                 JobMode::Replace,
@@ -720,6 +772,30 @@ impl UnitManager {
         } else {
             Err(Error::Internal)
         }
+    }
+
+    fn stop_unit_manual(&self, name: &str) -> Result<()> {
+        let unit = match self.load_unitx(name) {
+            None => {
+                return Err(Error::Internal);
+            }
+            Some(v) => v,
+        };
+        if unit
+            .get_config()
+            .config_data()
+            .borrow()
+            .Unit
+            .RefuseManualStop
+        {
+            return Err(Error::UnitActionERefuseManualStop);
+        }
+        self.jm.exec(
+            &JobConf::new(&unit, JobKind::Stop),
+            JobMode::Replace,
+            &mut JobAffect::new(false),
+        )?;
+        Ok(())
     }
 
     pub(self) fn reload(&self, name: &str) -> Result<()> {
