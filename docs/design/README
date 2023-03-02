@@ -1,16 +1,10 @@
-# Summary
-
-- [Summary](../README.md)
-- [整体架构](./chapter_1.md)
-- [UnitManger设计](./01-unitManger.md)
-- [事件设计](./01-libevent.md)
-- [unit设计](./01-unit.md)
-- [unitLoad设计](./01-unitload.md)
-- [subUnit开发](./01-devel-doc.md)
-- [service设计](./01-service.md)
-- [socket设计](./01-socket.md)
-
 >文档说明
+
+index.md 为Home栏,design 为Design栏,可以通过创建目录的方式添加其他栏.
+每层目录的assets为图片等资源的存放目录,对应当前层级的md文件.
+在相应的层级创建md文档将自动生成网页,网页标题是md的一级标题(必须).文件名前可以加前缀用于页面显示排序.如:
+00-架构相关, 01-模块及库, 02-组件相关, 03-其他
+
 
 1. mdbook的格式说明参考:<https://llever.com/mdBook-zh/README.zh.html>
 2. markdown格式参考官方文档
