@@ -121,7 +121,7 @@ impl Timer {
             },
             it_value: libc::timespec {
                 tv_sec: (next / USEC_PER_SEC) as i64,
-                tv_nsec: (next % USEC_PER_SEC) as i64,
+                tv_nsec: ((next % USEC_PER_SEC) * NSEC_PER_USEC) as i64,
             },
         }
     }

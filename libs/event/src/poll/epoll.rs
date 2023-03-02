@@ -12,6 +12,7 @@
 
 use crate::Result;
 use libc::{epoll_event, EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD};
+use std::cmp::max;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -53,25 +54,25 @@ impl Epoll {
     }
 
     pub(crate) fn poll(&self, timeout: i32) -> Result<Vec<epoll_event>> {
-        let size = self.n_sources.load(Ordering::Relaxed);
+        let size = max(self.n_sources.load(Ordering::Relaxed), 1);
         let mut events = Vec::<epoll_event>::with_capacity(size);
 
         events.clear();
-        if size > 0 {
-            let n_ready = syscall!(epoll_wait(
-                self.epoll_fd,
-                events.as_mut_ptr(),
-                events.capacity() as i32,
-                timeout,
-            ));
 
-            match n_ready {
-                Ok(n_ready) => unsafe {
-                    events.set_len(n_ready as usize);
-                },
-                Err(e) => return Err(e),
-            }
+        let n_ready = syscall!(epoll_wait(
+            self.epoll_fd,
+            events.as_mut_ptr(),
+            events.capacity() as i32,
+            timeout,
+        ));
+
+        match n_ready {
+            Ok(n_ready) => unsafe {
+                events.set_len(n_ready as usize);
+            },
+            Err(e) => return Err(e),
         }
+
         Ok(events)
     }
 

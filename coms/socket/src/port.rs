@@ -160,14 +160,8 @@ impl SocketPort {
 
             let mut buf = [0; 2048];
             // Use unwrap_or_else to handle errors
-            let v = nix::unistd::read(self.fd(), &mut buf).unwrap_or_else(|e| {
-                if e == Errno::EINTR {
-                    // Retry on EINTR
-                    1
-                } else {
-                    0
-                }
-            });
+            let v = nix::unistd::read(self.fd(), &mut buf)
+                .unwrap_or_else(|e| usize::from(e == Errno::EINTR));
             if v == 0 {
                 return;
             }

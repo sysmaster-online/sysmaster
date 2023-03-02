@@ -13,11 +13,13 @@
 #[cfg(test)]
 pub(crate) use rentry::RELI_HISTORY_MAX_DBS;
 
+pub(crate) mod alive_timer;
 pub(crate) mod commands;
 pub(crate) mod config;
 pub(crate) mod pre_install;
 pub(crate) mod rentry;
 pub(crate) mod signals;
+use crate::keep_alive::KeepAlive;
 use crate::unit::UnitManagerX;
 use basic::path_lookup::LookupPaths;
 use basic::process_util::{self};
@@ -38,6 +40,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::rel::{ReliLastFrame, Reliability};
+
+use alive_timer::AliveTimer;
 
 /// maximal size of process's arguments
 pub const MANAGER_ARGS_SIZE_MAX: usize = 5; // 6 - 1
@@ -172,6 +176,14 @@ impl ExecuterAction for CommandActionMgr {
     fn unmask(&self, unit_file: &str) -> Result<(), Self::Error> {
         self.um.unmask_unit(unit_file)
     }
+
+    fn daemon_reload(&self) {
+        self.set_state(State::ReLoad);
+    }
+
+    fn daemon_reexec(&self) {
+        self.set_state(State::ReExecute);
+    }
 }
 
 /// Encapsulate manager and expose api to the outside
@@ -185,6 +197,7 @@ pub struct Manager {
     state: Rc<RefCell<State>>,
     um: Rc<UnitManagerX>,
     lookup_path: Rc<LookupPaths>,
+    alive_timer: Rc<AliveTimer>,
 }
 
 impl Drop for Manager {
@@ -212,6 +225,16 @@ impl Manager {
             Rc::clone(&state),
         ));
 
+        let res = KeepAlive::get_instance();
+        let connect_fd;
+        match &*res {
+            Ok(kp) => connect_fd = kp.get_fd(),
+            Err(err) => {
+                panic!("err: {err:?}")
+            }
+        }
+        let alive_timer = Rc::new(AliveTimer::new(&event, connect_fd));
+
         Manager {
             event,
             commands: Rc::new(Commands::new(
@@ -225,6 +248,7 @@ impl Manager {
             state,
             um,
             lookup_path,
+            alive_timer,
         }
     }
 
@@ -407,6 +431,10 @@ impl Manager {
         self.event.add_source(signal).unwrap();
         let signal = Rc::clone(&self.signal);
         self.event.set_enabled(signal, EventState::On).unwrap();
+
+        // time
+        let timer = Rc::clone(&self.alive_timer);
+        timer.enable(true);
     }
 }
 

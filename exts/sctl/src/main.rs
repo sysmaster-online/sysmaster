@@ -95,8 +95,11 @@ enum SubCmd {
         force: bool,
     },
 
-    /// manager command
+    /// [manager] Reload sysmaster manager configuration
     DaemonReload {},
+
+    /// [manager] Reexecute sysmaster manager
+    DaemonReexec {},
 
     /// enable one unit file
     Enable {
@@ -161,10 +164,11 @@ fn generate_command_request(args: Args) -> Option<CommandRequest> {
             CommandRequest::new_syscomm(sys_comm::Action::Shutdown, force)
         }
 
+        SubCmd::DaemonReload {} => CommandRequest::new_mngrcomm(mngr_comm::Action::Reload),
+
+        SubCmd::DaemonReexec {} => CommandRequest::new_mngrcomm(mngr_comm::Action::Reexec),
+
         SubCmd::ListUnits {} => CommandRequest::new_mngrcomm(mngr_comm::Action::Listunits),
-        _ => {
-            return None;
-        }
     };
     Some(command_request)
 }

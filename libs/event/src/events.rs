@@ -17,6 +17,7 @@ use crate::{EventState, EventType, Poll, Signals, Source};
 use crate::Error;
 use crate::Result;
 use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, InotifyEvent, WatchDescriptor};
+use nix::unistd;
 use nix::NixPath;
 
 use std::cell::RefCell;
@@ -119,10 +120,11 @@ impl Events {
                 }
             }
             EventState::OneShot => {
-                top.dispatch(self);
                 self.data
                     .borrow_mut()
                     .set_enabled(top.clone(), EventState::Off)?;
+
+                top.dispatch(self);
             }
         }
 
@@ -452,6 +454,10 @@ impl EventsData {
         ] {
             if let Some(next) = self.timer.next(&et) {
                 if self.timer.timerid(&et) >= next {
+                    if !self.flush_timer(&et) {
+                        return false;
+                    }
+
                     while let Some(source) = self.timer.pop(&et) {
                         self.pending_push(source);
                     }
@@ -523,6 +529,19 @@ impl EventsData {
 
     pub(self) fn pending_is_empty(&self) -> bool {
         self.pending.is_empty()
+    }
+
+    fn flush_timer(&self, et: &EventType) -> bool {
+        let timer_fd = self.timerfd.get(et).unwrap().as_raw_fd();
+        let mut buffer = [0u8; 4096];
+        if let Err(err) = unistd::read(timer_fd, &mut buffer) {
+            if err == nix::errno::Errno::EAGAIN || err == nix::errno::Errno::EINTR {
+                return true;
+            }
+            return false;
+        }
+
+        true
     }
 
     fn clear(&mut self) {
