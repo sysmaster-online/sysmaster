@@ -344,7 +344,13 @@ impl Unit {
         c_pid: Option<Pid>,
         ko: KillOperation,
     ) -> Result<()> {
-        let sig = ko.to_signal();
+        let sig = ko.to_signal(k_context.clone());
+        log::debug!(
+            "unit: {}, kill operation: {:?}, kill signal: {}",
+            self.id(),
+            ko,
+            sig
+        );
         if let Some(pid) = m_pid {
             match nix::sys::signal::kill(pid, sig) {
                 Ok(_) => {

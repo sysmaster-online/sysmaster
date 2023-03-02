@@ -185,6 +185,7 @@ macro_rules! errfrom {
 }
 
 errfrom!(std::num::ParseIntError, std::string::ParseError => Parse);
+errfrom!(nix::errno::Errno => Nix);
 
 impl From<basic::error::Error> for Error {
     fn from(e: basic::Error) -> Error {
