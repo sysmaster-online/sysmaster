@@ -11,55 +11,77 @@
 // See the Mulan PSL v2 for more details.
 
 //! Daemon sysmaster or Systemd, restart the process when it exits
-
-use std::collections::VecDeque;
-use std::io::Error;
-use std::mem::MaybeUninit;
-use std::os::unix::process::CommandExt;
+mod runtime;
+use crate::runtime::{param::Param, InitState, RunTime};
+use nix::unistd;
 use std::path::Path;
-use std::process::{exit, Command};
-use std::time::{Duration, Instant};
-
-use libc::{siginfo_t, waitid};
-use nix::libc;
-use nix::sys::wait::waitpid;
-use nix::unistd::{fork, ForkResult, Pid};
-use signal_hook_registry::register_sigaction;
 
 const SYSMASTER_PATH: &str = "/usr/lib/sysmaster/sysmaster";
 const SYSTEMD_PATH: &str = "/usr/lib/systemd/systemd";
-const TIME_INTERVAL: Duration = Duration::from_secs(10);
-const FAIL_COUNT: usize = 3;
-const SELF_CODE_OFFSET: i32 = 14;
-const SELF_SIG_OFFSET: i32 = 7;
 
 fn main() {
-    register_signal();
-    let cmd = match get_command() {
-        Some(cmd) => cmd,
-        None => detect_init(),
-    };
-    loop {
-        if execute_mode(&cmd).is_ok() {
-            break;
+    let mut cmd = get_command();
+    if cmd.manager_args.is_empty() {
+        let argument = detect_init();
+        if argument.is_empty() {
+            println!("argument is invalid!");
+            freeze();
+        }
+        cmd.manager_args.push(argument);
+    }
+
+    if let Ok(res) = RunTime::new(cmd) {
+        let mut run_time = res;
+        if let Err(err) = run_time.init() {
+            println!("Failed to init:{:?} ", err);
+            run_time.clear();
+            freeze();
+        }
+
+        loop {
+            match run_time.get_state() {
+                InitState::Reexec => {
+                    if let Err(err) = run_time.reexec() {
+                        println!("Failed to reexec:{:?} ", err);
+                        break;
+                    }
+                }
+                InitState::RunRecover => {
+                    if let Err(err) = run_time.run() {
+                        println!("Failed to run:{:?} ", err);
+                        break;
+                    }
+                }
+                InitState::RunUnRecover => {
+                    if let Err(err) = run_time.unrecover_run() {
+                        println!("Failed to unrecover_run:{:?} ", err);
+                        break;
+                    }
+                }
+            }
+        }
+        run_time.clear();
+    }
+
+    println!("freeze");
+    freeze();
+}
+
+fn get_command() -> Param {
+    let mut param = Param::new();
+    let mut is_manager = false;
+
+    for arg in std::env::args() {
+        if arg.contains("sysmaster") {
+            is_manager = true;
+        }
+        if is_manager {
+            param.manager_args.push(arg);
+        } else {
+            param.init_args.push(arg);
         }
     }
-}
-
-fn register_signal() {
-    unsafe {
-        let _ = register_sigaction(libc::SIGRTMIN() + SELF_SIG_OFFSET, |siginfo| {
-            let _ = waitpid(Pid::from_raw(siginfo.si_pid()), None);
-        });
-    }
-}
-
-fn get_command() -> Option<String> {
-    if std::env::args().count() > 2 {
-        panic!("More than one para, panic!!!");
-    }
-
-    std::env::args().nth(1)
+    param
 }
 
 fn detect_init() -> String {
@@ -72,74 +94,9 @@ fn detect_init() -> String {
     String::new()
 }
 
-fn execute_mode(s: &str) -> Result<(), Error> {
-    let mut fail_record: VecDeque<Instant> = VecDeque::with_capacity(FAIL_COUNT);
-    let mut child = create_init(s);
+fn freeze() {
+    unistd::sync();
     loop {
-        let mut siginfo = MaybeUninit::<siginfo_t>::zeroed();
-        let pid = unsafe {
-            if waitid(
-                libc::P_ALL,
-                0,
-                siginfo.as_mut_ptr(),
-                libc::WEXITED | libc::WNOWAIT,
-            ) < 0
-            {
-                continue;
-            };
-            siginfo.assume_init().si_pid()
-        };
-        if pid <= 0 {
-            continue;
-        } else if pid == child.as_raw() {
-            if need_exit(&mut fail_record) {
-                println!("Manager({pid}) failed 3 times, exit");
-                let _ = waitpid(Pid::from_raw(pid), None);
-                break;
-            }
-            child = create_init(s);
-        } else {
-            send_signal(pid, siginfo);
-        }
-        println!("Reaped child {pid}");
-        let _ = waitpid(Pid::from_raw(pid), None);
-    }
-    Ok(())
-}
-
-fn create_init(s: &str) -> Pid {
-    println!("Running to execute command : {s:?}");
-    if let Ok(ForkResult::Parent { child, .. }) = unsafe { fork() } {
-        child
-    } else {
-        let mut command = Command::new(s);
-        let comm = command.env("SYSTEMD_MAINPID", format!("{}", unsafe { libc::getpid() }));
-        comm.exec();
-        exit(0)
-    }
-}
-
-fn need_exit(fail_record: &mut VecDeque<Instant>) -> bool {
-    fail_record.push_back(Instant::now());
-    if fail_record.len() == FAIL_COUNT
-        && fail_record.pop_front().unwrap().elapsed() <= TIME_INTERVAL
-    {
-        return true;
-    }
-    false
-}
-
-fn send_signal(pid: i32, mut siginfo: MaybeUninit<siginfo_t>) {
-    unsafe {
-        siginfo.assume_init_mut().si_code -= SELF_CODE_OFFSET;
-        if libc::syscall(
-            libc::SYS_rt_sigqueueinfo,
-            pid,
-            libc::SIGRTMIN() + SELF_SIG_OFFSET,
-            siginfo.as_mut_ptr(),
-        ) < 0
-        {
-            println!("send signal error:{}", Error::last_os_error())
-        }
+        unistd::pause();
     }
 }

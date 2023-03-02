@@ -61,6 +61,10 @@ pub trait ExecuterAction {
     fn mask(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// unmask unit_name
     fn unmask(&self, unit_name: &str) -> Result<(), Self::Error>;
+    /// daemon-reload
+    fn daemon_reload(&self);
+    /// daemon-reexec
+    fn daemon_reexec(&self);
 }
 
 /// Depending on the type of request
@@ -174,27 +178,37 @@ impl Executer for MngrComm {
         manager: Rc<impl ExecuterAction>,
         _call_back: Option<fn(&str) -> String>,
     ) -> CommandResponse {
-        let ret = match self.action() {
-            mngr_comm::Action::Listunits => manager.list_units(),
-            _ => todo!(),
-        };
-        match ret {
-            Ok(m) => CommandResponse {
-                status: StatusCode::OK.as_u16() as _,
-                message: m,
-            },
-            Err(e) => {
-                let action_str = match self.action() {
-                    mngr_comm::Action::Listunits => String::from("list all units"),
-                    _ => String::from("process"),
-                };
-                let error_message = format!("Failed to {action_str}:{e}");
+        return match self.action() {
+            mngr_comm::Action::Reexec => {
+                manager.daemon_reexec();
                 CommandResponse {
-                    status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
-                    message: error_message,
+                    status: StatusCode::OK.as_u16() as _,
+                    ..Default::default()
                 }
             }
-        }
+
+            mngr_comm::Action::Reload => {
+                manager.daemon_reload();
+                CommandResponse {
+                    status: StatusCode::OK.as_u16() as _,
+                    ..Default::default()
+                }
+            }
+
+            mngr_comm::Action::Listunits => match manager.list_units() {
+                Ok(m) => CommandResponse {
+                    status: StatusCode::OK.as_u16() as _,
+                    message: m,
+                },
+                Err(e) => {
+                    let error_message = format!("Failed to list all units:{e}");
+                    CommandResponse {
+                        status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                        message: error_message,
+                    }
+                }
+            },
+        };
     }
 }
 

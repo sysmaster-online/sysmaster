@@ -12,6 +12,7 @@
 
 //! sysmaster-core bin
 mod job;
+mod keep_alive;
 mod manager;
 ///
 
@@ -30,20 +31,36 @@ mod utils;
 
 #[macro_use]
 extern crate lazy_static;
+use crate::keep_alive::KeepAlive;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
 use basic::logger::{self};
-use libc::{c_int, prctl, PR_SET_CHILD_SUBREAPER};
+use libc::{c_int, getppid, prctl, PR_SET_CHILD_SUBREAPER};
 use log::{self};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use nix::unistd::{self};
 use std::convert::TryFrom;
 use std::env::{self};
-use std::ffi::CString;
+use std::os::unix::process::CommandExt;
+use std::process::{exit, Command};
 use sysmaster::error::*;
 use sysmaster::rel;
 
+const MANAGER_SIG_OFFSET: i32 = 7;
+
 fn main() -> Result<()> {
+    // The registration signal is at the beginning and has the highest priority!
+    register_reexe_signal();
+
+    let res = KeepAlive::get_instance();
+    let connect_fd = match &*res {
+        Ok(fd) => fd,
+        Err(err) => {
+            print!("KeepAlive::get_instance failed err:{:?}", *err);
+            return Err(Error::Nix { source: *err });
+        }
+    };
+
     logger::init_log_with_console("sysmaster", log::LevelFilter::Debug);
     log::info!("sysmaster running in system mode.");
 
@@ -62,7 +79,6 @@ fn main() -> Result<()> {
 
     initialize_runtime(switch)?;
 
-    let args: Vec<String> = env::args().collect();
     let manager = Manager::new(Mode::System, Action::Run);
 
     // enable clear, mutex with install_crash_handler
@@ -85,9 +101,13 @@ fn main() -> Result<()> {
 
     // re-exec
     if reexec {
-        do_reexecute(&args);
+        if let Err(err) = connect_fd.send_unmanageable() {
+            log::info!("send_unmanageable failed! err:{:?}", err);
+            return Err(Error::Nix { source: err });
+        }
     }
 
+    unistd::pause();
     Ok(())
 }
 
@@ -118,13 +138,30 @@ fn set_child_reaper() {
 fn do_reexecute(args: &Vec<String>) {
     let args_size = args.len().max(MANAGER_ARGS_SIZE_MAX);
 
-    // build default arg
-    let (cmd, argv) = execarg_build_default();
-    assert!(argv.len() <= args_size);
+    let path;
+    let mut argv = [].to_vec();
+    if args.is_empty() {
+        (path, argv) = execarg_build_default();
+    } else {
+        path = args[0].clone();
+        if args.len() >= 2 {
+            argv = args[1..].to_vec();
+        }
+    }
 
-    // action
-    if let Err(e) = unistd::execv(&cmd, &argv) {
-        log::info!("execute failed, with arg{:?} result {:?}", argv, e);
+    assert!(argv.len() <= args_size);
+    println!("do_reexecute path:{:?} argv:{:?}", path, argv);
+
+    let mut command = Command::new(&path);
+    command.args(&argv);
+    let comm = command.env("MANAGER", format!("{}", unsafe { libc::getpid() }));
+    let err = comm.exec();
+    match err.raw_os_error() {
+        Some(e) => {
+            log::error!("MANAGER exit err:{:?}", e);
+            exit(e);
+        }
+        None => exit(0),
     }
 }
 
@@ -151,21 +188,47 @@ fn install_crash_handler() {
 extern "C" fn crash(signo: c_int) {
     let _signal = Signal::try_from(signo).unwrap(); // debug
 
-    // default
-    let (cmd, argv) = execarg_build_default();
-    if let Err(_e) = unistd::execv(&cmd, &argv) {
-        // debug
+    let res = KeepAlive::get_instance();
+    let keep_alive = match &*res {
+        Ok(kp) => kp,
+        Err(err) => {
+            print!("KeepAlive::get_instance failed err:{:?}", *err);
+            return;
+        }
+    };
+
+    if let Err(err) = keep_alive.send_unmanageable() {
+        log::info!("send_unmanageable failed! err:{:?}", err);
     }
 }
 
-fn execarg_build_default() -> (CString, Vec<CString>) {
-    let mut argv = Vec::new();
-
-    // current execute path
+fn execarg_build_default() -> (String, Vec<String>) {
     let path = env::current_exe().unwrap();
-    let cmd = CString::new(path.to_str().unwrap()).unwrap();
-    argv.push(cmd.clone());
+    let str_path = String::from(path.to_str().unwrap());
 
-    // return
-    (cmd, argv)
+    let mut argv = [].to_vec();
+    let args: Vec<String> = env::args().collect();
+    if args.len() >= 2 {
+        argv = args[1..].to_vec();
+    }
+    (str_path, argv)
+}
+
+extern "C" fn crash_reexec(_signo: c_int, siginfo: *mut libc::siginfo_t, _con: *mut libc::c_void) {
+    unsafe {
+        if (*siginfo).si_pid() == getppid() {
+            let args: Vec<String> = env::args().collect();
+            do_reexecute(&args);
+        }
+    };
+}
+
+fn register_reexe_signal() {
+    let manager_signal: signal::Signal =
+        unsafe { std::mem::transmute(libc::SIGRTMIN() + MANAGER_SIG_OFFSET) };
+    let handler = SigHandler::SigAction(crash_reexec);
+    let flags = SaFlags::SA_NODEFER;
+    let action = SigAction::new(handler, flags, SigSet::empty());
+
+    unsafe { signal::sigaction(manager_signal, &action).expect("failed to set signal handler") };
 }
