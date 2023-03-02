@@ -13,9 +13,9 @@
 //! struct Device
 //!
 use basic::devnum_util::device_path_parse_major_minor;
-use libc::{dev_t, mode_t, S_IFBLK, S_IFCHR, S_IFMT};
+use libc::{dev_t, mode_t, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT, S_IRUSR};
 use nix::errno::Errno;
-use nix::sys::stat::{major, makedev, minor, stat};
+use nix::sys::stat::{lstat, major, makedev, minor, stat};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
@@ -23,6 +23,7 @@ use std::path::Path;
 use std::result::Result;
 use std::sync::{Arc, Mutex};
 
+use crate::utils::readlink_value;
 use crate::{error::Error, DeviceAction};
 
 /// Device
@@ -584,20 +585,10 @@ impl Device {
             // e.g. /sys/devices/pci0000:00/0000:00:10.0/host2/target2:0:1/2:0:1:0/block/sda/subsystem -> ../../../../../../../../class/block
             // get `block`
             let filename = if Path::exists(Path::new(subsystem_path)) {
-                let abs_path = match fs::canonicalize(subsystem_path) {
-                    Ok(ret) => ret,
-                    Err(e) => {
-                        return Err(Error::Nix {
-                            msg: format!(
-                                "get_subsystem failed: canonicalize {:?} ({})",
-                                subsystem_path, e
-                            ),
-                            source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
-                        });
-                    }
-                };
-
-                abs_path.file_name().unwrap().to_str().unwrap().to_string()
+                readlink_value(subsystem_path).map_err(|e| Error::Nix {
+                    msg: format!("get_subsystem failed: readlink_value ({})", e),
+                    source: e.get_errno(),
+                })?
             } else {
                 "".to_string()
             };
@@ -686,17 +677,13 @@ impl Device {
             let syspath = self.get_syspath().unwrap().to_string();
             let driver_path_str = syspath + "/driver";
             let driver_path = Path::new(&driver_path_str);
-            let driver = match driver_path.canonicalize() {
-                Ok(p) => p.to_str().unwrap_or_default().to_string(),
+            let driver = match readlink_value(driver_path) {
+                Ok(filename) => filename,
                 Err(e) => {
-                    let errno = e.raw_os_error().unwrap_or_default();
-                    if errno != libc::ENOENT {
+                    if e.get_errno() != Errno::ENOENT {
                         return Err(Error::Nix {
-                            msg: format!(
-                                "get_driver failed: canonicalize failed {} ({})",
-                                driver_path_str, e
-                            ),
-                            source: Errno::from_i32(errno),
+                            msg: format!("get_driver failed: readlink_value ({})", e),
+                            source: e.get_errno(),
                         });
                     }
 
@@ -817,8 +804,93 @@ impl Device {
     }
 
     /// get the value of specific device sysattr
-    pub fn get_sysattr_value(&self, _sysattr: String) -> Result<String, Error> {
-        todo!()
+    /// firstly check whether the sysattr is cached, otherwise lookup it from the sysfs and cache it
+    pub fn get_sysattr_value(&mut self, sysattr: String) -> Result<String, Error> {
+        // check whether the sysattr is already cached
+        match self.get_cached_sysattr_value(sysattr.clone()) {
+            Ok(v) => {
+                return Ok(v.to_string());
+            }
+            Err(e) => {
+                if e.get_errno() != Errno::ESTALE {
+                    return Err(Error::Nix {
+                        msg: format!("get_sysattr_value failed: get_cached_sysattr_value ({})", e),
+                        source: e.get_errno(),
+                    });
+                }
+            }
+        }
+
+        let syspath = self.get_syspath().unwrap().to_string();
+        let sysattr_path = syspath + "/" + sysattr.as_str();
+        // let sysattr_path = sysattr_path.as_str();
+        let value = match lstat(sysattr_path.as_str()) {
+            Ok(stat) => {
+                if stat.st_mode & S_IFMT == S_IFLNK {
+                    if ["driver", "subsystem", "module"].contains(&sysattr.as_str()) {
+                        readlink_value(sysattr_path)?
+                    } else {
+                        return Err(Error::Nix {
+                            msg: format!("get_sysattr_value failed: invalid sysattr {}", sysattr),
+                            source: Errno::EINVAL,
+                        });
+                    }
+                } else if stat.st_mode & S_IFMT == S_IFDIR {
+                    return Err(Error::Nix {
+                        msg: format!(
+                            "get_sysattr_value failed: sysattr can not be directory {}",
+                            sysattr
+                        ),
+                        source: Errno::EISDIR,
+                    });
+                } else if stat.st_mode & S_IRUSR == 0 {
+                    return Err(Error::Nix {
+                        msg: format!(
+                            "get_sysattr_value failed: non-readable sysattr file {}",
+                            sysattr
+                        ),
+                        source: Errno::EPERM,
+                    });
+                } else {
+                    // read full virtual file
+                    let mut fd = std::fs::OpenOptions::new()
+                        .read(true)
+                        .open(sysattr_path.clone())
+                        .map_err(|e| Error::Nix {
+                            msg: format!(
+                                "get_sysattr_value failed: open sysattr file failed {} ({})",
+                                sysattr_path, e
+                            ),
+                            source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
+                        })?;
+                    let mut value = String::new();
+                    fd.read_to_string(&mut value).map_err(|e| Error::Nix {
+                        msg: format!(
+                            "get_sysattr_value failed: read sysattr file failed {} ({})",
+                            sysattr_path, e
+                        ),
+                        source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
+                    })?;
+                    value.replace("\n\r", "\0")
+                }
+            }
+
+            Err(e) => {
+                self.remove_cached_sysattr_value(sysattr).unwrap();
+                return Err(Error::Nix {
+                    msg: format!("get_sysattr_value failed: lstat {}", sysattr_path),
+                    source: e,
+                });
+            }
+        };
+
+        self.cache_sysattr_value(sysattr, value.clone())
+            .map_err(|e| Error::Nix {
+                msg: format!("get_sysattr_value failed: cache_sysattr_value ({})", e),
+                source: e.get_errno(),
+            })?;
+
+        Ok(value)
     }
 
     /// trigger with uuid
@@ -1363,7 +1435,11 @@ impl Device {
         sysattr: String,
         value: String,
     ) -> Result<(), Error> {
-        self.sysattr_values.insert(sysattr, value);
+        if value.is_empty() {
+            self.remove_cached_sysattr_value(sysattr)?;
+        } else {
+            self.sysattr_values.insert(sysattr, value);
+        }
 
         Ok(())
     }
@@ -1373,6 +1449,34 @@ impl Device {
         self.sysattr_values.remove(&sysattr);
 
         Ok(())
+    }
+
+    /// get cached sysattr value
+    pub(crate) fn get_cached_sysattr_value(&self, sysattr: String) -> Result<&str, Error> {
+        if !self.sysattr_values.contains_key(&sysattr) {
+            return Err(Error::Nix {
+                msg: format!(
+                    "get_cached_sysattr_value failed: no cached sysattr {}",
+                    sysattr
+                ),
+                source: Errno::ESTALE,
+            });
+        }
+
+        match self.sysattr_values.get(&sysattr) {
+            Some(value) => {
+                return Ok(&value);
+            }
+            None => {
+                return Err(Error::Nix {
+                    msg: format!(
+                        "get_cached_sysattr_value failed: non-existing sysattr {}",
+                        sysattr
+                    ),
+                    source: Errno::ENOENT,
+                });
+            }
+        }
     }
 
     /// new from child
@@ -1598,7 +1702,15 @@ mod tests {
             }
         }
 
-        // todo: test get_sysattr_value
+        match device.get_sysattr_value("nsid".to_string()) {
+            Ok(value) => {
+                value.parse::<u32>().unwrap();
+            }
+            Err(e) => {
+                assert!([Errno::EACCES, Errno::EPERM, Errno::ENOENT, Errno::EINVAL]
+                    .contains(&e.get_errno()));
+            }
+        }
     }
 
     #[ignore]

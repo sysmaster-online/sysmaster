@@ -192,9 +192,7 @@ impl JobQueue {
         let seqnum: u64 = match device.get_seqnum() {
             Ok(seqnum) => seqnum,
             Err(_) => {
-                log::debug!(
-                    "Job Queue: failed to insert device as it is not received from uevent"
-                );
+                log::debug!("Job Queue: failed to insert device as it is not received from uevent");
                 return;
             }
         };
