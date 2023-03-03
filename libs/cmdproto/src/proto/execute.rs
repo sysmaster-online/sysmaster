@@ -34,6 +34,8 @@ pub(crate) trait Executer {
 pub trait ExecuterAction {
     #[allow(missing_docs)]
     type Error: Display + Into<nix::Error>;
+    #[allow(missing_docs)]
+    type Status: Display + Into<nix::Error>;
     /// start the unit_name
     fn start(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// stop the unit_name
@@ -43,7 +45,7 @@ pub trait ExecuterAction {
     /// reload the unit_name
     fn reload(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// show the status of unit_name
-    fn status(&self, unit_name: &str) -> Result<String, Self::Error>;
+    fn status(&self, unit_name: &str) -> Result<Self::Status, Self::Error>;
     /// list all units
     fn list_units(&self) -> Result<String, Self::Error>;
     /// suspend host
@@ -125,7 +127,8 @@ impl Executer for UnitComm {
                     new_line_break(&mut reply);
                     match manager.status(&unit) {
                         Ok(status) => {
-                            reply += &status;
+                            reply += &status.to_string();
+                            error_code = status.into() as u32;
                         }
                         Err(e) => {
                             reply = format!("{reply}Failed to show the status of {unit}: {e}");

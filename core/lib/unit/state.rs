@@ -10,6 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use basic::show_table::ShowTable;
 use bitflags::bitflags;
 
 /**Unit stats：
@@ -107,5 +108,67 @@ bitflags! {
         const UNIT_NOTIFY_RELOAD_FAILURE = 1 << 0;
         /// notify auto restart to manager
         const UNIT_NOTIFY_WILL_AUTO_RESTART = 1 << 1;
+    }
+}
+
+/// UnitStatus is used to display unit's status
+pub struct UnitStatus {
+    name: String,
+    description: Option<String>,
+    load_state: String,
+    sub_state: String,
+    active_state: String,
+    cgroup_path: String,
+    pid: String,
+    error_code: i32,
+}
+
+impl UnitStatus {
+    #[allow(clippy::too_many_arguments)]
+    ///
+    pub fn new(
+        name: String,
+        description: Option<String>,
+        load_state: String,
+        sub_state: String,
+        active_state: String,
+        cgroup_path: String,
+        pid: String,
+        error_code: i32,
+    ) -> Self {
+        Self {
+            name,
+            description,
+            load_state,
+            sub_state,
+            active_state,
+            cgroup_path,
+            pid,
+            error_code,
+        }
+    }
+}
+
+impl std::fmt::Display for UnitStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut status_table = ShowTable::new();
+        let full_active_state = self.active_state.to_string() + "(" + &self.sub_state + ")";
+        status_table.add_line(vec!["Loaded:", &self.load_state]);
+        status_table.add_line(vec!["Active:", &full_active_state]);
+        status_table.add_line(vec!["CGroup:", &self.cgroup_path]);
+        status_table.add_line(vec!["PID:", &self.pid]);
+        status_table.set_one_cell_align_right(0);
+        status_table.align_define();
+        let first_line = match &self.description {
+            None => "● ".to_string() + &self.name + "\n",
+            Some(str) => "● ".to_string() + &self.name + " - " + str + "\n",
+        };
+        write!(f, "{}", first_line + &status_table.to_string())
+    }
+}
+
+impl From<UnitStatus> for nix::Error {
+    fn from(status: UnitStatus) -> Self {
+        nix::Error::from_i32(status.error_code)
     }
 }

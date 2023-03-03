@@ -49,7 +49,7 @@ use sysmaster::error::*;
 use sysmaster::exec::ExecParameters;
 use sysmaster::exec::{ExecCommand, ExecContext};
 use sysmaster::rel::{ReStation, ReStationKind, ReliLastFrame, Reliability};
-use sysmaster::unit::{UmIf, UnitActiveState, UnitDependencyMask, UnitType};
+use sysmaster::unit::{UmIf, UnitActiveState, UnitDependencyMask, UnitStatus, UnitType};
 use unit_submanager::UnitSubManagers;
 
 //#[derive(Debug)]
@@ -136,7 +136,7 @@ impl UnitManagerX {
         self.data.restart_unit(name)
     }
 
-    pub(crate) fn get_unit_status(&self, name: &str) -> Result<String> {
+    pub(crate) fn get_unit_status(&self, name: &str) -> Result<UnitStatus> {
         self.data.get_unit_status(name)
     }
 
@@ -836,54 +836,40 @@ impl UnitManager {
         res
     }
 
-    pub(self) fn get_unit_status(&self, name: &str) -> Result<String> {
+    pub(self) fn get_unit_status(&self, name: &str) -> Result<UnitStatus> {
         let unit = match self.units_get(name) {
             Some(unit) => unit,
             None => {
                 return Err(Error::NotExisted);
             }
         };
-        let mut status_table = ShowTable::new();
-        status_table.add_line(vec![
-            "Loaded:".to_string(),
-            self.load_unit_success(name).to_string(),
-        ]);
-        status_table.add_line(vec![
-            "Active:".to_string(),
-            self.current_active_state(name).to_string() + "(" + &self.get_subunit_state(name) + ")",
-        ]);
-        status_table.add_line(vec![
-            "CGroup:".to_string(),
-            self.get_unit_cgroup_path(unit.clone()),
-        ]);
-        status_table.add_line(vec![
-            "PID:".to_string(),
-            self.get_unit_status_pids(unit.clone()),
-        ]);
-        status_table.set_one_cell_align_right(0);
-        status_table.align_define();
-        let first_line = match unit.get_description() {
-            None => "● ".to_string() + name + "\n",
-            Some(str) => "● ".to_string() + name + " - " + &str + "\n",
+        let error_code = match self.current_active_state(name) {
+            // systemd will return 3 if the unit's state is failed or inactive.
+            UnitActiveState::UnitFailed | UnitActiveState::UnitInActive => 3,
+            _ => 0,
         };
-        Ok(first_line + &status_table.to_string())
+        Ok(UnitStatus::new(
+            name.to_string(),
+            unit.get_description(),
+            self.load_unit_success(name).to_string(),
+            self.get_subunit_state(name),
+            self.current_active_state(name).to_string(),
+            self.get_unit_cgroup_path(unit.clone()),
+            self.get_unit_status_pids(unit.clone()),
+            error_code,
+        ))
     }
 
     pub(self) fn get_all_units(&self) -> Result<String> {
         let mut list_units_table = ShowTable::new();
-        list_units_table.add_line(vec![
-            "UNIT".to_string(),
-            "LOAD".to_string(),
-            "ACTIVE".to_string(),
-            "SUB".to_string(),
-            "DESCRIPTION".to_string(),
-        ]);
+        list_units_table.add_line(vec!["UNIT", "LOAD", "ACTIVE", "SUB", "DESCRIPTION"]);
         for unit_type in UnitType::iterator() {
             for unit_name in self.units_get_all(Some(unit_type)) {
                 let unit = match self.units_get(&unit_name) {
                     Some(unit) => unit,
                     None => {
-                        return Err(Error::NotExisted);
+                        log::info!("Failed to get unit: {}", unit_name);
+                        continue;
                     }
                 };
                 let load_state = self.load_unit_success(&unit_name).to_string();
@@ -894,11 +880,11 @@ impl UnitManager {
                     Some(str) => str,
                 };
                 list_units_table.add_line(vec![
-                    unit_name,
-                    load_state,
-                    active_state,
-                    sub_state,
-                    description,
+                    &unit_name,
+                    &load_state,
+                    &active_state,
+                    &sub_state,
+                    &description,
                 ]);
             }
         }

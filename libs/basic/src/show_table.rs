@@ -35,7 +35,7 @@ pub struct ShowTable {
 /// Struct can implement this trait to display in ShowTable
 pub trait ShowTableLine {
     /// change the struct to the string vector
-    fn to_vec(&self) -> Vec<String> {
+    fn to_vec(&self) -> Vec<&str> {
         todo!()
     }
 }
@@ -53,9 +53,9 @@ impl ShowTable {
         }
     }
     /// Add a new line to ShowTable
-    pub fn add_line(&mut self, line_content: Vec<String>) {
+    pub fn add_line(&mut self, line_content: Vec<&str>) {
         let content_length = line_content.len();
-        let mut new_line = line_content;
+        let mut new_line: Vec<String> = line_content.iter().map(|x| x.to_string()).collect();
         if self.row_length == 0 {
             self.column_length = content_length;
             self.cell_width = vec![0; self.column_length];
@@ -223,12 +223,8 @@ mod tests {
     }
 
     impl ShowTableLine for TestItem {
-        fn to_vec(&self) -> Vec<String> {
-            vec![
-                self.value1.to_string(),
-                self.value2.to_string(),
-                self.value3.to_string(),
-            ]
+        fn to_vec(&self) -> Vec<&str> {
+            vec![&self.value1, &self.value2, &self.value3]
         }
     }
 
@@ -236,16 +232,8 @@ mod tests {
     fn run_test() {
         use super::ShowTable;
         let mut table1 = ShowTable::new();
-        table1.add_line(vec![
-            "AAA".to_string(),
-            "BBBB".to_string(),
-            "CCCCCCCCCC".to_string(),
-        ]);
-        table1.add_line(vec![
-            "12345".to_string(),
-            "123".to_string(),
-            "123".to_string(),
-        ]);
+        table1.add_line(vec!["AAA", "BBBB", "CCCCCCCCCC"]);
+        table1.add_line(vec!["12345", "123", "123"]);
         table1.align_left();
         assert_eq!(
             table1.to_string(),
