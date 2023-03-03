@@ -126,9 +126,10 @@ pub(crate) struct UeConfigUnit {
     pub IgnoreOnIsolate: bool,
     #[config(default = true)]
     pub DefaultDependencies: bool,
-    // #[config(deserialize_with = JobMode::deserialize_with)]
-    // #[config(default = "replace")]
-    // pub on_success_job_mode: JobMode,
+    #[config(default = false)]
+    pub RefuseManualStart: bool,
+    #[config(default = false)]
+    pub RefuseManualStop: bool,
     #[config(deserialize_with = JobMode::deserialize_with)]
     #[config(default = "replace")]
     pub OnFailureJobMode: JobMode,

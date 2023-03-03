@@ -151,6 +151,10 @@ pub enum Error {
     UnitActionENoent,
     #[snafu(display("ECanceled(UnitActionError)"))]
     UnitActionECanceled,
+    #[snafu(display("unit can not be started manually"))]
+    UnitActionERefuseManualStart,
+    #[snafu(display("unit can not be stopped manually"))]
+    UnitActionERefuseManualStop,
 }
 
 impl From<Error> for nix::errno::Errno {
