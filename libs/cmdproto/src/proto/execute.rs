@@ -18,6 +18,7 @@ use super::{
 
 use crate::error::*;
 use http::StatusCode;
+use nix;
 use std::{fmt::Display, rc::Rc};
 
 pub(crate) trait Executer {
@@ -32,7 +33,7 @@ pub(crate) trait Executer {
 /// ExecuterAction
 pub trait ExecuterAction {
     #[allow(missing_docs)]
-    type Error: Display;
+    type Error: Display + Into<nix::Error>;
     /// start the unit_name
     fn start(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// stop the unit_name
@@ -108,6 +109,7 @@ impl Executer for UnitComm {
     ) -> CommandResponse {
         let mut reply = String::new();
         let mut units: Vec<String> = Vec::new();
+        let mut error_code: u32 = 0;
         for unit_name in &self.units {
             if call_back.is_none() {
                 units.push(unit_name.to_string());
@@ -126,7 +128,8 @@ impl Executer for UnitComm {
                             reply += &status;
                         }
                         Err(e) => {
-                            reply = format!("{reply} Failed to show the status of {unit}: {e}");
+                            reply = format!("{reply}Failed to show the status of {unit}: {e}");
+                            error_code = e.into() as u32;
                         }
                     }
                 }
@@ -135,7 +138,8 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.start(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply} Failed to start {unit}: {e}");
+                        reply = format!("{reply}Failed to start {unit}: {e}");
+                        error_code = e.into() as u32;
                     }
                 }
             }
@@ -143,7 +147,8 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.stop(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply} Failed to stop {unit}: {e}");
+                        reply = format!("{reply}Failed to stop {unit}: {e}");
+                        error_code = e.into() as u32;
                     }
                 }
             }
@@ -151,7 +156,8 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.restart(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply} Failed to restart {unit}: {e}");
+                        reply = format!("{reply}Failed to restart {unit}: {e}");
+                        error_code = e.into() as u32;
                     }
                 }
             }
@@ -159,7 +165,8 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.reload(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply} Failed to reload {unit}: {e}");
+                        reply = format!("{reply}Failed to reload {unit}: {e}");
+                        error_code = e.into() as u32;
                     }
                 }
             }
@@ -167,6 +174,7 @@ impl Executer for UnitComm {
         }
         CommandResponse {
             status: StatusCode::OK.as_u16() as _,
+            error_code,
             message: reply,
         }
     }
@@ -183,6 +191,7 @@ impl Executer for MngrComm {
                 manager.daemon_reexec();
                 CommandResponse {
                     status: StatusCode::OK.as_u16() as _,
+                    error_code: 0,
                     ..Default::default()
                 }
             }
@@ -191,6 +200,7 @@ impl Executer for MngrComm {
                 manager.daemon_reload();
                 CommandResponse {
                     status: StatusCode::OK.as_u16() as _,
+                    error_code: 0,
                     ..Default::default()
                 }
             }
@@ -198,12 +208,14 @@ impl Executer for MngrComm {
             mngr_comm::Action::Listunits => match manager.list_units() {
                 Ok(m) => CommandResponse {
                     status: StatusCode::OK.as_u16() as _,
+                    error_code: 0,
                     message: m,
                 },
                 Err(e) => {
                     let error_message = format!("Failed to list all units:{e}");
                     CommandResponse {
                         status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                        error_code: e.into() as u32,
                         message: error_message,
                     }
                 }
@@ -238,10 +250,12 @@ impl Executer for SysComm {
         match ret {
             Ok(_) => CommandResponse {
                 status: StatusCode::OK.as_u16() as _,
+                error_code: 0,
                 ..Default::default()
             },
-            Err(_e) => CommandResponse {
+            Err(e) => CommandResponse {
                 status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                error_code: e.into() as u32,
                 message: String::from("error."),
             },
         }
@@ -256,6 +270,7 @@ impl Executer for UnitFile {
     ) -> CommandResponse {
         let mut reply = String::new();
         let mut units: Vec<String> = Vec::new();
+        let mut error_code: u32 = 0;
         for unit_name in &self.unitname {
             if call_back.is_none() {
                 units.push(unit_name.to_string());
@@ -270,6 +285,7 @@ impl Executer for UnitFile {
                     if let Err(e) = manager.enable(&unit) {
                         new_line_break(&mut reply);
                         reply = format!("{reply} Failed to enable {unit}: {e}");
+                        error_code = e.into() as u32;
                     }
                 }
             }
@@ -278,6 +294,7 @@ impl Executer for UnitFile {
                     if let Err(e) = manager.disable(&unit) {
                         new_line_break(&mut reply);
                         reply = format!("{reply} Failed to disable {unit}: {e}");
+                        error_code = e.into() as u32;
                     }
                 }
             }
@@ -286,6 +303,7 @@ impl Executer for UnitFile {
                     if let Err(e) = manager.mask(&unit) {
                         new_line_break(&mut reply);
                         reply = format!("{reply} Failed to mask {unit}: {e}");
+                        error_code = e.into() as u32;
                     }
                 }
             }
@@ -294,6 +312,7 @@ impl Executer for UnitFile {
                     if let Err(e) = manager.unmask(&unit) {
                         new_line_break(&mut reply);
                         reply = format!("{reply} Failed to unmask {unit}: {e}");
+                        error_code = e.into() as u32;
                     }
                 }
             }
@@ -302,6 +321,7 @@ impl Executer for UnitFile {
 
         CommandResponse {
             status: StatusCode::OK.as_u16() as _,
+            error_code,
             message: reply,
         }
     }

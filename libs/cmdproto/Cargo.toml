@@ -10,6 +10,7 @@ edition = "2021"
 prost = "0.11" # 处理 protobuf 的代码
 http = "0.2"   # 我们使用 HTTP status code 所以引入这个类型库
 snafu = "0.7"
+nix = "0.24"
 
 [build-dependencies]
 prost-build = "0.9" # 编译 protobuf
