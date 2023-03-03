@@ -130,7 +130,7 @@ impl UnitLoadData {
             return Some(Rc::clone(&unit));
         };
         let unit = self.prepare_unit(name)?;
-        log::info!("begin dispatch unit in  load queue");
+        log::info!("begin dispatch unit in load queue");
         self.rt.dispatch_load_queue();
         Some(Rc::clone(&unit))
     }
