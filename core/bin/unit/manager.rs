@@ -683,33 +683,25 @@ impl UnitManager {
     }
 
     fn start_unit(&self, name: &str) -> Result<()> {
-        if let Some(unit) = self.load_unitx(name) {
-            if unit
-                .get_config()
-                .config_data()
-                .borrow()
-                .Unit
-                .RefuseManualStart
-            {
-                return Err(Error::UnitActionERefuseManualStart);
+        let unit = match self.load_unitx(name) {
+            None => {
+                return Err(Error::UnitActionENoent);
             }
-
-            self.jm.exec(
-                &JobConf::new(&unit, JobKind::Start),
-                JobMode::Replace,
-                &mut JobAffect::new(false),
-            )?;
-            log::debug!("job exec success");
-            Ok(())
-        } else {
-            Err(Error::Internal)
-        }
+            Some(v) => v,
+        };
+        self.jm.exec(
+            &JobConf::new(&unit, JobKind::Start),
+            JobMode::Replace,
+            &mut JobAffect::new(false),
+        )?;
+        log::debug!("job exec success");
+        Ok(())
     }
 
     fn start_unit_manual(&self, name: &str) -> Result<()> {
         let unit = match self.load_unitx(name) {
             None => {
-                return Err(Error::Internal);
+                return Err(Error::UnitActionENoent);
             }
             Some(v) => v,
         };
@@ -752,32 +744,24 @@ impl UnitManager {
 
     #[allow(dead_code)]
     pub(self) fn stop_unit(&self, name: &str) -> Result<()> {
-        if let Some(unit) = self.load_unitx(name) {
-            if unit
-                .get_config()
-                .config_data()
-                .borrow()
-                .Unit
-                .RefuseManualStop
-            {
-                return Err(Error::UnitActionERefuseManualStop);
+        let unit = match self.load_unitx(name) {
+            None => {
+                return Err(Error::UnitActionENoent);
             }
-
-            self.jm.exec(
-                &JobConf::new(&unit, JobKind::Stop),
-                JobMode::Replace,
-                &mut JobAffect::new(false),
-            )?;
-            Ok(())
-        } else {
-            Err(Error::Internal)
-        }
+            Some(v) => v,
+        };
+        self.jm.exec(
+            &JobConf::new(&unit, JobKind::Stop),
+            JobMode::Replace,
+            &mut JobAffect::new(false),
+        )?;
+        Ok(())
     }
 
     fn stop_unit_manual(&self, name: &str) -> Result<()> {
         let unit = match self.load_unitx(name) {
             None => {
-                return Err(Error::Internal);
+                return Err(Error::UnitActionENoent);
             }
             Some(v) => v,
         };
