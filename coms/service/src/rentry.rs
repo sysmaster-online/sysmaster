@@ -18,6 +18,7 @@ use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::VecDeque;
 use std::rc::Rc;
 use std::str::FromStr;
 use sysmaster::error::*;
@@ -170,19 +171,19 @@ pub(super) struct SectionService {
     #[config(default = "simple")]
     pub Type: ServiceType,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStart: Option<Vec<ExecCommand>>,
+    pub ExecStart: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStartPre: Option<Vec<ExecCommand>>,
+    pub ExecStartPre: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStartPost: Option<Vec<ExecCommand>>,
+    pub ExecStartPost: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStop: Option<Vec<ExecCommand>>,
+    pub ExecStop: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStopPost: Option<Vec<ExecCommand>>,
+    pub ExecStopPost: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecReload: Option<Vec<ExecCommand>>,
+    pub ExecReload: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecCondition: Option<Vec<ExecCommand>>,
+    pub ExecCondition: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub Sockets: Option<Vec<String>>,
     #[config(default = 0)]

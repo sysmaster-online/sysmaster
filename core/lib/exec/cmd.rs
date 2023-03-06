@@ -16,7 +16,7 @@ use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer, Serialize,
 };
-use std::path::Path;
+use std::{collections::VecDeque, path::Path};
 
 /// the exec command that was parsed from the unit file
 #[derive(PartialEq, Clone, Eq, Debug, Serialize, Deserialize)]
@@ -43,14 +43,14 @@ impl ExecCommand {
 }
 
 impl DeserializeWith for ExecCommand {
-    type Item = Vec<Self>;
+    type Item = VecDeque<Self>;
     fn deserialize_with<'de, D>(de: D) -> Result<Self::Item, D::Error>
     where
         D: Deserializer<'de>,
     {
         let s = String::deserialize(de)?;
 
-        let mut vec = vec![];
+        let mut commands = VecDeque::new();
 
         for cmd in s.trim().split_terminator(';') {
             if cmd.is_empty() {
@@ -84,9 +84,9 @@ impl DeserializeWith for ExecCommand {
 
             let cmd = path.to_str().unwrap().to_string();
             let new_command = ExecCommand::new(cmd, command);
-            vec.push(new_command);
+            commands.push_back(new_command);
         }
 
-        Ok(vec)
+        Ok(commands)
     }
 }

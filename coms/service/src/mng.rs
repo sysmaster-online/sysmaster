@@ -30,7 +30,7 @@ use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
@@ -55,9 +55,9 @@ pub(super) struct ServiceMng {
     spawn: ServiceSpawn,
     state: RefCell<ServiceState>,
     result: RefCell<ServiceResult>,
-    main_command: RefCell<Vec<ExecCommand>>,
+    main_command: RefCell<VecDeque<ExecCommand>>,
     control_cmd_type: RefCell<Option<ServiceCommand>>,
-    control_command: RefCell<Vec<ExecCommand>>,
+    control_command: RefCell<VecDeque<ExecCommand>>,
     rd: Rc<RunningData>,
     monitor: RefCell<ServiceMonitor>,
 }
@@ -138,9 +138,9 @@ impl ServiceMng {
             spawn: ServiceSpawn::new(commr, &_pid, configr, exec_ctx),
             state: RefCell::new(ServiceState::Dead),
             result: RefCell::new(ServiceResult::Success),
-            main_command: RefCell::new(Vec::new()),
+            main_command: RefCell::new(VecDeque::new()),
             control_cmd_type: RefCell::new(None),
-            control_command: RefCell::new(Vec::new()),
+            control_command: RefCell::new(VecDeque::new()),
             rd: rd.clone(),
             monitor: RefCell::new(ServiceMonitor::new()),
         }
@@ -715,7 +715,7 @@ impl ServiceMng {
     }
 
     fn main_command_pop(&self) -> Option<ExecCommand> {
-        self.main_command.borrow_mut().pop()
+        self.main_command.borrow_mut().pop_front()
     }
 
     fn main_command_update(&self, len: usize) {
@@ -734,7 +734,7 @@ impl ServiceMng {
     }
 
     fn control_command_pop(&self) -> Option<ExecCommand> {
-        self.control_command.borrow_mut().pop()
+        self.control_command.borrow_mut().pop_front()
     }
 
     fn control_command_update(&self, cmd_type: Option<ServiceCommand>, len: usize) {
@@ -1100,44 +1100,52 @@ impl ServiceMng {
                 self.run_next_main();
             } else {
                 self.main_command.borrow_mut().clear();
-                match self.state() {
-                    ServiceState::Dead => todo!(),
-                    ServiceState::Start if self.config.service_type() == ServiceType::Oneshot => {
-                        if res == ServiceResult::Success {
-                            self.enter_start_post();
-                        } else {
-                            self.enter_signal(ServiceState::StopSigterm, res);
+                if !self.cgroup_good() {
+                    match self.state() {
+                        ServiceState::Dead => todo!(),
+                        ServiceState::Start
+                            if self.config.service_type() == ServiceType::Oneshot =>
+                        {
+                            if res == ServiceResult::Success {
+                                self.enter_start_post();
+                            } else {
+                                self.enter_signal(ServiceState::StopSigterm, res);
+                            }
                         }
-                    }
-                    ServiceState::Start if self.config.service_type() == ServiceType::Notify => {
-                        if res != ServiceResult::Success {
-                            self.enter_signal(ServiceState::StopSigterm, res);
-                        } else {
-                            self.enter_signal(
-                                ServiceState::StopSigterm,
-                                ServiceResult::FailureProtocol,
-                            );
+                        ServiceState::Start
+                            if self.config.service_type() == ServiceType::Notify =>
+                        {
+                            if res != ServiceResult::Success {
+                                self.enter_signal(ServiceState::StopSigterm, res);
+                            } else {
+                                self.enter_signal(
+                                    ServiceState::StopSigterm,
+                                    ServiceResult::FailureProtocol,
+                                );
+                            }
                         }
+                        ServiceState::Start => {
+                            self.enter_running(res);
+                        }
+                        ServiceState::StartPost | ServiceState::Reload => {
+                            if self.pid.control().map_or(false, |_p| true) {
+                                self.enter_stop(res);
+                            }
+                        }
+                        ServiceState::Running => {
+                            self.enter_running(res);
+                        }
+                        ServiceState::Stop => {}
+                        ServiceState::StopWatchdog
+                        | ServiceState::StopSigkill
+                        | ServiceState::StopSigterm => {
+                            self.enter_stop_post(res);
+                        }
+                        ServiceState::FinalSigterm | ServiceState::FinalSigkill => {
+                            self.enter_dead(res, true);
+                        }
+                        _ => {}
                     }
-                    ServiceState::Start => {
-                        self.enter_running(res);
-                    }
-                    ServiceState::StartPost | ServiceState::Reload => {
-                        self.enter_stop(res);
-                    }
-                    ServiceState::Running => {
-                        self.enter_running(res);
-                    }
-                    ServiceState::Stop => {}
-                    ServiceState::StopWatchdog
-                    | ServiceState::StopSigkill
-                    | ServiceState::StopSigterm => {
-                        self.enter_stop_post(res);
-                    }
-                    ServiceState::FinalSigterm | ServiceState::FinalSigkill => {
-                        self.enter_dead(res, true);
-                    }
-                    _ => {}
                 }
             }
         } else if self.pid.control() == Some(pid) {

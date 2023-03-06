@@ -25,9 +25,9 @@ use event::EventState;
 use event::{EventType, Events, Source};
 use nix::libc::{self};
 use nix::sys::wait::WaitStatus;
-use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
+use std::{cell::RefCell, collections::VecDeque};
 use sysmaster::error::*;
 use sysmaster::exec::{ExecCommand, ExecContext};
 use sysmaster::rel::ReliLastFrame;
@@ -160,7 +160,7 @@ struct SocketMngData {
     state: Rc<RefCell<SocketState>>,
     result: RefCell<SocketResult>,
     control_cmd_type: RefCell<Option<SocketCommand>>,
-    control_command: RefCell<Vec<ExecCommand>>,
+    control_command: RefCell<VecDeque<ExecCommand>>,
     refused: RefCell<i32>,
 }
 
@@ -181,7 +181,7 @@ impl SocketMngData {
             state: Rc::new(RefCell::new(SocketState::StateMax)),
             result: RefCell::new(SocketResult::Success),
             control_cmd_type: RefCell::new(None),
-            control_command: RefCell::new(Vec::new()),
+            control_command: RefCell::new(VecDeque::new()),
             refused: RefCell::new(0),
         })
     }
@@ -673,7 +673,7 @@ impl SocketMngData {
     }
 
     fn control_command_pop(&self) -> Option<ExecCommand> {
-        self.control_command.borrow_mut().pop()
+        self.control_command.borrow_mut().pop_front()
     }
 
     fn control_command_update(&self, cmd_type: Option<SocketCommand>, len: usize) {

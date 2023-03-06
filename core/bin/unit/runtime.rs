@@ -183,7 +183,11 @@ impl UnitRTData {
         // retry
         if let Some(unit) = self.db.units_get(lunit) {
             if let Err(e) = unit.load() {
-                log::error!("load unit [{}] failed: {}", unit.id(), e.to_string());
+                log::error!(
+                    "dispatch dc last queue, load unit [{}] failed: {}",
+                    unit.id(),
+                    e.to_string()
+                );
             }
         }
     }

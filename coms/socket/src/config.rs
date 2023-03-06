@@ -26,6 +26,7 @@ use nix::sys::socket::{
     SockaddrLike, UnixAddr,
 };
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::fmt;
 use std::fs;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
@@ -157,7 +158,7 @@ impl SocketConfig {
         self.data.clone()
     }
 
-    pub(super) fn get_exec_cmds(&self, cmd_type: SocketCommand) -> Option<Vec<ExecCommand>> {
+    pub(super) fn get_exec_cmds(&self, cmd_type: SocketCommand) -> Option<VecDeque<ExecCommand>> {
         self.data.borrow().get_exec_cmds(cmd_type)
     }
 
@@ -317,7 +318,7 @@ impl SocketConfigData {
     }
 
     // keep consistency with the configuration, so just copy from configuration.
-    pub(self) fn get_exec_cmds(&self, cmd_type: SocketCommand) -> Option<Vec<ExecCommand>> {
+    pub(self) fn get_exec_cmds(&self, cmd_type: SocketCommand) -> Option<VecDeque<ExecCommand>> {
         match cmd_type {
             SocketCommand::StartPre => self.Socket.ExecStartPre.clone(),
             SocketCommand::StartPost => self.Socket.ExecStartPost.clone(),

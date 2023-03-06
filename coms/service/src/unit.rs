@@ -307,6 +307,8 @@ impl ServiceUnit {
                 return Ok(());
             }
 
+            log::debug!("service add sysinit and basic target to service");
+
             let um = self.comm.um();
 
             um.unit_add_two_dependency(
