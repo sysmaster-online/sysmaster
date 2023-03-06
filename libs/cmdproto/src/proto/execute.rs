@@ -178,7 +178,7 @@ impl Executer for MngrComm {
         manager: Rc<impl ExecuterAction>,
         _call_back: Option<fn(&str) -> String>,
     ) -> CommandResponse {
-        return match self.action() {
+        match self.action() {
             mngr_comm::Action::Reexec => {
                 manager.daemon_reexec();
                 CommandResponse {
@@ -208,7 +208,7 @@ impl Executer for MngrComm {
                     }
                 }
             },
-        };
+        }
     }
 }
 
