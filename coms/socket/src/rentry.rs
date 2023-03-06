@@ -15,6 +15,7 @@ use confique::Config;
 use macros::EnumDisplay;
 use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::os::unix::prelude::RawFd;
 use std::rc::Rc;
 use sysmaster::exec::ExecCommand;
@@ -33,15 +34,15 @@ const RELI_LAST_KEY: u32 = 0; // singleton
 #[allow(dead_code)]
 pub(super) struct SectionSocket {
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStartPre: Option<Vec<ExecCommand>>,
+    pub ExecStartPre: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStartChown: Option<Vec<ExecCommand>>,
+    pub ExecStartChown: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStartPost: Option<Vec<ExecCommand>>,
+    pub ExecStartPost: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStopPre: Option<Vec<ExecCommand>>,
+    pub ExecStopPre: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStopPost: Option<Vec<ExecCommand>>,
+    pub ExecStopPost: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub ListenStream: Option<Vec<String>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]

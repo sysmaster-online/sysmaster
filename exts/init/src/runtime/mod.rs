@@ -33,7 +33,7 @@ const INVALID_FD: i32 = -1;
 const INVALID_PID: i32 = -1;
 const MANAGER_SIG_OFFSET: i32 = 7;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub enum InitState {
     Reexec = 0,
     RunRecover = 1,

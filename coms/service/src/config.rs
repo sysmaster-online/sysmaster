@@ -15,6 +15,7 @@ use super::comm::ServiceUnitComm;
 use super::rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
 use confique::Config;
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::rc::Rc;
 use sysmaster::error::*;
@@ -81,7 +82,7 @@ impl ServiceConfig {
         self.data.clone()
     }
 
-    pub(super) fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Option<Vec<ExecCommand>> {
+    pub(super) fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Option<VecDeque<ExecCommand>> {
         self.data.borrow().get_exec_cmds(cmd_type)
     }
 
@@ -133,7 +134,7 @@ impl ServiceConfigData {
     }
 
     // keep consistency with the configuration, so just copy from configuration.
-    pub(self) fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Option<Vec<ExecCommand>> {
+    pub(self) fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Option<VecDeque<ExecCommand>> {
         match cmd_type {
             ServiceCommand::Condition => self.Service.ExecCondition.clone(),
             ServiceCommand::StartPre => self.Service.ExecStartPre.clone(),
