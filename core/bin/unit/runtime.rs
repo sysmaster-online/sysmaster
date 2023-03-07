@@ -334,7 +334,7 @@ fn dispatch_target_dep_unit(db: &Rc<UnitDb>, unit: &Rc<UnitX>) {
     let atom = UnitRelationAtom::UnitAtomDefaultTargetDependencies;
     let b_atom = UnitRelationAtom::UnitAtomBefore;
     let after = UnitRelations::UnitAfter;
-    let mask = UnitDependencyMask::UnitDependencyDefault;
+    let mask = UnitDependencyMask::Default;
     for dep_target in db.dep_gets_atom(unit, atom) {
         if dep_target.unit_type() != UnitType::UnitTarget {
             log::debug!("dep unit type is not target, continue");

@@ -231,14 +231,39 @@ impl ServiceUnit {
 
         if let Some(owner) = self.comm.owner() {
             if let Some(sockets) = self.config.sockets() {
+                let um = self.comm.um();
+
                 for socket in sockets {
-                    let ret = owner.insert_two_deps(
+                    if let Err(e) = um.unit_add_two_dependency(
+                        owner.id(),
                         UnitRelations::UnitWants,
                         UnitRelations::UnitAfter,
-                        socket.to_string(),
-                    );
-                    if ret.is_ok() {
-                        owner.insert_dep(UnitRelations::UnitTriggeredBy, socket.clone());
+                        &socket,
+                        true,
+                        UnitDependencyMask::File,
+                    ) {
+                        log::warn!(
+                            "failed to add {:?} {:?} dependency of {}, error: {:?}",
+                            UnitRelations::UnitWants,
+                            UnitRelations::UnitAfter,
+                            socket,
+                            e
+                        );
+                    }
+
+                    if let Err(e) = um.unit_add_dependency(
+                        owner.id(),
+                        UnitRelations::UnitTriggeredBy,
+                        &socket,
+                        true,
+                        UnitDependencyMask::File,
+                    ) {
+                        log::warn!(
+                            "failed to add {:?} dependency of {}, error: {:?}",
+                            UnitRelations::UnitTriggeredBy,
+                            socket,
+                            e
+                        );
                     }
                 }
             }
@@ -317,7 +342,7 @@ impl ServiceUnit {
                 UnitRelations::UnitRequires,
                 SYSINIT_TARGET,
                 true,
-                UnitDependencyMask::UnitDependencyDefault,
+                UnitDependencyMask::Default,
             )?;
 
             um.unit_add_dependency(
@@ -325,7 +350,7 @@ impl ServiceUnit {
                 UnitRelations::UnitAfter,
                 BASIC_TARGET,
                 true,
-                UnitDependencyMask::UnitDependencyDefault,
+                UnitDependencyMask::Default,
             )?;
 
             um.unit_add_two_dependency(
@@ -334,7 +359,7 @@ impl ServiceUnit {
                 UnitRelations::UnitConflicts,
                 SHUTDOWN_TARGET,
                 true,
-                UnitDependencyMask::UnitDependencyDefault,
+                UnitDependencyMask::Default,
             )?;
         }
 

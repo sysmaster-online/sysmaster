@@ -102,7 +102,9 @@ pub enum UnitRelationAtom {
 #[allow(missing_docs)]
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum UnitDependencyMask {
-    UnitDependencyDefault = 1 << 2,
+    File = 1 << 0,
+    Implicit = 1 << 1,
+    Default = 1 << 2,
 }
 
 #[allow(missing_docs)]
