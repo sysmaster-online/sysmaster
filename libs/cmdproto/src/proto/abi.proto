@@ -22,8 +22,10 @@ message CommandRequest {
 message CommandResponse {
   // stat code; HTTP 2xx/4xx/5xx
   uint32 status = 1;
+  // returned error_code, 0 for success, a positive value for failure
+  uint32 error_code = 2;
   // if not 2xx，message include more information
-  string message = 2;
+  string message = 3;
 }
 
 message UnitComm {

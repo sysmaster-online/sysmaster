@@ -157,11 +157,50 @@ pub enum Error {
     UnitActionERefuseManualStop,
 }
 
-impl From<Error> for nix::errno::Errno {
+/// Convert to the standard linux error code
+impl From<Error> for nix::Error {
     fn from(e: Error) -> Self {
         match e {
+            Error::EOF => nix::Error::EIO,
+            Error::Parse { source: _ } => nix::Error::EINVAL,
+            Error::PluginLoad { msg: _ } => nix::Error::EIO,
+            Error::Confique { source: _ } => nix::Error::EINVAL,
+            Error::Cgroup { source: _ } => nix::Error::EIO,
+            Error::Var { source: _ } => nix::Error::EINVAL,
+            Error::Util { source: _ } => nix::Error::EINVAL,
+            Error::Io { source: _ } => nix::Error::EIO,
             Error::Nix { source } => source,
-            _ => nix::errno::Errno::ENOTSUP,
+            Error::Heed { source: _ } => nix::Error::EIO,
+            Error::InvalidData => nix::Error::EINVAL,
+            Error::NotFound { what: _ } => nix::Error::ENOENT,
+            Error::Other { msg: _ } => nix::Error::EIO,
+            Error::Shared { source: _ } => nix::Error::EIO,
+            Error::ConvertToSysmaster => nix::Error::EIO,
+            Error::Input => nix::Error::EIO,
+            Error::Conflict => nix::Error::EBADR,
+            Error::NotExisted => nix::Error::ENOENT,
+            Error::Internal => nix::Error::EIO,
+            Error::NotSupported => nix::Error::ENOTSUP,
+            Error::BadRequest => nix::Error::EBADR,
+            Error::Timeout => nix::Error::ETIMEDOUT,
+            Error::NoCmdFound => nix::Error::ENOENT,
+            Error::SpawnError => nix::Error::EIO,
+            Error::UnitActionEAgain => nix::Error::EAGAIN,
+            Error::UnitActionEAlready => nix::Error::EALREADY,
+            Error::UnitActionEComm => nix::Error::ECOMM,
+            Error::UnitActionEBadR => nix::Error::EBADR,
+            Error::UnitActionENoExec => nix::Error::ENOEXEC,
+            Error::UnitActionEProto => nix::Error::EPROTO,
+            Error::UnitActionEOpNotSupp => nix::Error::ENOTSUP,
+            Error::UnitActionENolink => nix::Error::ENOLINK,
+            Error::UnitActionEStale => nix::Error::ESTALE,
+            Error::UnitActionEFailed => nix::Error::EIO,
+            Error::UnitActionEInval => nix::Error::EINVAL,
+            Error::UnitActionEBusy => nix::Error::EBUSY,
+            Error::UnitActionENoent => nix::Error::ENOENT,
+            Error::UnitActionECanceled => nix::Error::ECANCELED,
+            Error::UnitActionERefuseManualStart => nix::Error::EINVAL,
+            Error::UnitActionERefuseManualStop => nix::Error::EINVAL,
         }
     }
 }
