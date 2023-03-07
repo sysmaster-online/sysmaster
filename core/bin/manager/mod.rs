@@ -12,6 +12,7 @@
 
 #[cfg(test)]
 pub(crate) use rentry::RELI_HISTORY_MAX_DBS;
+use sysmaster::unit::UnitStatus;
 
 pub(crate) mod alive_timer;
 pub(crate) mod commands;
@@ -116,6 +117,7 @@ impl CommandActionMgr {
 
 impl ExecuterAction for CommandActionMgr {
     type Error = sysmaster::error::Error;
+    type Status = sysmaster::unit::UnitStatus;
     // type Result<T, Error> = Result<T, E>;
     fn start(&self, unit_name: &str) -> Result<(), Self::Error> {
         self.um.start_unit_manual(unit_name)
@@ -133,7 +135,7 @@ impl ExecuterAction for CommandActionMgr {
         self.um.reload(unit_name)
     }
 
-    fn status(&self, unit_name: &str) -> Result<String, Self::Error> {
+    fn status(&self, unit_name: &str) -> Result<UnitStatus, Self::Error> {
         self.um.get_unit_status(unit_name)
     }
 
