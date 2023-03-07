@@ -13,6 +13,8 @@
 use super::super::entry::Unit;
 use basic::fd_util;
 use nix::fcntl::FcntlArg;
+use nix::sys::signal::{pthread_sigmask, SigmaskHow};
+use nix::sys::signalfd::SigSet;
 use nix::sys::stat::Mode;
 use nix::unistd::{self, setresgid, setresuid, ForkResult, Gid, Group, Pid, Uid, User};
 use regex::Regex;
@@ -47,6 +49,10 @@ impl ExecSpawn {
                 Ok(child)
             }
             Ok(ForkResult::Child) => {
+                let set = SigSet::empty();
+                if pthread_sigmask(SigmaskHow::SIG_SETMASK, Some(&set), None).is_err() {
+                    log::info!("Failed to reset the sigmask of child process, ignoring.");
+                }
                 exec_child(unit, cmdline, params, ctx);
                 process::exit(0);
             }
