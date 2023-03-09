@@ -40,14 +40,17 @@ impl SocketLoad {
             if self.config.unit_ref_target().is_none() {
                 self.load_related_unit(UnitType::UnitService)?;
             }
-
-            self.comm.owner().map(|u| {
-                u.insert_two_deps(
+            if let Some(owner) = self.comm.owner() {
+                let um = self.comm.um();
+                um.unit_add_two_dependency(
+                    owner.id(),
                     UnitRelations::UnitBefore,
                     UnitRelations::UnitTriggers,
-                    self.config.unit_ref_target().unwrap(),
-                )
-            });
+                    &self.config.unit_ref_target().unwrap(),
+                    true,
+                    UnitDependencyMask::Implicit,
+                )?;
+            }
         }
 
         self.add_default_dependencies()?;
@@ -110,7 +113,7 @@ impl SocketLoad {
                 UnitRelations::UnitAfter,
                 SOCKETS_TARGET,
                 true,
-                UnitDependencyMask::UnitDependencyDefault,
+                UnitDependencyMask::Default,
             )?;
 
             um.unit_add_two_dependency(
@@ -119,7 +122,7 @@ impl SocketLoad {
                 UnitRelations::UnitRequires,
                 SYSINIT_TARGET,
                 true,
-                UnitDependencyMask::UnitDependencyDefault,
+                UnitDependencyMask::Default,
             )?;
 
             um.unit_add_two_dependency(
@@ -128,7 +131,7 @@ impl SocketLoad {
                 UnitRelations::UnitConflicts,
                 SHUTDOWN_TARGET,
                 true,
-                UnitDependencyMask::UnitDependencyDefault,
+                UnitDependencyMask::Default,
             )?;
         }
 

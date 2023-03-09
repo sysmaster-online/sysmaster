@@ -105,7 +105,7 @@ impl Target {
                     UnitRelations::UnitAfter,
                     &_u_n,
                     true,
-                    UnitDependencyMask::UnitDependencyDefault,
+                    UnitDependencyMask::Default,
                 );
                 if e.is_err() {
                     log::error!("add default dependencies error {:?}", e);

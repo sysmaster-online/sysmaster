@@ -10,10 +10,10 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use super::super::rel::ReStation;
 use super::kill::{KillContext, KillOperation};
 use super::state::{UnitActiveState, UnitNotifyFlags};
 use super::umif::UnitMngUtil;
-use super::{super::rel::ReStation, UnitRelations};
 use crate::error::*;
 use nix::sys::wait::WaitStatus;
 use nix::{sys::socket::UnixCredentials, unistd::Pid};
@@ -50,11 +50,6 @@ pub trait UnitBase {
 
     ///
     fn default_dependencies(&self) -> bool;
-
-    ///
-    fn insert_two_deps(&self, ra: UnitRelations, rb: UnitRelations, u_name: String) -> Result<()>;
-    ///
-    fn insert_dep(&self, ra: UnitRelations, u_name: String);
 
     ///
     fn cg_path(&self) -> PathBuf;

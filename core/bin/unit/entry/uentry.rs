@@ -18,10 +18,9 @@ use super::config::UeConfig;
 use super::load::UeLoad;
 use super::ratelimit::StartLimit;
 use super::UnitEmergencyAction;
-use crate::unit::data::{DataManager, UnitDepConf, UnitState};
+use crate::unit::data::{DataManager, UnitState};
 use crate::unit::rentry::{UnitLoadState, UnitRe};
 use crate::unit::util::UnitFile;
-use crate::unit::UnitRelations;
 use basic::process_util::my_child;
 use cgroup::{self, CgFlags};
 use nix::sys::signal::Signal;
@@ -153,13 +152,6 @@ impl UnitBase for Unit {
         self.default_dependencies()
     }
 
-    fn insert_two_deps(&self, ra: UnitRelations, rb: UnitRelations, u_name: String) -> Result<()> {
-        self.insert_two_deps(ra, rb, u_name);
-        Ok(())
-    }
-    fn insert_dep(&self, ra: UnitRelations, u_name: String) {
-        self.insert_dep(ra, u_name);
-    }
     fn cg_path(&self) -> PathBuf {
         self.cg_path()
     }
@@ -475,37 +467,6 @@ impl Unit {
         }
 
         pids
-    }
-
-    ///insert unit dep conf
-    pub fn insert_two_deps(
-        &self,
-        ra: UnitRelations,
-        rb: UnitRelations,
-        u_name: String,
-    ) -> Option<UnitDepConf> {
-        log::debug!(
-            "insert two relations {:?} and {:?} to unit {}",
-            ra,
-            rb,
-            u_name
-        );
-        let mut ud_conf = UnitDepConf::new();
-
-        for rl in [ra, rb] {
-            ud_conf.deps.insert(rl, vec![u_name.clone()]);
-        }
-
-        self.dm.insert_ud_config(self.id().to_string(), ud_conf)
-    }
-
-    ///
-    pub fn insert_dep(&self, ra: UnitRelations, u_name: String) -> Option<UnitDepConf> {
-        log::debug!("insert relation {:?} to unit {}", ra, u_name);
-        let mut ud_conf = UnitDepConf::new();
-        ud_conf.deps.insert(ra, vec![u_name]);
-
-        self.dm.insert_ud_config(self.id().to_string(), ud_conf)
     }
 
     ///
