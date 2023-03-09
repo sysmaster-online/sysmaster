@@ -215,18 +215,32 @@ fn main() -> Result {
                 nix::Error::ENOTSUP as u32,
             );
         }
-        Some(command_request) => command_request,
+        Some(v) => v,
     };
 
     let addrs = [
         SocketAddr::from(([127, 0, 0, 1], 9526)),
         SocketAddr::from(([127, 0, 0, 1], 9527)),
     ];
-    let stream = TcpStream::connect(&addrs[..]).unwrap();
+
+    let stream = match TcpStream::connect(&addrs[..]) {
+        Err(e) => {
+            let err_msg = format!("Failed to connect to sysmaster: {}", e);
+            return Result::Failure(err_msg, e.raw_os_error().unwrap() as u32);
+        }
+        Ok(v) => v,
+    };
 
     let mut client = ProstClientStream::new(stream);
 
-    let data = client.execute(command_request).unwrap();
+    let data = match client.execute(command_request) {
+        Err(e) => {
+            let err_msg = format!("Failed to execute the given command: {}", e);
+            // don't want to map all kinds of errors the message is clear, just return 1.
+            return Result::Failure(err_msg, 1);
+        }
+        Ok(v) => v,
+    };
 
     /* We should always print the error message if the returned error code is not 0. */
     if data.message.is_empty() {
