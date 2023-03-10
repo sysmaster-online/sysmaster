@@ -21,16 +21,17 @@ use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::result::Result;
+use std::sync::{Arc, Mutex};
 
-use crate::{device_action::DeviceAction, error::Error};
+use crate::{error::Error, DeviceAction};
 
 /// Device
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Device {
     /// inotify handler
     pub watch_handle: i32,
-    // /// the parent device
-    // pub parent: Option<Rc<Device>>,
+    /// the parent device
+    pub parent: Option<Arc<Mutex<Device>>>,
     /// ifindex
     pub ifindex: i32,
     /// device type
@@ -39,13 +40,13 @@ pub struct Device {
     pub devname: String,
     /// device number
     pub devnum: u64,
-    /// syspath with /sys/ as prefix
+    /// syspath with /sys/ as prefix, e.g., /sys/devices/pci0000:00/0000:00:10.0/host2/target2:0:1/2:0:1:0/block/sda
     pub syspath: String,
-    /// relative path under /sys/
+    /// relative path under /sys/, e.g., /devices/pci0000:00/0000:00:10.0/host2/target2:0:1/2:0:1:0/block/sda
     pub devpath: String,
     /// sysnum
-    pub sysnum: String,
-    /// sysname
+    pub sysnum: Option<String>,
+    /// sysname is the basename of syspath, e.g., sda
     pub sysname: String,
     /// device subsystem
     pub subsystem: String,
@@ -70,7 +71,6 @@ pub struct Device {
     pub seqnum: Option<u64>,
     // pub synth_uuid: u64,
     // pub partn: u32,
-    // pub parent: Weak<Device>,
     /// device properties
     pub properties: HashMap<String, String>,
     /// the subset of properties that should be written to db
@@ -98,6 +98,8 @@ pub struct Device {
     pub uevent_loaded: bool,
     /// whether the subsystem is initialized
     pub subsystem_set: bool,
+    /// whether the parent is set
+    pub parent_set: bool,
 }
 
 impl Default for Device {
@@ -118,7 +120,7 @@ impl Device {
             devnum: 0,
             syspath: String::new(),
             devpath: String::new(),
-            sysnum: String::new(),
+            sysnum: None,
             sysname: String::new(),
             subsystem: String::new(),
             driver_subsystem: String::new(),
@@ -143,6 +145,8 @@ impl Device {
             uevent_loaded: false,
             subsystem_set: false,
             diskseq: 0,
+            parent: None,
+            parent_set: false,
         }
     }
 
@@ -207,16 +211,16 @@ impl Device {
         } else if (mode & S_IFMT) == S_IFBLK {
             "block"
         } else {
-            return Err(Error::Other {
-                msg: "device: invalid mode".to_string(),
-                errno: Some(Errno::ENOTTY),
+            return Err(Error::Nix {
+                msg: "invalid mode".to_string(),
+                source: Errno::ENOTTY,
             });
         };
 
         if major(devnum) == 0 {
-            return Err(Error::Other {
-                msg: "device: invalid devnum".to_string(),
-                errno: Some(Errno::ENODEV),
+            return Err(Error::Nix {
+                msg: "invalid devnum".to_string(),
+                source: Errno::ENODEV,
             });
         }
 
@@ -228,18 +232,24 @@ impl Device {
         // verify devnum
         let devnum_ret = device.get_devnum()?;
         if devnum_ret != devnum {
-            return Err(Error::Other {
-                msg: "device: return inconsistent devnum".to_string(),
-                errno: None,
+            return Err(Error::Nix {
+                msg: "return inconsistent devnum".to_string(),
+                source: Errno::EINVAL,
             });
         }
 
         // verify subsystem
-        let subsystem_ret = device.get_subsystem()?;
+        let subsystem_ret = device.get_subsystem().map_err(|e| Error::Nix {
+            msg: format!(
+                "from_mode_and_devnum failed: failed to verify subsystem ({})",
+                e
+            ),
+            source: e.get_errno(),
+        })?;
         if (subsystem_ret == "block") != ((mode & S_IFMT) == S_IFBLK) {
-            return Err(Error::Other {
-                msg: "device: return inconsistent subsystem".to_string(),
-                errno: None,
+            return Err(Error::Nix {
+                msg: "return inconsistent subsystem".to_string(),
+                source: Errno::EINVAL,
             });
         }
 
@@ -252,9 +262,9 @@ impl Device {
     /// e.g. /dev/sda
     pub fn from_devname(devname: String) -> Result<Device, Error> {
         if !devname.starts_with("/dev") {
-            return Err(Error::Other {
-                msg: format!("device: the devname does not start with /dev {devname}"),
-                errno: Some(Errno::EINVAL),
+            return Err(Error::Nix {
+                msg: format!("the devname does not start with /dev {devname}"),
+                source: Errno::EINVAL,
             });
         }
 
@@ -264,9 +274,9 @@ impl Device {
             match stat(Path::new(&devname)) {
                 Ok(st) => Device::from_mode_and_devnum(st.st_mode, st.st_rdev)?,
                 Err(e) => {
-                    return Err(Error::Syscall {
-                        syscall: format!("device: failed at stat {devname}"),
-                        errno: e,
+                    return Err(Error::Nix {
+                        msg: format!("syscall stat failed: {devname}"),
+                        source: e,
                     });
                 }
             }
@@ -278,9 +288,12 @@ impl Device {
     /// create a Device instance from syspath
     pub fn from_syspath(syspath: String, strict: bool) -> Result<Device, Error> {
         if strict && !syspath.starts_with("/sys/") {
-            return Err(Error::Other {
-                msg: format!("device: syspath does not start with /sys/ {}", syspath),
-                errno: None,
+            return Err(Error::Nix {
+                msg: format!(
+                    "from_syspath failed: syspath {} doesn't start with /sys",
+                    syspath
+                ),
+                source: nix::errno::Errno::EINVAL,
             });
         }
 
@@ -316,18 +329,18 @@ impl Device {
         let mut file = match OpenOptions::new().write(true).open(sysattr_path.clone()) {
             Ok(f) => f,
             Err(e) => {
-                return Err(Error::Other {
-                    msg: format!("device: failed to open sysattr file {}", sysattr_path),
-                    errno: Some(Errno::from_i32(e.raw_os_error().unwrap_or_default())),
+                return Err(Error::Nix {
+                    msg: format!("failed to open sysattr file {}", sysattr_path),
+                    source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
                 })
             }
         };
 
         if let Err(e) = file.write(value.clone().unwrap().as_bytes()) {
             self.remove_cached_sysattr_value(sysattr)?;
-            return Err(Error::Other {
-                msg: format!("device: failed to write sysattr file {}", sysattr_path),
-                errno: Some(Errno::from_i32(e.raw_os_error().unwrap_or_default())),
+            return Err(Error::Nix {
+                msg: format!("failed to write sysattr file {}", sysattr_path),
+                source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
             });
         };
 
@@ -344,57 +357,108 @@ impl Device {
     pub fn trigger(&mut self, action: DeviceAction) -> Result<(), Error> {
         self.set_sysattr_value("uevent".to_string(), Some(format!("{}", action)))
     }
+
+    /// get the syspath of the device
+    pub fn get_syspath(&self) -> Option<&str> {
+        if self.syspath.is_empty() {
+            return None;
+        }
+
+        Some(&self.syspath)
+    }
+
+    /// get the devpath of the device
+    pub fn get_devpath(&self) -> Option<&str> {
+        if self.devpath.is_empty() {
+            return None;
+        }
+
+        Some(&self.devpath)
+    }
+
+    /// get the sysname of the device
+    pub fn get_sysname(&mut self) -> Option<&str> {
+        if self.sysname.is_empty() && self.set_sysname_and_sysnum().is_err() {
+            log::error!("device failed to set sysname and sysnum {}", self.devpath);
+            return None;
+        }
+
+        Some(&self.sysname)
+    }
+
+    /// get the parent of the device
+    pub fn get_parent(&mut self) -> Result<Arc<Mutex<Device>>, Error> {
+        if !self.parent_set {
+            match Device::new_from_child(self) {
+                Ok(parent) => self.parent = Some(Arc::new(Mutex::new(parent))),
+                Err(e) => {
+                    // it is okay if no parent device is found,
+                    if e.get_errno() != Errno::ENODEV {
+                        return Err(Error::Nix {
+                            msg: format!("get parent failed because ({})", e),
+                            source: e.get_errno(),
+                        });
+                    }
+                }
+            };
+            self.parent_set = true;
+        }
+
+        if self.parent.is_none() {
+            return Err(Error::Nix {
+                msg: format!("device {} has no parent", self.devpath),
+                source: Errno::ENOENT,
+            });
+        }
+
+        return Ok(self.parent.as_ref().unwrap().clone());
+    }
 }
 
 /// internal methods
 impl Device {
     /// set the syspath of Device
+    /// constraint: path should start with /sys
     pub(crate) fn set_syspath(&mut self, path: String, verify: bool) -> Result<(), Error> {
         let p = if verify {
-            let path = match fs::canonicalize(path) {
+            let path = match fs::canonicalize(path.clone()) {
                 Ok(pathbuf) => pathbuf,
-                Err(e) => match e.raw_os_error() {
-                    Some(n) => {
-                        return Err(Error::Other {
-                            msg: "device: the syspath is invalid".to_string(),
-                            errno: Some(Errno::from_i32(n)),
-                        })
-                    }
-                    None => {
-                        return Err(Error::Other {
-                            msg: "device: invalid syspath".to_string(),
-                            errno: None,
-                        })
-                    }
-                },
+                Err(e) => {
+                    return Err(Error::Nix {
+                        msg: format!("set_syspath failed: failed to canonicalize {}", path),
+                        source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
+                    });
+                }
             };
 
             if !path.starts_with("/sys") {
-                return Err(Error::Other {
-                    msg: "device: the syspath does not start with /sys".to_string(),
-                    errno: Some(Errno::EINVAL),
+                // todo: what if sysfs is mounted on somewhere else?
+                // systemd has considered this situation
+                return Err(Error::Nix {
+                    msg: format!("set_syspath failed: {:?} does not start with /sys", path),
+                    source: Errno::EINVAL,
                 });
             }
 
             if path.starts_with("/sys/devices/") {
                 if !path.is_dir() {
-                    return Err(Error::Other {
-                        msg: "device: the syspath is not a directory".to_string(),
-                        errno: Some(Errno::ENODEV),
+                    return Err(Error::Nix {
+                        msg: format!("set_syspath failed: {:?} is not a directory", path),
+                        source: Errno::ENOTDIR,
                     });
                 }
 
                 let uevent_path = path.join("uevent");
                 if !uevent_path.exists() {
-                    return Err(Error::Other {
-                        msg: "device: the uevent file does not exist".to_string(),
-                        errno: Some(Errno::ENODEV),
+                    return Err(Error::Nix {
+                        msg: format!("set_syspath failed: {:?} does not contain uevent", path),
+                        source: Errno::ENOENT,
                     });
                 }
             } else if !path.is_dir() {
-                return Err(Error::Other {
-                    msg: "device: the syspath is not a directory".to_string(),
-                    errno: Some(Errno::ENODEV),
+                return Err(Error::Nix {
+                    msg: format!("set_syspath failed: {:?} is not a directory", path),
+                    source: Errno::ENODEV,
                 });
             }
 
@@ -404,17 +468,17 @@ impl Device {
             match path.as_os_str().to_str() {
                 Some(s) => s.to_string(),
                 None => {
-                    return Err(Error::Other {
-                        msg: "device: failed to change the syspath to string".to_string(),
-                        errno: Some(Errno::EINVAL),
+                    return Err(Error::Nix {
+                        msg: format!("set_syspath failed: {:?} can not change to string", path),
+                        source: Errno::EINVAL,
                     });
                 }
             }
         } else {
             if !path.starts_with("/sys/") {
-                return Err(Error::Other {
-                    msg: "device: invalid syspath".to_string(),
-                    errno: Some(Errno::EINVAL),
+                return Err(Error::Nix {
+                    msg: format!("set_syspath failed: {:?} does not start with /sys", path),
+                    source: Errno::EINVAL,
                 });
             }
 
@@ -424,28 +488,70 @@ impl Device {
         let devpath = match p.strip_prefix("/sys") {
             Some(p) => p,
             None => {
-                return Err(Error::Other {
-                    msg: "device: the syspath is not a subdirectory of /sys".to_string(),
-                    errno: Some(Errno::EINVAL),
+                return Err(Error::Nix {
+                    msg: format!("set_syspath failed: syspath {} does not start with /sys", p),
+                    source: Errno::EINVAL,
                 });
             }
         };
 
         if !devpath.starts_with('/') {
-            return Err(Error::Other {
-                msg: "device: the device path is invalid without /sys as prefix".to_string(),
-                errno: Some(Errno::ENODEV),
+            return Err(Error::Nix {
+                msg: format!(
+                    "set_syspath failed: devpath {} alone is not a valid device path",
+                    p
+                ),
+                source: Errno::ENODEV,
             });
         }
 
         match self.add_property_internal("DEVPATH".to_string(), devpath.to_string()) {
             Ok(_) => {}
-            Err(e) => return Err(e),
+            Err(e) => {
+                return Err(Error::Nix {
+                    msg: format!("set_syspath failed: ({})", e),
+                    source: Errno::ENODEV,
+                })
+            }
         }
         self.syspath = p.clone();
         self.devpath = String::from(devpath);
 
-        Result::Ok(())
+        Ok(())
+    }
+
+    pub(crate) fn set_sysname_and_sysnum(&mut self) -> Result<(), Error> {
+        let sysname = match self.devpath.rfind('/') {
+            Some(i) => String::from(&self.devpath[i + 1..]),
+            None => {
+                return Err(Error::Nix {
+                    msg: format!(
+                        "set_sysname_and_sysnum failed: invalid devpath {}",
+                        self.devpath
+                    ),
+                    source: Errno::EINVAL,
+                });
+            }
+        };
+
+        let sysname = sysname.replace('!', "/");
+
+        let mut ridx = sysname.len();
+        loop {
+            ridx = match sysname[0..ridx].rfind(char::is_numeric) {
+                Some(ridx) => ridx,
+                None => break,
+            }
+        }
+
+        if ridx == sysname.len() {
+            self.sysnum = None;
+        } else {
+            self.sysnum = Some(String::from(&sysname[ridx..]));
+        }
+
+        self.sysname = sysname;
+        Ok(())
     }
 
     /// add property internal, in other words, do not write to external db
@@ -467,9 +573,9 @@ impl Device {
         db: bool,
     ) -> Result<(), Error> {
         if key.is_empty() {
-            return Err(Error::Other {
-                msg: "device: invalid key".to_string(),
-                errno: Some(Errno::EINVAL),
+            return Err(Error::Nix {
+                msg: "invalid key".to_string(),
+                source: Errno::EINVAL,
             });
         }
 
@@ -502,9 +608,9 @@ impl Device {
         }
 
         if major(self.devnum) == 0 {
-            return Err(Error::Other {
-                msg: "device: the devnum does not exist in uevent file".to_string(),
-                errno: Some(Errno::ENOENT),
+            return Err(Error::Nix {
+                msg: "the devnum does not exist in uevent file".to_string(),
+                source: Errno::ENOENT,
             });
         }
 
@@ -512,7 +618,7 @@ impl Device {
     }
 
     /// get subsystem
-    pub(crate) fn get_subsystem(&mut self) -> Result<String, Error> {
+    pub(crate) fn get_subsystem(&mut self) -> Result<&str, Error> {
         if !self.subsystem_set {
             let subsystem_path = self.syspath.clone() + "/subsystem";
             let subsystem_path = Path::new(subsystem_path.as_str());
@@ -523,29 +629,26 @@ impl Device {
             let filename = if Path::exists(Path::new(subsystem_path)) {
                 let abs_path = match fs::canonicalize(subsystem_path) {
                     Ok(ret) => ret,
-                    Err(e) => match e.raw_os_error() {
-                        Some(n) => {
-                            return Err(Error::Other {
-                                msg: "device: ".to_string() + e.to_string().as_str(),
-                                errno: Some(Errno::from_i32(n)),
-                            });
-                        }
-                        None => {
-                            return Err(Error::Other {
-                                msg: "device: ".to_string() + e.to_string().as_str(),
-                                errno: None,
-                            });
-                        }
-                    },
+                    Err(e) => {
+                        return Err(Error::Nix {
+                            msg: format!(
+                                "get_subsystem failed: canonicalize {:?} ({})",
+                                subsystem_path, e
+                            ),
+                            source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
+                        });
+                    }
                 };
 
                 abs_path.file_name().unwrap().to_str().unwrap().to_string()
             } else {
-                String::new()
+                "".to_string()
             };
 
             if !filename.is_empty() {
                 self.set_subsystem(filename)?;
+            } else if self.devpath.starts_with("/module/") {
+                self.set_subsystem("module".to_string())?;
             } else if self.devpath.contains("/drivers/") || self.devpath.contains("/drivers") {
                 self.set_drivers_subsystem()?;
             } else if self.devpath.starts_with("/class/") || self.devpath.starts_with("/bus/") {
@@ -556,11 +659,11 @@ impl Device {
         };
 
         if !self.subsystem.is_empty() {
-            Ok(self.subsystem.clone())
+            Ok(&self.subsystem)
         } else {
-            Err(Error::Other {
-                msg: "device: failed to get subsystem".to_string(),
-                errno: None,
+            Err(Error::Nix {
+                msg: "get_subsystem failed: no available subsystem".to_string(),
+                source: Errno::ENOENT,
             })
         }
     }
@@ -612,9 +715,9 @@ impl Device {
         }
 
         if subsystem.is_empty() {
-            return Err(Error::Other {
-                msg: "device: invalid driver subsystem".to_string(),
-                errno: None,
+            return Err(Error::Nix {
+                msg: "invalid driver subsystem".to_string(),
+                source: Errno::EINVAL,
             });
         }
 
@@ -636,15 +739,15 @@ impl Device {
             Ok(f) => f,
             Err(e) => match e.raw_os_error() {
                 Some(n) => {
-                    return Err(Error::Other {
-                        msg: "device: failed to open uevent file".to_string(),
-                        errno: Some(Errno::from_i32(n)),
+                    return Err(Error::Nix {
+                        msg: "failed to open uevent file".to_string(),
+                        source: Errno::from_i32(n),
                     });
                 }
                 None => {
-                    return Err(Error::Other {
-                        msg: "device: failed to open uevent file".to_string(),
-                        errno: None,
+                    return Err(Error::Nix {
+                        msg: "failed to open uevent file".to_string(),
+                        source: Errno::EINVAL,
                     });
                 }
             },
@@ -700,9 +803,9 @@ impl Device {
         self.ifindex = match ifindex.parse() {
             Ok(idx) => idx,
             Err(e) => {
-                return Err(Error::Other {
+                return Err(Error::Nix {
                     msg: e.to_string(),
-                    errno: None,
+                    source: Errno::EINVAL,
                 });
             }
         };
@@ -729,9 +832,9 @@ impl Device {
         self.devmode = match devmode.parse() {
             Ok(m) => m,
             Err(e) => {
-                return Err(Error::Other {
+                return Err(Error::Nix {
                     msg: e.to_string(),
-                    errno: None,
+                    source: Errno::EINVAL,
                 });
             }
         };
@@ -744,18 +847,18 @@ impl Device {
         let major_num: u64 = match major.parse() {
             Ok(n) => n,
             Err(e) => {
-                return Err(Error::Other {
+                return Err(Error::Nix {
                     msg: e.to_string(),
-                    errno: None,
+                    source: Errno::EINVAL,
                 });
             }
         };
         let minor_num: u64 = match minor.parse() {
             Ok(n) => n,
             Err(e) => {
-                return Err(Error::Other {
+                return Err(Error::Nix {
                     msg: e.to_string(),
-                    errno: None,
+                    source: Errno::EINVAL,
                 });
             }
         };
@@ -774,9 +877,9 @@ impl Device {
         let diskseq_num: u64 = match diskseq.parse() {
             Ok(n) => n,
             Err(e) => {
-                return Err(Error::Other {
+                return Err(Error::Nix {
                     msg: e.to_string(),
-                    errno: None,
+                    source: Errno::EINVAL,
                 });
             }
         };
@@ -798,9 +901,9 @@ impl Device {
         let action = match action_s.parse::<DeviceAction>() {
             Ok(a) => a,
             Err(_) => {
-                return Err(Error::Other {
-                    msg: format!("device: invalid action string {}", action_s),
-                    errno: None,
+                return Err(Error::Nix {
+                    msg: format!("invalid action string {}", action_s),
+                    source: Errno::EINVAL,
                 });
             }
         };
@@ -813,12 +916,9 @@ impl Device {
         let seqnum: u64 = match seqnum_s.parse() {
             Ok(n) => n,
             Err(_) => {
-                return Err(Error::Other {
-                    msg: format!(
-                        "device: invalid seqnum can not be parsed to u64 {}",
-                        seqnum_s
-                    ),
-                    errno: None,
+                return Err(Error::Nix {
+                    msg: format!("invalid seqnum can not be parsed to u64 {}", seqnum_s),
+                    source: Errno::EINVAL,
                 });
             }
         };
@@ -850,11 +950,64 @@ impl Device {
 
         Ok(())
     }
+
+    /// new from child
+    pub(crate) fn new_from_child(device: &mut Device) -> Result<Device, Error> {
+        let syspath = match device.get_syspath() {
+            Some(ret) => Path::new(ret),
+            None => {
+                return Err(Error::Nix {
+                    msg: "new_from_child failed: can not get syspath".to_string(),
+                    source: Errno::EINVAL,
+                });
+            }
+        };
+
+        let mut parent = syspath.parent();
+
+        loop {
+            match parent {
+                Some(p) => {
+                    if p == Path::new("/sys") {
+                        return Err(Error::Nix {
+                            msg: "new_from_child failed: no available parent device until /sys"
+                                .to_string(),
+                            source: Errno::ENODEV,
+                        });
+                    }
+                    let path = p.to_str().unwrap().to_string();
+
+                    match Device::from_syspath(path, true) {
+                        Ok(d) => return Ok(d),
+                        Err(e) => {
+                            if e.get_errno() != Errno::ENODEV {
+                                return Err(Error::Nix {
+                                    msg: format!(
+                                        "new_from_child failed: from_syspath failed ({})",
+                                        e
+                                    ),
+                                    source: e.get_errno(),
+                                });
+                            }
+                        }
+                    }
+                }
+                None => {
+                    return Err(Error::Nix {
+                        msg: "new_from_child failed: no available parent device".to_string(),
+                        source: Errno::ENODEV,
+                    });
+                }
+            }
+
+            parent = parent.unwrap().parent();
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::device::*;
     use libc::S_IFBLK;
     use nix::sys::stat::makedev;
 

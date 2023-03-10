@@ -15,6 +15,8 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
+use nix::errno::Errno;
+
 /// device action based on kobject from kernel
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,9 +44,9 @@ impl FromStr for DeviceAction {
             "offline" => Ok(Self::Offline),
             "bind" => Ok(Self::Bind),
             "unbind" => Ok(Self::Unbind),
-            _ => Err(Self::Err::Other {
+            _ => Err(Self::Err::Nix {
                 msg: "device: invalid action string".to_string(),
-                errno: None,
+                source: Errno::EINVAL,
             }),
         }
     }
@@ -69,7 +71,7 @@ impl Display for DeviceAction {
 
 #[cfg(test)]
 mod tests {
-    use crate::device_action::DeviceAction;
+    use crate::DeviceAction;
 
     /// test whether device action parse and display normally
     #[test]
