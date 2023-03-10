@@ -47,12 +47,13 @@ impl UnitReBase {
 #[allow(clippy::enum_variant_names)]
 #[derive(PartialEq, Debug, Eq, Copy, Clone, Serialize, Deserialize)]
 pub enum UnitLoadState {
-    UnitStub = 0,
-    UnitLoaded,
-    UnitNotFound,
-    UnitError,
-    UnitMerged,
-    UnitMasked,
+    Stub = 0,
+    Loaded,
+    NotFound,
+    Error,
+    BadSetting,
+    Merged,
+    Masked,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

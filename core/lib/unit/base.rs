@@ -142,6 +142,11 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     ) -> Result<()> {
         Ok(())
     }
+
+    ///
+    fn get_perpetual(&self) -> bool {
+        false
+    }
 }
 
 /// #[macro_use]

@@ -76,10 +76,11 @@ impl UnitX {
     pub(crate) fn load(&self) -> Result<()> {
         self.0.load_unit()
     }
+
     #[allow(dead_code)]
     pub(crate) fn try_load(&self) -> Result<()> {
         // transaction_add_job_and_dependencies: bus_unit_validate_load_state + manager_unit_cache_should_retry_load + unit_load + bus_unit_validate_load_state
-        todo!();
+        todo!()
     }
     pub(crate) fn start(&self) -> Result<()> {
         log::debug!("unitx start the unit {}", self.id());
@@ -177,9 +178,8 @@ impl UnitX {
         true
     }
 
-    #[allow(dead_code)]
     pub(crate) fn get_perpetual(&self) -> bool {
-        todo!();
+        self.0.get_perpetual()
     }
 
     #[allow(dead_code)]
@@ -197,9 +197,12 @@ impl UnitX {
         todo!();
     }
 
-    #[allow(dead_code)]
     pub(crate) fn is_load_complete(&self) -> bool {
-        todo!();
+        self.0.load_complete()
+    }
+
+    pub(crate) fn validate_load_state(&self) -> Result<()> {
+        self.0.validate_load_state()
     }
 
     pub(crate) fn cg_path(&self) -> PathBuf {

@@ -305,7 +305,7 @@ impl UmIf for UnitManager {
             return Err(Error::UnitActionENoent);
         };
 
-        if u.load_state() != UnitLoadState::UnitLoaded {
+        if u.load_state() != UnitLoadState::Loaded {
             log::error!("related service unit: {} is not loaded", name);
             return Err(Error::UnitActionENoent);
         }
@@ -484,7 +484,7 @@ impl UnitManager {
     /// load the unit for reference name
     fn load_unit_success(&self, name: &str) -> bool {
         if let Some(unit) = self.load_unitx(name) {
-            return unit.load_state() == UnitLoadState::UnitLoaded;
+            return unit.load_state() == UnitLoadState::Loaded;
         }
 
         false
@@ -750,6 +750,7 @@ impl UnitManager {
             }
             Some(v) => v,
         };
+
         self.jm.exec(
             &JobConf::new(&unit, JobKind::Stop),
             JobMode::Replace,
@@ -765,6 +766,17 @@ impl UnitManager {
             }
             Some(v) => v,
         };
+
+        if matches!(
+            unit.load_state(),
+            UnitLoadState::NotFound | UnitLoadState::Error | UnitLoadState::BadSetting
+        ) && unit.active_state() != UnitActiveState::UnitActive
+        {
+            return Err(Error::Other {
+                msg: format!("unit {} Not Found", unit.id()),
+            });
+        }
+
         if unit
             .get_config()
             .config_data()

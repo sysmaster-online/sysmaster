@@ -29,7 +29,7 @@ pub(super) fn job_trans_expand(
     mode: JobMode,
 ) -> Result<()> {
     // check input
-    //trans_expand_check_input(config)?;
+    trans_expand_check_input(config)?;
 
     // record
     let conf = JobConf::map(config);
@@ -90,7 +90,6 @@ pub(super) fn job_trans_fallback(
     del_jobs
 }
 
-#[allow(dead_code)]
 fn trans_expand_check_input(config: &JobConf) -> Result<()> {
     let kind = config.get_kind();
     let unit = config.get_unit();
@@ -100,7 +99,7 @@ fn trans_expand_check_input(config: &JobConf) -> Result<()> {
     }
 
     if kind != JobKind::Stop {
-        let err = match unit.try_load() {
+        let err = match unit.validate_load_state() {
             Ok(()) => Ok(()),
             Err(Error::UnitActionEBadR) => Err(Error::BadRequest),
             Err(_) => Err(Error::Input),
@@ -127,8 +126,10 @@ fn trans_expand_start(
     let atom = UnitRelationAtom::UnitAtomPullInStart;
     for other in db.dep_gets_atom(unit, atom).iter() {
         let conf = JobConf::new(other, JobKind::Start);
-        if job_trans_expand(stage, ja, db, &conf, mode).is_err() {
-            // debug
+        match job_trans_expand(stage, ja, db, &conf, mode) {
+            Err(Error::BadRequest) => (),
+            Err(e) => return Err(e),
+            _ => (),
         }
     }
 
@@ -705,6 +706,8 @@ mod tests {
     ) -> Rc<UnitX> {
         logger::init_log_with_console("test_unit_load", log::LevelFilter::Trace);
         log::info!("test");
-        test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
+        let unit = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
+        unit.load().expect("load error");
+        unit
     }
 }

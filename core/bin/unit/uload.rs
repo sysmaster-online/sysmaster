@@ -127,7 +127,7 @@ impl UnitLoadData {
 
     pub(self) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
         if let Some(u) = self.db.units_get(name) {
-            if u.load_state() != UnitLoadState::UnitNotFound {
+            if u.load_state() != UnitLoadState::NotFound {
                 return Some(Rc::clone(&u));
             } else {
                 self.db.unit_remove(name);
