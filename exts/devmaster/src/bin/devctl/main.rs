@@ -57,9 +57,21 @@ enum SubCmd {
         #[clap(short, long)]
         action: Option<String>,
 
+        /// the enumerator type, can be devices (default) or subsystems
+        #[clap(short, long)]
+        r#type: Option<String>,
+
+        /// print searched devices by enumerator
+        #[clap(short, long)]
+        verbose: bool,
+
         /// the devices to be triggered
         #[clap(required = false)]
         devices: Vec<String>,
+
+        /// do not actually trigger the device events
+        #[clap(short('n'), long)]
+        dry_run: bool,
     },
 }
 
@@ -84,6 +96,12 @@ fn main() {
         SubCmd::Monitor {} => subcommand_monitor(),
         SubCmd::Kill {} => subcommand_kill(),
         SubCmd::Test { devname } => subcommand_test(devname),
-        SubCmd::Trigger { action, devices } => subcommand_trigger(devices, action),
+        SubCmd::Trigger {
+            action,
+            r#type,
+            verbose,
+            devices,
+            dry_run,
+        } => subcommand_trigger(devices, r#type, verbose, action, dry_run),
     }
 }
