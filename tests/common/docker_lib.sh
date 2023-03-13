@@ -2,7 +2,7 @@
 # Description: docker common functions
 
 OS_VER="openEuler-22.03-LTS-SP1"
-DOCKER_IMG_URL="http://121.36.84.172/dailybuild/${OS_VER}/${OS_VER}/docker_img/$(arch)/"
+DOCKER_IMG_URL="https://mirrors.nju.edu.cn/openeuler/${OS_VER}/docker_img/$(arch)/"
 DOCKER_TAR="openEuler-docker.$(arch).tar"
 BASE_IMG="${OS_VER,,}"
 SYSMST_BASE_IMG="sysmaster_base-${BASE_IMG}"
@@ -30,6 +30,7 @@ function build_base_img() {
     cat << EOF > Dockerfile
 FROM ${BASE_IMG} as ${SYSMST_BASE_IMG}
 COPY install/usr/bin/sctl /usr/bin/
+COPY install/usr/bin/init /usr/bin/
 RUN mkdir /usr/lib/sysmaster
 COPY install/usr/lib/sysmaster /usr/lib/sysmaster/
 EOF

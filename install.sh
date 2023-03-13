@@ -8,7 +8,7 @@ install_dir=${work_dir}/target/install/usr/lib/sysmaster
 rm -rf "${work_dir}"/target/install
 
 install -Dm0755 -t ${work_dir}/target/install/usr/bin ${target_dir}/sctl || exit 1
-install -Dm0755 -t ${install_dir} ${target_dir}/init || exit 1
+install -Dm0755 -t ${work_dir}/target/install/usr/bin ${target_dir}/init || exit 1
 install -Dm0755 -t ${install_dir} ${target_dir}/sysmaster || exit 1
 install -Dm0755 -t ${install_dir} ${target_dir}/fstab || exit 1
 install -Dm0755 -t ${install_dir} ${target_dir}/sysmonitor || exit 1

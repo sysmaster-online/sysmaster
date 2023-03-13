@@ -573,18 +573,21 @@ impl Unit {
     pub fn start(&self) -> Result<()> {
         let active_state = self.current_active_state();
         if active_state.is_active_or_reloading() {
+            log::error!("Unit is already active/reloading [{:?}] is err",active_state.is_active_or_reloading());
             return Err(Error::UnitActionEAlready);
         }
 
         if active_state == UnitActiveState::UnitMaintenance {
+            log::error!("Unit active_state [{:?}] is err",active_state);
             return Err(Error::UnitActionEAgain);
         }
 
         if self.load_state() != UnitLoadState::UnitLoaded {
+            log::error!("Starting failed because unit load state[{:?}] is err",self.load_state());
             return Err(Error::UnitActionEInval);
         }
         if active_state != UnitActiveState::UnitActivating && !self.conditions().conditions_test() {
-            log::debug!("Starting failed because condition test failed");
+            log::error!("Starting failed because condition test failed");
             return Err(Error::UnitActionEInval);
         }
         if active_state != UnitActiveState::UnitActivating && !self.conditions().asserts_test() {
@@ -615,11 +618,13 @@ impl Unit {
     /// reload the unit
     pub fn reload(&self) -> Result<()> {
         if !self.sub.can_reload() {
+            log::warn!("{} unit can not reload", self.id());
             return Err(Error::UnitActionEBadR);
         }
 
         let active_state = self.current_active_state();
         if active_state == UnitActiveState::UnitReloading {
+            log::warn!("{} unit in reloading", self.id());
             return Err(Error::UnitActionEAgain);
         }
 

@@ -120,7 +120,7 @@ function expect_str_eq() {
 # usage: run sysmaster as daemon
 function run_sysmaster() {
     cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH} || return 1
-    /usr/lib/sysmaster/sysmaster &> "${SYSMST_LOG}" &
+    /usr/bin/init &> "${SYSMST_LOG}" &
     sysmaster_pid=$!
     # wait sysmaster init done
     sleep 3
