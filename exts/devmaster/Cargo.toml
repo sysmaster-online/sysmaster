@@ -8,15 +8,15 @@ default-run = "devmaster"
 
 [[bin]]
 name = "devmaster"
-path = "src/bin/devmaster.rs"
+path = "src/bin/devmaster/main.rs"
 
 [[bin]]
 name = "devctl"
-path = "src/bin/devctl.rs"
+path = "src/bin/devctl/main.rs"
 
 [lib]
 name = "libdevmaster"
-path = "src/lib.rs"
+path = "src/lib/lib.rs"
 
 [dependencies]
 # internal libraries

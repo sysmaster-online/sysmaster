@@ -23,8 +23,8 @@ use std::{
     rc::Rc,
 };
 
-use crate::job_queue::JobQueue;
-use crate::worker_manager::WorkerManager;
+use crate::framework::job_queue::JobQueue;
+use crate::framework::worker_manager::WorkerManager;
 
 /// listening address for control manager
 pub const CONTROL_MANAGER_LISTEN_ADDR: &str = "0.0.0.0:1224";

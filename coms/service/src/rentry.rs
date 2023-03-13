@@ -32,9 +32,10 @@ struct ServiceReDb<K, V>(ReDb<K, V>);
 const RELI_DB_HSERVICE_CONF: &str = "svcconf";
 const RELI_DB_HSERVICE_MNG: &str = "svcmng";
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy, Default)]
 pub(super) enum ServiceType {
     #[serde(alias = "simple")]
+    #[default]
     Simple,
     #[serde(alias = "forking")]
     Forking,
@@ -46,12 +47,6 @@ pub(super) enum ServiceType {
     Exec,
     TypeMax,
     TypeInvalid = -1,
-}
-
-impl Default for ServiceType {
-    fn default() -> Self {
-        ServiceType::Simple
-    }
 }
 
 impl DeserializeWith for ServiceType {
@@ -80,9 +75,10 @@ pub(super) enum NotifyAccess {
     Main,
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy, Default)]
 pub(super) enum ServiceRestart {
     #[serde(alias = "no")]
+    #[default]
     No,
     #[serde(alias = "on-success")]
     OnSuccess,
@@ -98,11 +94,6 @@ pub(super) enum ServiceRestart {
     Always,
 }
 
-impl Default for ServiceRestart {
-    fn default() -> Self {
-        ServiceRestart::No
-    }
-}
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ExitStatusSet {
     status: Vec<u8>,
@@ -238,8 +229,9 @@ impl ServiceReConf {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, EnumDisplay)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, EnumDisplay, Default)]
 pub(super) enum ServiceState {
+    #[default]
     Dead,
     Condition,
     StartPre,
@@ -261,13 +253,7 @@ pub(super) enum ServiceState {
     Cleaning,
 }
 
-impl Default for ServiceState {
-    fn default() -> Self {
-        ServiceState::Dead
-    }
-}
-
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, Default)]
 pub(super) enum ServiceResult {
     Success,
     FailureProtocol,
@@ -279,13 +265,8 @@ pub(super) enum ServiceResult {
     FailureCoreDump,
     FailureTimeout,
     SkipCondition,
+    #[default]
     ResultInvalid,
-}
-
-impl Default for ServiceResult {
-    fn default() -> Self {
-        ServiceResult::ResultInvalid
-    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Copy, Clone, Serialize, Deserialize)]

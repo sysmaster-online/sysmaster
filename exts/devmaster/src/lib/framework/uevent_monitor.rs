@@ -18,7 +18,7 @@ use nix::errno::Errno;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
 
-use crate::job_queue::JobQueue;
+use crate::framework::job_queue::JobQueue;
 
 /// uevent monitor
 #[derive(Debug)]
