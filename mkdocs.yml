@@ -8,6 +8,7 @@ site_description: >-
 # Repository
 repo_name: openEuler/sysMaster
 repo_url: https://gitee.com/openeuler/sysmaster
+edit_uri: edit/master/docs/
 
 # Copyright
 copyright: Copyright &copy; 2023 openEuler sysMaster team
@@ -65,8 +66,9 @@ theme:
 plugins:
   - search:
       separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
-  # - git-revision-date-localized:
-  #     enable_creation_date: true
+  - git-revision-date-localized:
+      enable_creation_date: true
+
   # - git-committers:
   #     repository: squidfunk/mkdocs-material
   #     branch: main

@@ -1,4 +1,4 @@
-# sctl命令
+# sctl 命令
 
 ## start
 
