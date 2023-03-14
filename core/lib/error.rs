@@ -122,6 +122,11 @@ pub enum Error {
     #[snafu(display("SpawnError(ExecCmdError)"))]
     SpawnError,
 
+    #[snafu(display("unit configuration error: '{}'.", msg))]
+    ConfigureError {
+        msg: String,
+    },
+
     /// UnitAction Error
     #[snafu(display("EAgain(UnitActionError)"))]
     UnitActionEAgain,
@@ -201,6 +206,7 @@ impl From<Error> for nix::Error {
             Error::UnitActionECanceled => nix::Error::ECANCELED,
             Error::UnitActionERefuseManualStart => nix::Error::EINVAL,
             Error::UnitActionERefuseManualStop => nix::Error::EINVAL,
+            Error::ConfigureError { msg: _ } => nix::Error::EINVAL,
         }
     }
 }
