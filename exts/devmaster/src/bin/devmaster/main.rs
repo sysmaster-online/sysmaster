@@ -13,7 +13,7 @@
 //! devmaster daemon
 use basic::logger::*;
 use event::{EventState, Events};
-use libdevmaster::{
+use libdevmaster::framework::{
     control_manager::{ControlManager, CONTROL_MANAGER_LISTEN_ADDR},
     job_queue::JobQueue,
     uevent_monitor::Monitor,

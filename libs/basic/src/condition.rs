@@ -67,18 +67,15 @@ impl Condition {
         if self.params.is_empty() {
             return true;
         }
-        let mut result = match self.c_type {
+        let result = match self.c_type {
             ConditionType::PathExists => self.test_path_exists(),
             ConditionType::FileNotEmpty => self.test_file_not_empty(),
             ConditionType::NeedsUpdate => self.test_needs_update(),
             ConditionType::User => self.test_user(),
             ConditionType::FirstBoot => self.test_first_boot(),
         };
-        if self.revert() >= 1 {
-            result = !result;
-        }
 
-        result > 0
+        (result > 0) ^ (self.revert() >= 1)
     }
 
     fn test_path_exists(&self) -> i8 {

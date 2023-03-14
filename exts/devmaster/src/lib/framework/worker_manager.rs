@@ -29,7 +29,7 @@ use std::sync::mpsc;
 use std::thread::JoinHandle;
 
 use crate::error::Error;
-use crate::job_queue::{DeviceJob, JobQueue, JobState};
+use crate::framework::job_queue::{DeviceJob, JobQueue, JobState};
 
 /// worker manager listen address
 pub const WORKER_MANAGER_LISTEN_ADDR: &str = "0.0.0.0:1223";

@@ -851,6 +851,7 @@ impl UnitManager {
         Ok(UnitStatus::new(
             name.to_string(),
             unit.get_description(),
+            unit.get_documentation(),
             self.load_unit_success(name).to_string(),
             self.get_subunit_state(name),
             self.current_active_state(name).to_string(),

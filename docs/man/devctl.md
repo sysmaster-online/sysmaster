@@ -1,4 +1,4 @@
-# devctl命令行工具
+# devctl 命令
 
 ## 1.简介
 
@@ -48,5 +48,8 @@ devctl是devmaster的管理工具，其功能包括控制devmaster行为、监�
     <DEVICES>...    以/sys或/dev开头的设备路径
 
 选项：
-    -h, --help  显示帮助信息
-    -a, --aciont <ACTION>   指定设备事件的动作类型
+    -h, --help              显示帮助信息
+    -a, --action <ACTION>   指定设备事件的动作类型
+    -t, --type <TYPE>       指定enumerator的类型，可以是devices（默认）或者subsystems
+    -v, --verbose           打印enumerator搜索到的设备
+    -n, --dry-run           不会实际触发设备事件，配合--verbose选项使用时，可以查看系统中的设备列表

@@ -20,7 +20,7 @@ use std::path::Path;
 
 /// given a device path, extract its mode and devnum
 /// e.g. input /dev/block/8:0, output (S_IFBLK, makedev(8,0))
-pub fn device_path_parse_major_minor(path: String) -> Result<(mode_t, u64)> {
+pub fn device_path_parse_devnum(path: String) -> Result<(mode_t, u64)> {
     let mode = if path.starts_with("/dev/block/") {
         S_IFBLK
     } else if path.starts_with("/dev/char/") {
@@ -32,7 +32,18 @@ pub fn device_path_parse_major_minor(path: String) -> Result<(mode_t, u64)> {
     };
 
     let filename = Path::new(&path).to_string_lossy().to_string();
-    let tokens: Vec<&str> = filename.split(':').collect();
+
+    Ok((mode, parse_devnum(filename)?))
+}
+
+/// parse the major:minor like string, and return the devnum
+pub fn parse_devnum(s: String) -> Result<u64> {
+    let tokens: Vec<&str> = s.split(':').collect();
+    if tokens.len() != 2 {
+        return Err(Error::Nix {
+            source: nix::errno::Errno::EINVAL,
+        });
+    }
 
     let (major, minor) = (
         tokens[0].parse::<u64>().map_err(|_| Error::Nix {
@@ -43,5 +54,12 @@ pub fn device_path_parse_major_minor(path: String) -> Result<(mode_t, u64)> {
         })?,
     );
 
-    Ok((mode, makedev(major, minor)))
+    Ok(makedev(major, minor))
+}
+
+/// parse the numeric like string into ifindex number
+pub fn parse_ifindex(s: String) -> Result<u32> {
+    s.parse::<u32>().map_err(|_| Error::Nix {
+        source: nix::errno::Errno::EINVAL,
+    })
 }

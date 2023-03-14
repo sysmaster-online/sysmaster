@@ -325,9 +325,7 @@ impl UnitRTData {
         self.load_queue.borrow_mut().push_back(unit);
     }
 
-    fn remove_unit(&self, _unit: &UnitX) {
-        todo!();
-    }
+    fn remove_unit(&self, _unit: &Rc<UnitX>) {}
 }
 
 fn dispatch_target_dep_unit(db: &Rc<UnitDb>, unit: &Rc<UnitX>) {

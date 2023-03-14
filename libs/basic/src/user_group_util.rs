@@ -32,7 +32,7 @@ pub fn parse_uid(uid_str: &String) -> Result<User> {
     let mut first = true;
     for c in uid_str.bytes() {
         // uid must only contains 0-9
-        if !first && (b'0'..=b'9').contains(&c) {
+        if !first && c.is_ascii_digit() {
             continue;
         }
         // uid must starts with 1-9
@@ -82,7 +82,7 @@ pub fn parse_gid(gid_str: &String) -> Result<Group> {
 
     let mut first = true;
     for c in gid_str.bytes() {
-        if !first && (b'0'..=b'9').contains(&c) {
+        if !first && c.is_ascii_digit() {
             continue;
         }
         if first && (b'1'..=b'9').contains(&c) {

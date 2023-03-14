@@ -23,9 +23,7 @@ pub fn get_project_root() -> io::Result<PathBuf> {
     let path = env::current_dir()?;
 
     for p in path.as_path().ancestors() {
-        let has_cargo = read_dir(p)?
-            .into_iter()
-            .any(|p| p.unwrap().file_name().eq("Cargo.lock"));
+        let has_cargo = read_dir(p)?.any(|p| p.unwrap().file_name().eq("Cargo.lock"));
         if has_cargo {
             return Ok(PathBuf::from(p));
         }

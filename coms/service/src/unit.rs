@@ -10,6 +10,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use crate::rentry::ServiceRestart;
+
 use super::base::PLUGIN_NAME;
 use super::comm::ServiceUnitComm;
 use super::config::ServiceConfig;
@@ -288,21 +290,21 @@ impl ServiceUnit {
         if !self.config.config_data().borrow().Service.RemainAfterExit
             && self
                 .config
-                .config_data()
-                .borrow()
-                .Service
-                .ExecStart
-                .is_none()
+                .get_exec_cmds(ServiceCommand::Start)
+                .map_or(true, |cmds| cmds.is_empty())
         {
-            return Err(Error::Other {
+            return Err(Error::ConfigureError {
                 msg: "No ExecStart command is configured and RemainAfterExit if false".to_string(),
             });
         }
 
         if self.config.service_type() != ServiceType::Oneshot
-            && self.config.get_exec_cmds(ServiceCommand::Start).is_none()
+            && self
+                .config
+                .get_exec_cmds(ServiceCommand::Start)
+                .map_or(true, |cmds| cmds.is_empty())
         {
-            return Err(Error::Other {
+            return Err(Error::ConfigureError {
                 msg: "No ExecStart command is configured, service type is not oneshot".to_string(),
             });
         }
@@ -315,11 +317,26 @@ impl ServiceUnit {
                 .len()
                 > 1
         {
-            return Err(Error::Other {
+            return Err(Error::ConfigureError {
                 msg:
                     "More than Oneshot ExecStart command is configured, service type is not oneshot"
                         .to_string(),
             });
+        }
+
+        if self.config.service_type() == ServiceType::Oneshot
+            && !matches!(
+                self.config.config_data().borrow().Service.Restart,
+                ServiceRestart::No
+                    | ServiceRestart::OnFailure
+                    | ServiceRestart::OnAbnormal
+                    | ServiceRestart::OnWatchdog
+                    | ServiceRestart::OnAbort
+            )
+        {
+            return Err(Error::ConfigureError { msg:
+                "When service type is onoshot, Restart= is not allowed set to Always or OnSuccess".to_string(),
+        });
         }
 
         Ok(())

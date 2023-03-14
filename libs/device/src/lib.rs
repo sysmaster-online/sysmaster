@@ -20,3 +20,5 @@ pub mod error;
 
 pub use crate::device::*;
 pub use crate::device_action::*;
+
+pub(crate) mod utils;

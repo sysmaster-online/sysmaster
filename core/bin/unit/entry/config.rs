@@ -31,9 +31,10 @@ pub(crate) struct UeConfig {
 }
 
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum UnitEmergencyAction {
     #[serde(alias = "none")]
+    #[default]
     None,
     #[serde(alias = "reboot")]
     Reboot,
@@ -51,12 +52,6 @@ pub enum UnitEmergencyAction {
     Exit,
     #[serde(alias = "exit-force")]
     ExitForce,
-}
-
-impl Default for UnitEmergencyAction {
-    fn default() -> Self {
-        UnitEmergencyAction::None
-    }
 }
 
 impl DeserializeWith for UnitEmergencyAction {

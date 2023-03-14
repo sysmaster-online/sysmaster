@@ -10,28 +10,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+//! the module of devctl subcommands
 //!
-pub mod condition;
-pub mod conf_parser;
-pub mod env_cargo;
-pub mod error;
-pub mod fd_util;
-pub mod file_util;
-pub mod fs_util;
-pub mod io_util;
-pub mod logger;
-pub mod macros;
-pub mod mount_util;
-pub mod parse_util;
-pub mod path_lookup;
-pub mod path_util;
-pub mod proc_cmdline;
-pub mod process_util;
-pub mod serialize;
-pub mod show_table;
-pub mod socket_util;
-pub mod special;
-pub mod string;
-pub mod time_util;
-pub mod user_group_util;
-pub use error::*;
+
+pub(crate) mod devctl_monitor;
+pub(crate) mod devctl_trigger;

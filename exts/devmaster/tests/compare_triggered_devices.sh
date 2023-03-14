@@ -10,13 +10,20 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! libdevmaster
-//!
-pub mod control_manager;
-pub mod error;
-pub mod job_queue;
-pub mod uevent_monitor;
-pub mod worker_manager;
+#!/bin/bash
 
-pub mod devctl_monitor;
-pub mod devctl_trigger;
+# compare triggered devices by udevadm and devctl
+
+if [[ -n $(command -v udevadm) ]];
+then
+    echo "export udevadm triggered devices"
+    udevadm trigger --verbose --dry-run > /run/udev_tmp.txt
+else
+    echo "udev does not exist"
+    exit 0
+fi
+
+echo "export devctl triggered devices"
+cargo run -p devmaster --bin devctl -- trigger --verbose --dry-run > /run/devmaster_tmp.txt
+
+diff /run/udev_tmp.txt /run/devmaster_tmp.txt

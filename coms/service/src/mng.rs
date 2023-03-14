@@ -41,7 +41,7 @@ use std::{
     rc::Weak,
 };
 use sysmaster::error::*;
-use sysmaster::exec::{ExecCommand, ExecContext, ExecFlags};
+use sysmaster::exec::{ExecCommand, ExecContext, ExecFlag, ExecFlags};
 use sysmaster::rel::ReStation;
 use sysmaster::unit::{KillOperation, UnitActiveState, UnitNotifyFlags};
 
@@ -60,6 +60,7 @@ pub(super) struct ServiceMng {
     control_command: RefCell<VecDeque<ExecCommand>>,
     rd: Rc<RunningData>,
     monitor: RefCell<ServiceMonitor>,
+    current_main_command: RefCell<ExecCommand>,
 }
 
 impl ReStation for ServiceMng {
@@ -143,6 +144,7 @@ impl ServiceMng {
             control_command: RefCell::new(VecDeque::new()),
             rd: rd.clone(),
             monitor: RefCell::new(ServiceMonitor::new()),
+            current_main_command: RefCell::new(ExecCommand::empty()),
         }
     }
 
@@ -302,12 +304,10 @@ impl ServiceMng {
             self.enter_start_post();
             return;
         }
-
-        let ret = self.spawn.start_service(
-            &cmd.unwrap(),
-            0,
-            ExecFlags::PASS_FDS | ExecFlags::SOFT_WATCHDOG,
-        );
+        let cmd = cmd.unwrap();
+        let ret = self
+            .spawn
+            .start_service(&cmd, 0, ExecFlags::PASS_FDS | ExecFlags::SOFT_WATCHDOG);
 
         if ret.is_err() {
             log::error!(
@@ -317,7 +317,7 @@ impl ServiceMng {
             self.enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
             return;
         }
-
+        *self.current_main_command.borrow_mut() = cmd;
         let pid = ret.unwrap();
         log::debug!(
             "service type is: {:?}, forking pid is: {}",
@@ -1076,7 +1076,7 @@ impl ServiceMng {
 
         // none has been filter after waitpid, unwrap is safe here
         let pid = wait_status.pid().unwrap();
-        let res = self.sigchld_result(wait_status);
+        let mut res = self.sigchld_result(wait_status);
 
         if self.pid.main() == Some(pid) {
             // for main pid updated by the process before its exited, updated the main pid.
@@ -1088,6 +1088,12 @@ impl ServiceMng {
 
             self.pid.reset_main();
             self.rd.set_wait_status(wait_status);
+            let exec_flag = self.current_main_command.borrow().get_exec_flag();
+
+            if exec_flag.contains(ExecFlag::EXEC_COMMAND_IGNORE_FAILURE) {
+                self.set_result(ServiceResult::Success);
+                res = ServiceResult::Success;
+            }
 
             if self.result() == ServiceResult::Success {
                 self.set_result(res);

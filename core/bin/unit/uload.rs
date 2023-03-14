@@ -129,14 +129,15 @@ impl UnitLoadData {
         if let Some(u) = self.db.units_get(name) {
             if u.load_state() != UnitLoadState::UnitNotFound {
                 return Some(Rc::clone(&u));
+            } else {
+                self.db.unit_remove(name);
             }
         }
-        let unit = self.prepare_unit(name).map(|u| {
+        self.prepare_unit(name).map(|u| {
             log::info!("begin dispatch unit in load queue");
             self.rt.dispatch_load_queue();
             u
-        });
-        unit
+        })
     }
 
     pub(self) fn set_um(&self, um: &Rc<UnitManager>) {

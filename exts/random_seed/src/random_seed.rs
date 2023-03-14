@@ -242,15 +242,11 @@ fn sd_id128_from_string(buf: &[u8]) -> Result<[u8; 16], ()> {
 }
 
 fn unhexchar(c: u8) -> Result<u8, ()> {
-    if (b'0'..=b'9').contains(&c) {
+    if c.is_ascii_digit() {
         return Ok(c - b'0');
-    }
-
-    if (b'a'..=b'f').contains(&c) {
+    } else if c.is_ascii_hexdigit() && c.is_ascii_lowercase() {
         return Ok(c - b'a' + 10);
-    }
-
-    if (b'A'..=b'F').contains(&c) {
+    } else if c.is_ascii_hexdigit() && c.is_ascii_uppercase() {
         return Ok(c - b'A' + 10);
     }
 

@@ -313,6 +313,11 @@ impl Unit {
         self.load.get_description()
     }
 
+    /// return documentation
+    pub fn get_documentation(&self) -> Option<String> {
+        self.load.get_documentation()
+    }
+
     ///
     pub fn prepare_exec(&self) -> Result<()> {
         log::debug!("prepare exec cgroup");
@@ -556,7 +561,7 @@ impl Unit {
         match self.load.load_unit_confs() {
             Ok(_) => {
                 let paths = self.load.get_unit_id_fragment_pathbuf();
-                log::debug!("begin exec sub class load");
+                log::debug!("Begin exec sub class load");
                 self.sub.load(paths)?;
 
                 self.load.set_load_state(UnitLoadState::UnitLoaded);
@@ -573,25 +578,34 @@ impl Unit {
     pub fn start(&self) -> Result<()> {
         let active_state = self.current_active_state();
         if active_state.is_active_or_reloading() {
-            log::error!("Unit is already active/reloading [{:?}] is err",active_state.is_active_or_reloading());
+            log::error!(
+                "Starting failed the unit active/reload state is [{:?}]",
+                active_state.is_active_or_reloading()
+            );
             return Err(Error::UnitActionEAlready);
         }
 
         if active_state == UnitActiveState::UnitMaintenance {
-            log::error!("Unit active_state [{:?}] is err",active_state);
+            log::error!(
+                "Starting failed the unit active state is [{:?}]",
+                active_state
+            );
             return Err(Error::UnitActionEAgain);
         }
 
         if self.load_state() != UnitLoadState::UnitLoaded {
-            log::error!("Starting failed because unit load state[{:?}] is err",self.load_state());
+            log::error!(
+                "Starting failed the unit load state is [{:?}]",
+                self.load_state()
+            );
             return Err(Error::UnitActionEInval);
         }
         if active_state != UnitActiveState::UnitActivating && !self.conditions().conditions_test() {
-            log::error!("Starting failed because condition test failed");
+            log::error!("Starting failed the unit condition test failed");
             return Err(Error::UnitActionEInval);
         }
         if active_state != UnitActiveState::UnitActivating && !self.conditions().asserts_test() {
-            log::error!("Starting failed because assert test failed");
+            log::error!("Starting failed the unit assert test failed");
             return Err(Error::UnitActionEInval);
         }
 
