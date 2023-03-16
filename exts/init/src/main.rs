@@ -14,21 +14,9 @@
 mod runtime;
 use crate::runtime::{param::Param, InitState, RunTime};
 use nix::unistd;
-use std::path::Path;
-
-const SYSMASTER_PATH: &str = "/usr/lib/sysmaster/sysmaster";
-const SYSTEMD_PATH: &str = "/usr/lib/systemd/systemd";
 
 fn main() {
-    let mut cmd = get_command();
-    if cmd.manager_args.is_empty() {
-        let argument = detect_init();
-        if argument.is_empty() {
-            println!("argument is invalid!");
-            freeze();
-        }
-        cmd.manager_args.push(argument);
-    }
+    let cmd = get_command();
 
     if let Ok(res) = RunTime::new(cmd) {
         let mut run_time = res;
@@ -63,38 +51,20 @@ fn main() {
         run_time.clear();
     }
 
-    println!("freeze");
     freeze();
 }
 
 fn get_command() -> Param {
     let mut param = Param::new();
-    let mut is_manager = false;
+    let agrs: Vec<String> = std::env::args().collect();
+    // Parameter parsing starts from the second position.
+    param.get_opt(agrs);
 
-    for arg in std::env::args() {
-        if arg.contains("sysmaster") {
-            is_manager = true;
-        }
-        if is_manager {
-            param.manager_args.push(arg);
-        } else {
-            param.init_args.push(arg);
-        }
-    }
     param
 }
 
-fn detect_init() -> String {
-    if Path::new(SYSMASTER_PATH).exists() {
-        return String::from(SYSMASTER_PATH);
-    } else if Path::new(SYSTEMD_PATH).exists() {
-        return String::from(SYSTEMD_PATH);
-    }
-
-    String::new()
-}
-
 fn freeze() {
+    println!("freeze");
     unistd::sync();
     loop {
         unistd::pause();

@@ -17,21 +17,21 @@ mod signals;
 
 use alive::Alive;
 use epoll::Epoll;
+use nix::errno::Errno;
+use nix::libc;
+use nix::sys::epoll::EpollFlags;
+use nix::unistd::{self, ForkResult, Pid};
 use param::Param;
 use signals::Signals;
-
-use nix::libc;
-use nix::unistd::{self, ForkResult, Pid};
 use std::os::unix::process::CommandExt;
+use std::path::Path;
 use std::process::{exit, Command};
-
-use nix::errno::Errno;
-use nix::sys::epoll::EpollFlags;
 use std::rc::Rc;
 
 const INVALID_FD: i32 = -1;
 const INVALID_PID: i32 = -1;
 const MANAGER_SIG_OFFSET: i32 = 7;
+const SYSMASTER_PATH: &str = "/usr/lib/sysmaster/sysmaster";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub enum InitState {
@@ -51,11 +51,10 @@ pub struct RunTime {
 }
 
 impl RunTime {
-    pub fn new(mut cmd: Param) -> Result<RunTime, Errno> {
-        cmd.get_opt();
+    pub fn new(cmd: Param) -> Result<RunTime, Errno> {
         let ep = Epoll::new()?;
         let epoll = Rc::new(ep);
-        let alive = Alive::new(&epoll, cmd.time_wait, cmd.time_out)?;
+        let alive = Alive::new(&epoll, cmd.init_param.time_wait, cmd.init_param.time_cnt)?;
         let signals = Signals::new(&epoll);
 
         Ok(RunTime {
@@ -92,7 +91,6 @@ impl RunTime {
         for event in events {
             let ep_event = event.events();
             let ep_data = event.data();
-            println!("ep_event:{:?} ep_data:{:?}", ep_event, ep_data);
             if let true = self.ep_event_err_proc(ep_event, ep_data)? {
                 return Ok(());
             }
@@ -103,8 +101,8 @@ impl RunTime {
                     self.need_reexec = true;
                 } else if self.alive.is_manageable(&buf) && !self.need_reexec {
                     self.state = InitState::RunRecover;
-                    self.alive.manager_time_count = 0;
-                    self.alive.alive_time_count = 0;
+                    self.alive.manager_time_cnt = 0;
+                    self.alive.alive_time_cnt = 0;
                 } else {
                     eprintln!("recv buf is invalid! {:?}", buf);
                 }
@@ -112,8 +110,8 @@ impl RunTime {
             }
             if self.alive.time_fd as u64 == ep_data {
                 self.epoll.read(self.alive.time_fd)?;
-                self.alive.manager_time_count += 1;
-                if self.alive.time_out <= self.alive.manager_time_count {
+                self.alive.manager_time_cnt += 1;
+                if self.alive.time_cnt <= self.alive.manager_time_cnt {
                     self.need_reexec = true;
                 }
                 continue;
@@ -149,11 +147,11 @@ impl RunTime {
             if self.alive.connect_fd as u64 == ep_data {
                 let buf = self.alive.recv_buf()?;
                 if self.alive.is_unmanageable(&buf) {
-                    self.alive.manager_time_count = 0;
+                    self.alive.manager_time_cnt = 0;
                     self.state = InitState::Reexec;
                     self.need_reexec = true;
                 } else if self.alive.is_alive(&buf) {
-                    self.alive.alive_time_count = 0;
+                    self.alive.alive_time_cnt = 0;
                 } else {
                     eprintln!("recv buf is invalid! {:?}", buf);
                 }
@@ -161,8 +159,8 @@ impl RunTime {
             }
             if self.alive.time_fd as u64 == ep_data {
                 self.epoll.read(self.alive.time_fd)?;
-                self.alive.alive_time_count += 1;
-                if self.alive.time_out <= self.alive.alive_time_count {
+                self.alive.alive_time_cnt += 1;
+                if self.alive.time_cnt <= self.alive.alive_time_cnt {
                     self.state = InitState::Reexec;
                     self.need_reexec = true;
                 }
@@ -195,16 +193,16 @@ impl RunTime {
             if self.alive.connect_fd as u64 == ep_data {
                 let buf = self.alive.recv_buf()?;
                 if self.alive.is_alive(&buf) {
-                    self.alive.manager_time_count = 0;
-                    self.alive.alive_time_count = 0;
+                    self.alive.manager_time_cnt = 0;
+                    self.alive.alive_time_cnt = 0;
                 }
                 continue;
             }
             if self.alive.time_fd as u64 == ep_data {
                 self.epoll.read(self.alive.time_fd)?;
-                self.alive.alive_time_count += 1;
-                if self.alive.time_out <= self.alive.alive_time_count {
-                    self.alive.alive_time_count = 0;
+                self.alive.alive_time_cnt += 1;
+                if self.alive.time_cnt <= self.alive.alive_time_cnt {
+                    self.alive.alive_time_cnt = 0;
                     println!("sysmaster is timeout!");
                 }
                 continue;
@@ -238,8 +236,8 @@ impl RunTime {
 
     fn reexec_manager(&mut self) -> Result<InitState, Errno> {
         self.need_reexec = false;
-        self.alive.manager_time_count = 0;
-        self.alive.alive_time_count = 0;
+        self.alive.manager_time_cnt = 0;
+        self.alive.alive_time_cnt = 0;
 
         if self.alive.connect_fd >= 0 {
             self.alive.del_connect_epoll()?;
@@ -315,10 +313,9 @@ impl RunTime {
     }
 
     fn create_sysmaster(&mut self) -> Result<(), Errno> {
-        let cmd = &self.cmd.manager_args;
-        if cmd.is_empty() {
-            println!("cmd is empty!");
-            return Err(Errno::EINVAL);
+        if !Path::new(SYSMASTER_PATH).exists() {
+            println!("{:?} does not exest! ", SYSMASTER_PATH);
+            return Err(Errno::ENOENT);
         }
 
         let res = unsafe { unistd::fork() };
@@ -330,12 +327,8 @@ impl RunTime {
             self.alive.wait_connect()?;
             Ok(())
         } else {
-            let mut command = Command::new(&cmd[0]);
-            let mut argv = [].to_vec();
-            if cmd.len() >= 2 {
-                argv = cmd[1..].to_vec();
-            }
-            command.args(argv);
+            let mut command = Command::new(SYSMASTER_PATH);
+            command.args(self.cmd.manager_param.to_vec());
 
             let comm = command.env("MANAGER", format!("{}", unsafe { libc::getpid() }));
             let err = comm.exec();
