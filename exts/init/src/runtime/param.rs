@@ -9,57 +9,80 @@
 // KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
+const DEFAULT_TIMECNT: i64 = 5;
+const DEFAULT_TIMEWAIT: i64 = 10;
+const INIT_PARAM: i32 = 0;
+// const SYSMASTER_PARAM: i32 = 1;
+type Callback = fn(arg: &str, key: &String, init_param: &mut InitParam);
 
-const TIME_OUT: i64 = 5;
-const TIME_WAIT: i64 = 10;
+struct Dispatch<'a> {
+    key: &'a str,
+    param_type: i32, // The parameter type of init is INIT_PARAM.
+    callback: Option<Callback>,
+}
+
+const PARAM_TABLE: &[Dispatch] = &[
+    Dispatch {
+        key: "--timecnt=",
+        param_type: INIT_PARAM,
+        callback: Some(parse_timecnt),
+    },
+    Dispatch {
+        key: "--timewait=",
+        param_type: INIT_PARAM,
+        callback: Some(parse_timewait),
+    },
+];
+
+fn parse_timecnt(arg: &str, key: &String, init_param: &mut InitParam) {
+    let str1 = &arg[key.len()..];
+    if let Ok(value) = str1.parse::<i64>() {
+        if value >= 2 {
+            init_param.time_cnt = value;
+        }
+    }
+}
+
+fn parse_timewait(arg: &str, key: &String, init_param: &mut InitParam) {
+    let str1 = &arg[key.len()..];
+    if let Ok(value) = str1.parse::<i64>() {
+        if value >= DEFAULT_TIMEWAIT {
+            init_param.time_wait = value;
+        }
+    }
+}
+
+pub struct InitParam {
+    pub time_cnt: i64,
+    pub time_wait: i64,
+}
 
 pub struct Param {
-    pub init_args: Vec<String>,
-    pub manager_args: Vec<String>,
-
-    pub time_out: i64,
-    pub time_wait: i64,
+    pub init_param: InitParam,
+    pub manager_param: Vec<String>,
 }
 
 impl Param {
     pub fn new() -> Self {
         Param {
-            init_args: Vec::<String>::with_capacity(0),
-            manager_args: Vec::<String>::with_capacity(0),
-            time_out: TIME_OUT,
-            time_wait: TIME_WAIT,
+            init_param: InitParam {
+                time_cnt: DEFAULT_TIMECNT,
+                time_wait: DEFAULT_TIMEWAIT,
+            },
+            manager_param: Vec::<String>::with_capacity(0),
         }
     }
 
-    pub fn get_opt(&mut self) {
-        for param in &self.init_args {
-            if let Some(size) = param.find("--timeout=") {
-                let len = size + str::len("--timeout=");
-                let str1 = &param[len..];
-                match str1.parse::<i64>() {
-                    Ok(time) => self.time_out = time,
-                    Err(_) => {
-                        println!(
-                            "Failed to parse timeout, using the default timeout:{:?}",
-                            TIME_OUT
-                        );
-                        self.time_out = TIME_OUT;
+    pub fn get_opt(&mut self, args: Vec<String>) {
+        for arg in args {
+            for table in PARAM_TABLE {
+                if arg.starts_with(table.key) && table.callback.is_some() {
+                    if INIT_PARAM == table.param_type {
+                        table.callback.unwrap()(&arg, &table.key.to_string(), &mut self.init_param);
+                    } else {
+                        self.manager_param.push(arg);
                     }
-                }
-            }
-
-            if let Some(size) = param.find("--timewait=") {
-                let len = size + str::len("--timewait=");
-                let str1 = &param[len..];
-                match str1.parse::<i64>() {
-                    Ok(time) => self.time_wait = time,
-                    Err(_) => {
-                        println!(
-                            "Failed to parse timewait, using the default timewait:{:?}",
-                            TIME_WAIT
-                        );
-                        self.time_wait = TIME_WAIT;
-                    }
+                    break;
                 }
             }
         }

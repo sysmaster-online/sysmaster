@@ -31,24 +31,24 @@ pub struct Alive {
     pub alive_fd: RawFd,
     pub connect_fd: RawFd,
     pub time_fd: RawFd,
-    pub manager_time_count: i64,
-    pub alive_time_count: i64,
-    pub time_out: i64,
+    pub manager_time_cnt: i64,
+    pub alive_time_cnt: i64,
+    pub time_cnt: i64,
     pub time_wait: i64,
     timer: TimerFd,
 }
 
 impl Alive {
-    pub fn new(epoll: &Rc<Epoll>, time_wait: i64, time_out: i64) -> Result<Alive, Errno> {
+    pub fn new(epoll: &Rc<Epoll>, time_wait: i64, time_cnt: i64) -> Result<Alive, Errno> {
         let timer = TimerFd::new(ClockId::CLOCK_REALTIME, TimerFlags::empty())?;
         Ok(Alive {
             epoll: epoll.clone(),
             alive_fd: INVALID_FD,
             connect_fd: INVALID_FD,
             time_fd: INVALID_FD,
-            manager_time_count: 0,
-            alive_time_count: 0,
-            time_out,
+            manager_time_cnt: 0,
+            alive_time_cnt: 0,
+            time_cnt,
             time_wait,
             timer,
         })
