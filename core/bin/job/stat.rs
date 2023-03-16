@@ -164,20 +164,6 @@ impl JobKindNum {
     pub(self) fn update(&mut self, changes: &(&Vec<Rc<Job>>, &Vec<Rc<Job>>, &Vec<Rc<Job>>)) {
         let (adds, dels, _) = changes;
 
-        // del
-        for job in dels.iter() {
-            let overflow = match job.kind() {
-                JobKind::Start => value_try_sub(&mut self.start, 1),
-                JobKind::Stop => value_try_sub(&mut self.stop, 1),
-                JobKind::Reload => value_try_sub(&mut self.reload, 1),
-                JobKind::Restart => value_try_sub(&mut self.restart, 1),
-                JobKind::Verify => value_try_sub(&mut self.verify, 1),
-                JobKind::Nop => value_try_sub(&mut self.nop, 1),
-                _ => unreachable!("There is an error in the transaction exchange mechanism."),
-            };
-            assert!(!overflow);
-        }
-
         // add
         for job in adds.iter() {
             let overflow = match job.kind() {
@@ -187,6 +173,20 @@ impl JobKindNum {
                 JobKind::Restart => value_try_add(&mut self.restart, 1),
                 JobKind::Verify => value_try_add(&mut self.verify, 1),
                 JobKind::Nop => value_try_add(&mut self.nop, 1),
+                _ => unreachable!("There is an error in the transaction exchange mechanism."),
+            };
+            assert!(!overflow);
+        }
+
+        // del
+        for job in dels.iter() {
+            let overflow = match job.kind() {
+                JobKind::Start => value_try_sub(&mut self.start, 1),
+                JobKind::Stop => value_try_sub(&mut self.stop, 1),
+                JobKind::Reload => value_try_sub(&mut self.reload, 1),
+                JobKind::Restart => value_try_sub(&mut self.restart, 1),
+                JobKind::Verify => value_try_sub(&mut self.verify, 1),
+                JobKind::Nop => value_try_sub(&mut self.nop, 1),
                 _ => unreachable!("There is an error in the transaction exchange mechanism."),
             };
             assert!(!overflow);
