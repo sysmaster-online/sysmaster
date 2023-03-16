@@ -120,10 +120,10 @@ impl JobTable {
         // relation processing if something is isolated or flushed
         if !iso_jobs.is_empty() || !flush_jobs.is_empty() {
             for unit in jobs_2_units(&iso_jobs).iter() {
-                self.process_relation(unit);
+                self.process_relation(unit, true);
             }
             for unit in jobs_2_units(&flush_jobs).iter() {
-                self.process_relation(unit);
+                self.process_relation(unit, true);
             }
         }
 
@@ -154,7 +154,7 @@ impl JobTable {
 
         // relation processing if something is deleted
         if !del_jobs.is_empty() {
-            self.process_relation(unit);
+            self.process_relation(unit, true);
         }
 
         del_jobs
@@ -177,6 +177,8 @@ impl JobTable {
     }
 
     pub(super) fn finish_trigger(&self, unit: &UnitX, result: JobResult) -> Option<Rc<Job>> {
+        assert!(self.get_trigger_info(unit).is_some()); // guaranteed by caller
+
         // finish table-unit
         let del_trigger = self.t_unit.borrow_mut().finish_trigger(unit, result);
 
@@ -185,10 +187,8 @@ impl JobTable {
             self.t_id.borrow_mut().remove(&job.get_id());
         }
 
-        // relation processing if something is deleted
-        if del_trigger.is_some() {
-            self.process_relation(unit);
-        }
+        // relation processing if something is finished, whether or not something is deleted
+        self.process_relation(unit, del_trigger.is_some());
 
         del_trigger
     }
@@ -372,11 +372,13 @@ impl JobTable {
         (trigger_info, merge_trigger)
     }
 
-    fn process_relation(&self, unit: &UnitX) {
-        // trigger-notify
-        let atom = UnitRelationAtom::UnitAtomTriggeredBy;
-        for other in self.db.dep_gets_atom(unit, atom) {
-            other.trigger(unit);
+    fn process_relation(&self, unit: &UnitX, st_deleted: bool) {
+        // trigger-notify only if something is deleted
+        if st_deleted {
+            let atom = UnitRelationAtom::UnitAtomTriggeredBy;
+            for other in self.db.dep_gets_atom(unit, atom) {
+                other.trigger(unit);
+            }
         }
 
         // resume order-related units
