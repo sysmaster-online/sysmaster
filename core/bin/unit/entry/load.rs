@@ -84,6 +84,15 @@ impl UeLoad {
         }
     }
 
+    pub(super) fn get_documentation(&self) -> Option<String> {
+        let res = String::from(&self.config.config_data().borrow().Unit.Documentation);
+        if res.is_empty() {
+            None
+        } else {
+            Some(res)
+        }
+    }
+
     pub(super) fn get_unit_id_fragment_pathbuf(&self) -> Vec<PathBuf> {
         self.file.get_unit_id_fragment_pathbuf(self.base.id())
     }

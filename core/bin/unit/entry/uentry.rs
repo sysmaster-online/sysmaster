@@ -313,6 +313,11 @@ impl Unit {
         self.load.get_description()
     }
 
+    /// return documentation
+    pub fn get_documentation(&self) -> Option<String> {
+        self.load.get_documentation()
+    }
+
     ///
     pub fn prepare_exec(&self) -> Result<()> {
         log::debug!("prepare exec cgroup");
