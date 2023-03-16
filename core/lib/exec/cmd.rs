@@ -11,6 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::serialize::DeserializeWith;
+use bitflags::bitflags;
 use regex::Regex;
 use serde::{
     de::{self, Unexpected},
@@ -18,17 +19,57 @@ use serde::{
 };
 use std::{collections::VecDeque, path::Path};
 
+bitflags! {
+    /// ExecCommand Flags
+    #[derive(Serialize, Deserialize)]
+    pub struct ExecFlag: u8 {
+        ///
+        const EXEC_COMMAND_EMPTY = 0;
+        ///
+        const EXEC_COMMAND_IGNORE_FAILURE   = 1 << 0;
+        ///
+        const EXEC_COMMAND_FULLY_PRIVILEGED = 1 << 1;
+        ///
+        const EXEC_COMMAND_NO_SETUID        = 1 << 2;
+        ///
+        const EXEC_COMMAND_AMBIENT_MAGIC    = 1 << 3;
+        ///
+        const EXEC_COMMAND_NO_ENV_EXPAND    = 1 << 4;
+    }
+}
+
 /// the exec command that was parsed from the unit file
 #[derive(PartialEq, Clone, Eq, Debug, Serialize, Deserialize)]
 pub struct ExecCommand {
     path: String,
     argv: Vec<String>,
+    flags: ExecFlag,
 }
 
 impl ExecCommand {
     /// create a new instance of the command
     pub fn new(path: String, argv: Vec<String>) -> ExecCommand {
-        ExecCommand { path, argv }
+        ExecCommand {
+            path,
+            argv,
+            flags: ExecFlag::EXEC_COMMAND_EMPTY,
+        }
+    }
+    ///
+    pub fn empty() -> ExecCommand {
+        ExecCommand {
+            path: String::new(),
+            argv: vec![String::new()],
+            flags: ExecFlag::EXEC_COMMAND_EMPTY,
+        }
+    }
+    ///
+    pub fn add_exec_flag(&mut self, flag: ExecFlag) {
+        self.flags |= flag;
+    }
+    ///
+    pub fn get_exec_flag(&self) -> ExecFlag {
+        self.flags
     }
 
     /// return the path of the command
@@ -48,7 +89,25 @@ impl DeserializeWith for ExecCommand {
     where
         D: Deserializer<'de>,
     {
-        let s = String::deserialize(de)?;
+        let mut s = String::deserialize(de)?;
+
+        let first = match s.as_bytes().first() {
+            None => {
+                return Err(de::Error::invalid_value(
+                    Unexpected::Str(&s),
+                    &"The configured value is empty.",
+                ));
+            }
+            Some(v) => *v,
+        };
+
+        let exec_flag = match first as char {
+            '-' => {
+                s = s.trim_start_matches('-').to_string();
+                ExecFlag::EXEC_COMMAND_IGNORE_FAILURE
+            }
+            _ => ExecFlag::EXEC_COMMAND_EMPTY,
+        };
 
         let mut commands = VecDeque::new();
 
@@ -83,7 +142,8 @@ impl DeserializeWith for ExecCommand {
             }
 
             let cmd = path.to_str().unwrap().to_string();
-            let new_command = ExecCommand::new(cmd, command);
+            let mut new_command = ExecCommand::new(cmd, command);
+            new_command.add_exec_flag(exec_flag);
             commands.push_back(new_command);
         }
 

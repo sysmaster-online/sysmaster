@@ -15,3 +15,4 @@ mod base;
 mod cmd;
 pub use base::{ExecContext, ExecFlags, ExecParameters};
 pub use cmd::ExecCommand;
+pub use cmd::ExecFlag;
