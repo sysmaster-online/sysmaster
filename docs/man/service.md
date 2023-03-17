@@ -1,4 +1,4 @@
-# [Service] 配置
+# Service 配置
 
 ## ExecStart
 
