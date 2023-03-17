@@ -11,6 +11,14 @@
 // See the Mulan PSL v2 for more details.
 
 //! the utils to test the conditions
+use nix::{
+    fcntl::{open, OFlag},
+    sys::{
+        stat::Mode,
+        statvfs::{fstatvfs, FsFlags},
+    },
+};
+
 use crate::{conf_parser, proc_cmdline, user_group_util};
 use std::{path::Path, string::String};
 
@@ -19,6 +27,8 @@ use std::{path::Path, string::String};
 pub enum ConditionType {
     /// check path exist
     PathExists,
+    /// check path is readable and writable
+    PathIsReadWrite,
     /// check file is empty
     FileNotEmpty,
     /// check need update
@@ -69,6 +79,7 @@ impl Condition {
         }
         let result = match self.c_type {
             ConditionType::PathExists => self.test_path_exists(),
+            ConditionType::PathIsReadWrite => self.test_path_is_read_write(),
             ConditionType::FileNotEmpty => self.test_file_not_empty(),
             ConditionType::NeedsUpdate => self.test_needs_update(),
             ConditionType::User => self.test_user(),
@@ -82,6 +93,37 @@ impl Condition {
         let tmp_path = Path::new(&self.params);
         let result = tmp_path.exists();
         result as i8
+    }
+
+    fn test_path_is_read_write(&self) -> i8 {
+        /* 1 for true, 0 for false. */
+        let path = Path::new(&self.params);
+        if !path.exists() {
+            return 0;
+        }
+        let fd = match open(path, OFlag::O_CLOEXEC | OFlag::O_PATH, Mode::empty()) {
+            Err(e) => {
+                log::error!(
+                    "Failed to open {} for checking file system permission: {}",
+                    self.params,
+                    e
+                );
+                return 0;
+            }
+            Ok(v) => v,
+        };
+        if fd < 0 {
+            log::error!("Invalid file descriptor.");
+            return 0;
+        }
+        let flags = match fstatvfs(&fd) {
+            Err(e) => {
+                log::error!("Failed to get the stat of file system: {}", e);
+                return 0;
+            }
+            Ok(v) => v,
+        };
+        (!flags.flags().contains(FsFlags::ST_RDONLY)) as i8
     }
 
     fn test_file_not_empty(&self) -> i8 {

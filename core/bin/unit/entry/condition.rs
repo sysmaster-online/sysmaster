@@ -15,6 +15,7 @@ use std::cell::RefCell;
 
 pub(super) mod condition_keys {
     pub(crate) const CONDITION_PATH_EXISTS: &str = "ConditionPathExists";
+    pub(crate) const CONDITION_PATH_IS_READ_WRITE: &str = "ConditionPathIsReadWrite";
     pub(crate) const CONDITION_FILE_NOT_EMPTY: &str = "ConditionFileNotEmpty";
     pub(crate) const CONDITION_FIRST_BOOT: &str = "ConditionFirstBOOT";
     pub(crate) const CONDITION_NEEDS_UPDATE: &str = "ConditionNeedsUpdate";
@@ -82,6 +83,7 @@ impl UeCondition {
         use condition_keys::*;
         let c_type = match condop {
             CONDITION_PATH_EXISTS => ConditionType::PathExists,
+            CONDITION_PATH_IS_READ_WRITE => ConditionType::PathIsReadWrite,
             CONDITION_FILE_NOT_EMPTY => ConditionType::FileNotEmpty,
             CONDITION_NEEDS_UPDATE => ConditionType::NeedsUpdate,
             CONDITION_USER => ConditionType::User,

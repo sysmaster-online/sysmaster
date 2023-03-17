@@ -247,6 +247,16 @@ impl Unit {
             );
 
             add_condition(
+                CONDITION_PATH_IS_READ_WRITE,
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionPathIsReadWrite
+                    .as_str(),
+            );
+
+            add_condition(
                 CONDITION_USER,
                 self.get_config()
                     .config_data()
