@@ -115,6 +115,7 @@ bitflags! {
 pub struct UnitStatus {
     name: String,
     description: Option<String>,
+    documentation: Option<String>,
     load_state: String,
     sub_state: String,
     active_state: String,
@@ -129,6 +130,7 @@ impl UnitStatus {
     pub fn new(
         name: String,
         description: Option<String>,
+        documentation: Option<String>,
         load_state: String,
         sub_state: String,
         active_state: String,
@@ -139,6 +141,7 @@ impl UnitStatus {
         Self {
             name,
             description,
+            documentation,
             load_state,
             sub_state,
             active_state,
@@ -156,6 +159,9 @@ impl std::fmt::Display for UnitStatus {
         status_table.add_line(vec!["Loaded:", &self.load_state]);
         status_table.add_line(vec!["Active:", &full_active_state]);
         status_table.add_line(vec!["CGroup:", &self.cgroup_path]);
+        if let Some(doc) = &self.documentation {
+            status_table.add_line(vec!["Docs:", doc]);
+        }
         status_table.add_line(vec!["PID:", &self.pid]);
         status_table.set_one_cell_align_right(0);
         status_table.align_define();
