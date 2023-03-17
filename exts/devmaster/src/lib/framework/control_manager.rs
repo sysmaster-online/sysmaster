@@ -75,7 +75,7 @@ impl ControlManager {
 
                 let mut device = Device::new();
                 device.devname = devname.to_string();
-                device.seqnum = Some(seqnum);
+                device.seqnum = seqnum;
 
                 self.job_queue.job_queue_insert(device);
                 self.job_queue.job_queue_start();

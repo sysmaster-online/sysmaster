@@ -190,11 +190,9 @@ impl JobQueue {
     /// encapsulate device into a device job and insert it into job queue
     pub(crate) fn job_queue_insert(&self, device: Device) {
         let seqnum: u64 = match device.get_seqnum() {
-            Some(seqnum) => seqnum,
-            None => {
-                log::debug!(
-                    "Job Queue: failed to insert device as it is not received from netlink"
-                );
+            Ok(seqnum) => seqnum,
+            Err(_) => {
+                log::debug!("Job Queue: failed to insert device as it is not received from uevent");
                 return;
             }
         };
