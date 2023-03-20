@@ -38,7 +38,6 @@ use basic::logger::{self};
 use libc::{c_int, getppid, prctl, PR_SET_CHILD_SUBREAPER};
 use log::{self};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
-use nix::unistd::{self};
 use std::convert::TryFrom;
 use std::env::{self};
 use std::os::unix::process::CommandExt;
@@ -51,15 +50,8 @@ const MANAGER_SIG_OFFSET: i32 = 7;
 fn main() -> Result<()> {
     // The registration signal is at the beginning and has the highest priority!
     register_reexe_signal();
-
-    let res = KeepAlive::get_instance();
-    let connect_fd = match &*res {
-        Ok(fd) => fd,
-        Err(err) => {
-            print!("KeepAlive::get_instance failed err:{:?}", *err);
-            return Err(Error::Nix { source: *err });
-        }
-    };
+    // Connect init.
+    KeepAlive::init();
 
     logger::init_log_with_console("sysmaster", log::LevelFilter::Debug);
     log::info!("sysmaster running in system mode.");
@@ -101,13 +93,10 @@ fn main() -> Result<()> {
 
     // re-exec
     if reexec {
-        if let Err(err) = connect_fd.send_unmanageable() {
-            log::info!("send_unmanageable failed! err:{:?}", err);
-            return Err(Error::Nix { source: err });
-        }
+        let args: Vec<String> = env::args().collect();
+        do_reexecute(&args);
     }
 
-    unistd::pause();
     Ok(())
 }
 
@@ -188,18 +177,8 @@ fn install_crash_handler() {
 extern "C" fn crash(signo: c_int) {
     let _signal = Signal::try_from(signo).unwrap(); // debug
 
-    let res = KeepAlive::get_instance();
-    let keep_alive = match &*res {
-        Ok(kp) => kp,
-        Err(err) => {
-            print!("KeepAlive::get_instance failed err:{:?}", *err);
-            return;
-        }
-    };
-
-    if let Err(err) = keep_alive.send_unmanageable() {
-        log::info!("send_unmanageable failed! err:{:?}", err);
-    }
+    let args: Vec<String> = env::args().collect();
+    do_reexecute(&args);
 }
 
 fn execarg_build_default() -> (String, Vec<String>) {

@@ -16,6 +16,7 @@ use nix::sys::socket::{self, MsgFlags};
 use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
+const ALIVE: &str = "ALIVE01234567890";
 
 pub(super) struct AliveTimer {
     sub: Rc<AliveTimerSub>,
@@ -93,7 +94,8 @@ impl AliveTimerData {
     fn keep_alive(&self) {
         let mut count = 0;
         loop {
-            if let Err(err) = socket::send(self.alive_fd, b"ALIVE", MsgFlags::MSG_DONTWAIT) {
+            if let Err(err) = socket::send(self.alive_fd, ALIVE.as_bytes(), MsgFlags::MSG_DONTWAIT)
+            {
                 if Errno::EINTR == err {
                     continue;
                 }
