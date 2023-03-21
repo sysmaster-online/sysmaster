@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use basic::show_table::ShowTable;
+use basic::show_table::{CellAlign, CellColor, ShowTable};
 use bitflags::bitflags;
 
 /**Unit stats：
@@ -155,7 +155,15 @@ impl UnitStatus {
 impl std::fmt::Display for UnitStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut status_table = ShowTable::new();
-        let full_active_state = self.active_state.to_string() + "(" + &self.sub_state + ")";
+        let full_active_state = self.active_state.to_string() + " (" + &self.sub_state + ")";
+
+        let mut color = CellColor::Empty;
+        if self.active_state == "active" {
+            color = CellColor::Green;
+        } else if self.active_state == "failed" {
+            color = CellColor::Red;
+        }
+
         status_table.add_line(vec!["Loaded:", &self.load_state]);
         status_table.add_line(vec!["Active:", &full_active_state]);
         status_table.add_line(vec!["CGroup:", &self.cgroup_path]);
@@ -163,11 +171,17 @@ impl std::fmt::Display for UnitStatus {
             status_table.add_line(vec!["Docs:", doc]);
         }
         status_table.add_line(vec!["PID:", &self.pid]);
-        status_table.set_one_cell_align_right(0);
-        status_table.align_define();
-        let first_line = match &self.description {
-            None => "● ".to_string() + &self.name + "\n",
-            Some(str) => "● ".to_string() + &self.name + " - " + str + "\n",
+        status_table.set_one_col_align(0, CellAlign::Right);
+        /* The first column: keep the left space, delete the right space. */
+        status_table.set_one_col_space(0, true, false);
+        /* Cell (1, 1) is used to show the unit state, make it colored. */
+        status_table.set_one_cell_color(1, 1, color);
+
+        let mut first_line =
+            "\x1b".to_string() + &String::from(color) + "● " + "\x1b[0m" + &self.name;
+        first_line = match &self.description {
+            None => first_line + "\n",
+            Some(str) => first_line + " - " + str + "\n",
         };
         write!(f, "{}", first_line + &status_table.to_string())
     }

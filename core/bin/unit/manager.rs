@@ -38,7 +38,7 @@ use crate::utils::table::{TableOp, TableSubscribe};
 use basic::path_lookup::LookupPaths;
 use basic::proc_cmdline::get_process_cmdline;
 use basic::process_util;
-use basic::show_table::ShowTable;
+use basic::show_table::{CellColor, ShowTable};
 use event::Events;
 use nix::unistd::Pid;
 use std::cell::RefCell;
@@ -865,6 +865,7 @@ impl UnitManager {
         let mut list_units_table = ShowTable::new();
         list_units_table.add_line(vec!["UNIT", "LOAD", "ACTIVE", "SUB", "DESCRIPTION"]);
         for unit_type in UnitType::iterator() {
+            list_units_table.set_current_row_underline(true);
             for unit_name in self.units_get_all(Some(unit_type)) {
                 let unit = match self.units_get(&unit_name) {
                     Some(unit) => unit,
@@ -887,9 +888,11 @@ impl UnitManager {
                     &sub_state,
                     &description,
                 ]);
+                if active_state == "failed" {
+                    list_units_table.set_current_row_color(CellColor::Red);
+                }
             }
         }
-        list_units_table.align_left();
         Ok(list_units_table.to_string())
     }
 

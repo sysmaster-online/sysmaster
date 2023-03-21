@@ -11,25 +11,426 @@
 // See the Mulan PSL v2 for more details.
 
 //! ShowTable can be used to display contents in a table format
+//! ```
+//!     This is called column
+//!              |
+//!              v
+//! Cell(0,0) Cell(0,1) Cell(0,2) -> This is called Line, or row
+//! Cell(1,0) Cell(1,1) Cell(1,2)
+//! Cell(2,0)    ...       ...
+//! ```
+use std::fmt::Display;
 
-#[derive(Clone, Copy)]
-/// Cell Align
+/// The alignment of one cell
+#[derive(Clone, Copy, PartialEq)]
 pub enum CellAlign {
-    /// Align to left
+    ///
     Left,
-    /// Align to right
+    ///
     Right,
+    ///
+    Center,
 }
 
-/// ShowTable can be used to display contents in a table format
-#[derive(Default)]
+/// The color of one cell
+#[derive(Clone, Copy, PartialEq)]
+pub enum CellColor {
+    ///
+    Empty,
+    ///
+    Grey,
+    ///
+    Red,
+    ///
+    Green,
+    ///
+    Yellow,
+    ///
+    Blue,
+    ///
+    Purple,
+}
+
+impl From<CellColor> for String {
+    /// Change the CellColor to the magic string
+    fn from(cell_color: CellColor) -> Self {
+        match cell_color {
+            CellColor::Empty => "[37m".to_string(),
+            CellColor::Grey => "[30m".to_string(),
+            CellColor::Red => "[31m".to_string(),
+            CellColor::Green => "[32m".to_string(),
+            CellColor::Yellow => "[33m".to_string(),
+            CellColor::Blue => "[34m".to_string(),
+            CellColor::Purple => "[35m".to_string(),
+        }
+    }
+}
+
+/// Table Cell
+pub struct Cell {
+    color: CellColor,
+    align: CellAlign,
+    underline: bool,
+    left_space: bool,
+    right_space: bool,
+    /* this cell's width, don't consider cells in other lines */
+    width: usize,
+    x_index: usize,
+    split_content: Vec<String>,
+}
+
+impl Cell {
+    /// Create a new cell
+    pub fn new(ori_content: Option<&str>, x_index: usize) -> Self {
+        let mut width = 0;
+        let mut split_content: Vec<String> = Vec::new();
+        match ori_content {
+            None => {
+                width = 0;
+                split_content.push(String::new());
+            }
+            Some(ori_content) => {
+                for cell_line in ori_content.split('\n') {
+                    width = std::cmp::max(width, cell_line.len());
+                    split_content.push(cell_line.to_string());
+                }
+            }
+        }
+
+        Cell {
+            color: CellColor::Empty,
+            underline: false,
+            align: CellAlign::Left,
+            left_space: true,
+            right_space: true,
+            width,
+            x_index,
+            split_content,
+        }
+    }
+
+    /// Set the color of one cell
+    pub fn set_color(&mut self, color: CellColor) {
+        self.color = color;
+    }
+
+    /// Set the alignment of one cell
+    pub fn set_align(&mut self, align: CellAlign) {
+        self.align = align;
+    }
+
+    /// Set the cell's content underlined
+    pub fn set_underline(&mut self, use_underline: bool) {
+        self.underline = use_underline;
+    }
+
+    /// Set if keep the cell's left space
+    pub fn set_left_space(&mut self, use_space: bool) {
+        self.left_space = use_space;
+    }
+
+    /// Set if keep the cell's right space
+    pub fn set_right_space(&mut self, use_space: bool) {
+        self.right_space = use_space;
+    }
+
+    /// Print one line of a cell out
+    ///
+    /// * i: print which line
+    ///
+    /// * width: the cell's width
+    ///
+    /// * height: the cell's height
+    pub fn format_cell_line(&self, i: usize, width: usize, height: usize) -> String {
+        let mut res = String::new();
+        if i >= self.split_content.len() {
+            res += &" ".repeat(width);
+        } else {
+            res += &self.split_content[i];
+        }
+        if self.align == CellAlign::Left && width > res.len() {
+            res += &" ".repeat(width - res.len());
+        } else if self.align == CellAlign::Right && width > res.len() {
+            res = " ".repeat(width - res.len()) + &res;
+        } else if self.align == CellAlign::Center && width > res.len() {
+            let left_size = (width - res.len()) / 2;
+            res = " ".repeat(left_size) + &res;
+            res += &" ".repeat(width - res.len());
+        }
+        if self.left_space {
+            res = " ".to_string() + &res;
+        }
+        if self.right_space {
+            res += " ";
+        }
+        let mut prefix = String::new();
+        if self.color != CellColor::Empty {
+            prefix = "\x1b".to_string() + &String::from(self.color);
+        }
+        if i == height - 1 && self.underline {
+            prefix += "\x1b[4m";
+        }
+        if !prefix.is_empty() {
+            res = prefix + &res + "\x1b[0m";
+        }
+        res
+    }
+}
+
+/// Table Line
+pub struct Line {
+    /// Height of this total line
+    height: usize,
+    /// Width of this line, don't consider other lines
+    per_widths: Vec<usize>,
+    /// Cells of this line
+    cells: Vec<Cell>,
+}
+
+impl Line {
+    /// Create an empty line
+    pub fn empty() -> Self {
+        Self {
+            per_widths: Vec::new(),
+            height: 0,
+            cells: Vec::new(),
+        }
+    }
+    /// Create a new line by a Vec<&str>
+    pub fn new(ori_contents: Vec<&str>) -> Self {
+        let mut per_widths = Vec::new();
+        let mut height = 0;
+        let mut cells = Vec::new();
+        for (x_index, ori_content) in ori_contents.into_iter().enumerate() {
+            let cell = Cell::new(Some(ori_content), x_index);
+            height = std::cmp::max(cell.split_content.len(), height);
+            per_widths.push(cell.width);
+            cells.push(cell);
+        }
+        Self {
+            height,
+            per_widths,
+            cells,
+        }
+    }
+}
+
+/// ShowTable
 pub struct ShowTable {
-    row_length: usize,
-    column_length: usize,
-    cell_width: Vec<usize>,
-    cell_align: Vec<CellAlign>,
-    original_contents: Vec<Vec<String>>,
-    show_contents: Vec<Vec<String>>,
+    /* width of the table, don't consider left_space or right_space. */
+    global_widths: Vec<usize>,
+    lines: Vec<Line>,
+}
+
+impl ShowTable {
+    /// Create a new empty ShowTable
+    pub fn new() -> Self {
+        Self {
+            global_widths: Vec::new(),
+            lines: Vec::new(),
+        }
+    }
+
+    /// Add a ShowTableLine to ShowTable
+    pub fn add_show_table_item(&mut self, show_table_line: &impl ShowTableLine) {
+        let line = show_table_line.to_vec();
+        self.add_line(line);
+    }
+
+    /// Add a single line to ShowTable
+    pub fn add_line(&mut self, ori_contents: Vec<&str>) {
+        let line = Line::new(ori_contents);
+        /* The table is empty. */
+        if self.global_widths.is_empty() {
+            for v in &line.per_widths {
+                self.global_widths.push(*v);
+            }
+        } else {
+            if line.per_widths.len() != self.global_widths.len() {
+                log::error!("Can not add this line to ShowTable, their lengths are different.");
+                return;
+            }
+            for i in 0..line.per_widths.len() {
+                self.global_widths[i] = std::cmp::max(self.global_widths[i], line.per_widths[i]);
+            }
+        }
+        self.lines.push(line);
+    }
+    /// Set all cells's alignment to left
+    pub fn set_all_cell_align_left(&mut self) {
+        for i in 0..self.lines.len() {
+            for j in 0..self.lines[i].cells.len() {
+                self.lines[i].cells[j].align = CellAlign::Left;
+            }
+        }
+    }
+    /// Set all cell's alignment to right
+    pub fn set_all_cell_align_right(&mut self) {
+        for i in 0..self.lines.len() {
+            for j in 0..self.lines[i].cells.len() {
+                self.lines[i].cells[j].align = CellAlign::Right;
+            }
+        }
+    }
+    /// Set all cells' alignment to center
+    pub fn set_all_cell_align_center(&mut self) {
+        for i in 0..self.lines.len() {
+            for j in 0..self.lines[i].cells.len() {
+                self.lines[i].cells[j].align = CellAlign::Center;
+            }
+        }
+    }
+    /// Set a certain row's alignment
+    pub fn set_one_row_align(&mut self, i: usize, align: CellAlign) {
+        for j in 0..self.lines[i].cells.len() {
+            self.lines[i].cells[j].align = align;
+        }
+    }
+    /// Set current row's alignment
+    ///
+    /// This is useful when one add a new line, and wants to change its format immediately.
+    pub fn set_current_row_align(&mut self, align: CellAlign) {
+        let total_line = self.lines.len();
+        if total_line < 1 {
+            log::info!("Failed to set current row's align.");
+            return;
+        }
+        for j in 0..self.lines[total_line - 1].cells.len() {
+            self.lines[total_line - 1].cells[j].align = align;
+        }
+    }
+    /// Set a certain column's alignment
+    pub fn set_one_col_align(&mut self, j: usize, align: CellAlign) {
+        for i in 0..self.lines.len() {
+            self.lines[i].cells[j].align = align;
+        }
+    }
+    /// Set a cell's alignment
+    pub fn set_one_cell_align(&mut self, i: usize, j: usize, align: CellAlign) {
+        self.lines[i].cells[j].align = align;
+    }
+    /// Set all cells' split space
+    pub fn set_all_cell_space(&mut self, left_space: bool, right_space: bool) {
+        for i in 0..self.lines.len() {
+            for j in 0..self.lines[i].cells.len() {
+                self.lines[i].cells[j].left_space = left_space;
+                self.lines[i].cells[j].right_space = right_space;
+            }
+        }
+    }
+    /// Set one row's split space
+    pub fn set_one_row_space(&mut self, i: usize, left_space: bool, right_space: bool) {
+        for j in 0..self.lines[i].cells.len() {
+            self.lines[i].cells[j].left_space = left_space;
+            self.lines[i].cells[j].right_space = right_space;
+        }
+    }
+    /// Set one column's split space
+    pub fn set_one_col_space(&mut self, j: usize, left_space: bool, right_space: bool) {
+        for i in 0..self.lines.len() {
+            self.lines[i].cells[j].left_space = left_space;
+            self.lines[i].cells[j].right_space = right_space;
+        }
+    }
+    /// Set one cell's split space
+    pub fn set_one_cell_space(&mut self, i: usize, j: usize, left_space: bool, right_space: bool) {
+        self.lines[i].cells[j].left_space = left_space;
+        self.lines[i].cells[j].right_space = right_space;
+    }
+    /// Set all cells' underline
+    pub fn set_all_cell_underline(&mut self, use_underline: bool) {
+        for i in 0..self.lines.len() {
+            for j in 0..self.lines[i].cells.len() {
+                self.lines[i].cells[j].underline = use_underline;
+            }
+        }
+    }
+    /// Set one row's underline
+    pub fn set_one_row_underline(&mut self, i: usize, use_underline: bool) {
+        for j in 0..self.lines[i].cells.len() {
+            self.lines[i].cells[j].underline = use_underline;
+        }
+    }
+    /// Set the current row's underline
+    pub fn set_current_row_underline(&mut self, use_underline: bool) {
+        let total_line = self.lines.len();
+        if total_line < 1 {
+            log::info!("Failed to set current row's underline.");
+            return;
+        }
+        for j in 0..self.lines[total_line - 1].cells.len() {
+            self.lines[total_line - 1].cells[j].underline = use_underline;
+        }
+    }
+    /// Set one column's underline
+    pub fn set_one_col_underline(&mut self, j: usize, use_underline: bool) {
+        for i in 0..self.lines.len() {
+            self.lines[i].cells[j].underline = use_underline;
+        }
+    }
+    /// Set one cell's underline
+    pub fn set_one_cell_underline(&mut self, i: usize, j: usize, use_underline: bool) {
+        self.lines[i].cells[j].underline = use_underline;
+    }
+    /// Set all cells' color
+    pub fn set_all_cell_color(&mut self, color: CellColor) {
+        for i in 0..self.lines.len() {
+            for j in 0..self.lines[i].cells.len() {
+                self.lines[i].cells[j].color = color;
+            }
+        }
+    }
+    /// Set one row's color
+    pub fn set_one_row_color(&mut self, i: usize, color: CellColor) {
+        for j in 0..self.lines[i].cells.len() {
+            self.lines[i].cells[j].color = color;
+        }
+    }
+    /// Set current row's color
+    pub fn set_current_row_color(&mut self, color: CellColor) {
+        let total_line = self.lines.len();
+        if total_line < 1 {
+            log::info!("Failed to set current row's color.");
+            return;
+        }
+        for j in 0..self.lines[total_line - 1].cells.len() {
+            self.lines[total_line - 1].cells[j].color = color;
+        }
+    }
+    /// Set one column's color
+    pub fn set_one_col_color(&mut self, j: usize, color: CellColor) {
+        for i in 0..self.lines.len() {
+            self.lines[i].cells[j].color = color;
+        }
+    }
+    /// Set one cell's color
+    pub fn set_one_cell_color(&mut self, i: usize, j: usize, color: CellColor) {
+        self.lines[i].cells[j].color = color;
+    }
+}
+
+impl Default for ShowTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Display for ShowTable {
+    /// Print the whole ShowTable out
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut res = String::new();
+        /* print one line */
+        for line in &self.lines {
+            /* The cell can be multi-cell_line, print one by one */
+            for i in 0..line.height {
+                for cell in &line.cells {
+                    res += &cell.format_cell_line(i, self.global_widths[cell.x_index], line.height);
+                }
+                res += "\n";
+            }
+        }
+        write!(f, "{}", res.trim_end())
+    }
 }
 
 /// Struct can implement this trait to display in ShowTable
@@ -37,179 +438,6 @@ pub trait ShowTableLine {
     /// change the struct to the string vector
     fn to_vec(&self) -> Vec<&str> {
         todo!()
-    }
-}
-
-impl ShowTable {
-    /// Create a new ShowTable
-    pub fn new() -> Self {
-        Self {
-            row_length: 0,
-            column_length: 0,
-            cell_width: vec![],
-            cell_align: vec![],
-            original_contents: vec![],
-            show_contents: vec![],
-        }
-    }
-    /// Add a new line to ShowTable
-    pub fn add_line(&mut self, line_content: Vec<&str>) {
-        let content_length = line_content.len();
-        let mut new_line: Vec<String> = line_content.iter().map(|x| x.to_string()).collect();
-        if self.row_length == 0 {
-            self.column_length = content_length;
-            self.cell_width = vec![0; self.column_length];
-            self.cell_align = vec![CellAlign::Left; self.column_length];
-        }
-        // remove string at the end, if the new line is longer
-        if content_length > self.column_length {
-            for _ in 0..content_length - self.column_length {
-                new_line.pop();
-            }
-        }
-
-        // add empty string at the end, if the new line is shorter.
-        if self.column_length > content_length {
-            for _ in 0..self.column_length - content_length {
-                new_line.push(String::new());
-            }
-        }
-
-        #[allow(clippy::needless_range_loop)]
-        for i in 0..self.column_length {
-            self.cell_width[i] = std::cmp::max(self.cell_width[i], new_line[i].len() + 2);
-        }
-
-        self.original_contents.push(new_line);
-        self.row_length += 1;
-    }
-
-    /// Add a ShowTableLine to ShowTable
-    pub fn add_show_table_item(&mut self, show_table_line: &impl ShowTableLine) {
-        let line_content = show_table_line.to_vec();
-        self.add_line(line_content);
-    }
-
-    fn cell_align_left(cell: &mut String, length: usize) {
-        // add a space to split different cell
-        *cell = " ".to_string() + cell;
-        if length > cell.len() {
-            for _ in 0..length - cell.len() {
-                // append spaces to the end
-                *cell += " ";
-            }
-        } else {
-            *cell = cell[0..length].to_string();
-        }
-    }
-
-    fn cell_align_right(cell: &mut String, length: usize) {
-        // add a space to split different cell
-        *cell += " ";
-        if length > cell.len() {
-            let mut spaces = String::new();
-            for _ in 0..length - cell.len() {
-                // append spaces to the end
-                spaces += " ";
-            }
-            *cell = spaces + cell;
-        } else {
-            *cell = cell[0..length].to_string();
-        }
-    }
-
-    /// Align all the cell content to the left and update
-    pub fn align_left(&mut self) {
-        self.show_contents.clear();
-        for line in &self.original_contents {
-            let mut show_line: Vec<String> = Vec::new();
-            #[allow(clippy::needless_range_loop)]
-            for i in 0..self.column_length {
-                let mut show_cell = line[i].to_string();
-                Self::cell_align_left(&mut show_cell, self.cell_width[i]);
-                show_line.push(show_cell);
-            }
-            self.show_contents.push(show_line);
-        }
-    }
-
-    /// Align all the cell content to the right and update
-    pub fn align_right(&mut self) {
-        self.show_contents.clear();
-        for line in &self.original_contents {
-            let mut show_line: Vec<String> = Vec::new();
-            #[allow(clippy::needless_range_loop)]
-            for i in 0..self.column_length {
-                let mut show_cell = line[i].to_string();
-                Self::cell_align_right(&mut show_cell, self.cell_width[i]);
-                show_line.push(show_cell);
-            }
-            self.show_contents.push(show_line);
-        }
-    }
-
-    /// Align the cell content by user's define
-    pub fn align_define(&mut self) {
-        self.show_contents.clear();
-        for line in &self.original_contents {
-            let mut show_line: Vec<String> = Vec::new();
-            #[allow(clippy::needless_range_loop)]
-            for i in 0..self.column_length {
-                let mut show_cell = line[i].to_string();
-                match self.cell_align[i] {
-                    CellAlign::Left => Self::cell_align_left(&mut show_cell, self.cell_width[i]),
-                    CellAlign::Right => Self::cell_align_right(&mut show_cell, self.cell_width[i]),
-                }
-                show_line.push(show_cell);
-            }
-            self.show_contents.push(show_line);
-        }
-    }
-
-    /// Set all cell aligns to left
-    pub fn set_cell_align_left(&mut self) {
-        self.cell_align = vec![CellAlign::Left; self.column_length];
-    }
-
-    /// Set all cell aligns to right
-    pub fn set_cell_align_right(&mut self) {
-        self.cell_align = vec![CellAlign::Right; self.column_length];
-    }
-
-    /// Set one cell align to left
-    pub fn set_one_cell_align_left(&mut self, column: usize) {
-        if column >= self.column_length {
-            self.cell_align[self.column_length - 1] = CellAlign::Left;
-            return;
-        }
-        self.cell_align[column] = CellAlign::Left;
-    }
-
-    /// Set one cell align to right
-    pub fn set_one_cell_align_right(&mut self, column: usize) {
-        if column >= self.column_length {
-            self.cell_align[self.column_length - 1] = CellAlign::Right;
-            return;
-        }
-        self.cell_align[column] = CellAlign::Right;
-    }
-
-    /// Set all cell aligns by user's define
-    pub fn set_all_cell_align_define(&mut self, cell_align: Vec<CellAlign>) {
-        self.cell_align = cell_align;
-    }
-}
-
-impl std::fmt::Display for ShowTable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut res = String::new();
-        for line in &self.show_contents {
-            for cell in line {
-                res += cell;
-            }
-            res += "\n";
-        }
-        write!(f, "{}", res.trim_end())
     }
 }
 
@@ -234,25 +462,23 @@ mod tests {
         let mut table1 = ShowTable::new();
         table1.add_line(vec!["AAA", "BBBB", "CCCCCCCCCC"]);
         table1.add_line(vec!["12345", "123", "123"]);
-        table1.align_left();
         assert_eq!(
             table1.to_string(),
             " AAA    BBBB  CCCCCCCCCC \n 12345  123   123"
         );
-        table1.align_right();
+        table1.set_all_cell_align_right();
         assert_eq!(
             table1.to_string(),
             "   AAA  BBBB  CCCCCCCCCC \n 12345   123         123"
         );
-        table1.set_one_cell_align_right(0);
-        table1.align_define();
+        table1.set_all_cell_align_left();
+        table1.set_one_row_align(0, crate::show_table::CellAlign::Right);
         assert_eq!(
             table1.to_string(),
             "   AAA  BBBB  CCCCCCCCCC \n 12345  123   123"
         );
-        table1.set_cell_align_right();
-        table1.set_one_cell_align_left(0);
-        table1.align_define();
+        table1.set_all_cell_align_right();
+        table1.set_one_col_align(0, crate::show_table::CellAlign::Left);
         assert_eq!(
             table1.to_string(),
             " AAA    BBBB  CCCCCCCCCC \n 12345   123         123"
@@ -271,7 +497,6 @@ mod tests {
         let mut table2 = ShowTable::new();
         table2.add_show_table_item(&test_item1);
         table2.add_show_table_item(&test_item2);
-        table2.align_left();
         assert_eq!(
             table2.to_string(),
             " AAA    BBBB  CCCCCCCCCC \n 12345  123   123"
