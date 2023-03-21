@@ -1834,7 +1834,6 @@ mod tests {
         }
     }
 
-    #[ignore]
     #[test]
     fn test_devices_all() {
         let mut enumerator = DeviceEnumerator::new();

@@ -31,7 +31,14 @@ pub fn device_path_parse_devnum(path: String) -> Result<(mode_t, u64)> {
         });
     };
 
-    let filename = Path::new(&path).to_string_lossy().to_string();
+    let filename = match Path::new(&path).file_name() {
+        Some(s) => s.to_string_lossy().to_string(),
+        None => {
+            return Err(Error::Invalid {
+                what: format!("invalid path {}", path),
+            })
+        }
+    };
 
     Ok((mode, parse_devnum(filename)?))
 }
@@ -40,17 +47,17 @@ pub fn device_path_parse_devnum(path: String) -> Result<(mode_t, u64)> {
 pub fn parse_devnum(s: String) -> Result<u64> {
     let tokens: Vec<&str> = s.split(':').collect();
     if tokens.len() != 2 {
-        return Err(Error::Nix {
-            source: nix::errno::Errno::EINVAL,
+        return Err(Error::Invalid {
+            what: format!("incorrect number of tokens: {}", s),
         });
     }
 
     let (major, minor) = (
-        tokens[0].parse::<u64>().map_err(|_| Error::Nix {
-            source: nix::errno::Errno::EINVAL,
+        tokens[0].parse::<u64>().map_err(|_| Error::Invalid {
+            what: format!("invalid major: {}", tokens[0]),
         })?,
-        tokens[1].parse::<u64>().map_err(|_| Error::Nix {
-            source: nix::errno::Errno::EINVAL,
+        tokens[1].parse::<u64>().map_err(|_| Error::Invalid {
+            what: format!("invalid minor: {}", tokens[1]),
         })?,
     );
 
