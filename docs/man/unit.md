@@ -71,6 +71,18 @@ sysmaster支持配置单元之间的依赖关系，可以配置的值为`;`分�
 
 `OnFailure`：配置当一个unit启动失败或成功结束后，对其他服务的影响。以`foo.service`配置`OnFailure/OnSuccess="bar.service"`为例，当`foo.service`启动失败或成功结束后，将自动拉起`bar.service`。拉起`bar.service`会生成一个Start类型的job,该job的模式可配置为`fail`， `replace`，`replace-irreversibly`，`isolate`，`flush`，`ignore-dependencies`或`ignore-requirements`。
 
+## 启动检查
+
+sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件不满足时，停止启动流程。
+
+### ConditionPathExists
+
+检查文件是否存在。只有`ConditionPathExists=`后配置的绝对路径存在时，检查通过，启动流程正常；如果配置的绝对路径不存在，则检查失败，停止单元的启动流程。支持在配置的绝对路径前添加`!`，反转检查结果。
+
+### ConditionPathIsReadWrite
+
+与`ConditionPathExists`类似，检查配置的绝对路径所属的文件系统是否为可读可写。
+
 ## 其他配置
 
 ### RefuseManualStart/RefuseManualStop

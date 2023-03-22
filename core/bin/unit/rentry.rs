@@ -168,6 +168,8 @@ pub(crate) struct UeConfigUnit {
     #[config(default = "")]
     pub ConditionPathExists: String,
     #[config(default = "")]
+    pub ConditionPathIsReadWrite: String,
+    #[config(default = "")]
     pub ConditionUser: String,
     #[config(default = "")]
     pub ConditionFirstBoot: String,
