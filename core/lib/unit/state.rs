@@ -102,11 +102,11 @@ impl std::fmt::Display for UnitActiveState {
 bitflags! {
     /// notify unit state to manager
     pub struct UnitNotifyFlags: u8 {
-        /// notify reload success to manager
+        /// the default flags propagate to jobs, it meas nothing.
         const UNIT_NOTIFY_SUCCESS = 0;
-        /// notify reload failure to manager
+        /// notify that the unit running reload failure
         const UNIT_NOTIFY_RELOAD_FAILURE = 1 << 0;
-        /// notify auto restart to manager
+        /// notify that the unit is in auto restart state
         const UNIT_NOTIFY_WILL_AUTO_RESTART = 1 << 1;
     }
 }

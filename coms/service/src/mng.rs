@@ -26,6 +26,7 @@ use event::{EventState, EventType, Events, Source};
 use nix::errno::Errno;
 use nix::libc;
 use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};
+use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
@@ -55,6 +56,8 @@ pub(super) struct ServiceMng {
     spawn: ServiceSpawn,
     state: RefCell<ServiceState>,
     result: RefCell<ServiceResult>,
+    reload_result: RefCell<ServiceResult>,
+
     main_command: RefCell<VecDeque<ExecCommand>>,
     control_cmd_type: RefCell<Option<ServiceCommand>>,
     control_command: RefCell<VecDeque<ExecCommand>>,
@@ -139,6 +142,8 @@ impl ServiceMng {
             spawn: ServiceSpawn::new(commr, &_pid, configr, exec_ctx),
             state: RefCell::new(ServiceState::Dead),
             result: RefCell::new(ServiceResult::Success),
+            reload_result: RefCell::new(ServiceResult::Success),
+
             main_command: RefCell::new(VecDeque::new()),
             control_cmd_type: RefCell::new(None),
             control_command: RefCell::new(VecDeque::new()),
@@ -481,11 +486,15 @@ impl ServiceMng {
             log::debug!("not allowded restart");
         } else {
             restart = self.shall_restart();
+            if restart {
+                self.rd.set_will_auto_restart(true)
+            }
         }
 
         self.set_state(state);
 
         if restart {
+            self.rd.set_will_auto_restart(false);
             self.enable_timer(self.config.config_data().borrow().Service.RestartSec);
             self.set_state(ServiceState::AutoRestart);
         } else {
@@ -500,12 +509,15 @@ impl ServiceMng {
         self.control_command.borrow_mut().clear();
         self.pid.unwatch_control();
         self.control_command_fill(ServiceCommand::Reload);
+        self.set_reload_result(ServiceResult::Success);
+
         match self.control_command_pop() {
             Some(cmd) => {
                 match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
                         log::error!("failed to start service: {}", self.comm.get_owner_id());
+                        self.set_reload_result(ServiceResult::FailureResources);
                         self.enter_running(ServiceResult::Success);
                         return;
                     }
@@ -636,6 +648,7 @@ impl ServiceMng {
         {
             self.pid.unwatch_control();
             self.control_command.borrow_mut().clear();
+            self.set_cmd_type(None);
         }
 
         log::debug!(
@@ -650,8 +663,21 @@ impl ServiceMng {
         let os = service_state_to_unit_state(self.config.service_type(), original_state);
         let ns = service_state_to_unit_state(self.config.service_type(), state);
         if let Some(u) = self.comm.owner() {
-            u.notify(os, ns, UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE)
+            let mut flags = UnitNotifyFlags::UNIT_NOTIFY_SUCCESS;
+
+            if self.rd.will_auto_restart() {
+                flags |= UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART;
+            }
+
+            if self.reload_result() != ServiceResult::Success {
+                flags |= UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE;
+            }
+            u.notify(os, ns, flags)
         }
+    }
+
+    fn set_cmd_type(&self, cmd_type: Option<ServiceCommand>) {
+        *self.control_cmd_type.borrow_mut() = cmd_type;
     }
 
     fn service_alive(&self) -> bool {
@@ -669,6 +695,25 @@ impl ServiceMng {
                 Ok(pid) => self.pid.set_control(pid),
                 Err(_e) => {
                     log::error!("failed to start service: {}", self.comm.get_owner_id());
+                    if matches!(
+                        self.state(),
+                        ServiceState::Condition
+                            | ServiceState::StartPre
+                            | ServiceState::StartPost
+                            | ServiceState::Stop
+                    ) {
+                        self.enter_signal(
+                            ServiceState::StopSigterm,
+                            ServiceResult::FailureResources,
+                        );
+                    } else if matches!(self.state(), ServiceState::StopPost) {
+                        self.enter_dead(ServiceResult::FailureResources, true);
+                    } else if matches!(self.state(), ServiceState::Reload) {
+                        self.set_reload_result(ServiceResult::FailureResources);
+                        self.enter_running(ServiceResult::Success);
+                    } else {
+                        self.enter_stop(ServiceResult::FailureResources);
+                    }
                 }
             }
         }
@@ -707,6 +752,14 @@ impl ServiceMng {
         *self.result.borrow()
     }
 
+    fn set_reload_result(&self, result: ServiceResult) {
+        *self.reload_result.borrow_mut() = result;
+    }
+
+    fn reload_result(&self) -> ServiceResult {
+        *self.reload_result.borrow()
+    }
+
     fn main_command_fill(&self) {
         let cmd_type = ServiceCommand::Start;
         if let Some(cmds) = self.config.get_exec_cmds(cmd_type) {
@@ -729,7 +782,10 @@ impl ServiceMng {
 
     fn control_command_fill(&self, cmd_type: ServiceCommand) {
         if let Some(cmds) = self.config.get_exec_cmds(cmd_type) {
-            *self.control_command.borrow_mut() = cmds
+            *self.control_command.borrow_mut() = cmds;
+            if !self.control_command.borrow().is_empty() {
+                self.set_cmd_type(Some(cmd_type));
+            }
         }
     }
 
@@ -977,6 +1033,7 @@ impl ServiceMng {
             self.rd.timer().set_time(usec);
 
             let events = self.comm.um().events();
+
             let source = self.rd.timer();
             events.set_enabled(source, EventState::OneShot).unwrap();
             return;
@@ -1038,7 +1095,6 @@ impl ServiceMng {
         }
     }
 }
-
 impl ServiceMng {
     pub(super) fn sigchld_event(&self, wait_status: WaitStatus) {
         self.do_sigchld_event(wait_status);
@@ -1054,9 +1110,21 @@ impl ServiceMng {
                     ServiceResult::FailureExitCode
                 }
             }
-            WaitStatus::Signaled(_, _, core_dump) => {
+            WaitStatus::Signaled(pid, sig, core_dump) => {
+                // long running service for not oneshot service, or service running in main pid, or current running service is Start.
+                // the following signals always use to indicate normal exit.
+                let is_daemon = self.config.service_type() != ServiceType::Oneshot
+                    || self.pid.control() != Some(pid)
+                    || *self.control_cmd_type.borrow() == Some(ServiceCommand::Start);
                 if core_dump {
                     ServiceResult::FailureCoreDump
+                } else if is_daemon
+                    && matches!(
+                        sig,
+                        Signal::SIGHUP | Signal::SIGINT | Signal::SIGTERM | Signal::SIGPIPE
+                    )
+                {
+                    ServiceResult::Success
                 } else {
                     ServiceResult::FailureSignal
                 }
@@ -1163,6 +1231,7 @@ impl ServiceMng {
             }
 
             self.control_command.borrow_mut().clear();
+            self.set_cmd_type(None);
             match self.state() {
                 ServiceState::Condition => {
                     if res == ServiceResult::Success {
@@ -1265,6 +1334,7 @@ impl ServiceMng {
                 }
                 ServiceState::Running => todo!(),
                 ServiceState::Reload => {
+                    self.set_reload_result(res);
                     self.enter_running(res);
                 }
                 ServiceState::Stop => {
@@ -1501,6 +1571,16 @@ impl RunningData {
         self.data.borrow().reset_restart()
     }
 
+    pub(self) fn set_will_auto_restart(&self, will_auto_restart: bool) {
+        self.data
+            .borrow_mut()
+            .set_will_auto_restart(will_auto_restart);
+    }
+
+    pub(self) fn will_auto_restart(&self) -> bool {
+        self.data.borrow().will_auto_restart()
+    }
+
     pub(self) fn attach_timer(&self, timer: Rc<ServiceTimer>) {
         timer.attach_mng(self.mng.borrow_mut().clone());
         self.data.borrow_mut().attach_timer(timer)
@@ -1559,6 +1639,7 @@ struct Rtdata {
 
     forbid_restart: bool,
     reset_restarts: bool,
+    will_auto_restart: bool,
     restarts: u32,
     timer: Option<Rc<ServiceTimer>>,
 
@@ -1576,6 +1657,7 @@ impl Rtdata {
 
             forbid_restart: false,
             reset_restarts: false,
+            will_auto_restart: false,
             restarts: 0,
             timer: None,
             exec_status: WaitStatus::StillAlive,
@@ -1622,6 +1704,14 @@ impl Rtdata {
 
     pub(self) fn reset_restart(&self) -> bool {
         self.reset_restarts
+    }
+
+    pub(self) fn set_will_auto_restart(&mut self, will_auto_restart: bool) {
+        self.will_auto_restart = will_auto_restart
+    }
+
+    pub(self) fn will_auto_restart(&self) -> bool {
+        self.will_auto_restart
     }
 
     pub(self) fn attach_timer(&mut self, timer: Rc<ServiceTimer>) {
