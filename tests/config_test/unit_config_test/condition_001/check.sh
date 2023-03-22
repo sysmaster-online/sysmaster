@@ -18,10 +18,16 @@ function test01() {
     run_sysmaster || return 1
 
     # path not exist
-    sctl start base.service
+    sctl start base.service &> log
     check_status base.service inactive || return 1
-    grep 'asdasda' "${SYSMST_LOG}"
-    expect_eq $? "${condition_test}" || return 1
+    if [ "${condition_test}" -eq 0 ]; then
+        check_log log 'asdasda'
+        check_log 'Starting failed because assert test failed' "${SYSMST_LOG}"
+    elif [ "${condition_test}" -eq 1 ]; then
+        expect_str_eq "$(cat log)" ''
+        check_log 'Starting failed because condition test failed' "${SYSMST_LOG}"
+    fi
+    rm -rf log
 
     # file path
     touch /tmp/path_exist
@@ -39,7 +45,7 @@ function test01() {
     # clean
     sctl stop base.service
     rm -rf /tmp/path_exist
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 test01 || exit 1

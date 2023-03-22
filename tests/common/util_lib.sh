@@ -1,12 +1,14 @@
 #!/bin/bash
 
-EXPECT_FAIL=0
-SYSMST_LIB_PATH='/usr/lib/sysmaster'
-SYSMST_ETC_PATH='/etc/sysmaster'
-SYSMST_LOG='/opt/sysmaster.log'
-RELIAB_SWITCH_PATH='/run/sysmaster/reliability'
-RELIAB_SWITCH='switch.debug'
-RELIAB_CLR='clear.debug'
+export EXPECT_FAIL=0
+export SYSMST_LIB_PATH='/usr/lib/sysmaster'
+export SYSMST_ETC_PATH='/etc/sysmaster'
+export SYSMST_LOG='/opt/sysmaster.log'
+export RELIAB_SWITCH_PATH='/run/sysmaster/reliability'
+export RELIAB_SWITCH='switch.debug'
+export RELIAB_CLR='clear.debug'
+export init_pid=''
+export sysmaster_pid=''
 
 # ================== log function ==================
 function log_info() {
@@ -120,18 +122,32 @@ function expect_str_eq() {
 # usage: run sysmaster as daemon
 function run_sysmaster() {
     cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH} || return 1
-    /usr/lib/sysmaster/sysmaster &> "${SYSMST_LOG}" &
+    /usr/bin/init &> "${SYSMST_LOG}" &
     sysmaster_pid=$!
+
     # wait sysmaster init done
     sleep 3
-
-    if ps aux | grep -v grep | grep sysmaster | grep -w "${sysmaster_pid}"; then
-        echo > "${SYSMST_LOG}"
-        return 0
-    else
+    for ((i = 0; i < 300; ++i)); do
+        sleep 1
+        ps -elf | grep -v grep | grep -w '/usr/lib/sysmaster/sysmaster' | grep ep_pol && break
+    done
+    # debug
+    ps -elf | grep -v grep | grep sysmaster
+    if ! ps -elf | grep -v grep | grep -wq '/usr/lib/sysmaster/sysmaster'; then
         cat "${SYSMST_LOG}"
         return 1
     fi
+
+    # get sysmaster pid
+    sysmaster_pid="$(ps -elf | grep -v grep | grep -w '/usr/lib/sysmaster/sysmaster' | awk '{print $4}')"
+    echo > "${SYSMST_LOG}"
+    return 0
+}
+
+# usage: kill sysmaster and init
+function kill_sysmaster() {
+    [ -n "${init_pid}" ] && kill -9 "${init_pid}"
+    [ -n "${sysmaster_pid}" ] && kill -9 "${sysmaster_pid}"
 }
 
 # usage: check log info.
@@ -163,8 +179,7 @@ function check_status() {
     local exp_status="$2"
 
     for ((cnt = 0; cnt < 3; ++cnt)); do
-        sctl status "${service}"
-        sctl status "${service}" | grep -w 'Active:' | head -n1 | awk '{print $2}' | grep -qw "${exp_status}" && return 0 || sleep 1
+        sctl status "${service}" |& grep -w 'Active:' | head -n1 | awk '{print $2}' | grep -w "${exp_status}" && return 0 || sleep 1
     done
     add_failure
     # debug
@@ -180,8 +195,7 @@ function check_load() {
     local exp_status="$2"
 
     for ((cnt = 0; cnt < 3; ++cnt)); do
-        sctl status "${service}"
-        sctl status "${service}" | grep -w 'Loaded:' | head -n1 | awk '{print $2}' | grep -qw "${exp_status}" && return 0 || sleep 1
+        sctl status "${service}" |& grep -w 'Loaded:' | head -n1 | awk '{print $2}' | grep -w "${exp_status}" && return 0 || sleep 1
     done
     add_failure
     # debug
@@ -194,5 +208,5 @@ function check_load() {
 function get_pids() {
     local service="$1"
 
-    sctl status "${service}" | sed -n '/PID:/,$p' | sed 's/PID://' | awk '{print $1}'
+    sctl status "${service}" |& sed -n '/PID:/,$p' | sed 's/PID://' | awk '{print $1}'
 }

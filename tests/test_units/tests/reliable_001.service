@@ -3,6 +3,3 @@ Description="reliable test 001"
 
 [Service]
 ExecStart="/bin/sleep 888"
-
-[Install]
-WantedBy="dbus.service"

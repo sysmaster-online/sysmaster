@@ -27,7 +27,7 @@ function test01() {
 
     # clean
     sctl stop before.service fork.service after.service
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test loop
@@ -43,7 +43,7 @@ function test02() {
 
     # clean
     sctl stop after.service
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # loop
     sed -i '/After=/ s/fork/before/' ${SYSMST_LIB_PATH}/after.service
@@ -55,7 +55,7 @@ function test02() {
     check_log "${SYSMST_LOG}" 'asdaasd' || return 1
 
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 test01 || exit 1

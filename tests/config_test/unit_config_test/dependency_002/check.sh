@@ -19,7 +19,7 @@ function test01() {
 
     # clean
     rm -rf log
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test WantedBy
@@ -53,7 +53,7 @@ function test02() {
 
     # clean
     sctl stop wantedby
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test RequiredBy
@@ -84,7 +84,7 @@ function test03() {
 
     # clean
     sctl stop requiredby
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test multiple Also
@@ -104,7 +104,7 @@ function test04() {
     expect_eq $? 1
 
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test multiple Alias
@@ -143,7 +143,7 @@ function test05() {
 
     # clean
     rm -rf log
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test duplicate Alias
@@ -165,7 +165,7 @@ function test06() {
     expect_eq $? 1
 
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 test01 || exit 1

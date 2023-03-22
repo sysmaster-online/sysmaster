@@ -1,0 +1,6 @@
+[Unit]
+Description="PartOf service"
+PartOf="base.service"
+
+[Service]
+ExecStart="/bin/sleep 100"

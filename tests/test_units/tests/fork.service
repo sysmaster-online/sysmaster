@@ -4,6 +4,3 @@ Description="fork service"
 [Service]
 Type="forking"
 ExecStart="/bin/sleep 5"
-
-[Install]
-WantedBy="dbus.service"

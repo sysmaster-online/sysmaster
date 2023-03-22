@@ -29,11 +29,13 @@ function test_run() {
         docker run --privileged --rm -v "${TMP_DIR}"/opt:/opt "${SYSMST_BASE_IMG}" sh -c "sh -x /opt/check.sh &> /opt/check.log"
         ret=$?
         cat "${TMP_DIR}"/opt/check.log
+        cat "${TMP_DIR}"/opt/sysmaster.log
     else
         cp -arf "${TEST_PATH}"/common/util_lib.sh ./
         sh -x check.sh &> check.log
         ret=$?
         cat check.log
+        cat sysmaster.log
     fi
 
     rm -rf tmp_units check.log
