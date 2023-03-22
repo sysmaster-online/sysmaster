@@ -13,9 +13,12 @@
 //!
 
 use clap::Parser;
-use cmdproto::proto::{
-    abi::{sys_comm, unit_comm, CommandRequest},
-    mngr_comm, unit_file, ProstClientStream,
+use cmdproto::{
+    error::ERROR_CODE_MASK_PRINT_STDOUT,
+    proto::{
+        abi::{sys_comm, unit_comm, CommandRequest},
+        mngr_comm, unit_file, ProstClientStream,
+    },
 };
 use std::io::Write;
 use std::{
@@ -195,7 +198,12 @@ impl Termination for Result {
         match self {
             Result::OK => ExitCode::SUCCESS,
             Result::Failure(s, error_code) => {
-                let _ = writeln!(std::io::stderr(), "{s}");
+                if error_code & ERROR_CODE_MASK_PRINT_STDOUT != 0 {
+                    let _ = writeln!(std::io::stdout(), "{s}");
+                } else {
+                    let _ = writeln!(std::io::stderr(), "{s}");
+                }
+                let error_code = error_code ^ ERROR_CODE_MASK_PRINT_STDOUT;
                 if error_code > u8::MAX.into() {
                     return ExitCode::FAILURE;
                 }

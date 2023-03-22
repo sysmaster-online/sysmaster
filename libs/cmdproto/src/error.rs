@@ -40,3 +40,6 @@ pub enum Error {
 /// new Result
 #[allow(dead_code)]
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+/// Set this byte of your error code if you want to print it to stdout
+pub const ERROR_CODE_MASK_PRINT_STDOUT: u32 = 1 << 10;
