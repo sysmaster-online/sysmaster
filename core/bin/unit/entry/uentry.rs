@@ -267,6 +267,16 @@ impl Unit {
             );
 
             add_condition(
+                CONDITION_AC_POWER,
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionACPower
+                    .as_str(),
+            );
+
+            add_condition(
                 CONDITION_FIRST_BOOT,
                 self.get_config()
                     .config_data()

@@ -13,6 +13,7 @@
 //!
 pub mod condition;
 pub mod conf_parser;
+pub mod device;
 pub mod env_cargo;
 pub mod error;
 pub mod fd_util;
