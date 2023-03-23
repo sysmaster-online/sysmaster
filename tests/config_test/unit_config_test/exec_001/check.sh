@@ -23,7 +23,7 @@ function test01() {
     check_load base false
     check_status base inactive
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # null ExecStart
     sed -i "/Service]/a ExecStart=\"\"" ${SYSMST_LIB_PATH}/base.service
@@ -35,7 +35,7 @@ function test01() {
     check_load base false
     check_status base inactive
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 
@@ -53,7 +53,7 @@ function test02() {
     check_load base false
     check_status base inactive
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # single command in multiple ExecStart
     sed -i "s#ExecStart=.*#ExecStart=\"/bin/sleep 99\"#" ${SYSMST_LIB_PATH}/base.service
@@ -66,7 +66,7 @@ function test02() {
     check_load base false
     check_status base inactive
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test invalid ExecStart
@@ -86,7 +86,7 @@ function test03() {
     check_status base failed
     # clean
     rm -rf /inexec
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # failed
     sed -i "s#ExecStart=\".*\"#ExecStart=\"/usr/bin/false\"#" ${SYSMST_LIB_PATH}/base.service
@@ -97,7 +97,7 @@ function test03() {
     check_load base true
     check_status base failed
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # failed but ignore
     sed -i "s#ExecStart=\".*\"#ExecStart=\"-/usr/bin/false\"#" ${SYSMST_LIB_PATH}/base.service
@@ -108,7 +108,7 @@ function test03() {
     check_load base true
     check_status base inactive
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test ExecStartPre/ExecStartPost/ExecStop/ExecStopPost
@@ -125,7 +125,7 @@ function test04() {
         'start_pre_1 start_pre_2 start_pre_3 start_1 start_post_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # ExecStartPre failed
     sed -i 's/echo echo_start_pre_2/false/' ${SYSMST_LIB_PATH}/exec.service
@@ -137,7 +137,7 @@ function test04() {
         'start_pre_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # ExecStartPre failed but ignore
     sed -i 's#/usr/bin/false#-/usr/bin/false#' ${SYSMST_LIB_PATH}/exec.service
@@ -149,7 +149,7 @@ function test04() {
         'start_pre_1 start_pre_3 start_1 start_post_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # ExecStart failed
     cp -arf "${work_dir}"/tmp_units/exec.service ${SYSMST_LIB_PATH} || return 1
@@ -162,7 +162,7 @@ function test04() {
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # ExecStart failed but ignore
     sed -i 's#/usr/bin/false#-/usr/bin/false#' ${SYSMST_LIB_PATH}/exec.service
@@ -174,7 +174,7 @@ function test04() {
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # ExecStartPost failed
     cp -arf "${work_dir}"/tmp_units/exec.service ${SYSMST_LIB_PATH} || return 1
@@ -187,7 +187,7 @@ function test04() {
         'start_pre_1 start_pre_2 start_pre_3 start_1 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # ExecStartPost failed but ignore
     sed -i 's#/usr/bin/false#-/usr/bin/false#' ${SYSMST_LIB_PATH}/exec.service
@@ -199,7 +199,7 @@ function test04() {
         'start_pre_1 start_pre_2 start_pre_3 start_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # ExecStop failed
     cp -arf "${work_dir}"/tmp_units/exec.service ${SYSMST_LIB_PATH} || return 1
@@ -217,7 +217,7 @@ function test04() {
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # ExecStop failed but ignore
     sed -i 's#/usr/bin/false#-/usr/bin/false#' ${SYSMST_LIB_PATH}/exec.service
@@ -233,7 +233,7 @@ function test04() {
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     # ExecStopPost failed
     cp -arf "${work_dir}"/tmp_units/exec.service ${SYSMST_LIB_PATH} || return 1
@@ -246,7 +246,7 @@ function test04() {
         'start_pre_1 start_pre_2 start_pre_3 start_1 start_post_1 start_post_2 start_post_3 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 test01 || exit 1

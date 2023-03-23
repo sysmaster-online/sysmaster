@@ -1,5 +1,5 @@
 #!/bin/bash
-# Description: test for Wants/Requires/Conflicts
+# Description: test for Wants/Requires/Conflicts/BindsTo/Requisite/PartOf
 
 TEST_SCRIPT="$(basename "$0")"
 TEST_SCRIPT_PATH="$(dirname "$0")"
@@ -12,7 +12,7 @@ function test_pre() {
     rm -rf tmp_units
     mkdir tmp_units
     cp -arf "${TEST_PATH}"/test_units/{shutdown.target,sysinit.target} tmp_units
-    cp -arf "${TEST_PATH}"/test_units/tests/{base.service,conflicts.service,requires.service,wants.service} tmp_units
+    cp -arf "${TEST_PATH}"/test_units/tests/{base.service,conflicts.service,requires.service,wants.service,requisite.service,partof.service,bindsto.service} tmp_units
     popd
 }
 
@@ -28,11 +28,13 @@ function test_run() {
         docker run --privileged --rm -v "${TMP_DIR}"/opt:/opt "${SYSMST_BASE_IMG}" sh -c "sh -x /opt/check.sh &> /opt/check.log"
         ret=$?
         cat "${TMP_DIR}"/opt/check.log
+        cat "${TMP_DIR}"/opt/sysmaster.log
     else
         cp -arf "${TEST_PATH}"/common/util_lib.sh ./
         sh -x check.sh &> check.log
         ret=$?
         cat check.log
+        cat sysmaster.log
     fi
 
     rm -rf tmp_units check.log

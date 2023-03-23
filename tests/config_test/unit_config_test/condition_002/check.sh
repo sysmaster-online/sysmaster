@@ -19,7 +19,7 @@ function test01() {
     expect_eq $? "${condition_test}" || return 1
 
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 
     rm -rf /tmp/file_not_empty
     sed -i '/ConditionFileNotEmpty=/ s#/tmp#/tmp/file_not_empty#' ${SYSMST_LIB_PATH}/base.service
@@ -48,7 +48,7 @@ function test01() {
     # clean
     sctl stop base.service
     rm -rf /tmp/file_not_empty
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 test01 || exit 1

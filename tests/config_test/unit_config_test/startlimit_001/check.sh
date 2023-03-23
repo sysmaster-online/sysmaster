@@ -14,17 +14,17 @@ function test01() {
     for ((i = 0; i < 5; ++i)); do
         sctl start base.service
         expect_eq $? 0 || return 1
-	check_status base.service active || return 1
-	sctl stop base.service
-	check_status base.service inactive || return 1
+    check_status base.service active || return 1
+    sctl stop base.service
+    check_status base.service inactive || return 1
     done
     sctl start base.service
-#    expect_eq $? 1 || return 1
+    expect_eq $? 1 || return 1
     check_status base.service failed || return 1
 
     sleep 9
     sctl start base.service
-#    expect_eq $? 1 || return 1
+    expect_eq $? 1 || return 1
     check_status base.service failed || return 1
 
     sleep 2
@@ -34,7 +34,7 @@ function test01() {
 
     # clean
     sctl stop base.service
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test StartLimitBurst
@@ -45,17 +45,17 @@ function test02() {
 
     for ((i = 0; i < 3; ++i)); do
         sctl start base.service
-	expect_eq $? 0 || return 1
-	check_status base.service active || return 1
-	sctl stop base.service
-	check_status base.service inactive || return 1
+    expect_eq $? 0 || return 1
+    check_status base.service active || return 1
+    sctl stop base.service
+    check_status base.service inactive || return 1
     done
     sctl start base.service
-#    expect_eq $? 1 || return 1
+    expect_eq $? 1 || return 1
     check_status base.service failed || return 1
 
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test StartLimitInterval
@@ -72,7 +72,7 @@ function test03() {
         check_status base.service inactive || return 1
     done
     sctl start base.service
-#    expect_eq $? 1 || return 1
+    expect_eq $? 1 || return 1
     check_status base.service failed || return 1
 
     sleep 4
@@ -82,7 +82,7 @@ function test03() {
 
     # clean
     sctl stop base.service
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test StartLimitBurst=0
@@ -94,13 +94,13 @@ function test04() {
     for ((i = 0; i < 50; ++i)); do
         sctl start base.service
         expect_eq $? 0 || return 1
-	check_status base.service active || return 1
-	sctl stop base.service
-	check_status base.service inactive || return 1
+    check_status base.service active || return 1
+    sctl stop base.service
+    check_status base.service inactive || return 1
     done
 
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 # usage: test StartLimitInterval=0
@@ -119,7 +119,7 @@ function test05() {
     done
 
     # clean
-    kill -9 "${sysmaster_pid}"
+    kill_sysmaster
 }
 
 test01 || exit 1

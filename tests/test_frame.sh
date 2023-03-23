@@ -50,8 +50,9 @@ function test_cleanup() {
 }
 
 function cleanup_docker() {
-    if docker ps | grep -v 'CONTAINER ID'; then
-        docker ps | sed -n '2,$p' | awk '{print $1}' | xargs docker rm -f
+    if docker ps -a | grep -v 'CONTAINER ID'; then
+        docker ps -a | sed -n '2,$p' | awk '{print $1}' | xargs docker rm -f
+        docker ps -a
     fi
     if docker images | grep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}"; then
         docker images | grep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}" | awk '{print $3}' | xargs docker rmi -f

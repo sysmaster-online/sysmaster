@@ -4,6 +4,3 @@ Conflicts="base.service"
 
 [Service]
 ExecStart="/bin/sleep 100"
-
-[Install]
-WantedBy="dbus.service"
