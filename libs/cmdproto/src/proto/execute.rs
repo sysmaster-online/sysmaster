@@ -128,7 +128,7 @@ impl Executer for UnitComm {
                     match manager.status(&unit) {
                         Ok(status) => {
                             reply += &status.to_string();
-                            error_code = status.into() as u32;
+                            error_code = status.into() as u32 | ERROR_CODE_MASK_PRINT_STDOUT;
                         }
                         Err(e) => {
                             reply = format!("{reply}Failed to show the status of {unit}: {e}");
