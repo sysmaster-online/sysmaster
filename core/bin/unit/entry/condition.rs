@@ -17,6 +17,7 @@ pub(super) mod condition_keys {
     pub(crate) const CONDITION_PATH_EXISTS: &str = "ConditionPathExists";
     pub(crate) const CONDITION_PATH_IS_READ_WRITE: &str = "ConditionPathIsReadWrite";
     pub(crate) const CONDITION_FILE_NOT_EMPTY: &str = "ConditionFileNotEmpty";
+    pub(crate) const CONDITION_AC_POWER: &str = "ConditionACPower";
     pub(crate) const CONDITION_FIRST_BOOT: &str = "ConditionFirstBOOT";
     pub(crate) const CONDITION_NEEDS_UPDATE: &str = "ConditionNeedsUpdate";
     pub(crate) const CONDITION_USER: &str = "ConditionUser";
@@ -87,6 +88,7 @@ impl UeCondition {
             CONDITION_FILE_NOT_EMPTY => ConditionType::FileNotEmpty,
             CONDITION_NEEDS_UPDATE => ConditionType::NeedsUpdate,
             CONDITION_USER => ConditionType::User,
+            CONDITION_AC_POWER => ConditionType::ACPower,
             CONDITION_FIRST_BOOT => ConditionType::FirstBoot,
             _ => return,
         };

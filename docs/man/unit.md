@@ -83,6 +83,10 @@ sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件�
 
 与`ConditionPathExists`类似，检查配置的绝对路径所属的文件系统是否为可读可写。
 
+### ConditionACPower
+
+检查操作系统是否连接交流电源。可以配置为`"false"`，`"true"`或不配置，引号不可省略。配置为`"true"`时，当操作系统至少一个接口连接了交流电，或者无法确定是否有连接时，检查通过。配置为`false`时，当成功检查到所有接口都没有连接交流电时，检查通过。如果不配置或配置为其他的值，默认检查通过跳过该检查。
+
 ## 其他配置
 
 ### RefuseManualStart/RefuseManualStop

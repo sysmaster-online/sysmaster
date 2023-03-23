@@ -19,7 +19,7 @@ use nix::{
     },
 };
 
-use crate::{conf_parser, proc_cmdline, user_group_util};
+use crate::{conf_parser, device::on_ac_power, proc_cmdline, user_group_util};
 use std::{path::Path, string::String};
 
 /// the type of the condition
@@ -35,6 +35,8 @@ pub enum ConditionType {
     NeedsUpdate,
     /// check whether the service manager is running as the given user.
     User,
+    /// check whether the service manager is running on AC Power.
+    ACPower,
     /// conditionalize units on whether the system is booting up for the first time
     FirstBoot,
 }
@@ -83,6 +85,7 @@ impl Condition {
             ConditionType::FileNotEmpty => self.test_file_not_empty(),
             ConditionType::NeedsUpdate => self.test_needs_update(),
             ConditionType::User => self.test_user(),
+            ConditionType::ACPower => self.test_ac_power(),
             ConditionType::FirstBoot => self.test_first_boot(),
         };
 
@@ -157,6 +160,17 @@ impl Condition {
             _ => false,
         };
         result as i8
+    }
+
+    fn test_ac_power(&self) -> i8 {
+        if self.params.eq("false") {
+            (!on_ac_power()) as i8
+        } else if self.params.eq("true") {
+            on_ac_power() as i8
+        } else {
+            /* We only accept "true" or "false", skip other values. */
+            1
+        }
     }
 
     fn test_first_boot(&self) -> i8 {
