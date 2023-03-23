@@ -59,11 +59,11 @@ sysmaster支持配置单元之间的依赖关系，可以配置的值为`;`分�
 
 `Requisite`：与`Requires`类似，区别在于启动`foo.service`时，如果`bar.service`还未启动成功，那么`foo.service`会直接失败。**注意：`Requisite`必须与`After`配合使用，否则启动`bar.service`不检查`foo.service`，这与systemd行为一致。**
 
-`PartOf`：与`Requires`类似，区别在于依赖仅影响重启或关闭。
+`PartOf`：与`Requires`类似，区别在于依赖仅影响单元的重启或关闭。
 
 `BindsTo`：与`Requires`类似，但依赖更强，当`bar.service`的状态突然发生变化时，`foo.service`会跟随立即变化。
 
-`Conflicts`：`foo.service`与`bar.service`的状态相反。启动`foo.service`将关闭`bar.service`，关闭`foo.service`会启动`bar.service`。
+`Conflicts`：`foo.service`与`bar.service`的状态相反。启动`foo.service`将关闭`bar.service`，启动`bar.service`会关闭`foo.service`。
 
 `Wants`和`Requires`除了支持通过`.service/.target/.socket`等单元配置文件配置，也允许在`/etc/sysmaster/`或`/usr/lib/sysmaster`目录下创建`单元名.wants/单元名.requires`目录，并在里面添加指向依赖单元的软链接。例如为了给`foo.service`配置`Wants="bar.service"`，可以创建`/etc/sysmaster/foo.service.wants`目录，并在该目录内创建`bar.service -> /etc/sysmaster/bar.service`的软链接。
 
