@@ -133,9 +133,7 @@ impl UnitChildData {
         self.watch_pids.borrow().get(&pid).cloned()
     }
 
-    fn remove_unit(&self, _unit: &UnitX) {
-        todo!();
-    }
+    fn remove_unit(&self, _unit: &Rc<UnitX>) {}
 }
 
 #[cfg(test)]

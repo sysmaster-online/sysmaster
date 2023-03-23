@@ -262,6 +262,7 @@ impl UnitRTData {
                         }
                         Err(e) => {
                             log::error!("load unit [{}] failed: {}", unit.id(), e.to_string());
+                            self.db.unit_remove(unit.id());
                         }
                     }
                     self.reli.clear_last_unit();
@@ -324,9 +325,7 @@ impl UnitRTData {
         self.load_queue.borrow_mut().push_back(unit);
     }
 
-    fn remove_unit(&self, _unit: &UnitX) {
-        todo!();
-    }
+    fn remove_unit(&self, _unit: &Rc<UnitX>) {}
 }
 
 fn dispatch_target_dep_unit(db: &Rc<UnitDb>, unit: &Rc<UnitX>) {

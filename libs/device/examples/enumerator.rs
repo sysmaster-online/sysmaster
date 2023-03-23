@@ -16,7 +16,7 @@ use device::{device_action::DeviceAction, device_enumerator::DeviceEnumerator};
 fn main() {
     let enumerator = DeviceEnumerator::new();
 
-    for device in enumerator.into_iter() {
+    for device in enumerator {
         println!("{}", device.as_ref().lock().unwrap().get_devpath().unwrap());
         device
             .as_ref()

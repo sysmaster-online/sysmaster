@@ -15,7 +15,7 @@ use crate::plugin::Plugin;
 use crate::unit::data::{DataManager, UnitDepConf};
 use crate::unit::datastore::UnitDb;
 use crate::unit::entry::UnitX;
-use crate::unit::rentry::{self, UnitRe};
+use crate::unit::rentry::{self, UnitLoadState, UnitRe};
 use crate::unit::runtime::UnitRT;
 use crate::unit::util::UnitFile;
 use crate::utils::table::{TableOp, TableSubscribe};
@@ -126,13 +126,18 @@ impl UnitLoadData {
     }
 
     pub(self) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-        if let Some(unit) = self.db.units_get(name) {
-            return Some(Rc::clone(&unit));
-        };
-        let unit = self.prepare_unit(name)?;
-        log::info!("begin dispatch unit in load queue");
-        self.rt.dispatch_load_queue();
-        Some(Rc::clone(&unit))
+        if let Some(u) = self.db.units_get(name) {
+            if u.load_state() != UnitLoadState::UnitNotFound {
+                return Some(Rc::clone(&u));
+            } else {
+                self.db.unit_remove(name);
+            }
+        }
+        self.prepare_unit(name).map(|u| {
+            log::info!("begin dispatch unit in load queue");
+            self.rt.dispatch_load_queue();
+            u
+        })
     }
 
     pub(self) fn set_um(&self, um: &Rc<UnitManager>) {
