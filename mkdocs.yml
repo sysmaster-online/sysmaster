@@ -8,7 +8,7 @@ site_description: >-
 # Repository
 repo_name: openEuler/sysMaster
 repo_url: https://gitee.com/openeuler/sysmaster
-edit_uri: edit/master/docs/
+edit_uri: https://gitee.com/-/ide/project/openeuler/sysmaster/edit/master/-/docs/
 
 # Copyright
 copyright: Copyright &copy; 2023 openEuler sysMaster team
