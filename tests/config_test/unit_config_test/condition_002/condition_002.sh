@@ -1,5 +1,5 @@
 #!/bin/bash
-# Description: test for ConditionFileNotEmpty
+# Description: test for ConditionACPower/ConditionFirstBoot/ConditionNeedsUpdate/ConditionUser
 
 TEST_SCRIPT="$(basename "$0")"
 TEST_SCRIPT_PATH="$(dirname "$0")"
