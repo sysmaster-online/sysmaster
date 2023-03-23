@@ -36,7 +36,7 @@ pub struct Comm {
     timer: Timer,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum CommType {
     Succeed,
     PipON,

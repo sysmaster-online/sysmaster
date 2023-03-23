@@ -114,6 +114,12 @@ pub enum Error {
     NotSupported,
     BadRequest,
 
+    /// events error
+    #[snafu(display("event error; '{}'.", msg))]
+    EventError {
+        msg: String,
+    },
+
     /// Error for exec command
     #[snafu(display("Timeout(ExecCmdError)"))]
     Timeout,
@@ -213,6 +219,7 @@ impl From<Error> for nix::Error {
 
             Error::ConfigureError { msg: _ } => nix::Error::EINVAL,
             Error::LoadError { msg: _ } => nix::Error::EIO,
+            Error::EventError { msg: _ } => nix::Error::EIO,
         }
     }
 }
@@ -269,6 +276,14 @@ impl From<String> for Error {
 impl From<Arc<Error>> for Error {
     fn from(source: Arc<Error>) -> Error {
         Error::Shared { source }
+    }
+}
+
+impl From<event::Error> for Error {
+    fn from(source: event::Error) -> Error {
+        Error::EventError {
+            msg: format!("{:?}", source),
+        }
     }
 }
 

@@ -21,9 +21,8 @@ use super::UnitEmergencyAction;
 use crate::unit::data::{DataManager, UnitState};
 use crate::unit::rentry::{UnitLoadState, UnitRe};
 use crate::unit::util::UnitFile;
-use basic::process_util::my_child;
+use basic::process_util::{self, my_child};
 use cgroup::{self, CgFlags};
-use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
@@ -131,8 +130,9 @@ impl UnitBase for Unit {
         m_pid: Option<Pid>,
         c_pid: Option<Pid>,
         ko: KillOperation,
-    ) -> Result<()> {
-        self.kill_context(k_context, m_pid, c_pid, ko)
+        main_pid_alien: bool,
+    ) -> Result<bool> {
+        self.kill_context(k_context, m_pid, c_pid, ko, main_pid_alien)
     }
 
     fn notify(
@@ -370,7 +370,9 @@ impl Unit {
         m_pid: Option<Pid>,
         c_pid: Option<Pid>,
         ko: KillOperation,
-    ) -> Result<()> {
+        main_pid_alien: bool,
+    ) -> Result<bool> {
+        let mut wait_exit = false;
         let sig = ko.to_signal(k_context.clone());
         log::debug!(
             "unit: {}, kill operation: {:?}, kill signal: {}",
@@ -379,36 +381,24 @@ impl Unit {
             sig
         );
         if let Some(pid) = m_pid {
-            match nix::sys::signal::kill(pid, sig) {
+            match process_util::kill_and_cont(pid, sig) {
                 Ok(_) => {
-                    if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
-                        match nix::sys::signal::kill(pid, Signal::SIGCONT) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                log::debug!("kill pid {} errno: {}", pid, e)
-                            }
-                        }
+                    if !main_pid_alien {
+                        wait_exit = true;
                     }
                 }
                 Err(e) => {
-                    log::warn!("Failed to kill main service: error: {}", e);
+                    log::warn!("Failed to kill pid {}, errno: {}", pid, e);
                 }
             }
         }
         if let Some(pid) = c_pid {
-            match nix::sys::signal::kill(pid, sig) {
+            match process_util::kill_and_cont(pid, sig) {
                 Ok(_) => {
-                    if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
-                        match nix::sys::signal::kill(pid, Signal::SIGCONT) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                log::debug!("kill pid {} errno: {}", pid, e)
-                            }
-                        }
-                    }
+                    wait_exit = true;
                 }
                 Err(e) => {
-                    log::warn!("Failed to kill control service: error: {}", e);
+                    log::warn!("Failed to kill pid {}, errno: {}", pid, e);
                 }
             }
         }
@@ -431,7 +421,8 @@ impl Unit {
                 }
             }
         }
-        Ok(())
+
+        Ok(wait_exit)
     }
 
     ///

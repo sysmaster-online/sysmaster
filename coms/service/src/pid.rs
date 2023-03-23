@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use super::comm::ServiceUnitComm;
-use basic::process_util;
+use basic::process_util::{self, my_child};
 use nix::errno::Errno;
 use nix::unistd::Pid;
 use std::cell::RefCell;
@@ -98,6 +98,10 @@ impl ServicePid {
         self.data.borrow().main()
     }
 
+    pub(super) fn main_pid_alien(&self) -> bool {
+        self.data.borrow().main_pid_alien()
+    }
+
     pub(super) fn control(&self) -> Option<Pid> {
         self.data.borrow().control()
     }
@@ -109,6 +113,7 @@ impl ServicePid {
 
 struct ServicePidData {
     main: Option<Pid>,
+    main_pid_alien: bool,
     state: MainState,
     control: Option<Pid>,
 }
@@ -118,6 +123,7 @@ impl ServicePidData {
     pub(self) fn new() -> ServicePidData {
         ServicePidData {
             main: None,
+            main_pid_alien: false,
             state: MainState::Unknown,
             control: None,
         }
@@ -128,6 +134,7 @@ impl ServicePidData {
             return Err(Errno::EINVAL);
         }
         self.main = Some(pid);
+        self.main_pid_alien = !my_child(pid);
         self.state = MainState::Known;
         Ok(())
     }
@@ -146,6 +153,10 @@ impl ServicePidData {
 
     pub(self) fn main(&self) -> Option<Pid> {
         self.main.as_ref().cloned()
+    }
+
+    pub(self) fn main_pid_alien(&self) -> bool {
+        self.main_pid_alien
     }
 
     pub(self) fn control(&self) -> Option<Pid> {

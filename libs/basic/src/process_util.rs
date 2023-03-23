@@ -14,7 +14,9 @@
 use crate::error::*;
 use crate::file_util;
 use nix::errno::errno;
+use nix::errno::Errno;
 use nix::libc::{kill, ESRCH};
+use nix::sys::signal::Signal;
 use nix::sys::wait::{waitpid, WaitPidFlag};
 use nix::unistd::Pid;
 use procfs::process::Stat;
@@ -176,7 +178,7 @@ fn get_ppid(pid: Pid) -> Result<Pid, Error> {
     Ok(Pid::from_raw(stat.ppid))
 }
 
-/// get the parent pid of the reference pid
+/// return true if the pid is the child of calling process, other false.
 pub fn my_child(pid: Pid) -> bool {
     if pid.as_raw() <= 1 {
         return false;
@@ -185,10 +187,23 @@ pub fn my_child(pid: Pid) -> bool {
     let ppid = get_ppid(pid);
 
     if let Ok(p) = ppid {
-        return p == nix::unistd::getppid();
+        return p == nix::unistd::getpid();
     }
 
     false
+}
+
+/// send signal to pid, send SIGCONT if the signal is not SIGCONT or SIGKILL
+pub fn kill_and_cont(pid: Pid, sig: Signal) -> Result<(), Errno> {
+    match nix::sys::signal::kill(pid, sig) {
+        Ok(_) => {
+            if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
+                _ = nix::sys::signal::kill(pid, Signal::SIGCONT);
+            }
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
 }
 
 #[cfg(test)]

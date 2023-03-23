@@ -491,7 +491,13 @@ impl SocketMngData {
 
         let op = state.to_kill_operation();
         if let Some(u) = self.comm.owner() {
-            match u.kill_context(self.config.kill_context(), None, self.pid.control(), op) {
+            match u.kill_context(
+                self.config.kill_context(),
+                None,
+                self.pid.control(),
+                op,
+                false,
+            ) {
                 Ok(_) => {}
                 Err(_e) => {
                     if IN_SET!(

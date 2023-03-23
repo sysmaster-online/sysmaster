@@ -22,7 +22,7 @@
 use std::fmt::Display;
 
 /// The alignment of one cell
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CellAlign {
     ///
     Left,
@@ -33,7 +33,7 @@ pub enum CellAlign {
 }
 
 /// The color of one cell
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CellColor {
     ///
     Empty,
