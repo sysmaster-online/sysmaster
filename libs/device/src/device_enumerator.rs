@@ -1402,7 +1402,7 @@ mod tests {
         enumerator.set_enumerator_type(DeviceEnumerationType::Devices);
 
         for i in enumerator {
-            println!("{}", i.lock().unwrap().devpath);
+            i.lock().unwrap().get_devpath().unwrap();
         }
     }
 
@@ -1412,7 +1412,10 @@ mod tests {
         enumerator.set_enumerator_type(DeviceEnumerationType::Subsystems);
 
         for i in enumerator {
-            println!("{}", i.lock().unwrap().devpath);
+            i.lock()
+                .expect("device is locked somewhere else")
+                .get_devpath()
+                .expect("can not get the devpath");
         }
     }
 
@@ -1422,7 +1425,10 @@ mod tests {
         enumerator.set_enumerator_type(DeviceEnumerationType::All);
 
         for i in enumerator {
-            println!("{}", i.lock().unwrap().devpath);
+            i.lock()
+                .expect("device is locked somewhere else")
+                .get_devpath()
+                .expect("can not get the devpath");
         }
     }
 }
