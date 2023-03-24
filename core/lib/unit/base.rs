@@ -152,7 +152,7 @@ macro_rules! declure_unitobj_plugin_default {
         /// method for create the unit instance
         #[no_mangle]
         pub fn __unit_obj_create_default() -> *mut dyn $crate::unit::SubUnit {
-            logger::init_log_with_default($name, $level);
+            logger::init_log_for_subum($name, $level, "console", "");
             let construcotr: fn() -> $unit_type = $constructor;
 
             let obj = construcotr();
@@ -174,8 +174,10 @@ macro_rules! declure_unitobj_plugin_with_param {
         pub fn __unit_obj_create_with_params(
             um: Rc<dyn $crate::unit::UmIf>,
             level: LevelFilter,
+            target: &str,
+            file: &str,
         ) -> *mut dyn $crate::unit::SubUnit {
-            logger::init_log_with_default($name, level);
+            logger::init_log_for_subum($name, level, target, file);
             let construcotr: fn(um: Rc<dyn $crate::unit::UmIf>) -> $unit_type = $constructor;
 
             let obj = construcotr(um);

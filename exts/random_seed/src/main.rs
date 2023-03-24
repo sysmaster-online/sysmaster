@@ -20,7 +20,7 @@ use crate::random_seed::run;
 use basic::logger;
 
 fn main() {
-    logger::init_log_with_console("random-seed", log::LevelFilter::Debug);
+    logger::init_log_to_console("random-seed", log::LevelFilter::Debug);
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         log::error!("{}", "This program requires one argument.");

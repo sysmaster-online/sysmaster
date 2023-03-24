@@ -32,6 +32,7 @@ mod utils;
 #[macro_use]
 extern crate lazy_static;
 use crate::keep_alive::KeepAlive;
+use crate::manager::config::ManagerConfig;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
 use basic::logger::{self};
@@ -43,6 +44,7 @@ use std::convert::TryFrom;
 use std::env::{self};
 use std::os::unix::process::CommandExt;
 use std::process::{exit, Command};
+use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::rel;
 
@@ -61,7 +63,18 @@ fn main() -> Result<()> {
         }
     };
 
-    logger::init_log_with_console("sysmaster", log::LevelFilter::Debug);
+    let manager_config = Rc::new(ManagerConfig::new(None));
+    let log_file = if manager_config.LogFile.is_empty() {
+        None
+    } else {
+        Some(manager_config.LogFile.as_str())
+    };
+    logger::init_log(
+        "sysmaster",
+        manager_config.LogLevel,
+        &manager_config.LogTarget,
+        log_file,
+    );
     log::info!("sysmaster running in system mode.");
 
     // temporary annotation for repeat mount
@@ -79,7 +92,7 @@ fn main() -> Result<()> {
 
     initialize_runtime(switch)?;
 
-    let manager = Manager::new(Mode::System, Action::Run);
+    let manager = Manager::new(Mode::System, Action::Run, manager_config);
 
     // enable clear, mutex with install_crash_handler
     if !switch {

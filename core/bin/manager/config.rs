@@ -11,22 +11,24 @@
 // See the Mulan PSL v2 for more details.
 //
 #![allow(non_snake_case)]
+
 use confique::Config;
 
 pub const SYSTEM_CONFIG: &str = "/etc/sysmaster/system.toml";
 
-#[derive(Config, Default, Debug)]
+#[derive(Config, Debug)]
 pub struct ManagerConfig {
-    #[config(nested)]
-    pub Manager: SectionManager,
-}
-
-#[derive(Config, Default, Debug)]
-pub struct SectionManager {
     #[config(default = 100)]
     pub DefaultRestartSec: u64,
     #[config(default = 90)]
     pub DefaultTimeoutSec: u64,
+
+    #[config(default = "debug")]
+    pub LogLevel: log::LevelFilter,
+    #[config(default = "console")]
+    pub LogTarget: String,
+    #[config(default = "")]
+    pub LogFile: String,
 }
 
 impl ManagerConfig {
@@ -35,8 +37,20 @@ impl ManagerConfig {
         let builder = ManagerConfig::builder().env();
         let manager_config = builder.file(file.unwrap_or(SYSTEM_CONFIG));
         match manager_config.load() {
-            Ok(m) => m,
-            _ => ManagerConfig::default(),
+            Ok(v) => v,
+            Err(_) => ManagerConfig::default(),
+        }
+    }
+}
+
+impl Default for ManagerConfig {
+    fn default() -> Self {
+        Self {
+            DefaultRestartSec: 100,
+            DefaultTimeoutSec: 90,
+            LogLevel: log::LevelFilter::Debug,
+            LogTarget: "console".to_string(),
+            LogFile: String::new(),
         }
     }
 }
@@ -53,6 +67,6 @@ mod test {
         file.push("config/system.toml");
         let config = ManagerConfig::new(file.to_str());
         println!("{config:?}");
-        assert_eq!(config.Manager.DefaultRestartSec, 100);
+        assert_eq!(config.DefaultRestartSec, 100);
     }
 }

@@ -730,7 +730,7 @@ mod tests {
 
     use crate::{plugin::Plugin, unit::data::DataManager, unit::util::UnitFile};
     fn unit_init() -> Rc<Unit> {
-        logger::init_log_with_console("test_unit_entry", log::LevelFilter::Trace);
+        logger::init_log_to_console("test_unit_entry", log::LevelFilter::Trace);
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
         let rentry = Rc::new(UnitRe::new(&reli));
 

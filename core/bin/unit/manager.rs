@@ -31,6 +31,7 @@ use super::uload::UnitLoad;
 use super::UnitRelationAtom;
 use super::UnitRelations;
 use crate::job::JobResult;
+use crate::manager::config::ManagerConfig;
 use crate::manager::pre_install::{Install, PresetMode};
 use crate::manager::State;
 use crate::unit::data::{DataManager, UnitState};
@@ -59,6 +60,8 @@ pub(crate) struct UnitManagerX {
     data: Rc<UnitManager>,
     lookup_path: Rc<LookupPaths>,
     state: Rc<RefCell<State>>,
+    #[allow(dead_code)]
+    manager_config: Rc<ManagerConfig>,
 }
 
 impl Drop for UnitManagerX {
@@ -75,14 +78,23 @@ impl UnitManagerX {
         relir: &Rc<Reliability>,
         lookup_path: &Rc<LookupPaths>,
         state: Rc<RefCell<State>>,
+        manager_config: Rc<ManagerConfig>,
     ) -> UnitManagerX {
         let _dm = Rc::new(DataManager::new());
         let umx = UnitManagerX {
             dm: Rc::clone(&_dm),
             sub_name: String::from("UnitManagerX"),
-            data: UnitManager::new(eventr, relir, &_dm, lookup_path, Rc::clone(&state)),
+            data: UnitManager::new(
+                eventr,
+                relir,
+                &_dm,
+                lookup_path,
+                Rc::clone(&state),
+                manager_config.clone(),
+            ),
             lookup_path: Rc::clone(lookup_path),
             state,
+            manager_config,
         };
         umx.register(&_dm, relir);
         umx
@@ -252,6 +264,7 @@ pub struct UnitManager {
     sigchld: Sigchld,
     notify: NotifyManager,
     sms: UnitSubManagers,
+    manager_config: Rc<ManagerConfig>,
 }
 
 impl UmIf for UnitManager {
@@ -436,6 +449,14 @@ impl UmIf for UnitManager {
 
     fn restart_unit(&self, name: &str) -> Result<()> {
         self.restart_unit(name)
+    }
+
+    fn get_log_file(&self) -> &str {
+        self.get_log_file()
+    }
+
+    fn get_log_target(&self) -> &str {
+        self.get_log_target()
     }
 }
 
@@ -902,6 +923,7 @@ impl UnitManager {
         dmr: &Rc<DataManager>,
         lookup_path: &Rc<LookupPaths>,
         state: Rc<RefCell<State>>,
+        manager_config: Rc<ManagerConfig>,
     ) -> Rc<UnitManager> {
         let _rentry = Rc::new(UnitRe::new(relir));
         let _db = Rc::new(UnitDb::new(&_rentry));
@@ -920,6 +942,7 @@ impl UnitManager {
             notify: NotifyManager::new(eventr, relir, &_rentry, &_db, &_jm),
             sms: UnitSubManagers::new(relir),
             state,
+            manager_config,
         });
         um.load.set_um(&um);
         um.sms.set_um(&um);
@@ -1025,6 +1048,14 @@ impl UnitManager {
     }
 
     fn remove_job_result(&self, _source: &str) {}
+
+    fn get_log_file(&self) -> &str {
+        &self.manager_config.LogFile
+    }
+
+    fn get_log_target(&self) -> &str {
+        &self.manager_config.LogTarget
+    }
 }
 
 impl ReStation for UnitManager {
@@ -1254,7 +1285,9 @@ mod unit_submanager {
 
         fn new_sub(&self, unit_type: UnitType) -> Option<Box<dyn UnitManagerObj>> {
             let um = self.um();
-            let ret = Plugin::get_instance().create_um_obj(unit_type);
+            let target = um.get_log_target();
+            let file = um.get_log_file();
+            let ret = Plugin::get_instance().create_um_obj(unit_type, target, file);
             if ret.is_err() {
                 log::info!("create um_obj is not found, type {:?}!", unit_type);
                 return None;
@@ -1299,7 +1332,7 @@ mod tests {
     use sysmaster::unit::UnitActiveState;
 
     fn init_dm_for_test() -> (Rc<DataManager>, Rc<Events>, Rc<UnitManager>) {
-        logger::init_log_with_console("manager test", log::LevelFilter::Trace);
+        logger::init_log_to_console("manager test", log::LevelFilter::Trace);
         let mut l_path = LookupPaths::new();
         l_path.init_lookup_paths();
         let lookup_path = Rc::new(l_path);
@@ -1308,7 +1341,14 @@ mod tests {
         let dm = Rc::new(DataManager::new());
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
         let state = Rc::new(RefCell::new(State::Init));
-        let um = UnitManager::new(&event, &reli, &dm, &lookup_path, state);
+        let um = UnitManager::new(
+            &event,
+            &reli,
+            &dm,
+            &lookup_path,
+            state,
+            Rc::new(ManagerConfig::new(None)),
+        );
         (dm, event, um)
     }
 
