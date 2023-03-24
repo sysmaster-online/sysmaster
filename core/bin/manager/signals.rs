@@ -70,4 +70,8 @@ impl<T: SignalDispatcher> Source for Signals<T> {
         let data: u64 = unsafe { std::mem::transmute(self) };
         data
     }
+
+    fn priority(&self) -> i8 {
+        -6
+    }
 }
