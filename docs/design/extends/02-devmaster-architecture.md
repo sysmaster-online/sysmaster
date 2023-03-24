@@ -41,7 +41,7 @@ devmaster包含两个可执行文件：常驻进程devmaster和客户端工具de
 
 如下所示为devmaster的总体架构图，各子模块的功能描述详情见附录的特性列表。
 
-<center>![](assets/devmaster_architecture.jpg)</center>
+<center>![](assets/devmaster_architecture.png)</center>
 
 ## 3.2 目录结构
 
