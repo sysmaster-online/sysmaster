@@ -9,6 +9,9 @@ export RELIAB_SWITCH='switch.debug'
 export RELIAB_CLR='clear.debug'
 export init_pid=''
 export sysmaster_pid=''
+export cond_fail_log='Starting failed .* condition test failed'
+export asst_fail_log='Starting failed .* assert test failed'
+export yum_proxy='proxy='
 
 # ================== log function ==================
 function log_info() {
@@ -123,7 +126,7 @@ function expect_str_eq() {
 function run_sysmaster() {
     cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH} || return 1
     /usr/bin/init &> "${SYSMST_LOG}" &
-    sysmaster_pid=$!
+    init_pid=$!
 
     # wait sysmaster init done
     sleep 3
@@ -160,6 +163,7 @@ function check_log() {
 
     # debug
     sync
+    sleep 1
     cat "${file_name}" | sed "s/\x00//g" || return 1
 
     shift 1
@@ -209,4 +213,17 @@ function get_pids() {
     local service="$1"
 
     sctl status "${service}" |& sed -n '/PID:/,$p' | sed 's/PID://' | awk '{print $1}'
+}
+
+# usage: install packages
+# input: packages names or files
+function install_pkg() {
+    if ! grep -rq 'proxy=' /etc/yum.repos.d; then
+        for file in /etc/yum.repos.d/*.repo; do
+            sed -i "/^baseurl=/a ${yum_proxy}" "${file}"
+        done
+        yum clean all
+        yum makecache
+    fi
+    yum install -y $@
 }

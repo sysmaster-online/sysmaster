@@ -1,5 +1,5 @@
 #!/bin/bash
-# Description: test for ConditionPathExists
+# Description: test for ConditionPathExists/ConditionFileNotEmpty/ConditionPathIsReadWrite
 
 TEST_SCRIPT="$(basename "$0")"
 TEST_SCRIPT_PATH="$(dirname "$0")"

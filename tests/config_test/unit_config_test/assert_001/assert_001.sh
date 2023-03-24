@@ -1,5 +1,5 @@
 #!/bin/bash
-# Description: test for AssertPathExists
+# Description: test for AssertPathExists/AssertFileNotEmpty
 
 TEST_SCRIPT="$(basename "$0")"
 TEST_SCRIPT_PATH="$(dirname "$0")"
