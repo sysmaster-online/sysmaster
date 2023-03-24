@@ -173,6 +173,16 @@ pub trait UmIf {
     fn restart_unit(&self, _unit_name: &str) -> Result<()> {
         Ok(())
     }
+
+    /// get the log file config
+    fn get_log_file(&self) -> &str {
+        ""
+    }
+
+    /// get the log target config
+    fn get_log_target(&self) -> &str {
+        ""
+    }
 }
 
 /// the trait used for attach UnitManager to sub unit
@@ -204,10 +214,13 @@ macro_rules! declure_umobj_plugin {
         // method for create the sub-unit-manager instance
         use log::LevelFilter;
         #[no_mangle]
-        pub fn __um_obj_create(level: LevelFilter) -> *mut dyn $crate::unit::UnitManagerObj {
-            logger::init_log_with_default($name, level);
+        pub fn __um_obj_create(
+            level: LevelFilter,
+            target: &str,
+            file: &str,
+        ) -> *mut dyn $crate::unit::UnitManagerObj {
+            logger::init_log_for_subum($name, level, target, file);
             let construcotr: fn() -> $unit_type = $constructor;
-
             let obj = construcotr();
             let boxed: Box<dyn $crate::unit::UnitManagerObj> = Box::new(obj);
             Box::into_raw(boxed)

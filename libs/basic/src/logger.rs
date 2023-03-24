@@ -11,17 +11,32 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-use log::LevelFilter;
+use log::{LevelFilter, Log};
 use log4rs::{
-    append::console::{ConsoleAppender, Target},
+    append::{
+        console::{ConsoleAppender, Target},
+        file::FileAppender,
+        Append,
+    },
     config::{Appender, Config, Logger, Root},
     encode::pattern::PatternEncoder,
 };
-use std::path::Path;
 
-struct LoggerPlugin(log4rs::Logger);
+/// sysmaster log parttern:
+///
+/// ```
+/// {d(%Y-%m-%d %H:%M:%S)} {h({l}):<5} {M} {m}{n}
+/// {d(%Y-%m-%d %H:%M:%S)}: log time, i.e. `2023-03-24 11:00:23`
+/// {h({l}:<5)}: log level, 5 bytes
+/// {M}: the method name where the logging request was issued
+/// {m}: log message
+/// {n}: separator character, '\n' in linux.
+/// ```
+pub const LOG_PATTERN: &str = "{d(%Y-%m-%d %H:%M:%S)} {h({l}):<5} {M} {m}{n}";
 
-impl log::Log for LoggerPlugin {
+struct LogPlugin(log4rs::Logger);
+
+impl log::Log for LogPlugin {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         self.0.enabled(metadata)
     }
@@ -31,74 +46,104 @@ impl log::Log for LoggerPlugin {
     }
 
     fn flush(&self) {
-        self.0.flush();
+        Log::flush(&self.0);
     }
 }
 
-fn set_logger(logger: log4rs::Logger) {
-    log::set_max_level(LevelFilter::Trace);
-    let _ = log::set_boxed_logger(Box::new(LoggerPlugin(logger)));
-}
-
+/// Init and set the sub unit manager's log
 ///
-pub fn init_log_with_default(app_name: &str, log_level: LevelFilter) {
-    let config = build_log_config(app_name, log_level);
+/// [`app_name`]: which app output the log
+///
+/// level:  maximum log level
+///
+/// target: log target
+///
+/// file_path: file path if the target is set to file
+pub fn init_log_for_subum(app_name: &str, level: LevelFilter, target: &str, file: &str) {
+    let file = if file.is_empty() { None } else { Some(file) };
+    let config = build_log_config(app_name, level, target, file);
     let logger = log4rs::Logger::new(config);
-    set_logger(logger);
+    log::set_max_level(LevelFilter::Trace);
+    let _ = log::set_boxed_logger(Box::new(LogPlugin(logger)));
 }
 
-/// Init logger with config yaml file.
+/// Init and set the log target to console
 ///
-/// [`path`] the config file path
-/// example
-/// see docs.rs/log4rs/1.0.0/#examples
+/// [`app_name`]: which app output the log
 ///
-pub fn init_log_with_file<P>(path: P)
-where
-    //where
-    P: AsRef<Path>,
-{
-    log4rs::init_file(path, Default::default()).expect("logging init");
+/// level: maximum log level
+pub fn init_log_to_console(app_name: &str, level: LevelFilter) {
+    init_log(app_name, level, "console", None);
 }
 
-/// Init logger output the log to console.
+/// Init and set the log target to file
 ///
-/// [`app_name`] which app output the log
-/// log level set the output log level
-/// [0] Error
-/// [1] Warn
-/// [2] Info.
-/// [3] Debug
-/// [4]  Trace
-/// [others] Info
+/// [`app_name`]: which app output the log
 ///
-pub fn init_log_with_console(app_name: &str, log_level: LevelFilter) {
-    let config = build_log_config(app_name, log_level);
-    let log_init_result = log4rs::init_config(config);
-    if let Err(e) = log_init_result {
+/// level: maximum log level
+///
+/// file_path: log to which file
+pub fn init_log_to_file(app_name: &str, level: LevelFilter, file_path: &str) {
+    init_log(app_name, level, "file", Some(file_path));
+}
+
+/// Init and set the logger
+///
+/// [`app_name`]: which app output the log
+///
+/// level:  maximum log level
+///
+/// target: log target
+///
+/// file_path: file path if the target is set to file
+pub fn init_log(app_name: &str, level: LevelFilter, target: &str, file_path: Option<&str>) {
+    let config = build_log_config(app_name, level, target, file_path);
+    let r = log4rs::init_config(config);
+    if let Err(e) = r {
         println!("{e}");
     }
 }
 
-fn build_log_config(app_name: &str, level: LevelFilter) -> Config {
-    let mut pattern = String::new();
-    pattern += "{d(%Y-%m-%d %H:%M:%S)} ";
-    pattern += "{h({l}):<5} ";
-    pattern += "{M} {m}{n}";
-    let stdout = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new(&pattern)))
-        .target(Target::Stderr)
-        .build();
-    let logging_builder =
-        Config::builder().appender(Appender::builder().build("console", Box::new(stdout)));
-
-    match Some(app_name) {
-        Some(a_p) => logging_builder
-            .logger(Logger::builder().build(a_p, level))
-            .build(Root::builder().appender("console").build(level)),
-        _ => logging_builder.build(Root::builder().appender("console").build(level)),
+fn build_log_config(
+    app_name: &str,
+    level: LevelFilter,
+    target: &str,
+    file: Option<&str>,
+) -> Config {
+    let mut target = target;
+    /* If the file is configured to None, use console forcely. */
+    if file.is_none() && target == "file" {
+        println!("LogTarget is configured to `file`, but LogFile is not configured, changing the LogTarget to `console`");
+        target = "console";
     }
-    .unwrap()
+    let encoder = Box::new(PatternEncoder::new(LOG_PATTERN));
+    let appender: Box<dyn Append> = match target {
+        "console" => Box::new(
+            ConsoleAppender::builder()
+                .encoder(encoder)
+                .target(Target::Stdout)
+                .build(),
+        ),
+        "file" => Box::new(
+            FileAppender::builder()
+                .encoder(encoder)
+                .build(file.unwrap())
+                .unwrap(),
+        ),
+        _ => Box::new(
+            ConsoleAppender::builder()
+                .encoder(encoder)
+                .target(Target::Stdout)
+                .build(),
+        ),
+    };
+    let logger = Logger::builder().build(app_name, level);
+    let root = Root::builder().appender(target).build(level);
+    Config::builder()
+        .appender(Appender::builder().build(target, appender))
+        .logger(logger)
+        .build(root)
+        .unwrap()
 }
 
 #[cfg(test)]
@@ -107,8 +152,8 @@ mod tests {
     use super::*;
     use log;
     #[test]
-    fn test_init_log_with_console() {
-        init_log_with_console("test", LevelFilter::Debug);
+    fn test_init_log_to_console() {
+        init_log_to_console("test", LevelFilter::Debug);
         // assert_eq!((), ());
         log::info!("test for logger info");
         log::error!("test for logger error");

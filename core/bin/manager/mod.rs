@@ -44,6 +44,8 @@ use sysmaster::rel::{ReliLastFrame, Reliability};
 
 use alive_timer::AliveTimer;
 
+use self::config::ManagerConfig;
+
 /// maximal size of process's arguments
 pub const MANAGER_ARGS_SIZE_MAX: usize = 5; // 6 - 1
 
@@ -200,6 +202,8 @@ pub struct Manager {
     um: Rc<UnitManagerX>,
     lookup_path: Rc<LookupPaths>,
     alive_timer: Rc<AliveTimer>,
+    #[allow(dead_code)]
+    config: Rc<ManagerConfig>,
 }
 
 impl Drop for Manager {
@@ -213,7 +217,7 @@ impl Drop for Manager {
 
 impl Manager {
     /// create factory instance
-    pub fn new(mode: Mode, action: Action) -> Self {
+    pub fn new(mode: Mode, action: Action, manager_config: Rc<ManagerConfig>) -> Self {
         let event = Rc::new(Events::new().unwrap());
         let reli = Rc::new(Reliability::new(rentry::RELI_HISTORY_MAX_DBS));
         let mut l_path = LookupPaths::new();
@@ -225,6 +229,7 @@ impl Manager {
             &reli,
             &lookup_path,
             Rc::clone(&state),
+            manager_config.clone(),
         ));
 
         let res = KeepAlive::get_instance();
@@ -251,6 +256,7 @@ impl Manager {
             um,
             lookup_path,
             alive_timer,
+            config: manager_config,
         }
     }
 
@@ -573,10 +579,10 @@ mod tests {
     //#[test]
     #[allow(dead_code)]
     fn manager_api() {
-        logger::init_log_with_console("test_target_unit_load", log::LevelFilter::Trace);
+        logger::init_log_to_console("test_target_unit_load", log::LevelFilter::Trace);
 
         // new
-        let manager = Manager::new(Mode::System, Action::Run);
+        let manager = Manager::new(Mode::System, Action::Run, Rc::new(ManagerConfig::new(None)));
         manager.reli.data_clear(); // clear all data
 
         // startup

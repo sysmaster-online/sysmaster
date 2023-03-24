@@ -14,7 +14,7 @@
 //!
 mod subcmds;
 
-use basic::logger::init_log_with_console;
+use basic::logger::init_log_to_console;
 use clap::Parser;
 use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
 use log::LevelFilter;
@@ -89,7 +89,7 @@ fn subcommand_kill() {
 }
 
 fn main() {
-    init_log_with_console("devctl", LevelFilter::Debug);
+    init_log_to_console("devctl", LevelFilter::Debug);
     let args = Args::parse();
 
     match args.subcmd {

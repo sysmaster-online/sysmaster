@@ -310,7 +310,12 @@ impl Plugin {
                     };
                     if symunit.is_err() {
                         log::warn!("Lib {} not contain __unit_obj_create_default try  __unit_obj_create_with_params", v);
-                        type SymType = fn(um: Rc<dyn UmIf>, level: LevelFilter) -> *mut dyn SubUnit;
+                        type SymType = fn(
+                            um: Rc<dyn UmIf>,
+                            level: LevelFilter,
+                            target: &str,
+                            file: &str,
+                        ) -> *mut dyn SubUnit;
                         #[allow(clippy::type_complexity)]
                         let symunit: Result<Symbol<SymType>> = unsafe {
                             lib.lib
@@ -325,7 +330,9 @@ impl Plugin {
 
                     #[allow(clippy::type_complexity)]
                     let symum: Result<
-                        Symbol<fn(level: LevelFilter) -> *mut dyn SubUnit>,
+                        Symbol<
+                            fn(level: LevelFilter, target: &str, file: &str) -> *mut dyn SubUnit,
+                        >,
                     > = unsafe {
                         lib.lib
                             .get(b"__um_obj_create")
@@ -431,7 +438,8 @@ impl Plugin {
         unit_type: UnitType,
         um: Rc<dyn UmIf>,
     ) -> Result<Box<dyn SubUnit>> {
-        type SymType = fn(um: Rc<dyn UmIf>, level: LevelFilter) -> *mut dyn SubUnit;
+        type SymType =
+            fn(um: Rc<dyn UmIf>, level: LevelFilter, target: &str, file: &str) -> *mut dyn SubUnit;
         match self.get_lib(unit_type) {
             Ok(dy_lib) => {
                 let sym: Result<Symbol<SymType>> = unsafe {
@@ -444,8 +452,10 @@ impl Plugin {
                     "create unit obj with param level filter: {:?}",
                     log::max_level()
                 );
+                let target = um.get_log_target();
+                let file = um.get_log_file();
                 if let Ok(fun) = sym {
-                    let boxed_raw = fun(um, log::max_level());
+                    let boxed_raw = fun(um.clone(), log::max_level(), target, file);
                     Ok(unsafe { Box::from_raw(boxed_raw) })
                 } else {
                     Err(Error::PluginLoad {
@@ -460,12 +470,19 @@ impl Plugin {
     }
     /// Create a  obj for subclasses of unit manager
     /// each sub unit manager need reference of declure_umobj_plugin
-    pub fn create_um_obj(&self, unit_type: UnitType) -> Result<Box<dyn UnitManagerObj>> {
+    pub fn create_um_obj(
+        &self,
+        unit_type: UnitType,
+        target: &str,
+        file: &str,
+    ) -> Result<Box<dyn UnitManagerObj>> {
         match self.get_lib(unit_type) {
             Ok(dy_lib) => {
                 #[allow(clippy::type_complexity)]
                 let sym: Result<
-                    Symbol<fn(level: LevelFilter) -> *mut dyn UnitManagerObj>,
+                    Symbol<
+                        fn(level: LevelFilter, target: &str, file: &str) -> *mut dyn UnitManagerObj,
+                    >,
                 > = unsafe {
                     dy_lib
                         .lib
@@ -473,7 +490,7 @@ impl Plugin {
                         .map_err(|e| Error::PluginLoad { msg: e.to_string() })
                 };
                 if let Ok(fun) = sym {
-                    let boxed_raw = fun(log::max_level());
+                    let boxed_raw = fun(log::max_level(), target, file);
                     Ok(unsafe { Box::from_raw(boxed_raw) })
                 } else {
                     Err(Error::PluginLoad {
@@ -534,7 +551,7 @@ mod tests {
     impl UmIf for UmIfD {}
 
     fn init_test() -> Arc<Plugin> {
-        logger::init_log_with_console("test_plugin_log_init", log::LevelFilter::Trace);
+        logger::init_log_to_console("test_plugin_log_init", log::LevelFilter::Trace);
         Arc::clone(&Plugin::get_instance())
     }
 
