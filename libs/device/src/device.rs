@@ -1825,7 +1825,8 @@ mod tests {
 
         match device.get_sysattr_value("nsid".to_string()) {
             Ok(value) => {
-                value.parse::<u32>().unwrap();
+                println!("{}", value);
+                value.trim().parse::<u32>().unwrap();
             }
             Err(e) => {
                 assert!([Errno::EACCES, Errno::EPERM, Errno::ENOENT, Errno::EINVAL]

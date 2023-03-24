@@ -575,7 +575,7 @@ impl Unit {
         // Mount unit doesn't have config file, set its loadstate to
         // UnitLoaded directly.
         if self.unit_type() == UnitType::UnitMount {
-            self.load.set_load_state(UnitLoadState::UnitLoaded);
+            self.load.set_load_state(UnitLoadState::Loaded);
             return Ok(());
         }
         match self.load.load_unit_confs() {
@@ -584,14 +584,46 @@ impl Unit {
                 log::debug!("Begin exec sub class load");
                 self.sub.load(paths)?;
 
-                self.load.set_load_state(UnitLoadState::UnitLoaded);
+                self.load.set_load_state(UnitLoadState::Loaded);
                 Ok(())
             }
             Err(e) => {
-                self.load.set_load_state(UnitLoadState::UnitNotFound);
+                self.load.set_load_state(UnitLoadState::NotFound);
                 Err(e)
             }
         }
+    }
+
+    /// Stub or Merges is temporarily state which represent not load complete
+    pub(super) fn load_complete(&self) -> bool {
+        self.load_state() != UnitLoadState::Stub && self.load_state() != UnitLoadState::Merged
+    }
+
+    ///
+    pub(super) fn validate_load_state(&self) -> Result<()> {
+        match self.load_state() {
+            UnitLoadState::Stub | UnitLoadState::Merged => Err(Error::LoadError {
+                msg: format!("unexpected load state of unit: {}", self.id()),
+            }),
+            UnitLoadState::Loaded => Ok(()),
+            UnitLoadState::NotFound => Err(Error::LoadError {
+                msg: format!("unit file is not found: {}", self.id()),
+            }),
+            UnitLoadState::Error => Err(Error::LoadError {
+                msg: format!("load unit file failed, adjust the unit file: {}", self.id()),
+            }),
+            UnitLoadState::BadSetting => Err(Error::LoadError {
+                msg: format!("unit file {} has bad setting", self.id()),
+            }),
+            UnitLoadState::Masked => Err(Error::LoadError {
+                msg: format!("unit file {} is masked", self.id()),
+            }),
+        }
+    }
+
+    ///
+    pub(super) fn get_perpetual(&self) -> bool {
+        self.sub.get_perpetual()
     }
 
     ///
@@ -613,7 +645,7 @@ impl Unit {
             return Err(Error::UnitActionEAgain);
         }
 
-        if self.load_state() != UnitLoadState::UnitLoaded {
+        if self.load_state() != UnitLoadState::Loaded {
             log::error!(
                 "Starting failed the unit load state is [{:?}]",
                 self.load_state()

@@ -1,0 +1,9 @@
+[Unit]
+Description="job test 001"
+DefaultDependencies=false
+
+[Service]
+ExecStart="/bin/sleep 888"
+
+[Install]
+WantedBy="dbus.service"

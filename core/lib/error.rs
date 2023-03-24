@@ -121,6 +121,10 @@ pub enum Error {
     NoCmdFound,
     #[snafu(display("SpawnError(ExecCmdError)"))]
     SpawnError,
+    #[snafu(display("load unit error '{}'.", msg))]
+    LoadError {
+        msg: String,
+    },
 
     #[snafu(display("unit configuration error: '{}'.", msg))]
     ConfigureError {
@@ -206,7 +210,9 @@ impl From<Error> for nix::Error {
             Error::UnitActionECanceled => nix::Error::ECANCELED,
             Error::UnitActionERefuseManualStart => nix::Error::EINVAL,
             Error::UnitActionERefuseManualStop => nix::Error::EINVAL,
+
             Error::ConfigureError { msg: _ } => nix::Error::EINVAL,
+            Error::LoadError { msg: _ } => nix::Error::EIO,
         }
     }
 }

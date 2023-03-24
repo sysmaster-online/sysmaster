@@ -1147,6 +1147,7 @@ mod tests {
         let unit_test1 = create_unit(&dm, &reli, &rentry, &name_test1);
         let name_test2 = String::from("test2.service");
         let unit_test2 = create_unit(&dm, &reli, &rentry, &name_test2);
+
         db.units_insert(name_test1, Rc::clone(&unit_test1));
         db.units_insert(name_test2, Rc::clone(&unit_test2));
         if let Some(r) = relation {
@@ -1166,6 +1167,8 @@ mod tests {
         logger::init_log_to_console("test_unit_load", log::LevelFilter::Trace);
         log::info!("test");
 
-        test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
+        let unit = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
+        unit.load().expect("load error");
+        unit
     }
 }

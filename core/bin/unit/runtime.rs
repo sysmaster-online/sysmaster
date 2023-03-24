@@ -256,7 +256,7 @@ impl UnitRTData {
                     match unit.load() {
                         Ok(()) => {
                             let load_state = unit.load_state();
-                            if load_state == UnitLoadState::UnitLoaded {
+                            if load_state == UnitLoadState::Loaded {
                                 self.push_target_dep_queue(Rc::clone(&unit));
                             }
                         }
@@ -339,8 +339,8 @@ fn dispatch_target_dep_unit(db: &Rc<UnitDb>, unit: &Rc<UnitX>) {
             log::debug!("dep unit type is not target, continue");
             return;
         }
-        if unit.load_state() != UnitLoadState::UnitLoaded
-            || dep_target.load_state() != UnitLoadState::UnitLoaded
+        if unit.load_state() != UnitLoadState::Loaded
+            || dep_target.load_state() != UnitLoadState::Loaded
         {
             log::debug!("dep unit  is not loaded, continue");
             return;
@@ -412,7 +412,7 @@ mod tests {
             .units_insert(service_name.to_string(), service_unit);
         rt.dispatch_load_queue(); // do not register dep notify so cannot parse dependency
         let unit = rt.data.db.units_get(&service_name);
-        assert_eq!(unit.unwrap().load_state(), UnitLoadState::UnitLoaded);
+        assert_eq!(unit.unwrap().load_state(), UnitLoadState::Loaded);
     }
 
     #[test]

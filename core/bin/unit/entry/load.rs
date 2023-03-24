@@ -65,7 +65,7 @@ impl UeLoad {
             file: Rc::clone(filer),
             base: Rc::clone(baser),
             config: Rc::clone(config),
-            load_state: RefCell::new(UnitLoadState::UnitStub),
+            load_state: RefCell::new(UnitLoadState::Stub),
             in_load_queue: RefCell::new(false),
             in_target_dep_queue: RefCell::new(false),
         };
@@ -123,7 +123,7 @@ impl UeLoad {
     pub(super) fn load_unit_confs(&self) -> Result<()> {
         self.file.build_name_map(
             self.base.id().clone(),
-            self.load_state() == UnitLoadState::UnitLoaded,
+            self.load_state() == UnitLoadState::Loaded,
         );
         self.config
             .load_fragment_and_dropin(self.file.as_ref(), self.base.id())?;
