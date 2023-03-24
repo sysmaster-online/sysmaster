@@ -79,3 +79,9 @@ fn docker_config_test_startlimit_001() {
 fn docker_config_test_exec_001() {
     common::run_script("docker_config_test", "docker_config_test_exec_001", "1");
 }
+
+#[test]
+#[ignore]
+fn docker_config_test_action_001() {
+    common::run_script("docker_config_test", "docker_config_test_action_001", "1");
+}

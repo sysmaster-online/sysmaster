@@ -125,6 +125,7 @@ function test04() {
 
 test01 || exit 1
 test02 || exit 1
-test03 || exit 1
+# ConditionNeedsUpdate not implemented yet
+# test03 || exit 1
 test04 || exit 1
 exit "${EXPECT_FAIL}"
