@@ -21,6 +21,7 @@ use log4rs::{
     config::{Appender, Config, Logger, Root},
     encode::pattern::PatternEncoder,
 };
+use nix::libc;
 
 /// sysmaster log parttern:
 ///
@@ -50,6 +51,33 @@ impl log::Log for LogPlugin {
     }
 }
 
+struct SysLogger;
+
+/* This is an extremely simple implementation, and only
+ * supports the very basic log function. */
+impl log::Log for SysLogger {
+    fn enabled(&self, _metadata: &log::Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &log::Record) {
+        let msg = record.args().to_string();
+        let level = match record.level() {
+            log::Level::Error => libc::LOG_ERR,
+            log::Level::Warn => libc::LOG_WARNING,
+            log::Level::Info => libc::LOG_INFO,
+            log::Level::Debug => libc::LOG_DEBUG,
+            /* The highest libc log level is LOG_DEBUG */
+            log::Level::Trace => libc::LOG_DEBUG,
+        };
+        unsafe {
+            libc::syslog(level, msg.as_ptr() as *const libc::c_char);
+        }
+    }
+
+    fn flush(&self) {}
+}
+
 /// Init and set the sub unit manager's log
 ///
 /// [`app_name`]: which app output the log
@@ -61,10 +89,7 @@ impl log::Log for LogPlugin {
 /// file_path: file path if the target is set to file
 pub fn init_log_for_subum(app_name: &str, level: LevelFilter, target: &str, file: &str) {
     let file = if file.is_empty() { None } else { Some(file) };
-    let config = build_log_config(app_name, level, target, file);
-    let logger = log4rs::Logger::new(config);
-    log::set_max_level(LevelFilter::Trace);
-    let _ = log::set_boxed_logger(Box::new(LogPlugin(logger)));
+    init_log(app_name, level, target, file);
 }
 
 /// Init and set the log target to console
@@ -97,6 +122,11 @@ pub fn init_log_to_file(app_name: &str, level: LevelFilter, file_path: &str) {
 ///
 /// file_path: file path if the target is set to file
 pub fn init_log(app_name: &str, level: LevelFilter, target: &str, file_path: Option<&str>) {
+    if target == "syslog" {
+        let _ = log::set_boxed_logger(Box::new(SysLogger));
+        log::set_max_level(level);
+        return;
+    }
     let config = build_log_config(app_name, level, target, file_path);
     let r = log4rs::init_config(config);
     if let Err(e) = r {
