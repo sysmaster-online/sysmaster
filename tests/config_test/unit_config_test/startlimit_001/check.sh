@@ -122,9 +122,40 @@ function test05() {
     kill_sysmaster
 }
 
+# usage: test StartLimitAction
+function test06() {
+    log_info "===== test06 ====="
+    cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
+    sed -i '/Description/ a StartLimitAction=' ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+
+    # service success: reboot, poweroff, exit
+    local cmd_list="reboot poweroff exit"
+    for cmd in ${cmd_list}; do
+        cp -arf "${work_dir}"/tmp_units/"${cmd}".target ${SYSMST_LIB_PATH} || return 1
+        sed -i "s/StartLimitAction=.*/StartLimitAction=\"${cmd}\"/" ${SYSMST_LIB_PATH}/base.service
+        run_sysmaster || return 1
+
+        for ((i=0; i<10; ++i)); do
+            sctl start base
+            sctl stop base
+        done
+        echo > "${SYSMST_LOG}"
+        sctl start base
+        check_status base failed || return 1
+        ps aux | grep -v grep | awk '{print $2}' | grep -w "${sysmaster_pid}"
+        expect_eq $? 0 || ps -elf
+        check_log "${SYSMST_LOG}" "by starting ${cmd}.target caused by unit base.service hit StartLimit" || return 1
+
+        # clean
+        kill_sysmaster
+    done
+}
+
 test01 || exit 1
 test02 || exit 1
 test03 || exit 1
 test04 || exit 1
 test05 || exit 1
+test06 || exit 1
 exit "${EXPECT_FAIL}"

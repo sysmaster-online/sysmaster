@@ -34,6 +34,16 @@ fn docker_config_test_dependency_002() {
 
 #[test]
 #[ignore]
+fn docker_config_test_dependency_003() {
+    common::run_script(
+        "docker_config_test",
+        "docker_config_test_dependency_003",
+        "1",
+    );
+}
+
+#[test]
+#[ignore]
 fn docker_config_test_seq_001() {
     common::run_script("docker_config_test", "docker_config_test_seq_001", "1");
 }
@@ -84,4 +94,10 @@ fn docker_config_test_exec_001() {
 #[ignore]
 fn docker_config_test_action_001() {
     common::run_script("docker_config_test", "docker_config_test_action_001", "1");
+}
+
+#[test]
+#[ignore]
+fn docker_config_test_timeout_001() {
+    common::run_script("docker_config_test", "docker_config_test_timeout_001", "1");
 }

@@ -5,7 +5,7 @@ source "${work_dir}"/util_lib.sh
 
 set +e
 
-# usage: test default SuccessAction
+# usage: test SuccessAction
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
@@ -14,8 +14,8 @@ function test01() {
     run_sysmaster || return 1
 
     sctl start base
-    check_status base.service active || return 1
-    check_status base.service inactive || return 1
+    check_status base active || return 1
+    check_status base inactive || return 1
     ps aux | grep -v grep | awk '{print $2}' | grep -w "${sysmaster_pid}"
     expect_eq $? 0 || ps -elf
 
@@ -95,7 +95,7 @@ function test01() {
     done
 }
 
-# usage: test default FailureAction
+# usage: test FailureAction
 function test02() {
     log_info "===== test02 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
