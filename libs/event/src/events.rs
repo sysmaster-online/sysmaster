@@ -132,7 +132,7 @@ impl Events {
     }
 
     /// for signal: read the signal content when signal source emit
-    pub fn read_signals(&self) -> std::io::Result<Option<libc::siginfo_t>> {
+    pub fn read_signals(&self) -> std::io::Result<Option<libc::signalfd_siginfo>> {
         self.data.borrow_mut().read_signals()
     }
 
@@ -402,7 +402,7 @@ impl EventsData {
     }
 
     /// read the signal content when signal source emit
-    pub(self) fn read_signals(&mut self) -> std::io::Result<Option<libc::siginfo_t>> {
+    pub(self) fn read_signals(&mut self) -> std::io::Result<Option<libc::signalfd_siginfo>> {
         self.signal.read_signals()
     }
 

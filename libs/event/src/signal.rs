@@ -99,8 +99,8 @@ impl Signals {
         }
     }
 
-    pub fn read_signals(&mut self) -> std::io::Result<Option<libc::siginfo_t>> {
-        let mut buffer = mem::MaybeUninit::<libc::siginfo_t>::zeroed();
+    pub fn read_signals(&mut self) -> std::io::Result<Option<libc::signalfd_siginfo>> {
+        let mut buffer = mem::MaybeUninit::<libc::signalfd_siginfo>::zeroed();
 
         let size = mem::size_of_val(&buffer);
         let res = unsafe { libc::read(self.fd, buffer.as_mut_ptr() as *mut libc::c_void, size) };

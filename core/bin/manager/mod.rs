@@ -61,38 +61,10 @@ impl SignalMgr {
 }
 
 impl SignalDispatcher for SignalMgr {
-    fn dispatch_signal(&self, signal: &Signal) -> Result<i32> {
-        match signal {
-            Signal::SIGHUP | Signal::SIGSEGV => self.reexec(),
-            Signal::SIGINT => todo!(),
-            Signal::SIGQUIT => todo!(),
-            Signal::SIGILL => todo!(),
-            Signal::SIGTRAP => todo!(),
-            Signal::SIGABRT => todo!(),
-            Signal::SIGBUS => todo!(),
-            Signal::SIGFPE => todo!(),
-            Signal::SIGKILL => todo!(),
-            Signal::SIGUSR1 => todo!(),
-            Signal::SIGUSR2 => todo!(),
-            Signal::SIGPIPE => todo!(),
-            Signal::SIGALRM => todo!(),
-            Signal::SIGTERM => todo!(),
-            Signal::SIGSTKFLT => todo!(),
-            Signal::SIGCHLD => Ok(self.um.child_sigchld_enable(true)),
-            Signal::SIGCONT => todo!(),
-            Signal::SIGSTOP => todo!(),
-            Signal::SIGTSTP => todo!(),
-            Signal::SIGTTIN => todo!(),
-            Signal::SIGTTOU => todo!(),
-            Signal::SIGURG => todo!(),
-            Signal::SIGXCPU => todo!(),
-            Signal::SIGXFSZ => todo!(),
-            Signal::SIGVTALRM => todo!(),
-            Signal::SIGPROF => todo!(),
-            Signal::SIGWINCH => todo!(),
-            Signal::SIGIO => todo!(),
-            Signal::SIGPWR => todo!(),
-            Signal::SIGSYS => todo!(),
+    fn dispatch_signal(&self, signal: &libc::signalfd_siginfo) -> Result<i32> {
+        match signal.ssi_signo as libc::c_int {
+            libc::SIGHUP | libc::SIGSEGV => self.reexec(),
+            libc::SIGCHLD => Ok(self.um.child_sigchld_enable(true)),
             _ => todo!(),
         }
     }
