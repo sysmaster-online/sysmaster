@@ -135,7 +135,7 @@ function run_sysmaster() {
         ps -elf | grep -v grep | grep -w '/usr/lib/sysmaster/sysmaster' | grep ep_pol && break
     done
     # debug
-    ps -elf | grep -v grep | grep sysmaster
+    ps -elf | grep -v grep | grep -Ew 'sysmaster|init'
     if ! ps -elf | grep -v grep | grep -wq '/usr/lib/sysmaster/sysmaster'; then
         cat "${SYSMST_LOG}"
         return 1

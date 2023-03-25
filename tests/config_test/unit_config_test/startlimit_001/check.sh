@@ -14,9 +14,9 @@ function test01() {
     for ((i = 0; i < 5; ++i)); do
         sctl start base.service
         expect_eq $? 0 || return 1
-    check_status base.service active || return 1
-    sctl stop base.service
-    check_status base.service inactive || return 1
+        check_status base.service active || return 1
+        sctl stop base.service
+        check_status base.service inactive || return 1
     done
     sctl start base.service
     expect_eq $? 1 || return 1
@@ -45,10 +45,10 @@ function test02() {
 
     for ((i = 0; i < 3; ++i)); do
         sctl start base.service
-    expect_eq $? 0 || return 1
-    check_status base.service active || return 1
-    sctl stop base.service
-    check_status base.service inactive || return 1
+        expect_eq $? 0 || return 1
+        check_status base.service active || return 1
+        sctl stop base.service
+        check_status base.service inactive || return 1
     done
     sctl start base.service
     expect_eq $? 1 || return 1
@@ -94,9 +94,9 @@ function test04() {
     for ((i = 0; i < 50; ++i)); do
         sctl start base.service
         expect_eq $? 0 || return 1
-    check_status base.service active || return 1
-    sctl stop base.service
-    check_status base.service inactive || return 1
+        check_status base.service active || return 1
+        sctl stop base.service
+        check_status base.service inactive || return 1
     done
 
     # clean
