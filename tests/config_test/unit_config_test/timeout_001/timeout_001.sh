@@ -1,5 +1,5 @@
 #!/bin/bash
-# Description: test for StartLimitInterval/StartLimitBurst/StartLimitAction
+# Description: test for JobTimeoutSec/JobTimeoutAction
 
 TEST_SCRIPT="$(basename "$0")"
 TEST_SCRIPT_PATH="$(dirname "$0")"
