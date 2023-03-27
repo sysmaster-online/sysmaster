@@ -100,32 +100,103 @@ function test04() {
     expect_eq $? 0 || return 1
     useradd "${test_user_1}"
     useradd "${test_user_2}"
+    # echo "${user_pw_1}" | passwd --stdin "${test_user_1}"
+    # echo "${user_pw_2}" | passwd --stdin "${test_user_2}"
 
+    # run sysmaster as root
+    # user = root
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
-    sed -i "/Description=/ a ConditionUser=\"${test_user_1}\"" ${SYSMST_LIB_PATH}/base.service
+    sed -i '/Description=/ a ConditionUser="root"' ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
-
-#    echo "${user_pw_1}" | passwd --stdin "${test_user_1}"
-#    echo "${user_pw_2}" | passwd --stdin "${test_user_2}"
-
     sctl start base
-    check_status base inactive || return 1
-    sudo -u "${test_user_1}" sctl start base; sctl status base
-    expect_eq $? 0 || return 1
-    sctl stop base
-    sudo -u "${test_user_2}" sctl start base; sctl status base
-    expect_eq $? 3 || return 1
-
+    check_status base active || return 1
     # clean
     sctl stop base
+    check_status base inactive
+    kill_sysmaster
+
+    # user = 0
+    sed -i 's/ConditionUser=.*/ConditionUser="0"/' ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+    sctl start base
+    check_status base active || return 1
+    # clean
+    sctl stop base
+    check_status base inactive
+    kill_sysmaster
+
+    # user = @system
+    sed -i 's/ConditionUser=.*/ConditionUser="@system"/' ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+    sctl start base
+    check_status base active || return 1
+    # clean
+    sctl stop base
+    check_status base inactive
+    kill_sysmaster
+
+    # user = normal user
+    sed -i "s/ConditionUser=.*/ConditionUser=\"${test_user_1}\"/" ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+    # start service as root
+    sctl start base
+    check_status base inactive || return 1
+    check_log "${SYSMST_LOG}" 'Starting failed the unit condition test failed'
+    # clean
+    kill_sysmaster
+
+    # user = normal user id
+    # id not exist
+    sed -i 's/ConditionUser=.*/ConditionUser="9999"/' ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+    # start service as root
+    sctl start base
+    check_status base inactive || return 1
+    check_log "${SYSMST_LOG}" 'Starting failed the unit condition test failed'
+    # clean
+    kill_sysmaster
+
+    # id exist
+    id="$(grep -w "${test_user_1}" /etc/passwd | awk -F ':' '{print $3}')"
+    expect_eq $? 0
+    sed -i "s/ConditionUser=.*/ConditionUser=\"${id}\"/" ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+    # start service as root
+    sctl start base
+    check_status base inactive || return 1
+    check_log "${SYSMST_LOG}" 'Starting failed the unit condition test failed'
+    # clean
+    kill_sysmaster
+
+    # run sysmaster as normal user
+    # run_sysmaster "${test_user_1}" || return 1
+
+    # start service as root
+    # sctl start base
+    # check_status base inactive || return 1
+    # check_log "${SYSMST_LOG}" 'Starting failed the unit condition test failed'
+    # echo > "${SYSMST_LOG}"
+
+    # start service as correct user
+    # sudo -u "${test_user_1}" "sctl start base; sleep 1; sctl status base"
+    # expect_eq $? 0 || return 1
+    # sudo -u "${test_user_1}" "sctl stop base; sleep 1; sctl status base"
+    # expect_eq $? 3 || return 1
+
+    # start service as incorrect user
+    # sudo -u "${test_user_2}" "sctl start base; sleep 1; sctl status base"
+    # expect_eq $? 3 || return 1
+
+    # clean
     userdel -rf "${test_user_1}"
     userdel -rf "${test_user_2}"
-    kill_sysmaster
+    # kill_sysmaster
 }
 
 test01 || exit 1
 test02 || exit 1
 # ConditionNeedsUpdate not implemented yet
 # test03 || exit 1
+# user mode not implemented yet
 test04 || exit 1
 exit "${EXPECT_FAIL}"
