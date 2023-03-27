@@ -18,7 +18,7 @@ pub(super) mod condition_keys {
     pub(crate) const CONDITION_PATH_IS_READ_WRITE: &str = "ConditionPathIsReadWrite";
     pub(crate) const CONDITION_FILE_NOT_EMPTY: &str = "ConditionFileNotEmpty";
     pub(crate) const CONDITION_AC_POWER: &str = "ConditionACPower";
-    pub(crate) const CONDITION_FIRST_BOOT: &str = "ConditionFirstBOOT";
+    pub(crate) const CONDITION_FIRST_BOOT: &str = "ConditionFirstBoot";
     pub(crate) const CONDITION_NEEDS_UPDATE: &str = "ConditionNeedsUpdate";
     pub(crate) const CONDITION_USER: &str = "ConditionUser";
 }
