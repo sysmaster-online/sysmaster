@@ -4,9 +4,7 @@
 
 设备管理器是系统中非常重要的组件，承担着设备热插拔感知、设备节点管理等关键工作，是用户态软件与底层物理设备之间的桥梁。sysMaster项目作为openEuler对新一代系统初始化和服务管理系统的探索，集成设备管理功能是必不可少的。devMaster作为sysMaster的设备管理模块，对Linux生态下主流设备管理方案的现状和优劣进行了总结和思考，旨在提供一种通用的、可扩展的、面向通用OS的设备管理能力。
 
-<center>
-<img src="assets/device_management.png" width="35%" height="35%">
-</center>
+<center>![](assets/device_management.png)</center>
 
 ## 主流的设备管理器
 
@@ -30,9 +28,7 @@ udev作为极具代表性的通用OS用户态设备管理器，基本占据了�
 
 ## devMaster的特点
 
-<center>
-<img src="assets/devmaster_architecture.png" width="70%" height="70%">
-</center>
+<center>![](assets/devmaster_architecture.png)</center>
 
 devMaster的软件架构遵循高内聚、低耦合的设计原则，保证各组件职责独立，提高软件可复用、可替换、可扩展能力，降低开发维测成本。devMaster主要包含四部分组件，分为常驻进程devmaster、客户端工具devctl、对外库以及兼容性工具。devMaster使用Rust语言编写，能够原生消除内存安全类问题。另外，devMaster具备以下主要特点：
 
