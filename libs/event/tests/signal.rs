@@ -50,7 +50,7 @@ impl Source for Signals {
         println!("Dispatching signal!");
         match e.read_signals() {
             Ok(Some(info)) => {
-                println!("read signo: {:?}", info.si_signo);
+                println!("read signo: {:?}", info.ssi_signo);
             }
             Ok(None) => (),
             Err(e) => {

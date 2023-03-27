@@ -11,8 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use event::{EventType, Events, Source};
-use nix::sys::signal::Signal;
-use std::{convert::TryFrom, rc::Rc};
+use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::rel::{ReliLastFrame, Reliability};
 
@@ -23,8 +22,9 @@ pub(super) struct Signals<T> {
 }
 
 pub(super) trait SignalDispatcher {
-    fn dispatch_signal(&self, signal: &Signal) -> Result<i32>;
+    fn dispatch_signal(&self, signal: &libc::signalfd_siginfo) -> Result<i32>;
 }
+
 impl<T> Signals<T> {
     pub(super) fn new(relir: &Rc<Reliability>, data_handler: T) -> Self {
         Signals {
@@ -53,10 +53,9 @@ impl<T: SignalDispatcher> Source for Signals<T> {
         self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);
         match e.read_signals() {
             Ok(Some(info)) => {
-                let signal = Signal::try_from(info.si_signo).unwrap();
-                log::debug!("read signal from event: {}", signal);
-                if let Err(e) = self.signal_handler.dispatch_signal(&signal) {
-                    log::error!("dispatch signal{:?} error: {}", signal, e);
+                log::debug!("read signal from event: {:?}", info);
+                if let Err(e) = self.signal_handler.dispatch_signal(&info) {
+                    log::error!("dispatch signal failed : {}", e);
                 }
             }
             Ok(None) => log::debug!("read signals none"),
