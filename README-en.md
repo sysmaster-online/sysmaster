@@ -14,7 +14,7 @@ sysMaster is developed by openEuler after summarizing the problems and character
 
 ## Initialization System and Service Management of Linux
 
-As we all know, process 1 is the first user-mode process started by the kernel in all Unix systems. It is the prerequisite for stable OS running. It is the representative of OS initialization programs (some tool sets actually used in initialization). In addition, process 1 needs to run in the background to reclaim orphan processes, to ensure that the system works properly. The initialization systems that you are familiar with include sysvinit, Upstart of Debian and Ubuntu, and systemd. The systems have their own characteristics. For details, see the following table.
+As we all know, process 1 is the first userspace process started by the kernel in all Unix systems. It is the prerequisite for stable OS running. It is the representative of OS initialization programs (some tool sets actually used in initialization). In addition, process 1 needs to run in the background to reap orphan processes, to ensure that the system works properly. The initialization systems that you are familiar with include sysvinit, Upstart of Debian and Ubuntu, and systemd. The systems have their own characteristics. For details, see the following table.
 
 | Initialization Software | Description                                                  | Start Management | Process Recycling | Service Management | Parallel Startup | Device Management | Resource Control | Log Management |
 | ----------------------- | ------------------------------------------------------------ | ---------------- | ----------------- | ------------------ | ---------------- | ----------------- | ---------------- | -------------- |
