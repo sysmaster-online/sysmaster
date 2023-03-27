@@ -27,7 +27,7 @@ Systemd对Sysvinit做出了很大的改进，尤其是启动速度上，功能�
 
 根据维护问题的统计追踪，Systemd每个版本引入的问题都不是一个收敛状态，并且近些年问题越来越多。而且由于1号进程特殊性，这些问题会带来系统级别的宕机。
 
-<center>![avatar](assets/systemd_problems.png)</center>
+<center>![](assets/systemd_problems.png)</center>
 
 ## 云的服务管理
 
@@ -35,7 +35,7 @@ Systemd对Sysvinit做出了很大的改进，尤其是启动速度上，功能�
 
 对于Node（VM，Host）内部的一些关键服务，如Ngnix，通过Systemd进行生命周期的管理，并且这些服务也是分布式的，当前出现问题，由服务自行进行处理，无法像容器实例和虚拟机实例一样通过类似K8S、OpenStack平台统一编排。
 
-<center>![avatar](assets/cloud_ori.jpg)</center>
+<center>![](assets/cloud_ori.jpg)</center>
 
 ## sysMaster应该聚焦什么？
 
@@ -53,7 +53,7 @@ Systemd对Sysvinit做出了很大的改进，尤其是启动速度上，功能�
 
 ## 极致可靠、轻量，满足嵌入式，服务器、云多种场景
 
-<center>![avatar](assets/sysmaster_arch_desc.jpg)</center>
+<center>![](assets/sysmaster_arch_desc.jpg)</center>
 
 sysMaster通过多级拆分的1+1+N架构，确保每个组件专注自己的职责，降低单组件的复杂性，确保组件架构的及简，从而提升系统整体架构扩展性，和适应性，并降低开发和维护的成本，并拥有以下主要特特点：
 
@@ -75,11 +75,13 @@ sysMaster定位为支持嵌入式和服务器，云等全场景的支持，当�
 
 sysMaster吸收现有运化场景的一些特点，结合容器引擎(iSulad)和Qemu，提供统一的容器实例和虚拟化实例的管理接口，以及由sysMaster管理的一些关键应用实例的管理统一对接到Kubernetes和OpenStack。
 
-<center>![avatar](assets/cloud_new.jpg)</center>
+<center>![](assets/cloud_new.jpg)</center>
 
 ## sysmaster项目里程碑及愿景
 
-<center><img src="assets/sysmaster-description.jpg" alt="atlas" style="zoom: 150%;" /></center>
+<center>![](assets/sysmaster-description.jpg)</center>
+
+
 
 ## 代码目录结构说明
 
