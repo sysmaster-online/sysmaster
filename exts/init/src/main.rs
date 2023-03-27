@@ -18,46 +18,36 @@ use nix::unistd;
 fn main() {
     let cmd = get_command();
 
-    if let Ok(res) = RunTime::new(cmd) {
-        let mut run_time = res;
-        if let Err(err) = run_time.init() {
-            println!("Failed to init:{:?} ", err);
-            run_time.clear();
-            freeze();
-        }
-
-        loop {
-            match run_time.get_state() {
-                InitState::Reexec => {
-                    if let Err(err) = run_time.reexec() {
-                        println!("Failed to reexec:{:?} ", err);
-                        break;
-                    }
-                }
-                InitState::RunRecover => {
-                    if let Err(err) = run_time.run() {
-                        println!("Failed to run:{:?} ", err);
-                        break;
-                    }
-                }
-                InitState::RunUnRecover => {
-                    if let Err(err) = run_time.unrecover_run() {
-                        println!("Failed to unrecover_run:{:?} ", err);
-                        break;
-                    }
+    // The main role of init is to manage sysmaster and recycle zombie processes.
+    // Reexec: Reexecute or connect the sysmaster.
+    // Run: Monitor the sysmaster's liveliness and acceptance of message.
+    // Unrecover: On-site problem collection or recreate new sysmaster.
+    match RunTime::new(cmd) {
+        Ok(mut run_time) => {
+            loop {
+                let state = run_time.state();
+                let ret = match state {
+                    InitState::Reexec => run_time.reexec(),
+                    InitState::Run => run_time.run(),
+                    InitState::Unrecover => run_time.unrecover(),
+                };
+                if let Err(err) = ret {
+                    eprintln!("Failed to {:?}:{:?} ", state, err);
+                    break;
                 }
             }
+            run_time.clear();
         }
-        run_time.clear();
+        Err(err) => eprintln!("Failed to new init{:?}", err),
     }
 
+    // freeze, after RunTime::new fails or signal_fd or timer_fd generates epoll error.
     freeze();
 }
 
 fn get_command() -> Param {
     let mut param = Param::new();
     let agrs: Vec<String> = std::env::args().collect();
-    // Parameter parsing starts from the second position.
     param.get_opt(agrs);
 
     param

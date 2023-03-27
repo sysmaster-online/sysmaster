@@ -533,14 +533,12 @@ impl EventsData {
 
     fn flush_timer(&self, et: &EventType) -> bool {
         let timer_fd = self.timerfd.get(et).unwrap().as_raw_fd();
-        let mut buffer = [0u8; 4096];
-        if let Err(err) = unistd::read(timer_fd, &mut buffer) {
+        if let Err(err) = unistd::read(timer_fd, &mut [0u8; 8]) {
             if err == nix::errno::Errno::EAGAIN || err == nix::errno::Errno::EINTR {
                 return true;
             }
             return false;
         }
-
         true
     }
 

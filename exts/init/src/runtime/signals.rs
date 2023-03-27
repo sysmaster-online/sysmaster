@@ -12,10 +12,13 @@
 
 use super::epoll::Epoll;
 use nix::errno::Errno;
+use nix::sys::epoll::EpollEvent;
 use nix::sys::signal::Signal;
 use nix::sys::wait::{self, Id, WaitPidFlag, WaitStatus};
+use nix::unistd;
 use std::mem;
 use std::ops::Neg;
+use std::os::fd::RawFd;
 use std::rc::Rc;
 
 pub const RUN_UNRECOVER_SIG_OFFSET: i32 = 8;
@@ -51,23 +54,19 @@ impl SigSet {
 }
 
 pub struct Signals {
-    pub epoll: Rc<Epoll>,
-    pub signal_fd: i32,
+    epoll: Rc<Epoll>,
+    signal_fd: RawFd,
     set: SigSet,
     oldset: SigSet,
     signals: Vec<i32>,
-    pub zombie_signal: i32,
-    pub restart_signal: i32,
-    pub unrecover_signal: i32,
+    zombie_signal: i32,
+    restart_signal: i32,
+    unrecover_signal: i32,
 }
 
 impl Signals {
     pub fn new(epoll: &Rc<Epoll>) -> Self {
-        let signals = vec![
-            libc::SIGRTMIN() + RUN_UNRECOVER_SIG_OFFSET,
-            libc::SIGRTMIN() + RESTART_MANAGER_SIG_OFFSET,
-            libc::SIGCHLD,
-        ];
+        let signals = (1..=libc::SIGRTMAX()).collect();
 
         Signals {
             epoll: epoll.clone(),
@@ -79,6 +78,18 @@ impl Signals {
             unrecover_signal: libc::SIGRTMIN() + RUN_UNRECOVER_SIG_OFFSET,
             restart_signal: libc::SIGRTMIN() + RESTART_MANAGER_SIG_OFFSET,
         }
+    }
+
+    pub fn is_zombie(&self, signo: i32) -> bool {
+        self.zombie_signal == signo
+    }
+
+    pub fn is_restart(&self, signo: i32) -> bool {
+        self.restart_signal == signo
+    }
+
+    pub fn is_unrecover(&self, signo: i32) -> bool {
+        self.unrecover_signal == signo
     }
 
     pub fn create_signals_epoll(&mut self) -> Result<(), Errno> {
@@ -102,8 +113,12 @@ impl Signals {
         }
     }
 
-    pub fn read_signals(&mut self) -> Result<Option<i32>, Errno> {
-        let mut buffer = mem::MaybeUninit::<libc::siginfo_t>::zeroed();
+    pub fn read(&mut self, event: EpollEvent) -> Result<Option<libc::signalfd_siginfo>, Errno> {
+        if self.epoll.is_err(event) {
+            return Err(Errno::EIO);
+        }
+        let mut buffer = mem::MaybeUninit::<libc::signalfd_siginfo>::zeroed();
+
         let size = mem::size_of_val(&buffer);
         let res = unsafe {
             libc::read(
@@ -116,27 +131,32 @@ impl Signals {
         match res {
             x if x == size as isize => {
                 let info = unsafe { buffer.assume_init() };
-                Ok(Some(info.si_signo))
+                Ok(Some(info))
             }
             x if x >= 0 => Ok(None),
             x => {
                 let err = Errno::from_i32(x.neg() as i32);
-                println!("read_signals failed err:{:?}", err);
-                Err(err)
+                eprintln!("read_signals failed err:{:?}", err);
+                unistd::sleep(1);
+                Ok(None)
             }
         }
     }
 
-    pub fn recycle_zombie(&mut self) -> Result<(), Errno> {
+    pub fn recycle_zombie(&mut self, dest_pid: unistd::Pid) {
         // peek signal
         let flags = WaitPidFlag::WEXITED | WaitPidFlag::WNOHANG | WaitPidFlag::WNOWAIT;
         loop {
             // get wait information
-            let wait_status = match wait::waitid(Id::All, flags) {
+            let mut id_flag = Id::All;
+            if dest_pid.as_raw() > 0 {
+                id_flag = Id::Pid(dest_pid);
+            }
+
+            let wait_status = match wait::waitid(id_flag, flags) {
                 Ok(status) => status,
-                Err(err) => {
-                    println!("Error while waiting pid: {:?}", err);
-                    return Ok(());
+                Err(_) => {
+                    return;
                 }
             };
 
@@ -152,21 +172,33 @@ impl Signals {
                 Some((pid, code, sig)) => (pid, code, sig),
                 None => {
                     println!("Ignored child signal: {:?}", wait_status);
-                    return Ok(());
+                    return;
                 }
             };
 
             if pid.as_raw() <= 0 {
-                println!("Ignored pid in signal: {:?}", pid);
-                return Ok(());
+                println!("pid:{:?} is invalid! Ignored it.", pid);
+                return;
             }
 
-            // pop: reap the zombie
+            // pop: recycle the zombie
             if let Err(e) = wait::waitid(Id::Pid(pid), WaitPidFlag::WEXITED) {
-                println!("Error when reap the zombie, ignoring: {:?}", e);
+                println!("Error when recycle the zombie, ignoring: {:?}", e);
             } else {
-                println!("reap the zombie: pid:{:?}", pid);
+                println!("recycle the zombie: pid:{:?}", pid);
             }
         }
+    }
+
+    pub fn is_fd(&self, fd: RawFd) -> bool {
+        if fd == self.signal_fd {
+            return true;
+        }
+        false
+    }
+
+    pub fn clear(&mut self) {
+        self.epoll.safe_close(self.signal_fd);
+        self.signal_fd = INVALID_FD;
     }
 }

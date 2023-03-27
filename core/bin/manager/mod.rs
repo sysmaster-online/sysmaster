@@ -232,15 +232,8 @@ impl Manager {
             manager_config.clone(),
         ));
 
-        let res = KeepAlive::get_instance();
-        let connect_fd;
-        match &*res {
-            Ok(kp) => connect_fd = kp.get_fd(),
-            Err(err) => {
-                panic!("err: {err:?}")
-            }
-        }
-        let alive_timer = Rc::new(AliveTimer::new(&event, connect_fd));
+        let kp = KeepAlive::get_instance();
+        let alive_timer = Rc::new(AliveTimer::new(&event, kp.get_fd()));
 
         Manager {
             event,

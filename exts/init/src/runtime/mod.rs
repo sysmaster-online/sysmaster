@@ -10,25 +10,27 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-mod alive;
+mod comm;
 mod epoll;
 pub mod param;
 mod signals;
+mod timer;
 
-use alive::Alive;
+use comm::{Comm, CommType};
 use epoll::Epoll;
+use libc::signalfd_siginfo;
 use nix::errno::Errno;
 use nix::libc;
-use nix::sys::epoll::EpollFlags;
+use nix::sys::epoll::EpollEvent;
 use nix::unistd::{self, ForkResult, Pid};
 use param::Param;
 use signals::Signals;
+use std::os::fd::RawFd;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{exit, Command};
 use std::rc::Rc;
 
-const INVALID_FD: i32 = -1;
 const INVALID_PID: i32 = -1;
 const MANAGER_SIG_OFFSET: i32 = 7;
 const SYSMASTER_PATH: &str = "/usr/lib/sysmaster/sysmaster";
@@ -36,8 +38,8 @@ const SYSMASTER_PATH: &str = "/usr/lib/sysmaster/sysmaster";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub enum InitState {
     Reexec = 0,
-    RunRecover = 1,
-    RunUnRecover = 2,
+    Run = 1,
+    Unrecover = 2,
 }
 
 pub struct RunTime {
@@ -45,7 +47,7 @@ pub struct RunTime {
     sysmaster_pid: Pid,
     state: InitState,
     epoll: Rc<Epoll>,
-    alive: Alive,
+    comm: Comm,
     signals: Signals,
     need_reexec: bool,
 }
@@ -54,277 +56,188 @@ impl RunTime {
     pub fn new(cmd: Param) -> Result<RunTime, Errno> {
         let ep = Epoll::new()?;
         let epoll = Rc::new(ep);
-        let alive = Alive::new(&epoll, cmd.init_param.time_wait, cmd.init_param.time_cnt)?;
+        let comm = Comm::new(&epoll, cmd.init_param.time_wait, cmd.init_param.time_cnt)?;
         let signals = Signals::new(&epoll);
 
-        Ok(RunTime {
+        let mut run_time = RunTime {
             cmd,
             sysmaster_pid: unistd::Pid::from_raw(INVALID_PID),
             state: InitState::Reexec,
             epoll,
-            alive,
+            comm,
             signals,
             need_reexec: false,
-        })
+        };
+
+        run_time.create_sysmaster()?;
+        run_time.signals.create_signals_epoll()?;
+
+        Ok(run_time)
     }
 
-    pub fn init(&mut self) -> Result<(), Errno> {
-        self.signals.create_signals_epoll()?;
-
-        self.alive.init()?;
-
-        self.create_sysmaster()?;
-        self.state = InitState::Reexec;
-        Ok(())
+    pub fn state(&self) -> InitState {
+        self.state
     }
 
     pub fn reexec(&mut self) -> Result<(), Errno> {
         if self.need_reexec {
-            // if the status of reexec_manager is not Reexec, return directly!
-            if InitState::Reexec != self.reexec_manager()? {
-                return Ok(());
-            }
+            self.reexec_manager();
         }
 
-        let events = self.epoll.wait()?;
-
-        for event in events {
-            let ep_event = event.events();
-            let ep_data = event.data();
-            if let true = self.ep_event_err_proc(ep_event, ep_data)? {
-                return Ok(());
-            }
-
-            if self.alive.connect_fd as u64 == ep_data {
-                let buf = self.alive.recv_buf()?;
-                if self.alive.is_unmanageable(&buf) {
-                    self.need_reexec = true;
-                } else if self.alive.is_manageable(&buf) && !self.need_reexec {
-                    self.state = InitState::RunRecover;
-                    self.alive.manager_time_cnt = 0;
-                    self.alive.alive_time_cnt = 0;
-                } else {
-                    eprintln!("recv buf is invalid! {:?}", buf);
-                }
-                continue;
-            }
-            if self.alive.time_fd as u64 == ep_data {
-                self.epoll.read(self.alive.time_fd)?;
-                self.alive.manager_time_cnt += 1;
-                if self.alive.time_cnt <= self.alive.manager_time_cnt {
-                    self.need_reexec = true;
-                }
-                continue;
-            }
-            if self.signals.signal_fd as u64 == ep_data {
-                let res = self.signals.read_signals()?;
-                match res {
-                    Some(signal) => {
-                        self.run_dispatch_signal(signal)?;
-                    }
-                    None => println!("read_signals is None!"),
-                }
-                continue;
-            }
+        let event = self.epoll.wait_one();
+        let fd = event.data() as RawFd;
+        match fd {
+            _x if self.comm.is_fd(fd) => self.reexec_comm_dispatch(event)?,
+            _x if self.signals.is_fd(fd) => self.reexec_signal_dispatch(event)?,
+            _ => self.epoll.safe_close(fd),
         }
-
         Ok(())
-    }
-
-    pub fn get_state(&self) -> InitState {
-        self.state
     }
 
     pub fn run(&mut self) -> Result<(), Errno> {
-        let events = self.epoll.wait()?;
-        for event in events {
-            let ep_event = event.events();
-            let ep_data = event.data();
-            if let true = self.ep_event_err_proc(ep_event, ep_data)? {
-                return Ok(());
-            }
-
-            if self.alive.connect_fd as u64 == ep_data {
-                let buf = self.alive.recv_buf()?;
-                if self.alive.is_unmanageable(&buf) {
-                    self.alive.manager_time_cnt = 0;
-                    self.state = InitState::Reexec;
-                    self.need_reexec = true;
-                } else if self.alive.is_alive(&buf) {
-                    self.alive.alive_time_cnt = 0;
-                } else {
-                    eprintln!("recv buf is invalid! {:?}", buf);
-                }
-                continue;
-            }
-            if self.alive.time_fd as u64 == ep_data {
-                self.epoll.read(self.alive.time_fd)?;
-                self.alive.alive_time_cnt += 1;
-                if self.alive.time_cnt <= self.alive.alive_time_cnt {
-                    self.state = InitState::Reexec;
-                    self.need_reexec = true;
-                }
-                continue;
-            }
-            if self.signals.signal_fd as u64 == ep_data {
-                let res = self.signals.read_signals()?;
-                match res {
-                    Some(signal) => {
-                        self.run_dispatch_signal(signal)?;
-                    }
-                    None => println!("None"),
-                }
-                continue;
-            }
+        let event = self.epoll.wait_one();
+        let fd = event.data() as RawFd;
+        match fd {
+            _x if self.comm.is_fd(fd) => self.run_comm_dispatch(event)?,
+            _x if self.signals.is_fd(fd) => self.run_signal_dispatch(event)?,
+            _ => self.epoll.safe_close(fd),
         }
         Ok(())
     }
 
-    pub fn unrecover_run(&mut self) -> Result<(), Errno> {
-        let events = self.epoll.wait()?;
-
-        for event in events {
-            let ep_event = event.events();
-            let ep_data = event.data();
-            if let true = self.ep_event_err_proc(ep_event, ep_data)? {
-                return Ok(());
-            }
-
-            if self.alive.connect_fd as u64 == ep_data {
-                let buf = self.alive.recv_buf()?;
-                if self.alive.is_alive(&buf) {
-                    self.alive.manager_time_cnt = 0;
-                    self.alive.alive_time_cnt = 0;
-                }
-                continue;
-            }
-            if self.alive.time_fd as u64 == ep_data {
-                self.epoll.read(self.alive.time_fd)?;
-                self.alive.alive_time_cnt += 1;
-                if self.alive.time_cnt <= self.alive.alive_time_cnt {
-                    self.alive.alive_time_cnt = 0;
-                    println!("sysmaster is timeout!");
-                }
-                continue;
-            }
-            if self.signals.signal_fd as u64 == ep_data {
-                let res = self.signals.read_signals()?;
-                match res {
-                    Some(signal) => {
-                        self.unrecover_dispatch_signal(signal)?;
-                    }
-                    None => println!("None"),
-                }
-                continue;
-            }
+    pub fn unrecover(&mut self) -> Result<(), Errno> {
+        let event = self.epoll.wait_one();
+        let fd = event.data() as RawFd;
+        match fd {
+            _x if self.comm.is_fd(fd) => self.unrecover_comm_dispatch(event),
+            _x if self.signals.is_fd(fd) => self.unrecover_signal_dispatch(event)?,
+            _ => self.epoll.safe_close(fd),
         }
         Ok(())
     }
 
     pub fn clear(&mut self) {
-        self.epoll.safe_close(self.alive.alive_fd);
-        self.alive.alive_fd = INVALID_FD;
-
-        self.epoll.safe_close(self.alive.connect_fd);
-        self.alive.connect_fd = INVALID_FD;
-
-        self.epoll.safe_close(self.signals.signal_fd);
-        self.signals.signal_fd = INVALID_FD;
-
+        self.comm.clear();
+        self.signals.clear();
         self.epoll.clear();
     }
 
-    fn reexec_manager(&mut self) -> Result<InitState, Errno> {
+    fn reexec_manager(&mut self) {
         self.need_reexec = false;
-        self.alive.manager_time_cnt = 0;
-        self.alive.alive_time_cnt = 0;
 
-        if self.alive.connect_fd >= 0 {
-            self.alive.del_connect_epoll()?;
-        }
+        self.comm.finish();
 
-        let res = unsafe {
+        unsafe {
             libc::kill(
                 self.sysmaster_pid.into(),
                 libc::SIGRTMIN() + MANAGER_SIG_OFFSET,
             )
         };
-        if let Err(err) = Errno::result(res).map(drop) {
-            println!(
-                "Failed to kill sysmaster:{:?}  err:{:?} change state to unrecover",
-                self.sysmaster_pid, err
-            );
-            self.state = InitState::RunUnRecover;
-            return Ok(self.state);
-        }
-
-        if self.alive.wait_connect().is_err() {
-            self.state = InitState::RunUnRecover;
-        }
-
-        Ok(self.state)
     }
 
-    fn ep_event_err_proc(&mut self, ep_flags: EpollFlags, ep_data: u64) -> Result<bool, Errno> {
-        if self.epoll.event_is_err(ep_flags) {
-            println!("ep_flags:{:?} ep_data:{:?} is invalid!", ep_flags, ep_data);
-            // when sysmaster is killed by signal,etc.
-            if self.alive.connect_fd as u64 == ep_data {
-                self.alive.del_connect_epoll()?;
-                self.state = InitState::RunUnRecover;
-                return Ok(true);
-            } else {
-                return Err(Errno::EIO);
+    fn reexec_comm_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
+        match self.comm.proc(event)? {
+            CommType::PipON => self.state = InitState::Run,
+            CommType::PipTMOUT => self.need_reexec = true,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn run_comm_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
+        match self.comm.proc(event)? {
+            CommType::PipOFF => self.state = InitState::Reexec,
+            CommType::PipTMOUT => {
+                self.state = InitState::Reexec;
+                self.need_reexec = true;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn unrecover_comm_dispatch(&mut self, event: EpollEvent) {
+        _ = self.comm.proc(event);
+    }
+
+    fn reexec_signal_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
+        if let Some(siginfo) = self.signals.read(event)? {
+            let signo = siginfo.ssi_signo as i32;
+            match signo {
+                _x if self.signals.is_zombie(signo) => self.do_recycle(siginfo),
+                _x if self.signals.is_restart(signo) => self.do_reexec(),
+                _x if self.signals.is_unrecover(signo) => self.change_to_unrecover(),
+                _ => {}
             }
         }
-        Ok(false)
+        Ok(())
     }
 
-    fn run_dispatch_signal(&mut self, signal: i32) -> Result<(), Errno> {
-        match signal {
-            x if x == self.signals.zombie_signal => self.signals.recycle_zombie(),
-            x if x == self.signals.restart_signal => self.do_restart(),
-            x if x == self.signals.unrecover_signal => self.run_to_unrecover(),
-            _ => Ok(()),
-        }
-    }
-
-    fn unrecover_dispatch_signal(&mut self, signal: i32) -> Result<(), Errno> {
-        match signal {
-            x if x == self.signals.zombie_signal => self.signals.recycle_zombie(),
-            x if x == self.signals.restart_signal => {
-                unsafe { libc::kill(self.sysmaster_pid.into(), libc::SIGKILL) };
-                self.create_sysmaster()
+    fn run_signal_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
+        if let Some(siginfo) = self.signals.read(event)? {
+            let signo = siginfo.ssi_signo as i32;
+            match signo {
+                _x if self.signals.is_zombie(signo) => self.do_recycle(siginfo),
+                _x if self.signals.is_restart(signo) => self.do_reexec(),
+                _ => {}
             }
-            _ => Ok(()),
         }
+        Ok(())
     }
 
-    fn run_to_unrecover(&mut self) -> Result<(), Errno> {
+    fn unrecover_signal_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
+        if let Some(siginfo) = self.signals.read(event)? {
+            let signo = siginfo.ssi_signo as i32;
+            match signo {
+                _x if self.signals.is_zombie(signo) => {
+                    self.signals.recycle_zombie(Pid::from_raw(0))
+                }
+                _x if self.signals.is_restart(signo) => self.do_recreate(),
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn change_to_unrecover(&mut self) {
         println!("change run state to unrecover");
-        self.state = InitState::RunUnRecover;
-        Ok(())
+        self.state = InitState::Unrecover;
+        // Attempt to recycle the zombie sysmaster.
+        self.signals.recycle_zombie(Pid::from_raw(0));
     }
 
-    fn do_restart(&mut self) -> Result<(), Errno> {
-        self.state = InitState::Reexec;
+    fn do_reexec(&mut self) {
         self.need_reexec = true;
-        Ok(())
+        self.state = InitState::Reexec;
+    }
+
+    fn do_recreate(&mut self) {
+        self.comm.finish();
+        unsafe { libc::kill(self.sysmaster_pid.into(), libc::SIGKILL) };
+        if let Err(err) = self.create_sysmaster() {
+            eprintln!("Failed to create_sysmaster{:?}", err);
+        }
+    }
+
+    fn do_recycle(&mut self, siginfo: signalfd_siginfo) {
+        let pid = siginfo.ssi_pid as i32;
+        if self.sysmaster_pid.as_raw() != pid {
+            self.signals.recycle_zombie(Pid::from_raw(pid));
+        }
     }
 
     fn create_sysmaster(&mut self) -> Result<(), Errno> {
         if !Path::new(SYSMASTER_PATH).exists() {
-            println!("{:?} does not exest! ", SYSMASTER_PATH);
+            eprintln!("{:?} does not exest!", SYSMASTER_PATH);
             return Err(Errno::ENOENT);
         }
 
         let res = unsafe { unistd::fork() };
         if let Err(err) = res {
-            println!("Failed to create_sysmaster:{:?}", err);
+            eprintln!("Failed to create_sysmaster:{:?}", err);
             Err(err)
         } else if let Ok(ForkResult::Parent { child, .. }) = res {
             self.sysmaster_pid = child;
-            self.alive.wait_connect()?;
             Ok(())
         } else {
             let mut command = Command::new(SYSMASTER_PATH);
@@ -334,7 +247,7 @@ impl RunTime {
             let err = comm.exec();
             match err.raw_os_error() {
                 Some(e) => {
-                    println!("MANAGER exit err:{:?}", e);
+                    eprintln!("MANAGER exit err:{:?}", e);
                     exit(e);
                 }
                 None => exit(0),
