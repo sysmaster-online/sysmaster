@@ -9,13 +9,13 @@
 
 
 
-# 1 概述
+## 1 概述
 
 devmaster是sysmaster的设备管理模块，是支撑1号进程在虚拟机、物理机环境中部署运行的核心能力之一。devmaster采用了机制和策略分离的架构，并设计了一套并发程序框架，在提供优秀的灵活性和可扩展性的基础上，充分发挥了多核硬件资源的并发能力。
 
 
 
-# 2 相关工作
+## 2 相关工作
 
 | 业界方案     | 特点                                                                                                                                           | 应用平台               |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
@@ -26,13 +26,13 @@ devmaster是sysmaster的设备管理模块，是支撑1号进程在虚拟机、�
 
 
 
-# 3 设计方案
+## 3 设计方案
 
 本节对devmaster的设计方案进行讨论。首先我们将分析devmaster的总体架构，并介绍涉及代码的目录结构，然后我们将介绍devmaster的基本运行框架，并细粒度分析各个子模块的工作原理，最后我们通过时序图介绍devmaster的核心功能场景。
 
 
 
-## 3.1 总体架构
+### 3.1 总体架构
 
 devmaster包含两个可执行文件：常驻进程devmaster和客户端工具devctl
 
@@ -43,7 +43,7 @@ devmaster包含两个可执行文件：常驻进程devmaster和客户端工具de
 
 <center>![](assets/devmaster_architecture.png)</center>
 
-## 3.2 目录结构
+### 3.2 目录结构
 
 1. 源码位置: extends/devmaster
 
@@ -53,25 +53,25 @@ devmaster包含两个可执行文件：常驻进程devmaster和客户端工具de
 
 
 
-## 3.3 基本框架
+### 3.3 基本框架
 
 devmaster采用基于epoll的event异步编程框架，当内核上报uevent事件或者用户通过devctl工具发送控制命令后，将激活devmaster进入设备处理流程。基本框架分成三个层次，第一层次包含ControlManager和Monitor模块，负责接收设备事件，ControlManager负责接收devctl发送的控制指令，用户可以通过devct对devmaster的框架功能进行调试，Monitor负责监听内核上报的uevent事件，第二层次为JobQueue模块，devmaster接收到设备事件后需要插入到任务队列中进行缓存，并等待派发给空闲worker进程设备处理，队列中的各个事件具有状态，JobQueue需要维护和刷新事件状态，第三层次为WorkerManager模块，当任务队列中存在待处理事件时，由WorkerManager分配或者创建空闲的worker，并派发事件给worker进行处理，WorkerManager需要维护和刷新worker的状态，worker接收到待处理事件时，会在日志中打印接收记录，处理成功后，向外广播设备信息，并向WorkerManager通过tcp发送应答消息。各模块间的依赖关系如下图所示，ControlManager和Monitor持有JobQueue的引用，当接收到设备事件后，插入到任务队列中，JobQueue和WorkerManager相互持有引用，JobQueue中存在待处理任务时，会向WorkerManager分发，如果获取到空闲worker，则更新任务状态，WorkerManager获取到空闲的worker时，会将设备任务发送给该worker进行处理，处理完成后，WorkerManager通过JobQueue更新任务状态。
 
 <center>![](assets/devmaster_basic_framework.jpg)</center>
 
-## 3.4 模块分析
+### 3.4 模块分析
 
 本节将详细介绍devmaster基本框架中的各个子模块。
 
 
 
-### 3.4.1 Monitor
+#### 3.4.1 Monitor
 
 devmaster的Monitor负责监听内核上报的uevent事件，从事件中提取设备信息，生成Device实例并插入到JobQueue保存。
 
 
 
-### 3.4.2 ControlManager
+#### 3.4.2 ControlManager
 
 devmaster通过ControlManager模块接收devctl工具发送的控制命令，ControlManager监听的端口地址为（0.0.0.0:1224），当前支持的控制命令如下：
 
@@ -80,7 +80,7 @@ devmaster通过ControlManager模块接收devctl工具发送的控制命令，Con
 
 
 
-### 3.4.3 JobQueue
+#### 3.4.3 JobQueue
 
 devmaster在短时间内监测到大量uevent事件时，可能无充足数量的worker来同时满足任务调度，因此使用JobQueue将设备事件缓存起来，等待worker进入空闲状态后再进行派发处理。
 
@@ -94,7 +94,7 @@ devmaster在短时间内监测到大量uevent事件时，可能无充足数量�
 
 
 
-### 3.4.4 WorkerManager
+#### 3.4.4 WorkerManager
 
 WorkerManager模块负责管理调度worker，需要承担任务派发、状态更新、worker回收等工作。
 
@@ -109,13 +109,13 @@ WorkerManager模块负责管理调度worker，需要承担任务派发、状态�
 <center>![](assets/devmaster_worker_communicate.jpg)</center>
 
 
-## 3.5 核心功能
+### 3.5 核心功能
 
 本节将以时序图的形式介绍devmaster的几个核心功能场景。
 
 
 
-### 3.5.1 事件驱动的设备处理流程
+#### 3.5.1 事件驱动的设备处理流程
 
 1. Monitor监听到uevent事件后，解析uevent报文并提取Device数据。
 
@@ -159,15 +159,15 @@ WorkerManager模块负责管理调度worker，需要承担任务派发、状态�
 
 <center>![](assets/devmaster_device_process.jpg)</center>
 
-# 4 实验对比
+## 4 实验对比
 
 
 
-# 5 附录
+## 5 附录
 
 
 
-## 5.1 特性列表
+### 5.1 特性列表
 
 | 需求编号 | 需求名称            | 特性描述                                                                                                                                                                                                                                              | 优先级 |
 | -------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
@@ -176,7 +176,7 @@ WorkerManager模块负责管理调度worker，需要承担任务派发、状态�
 | 3        | WorkerManager       | 采用线程池模型创建并管理worker，当接收事件队列派发的任务时，从线程池中获取一个空闲的worker进行处理，如果不存在空闲worker，则创建一个新的worker线程进行处理,worker中进行规则处理，需要设计看门狗机制防止处理超时，当worker空闲过久时，需要进行线程回收 | 高     |
 | 4        | 规则处理            | 负责导入和管理规则文件，处理设备任务时需要执行规则解析动作，规则解析过程需要一些特殊设备组件与builtin工具的支持，并且需要实现hwdb对设备信息进行持久化存储                                                                                             | 中     |
 | 5        | 信号处理            | 接收SIGINT和SIGTERM信号时，进入进程退出流程，接收SIGHUP信号时，重新加载进程                                                                                                                                                                           | 中     |
-| 6        | device           | 提供设备相关的公共函数、数据结构等支持                                                                                                                                                                                                                | 中     |
+| 6        | device              | 提供设备相关的公共函数、数据结构等支持                                                                                                                                                                                                                | 中     |
 | 7        | Watch               | 使用inotify机制监控设备节点的IN_CLOSE_WRITE操作，并通过sysfs机制模拟设备的change事件                                                                                                                                                                  | 低     |
 | 8        | ControlManager      | 使用UnixSocket机制，监听客户端程序devctl发起的连接请求，建立连接后进行报文交互，并根据控制请求进行控制响应                                                                                                                                            | 低     |
 | 9        | 控制响应            | 根据客户端程序的控制请求，进行配置设置、行为控制、延时控制等动作                                                                                                                                                                                      | 低     |
@@ -191,11 +191,11 @@ WorkerManager模块负责管理调度worker，需要承担任务派发、状态�
 
 
 
-## 5.2 接口定义
+### 5.2 接口定义
 
 
 
-### 1. devctl monitor
+#### 1. devctl monitor
 
 |                |                                                                                                                                                                                                   |
 | -------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -207,14 +207,14 @@ WorkerManager模块负责管理调度worker，需要承担任务派发、状态�
 | Output参数     | 无                                                                                                                                                                                                |
 | 约束和注意事项 | devmaster未处于运行状态时，仅能监听到来自内核的设备消息，并打印 KERNEL 记录。如果devmaster正在运行，且接收到uevent并成功处理完设备，会广播设备信息，此时devctl monitor命令将打印 USERSPACE 记录。 |
 
-### 2. devctl trigger
+#### 2. devctl trigger
 
-|                |                                                                                                  |
-| -------------- | :----------------------------------------------------------------------------------------------- |
-| 接口名称       | devctl trigger [OPTIONS] [DEVICES]...                                                            |
-| 接口描述       | 模拟一个设备事件，使内核上报对应的uevent事件，用于重放内核初始化过程中的冷插(coldplug)设备事件。 |
-| 接口类型       | 命令行                                                                                           |
-| 接口定义       | devctl trigger [OPTIONS] [DEVICES]...                                                            |
-| Input参数      | [DEVICES]: 以/sys或/dev开头的设备路径。                                                          |
-| Output参数     | 无                                                                                               |
-| 约束和注意事项 | 可以指定若干个触发的设备，或者默认触发系统中所有的设备。使用devctl monitor监听设备事件是否成功触发。             |
+|                |                                                                                                      |
+| -------------- | :--------------------------------------------------------------------------------------------------- |
+| 接口名称       | devctl trigger [OPTIONS] [DEVICES]...                                                                |
+| 接口描述       | 模拟一个设备事件，使内核上报对应的uevent事件，用于重放内核初始化过程中的冷插(coldplug)设备事件。     |
+| 接口类型       | 命令行                                                                                               |
+| 接口定义       | devctl trigger [OPTIONS] [DEVICES]...                                                                |
+| Input参数      | [DEVICES]: 以/sys或/dev开头的设备路径。                                                              |
+| Output参数     | 无                                                                                                   |
+| 约束和注意事项 | 可以指定若干个触发的设备，或者默认触发系统中所有的设备。使用devctl monitor监听设备事件是否成功触发。 |
