@@ -78,6 +78,18 @@ impl log::Log for SysLogger {
     fn flush(&self) {}
 }
 
+fn append_log(app_name: &str, level: LevelFilter, target: &str, file_path: Option<&str>) {
+    if target == "syslog" {
+        let _ = log::set_boxed_logger(Box::new(SysLogger));
+        log::set_max_level(level);
+        return;
+    }
+    let config = build_log_config(app_name, level, target, file_path);
+    let logger = log4rs::Logger::new(config);
+    log::set_max_level(level);
+    let _ = log::set_boxed_logger(Box::new(LogPlugin(logger)));
+}
+
 /// Init and set the sub unit manager's log
 ///
 /// [`app_name`]: which app output the log
@@ -89,7 +101,10 @@ impl log::Log for SysLogger {
 /// file_path: file path if the target is set to file
 pub fn init_log_for_subum(app_name: &str, level: LevelFilter, target: &str, file: &str) {
     let file = if file.is_empty() { None } else { Some(file) };
-    init_log(app_name, level, target, file);
+    /* We should avoid calling init_log here, or we will get many "attempted
+     * to set a logger after the logging system was already initialized" error
+     * message. */
+    append_log(app_name, level, target, file);
 }
 
 /// Init and set the log target to console

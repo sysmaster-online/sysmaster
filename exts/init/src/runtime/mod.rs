@@ -25,7 +25,7 @@ use nix::sys::epoll::EpollEvent;
 use nix::unistd::{self, ForkResult, Pid};
 use param::Param;
 use signals::Signals;
-use std::os::fd::RawFd;
+use std::os::unix::io::RawFd;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{exit, Command};
