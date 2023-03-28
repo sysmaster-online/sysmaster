@@ -138,7 +138,7 @@ pub(in crate::unit) fn unit_relation_to_atom(relation: UnitRelations) -> Vec<Uni
         }
         UnitRelations::UnitReloadPropagatedFrom
         | UnitRelations::UnitOnSuccessOf
-        | UnitRelations::UnitonFailureOf
+        | UnitRelations::UnitOnFailureOf
         | UnitRelations::UnitStopPropagatedFrom => {} // empty
     };
     atoms
