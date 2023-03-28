@@ -106,4 +106,3 @@ Example:
   - daemon crate: extends/udevd, extends/logind
 ```  
 
-
