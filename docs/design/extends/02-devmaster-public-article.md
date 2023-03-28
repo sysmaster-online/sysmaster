@@ -1,4 +1,4 @@
-# devMaster: a novel facility for device management
+# devMaster: 新一代设备管理器
 
 ## 为什么要开发devMaster
 
