@@ -18,7 +18,7 @@ use nix::sys::wait::{self, Id, WaitPidFlag, WaitStatus};
 use nix::unistd;
 use std::mem;
 use std::ops::Neg;
-use std::os::fd::RawFd;
+use std::os::unix::io::RawFd;
 use std::rc::Rc;
 
 pub const RUN_UNRECOVER_SIG_OFFSET: i32 = 8;

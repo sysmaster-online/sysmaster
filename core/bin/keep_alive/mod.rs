@@ -12,7 +12,7 @@
 
 use nix::sys::socket::{self, AddressFamily, SockFlag, SockType, UnixAddr};
 use once_cell::sync::Lazy;
-use std::os::fd::RawFd;
+use std::os::unix::io::RawFd;
 use std::path::PathBuf;
 use std::sync::Arc;
 
