@@ -21,6 +21,7 @@ pub(super) mod condition_keys {
     pub(crate) const CONDITION_FIRST_BOOT: &str = "ConditionFirstBoot";
     pub(crate) const CONDITION_NEEDS_UPDATE: &str = "ConditionNeedsUpdate";
     pub(crate) const CONDITION_USER: &str = "ConditionUser";
+    pub(crate) const CONDITION_CAPABILITY: &str = "ConditionCapability";
 }
 
 pub(super) mod assert_keys {
@@ -88,6 +89,7 @@ impl UeCondition {
             CONDITION_FILE_NOT_EMPTY => ConditionType::FileNotEmpty,
             CONDITION_NEEDS_UPDATE => ConditionType::NeedsUpdate,
             CONDITION_USER => ConditionType::User,
+            CONDITION_CAPABILITY => ConditionType::Capability,
             CONDITION_AC_POWER => ConditionType::ACPower,
             CONDITION_FIRST_BOOT => ConditionType::FirstBoot,
             _ => return,

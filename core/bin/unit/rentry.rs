@@ -177,6 +177,8 @@ pub(crate) struct UeConfigUnit {
     #[config(default = "")]
     pub ConditionFirstBoot: String,
     #[config(default = "")]
+    pub ConditionCapability: String,
+    #[config(default = "")]
     pub AssertPathExists: String,
     #[config(default = 10)]
     pub StartLimitInterval: u64,

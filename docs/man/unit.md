@@ -8,7 +8,7 @@ sysmaster兼容systemd的SuccessAction、FailureAction、StartLimitAction等配�
 
 配置当unit结束（SuccessAction）或进入失败状态（FailureAction）时采取的动作。可以配置的值包括： `none`，`reboot`，`reboot-force`，`reboot-immediate`，`poweroff`，`poweroff-force`，`poweroff-immediate`，`exit`和`exit-force`。
 
-当配置为`none`时，不触发任何动作，所有unit的默认值为`none`。`reboot`，`poweroff`，`exit`会分别触发`reboot.target`，`poweroff.target`，`exit.target`，与正常的系统重启、关机、退出流程一致。`reboot-force`，`poweroff-force`，`exit-force`会分别触发sysmaster以相应的状态退出，强行杀死服务及相关进程。`reboot-immediate`，`poweroff-immediate`会分别触发系统立即重启、关机，直接调用`reboot(2)`。
+当配置为`none`时，不触发任何动作，所有unit的默认值为`none`。`reboot`，`poweroff`，`exit`会分别触发`reboot.target`，`poweroff.target`，`exit.target`，与正常的系统重启、关机、退出流程一致。`reboot-force`，`poweroff-force`，`exit-force`会分别触发sysmaster以相应的状态退出，强行杀死服务及相关进程。`reboot-immediate`，`poweroff-immediate`会分别触发系统立即重启、关机，直接调用[reboot(2)](https://man7.org/linux/man-pages/man2/reboot.2.html)。
 
 ### StartLimitAction
 
@@ -85,7 +85,7 @@ sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件�
 
 ### ConditionACPower
 
-检查操作系统是否连接交流电源。可以配置为`"false"`，`"true"`或不配置，引号不可省略。配置为`"true"`时，当操作系统至少一个接口连接了交流电，或者无法确定是否有连接时，检查通过。配置为`false`时，当成功检查到所有接口都没有连接交流电时，检查通过。如果不配置或配置为其他的值，默认检查通过跳过该检查。
+检查操作系统是否连接交流电源。可以配置为`"false"`，`"true"`，`"yes"`，`"no"`等布尔量或不配置，引号不可省略。配置为`"true"`时，当操作系统至少一个接口连接了交流电，或者无法确定是否有连接时，检查通过。配置为`false`时，当成功检查到所有接口都没有连接交流电时，检查通过。如果不配置或配置为其他的值，默认检查通过跳过该检查。
 
 ### ConditionUser
 
@@ -94,6 +94,10 @@ sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件�
 ### ConditionFirstBoot
 
 检测系统是否首次启动，用于系统出厂后(或者恢复出厂设置之后)，首次开机时执行必要的初始化操作。该选项将会检测`/run/sysmaster/first-boot`文件是否存在。若文件存在，则表明系统首次启动，反之，则表明系统非首次启动。如果在内核命令行上指定了`sysmaster.condition-first-boot=`选项（采用布尔值），它将优先于`/run/sysmaster/first-boot`文件是否存在的检查结果。
+
+### ConditionCapability
+
+检测sysmaster是否支持给定的权能，允许配置引号括起来的权能名称，如`"CAP_CHOWN"`。该配置仅允许配置一个权能。通过读取`/proc/self/status/`的`CapBnd`检查sysmaster的权能组（Capability Set），如果包含指定的权能，那么检查通过；否则，检查失败。
 
 ## 其他配置
 
