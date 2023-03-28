@@ -105,4 +105,3 @@ Example:
   - bin crate: extends/init, sysmaster
   - daemon crate: extends/udevd, extends/logind
 ```  
-
