@@ -31,22 +31,24 @@ use std::{
 /// the type of the condition
 #[derive(Eq, PartialEq)]
 pub enum ConditionType {
+    /// check whether the service manager is running on AC Power.
+    ACPower,
+    /// check the capability
+    Capability,
+    /// check file is empty
+    FileNotEmpty,
+    /// conditionalize units on whether the system is booting up for the first time
+    FirstBoot,
+    /// check the kernel cmdline
+    KernelCommandLine,
+    /// check need update
+    NeedsUpdate,
     /// check path exist
     PathExists,
     /// check path is readable and writable
     PathIsReadWrite,
-    /// check file is empty
-    FileNotEmpty,
-    /// check need update
-    NeedsUpdate,
     /// check whether the service manager is running as the given user.
     User,
-    /// check whether the service manager is running on AC Power.
-    ACPower,
-    /// conditionalize units on whether the system is booting up for the first time
-    FirstBoot,
-    /// check the capability
-    Capability,
 }
 
 /// check whether the condition is met.
@@ -88,87 +90,18 @@ impl Condition {
             return true;
         }
         let result = match self.c_type {
+            ConditionType::ACPower => self.test_ac_power(),
+            ConditionType::Capability => self.test_capability(),
+            ConditionType::FileNotEmpty => self.test_file_not_empty(),
+            ConditionType::FirstBoot => self.test_first_boot(),
+            ConditionType::KernelCommandLine => self.test_kernel_command_line(),
+            ConditionType::NeedsUpdate => self.test_needs_update(),
             ConditionType::PathExists => self.test_path_exists(),
             ConditionType::PathIsReadWrite => self.test_path_is_read_write(),
-            ConditionType::FileNotEmpty => self.test_file_not_empty(),
-            ConditionType::NeedsUpdate => self.test_needs_update(),
             ConditionType::User => self.test_user(),
-            ConditionType::ACPower => self.test_ac_power(),
-            ConditionType::FirstBoot => self.test_first_boot(),
-            ConditionType::Capability => self.test_capability(),
         };
 
         (result > 0) ^ (self.revert() >= 1)
-    }
-
-    fn test_path_exists(&self) -> i8 {
-        let tmp_path = Path::new(&self.params);
-        let result = tmp_path.exists();
-        result as i8
-    }
-
-    fn test_path_is_read_write(&self) -> i8 {
-        /* 1 for true, 0 for false. */
-        let path = Path::new(&self.params);
-        if !path.exists() {
-            return 0;
-        }
-        let fd = match open(path, OFlag::O_CLOEXEC | OFlag::O_PATH, Mode::empty()) {
-            Err(e) => {
-                log::error!(
-                    "Failed to open {} for checking file system permission: {}",
-                    self.params,
-                    e
-                );
-                return 0;
-            }
-            Ok(v) => v,
-        };
-        if fd < 0 {
-            log::error!("Invalid file descriptor.");
-            return 0;
-        }
-        let flags = match fstatvfs(&fd) {
-            Err(e) => {
-                log::error!("Failed to get the stat of file system: {}", e);
-                return 0;
-            }
-            Ok(v) => v,
-        };
-        (!flags.flags().contains(FsFlags::ST_RDONLY)) as i8
-    }
-
-    fn test_file_not_empty(&self) -> i8 {
-        let tmp_path = Path::new(&self.params);
-        let result = tmp_path
-            .metadata()
-            .map(|m| if m.is_file() { m.len() > 0 } else { false })
-            .unwrap_or(false);
-        result as i8
-    }
-
-    fn test_needs_update(&self) -> i8 {
-        0
-    }
-
-    fn test_user(&self) -> i8 {
-        // may be UID
-        if let Ok(user) = user_group_util::parse_uid(&self.params) {
-            return (user.uid == nix::unistd::getuid() || user.uid == nix::unistd::geteuid()) as i8;
-        }
-
-        if self.params.eq("@system") {
-            return (user_group_util::uid_is_system(nix::unistd::getuid())
-                || user_group_util::uid_is_system(nix::unistd::geteuid()))
-                as i8;
-        }
-
-        // may be username
-        let result = match user_group_util::parse_name(&self.params) {
-            Ok(user) => user.uid == nix::unistd::getuid() || user.uid == nix::unistd::geteuid(),
-            _ => false,
-        };
-        result as i8
     }
 
     fn test_ac_power(&self) -> i8 {
@@ -181,24 +114,6 @@ impl Condition {
         };
 
         !(is_true ^ on_ac_power()) as i8
-    }
-
-    fn test_first_boot(&self) -> i8 {
-        if let Ok(ret) = proc_cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot") {
-            if ret {
-                return ret as i8;
-            }
-        }
-
-        let result = match conf_parser::parse_boolean(&self.params) {
-            Ok(ret) => ret,
-            _ => {
-                return 0;
-            }
-        };
-
-        let existed = Path::new("/run/sysmaster/first-boot").exists();
-        (result == existed) as i8
     }
 
     fn test_capability(&self) -> i8 {
@@ -247,6 +162,124 @@ impl Condition {
 
         let res = cap_bitmask & values.bitmask();
         (res != 0) as i8
+    }
+
+    fn test_file_not_empty(&self) -> i8 {
+        let tmp_path = Path::new(&self.params);
+        let result = tmp_path
+            .metadata()
+            .map(|m| if m.is_file() { m.len() > 0 } else { false })
+            .unwrap_or(false);
+        result as i8
+    }
+
+    fn test_first_boot(&self) -> i8 {
+        if let Ok(ret) = proc_cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot") {
+            if ret {
+                return ret as i8;
+            }
+        }
+
+        let result = match conf_parser::parse_boolean(&self.params) {
+            Ok(ret) => ret,
+            _ => {
+                return 0;
+            }
+        };
+
+        let existed = Path::new("/run/sysmaster/first-boot").exists();
+        (result == existed) as i8
+    }
+
+    fn test_kernel_command_line(&self) -> i8 {
+        let has_equal = self.params.contains('=');
+        let search_value = if has_equal {
+            self.params.split_once('=').unwrap().0
+        } else {
+            &self.params
+        };
+        let value = match proc_cmdline::cmdline_get_item(search_value) {
+            Err(_) => {
+                log::info!("Failed to get cmdline content, assuming ConditionKernelCommandLine check failed.");
+                return 0;
+            }
+            Ok(v) => {
+                if v.is_none() {
+                    log::info!(
+                        "/proc/cmdline doesn't contain the given item: {}",
+                        search_value
+                    );
+                    return 0;
+                }
+                v.unwrap()
+            }
+        };
+        if has_equal {
+            self.params.eq(&value) as i8
+        } else {
+            1
+        }
+    }
+
+    fn test_needs_update(&self) -> i8 {
+        0
+    }
+
+    fn test_path_exists(&self) -> i8 {
+        let tmp_path = Path::new(&self.params);
+        let result = tmp_path.exists();
+        result as i8
+    }
+
+    fn test_path_is_read_write(&self) -> i8 {
+        /* 1 for true, 0 for false. */
+        let path = Path::new(&self.params);
+        if !path.exists() {
+            return 0;
+        }
+        let fd = match open(path, OFlag::O_CLOEXEC | OFlag::O_PATH, Mode::empty()) {
+            Err(e) => {
+                log::error!(
+                    "Failed to open {} for checking file system permission: {}",
+                    self.params,
+                    e
+                );
+                return 0;
+            }
+            Ok(v) => v,
+        };
+        if fd < 0 {
+            log::error!("Invalid file descriptor.");
+            return 0;
+        }
+        let flags = match fstatvfs(&fd) {
+            Err(e) => {
+                log::error!("Failed to get the stat of file system: {}", e);
+                return 0;
+            }
+            Ok(v) => v,
+        };
+        (!flags.flags().contains(FsFlags::ST_RDONLY)) as i8
+    }
+
+    fn test_user(&self) -> i8 {
+        // may be UID
+        if let Ok(user) = user_group_util::parse_uid(&self.params) {
+            return (user.uid == nix::unistd::getuid() || user.uid == nix::unistd::geteuid()) as i8;
+        }
+
+        if self.params.eq("@system") {
+            return (user_group_util::uid_is_system(nix::unistd::getuid())
+                || user_group_util::uid_is_system(nix::unistd::geteuid()))
+                as i8;
+        }
+
+        // may be username
+        let result = match user_group_util::parse_name(&self.params) {
+            Ok(user) => user.uid == nix::unistd::getuid() || user.uid == nix::unistd::geteuid(),
+            _ => false,
+        };
+        result as i8
     }
 }
 

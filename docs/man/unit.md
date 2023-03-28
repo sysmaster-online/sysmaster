@@ -75,6 +75,23 @@ sysmaster支持配置单元之间的依赖关系，可以配置的值为`;`分�
 
 sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件不满足时，停止启动流程。
 
+### ConditionACPower
+
+检查操作系统是否连接交流电源。可以配置为`"false"`，`"true"`，`"yes"`，`"no"`等布尔量或不配置，引号不可省略。配置为`"true"`时，当操作系统至少一个接口连接了交流电，或者无法确定是否有连接时，检查通过。配置为`false`时，当成功检查到所有接口都没有连接交流电时，检查通过。如果不配置或配置为其他的值，默认检查通过跳过该检查。
+
+### ConditionCapability
+
+检测sysmaster是否支持给定的权能，允许配置引号括起来的权能名称，如`"CAP_CHOWN"`。该配置仅允许配置一个权能。通过读取`/proc/self/status/`的`CapBnd`检查sysmaster的权能组（Capability Set），如果包含指定的权能，那么检查通过；否则，检查失败。
+
+### ConditionFirstBoot
+
+检测系统是否首次启动，用于系统出厂后(或者恢复出厂设置之后)，首次开机时执行必要的初始化操作。该选项将会检测`/run/sysmaster/first-boot`文件是否存在。若文件存在，则表明系统首次启动，反之，则表明系统非首次启动。如果在内核命令行上指定了`sysmaster.condition-first-boot=`选项（采用布尔值），它将优先于`/run/sysmaster/first-boot`文件是否存在的检查结果。
+
+### ConditionKernelCommandLine
+
+检查内核命令行是否配置给定的内容。该选项仅允许配置 **一个** 单词或者`=`分隔的键值对，例如：`"ro"`，`"crashkernel=512M"`。配置为单词时，检查内核命令行是否包含
+该单词或作为键值对的键。配置为键值对时，将检查是否存在完全一致的键值对。内核命令行仅支持读取`/proc/cmdline`。
+
 ### ConditionPathExists
 
 检查文件是否存在。只有`ConditionPathExists=`后配置的绝对路径存在时，检查通过，启动流程正常；如果配置的绝对路径不存在，则检查失败，停止单元的启动流程。支持在配置的绝对路径前添加`!`，反转检查结果。
@@ -83,21 +100,9 @@ sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件�
 
 与`ConditionPathExists`类似，检查配置的绝对路径所属的文件系统是否为可读可写。
 
-### ConditionACPower
-
-检查操作系统是否连接交流电源。可以配置为`"false"`，`"true"`，`"yes"`，`"no"`等布尔量或不配置，引号不可省略。配置为`"true"`时，当操作系统至少一个接口连接了交流电，或者无法确定是否有连接时，检查通过。配置为`false`时，当成功检查到所有接口都没有连接交流电时，检查通过。如果不配置或配置为其他的值，默认检查通过跳过该检查。
-
 ### ConditionUser
 
 检测sysmaster是否以给定的用户身份运行。参数可以是数字形式的"UID"、字符串形式的UNIX用户名或者特殊值`"@system"`(表示属于系统用户范围内)。如果不配置，默认跳过该检查。
-
-### ConditionFirstBoot
-
-检测系统是否首次启动，用于系统出厂后(或者恢复出厂设置之后)，首次开机时执行必要的初始化操作。该选项将会检测`/run/sysmaster/first-boot`文件是否存在。若文件存在，则表明系统首次启动，反之，则表明系统非首次启动。如果在内核命令行上指定了`sysmaster.condition-first-boot=`选项（采用布尔值），它将优先于`/run/sysmaster/first-boot`文件是否存在的检查结果。
-
-### ConditionCapability
-
-检测sysmaster是否支持给定的权能，允许配置引号括起来的权能名称，如`"CAP_CHOWN"`。该配置仅允许配置一个权能。通过读取`/proc/self/status/`的`CapBnd`检查sysmaster的权能组（Capability Set），如果包含指定的权能，那么检查通过；否则，检查失败。
 
 ## 其他配置
 

@@ -162,8 +162,18 @@ pub(crate) struct UeConfigUnit {
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
     pub Conflicts: Vec<String>,
+
+    /* Conditions */
+    #[config(default = "")]
+    pub ConditionACPower: String,
+    #[config(default = "")]
+    pub ConditionCapability: String,
     #[config(default = "")]
     pub ConditionFileNotEmpty: String,
+    #[config(default = "")]
+    pub ConditionFirstBoot: String,
+    #[config(default = "")]
+    pub ConditionKernelCommandLine: String,
     #[config(default = "")]
     pub ConditionNeedsUpdate: String,
     #[config(default = "")]
@@ -171,13 +181,9 @@ pub(crate) struct UeConfigUnit {
     #[config(default = "")]
     pub ConditionPathIsReadWrite: String,
     #[config(default = "")]
-    pub ConditionACPower: String,
-    #[config(default = "")]
     pub ConditionUser: String,
-    #[config(default = "")]
-    pub ConditionFirstBoot: String,
-    #[config(default = "")]
-    pub ConditionCapability: String,
+
+    /* Asserts */
     #[config(default = "")]
     pub AssertPathExists: String,
     #[config(default = 10)]
