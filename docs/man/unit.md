@@ -89,7 +89,7 @@ sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件�
 
 ### ConditionUser
 
-检测sysmaster是否以给定的用户身份运行。参数可以是数字形式的"UID"、字符串形式的UNIX用户名或者特殊值`"@system"`(表示属于系统用户范围内)。此选项对于系统服务无效，因为管理系统服务的sysmaster进程总是以root用户身份运行。如果不配置或配置为其他的值，默认检查通过跳过该检查。
+检测sysmaster是否以给定的用户身份运行。参数可以是数字形式的"UID"、字符串形式的UNIX用户名或者特殊值`"@system"`(表示属于系统用户范围内)。如果不配置，默认跳过该检查。
 
 ### ConditionFirstBoot
 
