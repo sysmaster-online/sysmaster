@@ -124,25 +124,34 @@ function expect_str_eq() {
 # ================== util ==================
 # usage: run sysmaster as daemon
 function run_sysmaster() {
+    local user="${1:-root}"
+
     cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH} || return 1
-    /usr/bin/init &> "${SYSMST_LOG}" &
+    if [ "${user}" = root ]; then
+        /usr/bin/init &> "${SYSMST_LOG}" &
+    else
+        chmod 777 /usr/bin/init
+        chmod -R 777 /usr/lib/sysmaster /run
+        chmod -R 777 "$(dirname "${SYSMST_LOG}")"
+        sudo -u "${user}" /usr/bin/init &> "${SYSMST_LOG}" &
+    fi
     init_pid=$!
 
     # wait sysmaster init done
     sleep 3
     for ((i = 0; i < 300; ++i)); do
         sleep 1
-        ps -elf | grep -v grep | grep -w '/usr/lib/sysmaster/sysmaster' | grep ep_pol && break
+        ps -elf | grep -v grep | grep " $(echo ${user} | cut -c1-7)" | grep -w '/usr/lib/sysmaster/sysmaster' | grep ep_pol && break
     done
     # debug
     ps -elf | grep -v grep | grep -Ew 'sysmaster|init'
-    if ! ps -elf | grep -v grep | grep -wq '/usr/lib/sysmaster/sysmaster'; then
+    if ! ps -elf | grep -v grep | grep " $(echo ${user} | cut -c1-7)" | grep -wq '/usr/lib/sysmaster/sysmaster'; then
         cat "${SYSMST_LOG}"
         return 1
     fi
 
     # get sysmaster pid
-    sysmaster_pid="$(ps -elf | grep -v grep | grep -w '/usr/lib/sysmaster/sysmaster' | awk '{print $4}')"
+    sysmaster_pid="$(ps -elf | grep -v grep | grep " $(echo ${user} | cut -c1-7)" | grep -w '/usr/lib/sysmaster/sysmaster' | awk '{print $4}')"
     echo > "${SYSMST_LOG}"
     return 0
 }
