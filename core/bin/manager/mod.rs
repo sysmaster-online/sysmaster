@@ -380,11 +380,11 @@ impl Manager {
 
         let mut pids = process_util::kill_all_pids(15);
         pids = process_util::wait_pids(pids, 10000000);
-        if pids.is_empty() {
-            return;
+        if !pids.is_empty() {
+            pids = process_util::kill_all_pids(9);
+            process_util::wait_pids(pids, 10000000);
         }
-        pids = process_util::kill_all_pids(9);
-        process_util::wait_pids(pids, 10000000);
+
         log::info!("Rebooting...");
         let _ = reboot::reboot(reboot_mode); // make lint happy
     }

@@ -116,6 +116,7 @@ members = [
   "exts/rc-local-generator",
   "exts/sysmonitor",
   "exts/devmaster",
+  "exts/switch_root",
   #internal libraries crates
   "libs/cmdproto",
   #external libraries crates

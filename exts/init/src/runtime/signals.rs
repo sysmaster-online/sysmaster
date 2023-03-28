@@ -13,7 +13,7 @@
 use super::epoll::Epoll;
 use nix::errno::Errno;
 use nix::sys::epoll::EpollEvent;
-use nix::sys::signal::Signal;
+use nix::sys::signal::{SigmaskHow, Signal};
 use nix::sys::wait::{self, Id, WaitPidFlag, WaitStatus};
 use nix::unistd;
 use std::mem;
@@ -23,6 +23,7 @@ use std::rc::Rc;
 
 pub const RUN_UNRECOVER_SIG_OFFSET: i32 = 8;
 pub const RESTART_MANAGER_SIG_OFFSET: i32 = 9;
+pub const SIG_SWITCH_ROOT: i32 = 10;
 const INVALID_FD: i32 = -1;
 
 pub(crate) struct SigSet {
@@ -62,6 +63,7 @@ pub struct Signals {
     zombie_signal: i32,
     restart_signal: i32,
     unrecover_signal: i32,
+    switch_root_signal: i32,
 }
 
 impl Signals {
@@ -77,6 +79,7 @@ impl Signals {
             zombie_signal: libc::SIGCHLD,
             unrecover_signal: libc::SIGRTMIN() + RUN_UNRECOVER_SIG_OFFSET,
             restart_signal: libc::SIGRTMIN() + RESTART_MANAGER_SIG_OFFSET,
+            switch_root_signal: libc::SIGRTMIN() + SIG_SWITCH_ROOT,
         }
     }
 
@@ -90,6 +93,10 @@ impl Signals {
 
     pub fn is_unrecover(&self, signo: i32) -> bool {
         self.unrecover_signal == signo
+    }
+
+    pub fn is_switch_root(&self, signo: i32) -> bool {
+        self.switch_root_signal == signo
     }
 
     pub fn create_signals_epoll(&mut self) -> Result<(), Errno> {
@@ -200,5 +207,12 @@ impl Signals {
     pub fn clear(&mut self) {
         self.epoll.safe_close(self.signal_fd);
         self.signal_fd = INVALID_FD;
+        if let Err(e) = nix::sys::signal::pthread_sigmask(
+            SigmaskHow::SIG_SETMASK,
+            Some(&nix::sys::signal::SigSet::empty()),
+            None,
+        ) {
+            eprintln!("reset pthread_sigmask failed: {e}");
+        }
     }
 }

@@ -25,12 +25,14 @@ use nix::sys::epoll::EpollEvent;
 use nix::unistd::{self, ForkResult, Pid};
 use param::Param;
 use signals::Signals;
+use std::ffi::CString;
 use std::os::unix::io::RawFd;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{exit, Command};
 use std::rc::Rc;
 
+use self::signals::SIG_SWITCH_ROOT;
 const INVALID_PID: i32 = -1;
 const MANAGER_SIG_OFFSET: i32 = 7;
 const SYSMASTER_PATH: &str = "/usr/lib/sysmaster/sysmaster";
@@ -50,6 +52,7 @@ pub struct RunTime {
     comm: Comm,
     signals: Signals,
     need_reexec: bool,
+    switching: bool,
 }
 
 impl RunTime {
@@ -67,6 +70,7 @@ impl RunTime {
             comm,
             signals,
             need_reexec: false,
+            switching: false,
         };
 
         run_time.create_sysmaster()?;
@@ -120,6 +124,28 @@ impl RunTime {
         self.comm.clear();
         self.signals.clear();
         self.epoll.clear();
+    }
+
+    pub fn reexec_self(&mut self) {
+        self.clear();
+        let mut args = Vec::new();
+        let mut init_path = CString::new("/usr/bin/init").unwrap();
+        if let Some(str) = std::env::args().next() {
+            init_path = CString::new(str).unwrap();
+            args.push(init_path.clone());
+        }
+        for str in self.cmd.manager_param.iter() {
+            args.push(std::ffi::CString::new(str.to_string()).unwrap());
+        }
+
+        let cstr_args = args
+            .iter()
+            .map(|cstring| cstring.as_c_str())
+            .collect::<Vec<_>>();
+
+        if let Err(e) = unistd::execv(&init_path, &cstr_args) {
+            eprintln!("execv failed: {e}");
+        }
     }
 
     fn reexec_manager(&mut self) {
@@ -179,6 +205,7 @@ impl RunTime {
             match signo {
                 _x if self.signals.is_zombie(signo) => self.do_recycle(siginfo),
                 _x if self.signals.is_restart(signo) => self.do_reexec(),
+                _x if self.signals.is_switch_root(signo) => self.send_switch_root_signal(),
                 _ => {}
             }
         }
@@ -190,7 +217,11 @@ impl RunTime {
             let signo = siginfo.ssi_signo as i32;
             match signo {
                 _x if self.signals.is_zombie(signo) => {
-                    self.signals.recycle_zombie(Pid::from_raw(0))
+                    if self.is_sysmaster(siginfo.ssi_pid as i32) && self.switching {
+                        self.reexec_self()
+                    } else {
+                        self.signals.recycle_zombie(Pid::from_raw(0))
+                    }
                 }
                 _x if self.signals.is_restart(signo) => self.do_recreate(),
                 _ => {}
@@ -221,7 +252,7 @@ impl RunTime {
 
     fn do_recycle(&mut self, siginfo: signalfd_siginfo) {
         let pid = siginfo.ssi_pid as i32;
-        if self.sysmaster_pid.as_raw() != pid {
+        if !self.is_sysmaster(pid) {
             self.signals.recycle_zombie(Pid::from_raw(pid));
         }
     }
@@ -253,5 +284,26 @@ impl RunTime {
                 None => exit(0),
             }
         }
+    }
+
+    fn send_switch_root_signal(&mut self) {
+        let res = unsafe {
+            libc::kill(
+                self.sysmaster_pid.into(),
+                libc::SIGRTMIN() + SIG_SWITCH_ROOT,
+            )
+        };
+        if let Err(err) = Errno::result(res).map(drop) {
+            eprintln!(
+                "Failed to send sysmaster SIG_SWITCH_ROOT:{:?}  err:{:?} change state to switch_root",
+                self.sysmaster_pid, err
+            );
+        }
+        self.state = InitState::Unrecover;
+        self.switching = true;
+    }
+
+    fn is_sysmaster(&self, pid: i32) -> bool {
+        self.sysmaster_pid.as_raw() == pid
     }
 }

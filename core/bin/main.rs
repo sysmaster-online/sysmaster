@@ -36,8 +36,10 @@ use crate::manager::config::ManagerConfig;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
 use basic::logger::{self};
+use basic::process_util;
 use libc::{c_int, getppid, prctl, PR_SET_CHILD_SUBREAPER};
 use log::{self};
+use nix::sys::resource::{self, Resource};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use std::convert::TryFrom;
 use std::env::{self};
@@ -48,10 +50,12 @@ use sysmaster::error::*;
 use sysmaster::rel;
 
 const MANAGER_SIG_OFFSET: i32 = 7;
+const SIG_SWITCH_ROOT: i32 = 10;
 
 fn main() -> Result<()> {
     // The registration signal is at the beginning and has the highest priority!
     register_reexe_signal();
+    install_switch_root_handler();
     // Connect init.
     KeepAlive::init();
 
@@ -223,4 +227,84 @@ fn register_reexe_signal() {
     let action = SigAction::new(handler, flags, SigSet::empty());
 
     unsafe { signal::sigaction(manager_signal, &action).expect("failed to set signal handler") };
+}
+
+fn install_switch_root_handler() {
+    let manager_signal: signal::Signal =
+        unsafe { std::mem::transmute(libc::SIGRTMIN() + SIG_SWITCH_ROOT) };
+    let handler = SigHandler::Handler(switch_root);
+    let flags = SaFlags::SA_NODEFER;
+    let action = SigAction::new(handler, flags, SigSet::empty());
+
+    unsafe {
+        signal::sigaction(manager_signal, &action)
+            .expect("failed to set switch_root signal handler")
+    };
+}
+
+extern "C" fn switch_root(sig: libc::c_int) {
+    if sig != libc::SIGRTMIN() + SIG_SWITCH_ROOT {
+        return;
+    }
+    log::info!("sysMaster switch root");
+    let mut pids = process_util::kill_all_pids(15);
+    pids = process_util::wait_pids(pids, 10000000);
+
+    if !pids.is_empty() {
+        pids = process_util::kill_all_pids(9);
+        process_util::wait_pids(pids, 10000000);
+    }
+
+    reset_all_signal_handlers();
+    reset_signal_mask();
+    rlimit_nofile_safe();
+    exit(0);
+}
+
+fn rlimit_nofile_safe() {
+    let mut limit = match resource::getrlimit(Resource::RLIMIT_NOFILE) {
+        Ok(limit) => limit,
+        Err(e) => {
+            log::warn!("Failed to query RLIMIT_NOFILE: {}", e);
+            return;
+        }
+    };
+
+    log::info!("limit: {}, {}", limit.0, limit.1);
+    if limit.0 <= nix::sys::select::FD_SETSIZE as u64 {
+        return;
+    }
+
+    limit.0 = nix::sys::select::FD_SETSIZE as u64;
+
+    if let Err(e) = resource::setrlimit(Resource::RLIMIT_NOFILE, limit.0, limit.1) {
+        log::warn!("Failed to set RLIMIT_NOFILE: {}", e);
+    }
+}
+
+fn reset_all_signal_handlers() {
+    for it in nix::sys::signal::Signal::iterator() {
+        if it == Signal::SIGKILL || it == Signal::SIGSTOP {
+            continue;
+        }
+
+        let flags = SaFlags::SA_RESTART;
+        let sig_handler = SigHandler::SigDfl;
+        let sig_action = SigAction::new(sig_handler, flags, SigSet::empty());
+        unsafe {
+            if let Err(e) = signal::sigaction(it, &sig_action) {
+                log::warn!("reset {} signal failed:{}", it, e);
+            }
+        }
+    }
+}
+
+fn reset_signal_mask() {
+    if let Err(e) = signal::sigprocmask(
+        signal::SigmaskHow::SIG_SETMASK,
+        Some(&SigSet::empty()),
+        None,
+    ) {
+        log::warn!("reset sigprocmask failed:{}", e);
+    }
 }
