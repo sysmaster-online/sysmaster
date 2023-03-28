@@ -20,7 +20,13 @@ use nix::{
 };
 
 use crate::{conf_parser, device::on_ac_power, proc_cmdline, user_group_util};
-use std::{path::Path, string::String};
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+    str::FromStr,
+    string::String,
+};
 
 /// the type of the condition
 #[derive(Eq, PartialEq)]
@@ -39,6 +45,8 @@ pub enum ConditionType {
     ACPower,
     /// conditionalize units on whether the system is booting up for the first time
     FirstBoot,
+    /// check the capability
+    Capability,
 }
 
 /// check whether the condition is met.
@@ -87,6 +95,7 @@ impl Condition {
             ConditionType::User => self.test_user(),
             ConditionType::ACPower => self.test_ac_power(),
             ConditionType::FirstBoot => self.test_first_boot(),
+            ConditionType::Capability => self.test_capability(),
         };
 
         (result > 0) ^ (self.revert() >= 1)
@@ -163,14 +172,15 @@ impl Condition {
     }
 
     fn test_ac_power(&self) -> i8 {
-        if self.params.eq("false") {
-            (!on_ac_power()) as i8
-        } else if self.params.eq("true") {
-            on_ac_power() as i8
-        } else {
-            /* We only accept "true" or "false", skip other values. */
-            1
-        }
+        let is_true = match conf_parser::parse_boolean(&self.params) {
+            Err(_) => {
+                /* We only accept "true" or "false", skip other values. */
+                return 1;
+            }
+            Ok(v) => v,
+        };
+
+        !(is_true ^ on_ac_power()) as i8
     }
 
     fn test_first_boot(&self) -> i8 {
@@ -189,6 +199,54 @@ impl Condition {
 
         let existed = Path::new("/run/sysmaster/first-boot").exists();
         (result == existed) as i8
+    }
+
+    fn test_capability(&self) -> i8 {
+        let values = match caps::Capability::from_str(&self.params) {
+            Err(_) => {
+                log::info!("Failed to parse ConditionCapability values: {}, assuming ConditionCapability check failed", self.params);
+                return 0;
+            }
+            Ok(v) => v,
+        };
+
+        let file = match File::open("/proc/self/status") {
+            Err(_) => {
+                log::info!(
+                    "Failed to open /proc/self/status, assuming ConditionCapability check failed."
+                );
+                return 0;
+            }
+            Ok(v) => v,
+        };
+        let reader = BufReader::new(file);
+        let p = "CapBnd:";
+        let mut cap_bitmask: u64 = 0;
+        for line in reader.lines() {
+            let line = match line {
+                Err(_) => {
+                    log::info!("Failed to read /proc/self/status, assuming ConditionCapability check failed.");
+                    return 0;
+                }
+                Ok(v) => v,
+            };
+            if !line.starts_with(p) {
+                continue;
+            }
+            match u64::from_str_radix(line.trim_start_matches(p).trim_start(), 16) {
+                Err(_) => {
+                    log::info!("Failed to parse CapBnd, assuming ConditionCapability check failed");
+                    return 0;
+                }
+                Ok(v) => {
+                    cap_bitmask = v;
+                    break;
+                }
+            };
+        }
+
+        let res = cap_bitmask & values.bitmask();
+        (res != 0) as i8
     }
 }
 

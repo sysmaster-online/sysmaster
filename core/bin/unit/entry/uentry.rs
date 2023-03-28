@@ -286,6 +286,16 @@ impl Unit {
                     .as_str(),
             );
 
+            add_condition(
+                CONDITION_CAPABILITY,
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionCapability
+                    .as_str(),
+            );
+
             add_assert(
                 ASSERT_PATH_EXISTS,
                 self.get_config()
