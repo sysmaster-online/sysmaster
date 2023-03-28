@@ -1,6 +1,5 @@
 /target
 .vscode
 Cargo.lock
-tests/*.log
-tests/*/*.log
+tests/**/*.log
 /site
