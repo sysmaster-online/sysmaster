@@ -22,7 +22,7 @@ As we all know, process 1 is the first userspace process started by the kernel i
 | upstart                 | Init daemon used by Debian and Ubuntu                        | ✓                | ✓                 | ✓                  | ✓                |                   |                  |                |
 | systemd                 | Improves the system startup speed. This software is a major innovation compared with the traditional System V and has been used by most Linux distributions. | ✓                | ✓                 | ✓                  | ✓                | ✓                 | ✓                | ✓              |
 
-systemd is a huge improvement over sysvinit, especially in terms of the startup speed. systemd provides more and more functions, which however complicates the system architecture and implementation. Some scenarios do not require so many functions, and these functions cannot be flexibly combined. Besides, systemd cannot support embedded devices and some IoT devices well.  
+systemd is a huge improvement over sysvinit, especially in terms of the startup speed. systemd provides more and more functions, which however complicates the system architecture and implementation. Some scenarios do not require so many functions, and these functions cannot be flexibly combined. Besides, systemd cannot support embedded devices and some IoT devices well.
 
 According to the statistics, the number of maintenance problems in each systemd version is increasing in recent years. In addition, due to the particularity of process 1, these problems may cause system-level breakdown.
 
