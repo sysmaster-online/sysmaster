@@ -17,6 +17,7 @@ sysmaster支撑以上工作，提供可以扩展的开发框架，支持开发�
 
 需要启动的进程，初始化的系统配置，如网络配置，
 本文当详细描述，如何基于sysmaster开发框架，sysmaster扩展开发新的子类，具体的开发流程如下：
+
 ![avatar](assets/u_dev_process.jpg)
 
 ## 子类UnitSubClass实现 ##
@@ -141,7 +142,7 @@ unit作为所管理的系统资源在sysmaster中的投影，unit在通过os接�
 
 5. 实现子类配置文件解析
 
-   配置文件为toml格式，具体个是如下：
+   配置文件为toml格式，具体格式如下：
 
    ```toml
        [Unit]

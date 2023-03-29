@@ -212,7 +212,7 @@ fn unpack_config(data: &str) -> &str {
 
 我们过去熟悉的初始化系统（比如 sysVinit、systemd、upstart）, 大多是使用 C 写的, 且往往因为设计复杂, 功能大一统等有违 UNIX 传统思维的做法而广受诟病。openEuler 社区为社区提供了一个全新的、采用 Rust 编写的初始化系统 —— sysMaster。
 
-和 systemd 相比, 由于 sysMaster 采用 Rust 语言编写, 原生地规避了内存泄漏问题, 开发者无需担心内存泄漏导致的 1 号进程挂掉。而从零构建的 sysMaster, 也摒弃了之前的初始化系统中存在问题, 为开发者提供了**新一代的初始化系统**。
+和 systemd 相比, 由于 sysMaster 采用 Rust 语言编写, 原生地规避了内存泄漏问题, 开发者无需担心内存泄漏导致的 1 号进程挂掉。而从零构建的 sysMaster, 也摒弃了之前的初始化系统中存在问题, 为开发者提供了**新一代的初始化系统** 。
 
 相比于过去的初始化系统, sysMaster 提供了全新的架构设计, 分为 sysMaster Core 和 sysMaster Extend 两类。sysMaster Core 提供了极度轻量的调度方式, 占用更少的资源, 以及更快的启动速度。拆分的架构则可以支持拓展多种服务类型, 实现 1+1+N 的架构, 满足初始化系统的多样化诉求。而它的生态兼容工具, 则可以让开发者可以自由选择 systemd 和 sysMaster, 无需担心被生态绑定。
 
