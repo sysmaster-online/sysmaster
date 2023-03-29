@@ -216,6 +216,27 @@ impl Unit {
                 }
                 self.conditions.add_assert(assert_op, String::from(_params));
             };
+
+            add_condition(
+                CONDITION_AC_POWER,
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionACPower
+                    .as_str(),
+            );
+
+            add_condition(
+                CONDITION_CAPABILITY,
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionCapability
+                    .as_str(),
+            );
+
             add_condition(
                 CONDITION_FILE_NOT_EMPTY,
                 self.get_config()
@@ -227,12 +248,32 @@ impl Unit {
             );
 
             add_condition(
+                CONDITION_FIRST_BOOT,
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionFirstBoot
+                    .as_str(),
+            );
+
+            add_condition(
                 CONDITION_NEEDS_UPDATE,
                 self.get_config()
                     .config_data()
                     .borrow()
                     .Unit
                     .ConditionNeedsUpdate
+                    .as_str(),
+            );
+
+            add_condition(
+                CONDITION_KERNEL_COMMAND_LINE,
+                self.get_config()
+                    .config_data()
+                    .borrow()
+                    .Unit
+                    .ConditionKernelCommandLine
                     .as_str(),
             );
 
@@ -263,36 +304,6 @@ impl Unit {
                     .borrow()
                     .Unit
                     .ConditionUser
-                    .as_str(),
-            );
-
-            add_condition(
-                CONDITION_AC_POWER,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionACPower
-                    .as_str(),
-            );
-
-            add_condition(
-                CONDITION_FIRST_BOOT,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionFirstBoot
-                    .as_str(),
-            );
-
-            add_condition(
-                CONDITION_CAPABILITY,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionCapability
                     .as_str(),
             );
 

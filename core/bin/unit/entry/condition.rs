@@ -14,19 +14,22 @@ use basic::condition::{Condition, ConditionType};
 use std::cell::RefCell;
 
 pub(super) mod condition_keys {
+    /* Attention: sort the following options by dictionary order. */
+    pub(crate) const CONDITION_AC_POWER: &str = "ConditionACPower";
+    pub(crate) const CONDITION_CAPABILITY: &str = "ConditionCapability";
+    pub(crate) const CONDITION_FILE_NOT_EMPTY: &str = "ConditionFileNotEmpty";
+    pub(crate) const CONDITION_FIRST_BOOT: &str = "ConditionFirstBoot";
+    pub(crate) const CONDITION_KERNEL_COMMAND_LINE: &str = "ConditionKernelCommandLine";
+    pub(crate) const CONDITION_NEEDS_UPDATE: &str = "ConditionNeedsUpdate";
     pub(crate) const CONDITION_PATH_EXISTS: &str = "ConditionPathExists";
     pub(crate) const CONDITION_PATH_IS_READ_WRITE: &str = "ConditionPathIsReadWrite";
-    pub(crate) const CONDITION_FILE_NOT_EMPTY: &str = "ConditionFileNotEmpty";
-    pub(crate) const CONDITION_AC_POWER: &str = "ConditionACPower";
-    pub(crate) const CONDITION_FIRST_BOOT: &str = "ConditionFirstBoot";
-    pub(crate) const CONDITION_NEEDS_UPDATE: &str = "ConditionNeedsUpdate";
     pub(crate) const CONDITION_USER: &str = "ConditionUser";
-    pub(crate) const CONDITION_CAPABILITY: &str = "ConditionCapability";
 }
 
 pub(super) mod assert_keys {
-    pub(crate) const ASSERT_PATH_EXISTS: &str = "AssertPathExists";
+    /* Attention: sort the following options by dictionary order. */
     pub(crate) const ASSERT_FILE_NOT_EMPTY: &str = "AssertFileNotEmpty";
+    pub(crate) const ASSERT_PATH_EXISTS: &str = "AssertPathExists";
 }
 
 pub(super) struct UeCondition {
@@ -84,14 +87,15 @@ impl UeCondition {
         }
         use condition_keys::*;
         let c_type = match condop {
+            CONDITION_AC_POWER => ConditionType::ACPower,
+            CONDITION_CAPABILITY => ConditionType::Capability,
+            CONDITION_FILE_NOT_EMPTY => ConditionType::FileNotEmpty,
+            CONDITION_FIRST_BOOT => ConditionType::FirstBoot,
+            CONDITION_NEEDS_UPDATE => ConditionType::NeedsUpdate,
+            CONDITION_KERNEL_COMMAND_LINE => ConditionType::KernelCommandLine,
             CONDITION_PATH_EXISTS => ConditionType::PathExists,
             CONDITION_PATH_IS_READ_WRITE => ConditionType::PathIsReadWrite,
-            CONDITION_FILE_NOT_EMPTY => ConditionType::FileNotEmpty,
-            CONDITION_NEEDS_UPDATE => ConditionType::NeedsUpdate,
             CONDITION_USER => ConditionType::User,
-            CONDITION_CAPABILITY => ConditionType::Capability,
-            CONDITION_AC_POWER => ConditionType::ACPower,
-            CONDITION_FIRST_BOOT => ConditionType::FirstBoot,
             _ => return,
         };
         let condition = self.new_condition(c_type, _params);

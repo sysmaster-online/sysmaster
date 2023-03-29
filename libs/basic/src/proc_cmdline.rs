@@ -38,9 +38,29 @@ pub fn cmdline_get_value(key: &str) -> Result<Option<String>, Error> {
     let cmdline: Vec<&str> = buf.split_whitespace().collect();
 
     for cmd in cmdline.iter() {
-        let k_val: Vec<&str> = cmd.split('=').map(|s| s.trim()).collect();
-        if k_val.len() == 2 && k_val[0] == key {
-            return Ok(Some(k_val[1].to_string()));
+        if let Some(k_val) = cmd.split_once('=') {
+            if k_val.0 == key {
+                return Ok(Some(k_val.1.to_string()));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// read the content from /proc/cmdline and return specified item
+///-
+/// take `crashkernel=512M ro` for example, given `crashkernel` will
+/// return `crashkernel=512M`, given `ro` will return `ro`, given
+/// `foo` will return None.
+pub fn cmdline_get_item(item: &str) -> Result<Option<String>, Error> {
+    let buf = cmdline_content()?;
+
+    let cmdline: Vec<&str> = buf.split_whitespace().collect();
+
+    for cmd in cmdline.iter() {
+        if cmd.starts_with(item) {
+            return Ok(Some(cmd.to_string()));
         }
     }
 
