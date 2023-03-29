@@ -11,15 +11,15 @@ void main()
 	e = getenv("NOTIFY_SOCKET");
 	if (!e)
 	{
-		printf("NOTIFY_SOCKET env is not set\n");
+		printf("NOTIFY_SOCKET env is not set.\n");
 		return;
 	}
 
-	printf("notify socket: %s\n", e);
+	printf("notify socket: %s.\n", e);
 	int r = sd_notify(0, "READY=1");
 	if (r < 0)
 	{
-		printf("send notify message failed: %d\n", r);
+		printf("send notify message failed: %d.\n", r);
 		return;
 	}
 }
