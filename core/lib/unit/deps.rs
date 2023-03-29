@@ -39,7 +39,7 @@ pub enum UnitRelations {
     UnitOnSuccess,
     UnitOnSuccessOf,
     UnitOnFailure,
-    UnitonFailureOf,
+    UnitOnFailureOf,
 
     UnitTriggers,
     UnitTriggeredBy,

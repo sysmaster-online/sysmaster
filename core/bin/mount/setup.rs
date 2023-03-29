@@ -262,7 +262,7 @@ impl MountPoint {
 
                     return Ok(());
                 } else if v || self.flags.intersects(MsFlags::MS_REMOUNT) {
-                    log::debug!("mount point is not mounted but remount flag is set or is already mouted, both ignore it");
+                    log::debug!("mount point is not mounted but remount flag is set or is already mounted, both ignore it");
                     return Ok(());
                 }
             }
