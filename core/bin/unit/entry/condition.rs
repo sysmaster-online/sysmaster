@@ -17,12 +17,18 @@ pub(super) mod condition_keys {
     /* Attention: sort the following options by dictionary order. */
     pub(crate) const CONDITION_AC_POWER: &str = "ConditionACPower";
     pub(crate) const CONDITION_CAPABILITY: &str = "ConditionCapability";
+    pub(crate) const CONDITION_DIRECTORY_NOT_EMPTY: &str = "ConditionDirectoryNotEmpty";
+    pub(crate) const CONDITION_FILE_IS_EXECUTABLE: &str = "ConditionFileIsExecutable";
     pub(crate) const CONDITION_FILE_NOT_EMPTY: &str = "ConditionFileNotEmpty";
     pub(crate) const CONDITION_FIRST_BOOT: &str = "ConditionFirstBoot";
     pub(crate) const CONDITION_KERNEL_COMMAND_LINE: &str = "ConditionKernelCommandLine";
     pub(crate) const CONDITION_NEEDS_UPDATE: &str = "ConditionNeedsUpdate";
     pub(crate) const CONDITION_PATH_EXISTS: &str = "ConditionPathExists";
+    pub(crate) const CONDITION_PATH_EXISTS_GLOB: &str = "ConditionPathExistsGlob";
+    pub(crate) const CONDITION_PATH_IS_DIRECTORY: &str = "ConditionPathIsDirectory";
+    pub(crate) const CONDITION_PATH_IS_MOUNT_POINT: &str = "ConditionPathIsMountPoint";
     pub(crate) const CONDITION_PATH_IS_READ_WRITE: &str = "ConditionPathIsReadWrite";
+    pub(crate) const CONDITION_PATH_IS_SYMBOLIC_LINK: &str = "ConditionPathIsSymbolicLink";
     pub(crate) const CONDITION_SECURITY: &str = "ConditionSecurity";
     pub(crate) const CONDITION_USER: &str = "ConditionUser";
 }
@@ -90,13 +96,19 @@ impl UeCondition {
         let c_type = match condop {
             CONDITION_AC_POWER => ConditionType::ACPower,
             CONDITION_CAPABILITY => ConditionType::Capability,
+            CONDITION_DIRECTORY_NOT_EMPTY => ConditionType::DirectoryNotEmpty,
+            CONDITION_FILE_IS_EXECUTABLE => ConditionType::FileIsExecutable,
             CONDITION_FILE_NOT_EMPTY => ConditionType::FileNotEmpty,
             CONDITION_FIRST_BOOT => ConditionType::FirstBoot,
             CONDITION_NEEDS_UPDATE => ConditionType::NeedsUpdate,
             CONDITION_KERNEL_COMMAND_LINE => ConditionType::KernelCommandLine,
             CONDITION_PATH_EXISTS => ConditionType::PathExists,
+            CONDITION_PATH_EXISTS_GLOB => ConditionType::PathExistsGlob,
+            CONDITION_PATH_IS_DIRECTORY => ConditionType::PathIsDirectory,
+            CONDITION_PATH_IS_MOUNT_POINT => ConditionType::PathIsMountPoint,
             CONDITION_PATH_IS_READ_WRITE => ConditionType::PathIsReadWrite,
             CONDITION_SECURITY => ConditionType::Security,
+            CONDITION_PATH_IS_SYMBOLIC_LINK => ConditionType::PathIsSymbolicLink,
             CONDITION_USER => ConditionType::User,
             _ => return,
         };

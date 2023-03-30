@@ -235,12 +235,18 @@ impl Unit {
 
             add_condition_simplified!(CONDITION_AC_POWER, ConditionACPower);
             add_condition_simplified!(CONDITION_CAPABILITY, ConditionCapability);
+            add_condition_simplified!(CONDITION_DIRECTORY_NOT_EMPTY, ConditionDirectoryNotEmpty);
+            add_condition_simplified!(CONDITION_FILE_IS_EXECUTABLE, ConditionFileIsExecutable);
             add_condition_simplified!(CONDITION_FILE_NOT_EMPTY, ConditionFileNotEmpty);
             add_condition_simplified!(CONDITION_FIRST_BOOT, ConditionFirstBoot);
             add_condition_simplified!(CONDITION_KERNEL_COMMAND_LINE, ConditionKernelCommandLine);
             add_condition_simplified!(CONDITION_NEEDS_UPDATE, ConditionNeedsUpdate);
             add_condition_simplified!(CONDITION_PATH_EXISTS, ConditionPathExists);
+            add_condition_simplified!(CONDITION_PATH_EXISTS_GLOB, ConditionPathExistsGlob);
+            add_condition_simplified!(CONDITION_PATH_IS_DIRECTORY, ConditionPathIsDirectory);
+            add_condition_simplified!(CONDITION_PATH_IS_MOUNT_POINT, ConditionPathIsMountPoint);
             add_condition_simplified!(CONDITION_PATH_IS_READ_WRITE, ConditionPathIsReadWrite);
+            add_condition_simplified!(CONDITION_PATH_IS_SYMBOLIC_LINK, ConditionPathIsSymbolicLink);
             add_condition_simplified!(CONDITION_SECURITY, ConditionSecurity);
             add_condition_simplified!(CONDITION_USER, ConditionUser);
 

@@ -169,6 +169,10 @@ pub(crate) struct UeConfigUnit {
     #[config(default = "")]
     pub ConditionCapability: String,
     #[config(default = "")]
+    pub ConditionDirectoryNotEmpty: String,
+    #[config(default = "")]
+    pub ConditionFileIsExecutable: String,
+    #[config(default = "")]
     pub ConditionFileNotEmpty: String,
     #[config(default = "")]
     pub ConditionFirstBoot: String,
@@ -179,7 +183,15 @@ pub(crate) struct UeConfigUnit {
     #[config(default = "")]
     pub ConditionPathExists: String,
     #[config(default = "")]
+    pub ConditionPathExistsGlob: String,
+    #[config(default = "")]
+    pub ConditionPathIsDirectory: String,
+    #[config(default = "")]
+    pub ConditionPathIsMountPoint: String,
+    #[config(default = "")]
     pub ConditionPathIsReadWrite: String,
+    #[config(default = "")]
+    pub ConditionPathIsSymbolicLink: String,
     #[config(default = "")]
     pub ConditionSecurity: String,
     #[config(default = "")]

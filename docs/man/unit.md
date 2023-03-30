@@ -83,6 +83,14 @@ sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件�
 
 检测sysmaster是否支持给定的权能，允许配置引号括起来的权能名称，如`"CAP_CHOWN"`。该配置仅允许配置一个权能。通过读取`/proc/self/status/`的`CapBnd`检查sysmaster的权能组（Capability Set），如果包含指定的权能，那么检查通过；否则，检查失败。
 
+### ConditionDirectoryNotEmpty
+
+检查配置的绝对路径目录是否非空，如果为软链接，则判断软链接指向的目录。如果目录非空，检查通过；否则，检查失败。
+
+### ConditionFileIsExecutable
+
+检查配置的绝对路径文件是否可执行，如果为软链接，则判断软链接指向的文件。如果可执行，检查通过；否则，检查失败。
+
 ### ConditionFirstBoot
 
 检测系统是否首次启动，用于系统出厂后(或者恢复出厂设置之后)，首次开机时执行必要的初始化操作。该选项将会检测`/run/sysmaster/first-boot`文件是否存在。若文件存在，则表明系统首次启动，反之，则表明系统非首次启动。如果在内核命令行上指定了`sysmaster.condition-first-boot=`选项（采用布尔值），它将优先于`/run/sysmaster/first-boot`文件是否存在的检查结果。
@@ -96,9 +104,25 @@ sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件�
 
 检查文件是否存在。只有`ConditionPathExists=`后配置的绝对路径存在时，检查通过，启动流程正常；如果配置的绝对路径不存在，则检查失败，停止单元的启动流程。
 
+### ConditionPathExistsGlob
+
+与`ConditionPathExists`类似，区别在于`ConditionPathExistsGlob`支持通配符。
+
+### ConditionPathIsDirectory
+
+检查`ConditionPathIsDirectory=`后配置的绝对路径是否为目录，如果是，检查通过；否则检查失败。
+
+### ConditionPathIsMountPoint
+
+检查`ConditionPathIsMountPoint=`后配置的绝对路径是否为挂载点目录，如果是软链接，则检查软链接指向的目录。该配置仅支持`kernel > 4.11`版本。如果是挂载点目录，检查通过；否则，检查失败。
+
 ### ConditionPathIsReadWrite
 
 与`ConditionPathExists`类似，检查配置的绝对路径所属的文件系统是否为可读可写。
+
+### ConditionPathIsSymbolicLink
+
+检查`ConditionPathIsSymbolicLink=`后配置的绝对路径是否为软链接，如果是软链接，检查通过；否则检查失败。
 
 ### ConditionSecurity
 
