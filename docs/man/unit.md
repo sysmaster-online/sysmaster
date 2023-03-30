@@ -6,9 +6,9 @@ sysmaster兼容systemd的SuccessAction、FailureAction、StartLimitAction等配�
 
 ### SuccessAction/FailureAction
 
-配置当unit结束（SuccessAction）或进入失败状态（FailureAction）时采取的动作。可以配置的值包括： `none`，`reboot`，`reboot-force`，`reboot-immediate`，`poweroff`，`poweroff-force`，`poweroff-immediate`，`exit`和`exit-force`。
+配置当unit结束（SuccessAction）或进入失败状态（FailureAction）时采取的动作。可以配置的值包括： `"none"`，`"reboot"`，`"reboot-force"`，`"reboot-immediate"`，`"poweroff"`，`"poweroff-force"`，`"poweroff-immediate"`，`"exit"`和`"exit-force"`。
 
-当配置为`none`时，不触发任何动作，所有unit的默认值为`none`。`reboot`，`poweroff`，`exit`会分别触发`reboot.target`，`poweroff.target`，`exit.target`，与正常的系统重启、关机、退出流程一致。`reboot-force`，`poweroff-force`，`exit-force`会分别触发sysmaster以相应的状态退出，强行杀死服务及相关进程。`reboot-immediate`，`poweroff-immediate`会分别触发系统立即重启、关机，直接调用[reboot(2)](https://man7.org/linux/man-pages/man2/reboot.2.html)。
+当配置为`none`时，不触发任何动作，所有unit的默认值为`"none"`。`"reboot"`，`"poweroff"`，`"exit"`会分别触发`reboot.target`，`poweroff.target`，`exit.target`，与正常的系统重启、关机、退出流程一致。`"reboot-force"`，`"poweroff-force"`，`"exit-force"`会分别触发sysmaster以相应的状态退出，强行杀死服务及相关进程。`"reboot-immediate"`，`"poweroff-immediate"`会分别触发系统立即重启、关机，直接调用[reboot(2)](https://man7.org/linux/man-pages/man2/reboot.2.html)。
 
 ### StartLimitAction
 
@@ -28,11 +28,11 @@ sysmaster兼容systemd的SuccessAction、FailureAction、StartLimitAction等配�
 
 `JobTimeoutAction`配置unit的job运行超时时采取的动作，配置的值与采取的动作与`SuccessAction`、`FailureAction`一致。
 
-`JobTimeoutSec`配置unit的job运行超时时间，单位是`秒`。systemd禁用`JobTimeoutSec`的配置为`infinity`，sysmaster与之不同，禁用`JobTimeoutSec`需要配置为`0`。
+`JobTimeoutSec`配置unit的job运行超时时间，单位是`秒`。systemd禁用`JobTimeoutSec`的配置为`"infinity"`，sysmaster与之不同，禁用`JobTimeoutSec`需要配置为`"0"`。
 
 ## 顺序和依赖
 
-sysmaster支持配置单元之间的依赖关系，可以配置的值为`;`分隔的单元。如`After="foo.service;bar.target"`。需要注意：
+sysmaster支持配置单元之间的顺序及依赖关系，可以配置的值为`;`分隔的单元。如`After="foo.service;bar.target"`。需要注意：
 
 1. 单元之间不允许有多余的空格
 2. 仅支持通过`;`分隔，与systemd的空格分隔存在差异
@@ -73,7 +73,7 @@ sysmaster支持配置单元之间的依赖关系，可以配置的值为`;`分�
 
 ## 启动检查
 
-sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件不满足时，停止启动流程。
+sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件不满足时，停止启动流程。所有配置均支持通过在值前面添加`!`反转检查结果。
 
 ### ConditionACPower
 
@@ -94,11 +94,15 @@ sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件�
 
 ### ConditionPathExists
 
-检查文件是否存在。只有`ConditionPathExists=`后配置的绝对路径存在时，检查通过，启动流程正常；如果配置的绝对路径不存在，则检查失败，停止单元的启动流程。支持在配置的绝对路径前添加`!`，反转检查结果。
+检查文件是否存在。只有`ConditionPathExists=`后配置的绝对路径存在时，检查通过，启动流程正常；如果配置的绝对路径不存在，则检查失败，停止单元的启动流程。
 
 ### ConditionPathIsReadWrite
 
 与`ConditionPathExists`类似，检查配置的绝对路径所属的文件系统是否为可读可写。
+
+### ConditionSecurity
+
+`ConditionSecurity`可以用于检查系统是否支持给定的安全技术。当前支持的值包括：`"selinux"`，`"apparmor"`，`"tomoyo"`，`"ima"`，`"smack"`，`"audit"`，`"uefi-secureboot"`和`"tpm2"`。 **注意：** 检查`"selinux"`需要在编译时通过 `--features "selinux"` 开启 `"selinux"` feature。
 
 ### ConditionUser
 
@@ -108,4 +112,4 @@ sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件�
 
 ### RefuseManualStart/RefuseManualStop
 
-`RefuseManualStart`/`RefuseManualStop`：配置单元是否拒绝通过`sctl start/stop`的形式手动启动/关闭。默认配置为`false`，即允许手动启动/关闭。该配置不影响通过依>赖关系解析启动/关闭服务。
+`RefuseManualStart`/`RefuseManualStop`：配置单元是否拒绝通过`sctl start/stop`的形式手动启动/关闭。默认配置为`false`，即允许手动启动/关闭。该配置不影响通过依赖关系解析启动/关闭服务。

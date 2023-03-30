@@ -23,6 +23,7 @@ pub(super) mod condition_keys {
     pub(crate) const CONDITION_NEEDS_UPDATE: &str = "ConditionNeedsUpdate";
     pub(crate) const CONDITION_PATH_EXISTS: &str = "ConditionPathExists";
     pub(crate) const CONDITION_PATH_IS_READ_WRITE: &str = "ConditionPathIsReadWrite";
+    pub(crate) const CONDITION_SECURITY: &str = "ConditionSecurity";
     pub(crate) const CONDITION_USER: &str = "ConditionUser";
 }
 
@@ -95,6 +96,7 @@ impl UeCondition {
             CONDITION_KERNEL_COMMAND_LINE => ConditionType::KernelCommandLine,
             CONDITION_PATH_EXISTS => ConditionType::PathExists,
             CONDITION_PATH_IS_READ_WRITE => ConditionType::PathIsReadWrite,
+            CONDITION_SECURITY => ConditionType::Security,
             CONDITION_USER => ConditionType::User,
             _ => return,
         };

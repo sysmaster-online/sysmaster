@@ -203,119 +203,48 @@ impl Unit {
             return Rc::clone(&self.conditions);
         } else {
             //need to reconstruct the code, expose the config detail out is wrong
-            let add_condition = |condop: &str, _params: &str| {
-                if _params.is_empty() {
-                    return;
-                }
-                self.conditions.add_condition(condop, String::from(_params));
-            };
+            macro_rules! add_condition_simplified {
+                ($key: ident, $value: ident) => {
+                    let params = self
+                        .get_config()
+                        .config_data()
+                        .borrow()
+                        .Unit
+                        .$value
+                        .to_string();
+                    if !params.is_empty() {
+                        self.conditions.add_condition($key, params);
+                    }
+                };
+            }
 
-            let add_assert = |assert_op: &str, _params: &str| {
-                if _params.is_empty() {
-                    return;
-                }
-                self.conditions.add_assert(assert_op, String::from(_params));
-            };
+            macro_rules! add_assert_simplified {
+                ($key: ident, $value: ident) => {
+                    let params = self
+                        .get_config()
+                        .config_data()
+                        .borrow()
+                        .Unit
+                        .$value
+                        .to_string();
+                    if !params.is_empty() {
+                        self.conditions.add_assert($key, params);
+                    }
+                };
+            }
 
-            add_condition(
-                CONDITION_AC_POWER,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionACPower
-                    .as_str(),
-            );
+            add_condition_simplified!(CONDITION_AC_POWER, ConditionACPower);
+            add_condition_simplified!(CONDITION_CAPABILITY, ConditionCapability);
+            add_condition_simplified!(CONDITION_FILE_NOT_EMPTY, ConditionFileNotEmpty);
+            add_condition_simplified!(CONDITION_FIRST_BOOT, ConditionFirstBoot);
+            add_condition_simplified!(CONDITION_KERNEL_COMMAND_LINE, ConditionKernelCommandLine);
+            add_condition_simplified!(CONDITION_NEEDS_UPDATE, ConditionNeedsUpdate);
+            add_condition_simplified!(CONDITION_PATH_EXISTS, ConditionPathExists);
+            add_condition_simplified!(CONDITION_PATH_IS_READ_WRITE, ConditionPathIsReadWrite);
+            add_condition_simplified!(CONDITION_SECURITY, ConditionSecurity);
+            add_condition_simplified!(CONDITION_USER, ConditionUser);
 
-            add_condition(
-                CONDITION_CAPABILITY,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionCapability
-                    .as_str(),
-            );
-
-            add_condition(
-                CONDITION_FILE_NOT_EMPTY,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionFileNotEmpty
-                    .as_str(),
-            );
-
-            add_condition(
-                CONDITION_FIRST_BOOT,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionFirstBoot
-                    .as_str(),
-            );
-
-            add_condition(
-                CONDITION_NEEDS_UPDATE,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionNeedsUpdate
-                    .as_str(),
-            );
-
-            add_condition(
-                CONDITION_KERNEL_COMMAND_LINE,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionKernelCommandLine
-                    .as_str(),
-            );
-
-            add_condition(
-                CONDITION_PATH_EXISTS,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionPathExists
-                    .as_str(),
-            );
-
-            add_condition(
-                CONDITION_PATH_IS_READ_WRITE,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionPathIsReadWrite
-                    .as_str(),
-            );
-
-            add_condition(
-                CONDITION_USER,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .ConditionUser
-                    .as_str(),
-            );
-
-            add_assert(
-                ASSERT_PATH_EXISTS,
-                self.get_config()
-                    .config_data()
-                    .borrow()
-                    .Unit
-                    .AssertPathExists
-                    .as_str(),
-            );
+            add_assert_simplified!(ASSERT_PATH_EXISTS, AssertPathExists);
         }
         Rc::clone(&self.conditions)
     }
