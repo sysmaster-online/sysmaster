@@ -181,6 +181,8 @@ pub(crate) struct UeConfigUnit {
     #[config(default = "")]
     pub ConditionPathIsReadWrite: String,
     #[config(default = "")]
+    pub ConditionSecurity: String,
+    #[config(default = "")]
     pub ConditionUser: String,
 
     /* Asserts */

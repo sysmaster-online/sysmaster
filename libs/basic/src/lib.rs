@@ -28,6 +28,7 @@ pub mod path_lookup;
 pub mod path_util;
 pub mod proc_cmdline;
 pub mod process_util;
+pub mod security;
 pub mod serialize;
 pub mod show_table;
 pub mod socket_util;

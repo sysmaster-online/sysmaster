@@ -19,7 +19,7 @@ use nix::{
     },
 };
 
-use crate::{conf_parser, device::on_ac_power, proc_cmdline, user_group_util};
+use crate::{conf_parser, device::on_ac_power, proc_cmdline, security, user_group_util};
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -47,6 +47,8 @@ pub enum ConditionType {
     PathExists,
     /// check path is readable and writable
     PathIsReadWrite,
+    /// check the security
+    Security,
     /// check whether the service manager is running as the given user.
     User,
 }
@@ -98,6 +100,7 @@ impl Condition {
             ConditionType::NeedsUpdate => self.test_needs_update(),
             ConditionType::PathExists => self.test_path_exists(),
             ConditionType::PathIsReadWrite => self.test_path_is_read_write(),
+            ConditionType::Security => self.test_security(),
             ConditionType::User => self.test_user(),
         };
 
@@ -260,6 +263,21 @@ impl Condition {
             Ok(v) => v,
         };
         (!flags.flags().contains(FsFlags::ST_RDONLY)) as i8
+    }
+
+    fn test_security(&self) -> i8 {
+        let res = match self.params.as_str() {
+            "selinux" => security::selinux_enabled(),
+            "apparmor" => security::apparmor_enabled(),
+            "tomoyo" => security::tomoyo_enabled(),
+            "ima" => security::ima_enabled(),
+            "smack" => security::smack_enabled(),
+            "audit" => security::audit_enabled(),
+            "uefi-secureboot" => security::uefi_secureboot_enabled(),
+            "tpm2" => security::tpm2_enabled(),
+            _ => false,
+        };
+        res as i8
     }
 
     fn test_user(&self) -> i8 {
