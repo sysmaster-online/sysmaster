@@ -1,0 +1,1 @@
+../../config_test/unit_config_test/refuse_001/check.sh
