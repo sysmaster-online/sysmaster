@@ -315,7 +315,9 @@ impl Manager {
     pub fn setup_cgroup(&self) -> Result<()> {
         let cg_init = PathBuf::from(CGROUP_SYSMASTER);
 
-        cg_create_and_attach(&cg_init, Pid::from_raw(0)).unwrap();
+        if let Err(e) = cg_create_and_attach(&cg_init, Pid::from_raw(0)) {
+            return Err(Error::Cgroup { source: e });
+        }
 
         log::debug!("kill all pids except sysmaster in the sysmaster cgroup");
         cgroup::cg_kill_recursive(

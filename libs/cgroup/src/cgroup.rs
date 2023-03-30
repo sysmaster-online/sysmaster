@@ -45,6 +45,8 @@ const CGROUP_PROCS: &str = "cgroup.procs";
 const CG_UNIFIED_DIR: &str = "/sys/fs/cgroup/unified";
 const CG_V1_DIR: &str = "/sys/fs/cgroup/sysmaster";
 
+const CG_SYSTEMD_DIR: &str = "/sys/fs/cgroup/systemd";
+
 /// the base dir of the cgroup
 #[cfg(feature = "hongmeng")]
 pub const CG_BASE_DIR: &str = "/run/sysmaster/cgroup";
@@ -69,35 +71,45 @@ pub fn cg_type() -> Result<CgType> {
         }
     }
 
-    match statfs(CG_V1_DIR) {
-        Ok(s) => {
-            let fy = s.filesystem_type();
-            if fy == FsType(libc::CGROUP2_SUPER_MAGIC as FsTypeT) {
-                Ok(CgType::UnifiedV1)
-            } else if fy == FsType(libc::CGROUP_SUPER_MAGIC as FsTypeT) {
-                Ok(CgType::Legacy)
-            } else {
-                Ok(CgType::None)
-            }
+    if let Ok(s) = statfs(CG_V1_DIR) {
+        let fy = s.filesystem_type();
+        if fy == FsType(libc::CGROUP_SUPER_MAGIC as FsTypeT) {
+            return Ok(CgType::Legacy);
         }
-        Err(_) => Err(Error::NotSupported),
     }
+
+    if let Ok(s) = statfs(CG_SYSTEMD_DIR) {
+        let fy = s.filesystem_type();
+        if fy == FsType(libc::CGROUP_SUPER_MAGIC as FsTypeT) {
+            return Ok(CgType::LegacySystemd);
+        } else {
+            return Ok(CgType::None);
+        }
+    }
+
+    Err(Error::NotSupported)
 }
 
-#[allow(dead_code)]
 fn cgtype_to_path(cg_type: CgType) -> &'static str {
     match cg_type {
         CgType::None => "",
         CgType::UnifiedV1 => CG_UNIFIED_DIR,
         CgType::UnifiedV2 => CG_BASE_DIR,
         CgType::Legacy => CG_V1_DIR,
+        CgType::LegacySystemd => CG_SYSTEMD_DIR,
     }
 }
 
 #[cfg(feature = "linux")]
 fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf> {
     let cg_type = cg_type()?;
+    if cg_type == CgType::None {
+        return Err(Error::NotFound {
+            what: "cgroup is not mounted".to_string(),
+        });
+    }
     let base_path = cgtype_to_path(cg_type);
+    log::debug!("cgroup root path is: {}", base_path);
     let path_buf: PathBuf = PathBuf::from(base_path);
     Ok(path_buf.join(cg_path).join(suffix))
 }
@@ -385,7 +397,7 @@ pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool> {
                 _ => Err(e),
             },
         },
-        CgType::Legacy => {
+        CgType::Legacy | CgType::LegacySystemd => {
             let cgroup_path = cg_abs_path(cg_path, &PathBuf::from(""))?;
 
             for entry in WalkDir::new(cgroup_path)
@@ -616,6 +628,11 @@ mod tests {
         use std::thread;
         use std::{collections::HashSet, time::Duration};
 
+        if !nix::unistd::getuid().is_root() {
+            println!("Unprivileged users cannot attach process to system.slice, skipping.");
+            return;
+        }
+
         let cg_type = if let Ok(cg_type) = super::cg_type() {
             cg_type
         } else {
@@ -640,10 +657,6 @@ mod tests {
         let pid = match t_thread {
             Ok(ForkResult::Parent { child }) => {
                 println!("child pid is: {child:?}");
-                if !nix::unistd::getuid().is_root() {
-                    println!("Unprivileged users cannot attach process to system.slice, skipping.");
-                    return;
-                }
                 let ret = super::cg_attach(child, &cg_path);
                 assert!(ret.is_ok());
                 child

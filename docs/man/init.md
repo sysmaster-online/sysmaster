@@ -40,3 +40,6 @@ sysmaster二进制程序必须存放在`/usr/lib/sysmaster/`目录下。
 
 ## 8. 技术方案
 待补充
+
+## 9. 环境变量
+在containerd的容器环境中， 由于无方获取当前所处的容器环境， 在启动时需要指定container环境变量， 如`container=containerd`。
