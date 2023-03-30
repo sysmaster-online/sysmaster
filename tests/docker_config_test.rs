@@ -111,3 +111,9 @@ fn docker_config_test_action_001() {
 fn docker_config_test_timeout_001() {
     common::run_script("docker_config_test", "docker_config_test_timeout_001", "1");
 }
+
+#[test]
+#[ignore]
+fn docker_config_test_restart_001() {
+    common::run_script("docker_config_test", "docker_config_test_restart_001", "1");
+}

@@ -1,0 +1,8 @@
+[Unit]
+Description="restart 001 service"
+JobTimeoutSec=2
+
+[Service]
+RestartPreventExitStatus="SIGPIPE"
+ExecStart="/bin/sleep 1"
+Restart=

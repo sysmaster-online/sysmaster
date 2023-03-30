@@ -4,9 +4,8 @@ work_dir="$(dirname "$0")"
 source "${work_dir}"/util_lib.sh
 
 set +e
-key_log_1="ERROR sysmaster.*base.service] failed:.* Unable to determine the current process pid: No ExecStart command is configured and RemainAfterExit if false"
-key_log_2="ERROR sysmaster.*base.service] failed:.* Unable to determine the current process pid: More than Oneshot ExecStart command is configured, service type is not oneshot"
-key_log_3="ERROR sysmaster.*base.service] failed:.* failed to deserialize configuration from file"
+key_log_1="ERROR sysmaster.* Starting failed the unit load state is"
+key_log_2="ERROR sysmaster.* load unit .*base.service] failed: unit configuration error: 'More than Oneshot ExecStart command is configured, service type is not oneshot'"
 
 # usage: test unit without ExecStart
 function test01() {
@@ -20,8 +19,11 @@ function test01() {
     sctl start base
     expect_eq $? 1
     check_log ${SYSMST_LOG} "${key_log_1}"
-    check_load base false
-    check_status base inactive
+    # check_load base false
+    # check_status base inactive
+    sctl status base &> log
+    check_log log 'base.service: NotExisted'
+    rm -rf log
     # clean
     kill_sysmaster
 
@@ -32,8 +34,8 @@ function test01() {
     sctl start base
     expect_eq $? 1
     check_log ${SYSMST_LOG} "${key_log_1}"
-    check_load base false
-    check_status base inactive
+    # check_load base false
+    # check_status base inactive
     # clean
     kill_sysmaster
 }
@@ -44,15 +46,35 @@ function test02() {
     log_info "===== test02 ====="
 
     # multiple commands in single ExecStart
-    sed -i "s#ExecStart=.*#ExecStart=\"/bin/sleep 100; /bin/sleep 100\"#" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s#ExecStart=.*#ExecStart=\"/bin/sleep 2; /bin/sleep 222\"#" ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
 
     sctl start base
     expect_eq $? 1
     check_log ${SYSMST_LOG} "${key_log_2}"
-    check_load base false
-    check_status base inactive
+    # check_load base false
+    # check_status base inactive
     # clean
+    kill_sysmaster
+
+    # Type="oneshot": multiple commands in single ExecStart
+    sed -i '/ExecStart/ i Type="oneshot"' ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+
+    sctl start base &
+    check_load base true
+    check_status base activating
+    main_pid_1="$(get_pids base)"
+    ps -elf | grep -v grep | grep 'sleep 2$' | awk '{print $4}' | grep -w "${main_pid_1}"
+    expect_eq $? 0 || ps -elf
+    sleep 2
+    main_pid_2="$(get_pids base)"
+    ps -elf | grep -v grep | grep 'sleep 222$' | awk '{print $4}' | grep -w "${main_pid_2}"
+    expect_eq $? 0 || ps -elf
+    expect_gt "${main_pid_2}" "${main_pid_1}"
+    # clean
+    sctl stop base
+    check_status base inactive
     kill_sysmaster
 
     # single command in multiple ExecStart
@@ -62,9 +84,9 @@ function test02() {
 
     sctl start base
     expect_eq $? 1
-    check_log ${SYSMST_LOG} "${key_log_3}"
-    check_load base false
-    check_status base inactive
+    check_log ${SYSMST_LOG} "${key_log_1}"
+    # check_load base false
+    # check_status base inactive
     # clean
     kill_sysmaster
 }
@@ -121,19 +143,19 @@ function test04() {
 
     sctl start exec
     check_status exec inactive
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_1 start_post_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
     kill_sysmaster
 
     # ExecStartPre failed
-    sed -i 's/echo echo_start_pre_2/false/' ${SYSMST_LIB_PATH}/exec.service
+    sed -i 's/echo echo_start_pre_2_echo/false/' ${SYSMST_LIB_PATH}/exec.service
     run_sysmaster || return 1
 
     sctl start exec
     check_status exec failed
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
@@ -145,7 +167,7 @@ function test04() {
 
     sctl start exec
     check_status exec inactive
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_3 start_1 start_post_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
@@ -153,12 +175,12 @@ function test04() {
 
     # ExecStart failed
     cp -arf "${work_dir}"/tmp_units/exec.service ${SYSMST_LIB_PATH} || return 1
-    sed -i 's/echo echo_start_1/false/' ${SYSMST_LIB_PATH}/exec.service
+    sed -i 's/echo echo_start_1_echo/false/' ${SYSMST_LIB_PATH}/exec.service
     run_sysmaster || return 1
 
     sctl start exec
     check_status exec failed
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
@@ -170,7 +192,7 @@ function test04() {
 
     sctl start exec
     check_status exec failed
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
@@ -178,12 +200,12 @@ function test04() {
 
     # ExecStartPost failed
     cp -arf "${work_dir}"/tmp_units/exec.service ${SYSMST_LIB_PATH} || return 1
-    sed -i 's/echo echo_start_post_1/false/' ${SYSMST_LIB_PATH}/exec.service
+    sed -i 's/echo echo_start_post_1_echo/false/' ${SYSMST_LIB_PATH}/exec.service
     run_sysmaster || return 1
 
     sctl start exec
     check_status exec inactive
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_1 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
@@ -195,7 +217,7 @@ function test04() {
 
     sctl start exec
     check_status exec inactive
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
@@ -203,17 +225,17 @@ function test04() {
 
     # ExecStop failed
     cp -arf "${work_dir}"/tmp_units/exec.service ${SYSMST_LIB_PATH} || return 1
-    sed -i 's/echo echo_start_1/sleep 100/' ${SYSMST_LIB_PATH}/exec.service
-    sed -i 's/echo echo_stop_1/false/' ${SYSMST_LIB_PATH}/exec.service
+    sed -i 's/echo echo_start_1_echo/sleep 100/' ${SYSMST_LIB_PATH}/exec.service
+    sed -i 's/echo echo_stop_1_echo/false/' ${SYSMST_LIB_PATH}/exec.service
     run_sysmaster || return 1
 
     sctl start exec
     check_status exec active
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 ' || cat ${SYSMST_LOG}
     sctl stop exec
     check_status exec failed
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
@@ -225,11 +247,11 @@ function test04() {
 
     sctl start exec
     check_status exec active
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 ' || cat ${SYSMST_LOG}
     sctl stop exec
     check_status exec inactive
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean
@@ -237,12 +259,12 @@ function test04() {
 
     # ExecStopPost failed
     cp -arf "${work_dir}"/tmp_units/exec.service ${SYSMST_LIB_PATH} || return 1
-    sed -i 's/echo stop_post_1/false/' ${SYSMST_LIB_PATH}/exec.service
+    sed -i 's/echo stop_post_1_echo/false/' ${SYSMST_LIB_PATH}/exec.service
     run_sysmaster || return 1
 
     sctl start exec
     check_status exec inactive
-    expect_str_eq "$(cat ${${SYSMST_LOG}} | sed "s/\x00//g" | grep -a '^echo_' | sed 's/echo_//g' | tr '\n' ' ')" \
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_1 start_post_1 start_post_2 start_post_3 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
     # clean

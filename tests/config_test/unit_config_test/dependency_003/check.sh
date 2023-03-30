@@ -26,10 +26,11 @@ function test01() {
     expect_eq $? 1
     sctl start base
     expect_eq $? 0 || return 1
-    sctl status base
-    expect_eq $? 3
+    sleep 1
     sctl status base | grep Active | grep failed
     expect_eq $? 0
+    sctl status base
+    expect_eq $? 3
     sctl status failure1 failure2
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${key_log_1}" "${key_log_2}" "${key_log_3}" "${key_log_4}"
