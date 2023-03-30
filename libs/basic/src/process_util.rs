@@ -121,8 +121,9 @@ pub fn wait_pids(mut pids: HashSet<i32>, timeout: u64) -> HashSet<i32> {
     let now = SystemTime::now();
     let until = now + Duration::from_micros(timeout);
 
-    // remove PID1, we shouldn't wait our self.
+    // remove PID1, we shouldn't wait our self and init.
     pids.remove(&1);
+    pids.remove(&nix::unistd::getpid().into());
 
     loop {
         // 1. Find killed process by kernel.
