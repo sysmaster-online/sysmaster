@@ -136,6 +136,10 @@ impl Source for SigchldData {
         data
     }
 
+    fn priority(&self) -> i8 {
+        -7
+    }
+
     fn dispatch(&self, _event: &Events) -> i32 {
         println!("sigchld dispatch");
 

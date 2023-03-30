@@ -34,6 +34,7 @@ impl<T> Commands<T> {
             SocketAddr::from(([127, 0, 0, 1], 9527)),
         ];
         let fd = TcpListener::bind(&addrs[..]).unwrap();
+        fd.set_nonblocking(true).expect("set non-blocking");
         Commands {
             reli: Rc::clone(relir),
             command_action: Rc::new(comm_action),
@@ -62,8 +63,10 @@ where
             None => println!("None CommandRequest!"),
             Some(stream) => {
                 println!("{stream:?}");
-                let dispatch = ProstServerStream::new(stream.unwrap(), self.command_action.clone());
-                dispatch.process().unwrap();
+                if let Ok(s) = stream {
+                    let dispatch = ProstServerStream::new(s, self.command_action.clone());
+                    dispatch.process().unwrap();
+                }
             }
         }
         self.reli.clear_last_frame();

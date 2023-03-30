@@ -250,7 +250,7 @@ impl Source for JobManagerData {
     }
 
     fn priority(&self) -> i8 {
-        -10
+        100
     }
 
     fn token(&self) -> u64 {
