@@ -1,0 +1,71 @@
+#!/bin/bash
+
+work_dir="$(dirname "$0")"
+source "${work_dir}"/util_lib.sh
+
+set +e
+
+# usage: test RemainAfterExit
+function test01() {
+    log_info "===== test01 ====="
+    cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
+
+    # RemainAfterExit=false
+    sed -i '/ExecStart/ a RemainAfterExit=false' ${SYSMST_LIB_PATH}/base.service
+    sed -i 's/sleep 100/sleep 2/' ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+
+    sctl restart base
+    check_status base active || return 1
+    check_status base inactive || return 1
+    # clean
+    kill_sysmaster
+
+    # RemainAfterExit=true
+    sed -i '/RemainAfterExit/ s/false/true/' ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+
+    sctl restart base
+    check_status base active || return 1
+    sctl status base | grep active | grep 'running'
+    expect_eq $? 0 || sctl status base
+    main_pid="$(get_pids base)"
+    sleep 2.5
+    check_status base active || return 1
+    sctl status base | grep active | grep 'exited'
+    expect_eq $? 0 || sctl status base
+    ps -elf | grep -v grep | awk '{print $4}' | grep -w "${main_pid}"
+    expect_eq $? 1 || ps -elf
+
+    sctl stop base
+    check_status base inactive || return 1
+    # clean
+    kill_sysmaster
+}
+
+# usage: test RemainAfterExit with oneshot service
+function test02() {
+    log_info "===== test02 ====="
+    cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
+    sed -i '/ExecStart/ a Type="oneshot"' ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+
+    sctl restart base &
+    check_status base activating || return 1
+    main_pid="$(get_pids base)"
+    sleep 2.5
+    check_status base active || return 1
+    sctl status base | grep active | grep 'exited'
+    expect_eq $? 0 || sctl status base
+    ps -elf | grep -v grep | awk '{print $4}' | grep -w "${main_pid}"
+    expect_eq $? 1 || ps -elf
+
+    sctl stop base
+    check_status base inactive || return 1
+    # clean
+    kill_sysmaster
+}
+
+test01 || exit 1
+test02 || exit 1
+exit "${EXPECT_FAIL}"
