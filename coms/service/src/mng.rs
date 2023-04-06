@@ -502,6 +502,15 @@ impl ServiceMng {
         }
 
         self.rd.set_forbid_restart(false);
+
+        if let Some(p) = self.config.config_data().borrow().Service.PIDFile.as_ref() {
+            if let Err(e) = nix::unistd::unlink(&PathBuf::from(p)) {
+                log::warn!(
+                    "{}",
+                    format!("failed to unlink pid file: {}, error: {}", p, e)
+                );
+            }
+        }
     }
 
     fn enter_reload(&self) {
