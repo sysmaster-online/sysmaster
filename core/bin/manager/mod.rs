@@ -102,7 +102,7 @@ impl ExecuterAction for CommandActionMgr {
     }
 
     fn restart(&self, unit_name: &str) -> Result<(), Self::Error> {
-        self.um.restart_unit(unit_name)
+        self.um.restart_unit_manual(unit_name)
     }
 
     fn reload(&self, unit_name: &str) -> Result<(), Self::Error> {
