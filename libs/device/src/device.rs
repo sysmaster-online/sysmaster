@@ -93,8 +93,12 @@ pub struct Device {
     /// block device sequence number, monothonically incremented by the kernel on create/attach
     pub diskseq: u64,
 
-    /// whether self.properties is just now updated
+    /// properties are outdated
     pub properties_buf_outdated: bool,
+    /// devlinks in properties are outdated
+    pub property_devlinks_outdated: bool,
+    /// tags in properties are outdated
+    pub property_tags_outdated: bool,
     /// whether the device is initialized by reading uevent file
     pub uevent_loaded: bool,
     /// whether the subsystem is initialized
@@ -144,13 +148,15 @@ impl Device {
             all_tags: HashSet::new(),
             current_tags: HashSet::new(),
             devlinks: HashSet::new(),
-            properties_buf_outdated: false,
+            properties_buf_outdated: true,
             uevent_loaded: false,
             subsystem_set: false,
             diskseq: 0,
             parent: None,
             parent_set: false,
             driver_set: false,
+            property_devlinks_outdated: true,
+            property_tags_outdated: true,
         }
     }
 
@@ -861,8 +867,19 @@ impl Device {
     }
 
     /// get the value of specific device property
-    pub fn get_property_value(&self, _key: String) -> Result<String, Error> {
-        todo!()
+    pub fn get_property_value(&mut self, key: String) -> Result<String, Error> {
+        self.properties_prepare().map_err(|e| Error::Nix {
+            msg: format!("get_property_value failed: properties_prepare ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        match self.properties.get(&key) {
+            Some(v) => Ok(v.clone()),
+            None => Err(Error::Nix {
+                msg: format!("get_property_value failed: no key {}", key),
+                source: nix::errno::Errno::ENOENT,
+            }),
+        }
     }
 
     /// get the trigger uuid of the device
@@ -968,6 +985,21 @@ impl Device {
     /// open device
     pub fn open(&self, _flag: i32) -> Result<i32, Error> {
         todo!()
+    }
+
+    /// add property into device
+    pub fn add_property(&mut self, key: String, value: String) -> Result<(), Error> {
+        self.add_property_aux(key.clone(), value.clone(), false)?;
+
+        if !key.starts_with('.') {
+            self.add_property_aux(key, value, true)
+                .map_err(|e| Error::Nix {
+                    msg: format!("add_property failed: add_property_aux ({})", e),
+                    source: e.get_errno(),
+                })?;
+        }
+
+        Ok(())
     }
 }
 
@@ -1639,6 +1671,68 @@ impl Device {
         }
 
         Ok(&self.device_id)
+    }
+
+    /// prepare properties
+    pub(crate) fn properties_prepare(&mut self) -> Result<(), Error> {
+        self.read_uevent_file().map_err(|e| Error::Nix {
+            msg: format!("properties_prepare failed: read_uevent_file ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        // self.read_db().map_err(|e| Error::Nix {
+        //     msg: format!("properties_prepare failed: read_db ({})", e),
+        //     source: e.get_errno(),
+        // })?;
+
+        if self.property_devlinks_outdated {
+            let devlinks: Vec<String> = self.devlinks.clone().into_iter().collect();
+            let devlinks: String = devlinks.join(" ");
+            if !devlinks.is_empty() {
+                self.add_property_internal("DEVLINKS".to_string(), devlinks)
+                    .map_err(|e| Error::Nix {
+                        msg: format!(
+                            "properties_prepare failed: add_property_internal DEVLINKS ({})",
+                            e
+                        ),
+                        source: e.get_errno(),
+                    })?;
+
+                self.property_devlinks_outdated = false;
+            }
+        }
+
+        if self.property_tags_outdated {
+            let tags: Vec<String> = self.all_tags.clone().into_iter().collect();
+            let tags: String = tags.join(":");
+            if !tags.is_empty() {
+                self.add_property_internal("TAGS".to_string(), tags)
+                    .map_err(|e| Error::Nix {
+                        msg: format!(
+                            "properties_prepare failed: add_property_internal TAGS ({})",
+                            e
+                        ),
+                        source: e.get_errno(),
+                    })?;
+            }
+
+            let tags: Vec<String> = self.current_tags.clone().into_iter().collect();
+            let tags: String = tags.join(":");
+            if !tags.is_empty() {
+                self.add_property_internal("CURRENT_TAGS".to_string(), tags)
+                    .map_err(|e| Error::Nix {
+                        msg: format!(
+                            "properties_prepare failed: add_property_internal CURRENT_TAGS ({})",
+                            e
+                        ),
+                        source: e.get_errno(),
+                    })?;
+            }
+
+            self.property_tags_outdated = false;
+        }
+
+        Ok(())
     }
 }
 

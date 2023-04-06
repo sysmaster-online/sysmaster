@@ -14,6 +14,8 @@
 //!
 use snafu::prelude::*;
 
+pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
+
 /// devmaster error
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
@@ -36,6 +38,13 @@ pub enum Error {
     /// Error in control manager
     #[snafu(display("Control Manager: {}", msg))]
     ControlManagerError {
+        /// message
+        msg: &'static str,
+    },
+
+    /// Error encountered in builtin commands
+    #[snafu(display("Builtin: {}", msg))]
+    BuiltinCommandError {
         /// message
         msg: &'static str,
     },
