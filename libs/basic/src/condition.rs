@@ -14,15 +14,21 @@
 use nix::{
     fcntl::{open, OFlag},
     sys::{
-        stat::Mode,
+        stat,
         statvfs::{fstatvfs, FsFlags},
     },
 };
 
+use libc::{glob, glob_t, GLOB_NOSORT};
+#[cfg(not(target_env = "musl"))]
+use libc::{statx, STATX_ATTR_MOUNT_ROOT};
+
 use crate::{conf_parser, device::on_ac_power, proc_cmdline, security, user_group_util};
 use std::{
+    ffi::CString,
     fs::File,
     io::{BufRead, BufReader},
+    os::unix::prelude::AsRawFd,
     path::Path,
     str::FromStr,
     string::String,
@@ -35,6 +41,10 @@ pub enum ConditionType {
     ACPower,
     /// check the capability
     Capability,
+    /// check if the directory is empty
+    DirectoryNotEmpty,
+    /// check if the file is executable
+    FileIsExecutable,
     /// check file is empty
     FileNotEmpty,
     /// conditionalize units on whether the system is booting up for the first time
@@ -45,8 +55,16 @@ pub enum ConditionType {
     NeedsUpdate,
     /// check path exist
     PathExists,
+    /// check if the path exists using glob pattern
+    PathExistsGlob,
+    /// check if the path is directory
+    PathIsDirectory,
+    /// check if the path is a mount point
+    PathIsMountPoint,
     /// check path is readable and writable
     PathIsReadWrite,
+    /// check if the path is symbolic link
+    PathIsSymbolicLink,
     /// check the security
     Security,
     /// check whether the service manager is running as the given user.
@@ -92,14 +110,21 @@ impl Condition {
             return true;
         }
         let result = match self.c_type {
+            /* The following functions will return a positive value if check pass. */
             ConditionType::ACPower => self.test_ac_power(),
             ConditionType::Capability => self.test_capability(),
+            ConditionType::DirectoryNotEmpty => self.test_directory_not_empty(),
+            ConditionType::FileIsExecutable => self.test_file_is_executable(),
             ConditionType::FileNotEmpty => self.test_file_not_empty(),
             ConditionType::FirstBoot => self.test_first_boot(),
             ConditionType::KernelCommandLine => self.test_kernel_command_line(),
             ConditionType::NeedsUpdate => self.test_needs_update(),
             ConditionType::PathExists => self.test_path_exists(),
+            ConditionType::PathExistsGlob => self.test_path_exists_glob(),
+            ConditionType::PathIsDirectory => self.test_path_is_directory(),
+            ConditionType::PathIsMountPoint => self.test_path_is_mount_point(),
             ConditionType::PathIsReadWrite => self.test_path_is_read_write(),
+            ConditionType::PathIsSymbolicLink => self.test_path_is_symbolic_link(),
             ConditionType::Security => self.test_security(),
             ConditionType::User => self.test_user(),
         };
@@ -165,6 +190,35 @@ impl Condition {
 
         let res = cap_bitmask & values.bitmask();
         (res != 0) as i8
+    }
+
+    fn test_directory_not_empty(&self) -> i8 {
+        let path = Path::new(&self.params);
+        if path.is_file() {
+            return 0;
+        }
+        let mut iter = match path.read_dir() {
+            Err(_) => {
+                return 0;
+            }
+            Ok(v) => v,
+        };
+        iter.next().is_some() as i8
+    }
+
+    fn test_file_is_executable(&self) -> i8 {
+        let path = Path::new(&self.params);
+        if path.is_dir() {
+            return 0;
+        }
+        let s = match stat::stat(path) {
+            Err(_) => {
+                return 0;
+            }
+            Ok(v) => v,
+        };
+
+        ((s.st_mode & stat::SFlag::S_IFREG.bits() > 0) && (s.st_mode & 111 > 0)) as i8
     }
 
     fn test_file_not_empty(&self) -> i8 {
@@ -234,13 +288,90 @@ impl Condition {
         result as i8
     }
 
+    fn test_path_exists_glob(&self) -> i8 {
+        let pattern = CString::new(self.params.as_str()).unwrap();
+        let mut pglob: glob_t = unsafe { std::mem::zeroed() };
+        let status = unsafe {
+            /* use GLOB_NOSORT to speed up. */
+            glob(pattern.as_ptr(), GLOB_NOSORT, None, &mut pglob)
+        };
+        (status == 0) as i8
+    }
+
+    fn test_path_is_directory(&self) -> i8 {
+        Path::new(&self.params).is_dir() as i8
+    }
+
+    #[cfg(not(target_env = "musl"))]
+    fn test_path_is_mount_point(&self) -> i8 {
+        if self.params.eq("/") {
+            return 1;
+        }
+        let file = match File::open(Path::new(&self.params)) {
+            Err(_) => {
+                return 0;
+            }
+            Ok(v) => v,
+        };
+        let fd = file.as_raw_fd();
+        let path_name = CString::new(self.params.as_str()).unwrap();
+        let mut statxbuf: statx = unsafe { std::mem::zeroed() };
+        unsafe {
+            /* statx was added to linux in kernel 4.11 per `stat(2)`,
+             * we can depend on it safely. So we only use statx to
+             * check if the path is a mount point, and chase the
+             * symlink unconditionally*/
+            statx(fd, path_name.as_ptr(), 0, 0, &mut statxbuf);
+            /* The mask is supported and is set */
+            if statxbuf.stx_attributes_mask & (STATX_ATTR_MOUNT_ROOT as u64) != 0
+                && statxbuf.stx_attributes & (STATX_ATTR_MOUNT_ROOT as u64) != 0
+            {
+                1
+            } else {
+                0
+            }
+        }
+    }
+
+    #[cfg(target_env = "musl")]
+    /* musl can't use statx, check /proc/self/mountinfo. */
+    fn test_path_is_mount_point(&self) -> i8 {
+        use libmount::mountinfo;
+        use std::io::Read;
+
+        let mut mount_data = String::new();
+        let mut file = match File::open("/proc/self/mountinfo") {
+            Err(_) => {
+                return 0;
+            }
+            Ok(v) => v,
+        };
+        if file.read_to_string(&mut mount_data).is_err() {
+            return 0;
+        }
+        let parser = mountinfo::Parser::new(mount_data.as_bytes());
+        for mount_result in parser {
+            if let Ok(mount) = mount_result {
+                let mount_point = match mount.mount_point.to_str() {
+                    None => {
+                        continue;
+                    }
+                    Some(v) => v,
+                };
+                if self.params == mount_point {
+                    return 1;
+                }
+            }
+        }
+        0
+    }
+
     fn test_path_is_read_write(&self) -> i8 {
-        /* 1 for true, 0 for false. */
         let path = Path::new(&self.params);
         if !path.exists() {
             return 0;
         }
-        let fd = match open(path, OFlag::O_CLOEXEC | OFlag::O_PATH, Mode::empty()) {
+        let fd = match open(path, OFlag::O_CLOEXEC | OFlag::O_PATH, stat::Mode::empty()) {
             Err(e) => {
                 log::error!(
                     "Failed to open {} for checking file system permission: {}",
@@ -263,6 +394,10 @@ impl Condition {
             Ok(v) => v,
         };
         (!flags.flags().contains(FsFlags::ST_RDONLY)) as i8
+    }
+
+    fn test_path_is_symbolic_link(&self) -> i8 {
+        Path::new(&self.params).is_symlink() as i8
     }
 
     fn test_security(&self) -> i8 {
