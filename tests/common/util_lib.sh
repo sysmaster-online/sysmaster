@@ -236,3 +236,14 @@ function install_pkg() {
     fi
     yum install -y $@
 }
+
+# usage: check netstat
+# input: $1: path
+#        $2: type
+function check_netstat() {
+    local path="$1"
+    local type="$2"
+
+    netstat -nap | grep -w "${path}" | grep -w "${type}"
+    expect_eq $? 0
+}
