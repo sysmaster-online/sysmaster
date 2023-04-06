@@ -132,6 +132,18 @@ fn docker_config_test_service_001() {
 
 #[test]
 #[ignore]
+fn docker_config_test_service_002() {
+    common::run_script("docker_config_test", "docker_config_test_service_002", "1");
+}
+
+#[test]
+#[ignore]
 fn docker_config_test_env_001() {
     common::run_script("docker_config_test", "docker_config_test_env_001", "1");
+}
+
+#[test]
+#[ignore]
+fn docker_config_test_kill_001() {
+    common::run_script("docker_config_test", "docker_config_test_kill_001", "1");
 }
