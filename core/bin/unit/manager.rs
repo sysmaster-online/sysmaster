@@ -144,8 +144,8 @@ impl UnitManagerX {
         self.data.reload(name)
     }
 
-    pub(crate) fn restart_unit(&self, name: &str) -> Result<()> {
-        self.data.restart_unit(name)
+    pub(crate) fn restart_unit_manual(&self, name: &str) -> Result<()> {
+        self.data.restart_unit_manual(name)
     }
 
     pub(crate) fn get_unit_status(&self, name: &str) -> Result<UnitStatus> {
@@ -839,6 +839,42 @@ impl UnitManager {
         } else {
             Err(Error::Internal)
         }
+    }
+
+    pub(self) fn restart_unit_manual(&self, name: &str) -> Result<()> {
+        let unit = match self.load_unitx(name) {
+            None => {
+                return Err(Error::UnitActionENoent);
+            }
+            Some(v) => v,
+        };
+
+        if unit
+            .get_config()
+            .config_data()
+            .borrow()
+            .Unit
+            .RefuseManualStop
+        {
+            return Err(Error::UnitActionERefuseManualStop);
+        }
+
+        if unit
+            .get_config()
+            .config_data()
+            .borrow()
+            .Unit
+            .RefuseManualStart
+        {
+            return Err(Error::UnitActionERefuseManualStart);
+        }
+
+        self.jm.exec(
+            &JobConf::new(&unit, JobKind::Restart),
+            JobMode::Replace,
+            &mut JobAffect::new(false),
+        )?;
+        Ok(())
     }
 
     fn get_unit_cgroup_path(&self, unit: Rc<Unit>) -> String {
