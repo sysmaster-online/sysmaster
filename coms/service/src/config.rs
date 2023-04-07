@@ -116,6 +116,16 @@ impl ServiceConfig {
     pub(super) fn kill_context(&self) -> Rc<KillContext> {
         self.kill_context.clone()
     }
+
+    pub(super) fn flush_timeout(&self) {
+        let time_out = self.data.borrow().Service.TimeoutSec;
+        if time_out == 0 {
+            return;
+        }
+
+        self.data.borrow_mut().set_timeout_start(time_out);
+        self.data.borrow_mut().set_timeout_stop(time_out);
+    }
 }
 
 #[derive(Config, Default, Debug)]
@@ -144,6 +154,14 @@ impl ServiceConfigData {
             ServiceCommand::Stop => self.Service.ExecStop.clone(),
             ServiceCommand::StopPost => self.Service.ExecStopPost.clone(),
         }
+    }
+
+    pub(self) fn set_timeout_start(&mut self, time_out: u64) {
+        self.Service.set_timeout_start(time_out);
+    }
+
+    pub(self) fn set_timeout_stop(&mut self, time_out: u64) {
+        self.Service.set_timeout_stop(time_out);
     }
 }
 

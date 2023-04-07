@@ -23,6 +23,7 @@ use crate::rentry::ExitStatus;
 use basic::{fd_util, IN_SET};
 use basic::{file_util, process_util};
 use event::{EventState, EventType, Events, Source};
+use log::Level;
 use nix::errno::Errno;
 use nix::libc;
 use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};
@@ -139,7 +140,7 @@ impl ServiceMng {
             comm: Rc::clone(commr),
             config: Rc::clone(configr),
             pid: Rc::clone(&_pid),
-            spawn: ServiceSpawn::new(commr, &_pid, configr, exec_ctx),
+            spawn: ServiceSpawn::new(commr, &_pid, configr, exec_ctx, rd),
             state: RefCell::new(ServiceState::Dead),
             result: RefCell::new(ServiceResult::Success),
             reload_result: RefCell::new(ServiceResult::Success),
@@ -248,7 +249,11 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::Condition);
         match self.control_command_pop() {
             Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
+                match self.spawn.start_service(
+                    &cmd,
+                    self.config.config_data().borrow().Service.TimeoutStartSec,
+                    ExecFlags::CONTROL,
+                ) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
                         self.enter_dead(ServiceResult::FailureResources, true);
@@ -269,7 +274,11 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::StartPre);
         match self.control_command_pop() {
             Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
+                match self.spawn.start_service(
+                    &cmd,
+                    self.config.config_data().borrow().Service.TimeoutStartSec,
+                    ExecFlags::CONTROL,
+                ) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
                         self.enter_dead(ServiceResult::FailureResources, true);
@@ -310,9 +319,18 @@ impl ServiceMng {
             return;
         }
         let cmd = cmd.unwrap();
-        let ret = self
-            .spawn
-            .start_service(&cmd, 0, ExecFlags::PASS_FDS | ExecFlags::SOFT_WATCHDOG);
+
+        // for Simple and Idle service type, disable the timer.
+        let time_out = match service_type {
+            ServiceType::Simple | ServiceType::Idle => u64::MAX,
+            _ => self.config.config_data().borrow().Service.TimeoutStartSec,
+        };
+
+        let ret = self.spawn.start_service(
+            &cmd,
+            time_out,
+            ExecFlags::PASS_FDS | ExecFlags::SOFT_WATCHDOG,
+        );
 
         if ret.is_err() {
             log::error!(
@@ -336,7 +354,7 @@ impl ServiceMng {
                 self.enter_start_post();
             }
             ServiceType::Forking => {
-                // for foring service type, we consider the process startup complete when the process exit;
+                // for forking service type, we consider the process startup complete when the process exit;
                 log::debug!("in forking type, set pid {} to control pid", pid);
                 self.pid.set_control(pid);
                 self.set_state(ServiceState::Start);
@@ -361,7 +379,11 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::StartPost);
         match self.control_command_pop() {
             Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
+                match self.spawn.start_service(
+                    &cmd,
+                    self.config.config_data().borrow().Service.TimeoutStartSec,
+                    ExecFlags::CONTROL,
+                ) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
                         log::error!(
@@ -429,8 +451,18 @@ impl ServiceMng {
     }
 
     fn enter_stop_by_notify(&self) {
-        // todo
-        // start a timer
+        // todo tidy pids
+
+        if let Err(e) = self
+            .rd
+            .enable_timer(self.config.config_data().borrow().Service.TimeoutStopSec)
+        {
+            self.log(
+                Level::Warn,
+                &format!("action notify stop enable timer error: {}", e),
+            );
+        }
+
         self.set_state(ServiceState::StopSigterm);
     }
 
@@ -495,7 +527,17 @@ impl ServiceMng {
 
         if restart {
             self.rd.set_will_auto_restart(false);
-            self.enable_timer(self.config.config_data().borrow().Service.RestartSec);
+            if let Err(e) = self
+                .rd
+                .enable_timer(self.config.config_data().borrow().Service.RestartSec)
+            {
+                self.log(
+                    Level::Warn,
+                    &format!("auto restart start timer error: {}", e),
+                );
+                self.enter_dead(ServiceResult::FailureResources, false);
+                return;
+            }
             self.set_state(ServiceState::AutoRestart);
         } else {
             self.rd.set_reset_restart(true);
@@ -522,7 +564,11 @@ impl ServiceMng {
 
         match self.control_command_pop() {
             Some(cmd) => {
-                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
+                match self.spawn.start_service(
+                    &cmd,
+                    self.config.config_data().borrow().Service.TimeoutStartSec,
+                    ExecFlags::CONTROL,
+                ) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
                         log::error!("failed to start service: {}", self.comm.get_owner_id());
@@ -569,42 +615,67 @@ impl ServiceMng {
             res
         );
 
-        if let Some(u) = self.comm.owner() {
-            let op = state.to_kill_operation();
-            self.comm
-                .um()
-                .child_watch_all_pids(&self.comm.get_owner_id());
-            match u.kill_context(
-                self.config.kill_context(),
-                self.pid.main(),
-                self.pid.control(),
-                op,
+        if self.result() == ServiceResult::Success {
+            self.set_result(res);
+        }
+
+        let unit = self.comm.owner().expect("unit is not attached");
+
+        let op = state.to_kill_operation();
+        self.comm
+            .um()
+            .child_watch_all_pids(&self.comm.get_owner_id());
+
+        let ret = unit.kill_context(
+            self.config.kill_context(),
+            self.pid.main(),
+            self.pid.control(),
+            op,
+            self.pid.main_pid_alien(),
+        );
+
+        if ret.is_err() {
+            if matches!(
+                state,
+                ServiceState::StopWatchdog | ServiceState::StopSigterm | ServiceState::StopSigkill
             ) {
-                Ok(_) => {}
-                Err(_e) => {
-                    if IN_SET!(
-                        state,
-                        ServiceState::StopWatchdog,
-                        ServiceState::StopSigterm,
-                        ServiceState::StopSigkill
-                    ) {
-                        return self.enter_stop_post(ServiceResult::FailureResources);
-                    } else {
-                        return self.enter_dead(ServiceResult::FailureResources, true);
-                    }
-                }
+                return self.enter_stop_post(ServiceResult::FailureResources);
+            } else {
+                return self.enter_dead(ServiceResult::FailureResources, true);
             }
         }
 
-        if vec![
-            ServiceState::StopWatchdog,
-            ServiceState::StopSigterm,
-            ServiceState::StopSigkill,
-        ]
-        .contains(&state)
-        {
+        if ret.unwrap() {
+            if let Err(e) = self
+                .rd
+                .enable_timer(self.config.config_data().borrow().Service.TimeoutStopSec)
+            {
+                self.log(
+                    Level::Error,
+                    &format!("in enter signal start timer error: {}", e),
+                );
+
+                if matches!(
+                    state,
+                    ServiceState::StopWatchdog
+                        | ServiceState::StopSigterm
+                        | ServiceState::StopSigkill
+                ) {
+                    return self.enter_stop_post(ServiceResult::FailureResources);
+                } else {
+                    return self.enter_dead(ServiceResult::FailureResources, true);
+                }
+            }
+            self.set_state(state);
+        } else if matches!(
+            state,
+            ServiceState::StopWatchdog | ServiceState::StopSigterm | ServiceState::StopSigkill
+        ) {
             self.enter_stop_post(ServiceResult::Success);
-        } else if vec![ServiceState::FinalWatchdog, ServiceState::FinalSigterm].contains(&state) {
+        } else if matches!(
+            state,
+            ServiceState::FinalWatchdog | ServiceState::FinalSigterm
+        ) {
             self.enter_signal(ServiceState::FinalSigkill, ServiceResult::Success);
         } else {
             self.enter_dead(ServiceResult::Success, true);
@@ -614,6 +685,28 @@ impl ServiceMng {
     fn set_state(&self, state: ServiceState) {
         let original_state = self.state();
         *self.state.borrow_mut() = state;
+
+        if !matches!(
+            self.state(),
+            ServiceState::Condition
+                | ServiceState::StartPre
+                | ServiceState::Start
+                | ServiceState::StartPost
+                | ServiceState::Running
+                | ServiceState::Reload
+                | ServiceState::Stop
+                | ServiceState::StopWatchdog
+                | ServiceState::StopSigterm
+                | ServiceState::StopSigkill
+                | ServiceState::StopPost
+                | ServiceState::FinalWatchdog
+                | ServiceState::FinalSigterm
+                | ServiceState::FinalSigkill
+                | ServiceState::AutoRestart
+                | ServiceState::Cleaning
+        ) {
+            self.rd.delete_timer();
+        }
 
         // TODO
         // check the new state
@@ -699,8 +792,18 @@ impl ServiceMng {
 
     fn run_next_control(&self) {
         log::debug!("runring next control command");
+        let time_out = match self.state() {
+            ServiceState::Condition
+            | ServiceState::StartPre
+            | ServiceState::Start
+            | ServiceState::StartPost
+            | ServiceState::Running
+            | ServiceState::Reload => self.config.config_data().borrow().Service.TimeoutStartSec,
+            _ => self.config.config_data().borrow().Service.TimeoutStopSec,
+        };
+
         if let Some(cmd) = self.control_command_pop() {
-            match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
+            match self.spawn.start_service(&cmd, time_out, ExecFlags::CONTROL) {
                 Ok(pid) => self.pid.set_control(pid),
                 Err(_e) => {
                     log::error!("failed to start service: {}", self.comm.get_owner_id());
@@ -730,10 +833,11 @@ impl ServiceMng {
 
     fn run_next_main(&self) {
         if let Some(cmd) = self.main_command_pop() {
-            match self
-                .spawn
-                .start_service(&cmd, 0, ExecFlags::PASS_FDS | ExecFlags::SOFT_WATCHDOG)
-            {
+            match self.spawn.start_service(
+                &cmd,
+                self.config.config_data().borrow().Service.TimeoutStartSec,
+                ExecFlags::PASS_FDS | ExecFlags::SOFT_WATCHDOG,
+            ) {
                 Ok(pid) => {
                     let _ = self.pid.set_main(pid);
                 }
@@ -1037,25 +1141,6 @@ impl ServiceMng {
         }
     }
 
-    fn enable_timer(&self, usec: u64) {
-        if self.rd.armd_timer() {
-            self.rd.timer().set_time(usec);
-
-            let events = self.comm.um().events();
-
-            let source = self.rd.timer();
-            events.set_enabled(source, EventState::OneShot).unwrap();
-            return;
-        }
-
-        let timer = Rc::new(ServiceTimer::new(usec));
-        self.rd.attach_timer(timer.clone());
-
-        let events = self.comm.um().events();
-        events.add_source(timer.clone()).unwrap();
-        events.set_enabled(timer, EventState::OneShot).unwrap();
-    }
-
     fn restart_watchdog(&self) {
         self.monitor
             .borrow_mut()
@@ -1103,7 +1188,23 @@ impl ServiceMng {
             events.del_source(self.rd.watchdog()).unwrap();
         }
     }
+
+    fn kill_control_process(&self) {
+        if let Some(pid) = self.pid.control() {
+            if let Err(e) = process_util::kill_and_cont(pid, Signal::SIGKILL) {
+                self.log(
+                    Level::Warn,
+                    &format!("failed to kill control process {}, error: {}", pid, e),
+                )
+            }
+        }
+    }
+
+    fn log(&self, level: Level, msg: &str) {
+        self.comm.log(level, msg);
+    }
 }
+
 impl ServiceMng {
     pub(super) fn sigchld_event(&self, wait_status: WaitStatus) {
         self.do_sigchld_event(wait_status);
@@ -1527,13 +1628,15 @@ fn service_state_to_unit_state(service_type: ServiceType, state: ServiceState) -
 }
 
 pub(super) struct RunningData {
+    comm: Rc<ServiceUnitComm>,
     mng: RefCell<Weak<ServiceMng>>,
     data: RefCell<Rtdata>,
 }
 
 impl RunningData {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(commr: &Rc<ServiceUnitComm>) -> Self {
         RunningData {
+            comm: Rc::clone(commr),
             mng: RefCell::new(Weak::new()),
             data: RefCell::new(Rtdata::new()),
         }
@@ -1601,6 +1704,42 @@ impl RunningData {
 
     pub(self) fn armd_timer(&self) -> bool {
         self.data.borrow().armd_timer()
+    }
+
+    pub(super) fn enable_timer(&self, usec: u64) -> Result<i32> {
+        if usec == 0 || usec == u64::MAX {
+            return Ok(0);
+        }
+
+        if self.armd_timer() {
+            let events = self.comm.um().events();
+            let timer = self.timer();
+            events.del_source(timer.clone())?;
+
+            timer.set_time(usec);
+            events.set_enabled(timer, EventState::OneShot)?;
+            return Ok(0);
+        }
+
+        let timer = Rc::new(ServiceTimer::new(usec));
+        self.attach_timer(timer.clone());
+
+        let events = self.comm.um().events();
+        events.add_source(timer.clone())?;
+        events.set_enabled(timer, EventState::OneShot)?;
+
+        Ok(0)
+    }
+
+    pub(self) fn delete_timer(&self) {
+        if !self.armd_timer() {
+            return;
+        }
+
+        let events = self.comm.um().events();
+        let timer = self.timer();
+        events.set_enabled(timer.clone(), EventState::Off).unwrap();
+        events.del_source(timer).unwrap();
     }
 
     pub(super) fn add_restarts(&self) {
@@ -1996,32 +2135,93 @@ impl ServiceTimer {
     }
 
     fn do_dispatch(&self) -> i32 {
-        log::debug!("dispatch service timer");
+        self.mng().log(Level::Debug, "dispatch service timer");
 
         match self.mng().state() {
-            ServiceState::Dead => todo!(),
-            ServiceState::Condition => todo!(),
-            ServiceState::Start => todo!(),
-            ServiceState::StartPost => todo!(),
+            ServiceState::Condition
+            | ServiceState::StartPre
+            | ServiceState::Start
+            | ServiceState::StartPost => {
+                self.mng().log(
+                    Level::Warn,
+                    &format!(
+                        "{} operation time out, enter StopSigterm operation",
+                        self.mng().state()
+                    ),
+                );
+                self.mng()
+                    .enter_signal(ServiceState::StopSigterm, ServiceResult::FailureTimeout);
+            }
             ServiceState::Running => {
+                self.mng().log(
+                    Level::Warn,
+                    "Running operation time out, enter Stop operation",
+                );
                 self.mng().enter_stop(ServiceResult::FailureTimeout);
             }
-            ServiceState::Exited => todo!(),
-            ServiceState::Reload => todo!(),
-            ServiceState::StartPre => todo!(),
-            ServiceState::Stop => todo!(),
-            ServiceState::StopWatchdog => todo!(),
-            ServiceState::StopPost => todo!(),
-            ServiceState::StopSigterm => todo!(),
-            ServiceState::StopSigkill => todo!(),
-            ServiceState::FinalWatchdog => todo!(),
-            ServiceState::FinalSigterm => todo!(),
-            ServiceState::FinalSigkill => todo!(),
+            ServiceState::Reload => {
+                self.mng().log(
+                    Level::Warn,
+                    "Reload operation time out, kill control process and enter running",
+                );
+                self.mng().kill_control_process();
+                self.mng().set_reload_result(ServiceResult::FailureTimeout);
+
+                self.mng().enter_running(ServiceResult::Success);
+            }
+            ServiceState::Stop => {
+                self.mng()
+                    .log(Level::Warn, "Stop operation time out, enter StopSigterm");
+
+                self.mng()
+                    .enter_signal(ServiceState::StopSigterm, ServiceResult::FailureTimeout);
+            }
+            ServiceState::StopWatchdog => {
+                self.mng().log(
+                    Level::Warn,
+                    "StopWatchdog operation time out, enter StopPost",
+                );
+                self.mng().enter_stop_post(ServiceResult::FailureTimeout);
+            }
+            ServiceState::StopPost => {
+                self.mng().log(
+                    Level::Warn,
+                    "StopPost operation time out, enter FinalSigterm",
+                );
+
+                self.mng()
+                    .enter_signal(ServiceState::FinalSigterm, ServiceResult::FailureTimeout);
+            }
+            ServiceState::StopSigterm | ServiceState::StopSigkill => {
+                self.mng().log(
+                    Level::Warn,
+                    "StopSigterm or StopSigkill operation time out, enter StopPost",
+                );
+                self.mng().enter_stop_post(ServiceResult::FailureTimeout)
+            }
+            ServiceState::FinalWatchdog | ServiceState::FinalSigterm => {
+                self.mng().log(
+                    Level::Warn,
+                    "FinalWatchdog or FinalSigterm operation time out, enter Dead",
+                );
+                self.mng().enter_dead(ServiceResult::FailureTimeout, false)
+            }
+            ServiceState::FinalSigkill => {
+                self.mng()
+                    .log(Level::Warn, "FinalSigkill operation time out, enter Dead");
+                self.mng().enter_dead(ServiceResult::FailureTimeout, true)
+            }
             ServiceState::AutoRestart => {
+                self.mng()
+                    .log(Level::Warn, "AutoStart operation time out, enter Restart");
                 self.mng().enter_restart();
             }
-            ServiceState::Failed => todo!(),
-            ServiceState::Cleaning => todo!(),
+            ServiceState::Cleaning => self
+                .mng()
+                .enter_signal(ServiceState::FinalSigkill, ServiceResult::FailureTimeout),
+            _ => {
+                unreachable!()
+            }
         }
         0
     }
@@ -2046,6 +2246,10 @@ impl Source for ServiceTimer {
 
     fn dispatch(&self, _: &Events) -> i32 {
         self.do_dispatch()
+    }
+
+    fn priority(&self) -> i8 {
+        0
     }
 
     fn token(&self) -> u64 {
@@ -2152,7 +2356,7 @@ mod tests {
         let result = config.load(paths, false);
         assert!(result.is_ok());
 
-        let rt = Rc::new(RunningData::new());
+        let rt = Rc::new(RunningData::new(&comm));
         let mng = Rc::new(ServiceMng::new(&comm, &config, &rt, &context));
         rt.attach_mng(mng.clone());
         (mng, rt, config)

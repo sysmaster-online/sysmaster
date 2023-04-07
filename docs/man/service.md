@@ -17,9 +17,10 @@
 ## Restart
 
 配置在服务退出或终止时，是否重新启动服务，可以配置为`no`。`on-success`，`on-failure`，`on-watchdog`, `on-abnormal`, `on-abort`, `always`, 默认值为`no`。
-    `no`: 代表服务启动时， 不重新启动服务。
-    `on-success`: 当服务正常退出时重新启动服务。 1、退出码为0。 2、其他符合预期的退出码或信号。
-    `on-failure`: 当服务非正常退出时重新启动服务。 1、退出码非0。 2、非预期的信号或超时导致服务退出等。
+
+    `no`: 代表服务启动失败时， 不重新启动服务。
+    `on-success`: 当服务正常退出时重新启动服务。正常退出码有两种情况: 1、退出码为0。 2、其他符合预期的退出码或信号。
+    `on-failure`: 当服务非正常退出时重新启动服务。非正常退出码 1、退出码非0。 2、非预期的信号或超时导致服务退出等。
     `on-watchdog`: 当watchdog超时导致进程退出时重新启动服务。
     `on-abnormal`: 当服务超时或接收到异常的退出信号时候，重新启动服务。
     `on-abort`: 当服务因未捕获的异常退出时重新拉起服务。
@@ -45,3 +46,15 @@
 ## KillSignal
 
 设置杀死进程的第一步使用的信号, 配置类型为字符串。默认值为`SIGTERM`信号。
+
+## TimeoutSec
+
+服务启动或停止时的超时时间， 取值范围为0~u64::MAX, 当值为0或u64::Max时， 不启动定时器。当`TimeoutSec`的值不为0且`TimeoutStartSec`或`TimeoutStopSec`值为0时，则将`TimeoutStartSec`或`TimeoutStopSec`的值更新为`TimeoutSec`选项的
+
+## TimeoutStartSec
+
+服务启动时的超时时间， 取值范围为0~u64::MAX, 当值为0或u64::Max时， 不启动定时器。当执行`Condition`、`StartPre`、`Start`、`StartPost`、`Reload`命令时的超时时间。
+
+## TimeoutStopSec
+
+服务停止时的超时时间， 取值范围为0~u64::MAX, 当值为0或u64::Max时， 不启动定时器。当执行`Stop`、`StopPost`命令时的超时时间。

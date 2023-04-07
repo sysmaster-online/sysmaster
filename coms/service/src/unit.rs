@@ -187,7 +187,7 @@ impl ServiceUnit {
         let config = Rc::new(ServiceConfig::new(&comm));
         let context = Rc::new(ExecContext::new());
 
-        let rt = Rc::new(RunningData::new());
+        let rt = Rc::new(RunningData::new(&comm));
         let _mng = Rc::new(ServiceMng::new(&comm, &config, &rt, &context));
         rt.attach_mng(_mng.clone());
         ServiceUnit {
@@ -210,6 +210,9 @@ impl ServiceUnit {
     }
 
     fn parse(&self) -> Result<()> {
+        // if TimeoutSec is set, flush it's value to TimeoutStartSec and TimeoutStopSec
+        self.config.flush_timeout();
+
         if let Some(envs) = self.config.environments() {
             for env in envs {
                 let content: Vec<&str> = env.split('=').map(|s| s.trim()).collect();

@@ -10,6 +10,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use crate::mng::RunningData;
+
 use super::comm::ServiceUnitComm;
 use super::config::ServiceConfig;
 use super::pid::ServicePid;
@@ -25,6 +27,7 @@ pub(super) struct ServiceSpawn {
     pid: Rc<ServicePid>,
     config: Rc<ServiceConfig>,
     exec_ctx: Rc<ExecContext>,
+    rd: Rc<RunningData>,
 }
 
 impl ServiceSpawn {
@@ -33,19 +36,21 @@ impl ServiceSpawn {
         pidr: &Rc<ServicePid>,
         configr: &Rc<ServiceConfig>,
         exec_ctx: &Rc<ExecContext>,
+        rd: &Rc<RunningData>,
     ) -> ServiceSpawn {
         ServiceSpawn {
             comm: Rc::clone(commr),
             pid: Rc::clone(pidr),
             config: configr.clone(),
             exec_ctx: exec_ctx.clone(),
+            rd: rd.clone(),
         }
     }
 
     pub(super) fn start_service(
         &self,
         cmdline: &ExecCommand,
-        _time_out: u64,
+        time_out: u64,
         ec_flags: ExecFlags,
     ) -> Result<Pid> {
         let mut params = ExecParameters::new();
@@ -69,6 +74,8 @@ impl ServiceSpawn {
         };
         let um = self.comm.um();
         unit.prepare_exec()?;
+
+        self.rd.enable_timer(time_out)?;
 
         if ec_flags.contains(ExecFlags::PASS_FDS) {
             params.insert_fds(self.collect_socket_fds());

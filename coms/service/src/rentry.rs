@@ -208,11 +208,29 @@ pub(super) struct SectionService {
     pub EnvironmentFile: Vec<String>,
     #[config(default = "SIGTERM")]
     pub KillSignal: String,
+    #[config(default = 0)]
+    pub TimeoutSec: u64,
+    #[config(default = 0)]
+    pub TimeoutStartSec: u64,
+    #[config(default = 0)]
+    pub TimeoutStopSec: u64,
 }
 
 impl SectionService {
     pub(super) fn set_notify_access(&mut self, v: NotifyAccess) {
         self.NotifyAccess = Some(v);
+    }
+
+    pub(super) fn set_timeout_start(&mut self, time_out: u64) {
+        if self.TimeoutStartSec == 0 {
+            self.TimeoutStartSec = time_out;
+        }
+    }
+
+    pub(super) fn set_timeout_stop(&mut self, time_out: u64) {
+        if self.TimeoutStopSec == 0 {
+            self.TimeoutStopSec = time_out;
+        }
     }
 }
 

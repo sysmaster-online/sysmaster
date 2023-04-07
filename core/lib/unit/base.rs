@@ -35,7 +35,8 @@ pub trait UnitBase {
         m_pid: Option<Pid>,
         c_pid: Option<Pid>,
         ko: KillOperation,
-    ) -> Result<()>;
+        main_pid_alien: bool,
+    ) -> Result<bool>;
 
     ///
     fn notify(

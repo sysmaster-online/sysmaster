@@ -15,6 +15,7 @@ use super::rentry::{
 };
 use crate::monitor::ServiceMonitor;
 use crate::rentry::ExitStatus;
+use log::Level;
 use nix::unistd::Pid;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
@@ -140,6 +141,24 @@ impl ServiceUnitComm {
 
     pub(super) fn _reli(&self) -> Rc<Reliability> {
         self.umcomm._reli()
+    }
+
+    pub(super) fn log(&self, level: Level, msg: &str) {
+        match level {
+            Level::Error => log::error!("unit:{}, message: {}", self.id(), msg),
+            Level::Warn => log::warn!("unit:{}, message: {}", self.id(), msg),
+            Level::Info => log::info!("unit:{}, message: {}", self.id(), msg),
+            Level::Debug => log::debug!("unit:{}, message: {}", self.id(), msg),
+            Level::Trace => log::trace!("unit:{}, message: {}", self.id(), msg),
+        }
+    }
+
+    fn id(&self) -> String {
+        if let Some(ref unit) = *self.owner.borrow() {
+            return unit.id().to_string();
+        }
+
+        "".to_string()
     }
 
     fn rentry(&self) -> Rc<ServiceRe> {
