@@ -1,8 +1,27 @@
 # Service 配置
 
-## ExecStart
 
-`ExecStart`是Service唯一必须配置的选项，用于配置Service需要执行的命令。
+## Type
+
+service服务的类型， 当前支持`simple`、`forking`、`oneshot`、`notify`，默认值为`simple`。
+
+`simple`： 拉起service服务时，当执行fork成功即认为服务启动成功。
+
+`forking`： 代表ExecStart的进程会调用fork系统调用，此时父进程退出之后认为该服务启动成功。此时建议配置PIDFile选项， 通过该选项获取主服务进程的pid。
+
+`oneshot`： 主服务进程退出之后即认为服务启动完成， 此服务类型需同时设置`RemainAfterExit`， 允许配置多条命令， 通常用于短时间运行的服务。
+
+`notify`： 此服务需要主进程通过sd_notify发送通知消息， 当前支持的notify消息包括`MAINPID=`、`ERRNO=`、`STOPPING=1`、`WATCHDOG=`、`WATCHDOG_USEC`。
+
+    `MAINPID=`： 通过此消息接受主服务进程的pid。
+    `ERRNO=`: 接受主服务进程的错误码。
+    `STOPPING=1`: 当参数为1时， 且当前服务在Running状态则停止当前服务。
+    `WATCHDOG=`: 当参数为1时， 则启动watchdog的定时器， 当参数为trigger时，则服务进程StopWatchdog状态。
+
+
+## ExecCondition、ExecStartPre、ExecStart、ExecStop、ExecStartPost
+
+服务在不同的启动阶段执行的命令， `ExecStart`是Service唯一必须配置的选项，用于配置Service需要执行的命令。
 
 ### ExecStart配置的限制
 
@@ -10,13 +29,37 @@
 2. 除非服务的类型配置为`OneShot`，否则只允许配置一条命令
 3. 命令的绝对路径前支持添加前缀：`-`（暂不支持其他systemd支持的前缀，如`@`，`:`)。前缀`-`的含义是，即使后面列出的命令执行失败也当作成功处理。
 
+## PIDFile
+
+当Type类型为`forking`时使用， 用于获取主服务进程的pid。
+
+## RemainAfterExit
+
+支持的值为true或false, 当配置为true时， 当主服务进程退出时， 服务状态仍然为active状态。
+
+## NotifyAccess
+
+配置类型为字符串， 支持`none`、`main`， 当Type为Notify时默认值为`main`。当前功能未实现。
+
+## Sockets
+
+配置类型为字符串， 当需要配置多个时以；号隔开， 表示该服务需要从socket继承套接子。
+
+## KillMode
+
+当需要停止服务进程时， 杀死服务进程的方法， 取值范围如下： `control-group`、`process`、`mixed`， 默认值为`control-group`。
+
+    `control-group`: 表示杀死该服务的cgroup内的所有进程。
+    `process`: 仅杀死主进程。
+    `mixed`:  表示只向该服务的cgroup内的进程发送SigKill信号。
+
 ## WatchdogSec
 
 配置软件狗的定时时间，时间单位为秒， 当值大于0时，启用软件狗，应用通过发送notify消息喂狗， 定时时间内收到"WATCHDOG=1"消息代表应用正常， 收到“WATCHDOG=trigger"消息停止应用，收到“WATCHDOG_USEC=15”消息表示将定时时间修改为15秒。
 
 ## Restart
 
-配置在服务退出或终止时，是否重新启动服务，可以配置为`no`。`on-success`，`on-failure`，`on-watchdog`, `on-abnormal`, `on-abort`, `always`, 默认值为`no`。
+配置在服务退出或终止时，是否重新启动服务，可以配置为`no`,`on-success`，`on-failure`，`on-watchdog`, `on-abnormal`, `on-abort`, `always`, 默认值为`no`。
 
     `no`: 代表服务启动失败时， 不重新启动服务。
     `on-success`: 当服务正常退出时重新启动服务。正常退出码有两种情况: 1、退出码为0。 2、其他符合预期的退出码或信号。
@@ -38,6 +81,10 @@
 ## ExecReload
 
 主要用于服务重新加载配置文件等操作， 配置格式如`ExecStart`, 可以配置为空， 当服务active状态时， 才会生效。
+
+## Environment
+
+配置类型为字符串， 当需要配置多个时以；号隔开， 每个配置项支持以`key=value`的形式。
 
 ## EnvironmentFile
 
