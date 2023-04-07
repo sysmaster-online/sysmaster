@@ -15,44 +15,46 @@
 
 use crate::error::Error;
 use std::{
-    cell::RefCell,
     fmt::{self, Display},
-    rc::{Rc, Weak},
     str::FromStr,
+    sync::{Arc, RwLock, Weak},
 };
 
 pub mod rule_load;
 
 /// encapsulate all rule files
+#[derive(Debug, Clone)]
 pub struct Rules {
     /// the linked list to contain all rule files
     /// keeps the dictionary order
-    files: Option<Rc<RefCell<RuleFile>>>,
+    files: Option<Arc<RwLock<RuleFile>>>,
 
     /// current rule file
-    current_file: Option<Rc<RefCell<RuleFile>>>,
+    current_file: Option<Arc<RwLock<RuleFile>>>,
 }
 
 /// rule file is the basic unit to process the device
+#[derive(Debug, Clone)]
 pub struct RuleFile {
     /// the name of the rule file
     file_name: String,
 
     /// the linked list to contain all lines in the rule file
     /// keeps in order of line number
-    lines: Option<Rc<RefCell<RuleLine>>>,
+    lines: Option<Arc<RwLock<RuleLine>>>,
     /// current rule line
-    current_line: Option<Rc<RefCell<RuleLine>>>,
+    current_line: Option<Arc<RwLock<RuleLine>>>,
 
     /// previous rule file
-    prev: Option<Rc<RefCell<RuleFile>>>,
+    prev: Option<Arc<RwLock<RuleFile>>>,
     /// next rule file
-    next: Option<Rc<RefCell<RuleFile>>>,
+    next: Option<Arc<RwLock<RuleFile>>>,
 }
 
 /// rule line contains at least a rule token
 /// the regex is as following:
 ///     (<token>\s*,?\s*)+
+#[derive(Debug, Clone)]
 pub struct RuleLine {
     /// the content of the rule line
     line: String,
@@ -60,17 +62,17 @@ pub struct RuleLine {
     line_number: u32,
 
     /// the linked list to contain all tokens in the rule line
-    tokens: Option<Rc<RefCell<RuleToken>>>,
+    tokens: Option<Arc<RwLock<RuleToken>>>,
     /// current rule token
-    current_token: Option<Rc<RefCell<RuleToken>>>,
+    current_token: Option<Arc<RwLock<RuleToken>>>,
 
     /// the rule file to contain this line
-    file: Weak<RefCell<RuleFile>>,
+    file: Weak<RwLock<RuleFile>>,
 
     /// previous rule line
-    prev: Option<Rc<RefCell<RuleLine>>>,
+    prev: Option<Arc<RwLock<RuleLine>>>,
     /// next rule line
-    next: Option<Rc<RefCell<RuleLine>>>,
+    next: Option<Arc<RwLock<RuleLine>>>,
 }
 
 /// rule token matches regex:
@@ -79,6 +81,7 @@ pub struct RuleLine {
 ///     key: [^={+\-!:\0\s]+
 ///     attr: [^\{\}]+
 ///     value: [^\"]+
+#[derive(Debug, Clone)]
 pub struct RuleToken {
     r#type: TokenType,
     op: OperatorType,
@@ -86,13 +89,13 @@ pub struct RuleToken {
     // attr_subst_type: SubstituteType,
     attr: Option<String>,
     value: String,
-    prev: Option<Rc<RefCell<RuleToken>>>,
-    next: Option<Rc<RefCell<RuleToken>>>,
+    prev: Option<Arc<RwLock<RuleToken>>>,
+    next: Option<Arc<RwLock<RuleToken>>>,
 }
 
 /// token type
 #[allow(missing_docs, dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum TokenType {
     // the left value should take match == or unmatch != operator
     /// key = "ACTION", operator = "==|!="
@@ -157,7 +160,7 @@ pub(crate) enum TokenType {
 }
 
 /// operator type
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub(crate) enum OperatorType {
     /// ==
     Match,
@@ -213,7 +216,7 @@ impl Display for Rules {
         let mut s = String::new();
         // write!(f, "{}", s)
         for file in self.iter() {
-            s = format!("{}\n{}\n", s, file.as_ref().borrow());
+            s = format!("{}\n{}\n", s, file.as_ref().read().unwrap());
         }
         write!(f, "{}", s)
     }
@@ -221,18 +224,18 @@ impl Display for Rules {
 
 /// iterate over all rule files
 pub struct RulesIter {
-    current_file: Option<Rc<RefCell<RuleFile>>>,
+    current_file: Option<Arc<RwLock<RuleFile>>>,
 }
 
 impl Iterator for RulesIter {
     /// iterate over each rule file in the rules
-    type Item = Rc<RefCell<RuleFile>>;
+    type Item = Arc<RwLock<RuleFile>>;
 
     /// iterate over the rule file list
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.current_file.clone();
         self.current_file = match self.current_file.clone() {
-            Some(file) => file.borrow_mut().next.clone(),
+            Some(file) => file.read().unwrap().next.clone(),
             None => None,
         };
         ret
@@ -253,7 +256,7 @@ impl Display for RuleFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!("File: {}", self.file_name);
         for line in self.iter() {
-            s.push_str(format!("\n{}", line.as_ref().borrow()).as_str());
+            s.push_str(format!("\n{}", line.as_ref().read().unwrap()).as_str());
         }
 
         write!(f, "{}", s)
@@ -262,18 +265,18 @@ impl Display for RuleFile {
 
 /// iterator over lines in the rule file
 pub struct RuleFileIter {
-    current_line: Option<Rc<RefCell<RuleLine>>>,
+    current_line: Option<Arc<RwLock<RuleLine>>>,
 }
 
 impl Iterator for RuleFileIter {
     /// iterate over each rule file in the rules
-    type Item = Rc<RefCell<RuleLine>>;
+    type Item = Arc<RwLock<RuleLine>>;
 
     /// iterate over the rule file list
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.current_line.clone();
         self.current_line = match self.current_line.clone() {
-            Some(file) => file.borrow_mut().next.clone(),
+            Some(file) => file.read().unwrap().next.clone(),
             None => None,
         };
         ret
@@ -294,12 +297,18 @@ impl Display for RuleLine {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!(
             "{}:{}:  {}",
-            self.file.upgrade().unwrap().as_ref().borrow().file_name,
+            self.file
+                .upgrade()
+                .unwrap()
+                .as_ref()
+                .read()
+                .unwrap()
+                .file_name,
             self.line_number,
             self.line
         );
         for token in self.iter() {
-            s.push_str(format!("\n{}", token.as_ref().borrow()).as_str());
+            s.push_str(format!("\n{}", token.as_ref().read().unwrap()).as_str());
         }
         write!(f, "{}", s)
     }
@@ -307,18 +316,18 @@ impl Display for RuleLine {
 
 /// iterator over tokens in the rule line
 pub struct RuleLineIter {
-    current_token: Option<Rc<RefCell<RuleToken>>>,
+    current_token: Option<Arc<RwLock<RuleToken>>>,
 }
 
 impl Iterator for RuleLineIter {
     /// iterate over each rule file in the rules
-    type Item = Rc<RefCell<RuleToken>>;
+    type Item = Arc<RwLock<RuleToken>>;
 
     /// iterate over the rule file list
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.current_token.clone();
         self.current_token = match self.current_token.clone() {
-            Some(file) => file.borrow_mut().next.clone(),
+            Some(file) => file.read().unwrap().next.clone(),
             None => None,
         };
         ret
