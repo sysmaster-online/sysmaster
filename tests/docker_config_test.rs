@@ -80,6 +80,16 @@ fn docker_config_test_condition_002() {
 
 #[test]
 #[ignore]
+fn docker_config_test_condition_003() {
+    common::run_script(
+        "docker_config_test",
+        "docker_config_test_condition_003",
+        "1",
+    );
+}
+
+#[test]
+#[ignore]
 fn docker_config_test_assert_001() {
     common::run_script("docker_config_test", "docker_config_test_assert_001", "1");
 }
@@ -138,6 +148,12 @@ fn docker_config_test_service_002() {
 
 #[test]
 #[ignore]
+fn docker_config_test_service_003() {
+    common::run_script("docker_config_test", "docker_config_test_service_003", "1");
+}
+
+#[test]
+#[ignore]
 fn docker_config_test_env_001() {
     common::run_script("docker_config_test", "docker_config_test_env_001", "1");
 }
@@ -146,4 +162,16 @@ fn docker_config_test_env_001() {
 #[ignore]
 fn docker_config_test_kill_001() {
     common::run_script("docker_config_test", "docker_config_test_kill_001", "1");
+}
+
+#[test]
+#[ignore]
+fn docker_config_test_listen_001() {
+    common::run_script("docker_config_test", "docker_config_test_listen_001", "1");
+}
+
+#[test]
+#[ignore]
+fn docker_config_test_socket_001() {
+    common::run_script("docker_config_test", "docker_config_test_socket_001", "1");
 }

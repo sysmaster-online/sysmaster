@@ -1,0 +1,1 @@
+../../config_test/unit_config_test/service_003/check.sh

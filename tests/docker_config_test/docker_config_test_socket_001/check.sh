@@ -1,0 +1,1 @@
+../../config_test/unit_config_test/socket_001/check.sh

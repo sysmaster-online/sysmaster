@@ -5,12 +5,13 @@ source "${work_dir}"/util_lib.sh
 
 set +e
 
-# usage: test RemainAfterExit
+# usage: test Description/RemainAfterExit
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
 
     # RemainAfterExit=false
+    sed -i 's/^Description=.*/Description="this is a test"/' ${SYSMST_LIB_PATH}/base.service
     sed -i '/ExecStart/ a RemainAfterExit=false' ${SYSMST_LIB_PATH}/base.service
     sed -i 's/sleep 100/sleep 2/' ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
@@ -18,6 +19,9 @@ function test01() {
     sctl restart base
     check_status base active || return 1
     check_status base inactive || return 1
+    # check Description
+    sctl status base | grep "base.service - this is a test"
+    expect_eq $? 0 || sctl status base
     # clean
     kill_sysmaster
 
