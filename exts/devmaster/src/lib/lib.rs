@@ -15,3 +15,4 @@
 pub mod builtin;
 pub mod error;
 pub mod framework;
+pub mod rules;

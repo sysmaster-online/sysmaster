@@ -48,4 +48,11 @@ pub enum Error {
         /// message
         msg: &'static str,
     },
+
+    /// Error encountered in rules loader
+    #[snafu(display("Rules loader: {}", msg))]
+    RulesLoaderError {
+        /// message
+        msg: &'static str,
+    },
 }
