@@ -66,9 +66,9 @@
 //!     }
 //!
 //!     /// start dispatching after the event arrives
-//!     fn dispatch(&self, _: &Events) -> Result<i32, Error> {
+//!     fn dispatch(&self, _: &Events) -> i32 {
 //!         println!("Dispatching IO!");
-//!         Ok(0)
+//!         0
 //!     }
 //!
 //!     /// Unless you can guarantee all types of token allocation, it is recommended to use the default implementation here

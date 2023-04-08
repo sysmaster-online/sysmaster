@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 //! ShowTable can be used to display contents in a table format
-//! ```
+//! ```rust,ignore
 //!     This is called column
 //!              |
 //!              v
