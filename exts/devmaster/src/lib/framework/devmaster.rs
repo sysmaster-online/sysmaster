@@ -45,7 +45,7 @@ pub struct Devmaster {
 impl Devmaster {
     /// generate a devmaster object
     pub fn new(events: Rc<Events>) -> Rc<RefCell<Devmaster>> {
-        let rules = Rules::new(&DEFAULT_RULES_DIRS);
+        let rules = Rules::new(&[]);
 
         let ret = Rc::new(RefCell::new(Devmaster {
             events: events.clone(),

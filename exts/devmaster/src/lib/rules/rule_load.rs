@@ -183,6 +183,10 @@ impl RuleLine {
             line: line.clone(),
             line_number,
 
+            label: None,
+            goto_label: None,
+            goto_line: None,
+
             tokens: None,
             current_token: None,
 
@@ -193,7 +197,7 @@ impl RuleLine {
         };
 
         if !RE_LINE.is_match(&line) {
-            return Err(Error::RulesLoaderError {
+            return Err(Error::RulesLoadError {
                 msg: "Invalid rule line",
             });
         }
@@ -250,12 +254,12 @@ impl RuleToken {
         match key.as_str() {
             "ACTION" => {
                 if attr.is_some() {
-                    return Err(Error::RulesLoaderError {
+                    return Err(Error::RulesLoadError {
                         msg: "key ACTION can not carry attribute.",
                     });
                 }
                 if !op_is_match {
-                    return Err(Error::RulesLoaderError {
+                    return Err(Error::RulesLoadError {
                         msg: "key ACTION can only take match or unmatch operator.",
                     });
                 }
@@ -271,7 +275,7 @@ impl RuleToken {
             }
             "SYMLINK" => {
                 if attr.is_some() {
-                    return Err(Error::RulesLoaderError {
+                    return Err(Error::RulesLoadError {
                         msg: "key SYMLINK can not carry attribute.",
                     });
                 }

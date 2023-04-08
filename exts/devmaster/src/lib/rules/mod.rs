@@ -20,7 +20,9 @@ use std::{
     sync::{Arc, RwLock, Weak},
 };
 
+pub mod rule_execute;
 pub mod rule_load;
+pub mod utils;
 
 /// encapsulate all rule files
 #[derive(Debug, Clone)]
@@ -55,11 +57,19 @@ pub struct RuleFile {
 /// the regex is as following:
 ///     (<token>\s*,?\s*)+
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RuleLine {
     /// the content of the rule line
     line: String,
     /// the line number in its rule file
     line_number: u32,
+
+    /// whether this line has label token
+    label: Option<String>,
+    /// whether this line has goto token
+    goto_label: Option<String>,
+    /// which line should be went to
+    goto_line: Option<Arc<RwLock<RuleLine>>>,
 
     /// the linked list to contain all tokens in the rule line
     tokens: Option<Arc<RwLock<RuleToken>>>,
@@ -95,7 +105,7 @@ pub struct RuleToken {
 
 /// token type
 #[allow(missing_docs, dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub(crate) enum TokenType {
     // the left value should take match == or unmatch != operator
     /// key = "ACTION", operator = "==|!="
@@ -187,7 +197,7 @@ impl FromStr for OperatorType {
             "+=" => Ok(OperatorType::Add),
             "-=" => Ok(OperatorType::Remove),
             ":=" => Ok(OperatorType::AssignFinal),
-            _ => Err(Error::RulesLoaderError {
+            _ => Err(Error::RulesLoadError {
                 msg: "Invalid operator",
             }),
         }

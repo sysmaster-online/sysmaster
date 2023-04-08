@@ -17,7 +17,6 @@ use device::{
     device_monitor::{DeviceMonitor, MonitorNetlinkGroup},
 };
 use event::{EventState, EventType, Events, Source};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::io::{Read, Write};
@@ -27,9 +26,16 @@ use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::rc::{Rc, Weak};
 use std::sync::mpsc;
 use std::thread::JoinHandle;
+use std::{
+    cell::RefCell,
+    sync::{Arc, Mutex},
+};
 
-use crate::framework::job_queue::{DeviceJob, JobQueue, JobState};
 use crate::{error::Error, rules::Rules};
+use crate::{
+    framework::job_queue::{DeviceJob, JobQueue, JobState},
+    rules,
+};
 
 use super::devmaster::Devmaster;
 
@@ -40,7 +46,7 @@ const WORKER_MAX_IDLE_INTERVAL: u64 = 1;
 
 /// messages sended by manager to workers
 pub(crate) enum WorkerMessage {
-    Job(Box<Device>),
+    Job(Arc<Mutex<Device>>),
     Cmd(String),
 }
 
@@ -127,14 +133,22 @@ impl Worker {
             println!("{}", rules);
 
             match msg {
-                WorkerMessage::Job(mut device) => {
+                WorkerMessage::Job(device) => {
+                    // double cloned, may be optimized in future
+                    let device = device.as_ref().lock().unwrap().clone();
+
                     log::info!("Worker {id}: received device {}", device.devpath);
 
-                    Self::worker_process_device(id, device.as_ref());
+                    let mut execute_mgr = rules::rule_execute::ExecuteManager::new(rules.clone());
+
+                    let device = Rc::new(RefCell::new(device));
+                    let _ = execute_mgr.process_device(device.clone());
 
                     log::info!("Worker {id}: finished job");
 
-                    broadcaster.send_device(device.as_mut(), None).unwrap();
+                    broadcaster
+                        .send_device(&mut device.as_ref().borrow_mut(), None)
+                        .unwrap();
 
                     let mut tcp_stream =
                         TcpStream::connect(tcp_address.as_str()).unwrap_or_else(|error| {
@@ -196,11 +210,6 @@ impl Worker {
     /// get the state of the worker
     pub(crate) fn _get_state(&self) -> WorkerState {
         *self.state.borrow()
-    }
-
-    /// process a device
-    pub(crate) fn worker_process_device(id: u32, device: &Device) {
-        log::info!("Worker {id}: processing {}", device.devpath);
     }
 
     /// send message to the worker thread
@@ -331,7 +340,9 @@ impl WorkerManager {
             if state == WorkerState::Idle {
                 log::debug!("Worker Manager: find idle worker {}", worker.id);
                 self.set_worker_state(*id, WorkerState::Running);
-                worker.worker_send_message(WorkerMessage::Job(Box::new(device_job.device.clone())));
+                worker.worker_send_message(WorkerMessage::Job(Arc::new(Mutex::new(
+                    device_job.device.clone(),
+                ))));
                 return Ok(worker.clone());
             }
         }
@@ -341,7 +352,9 @@ impl WorkerManager {
                 let workers = self.workers.borrow();
                 let worker = workers.get(&id).unwrap();
                 self.set_worker_state(id, WorkerState::Running);
-                worker.worker_send_message(WorkerMessage::Job(Box::new(device_job.device.clone())));
+                worker.worker_send_message(WorkerMessage::Job(Arc::new(Mutex::new(
+                    device_job.device.clone(),
+                ))));
                 return Ok(worker.clone());
             }
         }
