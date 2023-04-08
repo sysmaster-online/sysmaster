@@ -9,7 +9,7 @@ set +e
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
-    sed -i "/Description=/ a ConditionACPower=\"true\"" ${SYSMST_LIB_PATH}/base.service
+    sed -i "/Description=/ a ConditionACPower=true" ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
 
     sctl start base
@@ -34,7 +34,7 @@ function test01() {
 function test02() {
     log_info "===== test02 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
-    sed -i "/Description=/ a ConditionFirstBoot=\"false\"" ${SYSMST_LIB_PATH}/base.service
+    sed -i "/Description=/ a ConditionFirstBoot=false" ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1
 
     sctl start base

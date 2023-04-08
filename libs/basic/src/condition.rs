@@ -23,7 +23,7 @@ use libc::{glob, glob_t, GLOB_NOSORT};
 #[cfg(not(target_env = "musl"))]
 use libc::{statx, STATX_ATTR_MOUNT_ROOT};
 
-use crate::{conf_parser, device::on_ac_power, proc_cmdline, security, user_group_util};
+use crate::{device::on_ac_power, proc_cmdline, security, user_group_util};
 use std::{
     ffi::CString,
     fs::File,
@@ -133,14 +133,9 @@ impl Condition {
     }
 
     fn test_ac_power(&self) -> i8 {
-        let is_true = match conf_parser::parse_boolean(&self.params) {
-            Err(_) => {
-                /* We only accept "true" or "false", skip other values. */
-                return 1;
-            }
-            Ok(v) => v,
-        };
-
+        /* params is generated from bool.to_string(), so it should
+         * be exactly "true", not "yes"/"on" or other words. */
+        let is_true = self.params.eq("true");
         !(is_true ^ on_ac_power()) as i8
     }
 
@@ -237,12 +232,7 @@ impl Condition {
             }
         }
 
-        let result = match conf_parser::parse_boolean(&self.params) {
-            Ok(ret) => ret,
-            _ => {
-                return 0;
-            }
-        };
+        let result = self.params.eq("true");
 
         let existed = Path::new("/run/sysmaster/first-boot").exists();
         (result == existed) as i8
@@ -543,9 +533,5 @@ mod test {
             assert!(!cond_first_boot_true.test(), "file should not be existed");
             assert!(cond_first_boot_false.test(), "file should not be existed");
         }
-
-        let cond_first_boot_invalid =
-            Condition::new(ConditionType::FirstBoot, 0, 0, String::from("invalid"));
-        assert!(!cond_first_boot_invalid.test(), "params should be invalid");
     }
 }

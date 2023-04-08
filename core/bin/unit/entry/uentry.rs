@@ -233,12 +233,35 @@ impl Unit {
                 };
             }
 
-            add_condition_simplified!(CONDITION_AC_POWER, ConditionACPower);
+            // ConditionACPower is different, it's Option<bool>, not String.
+            if let Some(v) = self
+                .get_config()
+                .config_data()
+                .borrow()
+                .Unit
+                .ConditionACPower
+            {
+                self.conditions
+                    .add_condition(CONDITION_AC_POWER, v.to_string());
+            }
+
             add_condition_simplified!(CONDITION_CAPABILITY, ConditionCapability);
             add_condition_simplified!(CONDITION_DIRECTORY_NOT_EMPTY, ConditionDirectoryNotEmpty);
             add_condition_simplified!(CONDITION_FILE_IS_EXECUTABLE, ConditionFileIsExecutable);
             add_condition_simplified!(CONDITION_FILE_NOT_EMPTY, ConditionFileNotEmpty);
-            add_condition_simplified!(CONDITION_FIRST_BOOT, ConditionFirstBoot);
+
+            // Same as ConditionACPower, it's Option<bool>.
+            if let Some(v) = self
+                .get_config()
+                .config_data()
+                .borrow()
+                .Unit
+                .ConditionFirstBoot
+            {
+                self.conditions
+                    .add_condition(CONDITION_FIRST_BOOT, v.to_string());
+            }
+
             add_condition_simplified!(CONDITION_KERNEL_COMMAND_LINE, ConditionKernelCommandLine);
             add_condition_simplified!(CONDITION_NEEDS_UPDATE, ConditionNeedsUpdate);
             add_condition_simplified!(CONDITION_PATH_EXISTS, ConditionPathExists);

@@ -17,7 +17,6 @@ use crate::manager::rentry::{
     RELI_DB_HUNIT_CONFIG, RELI_DB_HUNIT_DEP, RELI_DB_HUNIT_LOAD, RELI_DB_HUNIT_PPS,
 };
 use crate::unit::entry::UnitEmergencyAction;
-use basic::serialize::DeserializeWith;
 use bitflags::bitflags;
 use confique::Config;
 use nix::unistd::Pid;
@@ -26,6 +25,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
 use sysmaster::rel::{ReDb, Reliability};
+use sysmaster::serialize::DeserializeWith;
 use sysmaster::unit::{UnitRelations, UnitType};
 
 pub(crate) fn unit_name_to_type(unit_name: &str) -> UnitType {
@@ -164,8 +164,7 @@ pub(crate) struct UeConfigUnit {
     pub Conflicts: Vec<String>,
 
     /* Conditions */
-    #[config(default = "")]
-    pub ConditionACPower: String,
+    pub ConditionACPower: Option<bool>,
     #[config(default = "")]
     pub ConditionCapability: String,
     #[config(default = "")]
@@ -174,8 +173,7 @@ pub(crate) struct UeConfigUnit {
     pub ConditionFileIsExecutable: String,
     #[config(default = "")]
     pub ConditionFileNotEmpty: String,
-    #[config(default = "")]
-    pub ConditionFirstBoot: String,
+    pub ConditionFirstBoot: Option<bool>,
     #[config(default = "")]
     pub ConditionKernelCommandLine: String,
     #[config(default = "")]
