@@ -15,7 +15,8 @@
 use basic::parse_util::{device_path_parse_devnum, parse_devnum, parse_ifindex};
 use libc::{dev_t, mode_t, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT, S_IRUSR};
 use nix::errno::Errno;
-use nix::sys::stat::{lstat, major, makedev, minor, stat};
+use nix::fcntl::{open, OFlag};
+use nix::sys::stat::{self, lstat, major, makedev, minor, stat};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
@@ -983,8 +984,188 @@ impl Device {
     }
 
     /// open device
-    pub fn open(&self, _flag: i32) -> Result<i32, Error> {
-        todo!()
+    pub fn open(&mut self, oflags: OFlag) -> Result<i32, Error> {
+        let devname = self
+            .get_devname()
+            .map_err(|e| {
+                if e.get_errno() == Errno::ENOENT {
+                    Error::Nix {
+                        msg: format!("open failed: failed to get_devname ({})", e),
+                        source: Errno::ENOEXEC,
+                    }
+                } else {
+                    Error::Nix {
+                        msg: format!("open failed: failed to get_devname ({})", e),
+                        source: e.get_errno(),
+                    }
+                }
+            })?
+            .to_string();
+
+        let devnum = self.get_devnum().map_err(|e| {
+            if e.get_errno() == Errno::ENOENT {
+                Error::Nix {
+                    msg: format!("open failed: failed to get_devnum ({})", e),
+                    source: Errno::ENOEXEC,
+                }
+            } else {
+                Error::Nix {
+                    msg: format!("open failed: failed to get_devnum ({})", e),
+                    source: e.get_errno(),
+                }
+            }
+        })?;
+
+        let subsystem = match self.get_subsystem() {
+            Ok(s) => s,
+            Err(e) => {
+                if e.get_errno() != Errno::ENOENT {
+                    return Err(Error::Nix {
+                        msg: format!("open failed: failed to get_subsystem ({})", e),
+                        source: e.get_errno(),
+                    });
+                }
+
+                ""
+            }
+        }
+        .to_string();
+
+        let fd = match open(
+            devname.as_str(),
+            if oflags.intersects(OFlag::O_PATH) {
+                oflags
+            } else {
+                OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW | OFlag::O_PATH
+            },
+            stat::Mode::empty(),
+        ) {
+            Ok(fd) => fd,
+            Err(e) => {
+                return Err(Error::Nix {
+                    msg: format!("open failed: failed to open {}", devname),
+                    source: e,
+                })
+            }
+        };
+
+        let stat = match nix::sys::stat::fstat(fd) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(Error::Nix {
+                    msg: format!("open failed: failed to fstat fd {} for {}", fd, devname),
+                    source: e,
+                })
+            }
+        };
+
+        if stat.st_rdev != devnum {
+            return Err(Error::Nix {
+                msg: format!(
+                    "open failed: device number is inconsistent, st_rdev {}, devnum {}",
+                    stat.st_rdev, devnum
+                ),
+                source: Errno::ENXIO,
+            });
+        }
+
+        if subsystem == "block" {
+            if stat.st_mode & S_IFMT != S_IFBLK {
+                // the device is not block
+                return Err(Error::Nix {
+                    msg: format!(
+                        "open failed: subsystem is inconsistent, st_mode {}, subsystem {}",
+                        stat.st_mode, subsystem
+                    ),
+                    source: Errno::ENXIO,
+                });
+            }
+        } else if stat.st_mode & S_IFMT != S_IFCHR {
+            // the device is not char
+            return Err(Error::Nix {
+                msg: format!(
+                    "open failed: subsystem is inconsistent, st_mode {}, subsystem {}",
+                    stat.st_mode, subsystem
+                ),
+                source: Errno::ENXIO,
+            });
+        }
+
+        // if open flags has O_PATH, then we cannot check diskseq
+        if oflags.intersects(OFlag::O_PATH) {
+            return Ok(fd);
+        }
+
+        let mut diskseq: u64 = 0;
+
+        if self.get_is_initialized().map_err(|e| Error::Nix {
+            msg: format!("open failed: failed to get_is_initialized ({})", e),
+            source: e.get_errno(),
+        })? {
+            match self.get_property_value("ID_IGNORE_DISKSEQ".to_string()) {
+                Ok(value) => {
+                    if !value.parse::<bool>().map_err(|e| Error::Nix {
+                        msg: format!(
+                            "open failed: failed to parse value {} to boolean ({})",
+                            value, e
+                        ),
+                        source: Errno::EINVAL,
+                    })? {
+                        match self.get_diskseq() {
+                            Ok(n) => diskseq = n,
+                            Err(e) => {
+                                if e.get_errno() != Errno::ENOENT {
+                                    return Err(Error::Nix {
+                                        msg: format!("open failed: failed to get_diskseq ({})", e),
+                                        source: e.get_errno(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    if e.get_errno() != Errno::ENOENT {
+                        return Err(Error::Nix {
+                        msg: format!("open failed: failed to get_property_value \"ID_IGNORE_DISKSEQ\" ({})", e),
+                        source: e.get_errno(),
+                    });
+                    }
+                }
+            }
+        }
+
+        let fd2 = basic::fd_util::fd_reopen(fd, oflags).map_err(|e| Error::Nix {
+            msg: format!("open failed: failed to reopen fd {}", fd),
+            source: match e {
+                basic::Error::Nix { source } => source,
+                _ => Errno::EINVAL,
+            },
+        })?;
+
+        if diskseq == 0 {
+            return Ok(fd2);
+        }
+
+        let q = basic::fd_util::fd_get_diskseq(fd2).map_err(|e| Error::Nix {
+            msg: format!("open failed: failed to get diskseq on fd {}", fd2),
+            source: match e {
+                basic::Error::Nix { source } => source,
+                _ => Errno::EINVAL,
+            },
+        })?;
+
+        if q != diskseq {
+            return Err(Error::Nix {
+                msg: format!(
+                    "open failed: diskseq is inconsistent, ioctl get {}, but diskseq is {}",
+                    q, diskseq
+                ),
+                source: Errno::ENXIO,
+            });
+        }
+
+        Ok(fd2)
     }
 
     /// add property into device

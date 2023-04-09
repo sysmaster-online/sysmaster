@@ -12,7 +12,11 @@
 
 //!
 use crate::error::*;
-use nix::fcntl::{FcntlArg, FdFlag, OFlag};
+use nix::{
+    errno::Errno,
+    fcntl::{FcntlArg, FdFlag, OFlag},
+    ioctl_read,
+};
 
 ///
 pub fn fd_nonblock(fd: i32, nonblock: bool) -> Result<()> {
@@ -64,4 +68,71 @@ pub fn close(fd: i32) {
     if let Err(e) = nix::unistd::close(fd) {
         log::warn!("close fd {} failed, errno: {}", fd, e);
     }
+}
+
+/// reopen the specified fd with new flags to convert an O_PATH fd into
+/// regular one, or to turn O_RDWR fds into O_RDONLY fds
+///
+/// this function can not work on sockets, as they can not be opened
+///
+/// note that this function implicitly reset the read index to zero
+pub fn fd_reopen(fd: i32, oflags: OFlag) -> Result<i32> {
+    if oflags.intersects(OFlag::O_DIRECTORY) {
+        let new_fd = nix::fcntl::openat(fd, ".", oflags, nix::sys::stat::Mode::empty())
+            .map_err(|e| Error::Nix { source: e })?;
+
+        return Ok(new_fd);
+    }
+
+    match nix::fcntl::open(
+        format!("/proc/self/fd/{}", fd).as_str(),
+        oflags,
+        nix::sys::stat::Mode::empty(),
+    ) {
+        Ok(n) => Ok(n),
+        Err(e) => {
+            if e != Errno::ENOENT {
+                return Err(Error::Nix { source: e });
+            }
+
+            if !crate::stat_util::proc_mounted().map_err(|_| Error::Nix {
+                source: Errno::ENOENT,
+            })? {
+                // if /proc/ is not mounted, this function can not work
+                Err(Error::Nix {
+                    source: Errno::ENOSYS,
+                })
+            } else {
+                // if /proc/ is mounted, means this fd is not valid
+                Err(Error::Nix {
+                    source: Errno::EBADF,
+                })
+            }
+        }
+    }
+}
+
+const BLK_DISKSEQ_MAGIC: u8 = 18;
+const BLK_GET_DISKSEQ: u8 = 128;
+ioctl_read!(blk_get_diskseq, BLK_DISKSEQ_MAGIC, BLK_GET_DISKSEQ, u64);
+
+/// get the diskseq according to fd
+pub fn fd_get_diskseq(fd: i32) -> Result<u64> {
+    let mut diskseq: u64 = 0;
+    let ptr: *mut u64 = &mut diskseq;
+    unsafe {
+        match blk_get_diskseq(fd, ptr) {
+            Ok(_) => {}
+            Err(e) => {
+                if !crate::errno_util::errno_is_not_supported(e) && e != Errno::EINVAL {
+                    return Err(Error::Nix { source: e });
+                }
+
+                return Err(Error::Nix {
+                    source: Errno::EOPNOTSUPP,
+                });
+            }
+        }
+    }
+    Ok(diskseq)
 }
