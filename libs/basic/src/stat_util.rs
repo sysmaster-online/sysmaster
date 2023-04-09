@@ -19,6 +19,12 @@ use nix::{
     sys::statfs::{self, FsType},
 };
 
+#[cfg(any(
+    all(target_os = "linux", not(target_env = "musl")),
+    target_os = "android"
+))]
+use nix::sys::statfs::PROC_SUPER_MAGIC;
+
 /// check whether a path is specific file system type
 pub fn path_is_fs_type(path: &str, magic: FsType) -> Result<bool> {
     let s = statfs::statfs(path).map_err(|e| Error::Nix { source: e })?;
@@ -28,13 +34,19 @@ pub fn path_is_fs_type(path: &str, magic: FsType) -> Result<bool> {
 
 /// check whether /proc is mounted
 pub fn proc_mounted() -> Result<bool> {
-    match path_is_fs_type("/proc/", statfs::PROC_SUPER_MAGIC) {
-        Ok(r) => Ok(r),
+    #[cfg(any(
+        all(target_os = "linux", not(target_env = "musl")),
+        target_os = "android"
+    ))]
+    match path_is_fs_type("/proc/", PROC_SUPER_MAGIC) {
+        Ok(r) => return Ok(r),
         Err(e) => match e {
             Error::Nix {
                 source: Errno::ENOENT,
-            } => return Ok(false),
-            _ => Err(e),
+            } => {}
+            _ => return Err(e),
         },
     }
+
+    Ok(false)
 }

@@ -89,9 +89,9 @@ mod tests {
 
     #[test]
     fn test_builtin_example() {
-        let enumerator = DeviceEnumerator::new();
+        let mut enumerator = DeviceEnumerator::new();
 
-        for device in enumerator {
+        for device in enumerator.iter_mut() {
             let mut binding = device.as_ref().lock().unwrap();
             let device = binding.deref_mut();
 

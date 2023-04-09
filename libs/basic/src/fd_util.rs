@@ -114,7 +114,13 @@ pub fn fd_reopen(fd: i32, oflags: OFlag) -> Result<i32> {
 
 const BLK_DISKSEQ_MAGIC: u8 = 18;
 const BLK_GET_DISKSEQ: u8 = 128;
-ioctl_read!(blk_get_diskseq, BLK_DISKSEQ_MAGIC, BLK_GET_DISKSEQ, u64);
+ioctl_read!(
+    /// get the diskseq from block
+    blk_get_diskseq,
+    BLK_DISKSEQ_MAGIC,
+    BLK_GET_DISKSEQ,
+    u64
+);
 
 /// get the diskseq according to fd
 pub fn fd_get_diskseq(fd: i32) -> Result<u64> {

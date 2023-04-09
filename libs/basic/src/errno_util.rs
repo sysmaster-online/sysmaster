@@ -13,18 +13,23 @@
 //! utility for checking errno
 //!
 
-use nix::errno::{self, Errno};
+use nix::errno::Errno;
 
 /// seven errno for "operation, system call, ioctl or socket feature not supported"
 pub fn errno_is_not_supported(source: Errno) -> bool {
-    match source {
+    matches!(
+        source,
         Errno::EOPNOTSUPP
-        | Errno::ENOTTY
-        | Errno::ENOSYS
-        | Errno::EAFNOSUPPORT
-        | Errno::EPFNOSUPPORT
-        | Errno::EPROTONOSUPPORT
-        | Errno::ESOCKTNOSUPPORT => true,
-        _ => false,
-    }
+            | Errno::ENOTTY
+            | Errno::ENOSYS
+            | Errno::EAFNOSUPPORT
+            | Errno::EPFNOSUPPORT
+            | Errno::EPROTONOSUPPORT
+            | Errno::ESOCKTNOSUPPORT
+    )
+}
+
+/// two errno for access problems
+pub fn errno_is_privilege(source: Errno) -> bool {
+    matches!(source, Errno::EACCES | Errno::EPERM)
 }

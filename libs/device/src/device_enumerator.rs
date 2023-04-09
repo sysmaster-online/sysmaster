@@ -56,8 +56,6 @@ pub struct DeviceEnumerator {
     pub(crate) devices_by_syspath: HashMap<String, Arc<Mutex<Device>>>,
     /// sorted device vector
     pub(crate) devices: Vec<Arc<Mutex<Device>>>,
-    /// current device index used in iterator
-    pub(crate) current_device_index: usize,
 
     /// whether enumerator is up to date
     pub(crate) scan_up_to_date: bool,
@@ -113,37 +111,58 @@ pub enum DeviceEnumerationType {
     All,
 }
 
-impl Iterator for DeviceEnumerator {
+/// iterator of device enumerator
+pub struct DeviceEnumeratorIter<'a> {
+    current_device_index: usize,
+    enumerator: &'a mut DeviceEnumerator,
+}
+
+impl DeviceEnumerator {
+    /// iterate devices
+    pub fn iter_mut(&mut self) -> DeviceEnumeratorIter<'_> {
+        DeviceEnumeratorIter {
+            current_device_index: 0,
+            enumerator: self,
+        }
+    }
+}
+
+impl Iterator for DeviceEnumeratorIter<'_> {
     type Item = Arc<Mutex<Device>>;
 
     /// iterate over the devices or subsystems according to the enumerator type
     fn next(&mut self) -> Option<Self::Item> {
-        match self.etype {
+        match self.enumerator.etype {
             DeviceEnumerationType::Devices => {
-                if !self.scan_up_to_date && self.scan_devices().is_err() {
+                if !self.enumerator.scan_up_to_date && self.enumerator.scan_devices().is_err() {
                     return None;
                 }
             }
             DeviceEnumerationType::Subsystems => {
-                if !self.scan_up_to_date && self.scan_subsystems().is_err() {
+                if !self.enumerator.scan_up_to_date && self.enumerator.scan_subsystems().is_err() {
                     return None;
                 }
             }
             DeviceEnumerationType::All => {
-                if !self.scan_up_to_date && self.scan_devices_and_subsystems().is_err() {
+                if !self.enumerator.scan_up_to_date
+                    && self.enumerator.scan_devices_and_subsystems().is_err()
+                {
                     return None;
                 }
             }
         }
 
-        if !self.sorted && self.sort_devices().is_err() {
+        if !self.enumerator.sorted && self.enumerator.sort_devices().is_err() {
             return None;
         }
 
-        self.devices.get(self.current_device_index).map(|d| {
-            self.current_device_index += 1;
-            d.clone()
-        })
+        self.enumerator
+            .devices
+            .get(self.current_device_index)
+            .map(|d| {
+                self.current_device_index += 1;
+                d.clone()
+            })
     }
 }
 
@@ -331,7 +350,7 @@ impl DeviceEnumerator {
                             continue;
                         }
                     };
-                    if subsys != prioritized_subsystem {
+                    if !subsys.eq(prioritized_subsystem) {
                         continue;
                     }
 
@@ -411,7 +430,7 @@ impl DeviceEnumerator {
         });
         self.devices = devices;
         self.sorted = true;
-        self.current_device_index = 0;
+        // self.current_device_index = 0;
         Ok(())
     }
 
@@ -579,7 +598,7 @@ impl DeviceEnumerator {
                 }
             };
 
-            match self.match_subsystem(subsystem) {
+            match self.match_subsystem(&subsystem) {
                 Ok(ret) => match ret {
                     true => {}
                     false => return Ok(false),
@@ -1401,7 +1420,7 @@ mod tests {
         let mut enumerator = DeviceEnumerator::new();
         enumerator.set_enumerator_type(DeviceEnumerationType::Devices);
 
-        for i in enumerator {
+        for i in enumerator.iter_mut() {
             i.lock().unwrap().get_devpath().unwrap();
         }
     }
@@ -1411,7 +1430,7 @@ mod tests {
         let mut enumerator = DeviceEnumerator::new();
         enumerator.set_enumerator_type(DeviceEnumerationType::Subsystems);
 
-        for i in enumerator {
+        for i in enumerator.iter_mut() {
             i.lock()
                 .expect("device is locked somewhere else")
                 .get_devpath()
@@ -1424,7 +1443,7 @@ mod tests {
         let mut enumerator = DeviceEnumerator::new();
         enumerator.set_enumerator_type(DeviceEnumerationType::All);
 
-        for i in enumerator {
+        for i in enumerator.iter_mut() {
             i.lock()
                 .expect("device is locked somewhere else")
                 .get_devpath()

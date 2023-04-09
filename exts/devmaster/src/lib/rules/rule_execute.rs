@@ -129,7 +129,7 @@ impl ExecuteManager {
         Ok(())
     }
 
-    /// excute rules
+    /// execute rules
     pub(crate) fn execute_rules(&mut self) -> Result<()> {
         let unit = self.current_unit.as_mut().unwrap();
 

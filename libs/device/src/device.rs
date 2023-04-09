@@ -27,6 +27,9 @@ use std::sync::{Arc, Mutex};
 use crate::utils::readlink_value;
 use crate::{error::Error, DeviceAction};
 
+/// database directory path
+pub const DB_DIRECTORY_PATH: &str = "/run/udev/data/";
+
 /// Device
 #[derive(Debug, Clone)]
 pub struct Device {
@@ -91,8 +94,12 @@ pub struct Device {
     pub current_tags: HashSet<String>,
     /// device links
     pub devlinks: HashSet<String>,
+    /// device links priority
+    pub devlink_priority: i32,
     /// block device sequence number, monothonically incremented by the kernel on create/attach
     pub diskseq: u64,
+    /// database version
+    pub database_version: u32,
 
     /// properties are outdated
     pub properties_buf_outdated: bool,
@@ -108,6 +115,13 @@ pub struct Device {
     pub parent_set: bool,
     /// whether the driver is set
     pub driver_set: bool,
+    /// whether the database is loaded
+    pub db_loaded: bool,
+
+    /// whether the device object is initialized
+    pub is_initialized: bool,
+    /// don not read more information from uevent/db
+    pub sealed: bool,
 }
 
 impl Default for Device {
@@ -158,6 +172,11 @@ impl Device {
             driver_set: false,
             property_devlinks_outdated: true,
             property_tags_outdated: true,
+            is_initialized: false,
+            db_loaded: false,
+            sealed: false,
+            database_version: 0,
+            devlink_priority: 0,
         }
     }
 
@@ -650,7 +669,7 @@ impl Device {
     }
 
     /// get subsystem
-    pub fn get_subsystem(&mut self) -> Result<&str, Error> {
+    pub fn get_subsystem(&mut self) -> Result<String, Error> {
         if !self.subsystem_set {
             let subsystem_path = self.syspath.clone() + "/subsystem";
             let subsystem_path = Path::new(subsystem_path.as_str());
@@ -681,7 +700,7 @@ impl Device {
         };
 
         if !self.subsystem.is_empty() {
-            Ok(&self.subsystem)
+            Ok(self.subsystem.clone())
         } else {
             Err(Error::Nix {
                 msg: "get_subsystem failed: no available subsystem".to_string(),
@@ -708,7 +727,7 @@ impl Device {
     }
 
     /// get the device type
-    pub fn get_devtype(&mut self) -> Result<&str, Error> {
+    pub fn get_devtype(&mut self) -> Result<String, Error> {
         match self.read_uevent_file() {
             Ok(_) => {}
             Err(e) => {
@@ -723,7 +742,7 @@ impl Device {
             });
         }
 
-        Ok(&self.devtype)
+        Ok(self.devtype.clone())
     }
 
     /// get devnum
@@ -746,7 +765,7 @@ impl Device {
     }
 
     /// get driver
-    pub fn get_driver(&mut self) -> Result<&str, Error> {
+    pub fn get_driver(&mut self) -> Result<String, Error> {
         if !self.driver_set {
             let syspath = self.get_syspath().unwrap().to_string();
             let driver_path_str = syspath + "/driver";
@@ -779,11 +798,11 @@ impl Device {
             });
         }
 
-        Ok(&self.driver)
+        Ok(self.driver.clone())
     }
 
     /// get device name
-    pub fn get_devname(&mut self) -> Result<&str, Error> {
+    pub fn get_devname(&mut self) -> Result<String, Error> {
         match self.read_uevent_file() {
             Ok(_) => {}
             Err(e) => {
@@ -798,11 +817,11 @@ impl Device {
             });
         }
 
-        Ok(&self.devname)
+        Ok(self.devname.clone())
     }
 
     /// get device sysnum
-    pub fn get_sysnum(&mut self) -> Result<&str, Error> {
+    pub fn get_sysnum(&mut self) -> Result<String, Error> {
         if self.sysname.is_empty() {
             self.set_sysname_and_sysnum().map_err(|e| Error::Nix {
                 msg: format!("get_sysnum failed: get_sysnum ({})", e),
@@ -817,12 +836,22 @@ impl Device {
             });
         }
 
-        Ok(&self.sysnum)
+        Ok(self.sysnum.clone())
     }
 
     /// get device action
     pub fn get_action(&self) -> Result<DeviceAction, Error> {
-        todo!()
+        if self.action == DeviceAction::Invalid {
+            return Err(Error::Nix {
+                msg: format!(
+                    "get_action failed: {} does not have uevent action",
+                    self.devpath
+                ),
+                source: Errno::ENOENT,
+            });
+        }
+
+        Ok(self.action)
     }
 
     /// get device seqnum, if seqnum is greater than zero, return Ok, otherwise return Err
@@ -839,12 +868,39 @@ impl Device {
 
     /// get device diskseq
     pub fn get_diskseq(&mut self) -> Result<u64, Error> {
-        todo!();
+        self.read_uevent_file().map_err(|e| Error::Nix {
+            msg: format!("get_diskseq failed: failed to read_uevent_file ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        if self.diskseq == 0 {
+            return Err(Error::Nix {
+                msg: format!("get_diskseq failed: {} does not have diskseq", self.devpath),
+                source: Errno::ENOENT,
+            });
+        }
+
+        Ok(self.diskseq)
     }
 
     /// get is initialized
     pub fn get_is_initialized(&mut self) -> Result<bool, Error> {
-        todo!("require db");
+        // match self.read_db
+        match self.read_db() {
+            Ok(_) => {}
+            Err(e) => {
+                if e.get_errno() == Errno::ENOENT {
+                    return Ok(false);
+                }
+
+                return Err(Error::Nix {
+                    msg: format!("get_is_initialized failed: failed to read_db ({})", e),
+                    source: e.get_errno(),
+                });
+            }
+        }
+
+        Ok(self.is_initialized)
     }
 
     /// get initialized usec
@@ -858,13 +914,23 @@ impl Device {
     }
 
     /// check whether the device has the tag
-    pub fn has_tag(&self, _tag: String) -> Result<bool, Error> {
-        todo!();
+    pub fn has_tag(&mut self, tag: String) -> Result<bool, Error> {
+        self.read_db().map_err(|e| Error::Nix {
+            msg: format!("has_tag failed: failed to read db ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        Ok(self.all_tags.contains(&tag))
     }
 
     /// check whether the device has the current tag
-    pub fn has_current_tag(&self, _tag: String) -> Result<bool, Error> {
-        todo!()
+    pub fn has_current_tag(&mut self, tag: String) -> Result<bool, Error> {
+        self.read_db().map_err(|e| Error::Nix {
+            msg: format!("has_tag failed: failed to read db ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        Ok(self.current_tags.contains(&tag))
     }
 
     /// get the value of specific device property
@@ -894,7 +960,7 @@ impl Device {
         // check whether the sysattr is already cached
         match self.get_cached_sysattr_value(sysattr.clone()) {
             Ok(v) => {
-                return Ok(v.to_string());
+                return Ok(v);
             }
             Err(e) => {
                 if e.get_errno() != Errno::ESTALE {
@@ -985,22 +1051,19 @@ impl Device {
 
     /// open device
     pub fn open(&mut self, oflags: OFlag) -> Result<i32, Error> {
-        let devname = self
-            .get_devname()
-            .map_err(|e| {
-                if e.get_errno() == Errno::ENOENT {
-                    Error::Nix {
-                        msg: format!("open failed: failed to get_devname ({})", e),
-                        source: Errno::ENOEXEC,
-                    }
-                } else {
-                    Error::Nix {
-                        msg: format!("open failed: failed to get_devname ({})", e),
-                        source: e.get_errno(),
-                    }
+        let devname = self.get_devname().map_err(|e| {
+            if e.get_errno() == Errno::ENOENT {
+                Error::Nix {
+                    msg: format!("open failed: failed to get_devname ({})", e),
+                    source: Errno::ENOEXEC,
                 }
-            })?
-            .to_string();
+            } else {
+                Error::Nix {
+                    msg: format!("open failed: failed to get_devname ({})", e),
+                    source: e.get_errno(),
+                }
+            }
+        })?;
 
         let devnum = self.get_devnum().map_err(|e| {
             if e.get_errno() == Errno::ENOENT {
@@ -1026,10 +1089,9 @@ impl Device {
                     });
                 }
 
-                ""
+                "".to_string()
             }
-        }
-        .to_string();
+        };
 
         let fd = match open(
             devname.as_str(),
@@ -1348,6 +1410,7 @@ impl Device {
         Ok(())
     }
 
+    /// set the sysname and sysnum of device object
     pub(crate) fn set_sysname_and_sysnum(&mut self) -> Result<(), Error> {
         let sysname = match self.devpath.rfind('/') {
             Some(i) => String::from(&self.devpath[i + 1..]),
@@ -1430,6 +1493,25 @@ impl Device {
         Ok(())
     }
 
+    /// add tag to the device object
+    pub(crate) fn add_tag(&mut self, tag: String, both: bool) -> Result<(), Error> {
+        self.all_tags.insert(tag.clone());
+
+        if both {
+            self.current_tags.insert(tag);
+        }
+        self.property_tags_outdated = true;
+        Ok(())
+    }
+
+    /// add devlink records to the device object
+    pub(crate) fn add_devlink(&mut self, devlink: String) -> Result<(), Error> {
+        self.devlinks.insert(devlink);
+        self.property_devlinks_outdated = true;
+
+        Ok(())
+    }
+
     /// get properties nulstr, if it is out of date, update it
     pub(crate) fn get_properties_nulstr(&mut self) -> Result<(&Vec<u8>, usize), Error> {
         self.update_properties_bufs()?;
@@ -1491,7 +1573,7 @@ impl Device {
 
     /// read uevent file and filling device attributes
     pub(crate) fn read_uevent_file(&mut self) -> Result<(), Error> {
-        if self.uevent_loaded {
+        if self.uevent_loaded || self.sealed {
             return Ok(());
         }
 
@@ -1709,6 +1791,13 @@ impl Device {
         Ok(())
     }
 
+    /// set the initialized timestamp
+    pub(crate) fn set_usec_initialized(&mut self, time: u64) -> Result<(), Error> {
+        self.add_property_internal("USEC_INITIALIZED".to_string(), time.to_string())?;
+        self.usec_initialized = time;
+        Ok(())
+    }
+
     /// cache sysattr value
     pub(crate) fn cache_sysattr_value(
         &mut self,
@@ -1732,7 +1821,7 @@ impl Device {
     }
 
     /// get cached sysattr value
-    pub(crate) fn get_cached_sysattr_value(&self, sysattr: String) -> Result<&str, Error> {
+    pub(crate) fn get_cached_sysattr_value(&self, sysattr: String) -> Result<String, Error> {
         if !self.sysattr_values.contains_key(&sysattr) {
             return Err(Error::Nix {
                 msg: format!(
@@ -1744,7 +1833,7 @@ impl Device {
         }
 
         match self.sysattr_values.get(&sysattr) {
-            Some(value) => Ok(value),
+            Some(value) => Ok(value.clone()),
             None => Err(Error::Nix {
                 msg: format!(
                     "get_cached_sysattr_value failed: non-existing sysattr {}",
@@ -1810,16 +1899,12 @@ impl Device {
 
     /// get the device id
     /// device id is used to identify hwdb file in /run/devmaster/data/
-    #[allow(dead_code)]
-    pub(crate) fn get_device_id(&mut self) -> Result<&str, Error> {
+    pub(crate) fn get_device_id(&mut self) -> Result<String, Error> {
         if self.device_id.is_empty() {
-            let subsystem = self
-                .get_subsystem()
-                .map_err(|e| Error::Nix {
-                    msg: format!("get_device_id failed: get_subsystem ({})", e),
-                    source: e.get_errno(),
-                })?
-                .to_string();
+            let subsystem = self.get_subsystem().map_err(|e| Error::Nix {
+                msg: format!("get_device_id failed: get_subsystem ({})", e),
+                source: e.get_errno(),
+            })?;
 
             let id: String;
             if let Ok(devnum) = self.get_devnum() {
@@ -1851,7 +1936,7 @@ impl Device {
             self.device_id = id;
         }
 
-        Ok(&self.device_id)
+        Ok(self.device_id.clone())
     }
 
     /// prepare properties
@@ -1861,10 +1946,10 @@ impl Device {
             source: e.get_errno(),
         })?;
 
-        // self.read_db().map_err(|e| Error::Nix {
-        //     msg: format!("properties_prepare failed: read_db ({})", e),
-        //     source: e.get_errno(),
-        // })?;
+        self.read_db().map_err(|e| Error::Nix {
+            msg: format!("properties_prepare failed: read_db ({})", e),
+            source: e.get_errno(),
+        })?;
 
         if self.property_devlinks_outdated {
             let devlinks: Vec<String> = self.devlinks.clone().into_iter().collect();
@@ -1911,6 +1996,176 @@ impl Device {
             }
 
             self.property_tags_outdated = false;
+        }
+
+        Ok(())
+    }
+
+    /// read database
+    pub(crate) fn read_db(&mut self) -> Result<(), Error> {
+        self.read_db_internal(false).map_err(|e| Error::Nix {
+            msg: format!("read_db failed: failed to read_db_internal ({})", e),
+            source: e.get_errno(),
+        })
+    }
+
+    /// read database internally
+    pub(crate) fn read_db_internal(&mut self, force: bool) -> Result<(), Error> {
+        if self.db_loaded || (!force && self.sealed) {
+            return Ok(());
+        }
+
+        let id = self.get_device_id().map_err(|e| Error::Nix {
+            msg: format!("read_db_internal failed: failed to get_device_id ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        let path = DB_DIRECTORY_PATH.to_string() + &id;
+
+        self.read_db_internal_filename(path)
+            .map_err(|e| Error::Nix {
+                msg: format!(
+                    "read_db_internal failed: failed to read_db_internal_filename ({})",
+                    e
+                ),
+                source: e.get_errno(),
+            })
+    }
+
+    /// read database internally from specific file
+    pub(crate) fn read_db_internal_filename(&mut self, filename: String) -> Result<(), Error> {
+        let mut file = match fs::OpenOptions::new().read(true).open(filename.clone()) {
+            Ok(f) => f,
+            Err(e) => match e.raw_os_error() {
+                Some(n) => {
+                    if n == libc::ENOENT {
+                        return Ok(());
+                    }
+                    return Err(Error::Nix {
+                        msg: format!("read_db_internal_filename failed: db {} ({})", filename, e),
+                        source: Errno::from_i32(n),
+                    });
+                }
+                None => {
+                    return Err(Error::Nix {
+                        msg: format!("read_db_internal_filename failed: db {} ({})", filename, e),
+                        source: Errno::EINVAL,
+                    });
+                }
+            },
+        };
+
+        let mut buf = String::new();
+        file.read_to_string(&mut buf).unwrap();
+
+        self.is_initialized = true;
+        self.db_loaded = true;
+
+        for line in buf.split('\n') {
+            if line.is_empty() {
+                continue;
+            }
+
+            let key = &line[0..1];
+            let value = &line[2..];
+
+            self.handle_db_line(key, value).map_err(|e| Error::Nix {
+                msg: format!(
+                    "read_db_internal_filename failed: failed to handle_db_line ({})",
+                    e
+                ),
+                source: e.get_errno(),
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// handle database line
+    pub(crate) fn handle_db_line(&mut self, key: &str, value: &str) -> Result<(), Error> {
+        match key {
+            "G" | "Q" => {
+                self.add_tag(value.to_string(), key == "Q")
+                    .map_err(|e| Error::Nix {
+                        msg: format!("handle_db_line failed: failed to add_tag ({})", e),
+                        source: e.get_errno(),
+                    })?;
+            }
+            "S" => {
+                self.add_devlink(format!("/dev/{}", value))
+                    .map_err(|e| Error::Nix {
+                        msg: format!("handle_db_line failed: failed to add_devlink ({})", e),
+                        source: e.get_errno(),
+                    })?;
+            }
+            "E" => {
+                let tokens: Vec<_> = value.split('=').collect();
+                if tokens.len() != 2 {
+                    return Err(Error::Nix {
+                        msg: format!("handle_db_line failed: failed to parse property {}", value),
+                        source: Errno::EINVAL,
+                    });
+                }
+
+                let (k, v) = (tokens[0], tokens[1]);
+
+                self.add_property_internal(k.to_string(), v.to_string())
+                    .map_err(|e| Error::Nix {
+                        msg: format!(
+                            "handle_db_line failed: failed to add_property_internal ({})",
+                            e
+                        ),
+                        source: e.get_errno(),
+                    })?;
+            }
+            "I" => {
+                let time = value.parse::<u64>().map_err(|e| Error::Nix {
+                    msg: format!(
+                        "handle_db_line failed: failed to parse initialized time {} ({})",
+                        value, e
+                    ),
+                    source: Errno::EINVAL,
+                })?;
+
+                self.set_usec_initialized(time).map_err(|e| Error::Nix {
+                    msg: format!(
+                        "handle_db_line failed: failed to set_usec_initialized ({})",
+                        e
+                    ),
+                    source: Errno::EINVAL,
+                })?;
+            }
+            "L" => {
+                let priority = value.parse::<i32>().map_err(|e| Error::Nix {
+                    msg: format!(
+                        "handle_db_line failed: failed to parse devlink priority {} ({})",
+                        value, e
+                    ),
+                    source: Errno::EINVAL,
+                })?;
+
+                self.devlink_priority = priority;
+            }
+            "W" => {
+                log::debug!("watch handle in database is deprecated.");
+            }
+            "V" => {
+                let version = value.parse::<u32>().map_err(|e| Error::Nix {
+                    msg: format!(
+                        "handle_db_line failed: failed to parse database version {} ({})",
+                        value, e
+                    ),
+                    source: Errno::EINVAL,
+                })?;
+
+                self.database_version = version;
+            }
+            _ => {
+                log::debug!(
+                    "libdevice: unknown key {} in database line, ignore it.",
+                    key
+                );
+            }
         }
 
         Ok(())
@@ -1964,7 +2219,7 @@ mod tests {
         // test Device::from_subsystem_sysname
         match device.get_subsystem() {
             Ok(subsystem) => {
-                let subsystem = subsystem.to_string();
+                let subsystem = subsystem;
                 if !subsystem.is_empty() && subsystem != "gpio" {
                     is_block = subsystem == "block";
                     let name = if subsystem == "drivers" {
@@ -1982,7 +2237,7 @@ mod tests {
                         }
                     }
 
-                    let device_id = device.get_device_id().unwrap().to_string();
+                    let device_id = device.get_device_id().unwrap();
                     match Device::from_device_id(device_id.clone()) {
                         Ok(mut dev) => {
                             assert_eq!(device_id, dev.get_device_id().unwrap());
@@ -1990,6 +2245,17 @@ mod tests {
                         }
                         Err(e) => {
                             assert_eq!(e.get_errno(), Errno::ENODEV);
+                        }
+                    }
+
+                    if device.get_is_initialized().unwrap() {
+                        // test get_usec_since_initialized: todo
+                    }
+
+                    match device.get_property_value("ID_NET_DRIVER".to_string()) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            assert_eq!(e.get_errno(), Errno::ENOENT);
                         }
                     }
                 }
@@ -2013,12 +2279,28 @@ mod tests {
                     }
                 };
 
-                match Device::from_path(devname.to_string()) {
+                match Device::from_path(devname) {
                     Ok(device_new) => {
                         let syspath_new = device_new.get_syspath().unwrap();
                         assert_eq!(syspath, syspath_new);
 
                         // todo: device_open
+                        match device.open(
+                            OFlag::O_CLOEXEC
+                                | OFlag::O_NONBLOCK
+                                | if is_block {
+                                    OFlag::O_RDONLY
+                                } else {
+                                    OFlag::O_NOCTTY | OFlag::O_PATH
+                                },
+                        ) {
+                            Ok(fd) => {
+                                assert!(fd >= 0)
+                            }
+                            Err(e) => {
+                                assert!(basic::errno_util::errno_is_privilege(e.get_errno()));
+                            }
+                        }
                     }
                     Err(e) => {
                         assert!(
@@ -2114,7 +2396,7 @@ mod tests {
     fn test_devices_all() {
         let mut enumerator = DeviceEnumerator::new();
         enumerator.set_enumerator_type(DeviceEnumerationType::All);
-        for device in enumerator {
+        for device in enumerator.iter_mut() {
             test_device_one(device.lock().unwrap().borrow_mut());
         }
     }
