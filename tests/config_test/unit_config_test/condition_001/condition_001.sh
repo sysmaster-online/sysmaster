@@ -1,5 +1,7 @@
 #!/bin/bash
 # Description: test for ConditionPathExists/ConditionFileNotEmpty/ConditionPathIsReadWrite
+#                       ConditionDirectoryNotEmpty/ConditionFileIsExecutable
+#                       ConditionPathExistsGlob/ConditionPathIsDirectory/ConditionPathIsMountPoint/ConditionPathIsSymbolicLink
 
 TEST_SCRIPT="$(basename "$0")"
 TEST_SCRIPT_PATH="$(dirname "$0")"

@@ -14,7 +14,7 @@ function test01() {
 
     # ListenDatagram is file
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat "${test01_socket}" 'DGRAM' || return 1
     sctl stop base.socket
@@ -26,7 +26,7 @@ function test01() {
     run_sysmaster || return 1
 
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat "@${test01_socket}" 'DGRAM' || return 1
     sctl stop base.socket
@@ -39,7 +39,7 @@ function test01() {
     run_sysmaster || return 1
 
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat ":::${seed}1" 'udp6' || return 1
     sctl stop base.socket
@@ -52,7 +52,7 @@ function test01() {
     run_sysmaster || return 1
 
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat "127.0.0.1:${seed}1" 'udp' || return 1
     sctl stop base.socket
@@ -65,7 +65,7 @@ function test01() {
     run_sysmaster || return 1
 
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat ":::${seed}1" 'udp6' || return 1
     sctl stop base.socket
@@ -83,7 +83,7 @@ function test02() {
 
     # ListenStream is file
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat "${test02_socket}" 'STREAM' || return 1
     sctl stop base.socket
@@ -95,7 +95,7 @@ function test02() {
     run_sysmaster || return 1
 
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat "@${test02_socket}" 'STREAM' || return 1
     sctl stop base.socket
@@ -108,7 +108,7 @@ function test02() {
     run_sysmaster || return 1
 
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat ":::${seed}2" 'tcp6' || return 1
     sctl stop base.socket
@@ -121,7 +121,7 @@ function test02() {
     run_sysmaster || return 1
 
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat "127.0.0.1:${seed}2" 'tcp' || return 1
     sctl stop base.socket
@@ -134,7 +134,7 @@ function test02() {
     run_sysmaster || return 1
 
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat ":::${seed}2" 'tcp6' || return 1
     sctl stop base.socket
@@ -152,7 +152,7 @@ function test03() {
 
     # ListenSequentialPacket is file
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat "${test03_socket}" 'SEQPACKET' || return 1
     sctl stop base.socket
@@ -164,7 +164,7 @@ function test03() {
     run_sysmaster || return 1
 
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     check_netstat "@${test03_socket}" 'SEQPACKET' || return 1
     sctl stop base.socket
@@ -194,7 +194,7 @@ function test04() {
     ss -f netlink
     num="$(ss -f netlink | grep sysmaster | wc -l)"
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     check_status base.service inactive || return 1
     ss -f netlink
     expect_eq "$(ss -f netlink | grep sysmaster | wc -l)" "$((num + 1))"
