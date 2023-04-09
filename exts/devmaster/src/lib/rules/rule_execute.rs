@@ -111,7 +111,7 @@ impl ExecuteManager {
     pub fn process_device(&mut self, device: Rc<RefCell<Device>>) -> Result<()> {
         log::debug!("Processing device {}", device.as_ref().borrow_mut().devpath);
 
-        self.current_unit = Some(ExecuteUnit::new(device.clone()));
+        self.current_unit = Some(ExecuteUnit::new(device));
         // lock whole disk: todo
 
         // mark block device read only: todo
@@ -167,6 +167,7 @@ impl ExecuteManager {
         todo!();
     }
 
+    /// apply rules on device
     pub(crate) fn apply_rules(&mut self) -> Result<()> {
         self.current_rule_file = self.rules.files.clone();
 
@@ -192,7 +193,8 @@ impl ExecuteManager {
         Ok(())
     }
 
-    pub fn apply_rule_file(&mut self) -> Result<()> {
+    /// apply rule file on device
+    pub(crate) fn apply_rule_file(&mut self) -> Result<()> {
         self.current_rule_line = self
             .current_rule_file
             .clone()
@@ -214,6 +216,7 @@ impl ExecuteManager {
         Ok(())
     }
 
+    /// apply rule line on device
     pub(crate) fn apply_rule_line(&mut self) -> Result<Option<Arc<RwLock<RuleLine>>>> {
         self.current_rule_token = self
             .current_rule_line
@@ -307,6 +310,7 @@ impl ExecuteManager {
         }
     }
 
+    /// apply rule token on device
     pub(crate) fn apply_rule_token(&mut self) -> Result<bool> {
         let token_type = self
             .current_rule_token
@@ -350,6 +354,7 @@ impl ExecuteManager {
         Ok(true)
     }
 
+    /// apply rule token on the parent device
     pub(crate) fn apply_rule_token_on_parent(&mut self) -> Result<bool> {
         todo!();
     }

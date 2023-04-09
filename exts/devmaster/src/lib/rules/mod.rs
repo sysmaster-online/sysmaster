@@ -32,7 +32,7 @@ pub struct Rules {
     files: Option<Arc<RwLock<RuleFile>>>,
 
     /// current rule file
-    current_file: Option<Arc<RwLock<RuleFile>>>,
+    files_tail: Option<Arc<RwLock<RuleFile>>>,
 }
 
 /// rule file is the basic unit to process the device
@@ -45,7 +45,7 @@ pub struct RuleFile {
     /// keeps in order of line number
     lines: Option<Arc<RwLock<RuleLine>>>,
     /// current rule line
-    current_line: Option<Arc<RwLock<RuleLine>>>,
+    lines_tail: Option<Arc<RwLock<RuleLine>>>,
 
     /// previous rule file
     prev: Option<Arc<RwLock<RuleFile>>>,
@@ -74,7 +74,7 @@ pub struct RuleLine {
     /// the linked list to contain all tokens in the rule line
     tokens: Option<Arc<RwLock<RuleToken>>>,
     /// current rule token
-    current_token: Option<Arc<RwLock<RuleToken>>>,
+    tokens_tail: Option<Arc<RwLock<RuleToken>>>,
 
     /// the rule file to contain this line
     file: Weak<RwLock<RuleFile>>,
