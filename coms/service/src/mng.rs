@@ -245,7 +245,8 @@ impl ServiceMng {
     }
 
     fn enter_contion(&self) {
-        log::debug!("enter running service condition command");
+        self.log(Level::Debug, "enter running service condition command");
+
         self.control_command_fill(ServiceCommand::Condition);
         match self.control_command_pop() {
             Some(cmd) => {
@@ -269,7 +270,7 @@ impl ServiceMng {
     }
 
     fn enter_prestart(&self) {
-        log::debug!("enter running service prestart command");
+        self.log(Level::Debug, "enter running service prestart command");
         self.pid.unwatch_control();
         self.control_command_fill(ServiceCommand::StartPre);
         match self.control_command_pop() {
@@ -292,7 +293,8 @@ impl ServiceMng {
     }
 
     fn enter_start(&self) {
-        log::debug!("enter running service start command");
+        self.log(Level::Debug, "enter running service start command");
+
         self.control_command.borrow_mut().clear();
         self.pid.unwatch_control();
         self.pid.unwatch_main();
@@ -371,7 +373,8 @@ impl ServiceMng {
     }
 
     fn enter_start_post(&self) {
-        log::debug!("enter running service startpost command");
+        self.log(Level::Debug, "enter running service startpost command");
+
         self.pid.unwatch_control();
 
         self.restart_watchdog();
@@ -421,7 +424,10 @@ impl ServiceMng {
     }
 
     fn enter_stop(&self, res: ServiceResult) {
-        log::debug!("enter running stop command");
+        self.log(
+            Level::Debug,
+            &format!("enter running stop command, service result: {:?}", res),
+        );
 
         if self.result() == ServiceResult::Success {
             self.set_result(res);
@@ -467,7 +473,10 @@ impl ServiceMng {
     }
 
     fn enter_stop_post(&self, res: ServiceResult) {
-        log::debug!("runring stop post, service result: {:?}", res);
+        self.log(
+            Level::Debug,
+            &format!("runring stop post, service result: {:?}", res),
+        );
         if self.result() == ServiceResult::Success {
             self.set_result(res);
         }
@@ -493,7 +502,10 @@ impl ServiceMng {
     }
 
     fn enter_dead(&self, res: ServiceResult, force_restart: bool) {
-        log::debug!("Running into dead state, res: {:?}", res);
+        self.log(
+            Level::Debug,
+            &format!("Running into dead state, res: {:?}", res),
+        );
         let mut restart = force_restart;
 
         if self.comm.owner().is_none() {
@@ -609,10 +621,12 @@ impl ServiceMng {
     }
 
     fn enter_signal(&self, state: ServiceState, res: ServiceResult) {
-        log::debug!(
-            "Sending signal of state: {:?}, service result: {:?}",
-            state,
-            res
+        self.log(
+            Level::Debug,
+            &format!(
+                "Sending signal of state: {:?}, service result: {:?}",
+                state, res
+            ),
         );
 
         if self.result() == ServiceResult::Success {
@@ -686,6 +700,16 @@ impl ServiceMng {
         let original_state = self.state();
         *self.state.borrow_mut() = state;
 
+        self.log(
+            Level::Debug,
+            &format!(
+                "unit: {}, original state: {:?}, change to: {:?}",
+                self.comm.get_owner_id(),
+                original_state,
+                state
+            ),
+        );
+
         if !matches!(
             self.state(),
             ServiceState::Condition
@@ -753,12 +777,6 @@ impl ServiceMng {
             self.set_cmd_type(None);
         }
 
-        log::debug!(
-            "unit: {}, original state: {:?}, change to: {:?}",
-            self.comm.get_owner_id(),
-            original_state,
-            state
-        );
         // todo!()
         // trigger the unit the dependency trigger_by
 
@@ -791,7 +809,7 @@ impl ServiceMng {
     }
 
     fn run_next_control(&self) {
-        log::debug!("runring next control command");
+        self.log(Level::Debug, "runring next control command");
         let time_out = match self.state() {
             ServiceState::Condition
             | ServiceState::StartPre
@@ -1057,12 +1075,18 @@ impl ServiceMng {
     }
 
     fn unwatch_pid_file(&self) {
-        log::debug!("unwatch pid file {}", self.rd.path_inotify());
+        self.log(
+            Level::Debug,
+            &format!("unwatch pid file {}", self.rd.path_inotify()),
+        );
         self.rd.path_inotify().unwatch();
     }
 
     fn retry_pid_file(&self) -> Result<bool> {
-        log::debug!("retry loading pid file: {}", self.rd.path_inotify());
+        self.log(
+            Level::Debug,
+            &format!("retry loading pid file: {}", self.rd.path_inotify()),
+        );
         self.load_pid_file()?;
 
         self.unwatch_pid_file();
@@ -1284,51 +1308,53 @@ impl ServiceMng {
                 self.run_next_main();
             } else {
                 self.main_command.borrow_mut().clear();
-                if !self.cgroup_good() {
-                    match self.state() {
-                        ServiceState::Dead => todo!(),
-                        ServiceState::Start
-                            if self.config.service_type() == ServiceType::Oneshot =>
-                        {
-                            if res == ServiceResult::Success {
-                                self.enter_start_post();
-                            } else {
-                                self.enter_signal(ServiceState::StopSigterm, res);
-                            }
+
+                match self.state() {
+                    ServiceState::Start if self.config.service_type() == ServiceType::Oneshot => {
+                        if res == ServiceResult::Success {
+                            self.enter_start_post();
+                        } else {
+                            self.enter_signal(ServiceState::StopSigterm, res);
                         }
-                        ServiceState::Start
-                            if self.config.service_type() == ServiceType::Notify =>
-                        {
-                            if res != ServiceResult::Success {
-                                self.enter_signal(ServiceState::StopSigterm, res);
-                            } else {
-                                self.enter_signal(
-                                    ServiceState::StopSigterm,
-                                    ServiceResult::FailureProtocol,
-                                );
-                            }
+                    }
+                    ServiceState::Start if self.config.service_type() == ServiceType::Notify => {
+                        if res != ServiceResult::Success {
+                            self.enter_signal(ServiceState::StopSigterm, res);
+                        } else {
+                            self.enter_signal(
+                                ServiceState::StopSigterm,
+                                ServiceResult::FailureProtocol,
+                            );
                         }
-                        ServiceState::Start => {
-                            self.enter_running(res);
+                    }
+                    ServiceState::Start => {
+                        self.enter_running(res);
+                    }
+                    ServiceState::StartPost | ServiceState::Reload => {
+                        if self.pid.control().map_or(false, |_p| true) {
+                            self.enter_stop(res);
                         }
-                        ServiceState::StartPost | ServiceState::Reload => {
-                            if self.pid.control().map_or(false, |_p| true) {
-                                self.enter_stop(res);
-                            }
-                        }
-                        ServiceState::Running => {
-                            self.enter_running(res);
-                        }
-                        ServiceState::Stop => {}
-                        ServiceState::StopWatchdog
-                        | ServiceState::StopSigkill
-                        | ServiceState::StopSigterm => {
-                            self.enter_stop_post(res);
-                        }
-                        ServiceState::FinalSigterm | ServiceState::FinalSigkill => {
-                            self.enter_dead(res, true);
-                        }
-                        _ => {}
+                    }
+                    ServiceState::Running => {
+                        self.enter_running(res);
+                    }
+                    ServiceState::Stop => {}
+                    ServiceState::StopWatchdog
+                    | ServiceState::StopSigkill
+                    | ServiceState::StopSigterm => {
+                        self.enter_stop_post(res);
+                    }
+                    ServiceState::FinalSigterm | ServiceState::FinalSigkill => {
+                        self.enter_dead(res, true);
+                    }
+                    _ => {
+                        unreachable!(
+                            "{}",
+                            format!(
+                                "current state is: {}, main pid exit at wrong state",
+                                self.state()
+                            )
+                        );
                     }
                 }
             }

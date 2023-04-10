@@ -119,11 +119,9 @@ impl RuleFile {
         let file = File::open(&self.file_name).unwrap();
         let reader = BufReader::new(file);
 
-        let mut line_number = 0;
         let mut full_line = String::new();
         let mut offset = 0;
-        for line in reader.lines() {
-            line_number += 1;
+        for (line_number, line) in reader.lines().enumerate() {
             if let Err(e) = line {
                 log::warn!("Read line failed in {} : {:?}", self.file_name, e);
                 continue;
@@ -141,7 +139,7 @@ impl RuleFile {
                 full_line.push_str(line);
                 let line = RuleLine::new(
                     full_line.to_string(),
-                    line_number - offset,
+                    (line_number - offset) as u32,
                     self_ptr.clone(),
                 )
                 .unwrap();
