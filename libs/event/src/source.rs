@@ -67,9 +67,7 @@ pub trait Source {
     fn token(&self) -> u64;
 
     /// Set the priority, -127i8 ~ 128i8, the smaller the value, the higher the priority
-    fn priority(&self) -> i8 {
-        0i8
-    }
+    fn priority(&self) -> i8;
 
     /// The code of callback
     fn dispatch(&self, event: &Events) -> i32;

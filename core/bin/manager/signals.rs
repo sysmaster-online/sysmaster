@@ -72,6 +72,6 @@ impl<T: SignalDispatcher> Source for Signals<T> {
     }
 
     fn priority(&self) -> i8 {
-        -6
+        -6i8
     }
 }
