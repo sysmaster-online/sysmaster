@@ -1,5 +1,5 @@
 #!/bin/bash
-# Description: test for Description/Documentation/RemainAfterExit/DefaultDependencies
+# Description: test for User/Group/UMask
 
 TEST_SCRIPT="$(basename "$0")"
 TEST_SCRIPT_PATH="$(dirname "$0")"

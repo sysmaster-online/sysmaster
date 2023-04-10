@@ -20,7 +20,7 @@ function test01() {
     sleep 3
     main_pid="$(get_pids base)"
     check_status base activating || return 1
-    grep "${timeout_log}" "${SYSMST_LOG}"
+    grep -a "${timeout_log}" "${SYSMST_LOG}"
     expect_eq $? 1 || cat "${SYSMST_LOG}"
     ps -elf | grep -v grep | grep -w 'sleep' | awk '{print $4}' | grep -w "${main_pid}"
     expect_eq $? 0 || ps -elf
@@ -58,7 +58,7 @@ function test01() {
     check_status base activating || return 1
     sleep 1
     check_status base inactive || return 1
-    grep "${timeout_log}" "${SYSMST_LOG}"
+    grep -a "${timeout_log}" "${SYSMST_LOG}"
     expect_eq $? 1 || cat "${SYSMST_LOG}"
     ps -elf | grep -v grep | grep -w 'sleep' | awk '{print $4}' | grep -w "${main_pid}"
     expect_eq $? 1 || ps -elf
@@ -86,7 +86,7 @@ function test02() {
     check_status base active || return 1
     sleep 2
     check_status base inactive || return 1
-    grep "${timeout_log}" "${SYSMST_LOG}"
+    grep -a "${timeout_log}" "${SYSMST_LOG}"
     expect_eq $? 1 || cat "${SYSMST_LOG}"
     expect_gt "${main_pid}" "${pre_pid}"
     ps -elf | grep -v grep | grep -w 'sleep' | grep -Ew "${pre_pid}|${main_pid}"
@@ -108,7 +108,7 @@ function test02() {
     check_status base active || return 1
     sleep 2
     check_status base inactive || return 1
-    grep "${timeout_log}" "${SYSMST_LOG}"
+    grep -a "${timeout_log}" "${SYSMST_LOG}"
     expect_eq $? 1 || cat "${SYSMST_LOG}"
     expect_gt "${main_pid}" "${pre_pid}"
     ps -elf | grep -v grep | grep -w 'sleep' | grep -Ew "${pre_pid}|${main_pid}"

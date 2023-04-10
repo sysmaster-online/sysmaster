@@ -1,5 +1,5 @@
 #!/bin/bash
-# Description: test for Description/Documentation/RemainAfterExit/DefaultDependencies
+# Description: test for AllowIsolate/IgnoreOnIsolate
 
 TEST_SCRIPT="$(basename "$0")"
 TEST_SCRIPT_PATH="$(dirname "$0")"
@@ -12,7 +12,7 @@ function test_pre() {
     rm -rf tmp_units
     mkdir tmp_units
     cp -arf "${TEST_PATH}"/test_units/{shutdown.target,sysinit.target} tmp_units
-    cp -arf "${TEST_PATH}"/test_units/tests/base.service tmp_units
+    cp -arf "${TEST_PATH}"/test_units/tests/{base.service,reboot.target} tmp_units
     popd
 }
 

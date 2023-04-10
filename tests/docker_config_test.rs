@@ -124,6 +124,12 @@ fn docker_config_test_timeout_001() {
 
 #[test]
 #[ignore]
+fn docker_config_test_timeout_002() {
+    common::run_script("docker_config_test", "docker_config_test_timeout_002", "1");
+}
+
+#[test]
+#[ignore]
 fn docker_config_test_restart_001() {
     common::run_script("docker_config_test", "docker_config_test_restart_001", "1");
 }
@@ -154,6 +160,12 @@ fn docker_config_test_service_003() {
 
 #[test]
 #[ignore]
+fn docker_config_test_service_004() {
+    common::run_script("docker_config_test", "docker_config_test_service_004", "1");
+}
+
+#[test]
+#[ignore]
 fn docker_config_test_env_001() {
     common::run_script("docker_config_test", "docker_config_test_env_001", "1");
 }
@@ -175,3 +187,11 @@ fn docker_config_test_listen_001() {
 fn docker_config_test_socket_001() {
     common::run_script("docker_config_test", "docker_config_test_socket_001", "1");
 }
+
+/* sctl isolate cmd not implemented yet, can not run
+#[test]
+#[ignore]
+fn docker_config_test_isolate_001() {
+    common::run_script("docker_config_test", "docker_config_test_isolate_001", "1");
+}
+*/

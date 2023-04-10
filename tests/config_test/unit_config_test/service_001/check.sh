@@ -70,6 +70,38 @@ function test02() {
     kill_sysmaster
 }
 
+# usage: test DefaultDependencies
+function test03() {
+    local key_log='add default dependencies for target.*'
+
+    log_info "===== test03 ====="
+    cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
+    run_sysmaster || return 1
+
+    # default true
+    sctl restart base
+    check_status base active || return 1
+    check_log "${SYSMST_LOG}" "${key_log}sysinit.target" "${key_log}shutdown.target" 'ERROR .* basic.target is not exist'
+    sctl stop base
+    check_status base inactive || return 1
+    # clean
+    kill_sysmaster
+
+    # DefaultDependencies=false
+    sed -i '/Description/ a DefaultDependencies=false' ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+
+    sctl restart base
+    check_status base active || return 1
+    grep -aE "${key_log}|basic.target|sysinit.target|shutdown.target" "${SYSMST_LOG}"
+    expect_eq $? 1 || cat "${SYSMST_LOG}"
+    sctl stop base
+    check_status base inactive || return 1
+    # clean
+    kill_sysmaster
+}
+
 test01 || exit 1
 test02 || exit 1
+test03 || exit 1
 exit "${EXPECT_FAIL}"

@@ -294,8 +294,138 @@ function test04() {
     kill_sysmaster
 }
 
+# usage: test ExecCondition
+function test05() {
+    log_info "===== test05 ====="
+    cp -arf "${work_dir}"/tmp_units/exec.service ${SYSMST_LIB_PATH} || return 1
+    sed -i '/Service/ a ExecCondition="/usr/bin/echo echo_condition_1_echo; /usr/bin/echo echo_condition_2_echo"' ${SYSMST_LIB_PATH}/exec.service
+    run_sysmaster || return 1
+
+    # multiple success ExecCondition
+    sctl start exec
+    check_status exec inactive
+    sync
+    sleep 1
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
+        'condition_1 condition_2 start_pre_1 start_pre_2 start_pre_3 start_1 start_post_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
+        || cat ${SYSMST_LOG}
+    # clean
+    kill_sysmaster
+
+    # ExecCondition return 1
+    sed -i 's#ExecCondition=.*#ExecCondition="/usr/bin/echo echo_condition_1_echo; /usr/bin/false; /usr/bin/echo echo_condition_2_echo"#' ${SYSMST_LIB_PATH}/exec.service
+    run_sysmaster || return 1
+
+    sctl start exec
+    check_status exec inactive
+    sync
+    sleep 1
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
+        'condition_1 stop_post_1 stop_post_2 stop_post_3 ' \
+        || cat ${SYSMST_LOG}
+    # clean
+    kill_sysmaster
+
+    # ExecCondition return 254
+    sed -i 's#ExecCondition=.*#ExecCondition="/usr/bin/echo echo_condition_1_echo; /usr/bin/test.sh; /usr/bin/echo echo_condition_2_echo"#' ${SYSMST_LIB_PATH}/exec.service
+    echo "exit 254" > /usr/bin/test.sh
+    chmod +x /usr/bin/test.sh
+    run_sysmaster || return 1
+
+    sctl start exec
+    check_status exec inactive
+    sync
+    sleep 1
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
+        'condition_1 stop_post_1 stop_post_2 stop_post_3 ' \
+        || cat ${SYSMST_LOG}
+    # clean
+    rm -rf /usr/bin/test.sh
+    echo > "${SYSMST_LOG}"
+
+    # ExecCondition return 255
+    echo "exit 255" > /usr/bin/test.sh
+    chmod +x /usr/bin/test.sh
+    sctl start exec
+    check_status exec failed
+    sync
+    sleep 1
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
+        'condition_1 stop_post_1 stop_post_2 stop_post_3 ' \
+        || cat ${SYSMST_LOG}
+    # clean
+    rm -rf /usr/bin/test.sh
+    echo > "${SYSMST_LOG}"
+
+    # ExecCondition return 255 (cmd not exist)
+    sctl start exec
+    check_status exec failed
+    sync
+    sleep 1
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
+        'condition_1 stop_post_1 stop_post_2 stop_post_3 ' \
+        || cat ${SYSMST_LOG}
+    # clean
+    kill_sysmaster
+
+    # ExecCondition killed
+    sed -i 's#ExecCondition=.*#ExecCondition="/usr/bin/echo echo_condition_1_echo; /usr/bin/sleep 12321; /usr/bin/echo echo_condition_2_echo"#' ${SYSMST_LIB_PATH}/exec.service
+    run_sysmaster || return 1
+
+    sctl start exec &
+    sleep 1
+    check_status exec 'activating (condition)'
+    pid="$(ps aux | grep -v grep | grep 'sleep 12321' | awk '{print $2}')"
+    kill -9 "${pid}"
+    check_status exec 'failed'
+    sync
+    sleep 1
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
+        'condition_1 stop_post_1 stop_post_2 stop_post_3 ' \
+        || cat ${SYSMST_LOG}
+    # clean
+    kill_sysmaster
+
+    # ExecCondition timeout
+    sed -i '/ExecCondition/a TimeoutSec=2' ${SYSMST_LIB_PATH}/exec.service
+    run_sysmaster || return 1
+
+    sctl start exec &
+    sleep 1
+    check_status exec 'activating (condition)'
+    sleep 1.5
+    check_status exec 'failed'
+    sync
+    sleep 1
+    check_log ${SYSMST_LOG} 'condition operation time out. enter StopSigterm'
+    grep -a 'operation time out' ${SYSMST_LOG} | grep -v 'condition'
+    expect_eq $? 1
+    expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
+        'condition_1 stop_post_1 stop_post_2 stop_post_3 '
+    # clean
+    kill_sysmaster
+}
+
+# usage: test ExecReload
+function test06() {
+    log_info "===== test06 ====="
+    cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
+    sed -i '/ExecStart/ a ExecReload="/bin/kill -9 \$MAINPID"' ${SYSMST_LIB_PATH}/base.service
+    run_sysmaster || return 1
+
+    sctl start base
+    check_status base active || return 1
+    sctl reload base
+    expect_eq $? 0
+    check_status base failed || return 1
+    # clean
+    kill_sysmaster
+}
+
 test01 || exit 1
 test02 || exit 1
 test03 || exit 1
 test04 || exit 1
+test05 || exit 1
+test06 || exit 1
 exit "${EXPECT_FAIL}"
