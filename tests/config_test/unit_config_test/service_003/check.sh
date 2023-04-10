@@ -54,7 +54,7 @@ function test01() {
     sctl restart base
     check_status base.service active || return 1
     check_status base1.service inactive || return 1
-    check_status base1.socket 'active(listening)' || return 1
+    check_status base1.socket 'active (listening)' || return 1
     # clean
     sctl stop base1.socket
     sctl stop base

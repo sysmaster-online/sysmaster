@@ -4,8 +4,9 @@ work_dir="$(dirname "$0")"
 source "${work_dir}"/util_lib.sh
 
 set +e
-key_log_1="ERROR sysmaster.* Starting failed the unit load state is"
-key_log_2="ERROR sysmaster.* load unit .*base.service] failed: unit configuration error: 'More than Oneshot ExecStart command is configured, service type is not oneshot'"
+key_log_1="ERROR sysmaster.*No ExecStart command"
+key_log_2="ERROR sysmaster.* load unit .*base.service] failed: Confique  error"
+key_log_3="ERROR sysmaster.* load unit .*base.service] failed: unit configuration error: 'More than Oneshot ExecStart command is configured, service type is not oneshot'"
 
 # usage: test unit without ExecStart
 function test01() {
@@ -33,7 +34,7 @@ function test01() {
 
     sctl start base
     expect_eq $? 1
-    check_log ${SYSMST_LOG} "${key_log_1}"
+    check_log ${SYSMST_LOG} "${key_log_2}"
     # check_load base false
     # check_status base inactive
     # clean
@@ -51,7 +52,7 @@ function test02() {
 
     sctl start base
     expect_eq $? 1
-    check_log ${SYSMST_LOG} "${key_log_2}"
+    check_log ${SYSMST_LOG} "${key_log_3}"
     # check_load base false
     # check_status base inactive
     # clean
@@ -84,7 +85,7 @@ function test02() {
 
     sctl start base
     expect_eq $? 1
-    check_log ${SYSMST_LOG} "${key_log_1}"
+    check_log ${SYSMST_LOG} "${key_log_2}"
     # check_load base false
     # check_status base inactive
     # clean
@@ -143,6 +144,8 @@ function test04() {
 
     sctl start exec
     check_status exec inactive
+    sync
+    sleep 1
     expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_1 start_post_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
@@ -155,6 +158,8 @@ function test04() {
 
     sctl start exec
     check_status exec failed
+    sync
+    sleep 1
     expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
@@ -167,6 +172,8 @@ function test04() {
 
     sctl start exec
     check_status exec inactive
+    sync
+    sleep 1
     expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_3 start_1 start_post_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
@@ -180,6 +187,8 @@ function test04() {
 
     sctl start exec
     check_status exec failed
+    sync
+    sleep 1
     expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
@@ -192,6 +201,8 @@ function test04() {
 
     sctl start exec
     check_status exec failed
+    sync
+    sleep 1
     expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
@@ -205,6 +216,8 @@ function test04() {
 
     sctl start exec
     check_status exec inactive
+    sync
+    sleep 1
     expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_1 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
@@ -217,6 +230,8 @@ function test04() {
 
     sctl start exec
     check_status exec inactive
+    sync
+    sleep 1
     expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_1 start_post_2 start_post_3 stop_1 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
@@ -231,6 +246,8 @@ function test04() {
 
     sctl start exec
     check_status exec active
+    sync
+    sleep 1
     expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 ' || cat ${SYSMST_LOG}
     sctl stop exec
@@ -247,10 +264,14 @@ function test04() {
 
     sctl start exec
     check_status exec active
+    sync
+    sleep 1
     expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 ' || cat ${SYSMST_LOG}
     sctl stop exec
     check_status exec inactive
+    sync
+    sleep 1
     expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_post_1 start_post_2 start_post_3 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}
@@ -264,6 +285,8 @@ function test04() {
 
     sctl start exec
     check_status exec inactive
+    sync
+    sleep 1
     expect_str_eq "$(cat ${SYSMST_LOG} | sed "s/\x00//g" | grep -a '_echo$' | sed 's/.*echo_//g; s/_echo//g' | tr '\n' ' ')" \
         'start_pre_1 start_pre_2 start_pre_3 start_1 start_post_1 start_post_2 start_post_3 stop_post_1 stop_post_2 stop_post_3 ' \
         || cat ${SYSMST_LOG}

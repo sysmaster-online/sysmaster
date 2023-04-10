@@ -70,8 +70,7 @@ function test02() {
     kill_sysmaster
 
     # key=value
-    cmdline_para="$(cat /proc/cmdline | grep -oP 'crashkernel=\S+ ' | head -n1)"
-    [ -z "${cmdline_para}" ] && cmdline_para="$(cat /proc/cmdline | grep -oP 'crashkernel=\S+' | head -n1)"
+    cmdline_para="$(cat /proc/cmdline | grep -oP 'crashkernel=\S+' | head -n1)"
     [ -z "${cmdline_para}" ] && return 1
     sed -i 's/^ConditionKernelCommandLine=.*/ConditionKernelCommandLine="crashkernel=9999M"/' ${SYSMST_LIB_PATH}/base.service
     run_sysmaster || return 1

@@ -192,7 +192,7 @@ function check_status() {
     local exp_status="$2"
 
     for ((cnt = 0; cnt < 3; ++cnt)); do
-        sctl status "${service}" |& grep -w 'Active:' | head -n1 | awk '{print $2}' | grep -w "${exp_status}" && return 0 || sleep 1
+        sctl status "${service}" |& grep -w 'Active:' | head -n1 | grep -w "${exp_status}" && return 0 || sleep 1
     done
     add_failure
     # debug

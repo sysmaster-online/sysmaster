@@ -16,12 +16,12 @@ function test01() {
     run_sysmaster || return 1
 
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     ls -l ${test_socket}
     expect_eq $? 0
     echo A | nc -w1 -U "${test_socket}" &
-    check_status base.service 'active(running)' || return 1
-    check_status base.socket 'active(running)' || return 1
+    check_status base.service 'active (running)' || return 1
+    check_status base.socket 'active (running)' || return 1
     sctl status base1.service
     expect_ne $? 0
     pkill -9 nc
@@ -43,10 +43,10 @@ function test01() {
     run_sysmaster || return 1
 
     sctl restart base.socket
-    check_status base.socket 'active(listening)' || return 1
+    check_status base.socket 'active (listening)' || return 1
     echo A | nc -w1 -U "${test_socket}" &
     check_status base1.service active || return 1
-    check_status base.socket 'active(running)' || return 1
+    check_status base.socket 'active (running)' || return 1
     sctl status base.service
     expect_eq $? 1
     pkill -9 nc
