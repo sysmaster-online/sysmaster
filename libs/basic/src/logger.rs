@@ -25,7 +25,7 @@ use nix::libc;
 
 /// sysmaster log parttern:
 ///
-/// ```
+/// ```rust,ignore
 /// {d(%Y-%m-%d %H:%M:%S)} {h({l}):<5} {M} {m}{n}
 /// {d(%Y-%m-%d %H:%M:%S)}: log time, i.e. `2023-03-24 11:00:23`
 /// {h({l}:<5)}: log level, 5 bytes

@@ -14,13 +14,13 @@
 use super::base::UeBase;
 use crate::unit::rentry::{UeConfigInstall, UeConfigUnit};
 use crate::unit::util::UnitFile;
-use basic::serialize::DeserializeWith;
 use confique::Config;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::rel::ReStation;
+use sysmaster::serialize::DeserializeWith;
 
 pub(crate) struct UeConfig {
     // associated objects
