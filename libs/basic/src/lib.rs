@@ -36,4 +36,5 @@ pub mod special;
 pub mod string;
 pub mod time_util;
 pub mod user_group_util;
+pub mod virtualize;
 pub use error::*;

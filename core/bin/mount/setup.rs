@@ -11,9 +11,11 @@
 // See the Mulan PSL v2 for more details.
 
 //! mount the cgroup systems
-use basic::{fs_util, mount_util, path_util, proc_cmdline};
+use basic::virtualize::Virtualization;
+use basic::{fs_util, mount_util, path_util, proc_cmdline, virtualize};
 use bitflags::bitflags;
-use cgroup::{self, CgType, CG_BASE_DIR};
+use cgroup::{self, CgController, CgType, CG_BASE_DIR};
+use nix::unistd::Pid;
 use nix::{
     errno::Errno,
     fcntl::{AtFlags, OFlag},
@@ -21,7 +23,11 @@ use nix::{
     sys::stat::Mode,
     unistd::AccessFlags,
 };
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 use sysmaster::error::*;
 
 const EARLY_MOUNT_NUM: u8 = 3;
@@ -40,7 +46,7 @@ lazy_static! {
             options: None,
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: None,
-            mode: MountMode::MNT_FATAL
+            mode: MountMode::MNT_FATAL | MountMode::MNT_IN_CONTAINER,
         },
         MountPoint {
             source: String::from("sysfs"),
@@ -49,7 +55,7 @@ lazy_static! {
             options: None,
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: None,
-            mode: MountMode::MNT_FATAL
+            mode: MountMode::MNT_FATAL | MountMode::MNT_IN_CONTAINER,
         },
         MountPoint {
             source: String::from("devtmpfs"),
@@ -58,7 +64,7 @@ lazy_static! {
             options: Some("mode=755,size=4m,nr_inodes=64K".to_string()),
             flags: MsFlags::MS_NOSUID | MsFlags::MS_STRICTATIME,
             callback: None,
-            mode: MountMode::MNT_FATAL,
+            mode: MountMode::MNT_FATAL | MountMode::MNT_IN_CONTAINER,
         },
         // table.push(MountPoint {
         //     source: String::from("securityfs"),
@@ -83,7 +89,7 @@ lazy_static! {
             options: None,
             flags: MsFlags::MS_REMOUNT | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_legacy_wanted),
-            mode: MountMode::MNT_WRITABLE,
+            mode: MountMode::MNT_WRITABLE | MountMode::MNT_IN_CONTAINER,
         },
 
         MountPoint {
@@ -93,7 +99,7 @@ lazy_static! {
             options: Some("nsdelegate".to_string()),
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_unified_wanted),
-            mode: MountMode::MNT_WRITABLE,
+            mode: MountMode::MNT_WRITABLE | MountMode::MNT_IN_CONTAINER,
         },
 
         MountPoint {
@@ -103,7 +109,7 @@ lazy_static! {
             options: None,
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_unified_wanted),
-            mode: MountMode::MNT_WRITABLE,
+            mode: MountMode::MNT_WRITABLE | MountMode::MNT_IN_CONTAINER,
         },
 
         MountPoint {
@@ -113,7 +119,7 @@ lazy_static! {
             options: Some("mode=755".to_string()),
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV| MsFlags::MS_STRICTATIME,
             callback: Some(cg_legacy_wanted),
-            mode: MountMode::MNT_FATAL,
+            mode: MountMode::MNT_FATAL | MountMode::MNT_IN_CONTAINER,
         },
 
         MountPoint {
@@ -123,7 +129,7 @@ lazy_static! {
             options: Some("nsdelegate".to_string()),
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_unifiedv1_wanted),
-            mode: MountMode::MNT_WRITABLE,
+            mode: MountMode::MNT_WRITABLE | MountMode::MNT_IN_CONTAINER,
         },
 
         MountPoint {
@@ -133,7 +139,7 @@ lazy_static! {
             options: None,
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_unifiedv1_wanted),
-            mode: MountMode::MNT_WRITABLE,
+            mode: MountMode::MNT_WRITABLE | MountMode::MNT_IN_CONTAINER,
         },
 
         MountPoint {
@@ -143,8 +149,19 @@ lazy_static! {
             options: Some("none,name=sysmaster".to_string()),
             flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             callback: Some(cg_legacy_wanted),
-            mode: MountMode::MNT_WRITABLE,
+            mode: MountMode::MNT_WRITABLE | MountMode::MNT_IN_CONTAINER,
+        },
+
+        MountPoint {
+            source: String::from("cgroup"),
+            target: String::from("/sys/fs/cgroup/systemd"),
+            fs_type: String::from("cgroup"),
+            options: Some("none,name=systemd".to_string()),
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+            callback: Some(cg_legacy_wanted),
+            mode: MountMode::MNT_WRITABLE | MountMode::MNT_IN_CONTAINER | MountMode::MNT_NOT_HOST,
         }
+
         ];
         table
     };
@@ -204,6 +221,10 @@ bitflags! {
         const MNT_FATAL = 1 << 0;
         /// check the mount dir is writable
         const MNT_WRITABLE = 1 << 1;
+        /// if the flag enabled, the mount point will be mounted in container
+        const MNT_IN_CONTAINER = 1 << 2;
+        /// if the flag enabled, the mount point will not be mounted on host
+        const MNT_NOT_HOST = 1 << 3;
     }
 }
 
@@ -276,12 +297,30 @@ impl MountPoint {
             }
         }
 
-        log::debug!("create target dir: {}", self.target.to_string());
-        fs::create_dir_all(&self.target).context(IoSnafu)?;
-
         let source = self.source.as_str();
         let target = self.target.as_str();
         let fs_type = self.fs_type.as_str();
+
+        if fs_type == "cgroup" {
+            let virtualization = virtualize::detect_container();
+            if self.mode.contains(MountMode::MNT_NOT_HOST) && virtualization == Virtualization::None
+            {
+                return Ok(());
+            }
+
+            if self.mode.contains(MountMode::MNT_IN_CONTAINER) {
+                let t_path = PathBuf::from(target);
+                let controller = t_path.file_name().unwrap();
+
+                if let Err(_e) = CgController::new(controller.to_str().unwrap(), Pid::from_raw(0)) {
+                    log::warn!("in container, mount cgroup {} but the controller is exist in /proc/self/cgroup, skip it!", target);
+                    return Ok(());
+                }
+            }
+        }
+
+        log::debug!("create target dir: {}", self.target.to_string());
+        fs::create_dir_all(&self.target).context(IoSnafu)?;
 
         let options = if self.options.is_none() {
             None
@@ -352,7 +391,6 @@ pub fn mount_setup() -> Result<()> {
     Ok(())
 }
 
-#[allow(dead_code)]
 /// mount all the cgroup controller subsystem
 pub fn mount_cgroup_controllers() -> Result<()> {
     if !cg_legacy_wanted() {
@@ -417,7 +455,6 @@ pub fn mount_cgroup_controllers() -> Result<()> {
     Ok(())
 }
 
-#[allow(dead_code)]
 // return the pair controller which will join with the original controller
 fn pair_controller(controller: &str) -> Option<String> {
     let mut pairs = HashMap::new();
@@ -437,7 +474,6 @@ fn pair_controller(controller: &str) -> Option<String> {
     None
 }
 
-#[allow(dead_code)]
 fn symlink_controller(source: String, alias: String) -> Result<()> {
     let target_path = Path::new(CG_BASE_DIR).join(alias);
     let target = target_path.to_str().unwrap();
@@ -458,7 +494,6 @@ fn symlink_controller(source: String, alias: String) -> Result<()> {
     }
 }
 
-#[allow(dead_code)]
 fn cg_unified_wanted() -> bool {
     let cg_ver = cgroup::cg_type();
 
@@ -481,7 +516,6 @@ fn cg_unified_wanted() -> bool {
     false
 }
 
-#[allow(dead_code)]
 fn cg_legacy_wanted() -> bool {
     let cg_ver = cgroup::cg_type();
 
@@ -492,12 +526,13 @@ fn cg_legacy_wanted() -> bool {
     true
 }
 
-#[allow(dead_code)]
 fn cg_unifiedv1_wanted() -> bool {
     let cg_ver = cgroup::cg_type();
 
     if let Ok(v) = cg_ver {
-        return v != CgType::UnifiedV2;
+        if v == CgType::UnifiedV2 {
+            return false;
+        }
     }
 
     let ret = proc_cmdline::proc_cmdline_get_bool("sysmaster.unified_v1_controller");

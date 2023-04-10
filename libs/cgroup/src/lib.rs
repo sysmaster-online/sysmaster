@@ -54,4 +54,6 @@ pub enum CgType {
     UnifiedV1,
     /// cgroup v2 mounted to /sys/fs/cgroup/
     UnifiedV2,
+    /// cgroup v1 mounted to /sys/fs/cgroup/systemd
+    LegacySystemd,
 }
