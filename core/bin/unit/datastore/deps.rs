@@ -310,12 +310,25 @@ impl UnitDepData {
     }
 
     fn remove_one_way(&mut self, source: &UnitX, relation: UnitRelations, dest: &UnitX) {
-        if let Some(sv) = self.t.get_mut(source) {
-            let mut dv_dummy = HashMap::new(); // nothing inside
-            sv.get_mut(&relation).unwrap_or(&mut dv_dummy).remove(dest); // remove dest
-            if !sv.is_empty() {
-                self.t.remove(source); // remove unit-entry to release the key 'Rc<Unit>'
+        let sv = match self.t.get_mut(source) {
+            None => {
+                return;
             }
+            Some(v) => v,
+        };
+        let map = match sv.get_mut(&relation) {
+            None => {
+                return;
+            }
+            Some(v) => v,
+        };
+        /* remove the 3-level HashMap from bottom to top. */
+        map.remove(dest);
+        if map.is_empty() {
+            sv.remove(&relation);
+        }
+        if sv.is_empty() {
+            self.t.remove(source); // remove unit-entry to release the key 'Rc<Unit>'
         }
     }
 
