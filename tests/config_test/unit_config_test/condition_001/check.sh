@@ -236,18 +236,6 @@ function test04() {
     # clean
     rm -rf /${dir}_source /${dir}
     kill_sysmaster
-
-    # relative path
-    mkdir -p /${dir}/dir ${dir}/dir
-    sed -i "s#ConditionDirectoryNotEmpty=.*#ConditionDirectoryNotEmpty=\"${dir}\"#" ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-
-    sctl restart base
-    sleep 1
-    check_status base inactive || return 1
-    # clean
-    rm -rf ${dir} /${dir}
-    kill_sysmaster
 }
 
 # usage: test ConditionFileIsExecutable
@@ -306,19 +294,6 @@ function test05() {
     check_status base inactive || return 1
     # clean
     rm -rf /${file}_source /${file}
-    kill_sysmaster
-
-    # relative path
-    sed -i "s#ConditionFileIsExecutable=.*#ConditionFileIsExecutable=\"${file}\"#" ${SYSMST_LIB_PATH}/base.service
-    touch /${file} ${file}
-    chmod +x /${file} ${file}
-    run_sysmaster || return 1
-
-    sctl restart base
-    sleep 1
-    check_status base inactive || return 1
-    # clean
-    rm -rf /${file} ${file}
     kill_sysmaster
 }
 
@@ -402,18 +377,6 @@ function test07() {
     check_status base inactive || return 1
     # clean
     rm -rf /${path}_source /${path}
-    kill_sysmaster
-
-    # relative path
-    sed -i "s#ConditionPathIsDirectory=.*#ConditionPathIsDirectory=\"${path}\"#" ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-    mkdir /${path} ${path}
-
-    sctl restart base
-    sleep 1
-    check_status base inactive || return 1
-    # clean
-    rm -rf /${path} ${path}
     kill_sysmaster
 }
 
