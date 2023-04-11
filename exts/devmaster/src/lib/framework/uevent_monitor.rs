@@ -22,7 +22,7 @@ use crate::framework::job_queue::JobQueue;
 
 /// uevent monitor
 #[derive(Debug)]
-pub struct Monitor {
+pub struct UeventMonitor {
     /// receive uevent from netlink socket
     device_monitor: DeviceMonitor,
 
@@ -31,10 +31,10 @@ pub struct Monitor {
 }
 
 /// public methods
-impl Monitor {
+impl UeventMonitor {
     /// create a monitor instance for monitoring uevent from kernel
-    pub fn new(job_queue: Rc<JobQueue>) -> Monitor {
-        Monitor {
+    pub fn new(job_queue: Rc<JobQueue>) -> UeventMonitor {
+        UeventMonitor {
             device_monitor: DeviceMonitor::new(MonitorNetlinkGroup::Kernel, None),
             job_queue,
         }
@@ -46,7 +46,7 @@ impl Monitor {
     }
 }
 
-impl Source for Monitor {
+impl Source for UeventMonitor {
     /// socket fd
     fn fd(&self) -> RawFd {
         self.device_monitor.fd()

@@ -22,7 +22,7 @@ use crate::rules::{rule_load::DEFAULT_RULES_DIRS, Rules};
 use super::{
     control_manager::{ControlManager, CONTROL_MANAGER_LISTEN_ADDR},
     job_queue::JobQueue,
-    uevent_monitor::Monitor,
+    uevent_monitor::UeventMonitor,
     worker_manager::{WorkerManager, WORKER_MANAGER_LISTEN_ADDR},
 };
 
@@ -36,7 +36,7 @@ pub struct Devmaster {
     /// reference to control manager
     control_manager: Option<Rc<ControlManager>>,
     /// reference to monitor
-    monitor: Option<Rc<Monitor>>,
+    monitor: Option<Rc<UeventMonitor>>,
 
     /// rules
     rules: Rules,
@@ -68,7 +68,7 @@ impl Devmaster {
             worker_manager.clone(),
             job_queue.clone(),
         ));
-        let monitor = Rc::new(Monitor::new(job_queue.clone()));
+        let monitor = Rc::new(UeventMonitor::new(job_queue.clone()));
 
         // configure worker manager and monitor
         worker_manager.set_job_queue(&job_queue);
