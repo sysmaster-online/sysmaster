@@ -101,40 +101,42 @@ impl SocketLoad {
     }
 
     pub(self) fn add_default_dependencies(&self) -> Result<()> {
-        if let Some(u) = self.comm.owner() {
-            log::debug!("add default dependencies for socket [{}]", u.id());
-            if !u.default_dependencies() {
+        let u = match self.comm.owner() {
+            None => {
                 return Ok(());
             }
+            Some(v) => v,
+        };
 
-            let um = self.comm.um();
-            um.unit_add_dependency(
-                u.id(),
-                UnitRelations::UnitAfter,
-                SOCKETS_TARGET,
-                true,
-                UnitDependencyMask::Default,
-            )?;
-
-            um.unit_add_two_dependency(
-                u.id(),
-                UnitRelations::UnitAfter,
-                UnitRelations::UnitRequires,
-                SYSINIT_TARGET,
-                true,
-                UnitDependencyMask::Default,
-            )?;
-
-            um.unit_add_two_dependency(
-                u.id(),
-                UnitRelations::UnitBefore,
-                UnitRelations::UnitConflicts,
-                SHUTDOWN_TARGET,
-                true,
-                UnitDependencyMask::Default,
-            )?;
+        if !u.default_dependencies() {
+            return Ok(());
         }
 
+        log::debug!("Adding default dependencies for socket: {}", u.id());
+        let um = self.comm.um();
+        um.unit_add_dependency(
+            u.id(),
+            UnitRelations::UnitAfter,
+            SOCKETS_TARGET,
+            true,
+            UnitDependencyMask::Default,
+        )?;
+        um.unit_add_two_dependency(
+            u.id(),
+            UnitRelations::UnitAfter,
+            UnitRelations::UnitRequires,
+            SYSINIT_TARGET,
+            true,
+            UnitDependencyMask::Default,
+        )?;
+        um.unit_add_two_dependency(
+            u.id(),
+            UnitRelations::UnitBefore,
+            UnitRelations::UnitConflicts,
+            SHUTDOWN_TARGET,
+            true,
+            UnitDependencyMask::Default,
+        )?;
         Ok(())
     }
 }

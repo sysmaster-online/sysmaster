@@ -81,36 +81,42 @@ impl Target {
     }
 
     pub(self) fn add_default_dependencies(&self) {
-        if let Some(u) = self.owner() {
-            log::debug!("add default dependencies for target[{}]", u.id());
-            if !u.default_dependencies() {
-                return;
+        let u = match self.owner() {
+            None => return,
+            Some(u) => u,
+        };
+
+        if !u.default_dependencies() {
+            return;
+        }
+
+        log::debug!("Adding default dependencies for target: {}", u.id());
+        let um = self.um.clone();
+        let deps = um.get_dependency_list(
+            u.id(),
+            UnitRelationAtom::UnitAtomAddDefaultTargetDependencyQueue,
+        );
+        for other in deps {
+            /* If the other unit has configured DefaultDependencies=false,
+             * don't add default dependencies automatically. */
+            if !um.unit_has_default_dependecy(&other) {
+                continue;
             }
-            let um = Rc::clone(&self.um);
-            let deps = um.get_dependency_list(
+
+            /* Don't create loop, as we will add UnitAfter later. */
+            if um.unit_has_dependecy(u.id(), UnitRelationAtom::UnitAtomBefore, &other) {
+                continue;
+            }
+
+            if let Err(e) = um.unit_add_dependency(
                 u.id(),
-                UnitRelationAtom::UnitAtomAddDefaultTargetDependencyQueue,
-            );
-            for _u_n in deps {
-                if !um.unit_has_default_dependecy(&_u_n) {
-                    continue;
-                }
-
-                if um.unit_has_dependecy(u.id(), UnitRelationAtom::UnitAtomBefore, &_u_n) {
-                    continue;
-                }
-
-                let e = um.unit_add_dependency(
-                    u.id(),
-                    UnitRelations::UnitAfter,
-                    &_u_n,
-                    true,
-                    UnitDependencyMask::Default,
-                );
-                if e.is_err() {
-                    log::error!("add default dependencies error {:?}", e);
-                    return;
-                }
+                UnitRelations::UnitAfter,
+                &other,
+                true,
+                UnitDependencyMask::Default,
+            ) {
+                log::error!("Failed to add default dependencies for {}: {:?}", u.id(), e);
+                return;
             }
         }
     }
