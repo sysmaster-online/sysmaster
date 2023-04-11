@@ -1330,22 +1330,31 @@ impl ServiceMng {
                     ServiceState::Start => {
                         self.enter_running(res);
                     }
-                    ServiceState::StartPost | ServiceState::Reload => {
-                        if self.pid.control().map_or(false, |_p| true) {
+
+                    ServiceState::StartPost | ServiceState::Reload | ServiceState::Stop => {
+                        if !self.pid.control_pid_avail() {
                             self.enter_stop(res);
                         }
                     }
-                    ServiceState::Running => {
-                        self.enter_running(res);
-                    }
-                    ServiceState::Stop => {}
+
                     ServiceState::StopWatchdog
                     | ServiceState::StopSigkill
                     | ServiceState::StopSigterm => {
-                        self.enter_stop_post(res);
+                        if !self.pid.control_pid_avail() {
+                            self.enter_stop_post(res);
+                        }
                     }
-                    ServiceState::FinalSigterm | ServiceState::FinalSigkill => {
-                        self.enter_dead(res, true);
+                    ServiceState::StopPost => {
+                        if !self.pid.control_pid_avail() {
+                            self.enter_signal(ServiceState::FinalSigterm, res);
+                        }
+                    }
+                    ServiceState::FinalSigterm
+                    | ServiceState::FinalSigkill
+                    | ServiceState::FinalWatchdog => {
+                        if !self.pid.control_pid_avail() {
+                            self.enter_dead(res, true);
+                        }
                     }
                     _ => {
                         unreachable!(
@@ -1479,15 +1488,31 @@ impl ServiceMng {
                 ServiceState::StopSigterm
                 | ServiceState::StopSigkill
                 | ServiceState::StopWatchdog => {
-                    self.enter_stop_post(res);
+                    if !self.pid.main_pid_avail() {
+                        self.enter_stop_post(res);
+                    }
                 }
                 ServiceState::StopPost => {
-                    self.enter_signal(ServiceState::FinalSigterm, res);
+                    if !self.pid.main_pid_avail() {
+                        self.enter_signal(ServiceState::FinalSigterm, res);
+                    }
                 }
-                ServiceState::FinalSigterm | ServiceState::FinalSigkill => {
-                    self.enter_dead(res, true);
+                ServiceState::FinalSigterm
+                | ServiceState::FinalSigkill
+                | ServiceState::FinalWatchdog => {
+                    if !self.pid.main_pid_avail() {
+                        self.enter_dead(res, true);
+                    }
                 }
-                _ => {}
+                _ => {
+                    unreachable!(
+                        "{}",
+                        format!(
+                            "current state is: {}, control process exit at wrong time",
+                            self.state()
+                        )
+                    )
+                }
             }
         }
     }
