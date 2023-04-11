@@ -21,7 +21,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 
 /// directories for searching rule files
-const DEFAULT_RULES_DIRS: [&str; 4] = [
+pub const DEFAULT_RULES_DIRS: [&str; 4] = [
     "/etc/udev/rules.d",
     "/run/udev/rules.d",
     "/usr/local/lib/udev/rules.d",
@@ -81,12 +81,12 @@ impl Rules {
     }
 
     /// add the rule file into
-    pub(crate) fn add_file(&mut self, file: Rc<RefCell<RuleFile>>) {
+    pub(crate) fn add_file(&mut self, file: Arc<RwLock<RuleFile>>) {
         if self.current_file.is_none() {
             self.files = Some(file.clone());
         } else {
-            self.current_file.as_mut().unwrap().borrow_mut().next = Some(file.clone());
-            file.borrow_mut().prev = self.current_file.clone();
+            self.current_file.as_mut().unwrap().write().unwrap().next = Some(file.clone());
+            file.write().unwrap().prev = self.current_file.clone();
         }
 
         self.current_file = Some(file);
@@ -100,8 +100,8 @@ impl Default for Rules {
 }
 
 impl RuleFile {
-    pub(crate) fn new(file_name: String) -> Rc<RefCell<RuleFile>> {
-        let rule_file = Rc::<RefCell<RuleFile>>::new(RefCell::<RuleFile>::new(RuleFile {
+    pub(crate) fn new(file_name: String) -> Arc<RwLock<RuleFile>> {
+        let rule_file = Arc::<RwLock<RuleFile>>::new(RwLock::<RuleFile>::new(RuleFile {
             file_name,
             lines: None,
             current_line: None,
@@ -109,13 +109,13 @@ impl RuleFile {
             next: None,
         }));
 
-        rule_file.borrow_mut().parse_lines(rule_file.clone());
+        rule_file.write().unwrap().parse_lines(rule_file.clone());
 
         rule_file
     }
 
     /// parse and load all available lines in the rule file
-    pub(crate) fn parse_lines(&mut self, self_ptr: Rc<RefCell<RuleFile>>) {
+    pub(crate) fn parse_lines(&mut self, self_ptr: Arc<RwLock<RuleFile>>) {
         let file = File::open(&self.file_name).unwrap();
         let reader = BufReader::new(file);
 
@@ -153,12 +153,12 @@ impl RuleFile {
     }
 
     /// add rule line to the rule file object
-    pub(crate) fn add_line(&mut self, line: Rc<RefCell<RuleLine>>) {
+    pub(crate) fn add_line(&mut self, line: Arc<RwLock<RuleLine>>) {
         if self.lines.is_none() {
             self.lines = Some(line.clone());
         } else {
-            self.current_line.as_mut().unwrap().borrow_mut().next = Some(line.clone());
-            line.borrow_mut().prev = self.current_line.clone();
+            self.current_line.as_mut().unwrap().write().unwrap().next = Some(line.clone());
+            line.write().unwrap().prev = self.current_line.clone();
         }
 
         self.current_line = Some(line);
@@ -170,8 +170,8 @@ impl RuleLine {
     pub fn new(
         line: String,
         line_number: u32,
-        file: Rc<RefCell<RuleFile>>,
-    ) -> Result<Rc<RefCell<RuleLine>>> {
+        file: Arc<RwLock<RuleFile>>,
+    ) -> Result<Arc<RwLock<RuleLine>>> {
         lazy_static! {
             static ref RE_LINE: Regex =
                 Regex::new("((?P<key>[^={+\\-!:\0\\s]+)(\\{(?P<attr>[^\\{\\}]+)\\})?\\s*(?P<op>[!:+-=]?=)\\s*\"(?P<value>[^\"]+)\"\\s*,?\\s*)+").unwrap();
@@ -186,7 +186,7 @@ impl RuleLine {
             tokens: None,
             current_token: None,
 
-            file: Rc::downgrade(&file),
+            file: Arc::downgrade(&file),
 
             next: None,
             prev: None,
@@ -223,19 +223,19 @@ value = {}",
             rule_line.add_token(rule_token);
         }
 
-        Ok(Rc::<RefCell<RuleLine>>::new(RefCell::<RuleLine>::new(
+        Ok(Arc::<RwLock<RuleLine>>::new(RwLock::<RuleLine>::new(
             rule_line,
         )))
     }
 
     /// add token into rule line
     pub(crate) fn add_token(&mut self, rule_token: RuleToken) {
-        let rule_token = Rc::<RefCell<RuleToken>>::new(RefCell::<RuleToken>::new(rule_token));
+        let rule_token = Arc::<RwLock<RuleToken>>::new(RwLock::<RuleToken>::new(rule_token));
         if self.tokens.is_none() {
             self.tokens = Some(rule_token.clone());
         } else {
-            self.current_token.as_mut().unwrap().borrow_mut().next = Some(rule_token.clone());
-            rule_token.borrow_mut().prev = self.current_token.clone();
+            self.current_token.as_mut().unwrap().write().unwrap().next = Some(rule_token.clone());
+            rule_token.write().unwrap().prev = self.current_token.clone();
         }
 
         self.current_token = Some(rule_token);
@@ -310,15 +310,12 @@ mod tests {
     use log::LevelFilter;
 
     use super::*;
-    use std::fs;
+    use std::{fs, thread::JoinHandle};
 
-    #[test]
-    fn test_rules_new() {
-        init_log_to_console("test_rules_new", LevelFilter::Debug);
-
-        assert!(fs::create_dir("test_rules_new_1").is_ok());
+    fn create_test_rules_dir(dir: &'static str) {
+        assert!(fs::create_dir(dir).is_ok());
         assert!(fs::write(
-            "test_rules_new_1/test1.rules",
+            format!("{}/test.rules", dir),
             "ACTION == \"change\", SYMLINK += \"test1\"
 ACTION == \"change\", SYMLINK += \"test11\", \\
 SYMLINK += \"test111\"
@@ -327,21 +324,19 @@ SYMLINK += \"test11111\", \\
 SYMLINK += \"test111111\"",
         )
         .is_ok());
-        assert!(fs::create_dir("test_rules_new_2").is_ok());
-        assert!(fs::write(
-            "test_rules_new_2/test1.rules",
-            "ACTION == \"change\", SYMLINK += \"test2\"
-ACTION == \"change\", SYMLINK += \"test22\", \\
-SYMLINK += \"test222\"
-ACTION == \"change\", SYMLINK += \"test2222\", \\
-SYMLINK += \"test22222\", \\
-SYMLINK += \"test222222\"",
-        )
-        .is_ok());
+    }
+
+    fn clear_test_rules_dir(dir: &'static str) {
+        assert!(fs::remove_dir_all(dir).is_ok());
+    }
+
+    #[test]
+    fn test_rules_new() {
+        init_log_to_console("test_rules_new", LevelFilter::Debug);
+        create_test_rules_dir("test_rules_new");
         let rules = Rules::new(&["test_rules_new_1", "test_rules_new_2"]);
         println!("{}", rules);
-        assert!(fs::remove_dir_all("test_rules_new_1").is_ok());
-        assert!(fs::remove_dir_all("test_rules_new_2").is_ok());
+        clear_test_rules_dir("test_rules_new");
     }
 
     #[test]
@@ -388,5 +383,27 @@ SYMLINK += \"test222222\"",
             "add".to_string()
         )
         .is_err());
+    }
+
+    #[test]
+    fn test_rules_share_among_threads() {
+        create_test_rules_dir("test_rules_share_among_threads");
+        let rules = Rules::new(&["test_rules_new_1", "test_rules_new_2"]);
+        let mut handles = Vec::<JoinHandle<()>>::new();
+        (0..5).for_each(|i| {
+            let rules_clone = rules.clone();
+            let handle = std::thread::spawn(move || {
+                println!("thread {}", i);
+                println!("{}", rules_clone);
+            });
+
+            handles.push(handle);
+        });
+
+        for thread in handles {
+            thread.join().unwrap();
+        }
+
+        clear_test_rules_dir("test_rules_share_among_threads");
     }
 }

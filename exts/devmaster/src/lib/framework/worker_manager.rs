@@ -28,8 +28,10 @@ use std::rc::{Rc, Weak};
 use std::sync::mpsc;
 use std::thread::JoinHandle;
 
-use crate::error::Error;
 use crate::framework::job_queue::{DeviceJob, JobQueue, JobState};
+use crate::{error::Error, rules::Rules};
+
+use super::devmaster::Devmaster;
 
 /// worker manager listen address
 pub const WORKER_MANAGER_LISTEN_ADDR: &str = "0.0.0.0:1223";
@@ -59,6 +61,8 @@ pub struct WorkerManager {
     job_queue: RefCell<Weak<JobQueue>>,
     /// reference to events
     events: Rc<Events>,
+    /// reference to devmaster manager
+    devmaster: Weak<RefCell<Devmaster>>,
 }
 
 /// worker
@@ -108,9 +112,10 @@ impl Display for WorkerState {
 /// public methods
 impl Worker {
     /// create a new worker, start running the worker thread
-    pub(crate) fn new(id: u32, state: WorkerState, tcp_address: String) -> Worker {
+    pub(crate) fn new(id: u32, state: WorkerState, tcp_address: String, rules: Rules) -> Worker {
         let (tx, rx) = mpsc::channel::<WorkerMessage>();
 
+        // share rules in worker threads. worker should only read rules to avoid lock being poisoned.
         let handler = std::thread::spawn(move || loop {
             let msg = rx.recv().unwrap_or_else(|error| {
                 log::error!("Worker {id}: panic at recv \"{error}\"");
@@ -118,6 +123,8 @@ impl Worker {
             });
 
             let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
+
+            println!("{}", rules);
 
             match msg {
                 WorkerMessage::Job(mut device) => {
@@ -220,7 +227,12 @@ impl Worker {
 /// public methods
 impl WorkerManager {
     /// create a worker manager
-    pub fn new(workers_capacity: u32, listen_addr: String, events: Rc<Events>) -> WorkerManager {
+    pub fn new(
+        workers_capacity: u32,
+        listen_addr: String,
+        events: Rc<Events>,
+        devmaster: Weak<RefCell<Devmaster>>,
+    ) -> WorkerManager {
         let listener = RefCell::new(TcpListener::bind(listen_addr.as_str()).unwrap_or_else(
             |error| {
                 log::error!("Worker Manager: failed to bind listener \"{error}\"");
@@ -241,6 +253,7 @@ impl WorkerManager {
             kill_idle_workers: RefCell::new(None),
             job_queue: RefCell::new(Weak::new()),
             events,
+            devmaster,
         }
     }
 
@@ -271,7 +284,8 @@ impl WorkerManager {
 
 /// internal methods
 impl WorkerManager {
-    /// create a new worker
+    /// create a new worker object
+    /// clone rules and move it to worker thread
     pub(crate) fn create_new_worker(self: &Rc<WorkerManager>) -> Option<u32> {
         for id in 0..self.workers_capacity {
             if !self.workers.borrow().contains_key(&id) {
@@ -281,6 +295,12 @@ impl WorkerManager {
                         id,
                         WorkerState::Undef,
                         self.listen_addr.clone(),
+                        self.devmaster
+                            .upgrade()
+                            .unwrap()
+                            .as_ref()
+                            .borrow()
+                            .get_rules(),
                     )),
                 );
                 log::debug!("Worker Manager: created new worker {id}");

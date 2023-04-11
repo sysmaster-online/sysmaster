@@ -14,6 +14,7 @@
 //!
 
 pub mod control_manager;
+pub mod devmaster;
 pub mod job_queue;
 pub mod uevent_monitor;
 pub mod worker_manager;
