@@ -311,15 +311,11 @@ impl UnitDepData {
 
     fn remove_one_way(&mut self, source: &UnitX, relation: UnitRelations, dest: &UnitX) {
         let sv = match self.t.get_mut(source) {
-            None => {
-                return;
-            }
+            None => return,
             Some(v) => v,
         };
         let map = match sv.get_mut(&relation) {
-            None => {
-                return;
-            }
+            None => return,
             Some(v) => v,
         };
         /* remove the 3-level HashMap from bottom to top. */

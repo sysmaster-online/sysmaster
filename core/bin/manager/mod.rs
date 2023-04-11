@@ -94,15 +94,15 @@ impl ExecuterAction for CommandActionMgr {
     type Status = sysmaster::unit::UnitStatus;
     // type Result<T, Error> = Result<T, E>;
     fn start(&self, unit_name: &str) -> Result<(), Self::Error> {
-        self.um.start_unit_manual(unit_name)
+        self.um.start_unit(unit_name, true)
     }
 
     fn stop(&self, unit_name: &str) -> Result<(), Self::Error> {
-        self.um.stop_unit_manual(unit_name)
+        self.um.stop_unit(unit_name, true)
     }
 
     fn restart(&self, unit_name: &str) -> Result<(), Self::Error> {
-        self.um.restart_unit_manual(unit_name)
+        self.um.restart_unit(unit_name, true)
     }
 
     fn reload(&self, unit_name: &str) -> Result<(), Self::Error> {
@@ -228,7 +228,7 @@ impl Manager {
     fn add_default_job(&self) -> Result<i32> {
         self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);
         // add target "SPECIAL_DEFAULT_TARGET"
-        if let Err(e) = self.um.start_unit(BASIC_TARGET) {
+        if let Err(e) = self.um.start_unit(BASIC_TARGET, false) {
             log::error!("Failed to start basic.target: {:?}", e);
         }
         self.reli.clear_last_frame();

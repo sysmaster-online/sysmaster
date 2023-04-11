@@ -401,7 +401,7 @@ impl SocketMngData {
 
                     // start corresponding *.service
                     self.rentry().set_last_frame(SocketReFrame::FdListen(false)); // protect 'start_unit'
-                    let ret = self.comm.um().start_unit(&service);
+                    let ret = self.comm.um().unit_start_by_job(&service);
                     self.rentry().set_last_frame(SocketReFrame::FdListen(true));
                     if ret.is_err() {
                         self.enter_stop_pre(SocketResult::FailureResources);

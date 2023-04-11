@@ -360,7 +360,7 @@ impl MountMonitorData {
                     } else if self.comm.um().load_unit_success(unit_name.as_str()) {
                         // record + action
                         self.comm.reli().set_last_unit(&unit_name);
-                        let start_ok = self.comm.um().unit_start(&unit_name).is_ok();
+                        let start_ok = self.comm.um().unit_start_directly(&unit_name).is_ok();
                         self.comm.reli().clear_last_unit();
 
                         if start_ok {
