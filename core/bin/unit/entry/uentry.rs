@@ -344,10 +344,12 @@ impl Unit {
         let mut wait_exit = false;
         let sig = ko.to_signal(k_context.clone());
         log::debug!(
-            "unit: {}, kill operation: {:?}, kill signal: {}",
+            "unit: {}, kill operation: {:?}, kill signal: {}, main_pid: {:?}, control_pid: {:?}",
             self.id(),
             ko,
-            sig
+            sig,
+            m_pid,
+            c_pid
         );
         if let Some(pid) = m_pid {
             match process_util::kill_and_cont(pid, sig) {

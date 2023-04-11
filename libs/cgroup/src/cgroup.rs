@@ -240,7 +240,12 @@ fn cg_kill_process(
             continue;
         }
 
-        log::debug!("kill pid {} in cgroup.procs", pid);
+        log::debug!(
+            "kill pid {} in cgroup {:?} with signal {}",
+            pid,
+            cg_path,
+            signal
+        );
         match nix::sys::signal::kill(pid, signal) {
             Ok(_) => {
                 if flags.contains(CgFlags::SIGCONT) {
