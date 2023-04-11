@@ -2354,6 +2354,10 @@ impl Source for ServiceMonitorData {
         let data: u64 = unsafe { std::mem::transmute(self) };
         data
     }
+
+    fn priority(&self) -> i8 {
+        0i8
+    }
 }
 
 #[cfg(test)]

@@ -82,4 +82,8 @@ where
     fn fd(&self) -> RawFd {
         self.fd.as_raw_fd()
     }
+
+    fn priority(&self) -> i8 {
+        10i8
+    }
 }

@@ -82,7 +82,7 @@ impl UnitManagerObj for MountManager {}
 
 // the declaration "pub(self)" is for identification only.
 impl MountManager {
-    pub(self) fn new() -> MountManager {
+    pub fn new() -> MountManager {
         let _comm = MountUmComm::get_instance();
         MountManager {
             comm: Arc::clone(&_comm),
@@ -128,7 +128,7 @@ struct MountMonitor {
 
 // the declaration "pub(self)" is for identification only.
 impl MountMonitor {
-    pub(self) fn new(commr: &Arc<MountUmComm>) -> MountMonitor {
+    pub fn new(commr: &Arc<MountUmComm>) -> MountMonitor {
         let filename = "/proc/self/mountinfo".to_string();
         let _data = Rc::new(MountMonitorData::new(commr, filename));
         let _defer = Rc::new(MountMonitorDefer::new(&_data));
@@ -139,7 +139,7 @@ impl MountMonitor {
         }
     }
 
-    pub(self) fn register_ex(&self) {
+    pub fn register_ex(&self) {
         let events = self.data.comm.um().events();
 
         // io
@@ -148,7 +148,7 @@ impl MountMonitor {
         events.set_enabled(io, EventState::On).unwrap();
     }
 
-    pub(self) fn defer_enable(&self, enable: bool) -> i32 {
+    pub fn defer_enable(&self, enable: bool) -> i32 {
         self.io.defer_enable(enable)
     }
 
@@ -169,17 +169,14 @@ struct MountMonitorIo {
 
 // the declaration "pub(self)" is for identification only.
 impl MountMonitorIo {
-    pub(self) fn new(
-        datar: &Rc<MountMonitorData>,
-        deferr: &Rc<MountMonitorDefer>,
-    ) -> MountMonitorIo {
+    pub fn new(datar: &Rc<MountMonitorData>, deferr: &Rc<MountMonitorDefer>) -> MountMonitorIo {
         MountMonitorIo {
             data: Rc::clone(datar),
             defer: Rc::clone(deferr),
         }
     }
 
-    pub(self) fn defer_enable(&self, enable: bool) -> i32 {
+    pub fn defer_enable(&self, enable: bool) -> i32 {
         let source = Rc::clone(&self.defer);
         let state = match enable {
             true => EventState::OneShot,
@@ -235,6 +232,10 @@ impl Source for MountMonitorIo {
     fn fd(&self) -> RawFd {
         self.data.epfd
     }
+
+    fn priority(&self) -> i8 {
+        0i8
+    }
 }
 
 struct MountMonitorDefer {
@@ -242,9 +243,8 @@ struct MountMonitorDefer {
     data: Rc<MountMonitorData>,
 }
 
-// the declaration "pub(self)" is for identification only.
 impl MountMonitorDefer {
-    pub(self) fn new(datar: &Rc<MountMonitorData>) -> MountMonitorDefer {
+    pub fn new(datar: &Rc<MountMonitorData>) -> MountMonitorDefer {
         MountMonitorDefer {
             data: Rc::clone(datar),
         }
@@ -288,6 +288,10 @@ impl Source for MountMonitorDefer {
             Err(_) => -1,
         }
     }
+
+    fn priority(&self) -> i8 {
+        0i8
+    }
 }
 
 struct MountMonitorData {
@@ -302,7 +306,7 @@ struct MountMonitorData {
 }
 
 impl MountMonitorData {
-    pub(self) fn new(commr: &Arc<MountUmComm>, filename: String) -> Self {
+    pub fn new(commr: &Arc<MountUmComm>, filename: String) -> Self {
         let me_file = match File::open(&filename) {
             Ok(me_file) => me_file,
             Err(why) => {
@@ -328,7 +332,7 @@ impl MountMonitorData {
         }
     }
 
-    pub(self) fn dispatch_mountinfo(&self) -> Result<()> {
+    pub fn dispatch_mountinfo(&self) -> Result<()> {
         // First mark all active mount point we have as dead.
         let mut dead_mount_set: HashSet<String> = HashSet::new();
         let unit_type = Some(UnitType::UnitMount);
