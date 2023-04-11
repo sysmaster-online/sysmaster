@@ -30,6 +30,7 @@ use crate::framework::worker_manager::WorkerManager;
 pub const CONTROL_MANAGER_LISTEN_ADDR: &str = "0.0.0.0:1224";
 
 /// control manager
+#[derive(Debug)]
 pub struct ControlManager {
     /// listener for devctl messages
     listener: RefCell<TcpListener>,

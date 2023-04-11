@@ -303,12 +303,16 @@ impl MountPoint {
 
         if fs_type == "cgroup" {
             let virtualization = virtualize::detect_container();
+            // for systemd only mounted on virtualization machine
             if self.mode.contains(MountMode::MNT_NOT_HOST) && virtualization == Virtualization::None
             {
                 return Ok(());
             }
 
-            if self.mode.contains(MountMode::MNT_IN_CONTAINER) {
+            // check the controller is exist in /proc/self/cgroup, if not exist, not mounted for virtualization machine
+            if virtualization != Virtualization::None
+                && self.mode.contains(MountMode::MNT_IN_CONTAINER)
+            {
                 let t_path = PathBuf::from(target);
                 let controller = t_path.file_name().unwrap();
 

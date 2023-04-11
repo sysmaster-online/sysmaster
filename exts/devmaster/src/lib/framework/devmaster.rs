@@ -27,6 +27,7 @@ use super::{
 };
 
 /// encapsulate all submanagers
+#[derive(Debug)]
 pub struct Devmaster {
     /// reference to events
     events: Rc<Events>,
