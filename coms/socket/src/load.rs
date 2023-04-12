@@ -58,10 +58,6 @@ impl SocketLoad {
         Ok(())
     }
 
-    pub(super) fn socket_verify(&self) -> Result<()> {
-        Ok(())
-    }
-
     fn load_related_unit(&self, related_type: UnitType) -> Result<()> {
         let unit_name = self.comm.owner().map(|u| u.id().to_string());
         let suffix = String::from(related_type);

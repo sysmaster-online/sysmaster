@@ -75,7 +75,7 @@ impl SubUnit for SocketUnit {
 
         self.mng.build_ports();
 
-        self.load.socket_verify()
+        self.verify()
     }
 
     // the function entrance to start the unit
@@ -149,6 +149,37 @@ impl SocketUnit {
             mng: SocketMng::new(&_comm, &_config, &context),
             load: SocketLoad::new(&_config, &_comm),
         }
+    }
+
+    fn find_symlink_target(&self) -> Option<String> {
+        if self.config.ports().is_empty() {
+            return None;
+        }
+        let mut res: Option<String> = None;
+        for port in self.config.ports() {
+            if !port.can_be_symlinked() {
+                continue;
+            }
+            /* Already found one target, refuse if there are more. */
+            if res.is_some() {
+                return None;
+            }
+            res = Some(port.listen().to_string());
+        }
+        res
+    }
+
+    fn verify(&self) -> Result<()> {
+        let config = self.config.config_data();
+        if config.borrow().Socket.Symlinks.is_some()
+            && !config.borrow().Socket.Symlinks.as_ref().unwrap().is_empty()
+            && self.find_symlink_target().is_none()
+        {
+            /* Set to None, so we won't create symlinks by mistake. */
+            config.borrow_mut().Socket.Symlinks = None;
+            log::error!("Symlinks in [Socket] is configured, but there are none or more than one listen files.");
+        }
+        Ok(())
     }
 }
 

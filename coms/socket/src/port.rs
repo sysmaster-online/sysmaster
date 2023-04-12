@@ -18,7 +18,7 @@ use crate::{
     config::{SocketAddress, SocketConfig, SocketPortConf},
     rentry::PortType,
 };
-use basic::{fd_util, io_util, socket_util};
+use basic::{fd_util, fs_util, io_util, socket_util};
 use nix::{
     errno::Errno,
     poll::PollFlags,
@@ -79,10 +79,14 @@ impl SocketPort {
             PortType::Socket => {
                 let flag = SockFlag::SOCK_CLOEXEC | SockFlag::SOCK_NONBLOCK;
 
-                self.p_conf
+                let fd = self
+                    .p_conf
                     .sa()
                     .socket_listen(flag, 128)
-                    .context(NixSnafu)?
+                    .context(NixSnafu)?;
+
+                self.apply_symlink();
+                fd
             }
             PortType::Fifo => todo!(),
             PortType::Invalid => todo!(),
@@ -114,7 +118,10 @@ impl SocketPort {
         }
 
         fd_util::close(fd);
+        self.set_fd(SOCKET_INVALID_FD);
+    }
 
+    pub(super) fn unlink(&self) {
         match self.p_conf.p_type() {
             PortType::Socket => {
                 self.p_conf.sa().unlink();
@@ -122,8 +129,6 @@ impl SocketPort {
             PortType::Fifo => todo!(),
             PortType::Invalid => todo!(),
         }
-
-        self.set_fd(SOCKET_INVALID_FD);
     }
 
     pub(super) fn flush_accept(&self) {
@@ -244,6 +249,31 @@ impl SocketPort {
 
     pub(super) fn listen(&self) -> &str {
         self.p_conf.listen()
+    }
+
+    pub(super) fn apply_symlink(&self) {
+        if !self.p_conf.can_be_symlinked() {
+            return;
+        }
+        let config = self.config.config_data();
+        if config.borrow().Socket.Symlinks.is_none() {
+            return;
+        }
+
+        let target = self.listen();
+        for symlink in config.borrow().Socket.Symlinks.as_ref().unwrap() {
+            if let Err(e) = fs_util::symlink(target, symlink, false) {
+                let unit_name = match self.comm.owner() {
+                    None => "null".to_string(),
+                    Some(v) => v.id().to_string(),
+                };
+                log::error!(
+                    "Failed to apply Symlinks for {}: {:?}, skipping.",
+                    unit_name,
+                    e
+                );
+            }
+        }
     }
 
     fn family(&self) -> AddressFamily {
