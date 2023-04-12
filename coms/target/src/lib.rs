@@ -17,10 +17,10 @@
 //! #  Example:
 //! ``` toml
 //!  [Unit]
-//!  Description = ""
+//!  Description=""
 //!
 //!  [Install]
-//!  WantedBy =
+//!  WantedBy=
 //! ```
 //! ##  Automatic dependency
 //!
@@ -28,9 +28,8 @@
 //!  No implicit dependencies
 //!
 //! ###  Default Dependency
-//!  If DefaultDependencies=no is set, the following dependencies will be added by default:
-//! +  Yes XXX
-//! +  Conflicts = shutdown. Dependence between target and Before=shutdown.target
+//!  If DefaultDependencies=true is set, the following dependencies will be added by default:
+//!  Conflicts="shutdown.target", Beforet="shutdown.target"
 
 // dependency: target_base -> target_rentry -> target_comm -> {target_mng} -> target_unit -> target_manager
 mod base;

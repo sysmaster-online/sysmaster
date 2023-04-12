@@ -1,10 +1,26 @@
 # Unit 配置
 
+## Unit描述
+
+### Description
+
+* 类型：字符串
+
+允许配置为一个字符串，说明该unit的主要功能。
+
+### Documentation
+
+* 类型：字符串
+
+允许配置为一个字符串，说明该unit的文档链接。
+
 ## 条件动作
 
 sysmaster兼容systemd的SuccessAction、FailureAction、StartLimitAction等配置。这些配置允许某个unit的状态发生变更时修改操作系统的状态，例如重启、关机或退出。
 
 ### SuccessAction/FailureAction
+
+* 类型：字符串
 
 配置当unit结束（SuccessAction）或进入失败状态（FailureAction）时采取的动作。可以配置的值包括： `"none"`，`"reboot"`，`"reboot-force"`，`"reboot-immediate"`，`"poweroff"`，`"poweroff-force"`，`"poweroff-immediate"`，`"exit"`和`"exit-force"`。
 
@@ -12,19 +28,27 @@ sysmaster兼容systemd的SuccessAction、FailureAction、StartLimitAction等配�
 
 ### StartLimitAction
 
+* 类型：字符串
+
 配置当unit触发启动限制时采取的动作。配置的值与采取的动作与`SuccessAction`、`FailureAction`一致。
 
 触发启动限制指：sysmaster最多允许单个unit在`StartLimitInterval`时间内启动`StartLimitBurst`次。
 
 ### StartLimitInterval
 
+* 类型：数值
+
 限制启动的时间区间, 单位为秒， 默认值为10秒。
 
 ### StartLimitBurst
 
+* 类型：数值
+
 单位时间内最多的启动次数， 默认值为5。 只要`StartLimitInterval`与`StartLimitBurst`其中一项配置为0时不启动限速。
 
 ### JobTimeoutAction，JobTimeoutSec
+
+* 类型：字符串
 
 `JobTimeoutAction`配置unit的job运行超时时采取的动作，配置的值与采取的动作与`SuccessAction`、`FailureAction`一致。
 
@@ -41,6 +65,8 @@ sysmaster支持配置单元之间的顺序及依赖关系，可以配置的值�
     After="bar.service"
 
 ### After/Before
+
+* 类型：字符串
 
 `After`和`Before`能够配置同时启动的单元的先后顺序。如`foo.service`配置了`After="bar.service" Wants="bar.service"`，`foo.service`将在`bar.service`启动完成后启动。需要注意：
 
@@ -69,7 +95,22 @@ sysmaster支持配置单元之间的顺序及依赖关系，可以配置的值�
 
 ### OnFailure/OnSuccess
 
+* 类型：字符串
+
 `OnFailure`：配置当一个unit启动失败或成功结束后，对其他服务的影响。以`foo.service`配置`OnFailure/OnSuccess="bar.service"`为例，当`foo.service`启动失败或成功结束后，将自动拉起`bar.service`。拉起`bar.service`会生成一个Start类型的job,该job的模式可配置为`fail`， `replace`，`replace-irreversibly`，`isolate`，`flush`，`ignore-dependencies`或`ignore-requirements`。
+
+### DefaultDependencies
+
+* 类型：布尔值
+
+`DefaultDependencies`配置是否为单元添加缺省依赖，默认值为`true`。缺省依赖如下：
+
+1. 所有类型的单元统一添加`Conflict="shutdown.target"`，`Before="shutdown.target"`。
+2. 针对不同类型的单元，额外添加以下依赖
+
+> * 对`.service`，添加`Requires="sysinit.target"`，`After="sysinit.target"`，`After="basic.target"`。
+> * 对`.socket`，添加`Requires="sysinit.target"`，`After="sysinit.target"`，`After="socket.target"`。
+> * 对`.target`，对target配置的`Requires=`、`Wants=`补全`After=`。
 
 ## 启动检查
 
@@ -77,63 +118,93 @@ sysmaster支持配置`Condition...`和`Assert...`进行启动检查，当条件�
 
 ### ConditionACPower
 
+* 类型：可选的布尔值
+
 检查操作系统是否连接交流电源。可以配置为`false`，`true`。配置为`true`时，当操作系统至少一个接口连接了交流电，或者无法确定是否有连接时，检查通过。配置为`false`时，当成功检查到所有接口都没有连接交流电时，检查通过。如果不配置，跳过该检查。配置为其他的值，会导致解析失败。
 
 ### ConditionCapability
+
+* 类型：字符串
 
 检测sysmaster是否支持给定的权能，允许配置引号括起来的权能名称，如`"CAP_CHOWN"`。该配置仅允许配置一个权能。通过读取`/proc/self/status/`的`CapBnd`检查sysmaster的权能组（Capability Set），如果包含指定的权能，那么检查通过；否则，检查失败。
 
 ### ConditionDirectoryNotEmpty
 
+* 类型：字符串
+
 检查配置的绝对路径目录是否非空，如果为软链接，则判断软链接指向的目录。如果目录非空，检查通过；否则，检查失败。
 
 ### ConditionFileIsExecutable
+
+* 类型：字符串
 
 检查配置的绝对路径文件是否可执行，如果为软链接，则判断软链接指向的文件。如果可执行，检查通过；否则，检查失败。
 
 ### ConditionFirstBoot
 
+* 类型：可选的布尔值
+
 检测系统是否首次启动，可配置为`false`、`true`。用于系统出厂后(或者恢复出厂设置之后)，首次开机时执行必要的初始化操作。该选项将会检测`/run/sysmaster/first-boot`文件是否存在。若文件存在，则表明系统首次启动，反之，则表明系统非首次启动。如果在内核命令行上指定了`sysmaster.condition-first-boot=`选项（采用布尔值），它将优先于`/run/sysmaster/first-boot`文件是否存在的检查结果。
 
 ### ConditionKernelCommandLine
+
+* 类型：字符串
 
 检查内核命令行是否配置给定的内容。该选项仅允许配置 **一个** 单词或者`=`分隔的键值对，例如：`"ro"`，`"crashkernel=512M"`。配置为单词时，检查内核命令行是否包含
 该单词或作为键值对的键。配置为键值对时，将检查是否存在完全一致的键值对。内核命令行仅支持读取`/proc/cmdline`。
 
 ### ConditionPathExists
 
+* 类型：字符串
+
 检查文件是否存在。只有`ConditionPathExists=`后配置的绝对路径存在时，检查通过，启动流程正常；如果配置的绝对路径不存在，则检查失败，停止单元的启动流程。
 
 ### ConditionPathExistsGlob
+
+* 类型：字符串
 
 与`ConditionPathExists`类似，区别在于`ConditionPathExistsGlob`支持通配符。
 
 ### ConditionPathIsDirectory
 
+* 类型：字符串
+
 检查`ConditionPathIsDirectory=`后配置的绝对路径是否为目录，如果是，检查通过；否则检查失败。
 
 ### ConditionPathIsMountPoint
+
+* 类型：字符串
 
 检查`ConditionPathIsMountPoint=`后配置的绝对路径是否为挂载点目录，如果是软链接，则检查软链接指向的目录。该配置仅支持`kernel > 4.11`版本。如果是挂载点目录，检查通过；否则，检查失败。
 
 ### ConditionPathIsReadWrite
 
+* 类型：字符串
+
 与`ConditionPathExists`类似，检查配置的绝对路径所属的文件系统是否为可读可写。
 
 ### ConditionPathIsSymbolicLink
+
+* 类型：字符串
 
 检查`ConditionPathIsSymbolicLink=`后配置的绝对路径是否为软链接，如果是软链接，检查通过；否则检查失败。
 
 ### ConditionSecurity
 
+* 类型：字符串
+
 `ConditionSecurity`可以用于检查系统是否支持给定的安全技术。当前支持的值包括：`"selinux"`，`"apparmor"`，`"tomoyo"`，`"ima"`，`"smack"`，`"audit"`，`"uefi-secureboot"`和`"tpm2"`。 **注意：** 检查`"selinux"`需要在编译时通过 `--features "selinux"` 开启 `"selinux"` feature。
 
 ### ConditionUser
+
+* 类型：字符串
 
 检测sysmaster是否以给定的用户身份运行。参数可以是数字形式的"UID"、字符串形式的UNIX用户名或者特殊值`"@system"`(表示属于系统用户范围内)。如果不配置，默认跳过该检查。
 
 ## 其他配置
 
 ### RefuseManualStart/RefuseManualStop
+
+* 类型：布尔值
 
 `RefuseManualStart`/`RefuseManualStop`：配置单元是否拒绝通过`sctl start/stop`的形式手动启动/关闭。默认配置为`false`，即允许手动启动/关闭。该配置不影响通过依赖关系解析启动/关闭服务。
