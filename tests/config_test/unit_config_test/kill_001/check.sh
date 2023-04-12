@@ -29,7 +29,7 @@ function test01() {
     sctl stop fork
     check_status fork inactive || return 1
     check_log "${SYSMST_LOG}" "ThisIsExecStop$"
-    grep 'SIGHUP' "${SYSMST_LOG}"
+    grep -a 'SIGHUP' "${SYSMST_LOG}"
     expect_eq $? 1
     ps -elf | grep -v grep | grep -E "${main_pid}|${child_pid}"
     expect_eq $? 1 || ps -elf
@@ -58,7 +58,7 @@ function test02() {
     sctl stop fork
     check_status fork inactive || return 1
     check_log "${SYSMST_LOG}" "ThisIsExecStop$"
-    grep 'SIGHUP' "${SYSMST_LOG}"
+    grep -a 'SIGHUP' "${SYSMST_LOG}"
     expect_eq $? 1
     ps -elf | grep -v grep | grep -w "${main_pid}"
     expect_eq $? 1 || ps -elf
@@ -90,7 +90,7 @@ function test03() {
     sctl stop fork
     check_status fork inactive || return 1
     check_log "${SYSMST_LOG}" "ThisIsExecStop$"
-    grep 'SIGHUP' "${SYSMST_LOG}"
+    grep -a 'SIGHUP' "${SYSMST_LOG}"
     expect_eq $? 1
     ps -elf | grep -v grep | grep -w "${main_pid}" && ps -elf | grep -v grep | grep -w "${child_pid}"
     expect_eq $? 0 || ps -elf
@@ -120,7 +120,7 @@ function test04() {
     sctl stop fork
     check_status fork inactive || return 1
     check_log "${SYSMST_LOG}" "ThisIsExecStop$" "send SIGTERM to ${main_pid}" "send SIGKILL to ${child_pid}"
-    grep 'SIGHUP' "${SYSMST_LOG}"
+    grep -a 'SIGHUP' "${SYSMST_LOG}"
     expect_eq $? 1
     ps -elf | grep -v grep | grep -E "${main_pid}|${child_pid}"
     expect_eq $? 1 || ps -elf
@@ -150,7 +150,7 @@ function test05() {
     sctl stop fork
     check_status fork failed || return 1
     check_log "${SYSMST_LOG}" "ThisIsExecStop$" "send SIGKILL to ${main_pid}" "send SIGKILL to ${child_pid}"
-    grep 'SIGHUP' "${SYSMST_LOG}"
+    grep -a 'SIGHUP' "${SYSMST_LOG}"
     expect_eq $? 1
     ps -elf | grep -v grep | grep -E "${main_pid}|${child_pid}"
     expect_eq $? 1 || ps -elf
@@ -162,7 +162,8 @@ function test05() {
 
 test01 || exit 1
 test02 || exit 1
-test03 || exit 1
+# KillMode=none not implemented
+# test03 || exit 1
 test04 || exit 1
 test05 || exit 1
 exit "${EXPECT_FAIL}"

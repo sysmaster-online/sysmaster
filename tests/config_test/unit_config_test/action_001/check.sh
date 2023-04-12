@@ -87,7 +87,7 @@ function test01() {
         check_status base failed || return 1
         ps aux | grep -v grep | awk '{print $2}' | grep -w "${sysmaster_pid}"
         expect_eq $? 0 || ps -elf
-        grep "by starting .*target caused by unit base.service" "${SYSMST_LOG}"
+        grep -a "by starting .*target caused by unit base.service" "${SYSMST_LOG}"
         expect_eq $? 1 || cat "${SYSMST_LOG}"
 
         # clean
@@ -114,7 +114,7 @@ function test02() {
         check_status base inactive || return 1
         ps aux | grep -v grep | awk '{print $2}' | grep -w "${sysmaster_pid}"
         expect_eq $? 0 || ps -elf
-        grep "by starting .*target caused by unit base.service" "${SYSMST_LOG}"
+        grep -a "by starting .*target caused by unit base.service" "${SYSMST_LOG}"
         expect_eq $? 1 || cat "${SYSMST_LOG}"
 
         # clean
