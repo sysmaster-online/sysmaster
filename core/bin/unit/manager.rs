@@ -123,29 +123,20 @@ impl UnitManagerX {
         self.data.entry_coldplug();
     }
 
-    pub(crate) fn start_unit(&self, name: &str) -> Result<()> {
-        self.data.start_unit(name)
+    pub(crate) fn start_unit(&self, name: &str, is_manual: bool) -> Result<()> {
+        self.data.start_unit(name, is_manual)
     }
 
-    pub(crate) fn start_unit_manual(&self, name: &str) -> Result<()> {
-        self.data.start_unit_manual(name)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn stop_unit(&self, name: &str) -> Result<()> {
-        self.data.stop_unit(name)
-    }
-
-    pub(crate) fn stop_unit_manual(&self, name: &str) -> Result<()> {
-        self.data.stop_unit_manual(name)
+    pub(crate) fn stop_unit(&self, name: &str, is_manual: bool) -> Result<()> {
+        self.data.stop_unit(name, is_manual)
     }
 
     pub(crate) fn reload(&self, name: &str) -> Result<()> {
         self.data.reload(name)
     }
 
-    pub(crate) fn restart_unit_manual(&self, name: &str) -> Result<()> {
-        self.data.restart_unit_manual(name)
+    pub(crate) fn restart_unit(&self, name: &str, is_manual: bool) -> Result<()> {
+        self.data.restart_unit(name, is_manual)
     }
 
     pub(crate) fn get_unit_status(&self, name: &str) -> Result<UnitStatus> {
@@ -338,9 +329,8 @@ impl UmIf for UnitManager {
         self.relation_active_or_pending(name)
     }
 
-    /// start the unit
-    fn start_unit(&self, name: &str) -> Result<()> {
-        self.start_unit(name)
+    fn unit_start_by_job(&self, name: &str) -> Result<()> {
+        self.start_unit(name, false)
     }
 
     fn events(&self) -> Rc<Events> {
@@ -431,7 +421,7 @@ impl UmIf for UnitManager {
         s_unit.get_subunit_state()
     }
 
-    fn unit_start(&self, _name: &str) -> Result<()> {
+    fn unit_start_directly(&self, _name: &str) -> Result<()> {
         if let Some(unit) = self.db.units_get(_name) {
             unit.start()
         } else {
@@ -447,8 +437,8 @@ impl UmIf for UnitManager {
         }
     }
 
-    fn restart_unit(&self, name: &str) -> Result<()> {
-        self.restart_unit(name)
+    fn restart_unit(&self, name: &str, is_manual: bool) -> Result<()> {
+        self.restart_unit(name, is_manual)
     }
 
     fn get_log_file(&self) -> &str {
@@ -607,7 +597,7 @@ impl UnitManager {
         match action {
             UnitEmergencyAction::Reboot => {
                 log::info!("Rebooting by starting reboot.target caused by {}", reason);
-                if self.start_unit("reboot.target").is_err() {
+                if self.start_unit("reboot.target", false).is_err() {
                     log::error!("Failed to start reboot.target.");
                 }
             }
@@ -627,7 +617,7 @@ impl UnitManager {
                     "Poweroffing by starting poweroff.target caused by {}",
                     reason
                 );
-                if self.start_unit("poweroff.target").is_err() {
+                if self.start_unit("poweroff.target", false).is_err() {
                     log::error!("Failed to start poweroff.target.");
                 }
             }
@@ -644,7 +634,7 @@ impl UnitManager {
             }
             UnitEmergencyAction::Exit => {
                 log::info!("Exiting by starting exit.target caused by {}", reason);
-                if self.start_unit("exit.target").is_err() {
+                if self.start_unit("exit.target", false).is_err() {
                     log::error!("Failed to start exit.target.");
                 }
             }
@@ -703,35 +693,20 @@ impl UnitManager {
         false
     }
 
-    fn start_unit(&self, name: &str) -> Result<()> {
+    fn start_unit(&self, name: &str, is_manual: bool) -> Result<()> {
         let unit = match self.load_unitx(name) {
             None => {
                 return Err(Error::UnitActionENoent);
             }
             Some(v) => v,
         };
-        self.jm.exec(
-            &JobConf::new(&unit, JobKind::Start),
-            JobMode::Replace,
-            &mut JobAffect::new(false),
-        )?;
-        log::debug!("job exec success");
-        Ok(())
-    }
-
-    fn start_unit_manual(&self, name: &str) -> Result<()> {
-        let unit = match self.load_unitx(name) {
-            None => {
-                return Err(Error::UnitActionENoent);
-            }
-            Some(v) => v,
-        };
-        if unit
-            .get_config()
-            .config_data()
-            .borrow()
-            .Unit
-            .RefuseManualStart
+        if is_manual
+            && unit
+                .get_config()
+                .config_data()
+                .borrow()
+                .Unit
+                .RefuseManualStart
         {
             return Err(Error::UnitActionERefuseManualStart);
         }
@@ -740,6 +715,7 @@ impl UnitManager {
             JobMode::Replace,
             &mut JobAffect::new(false),
         )?;
+        log::debug!("job exec success");
         Ok(())
     }
 
@@ -763,8 +739,7 @@ impl UnitManager {
         self.db.get_unit_by_pid(pid)
     }
 
-    #[allow(dead_code)]
-    pub(self) fn stop_unit(&self, name: &str) -> Result<()> {
+    fn stop_unit(&self, name: &str, is_manual: bool) -> Result<()> {
         let unit = match self.load_unitx(name) {
             None => {
                 return Err(Error::UnitActionENoent);
@@ -772,38 +747,25 @@ impl UnitManager {
             Some(v) => v,
         };
 
-        self.jm.exec(
-            &JobConf::new(&unit, JobKind::Stop),
-            JobMode::Replace,
-            &mut JobAffect::new(false),
-        )?;
-        Ok(())
-    }
-
-    fn stop_unit_manual(&self, name: &str) -> Result<()> {
-        let unit = match self.load_unitx(name) {
-            None => {
-                return Err(Error::UnitActionENoent);
-            }
-            Some(v) => v,
-        };
-
-        if matches!(
-            unit.load_state(),
-            UnitLoadState::NotFound | UnitLoadState::Error | UnitLoadState::BadSetting
-        ) && unit.active_state() != UnitActiveState::UnitActive
+        if is_manual
+            && matches!(
+                unit.load_state(),
+                UnitLoadState::NotFound | UnitLoadState::Error | UnitLoadState::BadSetting
+            )
+            && unit.active_state() != UnitActiveState::UnitActive
         {
             return Err(Error::Other {
                 msg: format!("unit {} Not Found", unit.id()),
             });
         }
 
-        if unit
-            .get_config()
-            .config_data()
-            .borrow()
-            .Unit
-            .RefuseManualStop
+        if is_manual
+            && unit
+                .get_config()
+                .config_data()
+                .borrow()
+                .Unit
+                .RefuseManualStop
         {
             return Err(Error::UnitActionERefuseManualStop);
         }
@@ -828,20 +790,7 @@ impl UnitManager {
         }
     }
 
-    pub(self) fn restart_unit(&self, name: &str) -> Result<()> {
-        if let Some(unit) = self.load_unitx(name) {
-            self.jm.exec(
-                &JobConf::new(&unit, JobKind::Restart),
-                JobMode::Replace,
-                &mut JobAffect::new(false),
-            )?;
-            Ok(())
-        } else {
-            Err(Error::Internal)
-        }
-    }
-
-    pub(self) fn restart_unit_manual(&self, name: &str) -> Result<()> {
+    pub(self) fn restart_unit(&self, name: &str, is_manual: bool) -> Result<()> {
         let unit = match self.load_unitx(name) {
             None => {
                 return Err(Error::UnitActionENoent);
@@ -849,12 +798,13 @@ impl UnitManager {
             Some(v) => v,
         };
 
-        if unit
-            .get_config()
-            .config_data()
-            .borrow()
-            .Unit
-            .RefuseManualStop
+        if is_manual
+            && unit
+                .get_config()
+                .config_data()
+                .borrow()
+                .Unit
+                .RefuseManualStop
         {
             return Err(Error::UnitActionERefuseManualStop);
         }
@@ -1481,7 +1431,7 @@ mod tests {
     fn test_service_unit_start_conflicts() {
         let dm = init_dm_for_test();
         let conflict_unit_name = String::from("conflict.service");
-        let confilict_unit = dm.2.start_unit(&conflict_unit_name);
+        let confilict_unit = dm.2.start_unit(&conflict_unit_name, false);
 
         assert!(confilict_unit.is_ok());
     }

@@ -601,7 +601,11 @@ impl ServiceMng {
             return;
         }
 
-        if let Err(e) = self.comm.um().restart_unit(&self.comm.get_owner_id()) {
+        if let Err(e) = self
+            .comm
+            .um()
+            .restart_unit(&self.comm.get_owner_id(), false)
+        {
             log::debug!(
                 "failed to restart unit:{}, errno: {:?}",
                 &self.comm.get_owner_id(),

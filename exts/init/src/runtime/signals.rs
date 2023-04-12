@@ -162,9 +162,7 @@ impl Signals {
 
             let wait_status = match wait::waitid(id_flag, flags) {
                 Ok(status) => status,
-                Err(_) => {
-                    return;
-                }
+                Err(_) => return,
             };
 
             let si = match wait_status {

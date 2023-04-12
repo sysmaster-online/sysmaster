@@ -96,13 +96,13 @@ pub trait UmIf {
     fn relation_active_or_pending(&self, _name: &str) -> bool {
         false
     }
-    /// start the unit
-    fn start_unit(&self, _name: &str) -> Result<()> {
+    /// starting a unit by pushing it to job queue
+    fn unit_start_by_job(&self, _name: &str) -> Result<()> {
         Ok(())
     }
 
-    /// call the unit start function
-    fn unit_start(&self, _name: &str) -> Result<()> {
+    /// starting a unit by calling unit.start()
+    fn unit_start_directly(&self, _name: &str) -> Result<()> {
         Ok(())
     }
 
@@ -170,7 +170,7 @@ pub trait UmIf {
     }
 
     /// add restart job
-    fn restart_unit(&self, _unit_name: &str) -> Result<()> {
+    fn restart_unit(&self, _unit_name: &str, _is_manual: bool) -> Result<()> {
         Ok(())
     }
 

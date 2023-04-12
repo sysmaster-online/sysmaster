@@ -207,9 +207,7 @@ mod tests {
             for stream in fd.incoming() {
                 match stream {
                     Err(e) => panic!("failed: {e}"),
-                    Ok(_stream) => {
-                        return;
-                    }
+                    Ok(_stream) => return,
                 }
             }
         }
