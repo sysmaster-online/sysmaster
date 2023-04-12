@@ -109,6 +109,14 @@ impl ServicePid {
     pub(super) fn main_alive(&self) -> Result<bool> {
         self.data.borrow().main_alive()
     }
+
+    pub(super) fn control_pid_avail(&self) -> bool {
+        self.data.borrow().control_pid_avail()
+    }
+
+    pub(super) fn main_pid_avail(&self) -> bool {
+        self.data.borrow().main_pid_avail()
+    }
 }
 
 struct ServicePidData {
@@ -174,5 +182,13 @@ impl ServicePidData {
                 Ok(process_util::alive(self.main.unwrap()))
             }
         }
+    }
+
+    pub(self) fn control_pid_avail(&self) -> bool {
+        self.control.map_or(false, |_| true)
+    }
+
+    pub(self) fn main_pid_avail(&self) -> bool {
+        self.main.map_or(false, |_| true)
     }
 }
