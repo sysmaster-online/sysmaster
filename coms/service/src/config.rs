@@ -15,7 +15,7 @@ use super::comm::ServiceUnitComm;
 use super::rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
 use confique::Config;
 use std::cell::RefCell;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::rc::Rc;
 use sysmaster::error::*;
@@ -95,13 +95,8 @@ impl ServiceConfig {
         self.db_update();
     }
 
-    pub(super) fn environments(&self) -> Option<Vec<String>> {
-        self.data
-            .borrow()
-            .Service
-            .Environment
-            .as_ref()
-            .map(|v| v.iter().map(|v| v.to_string()).collect())
+    pub(super) fn environments(&self) -> Option<HashMap<String, String>> {
+        self.data.borrow().Service.Environment.clone()
     }
 
     pub(super) fn sockets(&self) -> Option<Vec<String>> {

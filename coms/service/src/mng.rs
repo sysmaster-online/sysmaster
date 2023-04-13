@@ -1335,6 +1335,8 @@ impl ServiceMng {
                         self.enter_running(res);
                     }
 
+                    ServiceState::Running => self.enter_running(res),
+
                     ServiceState::StartPost | ServiceState::Reload | ServiceState::Stop => {
                         if !self.pid.control_pid_avail() {
                             self.enter_stop(res);
@@ -1481,7 +1483,6 @@ impl ServiceMng {
                     }
                     self.enter_running(ServiceResult::Success);
                 }
-                ServiceState::Running => todo!(),
                 ServiceState::Reload => {
                     self.set_reload_result(res);
                     self.enter_running(res);
