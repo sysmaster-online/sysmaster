@@ -214,14 +214,8 @@ impl ServiceUnit {
         self.config.flush_timeout();
 
         if let Some(envs) = self.config.environments() {
-            for env in envs {
-                let content: Vec<&str> = env.split('=').map(|s| s.trim()).collect();
-                if content.len() != 2 {
-                    continue;
-                }
-
-                self.exec_ctx
-                    .insert_env(content[0].to_string(), content[1].to_string());
+            for (key, value) in envs {
+                self.exec_ctx.insert_env(key, value);
             }
         }
 

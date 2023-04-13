@@ -84,7 +84,9 @@ service服务的类型， 当前支持`simple`、`forking`、`oneshot`、`notify
 
 ## Environment
 
-配置类型为字符串， 当需要配置多个时以；号隔开， 每个配置项支持以`key=value`的形式。
+配置进程的环境变量， 采用toml内联表的格式， 如Environment = {var0="val0", var2="val1"};
+
+其中环境变量定义在花括号`{}`中， 多个键值对以`,`分割， value的值以双引号`""`包含。
 
 ## EnvironmentFile
 

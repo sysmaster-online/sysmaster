@@ -18,7 +18,7 @@ use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use std::str::FromStr;
 use sysmaster::error::*;
@@ -183,8 +183,7 @@ pub(super) struct SectionService {
     #[config(default = false)]
     pub RemainAfterExit: bool,
     pub NotifyAccess: Option<NotifyAccess>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub Environment: Option<Vec<String>>,
+    pub Environment: Option<HashMap<String, String>>,
     #[config(deserialize_with = KillMode::deserialize_with)]
     #[config(default = "none")]
     pub KillMode: KillMode,
