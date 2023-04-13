@@ -84,14 +84,14 @@ impl ReStation for Unit {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
-        self.base.db_map();
-        self.config.db_map();
-        self.cgroup.db_map();
-        self.load.db_map();
-        self.child.db_map();
+    fn db_map(&self, reload: bool) {
+        self.base.db_map(reload);
+        self.config.db_map(reload);
+        self.cgroup.db_map(reload);
+        self.load.db_map(reload);
+        self.child.db_map(reload);
 
-        self.sub.db_map();
+        self.sub.db_map(reload);
     }
 
     // reload: entry-only

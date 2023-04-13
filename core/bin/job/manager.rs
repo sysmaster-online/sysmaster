@@ -104,7 +104,7 @@ impl ReStation for JobManager {
     }
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, _reload: bool) {
         self.data.db_map();
     }
 

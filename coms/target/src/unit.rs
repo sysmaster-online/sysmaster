@@ -41,8 +41,8 @@ impl ReStation for Target {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
-        self.mng.db_map();
+    fn db_map(&self, reload: bool) {
+        self.mng.db_map(reload);
     }
 
     fn db_insert(&self) {

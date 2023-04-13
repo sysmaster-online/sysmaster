@@ -34,8 +34,8 @@ impl ReStation for UnitX {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
-        self.0.db_map();
+    fn db_map(&self, reload: bool) {
+        self.0.db_map(reload);
     }
 
     // reload: entry-only

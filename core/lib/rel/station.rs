@@ -78,15 +78,15 @@ impl ReliStation {
         }
     }
 
-    pub fn db_map(&self) {
+    pub fn db_map(&self, reload: bool) {
         // level 1
         for station in self.get_kind(ReStationKind::Level1).iter() {
-            station.db_map();
+            station.db_map(reload);
         }
 
         // level 2
         for station in self.get_kind(ReStationKind::Level2).iter() {
-            station.db_map();
+            station.db_map(reload);
         }
     }
 
@@ -163,7 +163,8 @@ pub trait ReStation {
 
     // data
     /// map data from database
-    fn db_map(&self) {}
+    /// If reload is true, determine whether the configuration needs to be reloaded based on the situation.
+    fn db_map(&self, _reload: bool) {}
     /// insert itself to database
     fn db_insert(&self) {}
     /// update itself to database

@@ -40,7 +40,10 @@ impl ReStation for UeLoad {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, reload: bool) {
+        if reload {
+            return;
+        }
         if let Some(load_state) = self.base.rentry_load_get() {
             *self.load_state.borrow_mut() = load_state;
         }

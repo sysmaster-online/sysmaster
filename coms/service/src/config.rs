@@ -38,7 +38,10 @@ impl ReStation for ServiceConfig {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, reload: bool) {
+        if reload {
+            return;
+        }
         if let Some(conf) = self.comm.rentry_conf_get() {
             self.data.replace(ServiceConfigData::new(conf));
         }

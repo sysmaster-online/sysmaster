@@ -73,7 +73,7 @@ impl ReStation for ServiceMng {
     // compensate: do nothing
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, _reload: bool) {
         if let Some((
             state,
             result,
@@ -124,7 +124,20 @@ impl ReStation for ServiceMng {
         );
     }
 
-    // reload: no external connections, no entry
+    // reload: no external connections
+    fn entry_coldplug(&self) {
+        self.rd.enable_timer(self.coldplug_timeout()).unwrap();
+        self.restart_watchdog();
+    }
+
+    fn entry_clear(&self) {
+        self.unwatch_pid_file();
+
+        self.stop_watchdog();
+
+        let events = self.comm.um().events();
+        events.del_source(self.rd.timer()).unwrap();
+    }
 }
 
 impl ServiceMng {
@@ -1083,6 +1096,8 @@ impl ServiceMng {
             Level::Debug,
             &format!("unwatch pid file {}", self.rd.path_inotify()),
         );
+        let events = self.comm.um().events();
+        events.del_source(self.rd.path_inotify()).unwrap();
         self.rd.path_inotify().unwatch();
     }
 
@@ -1230,6 +1245,38 @@ impl ServiceMng {
 
     fn log(&self, level: Level, msg: &str) {
         self.comm.log(level, msg);
+    }
+
+    pub(self) fn coldplug_timeout(&self) -> u64 {
+        match self.state() {
+            ServiceState::Condition
+            | ServiceState::StartPre
+            | ServiceState::Start
+            | ServiceState::StartPost
+            | ServiceState::Reload => self.config.config_data().borrow().Service.TimeoutStartSec,
+
+            ServiceState::Running => 0, // todo => TimeoutMaxSec,
+
+            ServiceState::Stop
+            | ServiceState::StopSigterm
+            | ServiceState::StopSigkill
+            | ServiceState::StopPost
+            | ServiceState::FinalSigterm
+            | ServiceState::FinalSigkill => {
+                self.config.config_data().borrow().Service.TimeoutStopSec
+            }
+
+            ServiceState::StopWatchdog | ServiceState::FinalWatchdog => {
+                // todo => TimeoutAbortSec ? TimeoutAbortSec : TimeoutStopSec,
+                self.config.config_data().borrow().Service.TimeoutStopSec
+            }
+
+            ServiceState::AutoRestart => self.config.config_data().borrow().Service.RestartSec,
+
+            ServiceState::Cleaning => todo!(), // TimeoutCleanSec,
+
+            _ => u64::MAX,
+        }
     }
 }
 

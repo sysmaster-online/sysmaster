@@ -43,8 +43,8 @@ impl ReStation for UnitRT {
     }
 
     // data: special insert
-    fn db_map(&self) {
-        self.data.db_map();
+    fn db_map(&self, reload: bool) {
+        self.data.db_map(reload);
     }
 
     // reload
@@ -221,18 +221,20 @@ impl UnitRTData {
         self.target_dep_queue.borrow_mut().clear();
     }
 
-    pub(self) fn db_map(&self) {
+    pub(self) fn db_map(&self, reload: bool) {
         for unit_id in self.rentry.pps_keys().iter() {
-            let load_mask = UnitRePps::QUEUE_LOAD;
-            if self.rentry.pps_contains(unit_id, load_mask) {
-                let unit = self.db.units_get(unit_id).unwrap();
-                self.push_load_queue(unit);
-            }
+            if !reload {
+                let load_mask = UnitRePps::QUEUE_LOAD;
+                if self.rentry.pps_contains(unit_id, load_mask) {
+                    let unit = self.db.units_get(unit_id).unwrap();
+                    self.push_load_queue(unit);
+                }
 
-            let tardeps_mask = UnitRePps::QUEUE_TARGET_DEPS;
-            if self.rentry.pps_contains(unit_id, tardeps_mask) {
-                let unit = self.db.units_get(unit_id).unwrap();
-                self.push_target_dep_queue(unit);
+                let tardeps_mask = UnitRePps::QUEUE_TARGET_DEPS;
+                if self.rentry.pps_contains(unit_id, tardeps_mask) {
+                    let unit = self.db.units_get(unit_id).unwrap();
+                    self.push_target_dep_queue(unit);
+                }
             }
         }
     }

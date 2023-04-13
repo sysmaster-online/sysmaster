@@ -100,6 +100,15 @@ impl UnitLoadData {
     }
 
     pub(self) fn prepare_unit(&self, name: &str) -> Option<Rc<UnitX>> {
+        if let Some(u) = self.db.units_get(name) {
+            if u.load_state() != UnitLoadState::NotFound {
+                return Some(Rc::clone(&u));
+            } else {
+                self.rt.push_load_queue(Rc::clone(&u));
+                return Some(Rc::clone(&u));
+            }
+        }
+
         match self.try_new_unit(name) {
             Some(unit) => {
                 self.db.units_insert(name.to_string(), Rc::clone(&unit));
@@ -126,13 +135,6 @@ impl UnitLoadData {
     }
 
     pub(self) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-        if let Some(u) = self.db.units_get(name) {
-            if u.load_state() != UnitLoadState::NotFound {
-                return Some(Rc::clone(&u));
-            } else {
-                self.db.unit_remove(name);
-            }
-        }
         self.prepare_unit(name).map(|u| {
             log::info!("begin dispatch unit in load queue");
             self.rt.dispatch_load_queue();

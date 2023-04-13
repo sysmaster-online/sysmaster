@@ -85,7 +85,10 @@ impl ReStation for SocketConfig {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, reload: bool) {
+        if reload {
+            return;
+        }
         if let Some((data, service)) = self.comm.rentry_conf_get() {
             // SocketConfigData
             self.data.replace(SocketConfigData::new(data));

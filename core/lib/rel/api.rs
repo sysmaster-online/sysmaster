@@ -142,14 +142,15 @@ impl Reliability {
     }
 
     /// [process reentrant] recover the data
-    pub fn recover(&self) {
+    /// if reload is true, only map result class parameters.
+    pub fn recover(&self, reload: bool) {
         // ignore last's input
         self.last.ignore_set(true);
 
         self.history.import();
         self.input_rebuild();
         self.db_compensate();
-        self.db_map();
+        self.db_map(reload);
         self.make_consistent();
 
         // restore last's ignore
@@ -280,11 +281,13 @@ impl Reliability {
         self.history.commit();
     }
 
-    fn db_map(&self) {
+    /// map data from database
+    /// If reload is true, determine whether the configuration needs to be reloaded based on the situation.
+    fn db_map(&self, reload: bool) {
         // ignore history's input
         self.history.ignore_set(true);
 
-        self.station.db_map();
+        self.station.db_map(reload);
 
         // restore history's ignore
         self.history.ignore_set(false);

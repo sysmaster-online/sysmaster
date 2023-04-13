@@ -76,8 +76,10 @@ impl ReStation for SocketMng {
     // compensate: do nothing
 
     // data
-    fn db_map(&self) {
-        self.build_ports();
+    fn db_map(&self, reload: bool) {
+        if !reload {
+            self.build_ports();
+        }
         self.data.db_map();
     }
 
@@ -200,12 +202,13 @@ impl SocketMngData {
     }
 
     fn entry_clear(&self) {
-        self.unwatch_fds();
-        // self.unwatch_pid_file: todo!()
+        self.close_fds();
     }
 
     fn entry_coldplug(&self) {
-        self.watch_fds();
+        if self.state() != SocketState::Listening {
+            self.watch_fds();
+        }
     }
 
     pub(self) fn start_check(&self) -> Result<bool> {
@@ -715,8 +718,10 @@ impl SocketMngData {
         assert_eq!(rports.len(), self.ports().len());
 
         for (p_type, listen, fd) in rports.iter() {
-            let port = self.ports_find(*p_type, listen).unwrap();
-            port.set_fd(self.comm.reli().fd_take(*fd));
+            match self.ports_find(*p_type, listen) {
+                Some(port) => port.set_fd(self.comm.reli().fd_take(*fd)),
+                None => log::debug!("Not find {:?}:{:?}", *p_type, listen),
+            }
         }
     }
 
@@ -911,7 +916,7 @@ impl SocketMngPort {
                 msg: "accept err".to_string(),
             })?;
 
-            self.port.apply_sock_opt(afd)
+            self.port.apply_sock_opt(afd);
         }
 
         self.mng().enter_running(afd);

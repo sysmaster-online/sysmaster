@@ -31,12 +31,14 @@ mod utils;
 
 #[macro_use]
 extern crate lazy_static;
+extern crate clap;
 use crate::keep_alive::KeepAlive;
 use crate::manager::config::ManagerConfig;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
 use basic::logger::{self};
 use basic::process_util;
+use clap::Parser;
 use libc::{c_int, getppid, prctl, PR_SET_CHILD_SUBREAPER};
 use log::{self};
 use nix::sys::resource::{self, Resource};
@@ -52,12 +54,25 @@ use sysmaster::rel;
 const MANAGER_SIG_OFFSET: i32 = 7;
 const SIG_SWITCH_ROOT: i32 = 10;
 
+/// parse program arguments
+#[derive(Parser, Debug)]
+#[clap(author, version, about)]
+struct Args {
+    #[clap(long)]
+    /// Reload the configuration.
+    deserialize: bool,
+}
+
 fn main() -> Result<()> {
+    //------------------------Code placed at the top-----------------------------
     // The registration signal is at the beginning and has the highest priority!
-    register_reexe_signal();
+    register_reexe_signal(true);
     install_switch_root_handler();
     // Connect init.
     KeepAlive::init();
+    //---------------------------------------------------------------------------
+
+    let args = Args::parse();
 
     let manager_config = Rc::new(ManagerConfig::new(None));
     let log_file = if manager_config.LogFile.is_empty() {
@@ -92,14 +107,18 @@ fn main() -> Result<()> {
 
     // enable clear, mutex with install_crash_handler
     if !switch {
-        manager.debug_clear_restore();
+        if !args.deserialize {
+            manager.debug_clear_restore();
+        }
+        // if switch is false unregister init's reexec signal.
+        register_reexe_signal(false);
         log::info!("debug: clear data restored.");
     }
 
     manager.setup_cgroup()?;
 
     // startup
-    manager.startup()?;
+    manager.startup(args.deserialize)?;
 
     // main loop
     let ret = manager.main_loop();
@@ -111,7 +130,7 @@ fn main() -> Result<()> {
     // re-exec
     if reexec {
         let args: Vec<String> = env::args().collect();
-        do_reexecute(&args);
+        do_reexecute(&args, true);
     }
 
     Ok(())
@@ -141,7 +160,7 @@ fn set_child_reaper() {
     }
 }
 
-fn do_reexecute(args: &Vec<String>) {
+fn do_reexecute(args: &Vec<String>, reload: bool) {
     let args_size = args.len().max(MANAGER_ARGS_SIZE_MAX);
 
     let path;
@@ -153,6 +172,18 @@ fn do_reexecute(args: &Vec<String>) {
         if args.len() >= 2 {
             argv = args[1..].to_vec();
         }
+    }
+
+    // Remove '--deserialize' from the previous parameter first, as this may be a fault recovery start.
+    for index in argv.iter().enumerate() {
+        if index.1 == "--deserialize" {
+            argv.remove(index.0);
+            break;
+        }
+    }
+
+    if reload {
+        argv.push("--deserialize".to_string());
     }
 
     assert!(argv.len() <= args_size);
@@ -195,7 +226,7 @@ extern "C" fn crash(signo: c_int) {
     let _signal = Signal::try_from(signo).unwrap(); // debug
 
     let args: Vec<String> = env::args().collect();
-    do_reexecute(&args);
+    do_reexecute(&args, false);
 }
 
 fn execarg_build_default() -> (String, Vec<String>) {
@@ -214,15 +245,22 @@ extern "C" fn crash_reexec(_signo: c_int, siginfo: *mut libc::siginfo_t, _con: *
     unsafe {
         if (*siginfo).si_pid() == getppid() {
             let args: Vec<String> = env::args().collect();
-            do_reexecute(&args);
+            do_reexecute(&args, false);
         }
     };
 }
 
-fn register_reexe_signal() {
+extern "C" fn crash_none(_signo: c_int, _siginfo: *mut libc::siginfo_t, _con: *mut libc::c_void) {
+    // nothing to do.
+}
+
+fn register_reexe_signal(enable: bool) {
     let manager_signal: signal::Signal =
         unsafe { std::mem::transmute(libc::SIGRTMIN() + MANAGER_SIG_OFFSET) };
-    let handler = SigHandler::SigAction(crash_reexec);
+    let handler = match enable {
+        true => SigHandler::SigAction(crash_reexec),
+        false => SigHandler::SigAction(crash_none),
+    };
     let flags = SaFlags::SA_NODEFER;
     let action = SigAction::new(handler, flags, SigSet::empty());
 
