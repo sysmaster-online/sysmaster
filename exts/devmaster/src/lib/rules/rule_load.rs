@@ -33,7 +33,7 @@ impl Rules {
     pub fn new(dirs: &[&str]) -> Rules {
         let mut rules = Rules {
             files: None,
-            current_file: None,
+            files_tail: None,
         };
 
         for dir in dirs {
@@ -82,14 +82,14 @@ impl Rules {
 
     /// add the rule file into
     pub(crate) fn add_file(&mut self, file: Arc<RwLock<RuleFile>>) {
-        if self.current_file.is_none() {
+        if self.files_tail.is_none() {
             self.files = Some(file.clone());
         } else {
-            self.current_file.as_mut().unwrap().write().unwrap().next = Some(file.clone());
-            file.write().unwrap().prev = self.current_file.clone();
+            self.files_tail.as_mut().unwrap().write().unwrap().next = Some(file.clone());
+            file.write().unwrap().prev = self.files_tail.clone();
         }
 
-        self.current_file = Some(file);
+        self.files_tail = Some(file);
     }
 }
 
@@ -104,7 +104,7 @@ impl RuleFile {
         let rule_file = Arc::<RwLock<RuleFile>>::new(RwLock::<RuleFile>::new(RuleFile {
             file_name,
             lines: None,
-            current_line: None,
+            lines_tail: None,
             prev: None,
             next: None,
         }));
@@ -155,11 +155,11 @@ impl RuleFile {
         if self.lines.is_none() {
             self.lines = Some(line.clone());
         } else {
-            self.current_line.as_mut().unwrap().write().unwrap().next = Some(line.clone());
-            line.write().unwrap().prev = self.current_line.clone();
+            self.lines_tail.as_mut().unwrap().write().unwrap().next = Some(line.clone());
+            line.write().unwrap().prev = self.lines_tail.clone();
         }
 
-        self.current_line = Some(line);
+        self.lines_tail = Some(line);
     }
 }
 
@@ -181,8 +181,12 @@ impl RuleLine {
             line: line.clone(),
             line_number,
 
+            label: None,
+            goto_label: None,
+            goto_line: None,
+
             tokens: None,
-            current_token: None,
+            tokens_tail: None,
 
             file: Arc::downgrade(&file),
 
@@ -191,7 +195,7 @@ impl RuleLine {
         };
 
         if !RE_LINE.is_match(&line) {
-            return Err(Error::RulesLoaderError {
+            return Err(Error::RulesLoadError {
                 msg: "Invalid rule line",
             });
         }
@@ -232,11 +236,11 @@ value = {}",
         if self.tokens.is_none() {
             self.tokens = Some(rule_token.clone());
         } else {
-            self.current_token.as_mut().unwrap().write().unwrap().next = Some(rule_token.clone());
-            rule_token.write().unwrap().prev = self.current_token.clone();
+            self.tokens_tail.as_mut().unwrap().write().unwrap().next = Some(rule_token.clone());
+            rule_token.write().unwrap().prev = self.tokens_tail.clone();
         }
 
-        self.current_token = Some(rule_token);
+        self.tokens_tail = Some(rule_token);
     }
 }
 
@@ -248,12 +252,12 @@ impl RuleToken {
         match key.as_str() {
             "ACTION" => {
                 if attr.is_some() {
-                    return Err(Error::RulesLoaderError {
+                    return Err(Error::RulesLoadError {
                         msg: "key ACTION can not carry attribute.",
                     });
                 }
                 if !op_is_match {
-                    return Err(Error::RulesLoaderError {
+                    return Err(Error::RulesLoadError {
                         msg: "key ACTION can only take match or unmatch operator.",
                     });
                 }
@@ -269,7 +273,7 @@ impl RuleToken {
             }
             "SYMLINK" => {
                 if attr.is_some() {
-                    return Err(Error::RulesLoaderError {
+                    return Err(Error::RulesLoadError {
                         msg: "key SYMLINK can not carry attribute.",
                     });
                 }

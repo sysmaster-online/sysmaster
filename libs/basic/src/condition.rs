@@ -28,7 +28,6 @@ use std::{
     ffi::CString,
     fs::File,
     io::{BufRead, BufReader},
-    os::unix::prelude::AsRawFd,
     path::Path,
     str::FromStr,
     string::String,
@@ -303,7 +302,7 @@ impl Condition {
             }
             Ok(v) => v,
         };
-        let fd = file.as_raw_fd();
+        let fd = std::os::fd::AsRawFd::as_raw_fd(&file);
         let path_name = CString::new(self.params.as_str()).unwrap();
         let mut statxbuf: statx = unsafe { std::mem::zeroed() };
         unsafe {

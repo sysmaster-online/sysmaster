@@ -51,8 +51,17 @@ pub enum Error {
 
     /// Error encountered in rules loader
     #[snafu(display("Rules loader: {}", msg))]
-    RulesLoaderError {
+    RulesLoadError {
         /// message
         msg: &'static str,
+    },
+
+    /// Error encountered in rules loader
+    #[snafu(display("Rules loader: {}", msg))]
+    RulesExecuteError {
+        /// message
+        msg: &'static str,
+        /// error number
+        errno: nix::errno::Errno,
     },
 }

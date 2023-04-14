@@ -20,7 +20,9 @@ use std::{
     sync::{Arc, RwLock, Weak},
 };
 
+pub mod rule_execute;
 pub mod rule_load;
+pub mod utils;
 
 /// encapsulate all rule files
 #[derive(Debug, Clone)]
@@ -30,7 +32,7 @@ pub struct Rules {
     files: Option<Arc<RwLock<RuleFile>>>,
 
     /// current rule file
-    current_file: Option<Arc<RwLock<RuleFile>>>,
+    files_tail: Option<Arc<RwLock<RuleFile>>>,
 }
 
 /// rule file is the basic unit to process the device
@@ -43,7 +45,7 @@ pub struct RuleFile {
     /// keeps in order of line number
     lines: Option<Arc<RwLock<RuleLine>>>,
     /// current rule line
-    current_line: Option<Arc<RwLock<RuleLine>>>,
+    lines_tail: Option<Arc<RwLock<RuleLine>>>,
 
     /// previous rule file
     prev: Option<Arc<RwLock<RuleFile>>>,
@@ -55,16 +57,24 @@ pub struct RuleFile {
 /// the regex is as following:
 ///     (<token>\s*,?\s*)+
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RuleLine {
     /// the content of the rule line
     line: String,
     /// the line number in its rule file
     line_number: u32,
 
+    /// whether this line has label token
+    label: Option<String>,
+    /// whether this line has goto token
+    goto_label: Option<String>,
+    /// which line should be went to
+    goto_line: Option<Arc<RwLock<RuleLine>>>,
+
     /// the linked list to contain all tokens in the rule line
     tokens: Option<Arc<RwLock<RuleToken>>>,
     /// current rule token
-    current_token: Option<Arc<RwLock<RuleToken>>>,
+    tokens_tail: Option<Arc<RwLock<RuleToken>>>,
 
     /// the rule file to contain this line
     file: Weak<RwLock<RuleFile>>,
@@ -95,7 +105,7 @@ pub struct RuleToken {
 
 /// token type
 #[allow(missing_docs, dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub(crate) enum TokenType {
     // the left value should take match == or unmatch != operator
     /// key = "ACTION", operator = "==|!="
@@ -187,7 +197,7 @@ impl FromStr for OperatorType {
             "+=" => Ok(OperatorType::Add),
             "-=" => Ok(OperatorType::Remove),
             ":=" => Ok(OperatorType::AssignFinal),
-            _ => Err(Error::RulesLoaderError {
+            _ => Err(Error::RulesLoadError {
                 msg: "Invalid operator",
             }),
         }
