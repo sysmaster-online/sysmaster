@@ -62,12 +62,12 @@ impl UnitDb {
         }
     }
 
-    pub(super) fn db_map_excl_units(&self) {
+    pub(super) fn db_map_excl_units(&self, reload: bool) {
         // dep
-        self.dep.db_map();
+        self.dep.db_map(reload);
 
         // child
-        self.child.db_map();
+        self.child.db_map(reload);
     }
 
     pub fn units_insert(&self, name: String, unit: Rc<UnitX>) -> Option<Rc<UnitX>> {

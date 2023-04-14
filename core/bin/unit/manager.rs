@@ -1124,28 +1124,33 @@ impl ReStation for UnitManager {
     }
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, reload: bool) {
         // unit_datastore(with unit_entry)
         /* unit-sets with unit_entry */
         for unit_id in self.rentry.base_keys().iter() {
-            let unit = self.load.try_new_unit(unit_id).unwrap();
-            unit.db_map();
-            self.db.units_insert(unit_id.clone(), unit);
+            if reload {
+                let unit = self.load.load_unit(unit_id).unwrap();
+                unit.db_map(reload);
+            } else {
+                let unit = self.load.try_new_unit(unit_id).unwrap();
+                unit.db_map(reload);
+                self.db.units_insert(unit_id.clone(), unit);
+            }
         }
         /* others: unit-dep and unit-child */
-        self.db.db_map_excl_units();
+        self.db.db_map_excl_units(reload);
 
         // rt
-        self.rt.db_map();
+        self.rt.db_map(reload);
 
         // job
-        self.jm.db_map();
+        self.jm.db_map(reload);
 
         // notify
-        self.notify.db_map();
+        self.notify.db_map(reload);
 
         // sub-manager
-        self.sms.db_map();
+        self.sms.db_map(reload);
     }
 
     // reload
@@ -1234,9 +1239,9 @@ mod unit_submanager {
             }
         }
 
-        pub(super) fn db_map(&self) {
+        pub(super) fn db_map(&self, reload: bool) {
             for (_, sub) in self.db.borrow().iter() {
-                sub.db_map();
+                sub.db_map(reload);
             }
         }
 

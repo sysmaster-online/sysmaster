@@ -32,7 +32,10 @@ impl ReStation for UnitDep {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, reload: bool) {
+        if reload {
+            return;
+        }
         self.sub.data.borrow_mut().db_map();
     }
 

@@ -33,7 +33,7 @@ impl ReStation for UnitChild {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, _reload: bool) {
         self.data.db_map(&self.units);
     }
 
@@ -113,7 +113,13 @@ impl UnitChildData {
 
     pub(self) fn db_map(&self, units: &UnitSets) {
         for unit_id in self.rentry.child_keys().iter() {
-            let unit = units.get(unit_id).unwrap();
+            let unit = match units.get(unit_id) {
+                Some(u) => u,
+                None => {
+                    log::warn!("Failed to get unit:{:?}", unit_id);
+                    continue;
+                }
+            };
             for pid in self.rentry.child_get(unit_id).iter() {
                 self.add_watch_pid(Rc::clone(&unit), *pid);
             }

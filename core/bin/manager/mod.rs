@@ -254,15 +254,21 @@ impl Manager {
     }
 
     /// start up
-    pub fn startup(&self) -> Result<i32> {
+    pub fn startup(&self, reload: bool) -> Result<i32> {
         self.reli.debug_clear();
 
         let restore = self.reli.enable();
-        log::info!("startup with restore[{}]...", restore);
+        log::info!("startup with restore[{}] reload[{}]", restore, reload);
 
         // recover
-        if restore {
-            self.reli.recover();
+        if reload {
+            // sctl daemon-reexec needs to reload the configuration.
+            self.reli.recover(true);
+        } else if restore {
+            // Fault recovery or process 1 execution does not require reloading the configuration.
+            self.reli.recover(false);
+        } else {
+            // Do nothing during the initialization phase or when interrupted by process one before restore is true.
         }
 
         // preset file before add default job
@@ -338,7 +344,7 @@ impl Manager {
         self.um.entry_clear();
 
         // recover entry
-        self.reli.recover();
+        self.reli.recover(true);
 
         // rebuild external connections
         /* register entry's external events */
@@ -553,7 +559,7 @@ mod tests {
         manager.reli.data_clear(); // clear all data
 
         // startup
-        let ret = manager.startup();
+        let ret = manager.startup(false);
         assert!(ret.is_ok());
     }
 }

@@ -25,7 +25,7 @@ impl ReStation for UeChild {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, _reload: bool) {
         self.data.borrow_mut().db_map();
     }
 

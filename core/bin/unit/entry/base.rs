@@ -30,7 +30,10 @@ impl ReStation for UeBase {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, reload: bool) {
+        if reload {
+            return;
+        }
         let unit_type = self.rentry.base_get(&self.id).unwrap();
         assert_eq!(self.unit_type, unit_type);
     }

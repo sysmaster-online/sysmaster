@@ -312,13 +312,10 @@ impl Condition {
              * symlink unconditionally*/
             statx(fd, path_name.as_ptr(), 0, 0, &mut statxbuf);
             /* The mask is supported and is set */
-            if statxbuf.stx_attributes_mask & (STATX_ATTR_MOUNT_ROOT as u64) != 0
-                && statxbuf.stx_attributes & (STATX_ATTR_MOUNT_ROOT as u64) != 0
-            {
-                1
-            } else {
-                0
-            }
+            i8::from(
+                statxbuf.stx_attributes_mask & (STATX_ATTR_MOUNT_ROOT as u64) != 0
+                    && statxbuf.stx_attributes & (STATX_ATTR_MOUNT_ROOT as u64) != 0,
+            )
         }
     }
 

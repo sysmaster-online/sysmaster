@@ -261,7 +261,7 @@ impl Job {
 
     pub(super) fn clear(&self) {
         // release external connection, like: timer, ...
-        // do nothing now
+        self.events.del_source(self.get_timer()).unwrap();
     }
 
     pub(super) fn get_timer(&self) -> Rc<JobTimer> {
@@ -298,12 +298,22 @@ impl Job {
 
     pub(super) fn coldplug_trigger(&self) {
         // rebuild external connections, like: timer, ...
-        // do nothing now
+        self.events.del_source(self.get_timer()).unwrap();
+
+        self.events.add_source(self.get_timer()).unwrap();
+        self.events
+            .set_enabled(self.get_timer(), EventState::OneShot)
+            .unwrap();
     }
 
     pub(super) fn coldplug_suspend(&self) {
         // rebuild external connections, like: timer, ...
-        // do nothing now
+        self.events.del_source(self.get_timer()).unwrap();
+
+        self.events.add_source(self.get_timer()).unwrap();
+        self.events
+            .set_enabled(self.get_timer(), EventState::OneShot)
+            .unwrap();
     }
 
     pub(super) fn init_attr(&self, mode: JobMode) {

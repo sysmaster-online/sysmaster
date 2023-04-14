@@ -38,7 +38,7 @@ impl ReStation for TargetMng {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, _reload: bool) {
         if let Some(state) = self.comm.rentry_mng_get() {
             *self.state.borrow_mut() = state;
         }

@@ -48,9 +48,9 @@ impl ReStation for ServiceUnit {
     // compensate: do nothing
 
     // data
-    fn db_map(&self) {
-        self.config.db_map();
-        self.mng.db_map();
+    fn db_map(&self, reload: bool) {
+        self.config.db_map(reload);
+        self.mng.db_map(reload);
     }
 
     fn db_insert(&self) {

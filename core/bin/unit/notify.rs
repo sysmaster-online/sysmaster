@@ -60,7 +60,7 @@ impl ReStation for NotifyManager {
     }
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, _reload: bool) {
         self.notify.db_map();
     }
 

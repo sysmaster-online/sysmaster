@@ -98,7 +98,10 @@ impl ReStation for UeConfig {
     // no input, no compensate
 
     // data
-    fn db_map(&self) {
+    fn db_map(&self, reload: bool) {
+        if reload {
+            return;
+        }
         if let Some((unit, install)) = self.base.rentry_conf_get() {
             let conf = UeConfigData::new(unit, install);
             *self.data.borrow_mut() = conf;
