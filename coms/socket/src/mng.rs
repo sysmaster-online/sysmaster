@@ -23,8 +23,11 @@ use super::{
 use basic::IN_SET;
 use event::EventState;
 use event::{EventType, Events, Source};
-use nix::libc::{self};
 use nix::sys::wait::WaitStatus;
+use nix::{
+    libc::{self},
+    unistd::unlink,
+};
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
 use std::{cell::RefCell, collections::VecDeque};
@@ -304,35 +307,28 @@ impl SocketMngData {
         self.pid.unwatch_control();
 
         self.control_command_fill(SocketCommand::StartPre);
-        match self.control_command_pop() {
-            Some(cmd) => {
-                match self.spawn.start_socket(&cmd) {
-                    Ok(pid) => self.pid.set_control(pid),
-                    #[allow(clippy::unit_arg)]
-                    Err(e) => {
-                        self.comm.owner().map_or_else(
-                            || {
-                                log::error!(
-                                "Failed to run start pre service, unit name is None,error: {:?}",
-                                e
-                            );
-                            },
-                            |u| {
-                                log::error!(
-                                    "Failed to run start pre service: {}, error: {:?}",
-                                    u.id(),
-                                    e
-                                );
-                            },
-                        );
-                        self.enter_dead(SocketResult::FailureResources);
-                        return;
-                    }
-                }
-                self.set_state(SocketState::StartPre);
+        let cmd = match self.control_command_pop() {
+            None => {
+                self.enter_start_chown();
+                return;
             }
-            None => self.enter_start_chown(),
-        }
+            Some(v) => v,
+        };
+
+        let pid = match self.spawn.start_socket(&cmd) {
+            Err(e) => {
+                let unit_name = self
+                    .comm
+                    .owner()
+                    .map_or("null".to_string(), |u| u.id().to_string());
+                log::error!("Failed to run ExecStartPre for unit {}: {:?}", unit_name, e);
+                self.enter_dead(SocketResult::FailureResources);
+                return;
+            }
+            Ok(v) => v,
+        };
+        self.pid.set_control(pid);
+        self.set_state(SocketState::StartPre);
     }
 
     fn enter_start_chown(&self) {
@@ -350,24 +346,31 @@ impl SocketMngData {
         self.pid.unwatch_control();
         self.control_command_fill(SocketCommand::StartPost);
 
-        match self.control_command_pop() {
-            Some(cmd) => {
-                match self.spawn.start_socket(&cmd) {
-                    Ok(pid) => self.pid.set_control(pid),
-                    Err(_e) => {
-                        if let Some(u) = self.comm.owner() {
-                            log::error!("Failed to run start post service: {}", u.id());
-                        } else {
-                            log::error!("Failed to run start post service unit id is None");
-                        }
-                        self.enter_stop_pre(SocketResult::FailureResources);
-                        return;
-                    }
-                }
-                self.set_state(SocketState::StartPost);
+        let cmd = match self.control_command_pop() {
+            None => {
+                self.enter_listening();
+                return;
             }
-            None => self.enter_listening(),
+            Some(v) => v,
+        };
+
+        match self.spawn.start_socket(&cmd) {
+            Ok(pid) => self.pid.set_control(pid),
+            Err(e) => {
+                let unit_name = self
+                    .comm
+                    .owner()
+                    .map_or("null".to_string(), |u| u.id().to_string());
+                log::error!(
+                    "Failed to run ExecStartPost for unit {}: {:?}",
+                    unit_name,
+                    e
+                );
+                self.enter_stop_pre(SocketResult::FailureResources);
+                return;
+            }
         }
+        self.set_state(SocketState::StartPost);
     }
 
     fn enter_listening(&self) {
@@ -576,9 +579,25 @@ impl SocketMngData {
             events.del_source(source).unwrap();
         }
 
-        // close
         for port in self.ports().iter() {
             port.close(true);
+        }
+
+        if !self.config.config_data().borrow().Socket.RemoveOnStop {
+            return;
+        }
+
+        // remove only when RemoveOnStop is true
+        for port in self.ports().iter() {
+            port.unlink();
+        }
+        // remove symlinks
+        let config = self.config.config_data();
+        if config.borrow().Socket.Symlinks.is_none() {
+            return;
+        }
+        for symlink in config.borrow().Socket.Symlinks.as_ref().unwrap() {
+            let _ = unlink(symlink.as_str());
         }
     }
 

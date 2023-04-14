@@ -43,6 +43,7 @@ pub(super) struct SectionSocket {
     pub ExecStopPre: Option<VecDeque<ExecCommand>>,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
     pub ExecStopPost: Option<VecDeque<ExecCommand>>,
+
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub ListenStream: Option<Vec<String>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
@@ -51,22 +52,28 @@ pub(super) struct SectionSocket {
     pub ListenNetlink: Option<Vec<String>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub ListenSequentialPacket: Option<Vec<String>>,
-    pub PassPacketInfo: Option<bool>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    pub ListenFIFO: Option<Vec<String>>,
+
     #[config(default = false)]
     pub Accept: bool,
     pub Service: Option<String>,
     pub ReceiveBuffer: Option<u64>,
     pub SendBuffer: Option<u64>,
     pub PassCredentials: Option<bool>,
+    pub PassPacketInfo: Option<bool>,
     pub KeepAlive: Option<bool>,
     pub KeepAliveTimeSec: Option<u32>,
     pub KeepAliveIntervalSec: Option<u32>,
     pub KeepAliveProbes: Option<u32>,
     pub Broadcast: Option<bool>,
+    #[config(default = false)]
+    pub RemoveOnStop: bool,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub Symlinks: Option<Vec<String>>,
     pub PassSecurity: Option<bool>,
     pub SocketMode: Option<u32>,
+
     #[config(deserialize_with = KillMode::deserialize_with)]
     #[config(default = "none")]
     pub KillMode: KillMode,

@@ -1,6 +1,5 @@
 # Socket 配置
 
-
 ## ExecStartPre、ExecStartPost、ExecStopPre、ExecStopPost
 
 服务在不同的启动阶段执行的命令。配置多条命令时以；号隔开。
@@ -47,3 +46,17 @@ SOCK_SEQPACKET只有在Unix套接子时才有效。
 ## SocketMode
 
 设置文件的访问模式， 仅unix套接字文件时有效。
+
+## Symlinks
+
+* 类型：字符串
+
+为`AF_UNIX`、`FIFO`类型的socket创建软链接，仅支持配置为绝对路径。允许用户配置`;`隔开的多个路径。
+
+**注意：** 如果使用该配置，必须确保有且仅有一个`AF_UNXI`或`FIFO`的socket路径，否则socket虽然会启动，但软链接并不会创建出来。
+
+## RemoveOnStop
+
+* 类型：布尔值
+
+配置在socket单元停止后是否删除建立的socket文件，以及由`Symlinks`配置生成的软链接。配置为`true`时，删除；配置为`false`时，不删除。默认为`false`。

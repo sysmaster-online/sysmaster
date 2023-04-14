@@ -197,77 +197,55 @@ impl SocketConfig {
 
     fn parse_port(&self) -> Result<()> {
         log::debug!("begin to parse socket section");
-
-        let config = &self.data;
-        self.parse_listen_socket(ListeningItem::Stream, config.clone())?;
-        self.parse_listen_socket(ListeningItem::Datagram, config.clone())?;
-        self.parse_listen_socket(ListeningItem::Netlink, config.clone())?;
-
-        self.parse_listen_socket(ListeningItem::SequentialPacket, config.clone())?;
-
-        Ok(())
-    }
-
-    fn parse_listen_socket(
-        &self,
-        item: ListeningItem,
-        socket_conf: Rc<RefCell<SocketConfigData>>,
-    ) -> Result<()> {
-        // let sock_addr
-        match item {
-            ListeningItem::Stream => {
-                if let Some(listen_stream) = socket_conf.borrow().listen_stream() {
-                    self.parse_sockets(listen_stream, SockType::Stream)?;
-                };
-            }
-            ListeningItem::Datagram => {
-                if let Some(listen_datagram) = socket_conf.borrow().listen_datagram() {
-                    self.parse_sockets(listen_datagram, SockType::Datagram)?;
-                }
-            }
-            ListeningItem::Netlink => {
-                if let Some(listen_netlink) = socket_conf.borrow().listen_netlink() {
-                    for v in &listen_netlink {
-                        if v.is_empty() {
-                            continue;
-                        }
-
-                        if let Err(e) = parse_netlink_address(v) {
-                            log::error!("create netlink listening socket: {}, failed: {:?}", v, e);
-                            return Err(
-                                format!("create netlink listening socket failed: {v}").into()
-                            );
-                        }
-
-                        let socket_addr = parse_netlink_address(v).unwrap();
-                        let port = SocketPortConf::new(PortType::Socket, socket_addr, v);
-                        self.push_port(Rc::new(port));
-                    }
-                }
-            }
-            ListeningItem::SequentialPacket => {
-                if let Some(sequential_packet) = socket_conf.borrow().listen_sequential_packet() {
-                    self.parse_sockets(sequential_packet, SockType::SeqPacket)?;
-                }
-            }
+        let config = &self.data.borrow().Socket;
+        if config.ListenStream.is_some() {
+            self.parse_sockets(config.ListenStream.as_ref().unwrap(), ListenItem::Stream)?;
         }
-
+        if config.ListenDatagram.is_some() {
+            self.parse_sockets(
+                config.ListenDatagram.as_ref().unwrap(),
+                ListenItem::Datagram,
+            )?;
+        }
+        if config.ListenNetlink.is_some() {
+            self.parse_sockets(config.ListenNetlink.as_ref().unwrap(), ListenItem::Netlink)?;
+        }
+        if config.ListenSequentialPacket.is_some() {
+            self.parse_sockets(
+                config.ListenSequentialPacket.as_ref().unwrap(),
+                ListenItem::SequentialPacket,
+            )?;
+        }
         Ok(())
     }
 
-    fn parse_sockets(&self, listens: Vec<String>, socket_type: SockType) -> Result<()> {
-        for v in &listens {
+    fn parse_sockets(&self, listens: &Vec<String>, listen_item: ListenItem) -> Result<()> {
+        let socket_type = match listen_item {
+            ListenItem::Datagram => SockType::Datagram,
+            ListenItem::Stream => SockType::Stream,
+            ListenItem::SequentialPacket => SockType::SeqPacket,
+            ListenItem::Netlink => SockType::Raw,
+        };
+
+        let parse_func = match listen_item {
+            ListenItem::Netlink => parse_netlink_address,
+            _ => parse_socket_address,
+        };
+
+        for v in listens {
             if v.is_empty() {
                 continue;
             }
 
-            if let Ok(socket_addr) = parse_socket_address(v, socket_type) {
-                let port = SocketPortConf::new(PortType::Socket, socket_addr, v);
-                self.push_port(Rc::new(port));
-            } else {
-                log::error!("parsing listening socket failed: {}", v);
-                return Err(format!("parsing listening socket failed: {v}").into());
-            }
+            let socket_addr = match parse_func(v, socket_type) {
+                Err(_) => {
+                    return Err(format!("Invalid socket configuration: {v}").into());
+                }
+                Ok(v) => v,
+            };
+
+            let port = SocketPortConf::new(PortType::Socket, socket_addr, v);
+            self.push_port(Rc::new(port));
         }
 
         Ok(())
@@ -299,7 +277,8 @@ impl SocketConfig {
     }
 }
 
-enum ListeningItem {
+#[derive(PartialEq)]
+enum ListenItem {
     Stream,
     Datagram,
     Netlink,
@@ -326,39 +305,12 @@ impl SocketConfigData {
             SocketCommand::StopPost => self.Socket.ExecStopPost.clone(),
         }
     }
-
-    pub(self) fn listen_stream(&self) -> Option<Vec<String>> {
-        self.Socket
-            .ListenStream
-            .as_ref()
-            .map(|v| v.iter().map(|v| v.to_string()).collect())
-    }
-
-    pub(self) fn listen_datagram(&self) -> Option<Vec<String>> {
-        self.Socket
-            .ListenDatagram
-            .as_ref()
-            .map(|v| v.iter().map(|v| v.to_string()).collect())
-    }
-
-    pub(self) fn listen_netlink(&self) -> Option<Vec<String>> {
-        self.Socket
-            .ListenNetlink
-            .as_ref()
-            .map(|v| v.iter().map(|v| v.to_string()).collect())
-    }
-
-    pub(self) fn listen_sequential_packet(&self) -> Option<Vec<String>> {
-        self.Socket
-            .ListenSequentialPacket
-            .as_ref()
-            .map(|v| v.iter().map(|v| v.to_string()).collect())
-    }
 }
 
 pub(super) struct SocketPortConf {
     p_type: PortType,
     sa: SocketAddress,
+    /* raw addr */
     listen: String,
 }
 
@@ -381,6 +333,16 @@ impl SocketPortConf {
 
     pub(super) fn listen(&self) -> &str {
         &self.listen
+    }
+
+    pub(super) fn can_be_symlinked(&self) -> bool {
+        if ![PortType::Socket, PortType::Fifo].contains(&self.p_type()) {
+            return false;
+        }
+        if !self.listen().starts_with('/') {
+            return false;
+        }
+        true
     }
 }
 
@@ -490,7 +452,7 @@ impl fmt::Display for SocketAddress {
     }
 }
 
-fn parse_netlink_address(item: &str) -> Result<SocketAddress> {
+fn parse_netlink_address(item: &str, socket_type: SockType) -> Result<SocketAddress> {
     let words: Vec<String> = item.split_whitespace().map(|s| s.to_string()).collect();
     if words.len() != 2 {
         return Err(format!("Netlink configuration format is not correct: {item}").into());
@@ -511,7 +473,7 @@ fn parse_netlink_address(item: &str) -> Result<SocketAddress> {
 
     Ok(SocketAddress::new(
         Box::new(net_link),
-        SockType::Raw,
+        socket_type,
         Some(SockProtocol::from(family)),
     ))
 }
@@ -523,7 +485,8 @@ fn parse_socket_address(item: &str, socket_type: SockType) -> Result<SocketAddre
     }
 
     if item.starts_with('@') {
-        let unix_addr = UnixAddr::new_abstract(item.as_bytes()).context(NixSnafu)?;
+        let address = item.trim_start_matches('@').as_bytes();
+        let unix_addr = UnixAddr::new_abstract(address).context(NixSnafu)?;
 
         return Ok(SocketAddress::new(Box::new(unix_addr), socket_type, None));
     }
