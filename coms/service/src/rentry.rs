@@ -12,15 +12,19 @@
 //
 #![allow(non_snake_case)]
 use crate::monitor::ServiceMonitor;
+use basic::special::EXEC_RUNTIME_PREFIX;
 use confique::Config;
 use macros::EnumDisplay;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, VecDeque};
+use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
+
 use sysmaster::error::*;
 use sysmaster::exec::ExecCommand;
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
@@ -156,6 +160,22 @@ impl DeserializeWith for ExitStatusSet {
     }
 }
 
+fn deserialize_pidfile<'de, D>(de: D) -> Result<PathBuf, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let file = String::deserialize(de)?;
+    let pid_file_path = Path::new(&file);
+    if pid_file_path.is_absolute() {
+        return pid_file_path.canonicalize().map_err(de::Error::custom);
+    }
+
+    Path::new(EXEC_RUNTIME_PREFIX)
+        .join(pid_file_path)
+        .canonicalize()
+        .map_err(de::Error::custom)
+}
+
 #[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
 pub(super) struct SectionService {
     #[config(deserialize_with = ServiceType::deserialize_with)]
@@ -179,7 +199,8 @@ pub(super) struct SectionService {
     pub Sockets: Option<Vec<String>>,
     #[config(default = 0)]
     pub WatchdogSec: u64,
-    pub PIDFile: Option<String>,
+    #[config(deserialize_with = deserialize_pidfile)]
+    pub PIDFile: Option<PathBuf>,
     #[config(default = false)]
     pub RemainAfterExit: bool,
     pub NotifyAccess: Option<NotifyAccess>,

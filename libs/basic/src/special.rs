@@ -34,3 +34,6 @@ pub const SYSMASTER_SLICE: &str = "system.slice";
 
 /// the unit store sysmaster itself
 pub const CGROUP_SYSMASTER: &str = "sysmaster";
+
+/// the default running time directory of sysmaster
+pub const EXEC_RUNTIME_PREFIX: &str = "/run";

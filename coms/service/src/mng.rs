@@ -35,7 +35,6 @@ use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::os::unix::prelude::AsRawFd;
-use std::path::Path;
 use std::rc::Rc;
 use std::{
     os::unix::prelude::{FromRawFd, RawFd},
@@ -557,11 +556,11 @@ impl ServiceMng {
 
         self.rd.set_forbid_restart(false);
 
-        if let Some(p) = self.config.config_data().borrow().Service.PIDFile.as_ref() {
-            if let Err(e) = nix::unistd::unlink(&PathBuf::from(p)) {
+        if let Some(p) = self.config.pid_file() {
+            if let Err(e) = nix::unistd::unlink(&p) {
                 log::warn!(
                     "{}",
-                    format!("failed to unlink pid file: {}, error: {}", p, e)
+                    format!("failed to unlink pid file: {:?}, error: {}", p, e)
                 );
             }
         }
@@ -942,25 +941,19 @@ impl ServiceMng {
     }
 
     fn load_pid_file(&self) -> Result<bool> {
-        let pid_file = self
-            .config
-            .config_data()
-            .borrow()
-            .Service
-            .PIDFile
-            .as_ref()
-            .map(|s| s.to_string());
-        if pid_file.is_none() {
-            return Err(Error::Other {
-                msg: "pid file is not configured".to_string(),
-            });
-        }
+        let pid_file = match self.config.pid_file() {
+            Some(v) => v,
+            None => {
+                return Err(Error::Other {
+                    msg: "pid file is not configured".to_string(),
+                })
+            }
+        };
 
-        let file = &pid_file.unwrap();
-        let pid_file_path = Path::new(file);
+        let pid_file_path = pid_file.as_path();
         if !pid_file_path.exists() || !pid_file_path.is_file() {
-            return Err(Error::Other {
-                msg: "pid file is not a file or not exist".to_string(),
+            return Err(Error::NotFound {
+                what: "pid file is not a file or not exist".to_string(),
             });
         }
 
@@ -1033,15 +1026,7 @@ impl ServiceMng {
     }
 
     fn demand_pid_file(&self) -> Result<()> {
-        let pid_file_inotify = PathIntofy::new(PathBuf::from(
-            self.config
-                .config_data()
-                .borrow()
-                .Service
-                .PIDFile
-                .as_ref()
-                .unwrap(),
-        ));
+        let pid_file_inotify = PathIntofy::new(self.config.pid_file().unwrap());
 
         self.rd.attach_inotify(Rc::new(pid_file_inotify));
 
@@ -1409,7 +1394,7 @@ impl ServiceMng {
                         return;
                     }
 
-                    if self.config.config_data().borrow().Service.PIDFile.is_some() {
+                    if self.config.pid_file().is_some() {
                         // will load the pid_file after the forking pid exist.
                         let start_post_exist = if self
                             .config
@@ -1460,7 +1445,7 @@ impl ServiceMng {
                         self.enter_signal(ServiceState::StopSigterm, res);
                     }
 
-                    if self.config.config_data().borrow().Service.PIDFile.is_some() {
+                    if self.config.pid_file().is_some() {
                         let loaded = self.load_pid_file();
                         if loaded.is_err() {
                             match self.demand_pid_file() {
