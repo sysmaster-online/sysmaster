@@ -97,7 +97,7 @@ impl SocketReConf {
 }
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, EnumDisplay)]
-pub(super) enum SocketState {
+pub(crate) enum SocketState {
     Dead,
     StartPre,
     StartChown,

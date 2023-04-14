@@ -33,7 +33,7 @@ use sysmaster::error::*;
 
 pub(super) const SOCKET_INVALID_FD: RawFd = -1;
 
-pub(super) struct SocketPort {
+pub(crate) struct SocketPort {
     // associated objects
     comm: Rc<SocketUnitComm>,
     config: Rc<SocketConfig>,
