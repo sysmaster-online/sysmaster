@@ -404,11 +404,7 @@ impl SocketAddress {
     }
 
     pub(super) fn can_accept(&self) -> bool {
-        if self.sa_type == SockType::Stream {
-            return true;
-        }
-
-        false
+        matches!(self.sa_type, SockType::SeqPacket | SockType::Stream)
     }
 
     pub(super) fn path(&self) -> Option<PathBuf> {
