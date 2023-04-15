@@ -1,5 +1,5 @@
 #!/bin/bash
-# Description: test for Service
+# Description: test for Service/Symlinks/RemoveOnStop
 
 TEST_SCRIPT="$(basename "$0")"
 TEST_SCRIPT_PATH="$(dirname "$0")"
