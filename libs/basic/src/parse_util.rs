@@ -70,3 +70,21 @@ pub fn parse_ifindex(s: String) -> Result<u32> {
         source: nix::errno::Errno::EINVAL,
     })
 }
+
+/// parse the string into mode_t
+pub fn parse_mode(mode: &str) -> Result<mode_t> {
+    match mode.parse::<mode_t>() {
+        Ok(v) => {
+            if v > 7777 {
+                return Err(Error::Nix {
+                    source: nix::errno::Errno::ERANGE,
+                });
+            }
+
+            Ok(v)
+        }
+        Err(e) => Err(Error::Parse {
+            source: Box::new(e),
+        }),
+    }
+}

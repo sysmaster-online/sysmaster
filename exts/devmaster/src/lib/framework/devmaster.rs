@@ -13,11 +13,15 @@
 //! encapsulate all sub-managers of framework
 //!
 
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{Arc, RwLock},
+};
 
 use event::{EventState, Events};
 
-use crate::rules::{rule_load::DEFAULT_RULES_DIRS, Rules};
+use crate::rules::{rule_load::DEFAULT_RULES_DIRS, ResolveNameTime, Rules};
 
 use super::{
     control_manager::{ControlManager, CONTROL_MANAGER_LISTEN_ADDR},
@@ -40,13 +44,15 @@ pub struct Devmaster {
     monitor: Option<Rc<UeventMonitor>>,
 
     /// rules
-    rules: Rules,
+    rules: Arc<RwLock<Rules>>,
 }
 
 impl Devmaster {
     /// generate a devmaster object
     pub fn new(events: Rc<Events>) -> Rc<RefCell<Devmaster>> {
-        let rules = Rules::new(&DEFAULT_RULES_DIRS);
+        let rules = Rules::load_rules(&DEFAULT_RULES_DIRS, ResolveNameTime::Early);
+
+        log::debug!("{}", rules.as_ref().read().unwrap());
 
         let ret = Rc::new(RefCell::new(Devmaster {
             events: events.clone(),
@@ -117,7 +123,7 @@ impl Devmaster {
     }
 
     /// get a clone of rules
-    pub(crate) fn get_rules(&self) -> Rules {
+    pub(crate) fn get_rules(&self) -> Arc<RwLock<Rules>> {
         self.rules.clone()
     }
 }
