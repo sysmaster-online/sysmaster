@@ -18,6 +18,7 @@ use crate::builtin::Netlink;
 use crate::error::{Error, Result};
 use device::Device;
 use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 
 /// example for implementing Builtin trait
 pub struct Example;
@@ -26,7 +27,7 @@ impl Builtin for Example {
     /// builtin command
     fn cmd(
         &self,
-        device: &mut Device,
+        device: Arc<Mutex<Device>>,
         ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         _argv: Vec<String>,
@@ -34,7 +35,7 @@ impl Builtin for Example {
     ) -> Result<bool> {
         println!("example builtin run");
 
-        let syspath = match device.get_syspath() {
+        let syspath = match device.lock().unwrap().get_syspath() {
             Some(p) => String::from(p),
             None => {
                 return Err(Error::BuiltinCommandError {
@@ -46,6 +47,8 @@ impl Builtin for Example {
         ret_rtnl.replace(Some(Netlink {}));
 
         device
+            .lock()
+            .unwrap()
             .add_property("ID_EXAMPLE_SYSPATH".to_string(), syspath)
             .map_err(|_| Error::BuiltinCommandError {
                 msg: "add property failed",
@@ -85,22 +88,23 @@ mod tests {
     use super::Example;
     use crate::builtin::{Builtin, Netlink};
     use device::device_enumerator::DeviceEnumerator;
-    use std::{cell::RefCell, ops::DerefMut};
+    use std::cell::RefCell;
 
     #[test]
     fn test_builtin_example() {
         let mut enumerator = DeviceEnumerator::new();
 
         for device in enumerator.iter_mut() {
-            let mut binding = device.as_ref().lock().unwrap();
-            let device = binding.deref_mut();
-
             let mut rtnl = RefCell::<Option<Netlink>>::from(None);
 
             let builtin = Example {};
-            builtin.cmd(device, &mut rtnl, 0, vec![], false).unwrap();
+            builtin
+                .cmd(device.clone(), &mut rtnl, 0, vec![], false)
+                .unwrap();
 
             device
+                .lock()
+                .unwrap()
                 .get_property_value("ID_EXAMPLE_SYSPATH".to_string())
                 .unwrap();
             rtnl.take().unwrap();

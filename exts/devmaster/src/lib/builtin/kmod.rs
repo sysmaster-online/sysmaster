@@ -18,6 +18,7 @@ use crate::builtin::Netlink;
 use crate::error::Result;
 use device::Device;
 use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 
 /// kmod builtin command
 pub struct Kmod;
@@ -26,7 +27,7 @@ impl Builtin for Kmod {
     /// builtin command
     fn cmd(
         &self,
-        _device: &mut Device,
+        _device: Arc<Mutex<Device>>,
         _ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         _argv: Vec<String>,
