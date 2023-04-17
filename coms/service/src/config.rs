@@ -124,6 +124,10 @@ impl ServiceConfig {
         self.data.borrow_mut().set_timeout_start(time_out);
         self.data.borrow_mut().set_timeout_stop(time_out);
     }
+
+    pub(super) fn pid_file(&self) -> Option<PathBuf> {
+        self.data.borrow().Service.PIDFile.clone()
+    }
 }
 
 #[derive(Config, Default, Debug)]
