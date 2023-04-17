@@ -15,6 +15,9 @@ use std::time::SystemTime;
 
 const USEC_INFINITY: u128 = u128::MAX;
 
+/// usec per sec
+pub const USEC_PER_SEC: u64 = 1000000;
+
 ///
 pub fn timespec_load(systime: SystemTime) -> u128 {
     match systime.duration_since(SystemTime::UNIX_EPOCH) {

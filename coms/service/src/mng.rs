@@ -427,6 +427,13 @@ impl ServiceMng {
                 self.enter_stop_by_notify();
             } else {
                 self.set_state(ServiceState::Running);
+                // for running service, the default timeout is runtime_max_usec, the default value is U64::MAX for not enable timer
+                if let Err(e) = self.rd.enable_timer(u64::MAX) {
+                    self.log(
+                        Level::Warn,
+                        &format!("enter running enable timer error: {}", e),
+                    );
+                }
             }
         } else if self.config.config_data().borrow().Service.RemainAfterExit {
             self.set_state(ServiceState::Exited);
@@ -1795,14 +1802,20 @@ impl RunningData {
     }
 
     pub(super) fn enable_timer(&self, usec: u64) -> Result<i32> {
+        let events = self.comm.um().events();
+
         if usec == 0 || usec == u64::MAX {
+            // which means not enable the service timer, so delete the previous timer
+            if self.armd_timer() {
+                let timer = self.timer();
+                events.del_source(timer)?;
+            }
             return Ok(0);
         }
 
         if self.armd_timer() {
-            let events = self.comm.um().events();
             let timer = self.timer();
-            events.del_source(timer.clone())?;
+            events.set_enabled(timer.clone(), EventState::Off)?;
 
             timer.set_time(usec);
             events.set_enabled(timer, EventState::OneShot)?;
@@ -1812,7 +1825,6 @@ impl RunningData {
         let timer = Rc::new(ServiceTimer::new(usec));
         self.attach_timer(timer.clone());
 
-        let events = self.comm.um().events();
         events.add_source(timer.clone())?;
         events.set_enabled(timer, EventState::OneShot)?;
 
@@ -2329,7 +2341,7 @@ impl Source for ServiceTimer {
     }
 
     fn time_relative(&self) -> u64 {
-        *self.time.borrow() * 1000000
+        *self.time.borrow()
     }
 
     fn dispatch(&self, _: &Events) -> i32 {
