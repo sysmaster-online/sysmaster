@@ -55,6 +55,7 @@ impl ServiceSpawn {
     ) -> Result<Pid> {
         let mut params = ExecParameters::new();
         params.set_exec_flags(ec_flags);
+        params.set_nonblock(self.config.config_data().borrow().Service.NonBlocking);
 
         params.add_env(
             "PATH",

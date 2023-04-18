@@ -109,6 +109,7 @@ pub struct ExecParameters {
     umask: Option<Mode>,
     watchdog_usec: u64,
     flags: ExecFlags,
+    nonblock: bool,
 }
 
 struct EnvData {
@@ -160,6 +161,7 @@ impl ExecParameters {
             umask: None,
             watchdog_usec: 0,
             flags: ExecFlags::CONTROL,
+            nonblock: false,
         }
     }
 
@@ -176,6 +178,16 @@ impl ExecParameters {
     /// return all environments that will be passed to child
     pub fn envs(&self) -> Vec<CString> {
         self.environment.envs()
+    }
+
+    /// set nonblock
+    pub fn set_nonblock(&mut self, nonblock: bool) {
+        self.nonblock = nonblock;
+    }
+
+    /// get nonblock
+    pub fn get_nonblock(&self) -> bool {
+        self.nonblock
     }
 
     /// insert fds that will be passed to child

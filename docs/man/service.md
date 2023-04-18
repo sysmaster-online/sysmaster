@@ -37,6 +37,12 @@ service服务的类型， 当前支持`simple`、`forking`、`oneshot`、`notify
 
 支持的值为true或false, 当配置为true时， 当主服务进程退出时， 服务状态仍然为active状态。
 
+## NonBlocking
+
+* 类型：布尔值
+
+该配置仅对socket激活的服务有效，设置从socket继承的文件描述符的O_NONBLOCK标志位。默认值为`false`。
+
 ## NotifyAccess
 
 配置类型为字符串， 支持`none`、`main`， 当Type为Notify时默认值为`main`。当前功能未实现。
