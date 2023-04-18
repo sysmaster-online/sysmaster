@@ -115,3 +115,11 @@ service服务的类型，当前支持`simple`、`forking`、`oneshot`、`notify`
 ## TimeoutStopSec
 
 服务停止时的超时时间，取值范围为0~u64::MAX, 当值为0或u64::Max时，不启动定时器。当执行`Stop`、`StopPost`命令时的超时时间。
+
+## LimitCORE、LimitNOFILE、LimitNPROC
+
+设置进程的资源限制，参考[setrlimit(2)](https://www.man7.org/linux/man-pages/man2/setrlimit.2.html)，配置类型为字符串。
+
+当前支持两种格式，(1) 不包括`':'`的当个字符串，此时soft、hard设置为同一个值，(2) 使用`':'`分割的两个字符串，soft为`:`前的值， hard为`:`后的值。
+
+单个值只支持配置为数值型或“infinity”字符串，配置为“infinity”时资源限制设置为`ulimit`。

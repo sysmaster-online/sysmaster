@@ -13,6 +13,6 @@
 //! execute module
 mod base;
 mod cmd;
-pub use base::{ExecContext, ExecFlags, ExecParameters};
+pub use base::{ExecContext, ExecFlags, ExecParameters, Rlimit};
 pub use cmd::ExecCommand;
 pub use cmd::ExecFlag;

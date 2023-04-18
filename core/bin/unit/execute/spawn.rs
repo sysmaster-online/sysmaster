@@ -159,6 +159,11 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
 
     log::debug!("exec child env env is: {:?}", envs);
 
+    if let Err(e) = set_all_rlimits(ctx) {
+        log::error!("failed to set rlimit: {}", e.to_string());
+        return;
+    }
+
     let envs_cstr = envs.iter().map(|v| v.as_c_str()).collect::<Vec<_>>();
     let mut keep_fds = params.fds();
 
@@ -347,4 +352,8 @@ fn flags_fds(fds: &mut Vec<i32>, nonblock: bool) -> bool {
     }
 
     true
+}
+
+fn set_all_rlimits(ctx: Rc<ExecContext>) -> Result<()> {
+    ctx.set_all_rlimits()
 }
