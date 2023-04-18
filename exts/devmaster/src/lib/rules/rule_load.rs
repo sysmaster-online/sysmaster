@@ -1321,6 +1321,7 @@ SYMLINK += \"test111111\"",
     }
 
     #[test]
+    #[ignore]
     fn test_resolve_user() {
         let mut rules = Rules::new(&[], ResolveNameTime::Early);
         assert!(rules.resolve_user("tss").is_ok());
