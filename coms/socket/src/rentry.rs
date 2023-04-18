@@ -54,6 +54,8 @@ pub(super) struct SectionSocket {
     pub ListenSequentialPacket: Option<Vec<String>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub ListenFIFO: Option<Vec<String>>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    pub ListenSpecial: Option<Vec<String>>,
 
     #[config(default = false)]
     pub Accept: bool,
@@ -145,6 +147,7 @@ pub(super) enum PortType {
     #[default]
     Socket,
     Fifo,
+    Special,
     Invalid,
 }
 

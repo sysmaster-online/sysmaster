@@ -23,7 +23,7 @@ use libc::{glob, glob_t, GLOB_NOSORT};
 #[cfg(not(target_env = "musl"))]
 use libc::{statx, STATX_ATTR_MOUNT_ROOT};
 
-use crate::{device::on_ac_power, proc_cmdline, security, user_group_util};
+use crate::{device::on_ac_power, fd_util, proc_cmdline, security, user_group_util};
 use std::{
     ffi::CString,
     fs::File,
@@ -211,8 +211,7 @@ impl Condition {
             }
             Ok(v) => v,
         };
-
-        ((s.st_mode & stat::SFlag::S_IFREG.bits() > 0) && (s.st_mode & 111 > 0)) as i8
+        (fd_util::stat_is_reg(s.st_mode) && (s.st_mode & 111 > 0)) as i8
     }
 
     fn test_file_not_empty(&self) -> i8 {

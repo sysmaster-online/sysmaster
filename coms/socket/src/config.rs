@@ -16,15 +16,17 @@
 use super::comm::SocketUnitComm;
 use super::rentry::{PortType, SectionSocket, SocketCommand};
 use crate::base::NetlinkProtocol;
-use basic::socket_util;
+use basic::{fd_util, socket_util};
 use confique::Config;
 use nix::errno::Errno;
+use nix::fcntl::{open, OFlag};
 use nix::sys::signal::Signal;
 use nix::sys::socket::sockopt::ReuseAddr;
 use nix::sys::socket::{
     self, AddressFamily, NetlinkAddr, SockFlag, SockProtocol, SockType, SockaddrIn, SockaddrIn6,
     SockaddrLike, UnixAddr,
 };
+use nix::sys::stat::{self, fstat};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
@@ -201,23 +203,23 @@ impl SocketConfig {
     fn parse_port(&self) -> Result<()> {
         log::debug!("begin to parse socket section");
         let config = &self.data.borrow().Socket;
-        if config.ListenStream.is_some() {
-            self.parse_sockets(config.ListenStream.as_ref().unwrap(), ListenItem::Stream)?;
+        if let Some(v) = config.ListenStream.as_ref() {
+            self.parse_sockets(v, ListenItem::Stream)?;
         }
-        if config.ListenDatagram.is_some() {
-            self.parse_sockets(
-                config.ListenDatagram.as_ref().unwrap(),
-                ListenItem::Datagram,
-            )?;
+        if let Some(v) = config.ListenDatagram.as_ref() {
+            self.parse_sockets(v, ListenItem::Datagram)?;
         }
-        if config.ListenNetlink.is_some() {
-            self.parse_sockets(config.ListenNetlink.as_ref().unwrap(), ListenItem::Netlink)?;
+        if let Some(v) = config.ListenNetlink.as_ref() {
+            self.parse_sockets(v, ListenItem::Netlink)?;
         }
-        if config.ListenSequentialPacket.is_some() {
-            self.parse_sockets(
-                config.ListenSequentialPacket.as_ref().unwrap(),
-                ListenItem::SequentialPacket,
-            )?;
+        if let Some(v) = config.ListenSequentialPacket.as_ref() {
+            self.parse_sockets(v, ListenItem::SequentialPacket)?;
+        }
+        if let Some(v) = config.ListenFIFO.as_ref() {
+            self.parse_fifo(v)?;
+        }
+        if let Some(v) = config.ListenSpecial.as_ref() {
+            self.parse_special(v)?;
         }
         Ok(())
     }
@@ -251,6 +253,22 @@ impl SocketConfig {
             self.push_port(Rc::new(port));
         }
 
+        Ok(())
+    }
+
+    fn parse_fifo(&self, listens: &Vec<String>) -> Result<()> {
+        for v in listens {
+            let port = SocketPortConf::new(PortType::Fifo, SocketAddress::empty(), v);
+            self.push_port(Rc::new(port));
+        }
+        Ok(())
+    }
+
+    fn parse_special(&self, listens: &Vec<String>) -> Result<()> {
+        for v in listens {
+            let port = SocketPortConf::new(PortType::Special, SocketAddress::empty(), v);
+            self.push_port(Rc::new(port));
+        }
         Ok(())
     }
 
@@ -338,6 +356,80 @@ impl SocketPortConf {
         &self.listen
     }
 
+    pub(super) fn can_accept(&self) -> bool {
+        if self.p_type() == PortType::Socket {
+            self.sa.can_accept()
+        } else {
+            false
+        }
+    }
+
+    pub(super) fn socket_listen(&self, flags: SockFlag, backlog: usize) -> Result<i32, Errno> {
+        if self.p_type() == PortType::Socket {
+            self.sa.socket_listen(flags, backlog)
+        } else {
+            Err(Errno::ENOTSUP)
+        }
+    }
+
+    pub(super) fn unlink_socket(&self) {
+        self.sa().unlink()
+    }
+
+    pub(super) fn open_fifo(&self) -> Result<i32, Errno> {
+        let path = match PathBuf::from_str(self.listen()) {
+            Err(_) => return Err(Errno::EINVAL),
+            Ok(v) => v,
+        };
+        nix::unistd::mkfifo(&path, stat::Mode::S_IRWXU)?;
+        let oflag = OFlag::O_RDWR
+            | OFlag::O_CLOEXEC
+            | OFlag::O_NOCTTY
+            | OFlag::O_NONBLOCK
+            | OFlag::O_NOFOLLOW;
+        let mode = stat::Mode::S_IRWXU;
+        let fd = match open(&path, oflag, mode) {
+            Err(e) => return Err(e),
+            Ok(v) => v,
+        };
+        Ok(fd)
+    }
+
+    pub(super) fn unlink_fifo(&self) {
+        let path = match PathBuf::from_str(self.listen()) {
+            Err(_) => return,
+            Ok(v) => v,
+        };
+        if let Err(e) = nix::unistd::unlink(&path) {
+            log::error!("Failed to unlink FIFO {}: {e}", self.listen());
+        }
+    }
+
+    pub(super) fn open_special(&self) -> Result<i32, Errno> {
+        let path = match PathBuf::from_str(self.listen()) {
+            Err(_) => return Err(Errno::EINVAL),
+            Ok(v) => v,
+        };
+        let oflag = OFlag::O_RDWR
+            | OFlag::O_CLOEXEC
+            | OFlag::O_NOCTTY
+            | OFlag::O_NONBLOCK
+            | OFlag::O_NOFOLLOW;
+        let fd = match open(&path, oflag, stat::Mode::empty()) {
+            Err(e) => return Err(e),
+            Ok(v) => v,
+        };
+        let st = fstat(fd)?;
+        if !fd_util::stat_is_reg(st.st_mode) && !fd_util::stat_is_char(st.st_mode) {
+            return Err(Errno::EEXIST);
+        }
+        Ok(fd)
+    }
+
+    pub(super) fn unlink_special(&self) {
+        /* Do noting for ListenSpecial */
+    }
+
     pub(super) fn can_be_symlinked(&self) -> bool {
         if ![PortType::Socket, PortType::Fifo].contains(&self.p_type()) {
             return false;
@@ -365,6 +457,15 @@ impl SocketAddress {
             sock_addr,
             sa_type,
             protocol,
+        }
+    }
+
+    pub(super) fn empty() -> SocketAddress {
+        let unix_addr = UnixAddr::new(&PathBuf::from("/dev/null")).unwrap();
+        SocketAddress {
+            sock_addr: Box::new(unix_addr),
+            sa_type: SockType::Raw,
+            protocol: None,
         }
     }
 

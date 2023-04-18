@@ -26,6 +26,17 @@ SOCK_SEQPACKET只有在Unix套接子时才有效。
 
 当前支持的name为route, inet-diag, selinux, iscsi, audit, fib-lookup, netfilter, ip6-fw, dnrtmsg, kobject_ uevent、scsitransport、rdma等。
 
+## ListenFIFO
+
+* 类型：字符串
+
+创建并监听用户配置的FIFO文件，详见：[fifo(7)](https://man7.org/linux/man-pages/man7/fifo.7.html)，仅允许配置为一个绝对路径。
+
+## ListenSpecial
+
+* 类型：字符串
+
+监听一个特殊文件，仅允许配置为绝对路径。特殊文件指：字符设备、/proc、/sys目录下的文件。
 
 ## ReceiveBuffer 、SendBuffer
 
