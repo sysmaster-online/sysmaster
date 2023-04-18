@@ -23,7 +23,7 @@ use std::sync::{Arc, RwLock};
 use sysmaster::rel::Reliability;
 use sysmaster::unit::{UmIf, UnitBase};
 
-pub(super) struct SocketUnitComm {
+pub(crate) struct SocketUnitComm {
     owner: RefCell<Option<Rc<dyn UnitBase>>>,
     umcomm: Arc<SocketUmComm>,
 }

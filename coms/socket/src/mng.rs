@@ -69,129 +69,13 @@ impl SocketState {
     }
 }
 
-pub(super) struct SocketMng {
-    data: Rc<SocketMngData>,
-}
-
 impl ReStation for SocketMng {
     // input: do nothing
 
     // compensate: do nothing
 
     // data
-    fn db_map(&self, reload: bool) {
-        if !reload {
-            self.build_ports();
-        }
-        self.data.db_map();
-    }
-
-    fn db_insert(&self) {
-        self.data.db_insert();
-    }
-
-    // reload: entry-only
-    fn entry_coldplug(&self) {
-        self.data.entry_coldplug();
-    }
-
-    fn entry_clear(&self) {
-        self.data.entry_clear();
-    }
-}
-
-impl SocketMng {
-    pub(super) fn new(
-        commr: &Rc<SocketUnitComm>,
-        configr: &Rc<SocketConfig>,
-        exec_ctx: &Rc<ExecContext>,
-    ) -> SocketMng {
-        SocketMng {
-            data: SocketMngData::new(commr, configr, exec_ctx),
-        }
-    }
-
-    pub(super) fn start_check(&self) -> Result<bool> {
-        self.data.start_check()
-    }
-
-    pub(super) fn start_action(&self) {
-        self.data.start_action();
-        self.db_update();
-    }
-
-    pub(super) fn stop_check(&self) -> Result<bool> {
-        self.data.stop_check()
-    }
-
-    pub(super) fn stop_action(&self) {
-        self.data.stop_action();
-        self.db_update();
-    }
-
-    pub(super) fn get_state(&self) -> String {
-        let state = self.data.state();
-        state.to_string()
-    }
-
-    pub(super) fn sigchld_event(&self, wait_status: WaitStatus) {
-        self.data.sigchld_event(wait_status);
-        self.db_update();
-    }
-
-    pub(super) fn current_active_state(&self) -> UnitActiveState {
-        self.data.current_active_state()
-    }
-
-    pub(super) fn collect_fds(&self) -> Vec<i32> {
-        self.data.collect_fds()
-    }
-
-    pub(super) fn build_ports(&self) {
-        self.data.build_ports(&self.data);
-        self.db_update();
-    }
-}
-
-struct SocketMngData {
-    // associated objects
-    comm: Rc<SocketUnitComm>,
-    config: Rc<SocketConfig>,
-
-    // owned objects
-    pid: SocketPid,
-    spawn: SocketSpawn,
-    ports: RefCell<Vec<Rc<SocketMngPort>>>,
-    state: Rc<RefCell<SocketState>>,
-    result: RefCell<SocketResult>,
-    control_cmd_type: RefCell<Option<SocketCommand>>,
-    control_command: RefCell<VecDeque<ExecCommand>>,
-    refused: RefCell<i32>,
-}
-
-// the declaration "pub(self)" is for identification only.
-impl SocketMngData {
-    pub(self) fn new(
-        commr: &Rc<SocketUnitComm>,
-        configr: &Rc<SocketConfig>,
-        exec_ctx: &Rc<ExecContext>,
-    ) -> Rc<SocketMngData> {
-        Rc::new(SocketMngData {
-            comm: Rc::clone(commr),
-            config: Rc::clone(configr),
-
-            pid: SocketPid::new(commr),
-            spawn: SocketSpawn::new(commr, exec_ctx),
-            ports: RefCell::new(Vec::new()),
-            state: Rc::new(RefCell::new(SocketState::StateMax)),
-            result: RefCell::new(SocketResult::Success),
-            control_cmd_type: RefCell::new(None),
-            control_command: RefCell::new(VecDeque::new()),
-            refused: RefCell::new(0),
-        })
-    }
-
-    pub(self) fn db_map(&self) {
+    fn db_map(&self, _reload: bool) {
         if let Some((state, result, c_pid, control_cmd_type, control_cmd_len, refused, rports)) =
             self.comm.rentry_mng_get()
         {
@@ -204,17 +88,72 @@ impl SocketMngData {
         }
     }
 
-    fn entry_clear(&self) {
-        self.close_fds();
+    fn db_insert(&self) {
+        self.comm.rentry_mng_insert(
+            self.state(),
+            self.result(),
+            self.pid.control(),
+            *self.control_cmd_type.borrow(),
+            self.control_command.borrow().len(),
+            *self.refused.borrow(),
+            self.ports()
+                .iter()
+                .map(|p| (p.p_type(), String::from(p.listen()), p.fd()))
+                .collect::<_>(),
+        );
     }
 
+    // reload: entry-only
     fn entry_coldplug(&self) {
         if self.state() != SocketState::Listening {
             self.watch_fds();
         }
     }
 
-    pub(self) fn start_check(&self) -> Result<bool> {
+    fn entry_clear(&self) {
+        self.close_fds();
+    }
+}
+
+pub(crate) struct SocketMng {
+    // associated objects
+    comm: Rc<SocketUnitComm>,
+    config: Rc<SocketConfig>,
+
+    // owned objects
+    pid: SocketPid,
+    spawn: SocketSpawn,
+    ports: RefCell<Vec<Rc<SocketMngPort>>>,
+    state: RefCell<SocketState>,
+    result: RefCell<SocketResult>,
+    control_cmd_type: RefCell<Option<SocketCommand>>,
+    control_command: RefCell<VecDeque<ExecCommand>>,
+    refused: RefCell<i32>,
+}
+
+// the declaration "pub(self)" is for identification only.
+impl SocketMng {
+    pub(crate) fn new(
+        commr: &Rc<SocketUnitComm>,
+        configr: &Rc<SocketConfig>,
+        exec_ctx: &Rc<ExecContext>,
+    ) -> SocketMng {
+        SocketMng {
+            comm: Rc::clone(commr),
+            config: Rc::clone(configr),
+
+            pid: SocketPid::new(commr),
+            spawn: SocketSpawn::new(commr, exec_ctx),
+            ports: RefCell::new(Vec::new()),
+            state: RefCell::new(SocketState::StateMax),
+            result: RefCell::new(SocketResult::Success),
+            control_cmd_type: RefCell::new(None),
+            control_command: RefCell::new(VecDeque::new()),
+            refused: RefCell::new(0),
+        }
+    }
+
+    pub(crate) fn start_check(&self) -> Result<bool> {
         if IN_SET!(
             self.state(),
             SocketState::StopPre,
@@ -251,15 +190,17 @@ impl SocketMngData {
         Ok(false)
     }
 
-    pub(self) fn start_action(&self) {
+    pub(crate) fn start_action(&self) {
         self.enter_start_pre();
+        self.db_update();
     }
 
-    pub(self) fn stop_action(&self) {
+    pub(crate) fn stop_action(&self) {
         self.enter_stop_pre(SocketResult::Success);
+        self.db_update();
     }
 
-    pub(self) fn stop_check(&self) -> Result<bool> {
+    pub(crate) fn stop_check(&self) -> Result<bool> {
         if IN_SET!(
             self.state(),
             SocketState::StopPre,
@@ -285,7 +226,7 @@ impl SocketMngData {
         Ok(false)
     }
 
-    pub(self) fn current_active_state(&self) -> UnitActiveState {
+    pub(crate) fn current_active_state(&self) -> UnitActiveState {
         self.state().to_unit_active_state()
     }
 
@@ -294,7 +235,7 @@ impl SocketMngData {
         self.ports.borrow_mut().clear();
     }
 
-    pub(self) fn collect_fds(&self) -> Vec<i32> {
+    pub(crate) fn collect_fds(&self) -> Vec<i32> {
         let mut fds = Vec::new();
         for port in self.ports().iter() {
             if port.fd() >= 0 {
@@ -305,7 +246,7 @@ impl SocketMngData {
         fds
     }
 
-    fn enter_start_pre(&self) {
+    pub(crate) fn enter_start_pre(&self) {
         log::debug!("enter start pre command");
         self.pid.unwatch_control();
 
@@ -332,6 +273,11 @@ impl SocketMngData {
         };
         self.pid.set_control(pid);
         self.set_state(SocketState::StartPre);
+    }
+
+    pub(crate) fn push_port(&self, port: Rc<SocketMngPort>) {
+        self.ports.borrow_mut().push(port);
+        self.db_update();
     }
 
     fn enter_start_chown(&self) {
@@ -690,7 +636,7 @@ impl SocketMngData {
         }
     }
 
-    fn state(&self) -> SocketState {
+    pub(crate) fn state(&self) -> SocketState {
         *self.state.borrow()
     }
 
@@ -723,14 +669,6 @@ impl SocketMngData {
 
     fn set_result(&self, res: SocketResult) {
         *self.result.borrow_mut() = res;
-    }
-
-    fn build_ports(&self, mng: &Rc<SocketMngData>) {
-        for p_conf in self.config.ports().iter() {
-            let port = Rc::new(SocketPort::new(&self.comm, &self.config, p_conf));
-            let mport = Rc::new(SocketMngPort::new(mng, port));
-            self.ports.borrow_mut().push(mport);
-        }
     }
 
     fn map_ports_fd(&self, rports: Vec<(PortType, String, RawFd)>) {
@@ -771,28 +709,10 @@ impl SocketMngData {
         self.comm.rentry()
     }
 
-    fn db_insert(&self) {
-        self.comm.rentry_mng_insert(
-            self.state(),
-            self.result(),
-            self.pid.control(),
-            *self.control_cmd_type.borrow(),
-            self.control_command.borrow().len(),
-            *self.refused.borrow(),
-            self.ports()
-                .iter()
-                .map(|p| (p.p_type(), String::from(p.listen()), p.fd()))
-                .collect::<_>(),
-        );
-    }
-
     fn db_update(&self) {
         self.db_insert();
     }
-}
 
-// the declaration "pub(self)" is for identification only.
-impl SocketMngData {
     fn sigchld_result(&self, wait_status: WaitStatus) -> SocketResult {
         match wait_status {
             WaitStatus::Exited(_, status) => {
@@ -813,7 +733,7 @@ impl SocketMngData {
         }
     }
 
-    pub(self) fn sigchld_event(&self, wait_status: WaitStatus) {
+    pub(crate) fn sigchld_event(&self, wait_status: WaitStatus) {
         let res = self.sigchld_result(wait_status);
 
         if !self.control_command.borrow().is_empty() && res == SocketResult::Success {
@@ -858,12 +778,14 @@ impl SocketMngData {
                 }
             }
         }
+
+        self.db_update();
     }
 }
 
-struct SocketMngPort {
+pub(crate) struct SocketMngPort {
     // associated objects
-    mng: Weak<SocketMngData>,
+    mng: Weak<SocketMng>,
 
     // owned objects
     port: Rc<SocketPort>,
@@ -913,7 +835,7 @@ impl Source for SocketMngPort {
 
 // the declaration "pub(self)" is for identification only.
 impl SocketMngPort {
-    pub(self) fn new(mng: &Rc<SocketMngData>, port: Rc<SocketPort>) -> SocketMngPort {
+    pub(crate) fn new(mng: &Rc<SocketMng>, port: Rc<SocketPort>) -> SocketMngPort {
         SocketMngPort {
             mng: Rc::downgrade(mng),
             port,
@@ -952,7 +874,7 @@ impl SocketMngPort {
         self.mng().comm.rentry()
     }
 
-    fn mng(&self) -> Rc<SocketMngData> {
+    fn mng(&self) -> Rc<SocketMng> {
         self.mng.clone().upgrade().unwrap()
     }
 }

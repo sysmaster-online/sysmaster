@@ -15,6 +15,8 @@
 //! Trait UnitMngUtil is used to attach the Unitmanager to the sub unit.
 //! Trait UnitSubClass implement the convert from sub unit to UnitObj.
 
+use crate::mng::SocketMngPort;
+use crate::port::SocketPort;
 use crate::{
     base::PLUGIN_NAME, comm::SocketUnitComm, config::SocketConfig, load::SocketLoad, mng::SocketMng,
 };
@@ -30,7 +32,7 @@ use sysmaster::unit::{SubUnit, UmIf, UnitActiveState, UnitBase, UnitMngUtil};
 struct SocketUnit {
     comm: Rc<SocketUnitComm>,
     config: Rc<SocketConfig>,
-    mng: SocketMng,
+    mng: Rc<SocketMng>,
     load: SocketLoad,
 }
 
@@ -42,6 +44,9 @@ impl ReStation for SocketUnit {
     // data
     fn db_map(&self, reload: bool) {
         self.config.db_map(reload);
+        if !reload {
+            self.build_ports();
+        }
         self.mng.db_map(reload);
     }
 
@@ -73,7 +78,7 @@ impl SubUnit for SocketUnit {
             return ret;
         }
 
-        self.mng.build_ports();
+        self.build_ports();
 
         self.verify()
     }
@@ -114,7 +119,7 @@ impl SubUnit for SocketUnit {
     }
 
     fn get_subunit_state(&self) -> String {
-        self.mng.get_state()
+        self.mng.state().to_string()
     }
 
     fn collect_fds(&self) -> Vec<i32> {
@@ -146,7 +151,7 @@ impl SocketUnit {
         SocketUnit {
             comm: Rc::clone(&_comm),
             config: Rc::clone(&_config),
-            mng: SocketMng::new(&_comm, &_config, &context),
+            mng: Rc::new(SocketMng::new(&_comm, &_config, &context)),
             load: SocketLoad::new(&_config, &_comm),
         }
     }
@@ -167,6 +172,14 @@ impl SocketUnit {
             res = Some(port.listen().to_string());
         }
         res
+    }
+
+    fn build_ports(&self) {
+        for p_conf in self.config.ports().iter() {
+            let port = Rc::new(SocketPort::new(&self.comm, &self.config, p_conf));
+            let mport = Rc::new(SocketMngPort::new(&self.mng, port));
+            self.mng.push_port(mport);
+        }
     }
 
     fn verify(&self) -> Result<()> {
