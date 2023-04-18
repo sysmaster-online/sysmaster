@@ -104,9 +104,7 @@ pub fn uefi_secureboot_enabled() -> bool {
         Ok(v) => v,
     };
     let stat = match fstat(file.as_raw_fd()) {
-        Err(_) => {
-            return false;
-        }
+        Err(_) => return false,
         Ok(v) => v,
     };
 

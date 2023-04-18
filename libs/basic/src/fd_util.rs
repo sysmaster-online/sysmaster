@@ -16,7 +16,18 @@ use nix::{
     errno::Errno,
     fcntl::{FcntlArg, FdFlag, OFlag},
     ioctl_read,
+    sys::stat::SFlag,
 };
+
+/// check if the given stat.st_mode is regular file
+pub fn stat_is_reg(st_mode: u32) -> bool {
+    st_mode & SFlag::S_IFMT.bits() & SFlag::S_IFREG.bits() > 0
+}
+
+/// check if the given stat.st_mode is char device
+pub fn stat_is_char(st_mode: u32) -> bool {
+    st_mode & SFlag::S_IFMT.bits() & SFlag::S_IFCHR.bits() > 0
+}
 
 ///
 pub fn fd_nonblock(fd: i32, nonblock: bool) -> Result<()> {
@@ -141,4 +152,34 @@ pub fn fd_get_diskseq(fd: i32) -> Result<u64> {
         }
     }
     Ok(diskseq)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::fd_util::{stat_is_char, stat_is_reg};
+    use nix::sys::stat::fstat;
+    use std::{fs::File, os::fd::AsRawFd, path::Path};
+
+    #[test]
+    fn test_stats() {
+        let fd_reg_file = File::open(Path::new("/bin/true")).unwrap();
+        assert!(fd_reg_file.as_raw_fd() > 0);
+        let st = fstat(fd_reg_file.as_raw_fd()).unwrap();
+        assert!(stat_is_reg(st.st_mode));
+
+        let fd_non_reg_file = File::open(Path::new("/proc/1")).unwrap();
+        assert!(fd_non_reg_file.as_raw_fd() > 0);
+        let st = fstat(fd_non_reg_file.as_raw_fd()).unwrap();
+        assert!(!stat_is_reg(st.st_mode));
+
+        let fd_char_file = File::open(Path::new("/dev/zero")).unwrap();
+        assert!(fd_char_file.as_raw_fd() > 0);
+        let st = fstat(fd_char_file.as_raw_fd()).unwrap();
+        assert!(stat_is_char(st.st_mode));
+
+        let fd_non_char_file = File::open(Path::new("/proc/1")).unwrap();
+        assert!(fd_non_char_file.as_raw_fd() > 0);
+        let st = fstat(fd_non_char_file.as_raw_fd()).unwrap();
+        assert!(!stat_is_char(st.st_mode));
+    }
 }

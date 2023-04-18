@@ -88,7 +88,7 @@ impl SocketLoad {
                 return true;
             }
 
-            if !port.sa().can_accept() {
+            if !port.can_accept() {
                 return true;
             }
         }

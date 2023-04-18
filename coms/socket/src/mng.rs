@@ -191,6 +191,8 @@ impl SocketMng {
     }
 
     pub(crate) fn start_action(&self) {
+        /* make sure the former failure doesn't disturb later action. */
+        self.set_result(SocketResult::Success);
         self.enter_start_pre();
         self.db_update();
     }
@@ -851,7 +853,7 @@ impl SocketMngPort {
 
         if self.mng().config.config_data().borrow().Socket.Accept
             && self.port.p_type() == PortType::Socket
-            && self.port.sa().can_accept()
+            && self.port.can_accept()
         {
             let afd = self.port.accept().map_err(|_e| Error::Other {
                 msg: "accept err".to_string(),

@@ -15,7 +15,7 @@
 
 use crate::{
     comm::SocketUnitComm,
-    config::{SocketAddress, SocketConfig, SocketPortConf},
+    config::{SocketConfig, SocketPortConf},
     rentry::PortType,
 };
 use basic::{fd_util, fs_util, io_util, socket_util};
@@ -78,17 +78,34 @@ impl SocketPort {
         let fd = match self.p_conf.p_type() {
             PortType::Socket => {
                 let flag = SockFlag::SOCK_CLOEXEC | SockFlag::SOCK_NONBLOCK;
-
-                let fd = self
-                    .p_conf
-                    .sa()
-                    .socket_listen(flag, 128)
-                    .context(NixSnafu)?;
-
+                let fd = match self.p_conf.socket_listen(flag, 128) {
+                    Err(e) => {
+                        log::error!("Failed to listen {}: {e}", self.p_conf.listen());
+                        return Err(Error::Nix { source: e });
+                    }
+                    Ok(v) => v,
+                };
                 self.apply_symlink();
                 fd
             }
-            PortType::Fifo => todo!(),
+            PortType::Fifo => {
+                let fd = match self.p_conf.open_fifo() {
+                    Err(e) => {
+                        log::error!("Failed to open FIFO file {}: {e}", self.p_conf.listen());
+                        return Err(Error::Nix { source: e });
+                    }
+                    Ok(v) => v,
+                };
+                self.apply_symlink();
+                fd
+            }
+            PortType::Special => match self.p_conf.open_special() {
+                Err(e) => {
+                    log::error!("Failed to open special file {}: {e}", self.p_conf.listen());
+                    return Err(Error::Nix { source: e });
+                }
+                Ok(v) => v,
+            },
             PortType::Invalid => todo!(),
         };
 
@@ -123,10 +140,9 @@ impl SocketPort {
 
     pub(super) fn unlink(&self) {
         match self.p_conf.p_type() {
-            PortType::Socket => {
-                self.p_conf.sa().unlink();
-            }
-            PortType::Fifo => todo!(),
+            PortType::Socket => self.p_conf.unlink_socket(),
+            PortType::Fifo => self.p_conf.unlink_fifo(),
+            PortType::Special => self.p_conf.unlink_special(),
             PortType::Invalid => todo!(),
         }
     }
@@ -243,12 +259,12 @@ impl SocketPort {
         self.p_conf.p_type()
     }
 
-    pub(super) fn sa(&self) -> &SocketAddress {
-        self.p_conf.sa()
-    }
-
     pub(super) fn listen(&self) -> &str {
         self.p_conf.listen()
+    }
+
+    pub(super) fn can_accept(&self) -> bool {
+        self.p_conf.can_accept()
     }
 
     pub(super) fn apply_symlink(&self) {
@@ -287,7 +303,7 @@ impl fmt::Display for SocketPort {
             f,
             "port type: {:?}, socket address: {}",
             self.p_conf.p_type(),
-            self.p_conf.sa()
+            self.p_conf.listen()
         )
     }
 }
