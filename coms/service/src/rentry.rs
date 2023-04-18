@@ -12,7 +12,7 @@
 //
 #![allow(non_snake_case)]
 use crate::monitor::ServiceMonitor;
-use basic::special::EXEC_RUNTIME_PREFIX;
+
 use confique::Config;
 use macros::EnumDisplay;
 use nix::sys::signal::Signal;
@@ -30,6 +30,9 @@ use sysmaster::exec::ExecCommand;
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use sysmaster::serialize::DeserializeWith;
 use sysmaster::unit::KillMode;
+
+use basic::special::EXEC_RUNTIME_PREFIX;
+use basic::time_util::USEC_PER_SEC;
 
 struct ServiceReDb<K, V>(ReDb<K, V>);
 
@@ -176,6 +179,18 @@ where
         .map_err(de::Error::custom)
 }
 
+fn deserialize_time<'de, D>(de: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let timeout = u64::deserialize(de)?;
+    if timeout >= u64::MAX / USEC_PER_SEC {
+        return Ok(u64::MAX);
+    }
+
+    Ok(timeout * USEC_PER_SEC)
+}
+
 #[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
 pub(super) struct SectionService {
     #[config(deserialize_with = ServiceType::deserialize_with)]
@@ -228,10 +243,13 @@ pub(super) struct SectionService {
     pub EnvironmentFile: Vec<String>,
     #[config(default = "SIGTERM")]
     pub KillSignal: String,
+    #[config(deserialize_with = deserialize_time)]
     #[config(default = 0)]
     pub TimeoutSec: u64,
+    #[config(deserialize_with = deserialize_time)]
     #[config(default = 0)]
     pub TimeoutStartSec: u64,
+    #[config(deserialize_with = deserialize_time)]
     #[config(default = 0)]
     pub TimeoutStopSec: u64,
 }
