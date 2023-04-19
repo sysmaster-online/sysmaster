@@ -54,8 +54,11 @@ impl ServiceSpawn {
         ec_flags: ExecFlags,
     ) -> Result<Pid> {
         let mut params = ExecParameters::new();
+        let config_refcell = self.config.config_data();
+        let service_config = &config_refcell.borrow().Service;
+
         params.set_exec_flags(ec_flags);
-        params.set_nonblock(self.config.config_data().borrow().Service.NonBlocking);
+        params.set_nonblock(service_config.NonBlocking);
 
         params.add_env(
             "PATH",
@@ -82,48 +85,35 @@ impl ServiceSpawn {
             params.insert_fds(self.collect_socket_fds());
         }
 
-        if self.config.service_type() == ServiceType::Notify
-            || self.config.config_data().borrow().Service.WatchdogSec > 0
-        {
+        if self.config.service_type() == ServiceType::Notify || service_config.WatchdogSec > 0 {
             let notify_sock = um.notify_socket().unwrap();
             log::debug!("add NOTIFY_SOCKET env: {}", notify_sock.to_str().unwrap());
             params.add_env("NOTIFY_SOCKET", notify_sock.to_str().unwrap().to_string());
             params.set_notify_sock(notify_sock);
         }
 
-        if let Err(e) = params.add_user(self.config.config_data().borrow().Service.User.clone()) {
-            log::error!(
-                "Failed to add user to execute parameters: {}",
-                e.to_string()
-            );
+        if let Err(e) = params.add_user(service_config.User.clone()) {
+            log::error!("Failed to add user to execute parameters: {e}");
             return Err(e);
         }
 
-        if let Err(e) = params.add_group(self.config.config_data().borrow().Service.Group.clone()) {
-            log::error!(
-                "Failed to add group to execute parameters: {}",
-                e.to_string()
-            );
+        if let Err(e) = params.add_group(service_config.Group.clone()) {
+            log::error!("Failed to add group to execute parameters: {e}");
             return Err(e);
         }
 
-        if let Err(e) = params.add_umask(self.config.config_data().borrow().Service.UMask.clone()) {
-            log::error!(
-                "Failed to add umask to execute parameters: {}",
-                e.to_string()
-            );
+        if let Err(e) = params.add_umask(service_config.UMask.clone()) {
+            log::error!("Failed to add umask to execute parameters: {e}");
             return Err(e);
         }
 
-        if let Err(e) = params.add_working_directory(
-            self.config
-                .config_data()
-                .borrow()
-                .Service
-                .WorkingDirectory
-                .clone(),
-        ) {
-            log::error!("Failed to add working directory: {}", e.to_string());
+        if let Err(e) = params.add_root_directory(service_config.RootDirectory.clone()) {
+            log::error!("Failed to add root directory: {e}");
+            return Err(e);
+        }
+
+        if let Err(e) = params.add_working_directory(service_config.WorkingDirectory.clone()) {
+            log::error!("Failed to add working directory: {e}");
             return Err(e);
         }
 

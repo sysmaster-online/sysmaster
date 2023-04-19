@@ -134,10 +134,10 @@ impl DeserializeWith for ExecCommand {
             let exec_cmd = command.remove(0);
             let path = Path::new(&exec_cmd);
 
-            if path.is_absolute() && !path.exists() {
+            if !path.is_absolute() {
                 return Err(de::Error::invalid_value(
                     Unexpected::Str(&exec_cmd),
-                    &"no exist absolute path",
+                    &"only accept absolute path",
                 ));
             }
 

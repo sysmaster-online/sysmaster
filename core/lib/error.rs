@@ -50,7 +50,7 @@ pub enum Error {
         msg: String,
     },
 
-    #[snafu(display("Confique  error"))]
+    #[snafu(display("Confique error"))]
     Confique {
         source: confique::Error,
     },

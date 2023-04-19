@@ -16,7 +16,7 @@ use nix::fcntl::FcntlArg;
 use nix::sys::signal::{pthread_sigmask, SigmaskHow};
 use nix::sys::signalfd::SigSet;
 use nix::sys::stat::Mode;
-use nix::unistd::{self, setresgid, setresuid, ForkResult, Gid, Group, Pid, Uid, User};
+use nix::unistd::{self, chroot, setresgid, setresuid, ForkResult, Gid, Group, Pid, Uid, User};
 use regex::Regex;
 use std::path::PathBuf;
 use std::process;
@@ -94,11 +94,17 @@ fn apply_user_and_group(
     setresuid(user.uid, user.uid, user.uid).context(NixSnafu)
 }
 
+fn apply_root_directory(root_directory: Option<PathBuf>) -> Result<()> {
+    let root_directory = match root_directory {
+        None => return Ok(()),
+        Some(v) => v,
+    };
+    chroot(&root_directory).context(NixSnafu)
+}
+
 fn apply_working_directory(working_directory: Option<PathBuf>) -> Result<()> {
     let working_directory = match working_directory {
-        None => {
-            return Ok(());
-        }
+        None => return Ok(()),
         Some(v) => v,
     };
     std::env::set_current_dir(working_directory).context(IoSnafu)
@@ -117,6 +123,11 @@ fn apply_umask(umask: Option<Mode>) -> Result<()> {
 
 fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: Rc<ExecContext>) {
     log::debug!("exec context params: {:?}", ctx.envs());
+
+    if let Err(e) = apply_root_directory(params.get_root_directory()) {
+        log::error!("Failed to apply root directory: {}", e.to_string());
+        return;
+    }
 
     if let Err(e) = apply_user_and_group(params.get_user(), params.get_group(), params) {
         log::error!("Failed to apply user or group: {}", e.to_string());

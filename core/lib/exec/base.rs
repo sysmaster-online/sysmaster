@@ -103,6 +103,7 @@ pub struct ExecParameters {
     environment: Rc<EnvData>,
     fds: Vec<i32>,
     notify_sock: Option<PathBuf>,
+    root_directory: Option<PathBuf>,
     working_directory: Option<PathBuf>,
     user: Option<User>,
     group: Option<Group>,
@@ -155,6 +156,7 @@ impl ExecParameters {
             environment: Rc::new(EnvData::new()),
             fds: Vec::new(),
             notify_sock: None,
+            root_directory: None,
             working_directory: None,
             user: None,
             group: None,
@@ -203,6 +205,29 @@ impl ExecParameters {
     /// set the NOTIFY_SOCKET value
     pub fn set_notify_sock(&mut self, notify_sock: PathBuf) {
         self.notify_sock = Some(notify_sock)
+    }
+
+    // Just check if the given directory exists
+    fn add_directory_common(directory_str: String) -> Result<Option<PathBuf>> {
+        if directory_str.is_empty() {
+            return Ok(None);
+        }
+        let directory = PathBuf::from(&directory_str);
+        if !directory.is_dir() {
+            return Err(Error::InvalidData);
+        }
+        Ok(Some(directory))
+    }
+
+    /// add RootDirectory
+    pub fn add_root_directory(&mut self, root_directory_str: String) -> Result<()> {
+        self.root_directory = Self::add_directory_common(root_directory_str)?;
+        Ok(())
+    }
+
+    /// get RootDirectory
+    pub fn get_root_directory(&self) -> Option<PathBuf> {
+        self.root_directory.clone()
     }
 
     /// add WorkingDirectory

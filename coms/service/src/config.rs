@@ -72,7 +72,14 @@ impl ServiceConfig {
             builder = builder.file(v);
         }
 
-        *self.data.borrow_mut() = builder.load().context(ConfiqueSnafu)?;
+        *self.data.borrow_mut() = match builder.load() {
+            Err(e) => {
+                /* The error message is pretty readable, just print it out. */
+                log::error!("{e}");
+                return Err(Error::Confique { source: e });
+            }
+            Ok(v) => v,
+        };
 
         if update {
             self.db_update();
