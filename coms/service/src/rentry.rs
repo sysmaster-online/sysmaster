@@ -219,6 +219,8 @@ pub(super) struct SectionService {
     #[config(default = false)]
     pub RemainAfterExit: bool,
     pub NotifyAccess: Option<NotifyAccess>,
+    #[config(default = false)]
+    pub NonBlocking: bool,
     pub Environment: Option<HashMap<String, String>>,
     #[config(deserialize_with = KillMode::deserialize_with)]
     #[config(default = "none")]

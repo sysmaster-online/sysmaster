@@ -173,7 +173,7 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
         return;
     }
 
-    if !flags_fds(&mut keep_fds) {
+    if !flags_fds(&mut keep_fds, params.get_nonblock()) {
         log::error!("flags set all fds error");
         return;
     }
@@ -335,9 +335,9 @@ fn shift_fds(fds: &mut Vec<i32>) -> bool {
     true
 }
 
-fn flags_fds(fds: &mut Vec<i32>) -> bool {
+fn flags_fds(fds: &mut Vec<i32>, nonblock: bool) -> bool {
     for fd in fds {
-        if let Err(_e) = fd_util::fd_nonblock(*fd, false) {
+        if let Err(_e) = fd_util::fd_nonblock(*fd, nonblock) {
             return false;
         }
 

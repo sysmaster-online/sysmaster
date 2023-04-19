@@ -36,11 +36,14 @@ pub fn fd_nonblock(fd: i32, nonblock: bool) -> Result<()> {
     let flags = nix::fcntl::fcntl(fd, FcntlArg::F_GETFL).context(NixSnafu)?;
     let fd_flag = unsafe { OFlag::from_bits_unchecked(flags) };
 
-    let n_block = match nonblock {
-        true => OFlag::O_NONBLOCK,
-        false => !OFlag::O_NONBLOCK,
+    let nflag = match nonblock {
+        true => fd_flag | OFlag::O_NONBLOCK,
+        false => fd_flag & !OFlag::O_NONBLOCK,
     };
-    let nflag = fd_flag & n_block;
+
+    if nflag == fd_flag {
+        return Ok(());
+    }
 
     nix::fcntl::fcntl(fd, FcntlArg::F_SETFL(nflag)).context(NixSnafu)?;
 
@@ -163,22 +166,22 @@ mod tests {
     #[test]
     fn test_stats() {
         let fd_reg_file = File::open(Path::new("/bin/true")).unwrap();
-        assert!(fd_reg_file.as_raw_fd() > 0);
+        assert!(fd_reg_file.as_raw_fd() >= 0);
         let st = fstat(fd_reg_file.as_raw_fd()).unwrap();
         assert!(stat_is_reg(st.st_mode));
 
         let fd_non_reg_file = File::open(Path::new("/proc/1")).unwrap();
-        assert!(fd_non_reg_file.as_raw_fd() > 0);
+        assert!(fd_non_reg_file.as_raw_fd() >= 0);
         let st = fstat(fd_non_reg_file.as_raw_fd()).unwrap();
         assert!(!stat_is_reg(st.st_mode));
 
         let fd_char_file = File::open(Path::new("/dev/zero")).unwrap();
-        assert!(fd_char_file.as_raw_fd() > 0);
+        assert!(fd_char_file.as_raw_fd() >= 0);
         let st = fstat(fd_char_file.as_raw_fd()).unwrap();
         assert!(stat_is_char(st.st_mode));
 
         let fd_non_char_file = File::open(Path::new("/proc/1")).unwrap();
-        assert!(fd_non_char_file.as_raw_fd() > 0);
+        assert!(fd_non_char_file.as_raw_fd() >= 0);
         let st = fstat(fd_non_char_file.as_raw_fd()).unwrap();
         assert!(!stat_is_char(st.st_mode));
     }
