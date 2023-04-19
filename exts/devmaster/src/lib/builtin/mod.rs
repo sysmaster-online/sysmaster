@@ -20,6 +20,7 @@ use std::{
     collections::HashMap,
     fmt::{self, Display},
     str::FromStr,
+    sync::{Arc, Mutex},
 };
 
 pub mod blkid;
@@ -43,7 +44,7 @@ pub trait Builtin {
     /// builtin command
     fn cmd(
         &self,
-        device: &mut Device,
+        device: Arc<Mutex<Device>>,
         ret_rtnl: &mut RefCell<Option<Netlink>>,
         argc: i32,
         argv: Vec<String>,
@@ -213,7 +214,7 @@ impl BuiltinManager {
     #[allow(dead_code)]
     pub fn run(
         &self,
-        device: &mut Device,
+        device: Arc<Mutex<Device>>,
         ret_rtnl: &mut RefCell<Option<Netlink>>,
         cmd: BuiltinCommand,
         argc: i32,
@@ -232,7 +233,7 @@ mod tests {
     use super::BuiltinManager;
     use super::Netlink;
     use device::device_enumerator::DeviceEnumerator;
-    use std::{cell::RefCell, ops::DerefMut};
+    use std::cell::RefCell;
 
     #[test]
     fn test_builtin_manager() {
@@ -244,12 +245,10 @@ mod tests {
         mgr.init();
 
         for device in enumerator.iter_mut() {
-            let mut binding = device.as_ref().lock().unwrap();
-            let device = binding.deref_mut();
             let mut rtnl = RefCell::<Option<Netlink>>::from(None);
 
             for (_, v) in mgr.builtins.iter() {
-                v.cmd(device, &mut rtnl, 0, vec![], false).unwrap();
+                v.cmd(device.clone(), &mut rtnl, 0, vec![], false).unwrap();
             }
         }
 
