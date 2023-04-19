@@ -179,15 +179,17 @@ where
         .map_err(de::Error::custom)
 }
 
-fn deserialize_time<'de, D>(de: D) -> Result<u64, D::Error>
+fn deserialize_timeout<'de, D>(de: D) -> Result<u64, D::Error>
 where
     D: Deserializer<'de>,
 {
     let timeout = u64::deserialize(de)?;
+    if timeout == 0 {
+        return Ok(u64::MAX);
+    }
     if timeout >= u64::MAX / USEC_PER_SEC {
         return Ok(u64::MAX);
     }
-
     Ok(timeout * USEC_PER_SEC)
 }
 
@@ -238,20 +240,20 @@ pub(super) struct SectionService {
     #[config(deserialize_with = ExitStatusSet::deserialize_with)]
     #[config(default = "")]
     pub RestartPreventExitStatus: ExitStatusSet,
-    #[config(default = 0)]
+    #[config(default = 100000)]
     pub RestartSec: u64,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]
     pub EnvironmentFile: Vec<String>,
     #[config(default = "SIGTERM")]
     pub KillSignal: String,
-    #[config(deserialize_with = deserialize_time)]
+    #[config(deserialize_with = deserialize_timeout)]
     #[config(default = 0)]
     pub TimeoutSec: u64,
-    #[config(deserialize_with = deserialize_time)]
+    #[config(deserialize_with = deserialize_timeout)]
     #[config(default = 0)]
     pub TimeoutStartSec: u64,
-    #[config(deserialize_with = deserialize_time)]
+    #[config(deserialize_with = deserialize_timeout)]
     #[config(default = 0)]
     pub TimeoutStopSec: u64,
 }

@@ -1804,7 +1804,7 @@ impl RunningData {
     pub(super) fn enable_timer(&self, usec: u64) -> Result<i32> {
         let events = self.comm.um().events();
 
-        if usec == 0 || usec == u64::MAX {
+        if usec == u64::MAX {
             // which means not enable the service timer, so delete the previous timer
             if self.armd_timer() {
                 let timer = self.timer();
