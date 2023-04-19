@@ -21,36 +21,41 @@ function test01() {
         sed -i "/Description=/ a AssertPathExists=\"/tmp/path_exist\"" ${SYSMST_LIB_PATH}/base.service
     fi
     rm -rf /tmp/path_exist
-    run_sysmaster || return 1
+    sctl daemon-reload
+    echo > "${SYSMST_LOG}"
 
     # path not exist
     sctl start base.service &> log
-    check_status base.service inactive || return 1
+    check_status base.service inactive
+    expect_eq $? 0 || return 1
     if [ "${condition_test}" -eq 0 ]; then
         check_log log "${key_log_2}"
+        expect_eq $? 0
     elif [ "${condition_test}" -eq 1 ]; then
         expect_str_eq "$(cat log)" ''
     fi
     check_log "${SYSMST_LOG}" "${key_log_1}"
+    expect_eq $? 0
     rm -rf log
 
     # file path
     touch /tmp/path_exist
     sctl stop base.service
     sctl start base.service
-    check_status base.service active || return 1
+    check_status base.service active
+    expect_eq $? 0 || return 1
 
     # dir path
     sctl stop base.service
     rm -rf /tmp/path_exist
     mkdir /tmp/path_exist
     sctl start base.service
-    check_status base.service active || return 1
+    check_status base.service active
+    expect_eq $? 0 || return 1
 
     # clean
     sctl stop base.service
     rm -rf /tmp/path_exist
-    kill_sysmaster
 }
 
 # usage: test ConditionFileNotEmpty/AssertFileNotEmpty
@@ -62,22 +67,23 @@ function test02() {
     elif [ "${condition_test}" -eq 0 ]; then
         sed -i "/Description=/ a AssertFileNotEmpty=\"/tmp\"" ${SYSMST_LIB_PATH}/base.service
     fi
-    run_sysmaster || return 1
+    sctl daemon-reload
+    echo > "${SYSMST_LOG}"
 
     # path is directory
-    sctl start base.service &> log
+    sctl restart base.service &> log
     sleep 1
-    check_status base.service inactive || return 1
+    check_status base.service inactive
+    expect_eq $? 0 || return 1
     if [ "${condition_test}" -eq 0 ]; then
         check_log log "${key_log_2}"
+        expect_eq $? 0
     elif [ "${condition_test}" -eq 1 ]; then
         expect_str_eq "$(cat log)" ''
     fi
     check_log "${SYSMST_LOG}" "${key_log_1}"
+    expect_eq $? 0
     rm -rf log
-
-    # clean
-    kill_sysmaster
 
     rm -rf /tmp/file_not_empty
     if [ "${condition_test}" -eq 1 ]; then
@@ -85,12 +91,13 @@ function test02() {
     elif [ "${condition_test}" -eq 0 ]; then
         sed -i '/AssertFileNotEmpty=/ s#/tmp#/tmp/file_not_empty#' ${SYSMST_LIB_PATH}/base.service
     fi
-    run_sysmaster || return 1
+    sctl daemon-reload
 
     # path not exist
-    sctl start base.service &> log
+    sctl restart base.service &> log
     sleep 1
-    check_status base.service inactive || return 1
+    check_status base.service inactive
+    expect_eq $? 0 || return 1
     if [ "${condition_test}" -eq 0 ]; then
         check_log log "${key_log_2}"
     elif [ "${condition_test}" -eq 1 ]; then
@@ -102,7 +109,8 @@ function test02() {
     touch /tmp/file_not_empty
     sctl restart base.service &> log
     sleep 1
-    check_status base.service inactive || return 1
+    check_status base.service inactive
+    expect_eq $? 0 || return 1
     if [ "${condition_test}" -eq 0 ]; then
         check_log log "${key_log_2}"
     elif [ "${condition_test}" -eq 1 ]; then
@@ -114,12 +122,12 @@ function test02() {
     echo 1 > /tmp/file_not_empty
     sctl stop base.service
     sctl start base.service
-    check_status base.service active || return 1
+    check_status base.service active
+    expect_eq $? 0 || return 1
 
     # clean
     sctl stop base.service
     rm -rf /tmp/file_not_empty
-    kill_sysmaster
 }
 
 # usage: test ConditionPathIsReadWrite/AssertPathIsReadWrite
@@ -131,25 +139,30 @@ function test03() {
     elif [ "${condition_test}" -eq 0 ]; then
         sed -i "/Description=/ a AssertPathIsReadWrite=\"/path_rw\"" ${SYSMST_LIB_PATH}/base.service
     fi
-    run_sysmaster || return 1
+    sctl daemon-reload
+    echo > "${SYSMST_LOG}"
 
     # path not exist
-    sctl start base &> log
+    sctl restart base &> log
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     if [ "${condition_test}" -eq 0 ]; then
         check_log log "${key_log_2}"
+        expect_eq $? 0
     elif [ "${condition_test}" -eq 1 ]; then
         expect_str_eq "$(cat log)" ''
     fi
     check_log "${SYSMST_LOG}" "${key_log_1}"
+    expect_eq $? 0
     rm -rf log
 
     # valid path
     mkdir /path_rw
     sctl stop base
     sctl start base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
 
     # ro mounted path
     which mount || install_pkg /usr/bin/mount
@@ -162,9 +175,11 @@ function test03() {
     mount | grep path_rw
     sctl restart base &> log
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     if [ "${condition_test}" -eq 0 ]; then
         check_log log "${key_log_2}"
+        expect_eq $? 0
     elif [ "${condition_test}" -eq 1 ]; then
         expect_str_eq "$(cat log)" ''
     fi
@@ -174,7 +189,6 @@ function test03() {
     sctl stop base
     umount /path_rw || umount -l /path_rw
     rm -rf /tmp/mountfile /path_rw
-    kill_sysmaster
 }
 
 # usage: test ConditionDirectoryNotEmpty
@@ -187,38 +201,45 @@ function test04() {
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
-    run_sysmaster || return 1
+    sctl daemon-reload
 
     # directory not exist
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # directory empty
     mkdir -p /${dir}
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # directory not empty
     mkdir -p /${dir}/dir
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl stop base
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     rm -rf /${dir}/${dir}
     touch /${dir}/.file
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl stop base
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # file
     rm -rf /${dir}
     touch /${dir}
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # symbolic link to dir
     rm -rf /${dir}
@@ -227,15 +248,17 @@ function test04() {
     expect_eq $? 0
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     touch /${dir}_source/file
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl stop base
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     # clean
     rm -rf /${dir}_source /${dir}
-    kill_sysmaster
 }
 
 # usage: test ConditionFileIsExecutable
@@ -247,37 +270,39 @@ function test05() {
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
-    run_sysmaster || return 1
+    sctl daemon-reload
 
     # directory
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
-    # clean
-    kill_sysmaster
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # file not exist
     local file=file_"$RANDOM"
     sed -i "s#ConditionFileIsExecutable=.*#ConditionFileIsExecutable=\"/${file}\"#" ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # file not executable
     touch /${file}
     chmod 400 /${file}
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # file executable
     chmod +x /${file}
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl stop base
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # symbolic link
     rm -rf /${file}
@@ -286,15 +311,17 @@ function test05() {
     ln -s /${file}_source /${file}
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     chmod +x /${file}_source
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl stop base
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     # clean
     rm -rf /${file}_source /${file}
-    kill_sysmaster
 }
 
 # usage: test ConditionPathExistsGlob
@@ -307,23 +334,25 @@ function test06() {
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     touch /tmp/file
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     touch /tmp/${file}_1
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     # clean
     sctl stop base
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     rm -rf /tmp/file /tmp/${file}_1
-    kill_sysmaster
 }
 
 # usage: test ConditionPathIsDirectory
@@ -335,49 +364,49 @@ function test07() {
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     sctl restart base
-    check_status base active || return 1
-    # clean
-    sctl stop base
-    check_status base inactive || return 1
-    kill_sysmaster
+    check_status base active
+    expect_eq $? 0 || return 1
 
     # path not exist
     local path=path_${RANDOM}
     sed -i "s#ConditionPathIsDirectory=.*#ConditionPathIsDirectory=\"/${path}\"#" ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # path is file
     touch /${path}
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # path is dir
     rm -rf /${path}
     mkdir /${path}
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl stop base
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # path is symbolic link
     rm -rf /${path}
     mkdir /${path}_source
     ln -s /${path}_source /${path}
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl stop base
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     # clean
     rm -rf /${path}_source /${path}
-    kill_sysmaster
 }
 
 # usage: test ConditionPathIsMountPoint
@@ -393,45 +422,44 @@ function test08() {
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     sctl restart base
-    check_status base active || return 1
-    # clean
-    sctl stop base
-    check_status base inactive || return 1
-    kill_sysmaster
+    check_status base active
+    expect_eq $? 0 || return 1
 
     # path not exist
     local path=path_${RANDOM}
     sed -i "s#ConditionPathIsMountPoint=.*#ConditionPathIsMountPoint=\"/${path}\"#" ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # path not mount point
     touch /${path}
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     rm -rf /${path}
     mkdir /${path}
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # symbolic mount point
     rm -rf /${path}
     ln -s ${mnt} /${path}
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     # clean
     sctl stop base
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     rm -rf /${path}
-    kill_sysmaster
 }
 
 # usage: test ConditionPathIsSymbolicLink
@@ -443,40 +471,44 @@ function test09() {
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # path not exist
     local path=path_${RANDOM}
     sed -i "s#ConditionPathIsSymbolicLink=.*#ConditionPathIsSymbolicLink=\"/${path}\"#" ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     sctl restart base
     sleep 1
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # path is symbolic
     rm -rf /${path}
     ln -s /boot /${path}
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl stop base
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     rm -rf /${path}
     touch /${path}_source
     ln -s /${path}_source /${path}
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl stop base
-    check_status base inactive || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
     # clean
     rm -rf /${path}_source /${path}
-    kill_sysmaster
 }
 
+run_sysmaster || exit 1
 test01 || exit 1
 test02 || exit 1
 test03 || exit 1
