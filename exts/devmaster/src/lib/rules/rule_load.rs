@@ -729,7 +729,7 @@ impl RuleToken {
                 }
 
                 Ok(RuleToken::new(
-                    TokenType::MatchParentsSubsystem,
+                    TokenType::MatchParentsKernel,
                     op,
                     None,
                     value,
