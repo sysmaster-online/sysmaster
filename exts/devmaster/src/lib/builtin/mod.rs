@@ -92,7 +92,14 @@ impl FromStr for BuiltinCommand {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
+        let tokens: Vec<&str> = s.split(' ').collect();
+        if tokens.is_empty() {
+            return Err(Error::BuiltinCommandError {
+                msg: "invalid builtin command",
+            });
+        }
+
+        match tokens[0] {
             "blkid" => Ok(BuiltinCommand::Blkid),
             "btrfs" => Ok(BuiltinCommand::Btrfs),
             "hwdb" => Ok(BuiltinCommand::Hwdb),

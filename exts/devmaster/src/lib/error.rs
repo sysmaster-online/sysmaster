@@ -53,15 +53,21 @@ pub enum Error {
     #[snafu(display("Rules loader: {}", msg))]
     RulesLoadError {
         /// message
-        msg: &'static str,
+        msg: String,
     },
 
     /// Error encountered in rules loader
     #[snafu(display("Rules loader: {}", msg))]
     RulesExecuteError {
         /// message
-        msg: &'static str,
+        msg: String,
         /// error number
         errno: nix::errno::Errno,
+    },
+
+    /// Errors that can be ignored
+    IgnoreError {
+        /// message
+        msg: String,
     },
 }

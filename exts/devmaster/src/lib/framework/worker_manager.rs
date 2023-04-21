@@ -17,7 +17,6 @@ use device::{
     device_monitor::{DeviceMonitor, MonitorNetlinkGroup},
 };
 use event::{EventState, EventType, Events, Source};
-use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -30,6 +29,7 @@ use std::{
     cell::RefCell,
     sync::{Arc, Mutex},
 };
+use std::{collections::HashMap, sync::RwLock};
 
 use crate::{error::Error, rules::Rules};
 use crate::{
@@ -118,7 +118,12 @@ impl Display for WorkerState {
 /// public methods
 impl Worker {
     /// create a new worker, start running the worker thread
-    pub(crate) fn new(id: u32, state: WorkerState, tcp_address: String, rules: Rules) -> Worker {
+    pub(crate) fn new(
+        id: u32,
+        state: WorkerState,
+        tcp_address: String,
+        rules: Arc<RwLock<Rules>>,
+    ) -> Worker {
         let (tx, rx) = mpsc::channel::<WorkerMessage>();
 
         // share rules in worker threads. worker should only read rules to avoid lock being poisoned.
@@ -130,7 +135,7 @@ impl Worker {
 
             let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
 
-            println!("{}", rules);
+            println!("{}", rules.as_ref().read().unwrap());
 
             match msg {
                 WorkerMessage::Job(device) => {

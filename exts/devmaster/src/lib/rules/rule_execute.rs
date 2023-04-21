@@ -86,7 +86,7 @@ impl ExecuteUnit {
 
 /// manage processing units
 pub struct ExecuteManager {
-    rules: Rules,
+    rules: Arc<RwLock<Rules>>,
 
     current_rule_file: Option<Arc<RwLock<RuleFile>>>,
     current_rule_line: Option<Arc<RwLock<RuleLine>>>,
@@ -97,7 +97,7 @@ pub struct ExecuteManager {
 
 impl ExecuteManager {
     /// create a execute manager object
-    pub fn new(rules: Rules) -> ExecuteManager {
+    pub fn new(rules: Arc<RwLock<Rules>>) -> ExecuteManager {
         ExecuteManager {
             rules,
             current_rule_file: None,
@@ -169,7 +169,7 @@ impl ExecuteManager {
 
     /// apply rules on device
     pub(crate) fn apply_rules(&mut self) -> Result<()> {
-        self.current_rule_file = self.rules.files.clone();
+        self.current_rule_file = self.rules.as_ref().read().unwrap().files.clone();
 
         loop {
             let next_file = self
@@ -217,16 +217,13 @@ impl ExecuteManager {
     }
 
     /// apply rule line on device
+    /// normally return the next rule line after current line
+    /// if current line has goto label, use the line with the target label as the next line
     pub(crate) fn apply_rule_line(&mut self) -> Result<Option<Arc<RwLock<RuleLine>>>> {
-        self.current_rule_token = self
-            .current_rule_line
-            .clone()
-            .unwrap()
-            .as_ref()
-            .read()
-            .unwrap()
-            .tokens
-            .clone();
+        self.current_rule_token = match self.current_rule_line.clone() {
+            Some(line) => line.as_ref().read().unwrap().tokens.clone(),
+            None => return Ok(None),
+        };
 
         // only apply rule token on parent device once
         // that means if some a parent device matches the token, do not match any parent tokens in the following

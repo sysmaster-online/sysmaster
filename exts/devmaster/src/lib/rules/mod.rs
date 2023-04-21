@@ -11,10 +11,14 @@
 // See the Mulan PSL v2 for more details.
 
 //! rule loader and executer
+//! the implementation of rules has referred to udev for compatibility.
 //!
 
 use crate::error::Error;
+use bitflags::bitflags;
+use nix::unistd::{Group, User};
 use std::{
+    collections::HashMap,
     fmt::{self, Display},
     str::FromStr,
     sync::{Arc, RwLock, Weak},
@@ -33,6 +37,17 @@ pub struct Rules {
 
     /// current rule file
     files_tail: Option<Arc<RwLock<RuleFile>>>,
+
+    /// directories for searching rule files
+    dirs: Vec<String>,
+
+    /// format time
+    resolve_name_time: ResolveNameTime,
+
+    /// users declared in rules by 'OWNER'
+    users: HashMap<String, User>,
+    /// groups declared in rules by 'GROUP'
+    groups: HashMap<String, Group>,
 }
 
 /// rule file is the basic unit to process the device
@@ -63,6 +78,9 @@ pub struct RuleLine {
     line: String,
     /// the line number in its rule file
     line_number: u32,
+
+    /// line type
+    r#type: RuleLineType,
 
     /// whether this line has label token
     label: Option<String>,
@@ -152,11 +170,13 @@ pub(crate) enum TokenType {
     AssignMode,
     AssignOwnerId,
     AssignGroupId,
+    AssignModeId,
     AssignTag,
     AssignOptionsStaticNode,
     AssignSeclabel,
     AssignEnv,
     AssignName,
+
     /// key = "SYMLINK", operator = "=|+=|-=|:="
     AssignDevlink,
     AssignAttr,
@@ -198,7 +218,7 @@ impl FromStr for OperatorType {
             "-=" => Ok(OperatorType::Remove),
             ":=" => Ok(OperatorType::AssignFinal),
             _ => Err(Error::RulesLoadError {
-                msg: "Invalid operator",
+                msg: "Invalid operator".to_string(),
             }),
         }
     }
@@ -365,6 +385,26 @@ impl Display for RuleToken {
     }
 }
 
+bitflags! {
+    /// value matching type
+    pub(crate) struct RuleLineType: u8 {
+        /// initial type
+        const INITIAL = 0;
+        /// has NAME=
+        const HAS_NAME = 1<<0;
+        /// has SYMLINK=, OWNER=, GROUP= or MODE=
+        const HAS_DEVLINK = 1<<1;
+        /// has OPTIONS=static_node
+        const HAS_STATIC_NODE = 1<<2;
+        /// has GOTO=
+        const HAS_GOTO = 1<<3;
+        /// has LABEL=
+        const HAS_LABEL = 1<<4;
+        /// has other Assign* or MatchImport* tokens
+        const UPDATE_SOMETHING = 1<<5;
+    }
+}
+
 // bitflags! {
 //     /// value matching type
 //     pub(crate) struct MatchType: u8 {
@@ -377,12 +417,122 @@ impl Display for RuleToken {
 //     }
 // }
 
-// /// substitute string
-// pub(crate) enum SubstituteType {
-//     /// no substitution
-//     Plain,
-//     /// contain $ or %
-//     Format,
-//     /// [<SBUSTYEM>|<KERNEL>]<attribute>
-//     Subsys,
-// }
+/// substitute string
+#[derive(Eq, PartialEq)]
+pub(crate) enum SubstituteType {
+    /// no substitution
+    Plain,
+    /// contain $ or %
+    Format,
+    /// [<SBUSTYEM>|<KERNEL>]<attribute>
+    Subsys,
+}
+
+impl FromStr for SubstituteType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<SubstituteType, Self::Err> {
+        if s.is_empty() {
+            return Ok(SubstituteType::Plain);
+        }
+
+        if s.starts_with('[') {
+            return Ok(SubstituteType::Subsys);
+        }
+
+        if s.contains(['%', '$']) {
+            return Ok(SubstituteType::Format);
+        }
+
+        Ok(SubstituteType::Plain)
+    }
+}
+
+/// the time when to format a string
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[allow(dead_code)]
+pub(crate) enum ResolveNameTime {
+    /// never format a string
+    Never,
+    /// do not format the string until rule execution
+    Late,
+    /// format the string when loading the rules
+    Early,
+}
+
+/// formatter substitution type
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
+pub(crate) enum FormatSubstitutionType {
+    Devnode,
+    Attr,
+    Env,
+    Kernel,
+    KernelNumber,
+    Driver,
+    Devpath,
+    Id,
+    Major,
+    Minor,
+    Result,
+    Parent,
+    Name,
+    Links,
+    Root,
+    Sys,
+    #[default]
+    Invalid,
+}
+
+impl FromStr for FormatSubstitutionType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<FormatSubstitutionType, Self::Err> {
+        match s {
+            "devnode" | "N" | "tempnode" => Ok(FormatSubstitutionType::Devnode),
+            "attr" | "sysfs" | "s" => Ok(FormatSubstitutionType::Attr),
+            "env" | "E" => Ok(FormatSubstitutionType::Env),
+            "kernel" | "k" => Ok(FormatSubstitutionType::Kernel),
+            "number" | "n" => Ok(FormatSubstitutionType::KernelNumber),
+            "driver" | "d" => Ok(FormatSubstitutionType::Driver),
+            "devpath" | "p" => Ok(FormatSubstitutionType::Devpath),
+            "id" | "b" => Ok(FormatSubstitutionType::Id),
+            "major" | "M" => Ok(FormatSubstitutionType::Major),
+            "minor" | "m" => Ok(FormatSubstitutionType::Minor),
+            "result" | "c" => Ok(FormatSubstitutionType::Result),
+            "parent" | "P" => Ok(FormatSubstitutionType::Parent),
+            "name" | "D" => Ok(FormatSubstitutionType::Name),
+            "links" | "L" => Ok(FormatSubstitutionType::Links),
+            "root" | "r" => Ok(FormatSubstitutionType::Root),
+            "sys" | "S" => Ok(FormatSubstitutionType::Sys),
+            _ => Err(Error::RulesLoadError {
+                msg: "Invalid substitute formatter".to_string(),
+            }),
+        }
+    }
+}
+
+impl Display for FormatSubstitutionType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            FormatSubstitutionType::Devnode => "devnode",
+            FormatSubstitutionType::Attr => "attr",
+            FormatSubstitutionType::Env => "env",
+            FormatSubstitutionType::Kernel => "kernel",
+            FormatSubstitutionType::KernelNumber => "kernel number",
+            FormatSubstitutionType::Driver => "driver",
+            FormatSubstitutionType::Devpath => "devpath",
+            FormatSubstitutionType::Id => "id",
+            FormatSubstitutionType::Major => "major",
+            FormatSubstitutionType::Minor => "minor",
+            FormatSubstitutionType::Result => "result",
+            FormatSubstitutionType::Parent => "parent",
+            FormatSubstitutionType::Name => "name",
+            FormatSubstitutionType::Links => "links",
+            FormatSubstitutionType::Root => "root",
+            FormatSubstitutionType::Sys => "sys",
+            FormatSubstitutionType::Invalid => "invalid substitute formatter",
+        };
+
+        write!(f, "{}", s)
+    }
+}
