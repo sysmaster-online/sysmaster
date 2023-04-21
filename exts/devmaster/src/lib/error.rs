@@ -50,14 +50,14 @@ pub enum Error {
     },
 
     /// Error encountered in rules loader
-    #[snafu(display("Rules loader: {}", msg))]
+    #[snafu(display("Failed to load rule: {}", msg))]
     RulesLoadError {
         /// message
         msg: String,
     },
 
     /// Error encountered in rules loader
-    #[snafu(display("Rules loader: {}", msg))]
+    #[snafu(display("Failed to execute rule: {}", msg))]
     RulesExecuteError {
         /// message
         msg: String,
@@ -66,6 +66,7 @@ pub enum Error {
     },
 
     /// Errors that can be ignored
+    #[snafu(display("Ignore error: {}", msg))]
     IgnoreError {
         /// message
         msg: String,

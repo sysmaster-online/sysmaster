@@ -13,12 +13,13 @@
 //! load rules
 //!
 
-use super::utils::{check_attr_format, check_value_format};
 use super::*;
 use crate::builtin::BuiltinCommand;
 use crate::error::{Error, Result};
+use crate::utils::*;
 use basic::parse_util::parse_mode;
 use basic::user_group_util::{parse_gid, parse_uid};
+use fnmatch_regex;
 use lazy_static::lazy_static;
 use nix::unistd::{Group, User};
 use regex::Regex;
@@ -231,7 +232,7 @@ impl RuleFile {
                 full_line.push_str(line);
                 let line = RuleLine::load_line(
                     full_line.to_string(),
-                    (line_number - offset) as u32,
+                    (line_number + 1 - offset) as u32,
                     self_ptr.clone(),
                     rules.clone(),
                 )
@@ -367,15 +368,57 @@ impl RuleToken {
         op: OperatorType,
         attr: Option<String>,
         value: String,
-    ) -> RuleToken {
-        RuleToken {
+    ) -> Result<RuleToken> {
+        let mut match_type = MatchType::Invalid;
+        let mut attr_subst_type = SubstituteType::Invalid;
+        let mut value_regex = vec![];
+
+        if r#type <= TokenType::MatchResult {
+            if r#type == TokenType::MatchSubsystem
+                && matches!(value.as_str(), "subsystem" | "bus" | "class")
+            {
+                match_type = MatchType::Subsystem;
+            }
+
+            if r#type < TokenType::MatchTest || r#type == TokenType::MatchResult {
+                // compatible with udev rules
+                for s in value.split('|') {
+                    match fnmatch_regex::glob_to_regex(s) {
+                        Ok(r) => {
+                            value_regex.push(r);
+                        }
+                        Err(_) => {
+                            return Err(Error::RulesLoadError {
+                                msg: "Failed to parse token value to regex.".to_string(),
+                            })
+                        }
+                    }
+                }
+            }
+        }
+
+        if matches!(r#type, TokenType::MatchAttr | TokenType::MatchParentsAttr) {
+            attr_subst_type = match attr.clone().unwrap_or_default().parse::<SubstituteType>() {
+                Ok(t) => t,
+                Err(_) => {
+                    return Err(Error::RulesLoadError {
+                        msg: "Failed to parse the subsittution type of attribute.".to_string(),
+                    });
+                }
+            }
+        }
+
+        Ok(RuleToken {
             r#type,
             op,
+            match_type,
+            value_regex,
+            attr_subst_type,
             attr,
             value,
             prev: None,
             next: None,
-        }
+        })
     }
 
     /// parse strings into a rule token
@@ -401,7 +444,7 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::MatchAction, op, None, value))
+                Ok(RuleToken::new(TokenType::MatchAction, op, None, value))?
             }
             "DEVPATH" => {
                 if attr.is_some() {
@@ -415,7 +458,7 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::MatchDevpath, op, None, value))
+                Ok(RuleToken::new(TokenType::MatchDevpath, op, None, value))?
             }
             "KERNEL" => {
                 if attr.is_some() {
@@ -429,7 +472,7 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::MatchKernel, op, attr, value))
+                Ok(RuleToken::new(TokenType::MatchKernel, op, attr, value))?
             }
             "SYMLINK" => {
                 if attr.is_some() {
@@ -447,9 +490,9 @@ impl RuleToken {
                     if let Err(e) = check_value_format(key.as_str(), value.as_str(), false) {
                         log::warn!("{}", e);
                     }
-                    Ok(RuleToken::new(TokenType::AssignDevlink, op, None, value))
+                    Ok(RuleToken::new(TokenType::AssignDevlink, op, None, value))?
                 } else {
-                    Ok(RuleToken::new(TokenType::MatchDevlink, op, None, value))
+                    Ok(RuleToken::new(TokenType::MatchDevlink, op, None, value))?
                 }
             }
             "NAME" => {
@@ -484,9 +527,9 @@ impl RuleToken {
                         log::warn!("{}", e);
                     }
 
-                    Ok(RuleToken::new(TokenType::AssignName, op, None, value))
+                    Ok(RuleToken::new(TokenType::AssignName, op, None, value))?
                 } else {
-                    Ok(RuleToken::new(TokenType::MatchName, op, None, value))
+                    Ok(RuleToken::new(TokenType::MatchName, op, None, value))?
                 }
             }
             "ENV" => {
@@ -534,9 +577,9 @@ impl RuleToken {
                         log::warn!("{}", e);
                     }
 
-                    Ok(RuleToken::new(TokenType::AssignEnv, op, attr, value))
+                    Ok(RuleToken::new(TokenType::AssignEnv, op, attr, value))?
                 } else {
-                    Ok(RuleToken::new(TokenType::MatchEnv, op, attr, value))
+                    Ok(RuleToken::new(TokenType::MatchEnv, op, attr, value))?
                 }
             }
             "CONST" => {
@@ -552,7 +595,7 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::MatchConst, op, attr, value))
+                Ok(RuleToken::new(TokenType::MatchConst, op, attr, value))?
             }
             "TAG" => {
                 if attr.is_some() {
@@ -573,9 +616,9 @@ impl RuleToken {
                         log::warn!("{}", e);
                     }
 
-                    Ok(RuleToken::new(TokenType::AssignTag, op, None, value))
+                    Ok(RuleToken::new(TokenType::AssignTag, op, None, value))?
                 } else {
-                    Ok(RuleToken::new(TokenType::MatchTag, op, None, value))
+                    Ok(RuleToken::new(TokenType::MatchTag, op, None, value))?
                 }
             }
             "SUBSYSTEM" => {
@@ -595,7 +638,7 @@ impl RuleToken {
                     log::warn!("The value of key 'SUBSYSTEM' must be specified as 'subsystem'");
                 }
 
-                Ok(RuleToken::new(TokenType::MatchSubsystem, op, None, value))
+                Ok(RuleToken::new(TokenType::MatchSubsystem, op, None, value))?
             }
             "DRIVER" => {
                 if attr.is_some() {
@@ -610,7 +653,7 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::MatchDriver, op, None, value))
+                Ok(RuleToken::new(TokenType::MatchDriver, op, None, value))?
             }
             "ATTR" => {
                 if let Err(e) = check_attr_format(
@@ -638,9 +681,9 @@ impl RuleToken {
                     if let Err(e) = check_value_format(key.as_str(), value.as_str(), false) {
                         log::warn!("{}", e);
                     }
-                    Ok(RuleToken::new(TokenType::AssignAttr, op, attr, value))
+                    Ok(RuleToken::new(TokenType::AssignAttr, op, attr, value))?
                 } else {
-                    Ok(RuleToken::new(TokenType::MatchAttr, op, attr, value))
+                    Ok(RuleToken::new(TokenType::MatchAttr, op, attr, value))?
                 }
             }
             "SYSCTL" => {
@@ -668,9 +711,9 @@ impl RuleToken {
                         log::warn!("{}", e);
                     }
 
-                    Ok(RuleToken::new(TokenType::AssignAttr, op, attr, value))
+                    Ok(RuleToken::new(TokenType::AssignAttr, op, attr, value))?
                 } else {
-                    Ok(RuleToken::new(TokenType::MatchAttr, op, attr, value))
+                    Ok(RuleToken::new(TokenType::MatchAttr, op, attr, value))?
                 }
             }
             "KERNELS" => {
@@ -690,7 +733,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                ))
+                ))?
             }
             "SUBSYSTEMS" => {
                 if attr.is_some() {
@@ -709,7 +752,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                ))
+                ))?
             }
             "DRIVERS" => {
                 if attr.is_some() {
@@ -728,7 +771,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                ))
+                ))?
             }
             "ATTRS" => {
                 if let Err(e) = check_attr_format(
@@ -753,7 +796,7 @@ impl RuleToken {
                     log::warn!("direct reference to parent directory may be deprecated in future.");
                 }
 
-                Ok(RuleToken::new(TokenType::MatchParentsAttr, op, attr, value))
+                Ok(RuleToken::new(TokenType::MatchParentsAttr, op, attr, value))?
             }
             "TAGS" => {
                 if attr.is_some() {
@@ -768,7 +811,7 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::MatchParentsTag, op, None, value))
+                Ok(RuleToken::new(TokenType::MatchParentsTag, op, None, value))?
             }
             "TEST" => {
                 if attr.is_some() {
@@ -787,7 +830,7 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::MatchTest, op, attr, value))
+                Ok(RuleToken::new(TokenType::MatchTest, op, attr, value))?
             }
             "PROGRAM" => {
                 if attr.is_some() {
@@ -810,7 +853,7 @@ impl RuleToken {
                     op = OperatorType::Match;
                 }
 
-                Ok(RuleToken::new(TokenType::MatchProgram, op, attr, value))
+                Ok(RuleToken::new(TokenType::MatchProgram, op, attr, value))?
             }
             "IMPORT" => {
                 if attr.is_none() {
@@ -829,7 +872,7 @@ impl RuleToken {
                 }
 
                 if attr.as_ref().unwrap() == "file" {
-                    Ok(RuleToken::new(TokenType::MatchImportFile, op, attr, value))
+                    Ok(RuleToken::new(TokenType::MatchImportFile, op, attr, value))?
                 } else if attr.as_ref().unwrap() == "program" {
                     match value.parse::<BuiltinCommand>() {
                         Ok(_) => {
@@ -839,14 +882,14 @@ impl RuleToken {
                                 op,
                                 attr,
                                 value,
-                            ))
+                            ))?
                         }
                         Err(_) => Ok(RuleToken::new(
                             TokenType::MatchImportProgram,
                             op,
                             attr,
                             value,
-                        )),
+                        ))?,
                     }
                 } else if attr.as_ref().unwrap() == "builtin" {
                     if value.parse::<BuiltinCommand>().is_err() {
@@ -860,7 +903,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                    ))
+                    ))?
                 } else {
                     let token_type = match attr.as_ref().unwrap().as_str() {
                         "db" => TokenType::MatchImportDb,
@@ -873,7 +916,7 @@ impl RuleToken {
                         }
                     };
 
-                    Ok(RuleToken::new(token_type, op, attr, value))
+                    Ok(RuleToken::new(token_type, op, attr, value))?
                 }
             }
             "RESULT" => {
@@ -889,7 +932,7 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::MatchResult, op, attr, value))
+                Ok(RuleToken::new(TokenType::MatchResult, op, attr, value))?
             }
             "OPTIONS" => {
                 if attr.is_some() {
@@ -912,31 +955,31 @@ impl RuleToken {
                         op,
                         None,
                         "".to_string(),
-                    )),
+                    ))?,
                     "string_escape=replace" => Ok(RuleToken::new(
                         TokenType::AssignOptionsStringEscapeReplace,
                         op,
                         None,
                         "".to_string(),
-                    )),
+                    ))?,
                     "db_persist" => Ok(RuleToken::new(
                         TokenType::AssignOptionsDbPersist,
                         op,
                         None,
                         "".to_string(),
-                    )),
+                    ))?,
                     "watch" => Ok(RuleToken::new(
                         TokenType::AssignOptionsInotifyWatch,
                         op,
                         None,
                         "1".to_string(),
-                    )),
+                    ))?,
                     "nowatch" => Ok(RuleToken::new(
                         TokenType::AssignOptionsInotifyWatch,
                         op,
                         None,
                         "0".to_string(),
-                    )),
+                    ))?,
                     _ => {
                         if let Some(strip_value) = value.strip_prefix("static_node=") {
                             Ok(RuleToken::new(
@@ -944,7 +987,7 @@ impl RuleToken {
                                 op,
                                 None,
                                 strip_value.to_string(),
-                            ))
+                            ))?
                         } else if let Some(strip_value) = value.strip_prefix("link_priority=") {
                             if value["link_priority=".len()..].parse::<i32>().is_err() {
                                 return Err(Error::RulesLoadError { msg: "Key 'OPTIONS' failed to parse link priority into a valid number.".to_string() });
@@ -955,7 +998,7 @@ impl RuleToken {
                                 op,
                                 None,
                                 strip_value.to_string(),
-                            ))
+                            ))?
                         } else if let Some(strip_value) = value.strip_prefix("log_level=") {
                             let level = if strip_value == "rest" {
                                 "-1"
@@ -976,7 +1019,7 @@ impl RuleToken {
                                 op,
                                 None,
                                 level.to_string(),
-                            ))
+                            ))?
                         } else {
                             Err(Error::RulesLoadError {
                                 msg: "Key 'OPTIONS' has invalid value.".to_string(),
@@ -1006,7 +1049,7 @@ impl RuleToken {
                 if let Some(rules) = rules {
                     // only parse 'OWNER' token when rules object is provided.
                     if parse_uid(&value).is_ok() {
-                        return Ok(RuleToken::new(TokenType::AssignOwnerId, op, attr, value));
+                        return Ok(RuleToken::new(TokenType::AssignOwnerId, op, attr, value))?;
                     }
 
                     let time = rules.as_ref().read().unwrap().resolve_name_time;
@@ -1020,14 +1063,14 @@ impl RuleToken {
                             op,
                             attr,
                             user.uid.to_string(),
-                        ));
+                        ))?;
                     } else if time != ResolveNameTime::Never {
                         // early or late
                         if let Err(e) = check_value_format("OWNER", value.as_str(), true) {
                             log::warn!("{}", e);
                         }
 
-                        return Ok(RuleToken::new(TokenType::AssignOwner, op, attr, value));
+                        return Ok(RuleToken::new(TokenType::AssignOwner, op, attr, value))?;
                     }
                 }
 
@@ -1056,7 +1099,7 @@ impl RuleToken {
                 if let Some(rules) = rules {
                     // only parse 'GROUP' token when rules object is provided.
                     if parse_gid(&value).is_ok() {
-                        return Ok(RuleToken::new(TokenType::AssignGroupId, op, attr, value));
+                        return Ok(RuleToken::new(TokenType::AssignGroupId, op, attr, value))?;
                     }
 
                     let time = rules.as_ref().read().unwrap().resolve_name_time;
@@ -1070,14 +1113,14 @@ impl RuleToken {
                             op,
                             attr,
                             group.gid.to_string(),
-                        ));
+                        ))?;
                     } else if time != ResolveNameTime::Never {
                         // early or late
                         if let Err(e) = check_value_format("GROUP", value.as_str(), true) {
                             log::warn!("{}", e);
                         }
 
-                        return Ok(RuleToken::new(TokenType::AssignGroup, op, attr, value));
+                        return Ok(RuleToken::new(TokenType::AssignGroup, op, attr, value))?;
                     }
                 }
 
@@ -1104,13 +1147,13 @@ impl RuleToken {
                 }
 
                 if parse_mode(&value).is_ok() {
-                    Ok(RuleToken::new(TokenType::AssignModeId, op, None, value))
+                    Ok(RuleToken::new(TokenType::AssignModeId, op, None, value))?
                 } else {
                     if let Err(e) = check_value_format(key.as_str(), value.as_str(), true) {
                         log::warn!("{}", e);
                     }
 
-                    Ok(RuleToken::new(TokenType::AssignMode, op, None, value))
+                    Ok(RuleToken::new(TokenType::AssignMode, op, None, value))?
                 }
             }
             "SECLABEL" => {
@@ -1137,7 +1180,7 @@ impl RuleToken {
                     op = OperatorType::Assign;
                 }
 
-                Ok(RuleToken::new(TokenType::AssignSeclabel, op, attr, value))
+                Ok(RuleToken::new(TokenType::AssignSeclabel, op, attr, value))?
             }
             "RUN" => {
                 if op_is_match || op == OperatorType::Remove {
@@ -1152,7 +1195,7 @@ impl RuleToken {
 
                 let attr_content = attr.clone().unwrap_or("".to_string());
                 if attr.is_none() || attr_content == "program" {
-                    Ok(RuleToken::new(TokenType::AssignRunProgram, op, None, value))
+                    Ok(RuleToken::new(TokenType::AssignRunProgram, op, None, value))?
                 } else if attr_content == "builtin" {
                     if value.parse::<BuiltinCommand>().is_err() {
                         return Err(Error::RulesLoadError {
@@ -1160,7 +1203,7 @@ impl RuleToken {
                         });
                     }
 
-                    Ok(RuleToken::new(TokenType::AssignRunBuiltin, op, attr, value))
+                    Ok(RuleToken::new(TokenType::AssignRunBuiltin, op, attr, value))?
                 } else {
                     Err(Error::IgnoreError {
                         msg: format!(
@@ -1183,7 +1226,7 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::Goto, op, None, value))
+                Ok(RuleToken::new(TokenType::Goto, op, None, value))?
             }
             "LABEL" => {
                 if attr.is_some() {
@@ -1198,7 +1241,7 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::Label, op, None, value))
+                Ok(RuleToken::new(TokenType::Label, op, None, value))?
             }
             _ => Err(Error::RulesLoadError {
                 msg: format!("Key '{}' is not supported.", key),
@@ -1293,6 +1336,108 @@ SYMLINK += \"test111111\"",
             None,
         )
         .is_err());
+    }
+
+    #[test]
+    fn test_rules_token_regex() {
+        let t = RuleToken::parse_token(
+            "ACTION".to_string(),
+            None,
+            "==".to_string(),
+            "add".to_string(),
+            None,
+        )
+        .unwrap();
+
+        println!("{:?}", t);
+
+        let t = RuleToken::parse_token(
+            "ACTION".to_string(),
+            None,
+            "==".to_string(),
+            ".?.*".to_string(),
+            None,
+        )
+        .unwrap();
+
+        println!("{:?}", t);
+
+        let t = RuleToken::parse_token(
+            "ACTION".to_string(),
+            None,
+            "==".to_string(),
+            "?*".to_string(),
+            None,
+        )
+        .unwrap();
+
+        println!("{:?}", t);
+
+        let t = RuleToken::parse_token(
+            "ACTION".to_string(),
+            None,
+            "==".to_string(),
+            "hello|?*|hello*|3279/tty[0-9]*".to_string(),
+            None,
+        )
+        .unwrap();
+
+        println!("{:?}", t);
+
+        let t = RuleToken::parse_token(
+            "ACTION".to_string(),
+            None,
+            "==".to_string(),
+            "".to_string(),
+            None,
+        )
+        .unwrap();
+
+        println!("{:?}", t);
+
+        let t = RuleToken::parse_token(
+            "ACTION".to_string(),
+            None,
+            "==".to_string(),
+            "|hello|?*|hello*|3279/tty[0-9]*".to_string(),
+            None,
+        )
+        .unwrap();
+
+        println!("{:?}", t);
+
+        let t = RuleToken::parse_token(
+            "ATTR".to_string(),
+            Some("whatever".to_string()),
+            "==".to_string(),
+            "hello".to_string(),
+            None,
+        )
+        .unwrap();
+
+        println!("{:?}", t);
+
+        let t = RuleToken::parse_token(
+            "ATTR".to_string(),
+            Some("whatever$".to_string()),
+            "==".to_string(),
+            "hello".to_string(),
+            None,
+        )
+        .unwrap();
+
+        println!("{:?}", t);
+
+        let t = RuleToken::parse_token(
+            "ATTR".to_string(),
+            Some("whatever%".to_string()),
+            "==".to_string(),
+            "hello".to_string(),
+            None,
+        )
+        .unwrap();
+
+        println!("{:?}", t);
     }
 
     #[test]

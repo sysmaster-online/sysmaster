@@ -13,14 +13,18 @@
 //! the process unit to apply rules on device uevent in worker thread
 //!
 
-use super::{RuleFile, RuleLine, RuleToken, Rules, TokenType};
-use crate::error::Result;
+use super::{RuleFile, RuleLine, RuleToken, Rules, TokenType::*};
+use crate::error::{Error, Result};
 use device::{Device, DeviceAction};
 use std::{
     cell::RefCell,
     rc::Rc,
     sync::{Arc, RwLock},
 };
+
+use crate::device_trace;
+use crate::{execute_err, execute_none};
+use nix::errno::Errno;
 
 /// the process unit on device uevent
 #[allow(missing_docs)]
@@ -225,6 +229,18 @@ impl ExecuteManager {
             None => return Ok(None),
         };
 
+        device_trace!(
+            "Apply Rule Line:",
+            self.current_unit
+                .as_ref()
+                .unwrap()
+                .device
+                .as_ref()
+                .borrow_mut(),
+            self.get_current_rule_file(),
+            self.get_current_line_number()
+        );
+
         // only apply rule token on parent device once
         // that means if some a parent device matches the token, do not match any parent tokens in the following
         let mut parents_done = false;
@@ -335,20 +351,22 @@ impl ExecuteManager {
             .unwrap();
 
         match token_type {
-            TokenType::MatchAction => {
-                let action = device.action;
+            MatchAction => {
+                let action = execute_err!(device.get_action(), "MatchAction")?;
 
-                return Ok(action.to_string() == token.value);
+                Ok(action.to_string() == token.value)
             }
-            TokenType::AssignDevlink => {
-                println!("{}", token.value);
+            MatchDevpath => {
+                let devpath = execute_none!(device.get_devpath(), "MatchDevpath", "DEVPATH")?;
+                Ok(*devpath == token.value)
+            }
+            AssignDevlink => {
+                todo!()
             }
             _ => {
                 todo!();
             }
         }
-
-        Ok(true)
     }
 
     /// apply rule token on the parent device
@@ -360,4 +378,51 @@ impl ExecuteManager {
     pub(crate) fn execute_run(&mut self) -> Result<()> {
         Ok(())
     }
+
+    /// get the current rule file name
+    pub(crate) fn get_current_rule_file(&self) -> String {
+        self.current_rule_file
+            .as_ref()
+            .unwrap()
+            .read()
+            .unwrap()
+            .file_name
+            .clone()
+    }
+
+    /// get the current rule line number
+    pub(crate) fn get_current_line_number(&self) -> u32 {
+        self.current_rule_line
+            .as_ref()
+            .unwrap()
+            .read()
+            .unwrap()
+            .line_number
+    }
+}
+
+/// translate execution error from downside call chain
+#[macro_export]
+macro_rules! execute_err {
+    ($e:expr, $k:expr) => {
+        $e.map_err(|err| Error::RulesExecuteError {
+            msg: format!("Apply '{}' error: {}", $k, err),
+            errno: err.get_errno(),
+        })
+    };
+}
+
+/// translate execution error on none return from downside call chain
+#[macro_export]
+macro_rules! execute_none {
+    ($e:expr, $k:expr, $v:expr) => {
+        if $e.is_none() {
+            Err(Error::RulesExecuteError {
+                msg: format!("Apply '{}' error: have no {}", $k, $v),
+                errno: Errno::EINVAL,
+            })
+        } else {
+            Ok($e.unwrap())
+        }
+    };
 }
