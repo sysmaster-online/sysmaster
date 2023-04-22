@@ -107,13 +107,11 @@ pub(crate) fn check_format(key: &str, value: &str) -> Result<()> {
 macro_rules! device_trace {
     // Match rule that takes any number of arguments
     ($p:tt, $d:expr, $($arg:expr),*) => {
-        let action = $d.get_action().unwrap().to_string();
-        let sysname = $d.get_sysname().unwrap().to_string();
-        let syspath = $d.get_syspath().unwrap().to_string();
-        let subsystem = $d.get_subsystem().unwrap().to_string();
+        let action = $d.get_action().unwrap_or_default().to_string();
+        let sysname = $d.get_sysname().unwrap_or("no_sysname").to_string();
+        let syspath = $d.get_syspath().unwrap_or("no_syspath").to_string();
+        let subsystem = $d.get_subsystem().unwrap_or("no_subsystem".to_string());
         // Generate a string with formatted arguments
-        // let s = format!($($arg),*);
-        // Print the string
         let mut s: String = format!("{} {} {} {} {}",$p ,action, sysname, syspath, subsystem);
         $(s.push_str(format!(" {}", $arg).as_str());)*
         log::debug!("{}", s);
