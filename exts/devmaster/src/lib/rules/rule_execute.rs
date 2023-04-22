@@ -13,13 +13,13 @@
 //! the process unit to apply rules on device uevent in worker thread
 //!
 
-use super::{RuleFile, RuleLine, RuleToken, Rules, TokenType::*};
+use super::{OperatorType, RuleFile, RuleLine, RuleToken, Rules, TokenType::*};
 use crate::error::{Error, Result};
 use device::{Device, DeviceAction};
 use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{Arc, RwLock},
+    borrow::BorrowMut,
+    collections::HashMap,
+    sync::{Arc, Mutex, RwLock},
 };
 
 use crate::device_trace;
@@ -29,10 +29,10 @@ use nix::errno::Errno;
 /// the process unit on device uevent
 #[allow(missing_docs)]
 struct ExecuteUnit {
-    device: Rc<RefCell<Device>>,
-    // parent: Option<Arc<Mutex<Device>>>,
+    device: Arc<Mutex<Device>>,
+    parent: Option<Arc<Mutex<Device>>>,
     // device_db_clone: Option<Device>,
-    // name: String,
+    name: String,
     // program_result: String,
     // mode: mode_t,
     // uid: uid_t,
@@ -56,15 +56,15 @@ struct ExecuteUnit {
 }
 
 impl ExecuteUnit {
-    pub fn new(device: Rc<RefCell<Device>>) -> ExecuteUnit {
+    pub fn new(device: Arc<Mutex<Device>>) -> ExecuteUnit {
         // let mut unit = ProcessUnit::default();
         // unit.device = device;
         // unit
         ExecuteUnit {
             device,
-            // parent: None,
+            parent: None,
             // device_db_clone: None,
-            // name: (),
+            name: String::new(),
             // program_result: (),
             // mode: (),
             // uid: (),
@@ -97,6 +97,8 @@ pub struct ExecuteManager {
     current_rule_token: Option<Arc<RwLock<RuleToken>>>,
 
     current_unit: Option<ExecuteUnit>,
+
+    properties: HashMap<String, String>,
 }
 
 impl ExecuteManager {
@@ -108,12 +110,16 @@ impl ExecuteManager {
             current_rule_line: None,
             current_rule_token: None,
             current_unit: None,
+            properties: HashMap::new(),
         }
     }
 
     /// process a device object
-    pub fn process_device(&mut self, device: Rc<RefCell<Device>>) -> Result<()> {
-        log::debug!("Processing device {}", device.as_ref().borrow_mut().devpath);
+    pub fn process_device(&mut self, device: Arc<Mutex<Device>>) -> Result<()> {
+        log::debug!(
+            "Processing device {}",
+            device.as_ref().lock().unwrap().devpath
+        );
 
         self.current_unit = Some(ExecuteUnit::new(device));
         // lock whole disk: todo
@@ -137,7 +143,7 @@ impl ExecuteManager {
     pub(crate) fn execute_rules(&mut self) -> Result<()> {
         let unit = self.current_unit.as_mut().unwrap();
 
-        let action = unit.device.as_ref().borrow_mut().action;
+        let action = unit.device.as_ref().lock().unwrap().action;
 
         println!("{}", action);
 
@@ -236,7 +242,8 @@ impl ExecuteManager {
                 .unwrap()
                 .device
                 .as_ref()
-                .borrow_mut(),
+                .lock()
+                .unwrap(),
             self.get_current_rule_file(),
             self.get_current_line_number()
         );
@@ -245,16 +252,22 @@ impl ExecuteManager {
         // that means if some a parent device matches the token, do not match any parent tokens in the following
         let mut parents_done = false;
 
-        loop {
-            let next_token = self
-                .current_rule_token
-                .clone()
-                .unwrap()
-                .as_ref()
-                .read()
-                .unwrap()
-                .next
-                .clone();
+        for token in RuleToken::iter(self.current_rule_token.clone()) {
+            self.current_rule_token = Some(token.clone());
+
+            device_trace!(
+                "Apply Rule Token:",
+                self.current_unit
+                    .as_ref()
+                    .unwrap()
+                    .device
+                    .as_ref()
+                    .lock()
+                    .unwrap(),
+                self.get_current_rule_file(),
+                self.get_current_line_number(),
+                token.as_ref().read().unwrap()
+            );
 
             if self
                 .current_rule_token
@@ -280,7 +293,7 @@ impl ExecuteManager {
 
                     parents_done = true;
                 }
-            } else if !self.apply_rule_token()? {
+            } else if !self.apply_rule_token(self.current_unit.as_ref().unwrap().device.clone())? {
                 // if current rule token does not match, abort applying the rest tokens in this line
                 return Ok(self
                     .current_rule_line
@@ -291,11 +304,6 @@ impl ExecuteManager {
                     .unwrap()
                     .next
                     .clone());
-            }
-
-            self.current_rule_token = next_token;
-            if self.current_rule_token.is_none() {
-                break;
             }
         }
 
@@ -324,7 +332,7 @@ impl ExecuteManager {
     }
 
     /// apply rule token on device
-    pub(crate) fn apply_rule_token(&mut self) -> Result<bool> {
+    pub(crate) fn apply_rule_token(&mut self, device: Arc<Mutex<Device>>) -> Result<bool> {
         let token_type = self
             .current_rule_token
             .clone()
@@ -334,13 +342,7 @@ impl ExecuteManager {
             .unwrap()
             .r#type;
 
-        let device = self
-            .current_unit
-            .as_ref()
-            .unwrap()
-            .device
-            .as_ref()
-            .borrow_mut();
+        let mut device = device.as_ref().lock().unwrap();
 
         let token = self
             .current_rule_token
@@ -354,16 +356,76 @@ impl ExecuteManager {
             MatchAction => {
                 let action = execute_err!(device.get_action(), "MatchAction")?;
 
-                Ok(action.to_string() == token.value)
+                Ok(token.pattern_match(&action.to_string()))
             }
             MatchDevpath => {
                 let devpath = execute_none!(device.get_devpath(), "MatchDevpath", "DEVPATH")?;
-                Ok(*devpath == token.value)
+
+                Ok(token.pattern_match(&devpath.to_string()))
+            }
+            MatchKernel | MatchParentsKernel => {
+                let sysname = execute_none!(
+                    device.get_sysname(),
+                    "MatchKernel|MatchParentsKernel",
+                    "SYSNAME"
+                )?;
+
+                Ok(token.pattern_match(&sysname.to_string()))
+            }
+            MatchDevlink => {
+                for devlink in device.devlinks.iter() {
+                    if token.pattern_match(devlink) {
+                        return Ok(token.op == OperatorType::Match);
+                    }
+                }
+
+                Ok(token.op == OperatorType::Nomatch)
+            }
+            MatchName => {
+                let name = self.current_unit.as_ref().unwrap().name.clone();
+
+                Ok(token.pattern_match(&name))
+            }
+            MatchEnv => {
+                let value = match device.get_property_value(token.attr.clone().unwrap()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        if e.get_errno() != Errno::ENOENT {
+                            return Err(Error::RulesExecuteError {
+                                msg: format!("Apply 'MatchEnv' error: {}", e),
+                                errno: e.get_errno(),
+                            });
+                        }
+
+                        self.properties
+                            .get(&token.attr.clone().unwrap())
+                            .unwrap_or(&"".to_string())
+                            .to_string()
+                    }
+                };
+
+                Ok(token.pattern_match(&value))
+            }
+            MatchConst => {
+                todo!()
+            }
+            MatchTag | MatchParentsTag => {
+                for tag in device.current_tags.iter() {
+                    if token.pattern_match(tag) {
+                        return Ok(token.op == OperatorType::Match);
+                    }
+                }
+
+                Ok(token.op == OperatorType::Nomatch)
+            }
+            MatchSubsystem => {
+                todo!()
             }
             AssignDevlink => {
                 todo!()
             }
             _ => {
+                println!("cjy");
                 todo!();
             }
         }
@@ -371,7 +433,16 @@ impl ExecuteManager {
 
     /// apply rule token on the parent device
     pub(crate) fn apply_rule_token_on_parent(&mut self) -> Result<bool> {
-        todo!();
+        self.current_unit.as_mut().unwrap().borrow_mut().parent = Some(
+            self.current_unit
+                .as_ref()
+                .unwrap()
+                .borrow_mut()
+                .device
+                .clone(),
+        );
+
+        loop {}
     }
 
     /// execute run
@@ -401,6 +472,17 @@ impl ExecuteManager {
     }
 }
 
+impl RuleToken {
+    pub(crate) fn pattern_match(&self, s: &String) -> bool {
+        for regex in self.value_regex.iter() {
+            if regex.is_match(&s) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
 /// translate execution error from downside call chain
 #[macro_export]
 macro_rules! execute_err {
@@ -425,4 +507,30 @@ macro_rules! execute_none {
             Ok($e.unwrap())
         }
     };
+}
+
+/// tokens iterator
+struct RuleTokenIter {
+    token: Option<Arc<RwLock<RuleToken>>>,
+}
+
+impl RuleToken {
+    fn iter(token: Option<Arc<RwLock<RuleToken>>>) -> RuleTokenIter {
+        RuleTokenIter { token }
+    }
+}
+
+impl Iterator for RuleTokenIter {
+    type Item = Arc<RwLock<RuleToken>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.token.is_some() {
+            let ret = self.token.clone();
+            let next = self.token.clone().unwrap().read().unwrap().next.clone();
+            self.token = next;
+            return ret;
+        }
+
+        None
+    }
 }

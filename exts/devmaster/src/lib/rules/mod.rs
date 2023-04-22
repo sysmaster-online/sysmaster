@@ -116,7 +116,6 @@ pub struct RuleToken {
     match_type: MatchType,
     value_regex: Vec<regex::Regex>,
     attr_subst_type: SubstituteType,
-    // attr_subst_type: SubstituteType,
     attr: Option<String>,
     value: String,
     prev: Option<Arc<RwLock<RuleToken>>>,
