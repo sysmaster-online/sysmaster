@@ -278,22 +278,26 @@ impl ExecuteManager {
                 .unwrap()
                 .is_for_parents()
             {
-                if !parents_done {
-                    if !self.apply_rule_token_on_parent()? {
-                        return Ok(self
-                            .current_rule_line
-                            .clone()
-                            .unwrap()
-                            .as_ref()
-                            .read()
-                            .unwrap()
-                            .next
-                            .clone());
-                    }
-
-                    parents_done = true;
+                if parents_done {
+                    continue;
                 }
-            } else if !self.apply_rule_token(self.current_unit.as_ref().unwrap().device.clone())? {
+                if !self.apply_rule_token_on_parent()? {
+                    return Ok(self
+                        .current_rule_line
+                        .clone()
+                        .unwrap()
+                        .as_ref()
+                        .read()
+                        .unwrap()
+                        .next
+                        .clone());
+                }
+
+                parents_done = true;
+                continue;
+            }
+
+            if !self.apply_rule_token(self.current_unit.as_ref().unwrap().device.clone())? {
                 // if current rule token does not match, abort applying the rest tokens in this line
                 return Ok(self
                     .current_rule_line
@@ -422,7 +426,8 @@ impl ExecuteManager {
                 todo!()
             }
             AssignDevlink => {
-                todo!()
+                println!("\x1b[31mHello world!\x1b[0m");
+                Ok(true)
             }
             _ => {
                 println!("cjy");
@@ -442,7 +447,47 @@ impl ExecuteManager {
                 .clone(),
         );
 
-        loop {}
+        let head = self.current_rule_token.clone();
+        let mut match_rst = true;
+
+        loop {
+            // udev try to traverse the following parent tokens
+            // this seems useless and redundant
+            for token in RuleToken::iter(head.clone()) {
+                if !token.as_ref().read().unwrap().is_for_parents() {
+                    return Ok(true);
+                }
+
+                self.current_rule_token = Some(token);
+                if !self
+                    .apply_rule_token(self.current_unit.as_ref().unwrap().parent.clone().unwrap())?
+                {
+                    match_rst = false;
+                    break;
+                }
+            }
+
+            if match_rst {
+                return Ok(true);
+            }
+
+            let tmp = self.current_unit.as_ref().unwrap().parent.clone().unwrap();
+            match tmp.as_ref().lock().unwrap().get_parent() {
+                Ok(d) => {
+                    self.current_unit.as_mut().unwrap().borrow_mut().parent = Some(d);
+                }
+                Err(e) => {
+                    if e.get_errno() != Errno::ENOENT {
+                        return Err(Error::RulesExecuteError {
+                            msg: format!("failed to get parent: ({})", e),
+                            errno: e.get_errno(),
+                        });
+                    }
+
+                    return Ok(false);
+                }
+            };
+        }
     }
 
     /// execute run
