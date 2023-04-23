@@ -1,0 +1,4 @@
+[Unit]
+
+[Service]
+ExecStart="/usr/lib/sysmaster/fstab"
