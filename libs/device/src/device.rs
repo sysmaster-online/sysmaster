@@ -1022,7 +1022,7 @@ impl Device {
                         ),
                         source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
                     })?;
-                    value.replace("\n\r", "\0")
+                    value.trim_end().to_string()
                 }
             }
 
