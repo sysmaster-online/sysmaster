@@ -228,6 +228,20 @@ impl ServiceUnit {
                 .clone(),
         );
 
+        if let Some(rlimit) = self.config.config_data().borrow().Service.LimitCORE {
+            self.exec_ctx.insert_rlimit(libc::RLIMIT_CORE as u8, rlimit);
+        }
+
+        if let Some(rlimit) = self.config.config_data().borrow().Service.LimitNOFILE {
+            self.exec_ctx
+                .insert_rlimit(libc::RLIMIT_NOFILE as u8, rlimit);
+        }
+
+        if let Some(rlimit) = self.config.config_data().borrow().Service.LimitNPROC {
+            self.exec_ctx
+                .insert_rlimit(libc::RLIMIT_NPROC as u8, rlimit);
+        }
+
         if let Some(owner) = self.comm.owner() {
             if let Some(sockets) = self.config.sockets() {
                 let um = self.comm.um();

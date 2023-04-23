@@ -11,20 +11,122 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::error::*;
+use crate::serialize::DeserializeWith;
+use basic::rlimit_util;
 use bitflags::bitflags;
+use libc::EPERM;
 use nix::sys::stat::Mode;
 use nix::unistd::{Group, Uid, User};
-
+use serde::{de, Deserialize, Deserializer, Serialize};
+use std::cmp::min;
 use std::fs::File;
 use std::io::{self, BufRead};
+use std::str::FromStr;
 use std::{cell::RefCell, collections::HashMap};
 use std::{ffi::CString, path::PathBuf, rc::Rc};
+
+/// the Rlimit soft and hard value
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct Rlimit {
+    soft: u64,
+    hard: u64,
+}
+
+impl Rlimit {
+    fn setrlimit(&self, resource: u8) -> Result<()> {
+        log::debug!(
+            "set rlimit resource: {:?}, soft: {}, hard: {}",
+            resource,
+            self.soft,
+            self.hard
+        );
+
+        if let Err(e) = rlimit_util::setrlimit(resource, self.soft, self.hard) {
+            let (_soft, hard) = match e.raw_os_error() {
+                Some(code) if code == EPERM => rlimit_util::getrlimit(resource)?,
+                None => return Err(Error::from(e)),
+                Some(_) => return Err(Error::from(e)),
+            };
+
+            if hard == self.hard {
+                return Err(Error::from(e));
+            }
+
+            let new_soft = min(self.soft, hard);
+            let new_hard = min(self.hard, hard);
+            log::debug!(
+                "set new rlimit resource: {:?}, soft: {}, hard: {}",
+                resource,
+                new_soft,
+                new_hard
+            );
+            rlimit_util::setrlimit(resource, new_soft, new_hard)?;
+        }
+        Ok(())
+    }
+}
+
+fn parse_rlimit(limit: &str) -> Result<u64, Error> {
+    if limit.is_empty() {
+        return Err(Error::ConfigureError {
+            msg: "empty configure for Limit".to_string(),
+        });
+    }
+    if limit == "infinity" {
+        return Ok(rlimit_util::INFINITY);
+    }
+
+    let ret = limit.parse::<u64>()?;
+    Ok(ret)
+}
+
+impl FromStr for Rlimit {
+    type Err = Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let value: Vec<_> = s.trim().split_terminator(':').collect();
+        let soft: u64;
+        let hard: u64;
+        if value.len() == 1 {
+            soft = parse_rlimit(value[0])?;
+            hard = soft;
+        } else if value.len() == 2 {
+            soft = parse_rlimit(value[0])?;
+            hard = parse_rlimit(value[1])?;
+        } else {
+            return Err(Error::ConfigureError {
+                msg: "invalid configure for Limit".to_string(),
+            });
+        }
+
+        if soft > hard {
+            return Err(Error::ConfigureError {
+                msg: "soft is higher than hard limit".to_string(),
+            });
+        }
+
+        Ok(Rlimit { soft, hard })
+    }
+}
+
+impl DeserializeWith for Rlimit {
+    type Item = Self;
+
+    fn deserialize_with<'de, D>(de: D) -> Result<Self::Item, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(de)?;
+        let rlimit = Rlimit::from_str(&s).map_err(de::Error::custom)?;
+        Ok(rlimit)
+    }
+}
 
 /// the exec context that was parse from the unit file.
 /// like parsed from Environment field.
 pub struct ExecContext {
     envs: RefCell<HashMap<String, String>>,
     env_files: RefCell<Vec<PathBuf>>,
+    rlimits: RefCell<HashMap<u8, Rlimit>>,
 }
 
 impl Default for ExecContext {
@@ -39,6 +141,7 @@ impl ExecContext {
         ExecContext {
             envs: RefCell::new(HashMap::new()),
             env_files: RefCell::new(vec![]),
+            rlimits: RefCell::new(HashMap::new()),
         }
     }
 
@@ -92,6 +195,20 @@ impl ExecContext {
                     .borrow_mut()
                     .insert(content[0].to_string(), content[1].to_string());
             }
+        }
+
+        Ok(())
+    }
+
+    /// insert configured rlimit to ExecContext
+    pub fn insert_rlimit(&self, resource: u8, rlimit: Rlimit) {
+        self.rlimits.borrow_mut().insert(resource, rlimit);
+    }
+
+    /// set the configured rlimit
+    pub fn set_all_rlimits(&self) -> Result<()> {
+        for (resource, limit) in &*self.rlimits.borrow() {
+            limit.setrlimit(*resource)?;
         }
 
         Ok(())
@@ -355,10 +472,15 @@ bitflags! {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use basic::rlimit_util;
     use nix::{
         sys::stat::Mode,
         unistd::{Gid, Uid},
     };
+
+    use crate::exec::base::Rlimit;
 
     use super::ExecParameters;
 
@@ -449,5 +571,47 @@ mod tests {
         assert_eq!(params.get_umask(), None);
         assert!(params.add_umask("0011".to_string()).is_ok());
         assert_eq!(params.get_umask().unwrap(), Mode::from_bits(9).unwrap());
+    }
+
+    #[test]
+    fn test_rlimit_from_str() {
+        let source = "100";
+        let ret = Rlimit::from_str(source);
+        assert!(ret.is_ok());
+        let rlimit = ret.unwrap();
+        assert_eq!(rlimit.soft, 100);
+        assert_eq!(rlimit.hard, 100);
+
+        let source1 = "100:150";
+        let ret = Rlimit::from_str(source1);
+        assert!(ret.is_ok());
+        let rlimit = ret.unwrap();
+        assert_eq!(rlimit.soft, 100);
+        assert_eq!(rlimit.hard, 150);
+
+        let source2 = "infinity";
+        let ret = Rlimit::from_str(source2);
+        assert!(ret.is_ok());
+        let rlimit = ret.unwrap();
+        assert_eq!(rlimit.soft, rlimit_util::INFINITY);
+        assert_eq!(rlimit.hard, rlimit_util::INFINITY);
+
+        let source3 = "infinity:infinity";
+        let ret = Rlimit::from_str(source3);
+        assert!(ret.is_ok());
+        let rlimit = ret.unwrap();
+        assert_eq!(rlimit.soft, rlimit_util::INFINITY);
+        assert_eq!(rlimit.hard, rlimit_util::INFINITY);
+
+        let source4 = "100:infinity";
+        let ret = Rlimit::from_str(source4);
+        assert!(ret.is_ok());
+        let rlimit = ret.unwrap();
+        assert_eq!(rlimit.soft, 100);
+        assert_eq!(rlimit.hard, rlimit_util::INFINITY);
+
+        let source5 = "infinity:100";
+        let rlimit = Rlimit::from_str(source5);
+        assert!(rlimit.is_err());
     }
 }

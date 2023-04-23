@@ -26,7 +26,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use sysmaster::error::*;
-use sysmaster::exec::ExecCommand;
+use sysmaster::exec::{ExecCommand, Rlimit};
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use sysmaster::serialize::DeserializeWith;
 use sysmaster::unit::KillMode;
@@ -256,6 +256,12 @@ pub(super) struct SectionService {
     #[config(deserialize_with = deserialize_timeout)]
     #[config(default = 0)]
     pub TimeoutStopSec: u64,
+    #[config(deserialize_with = Rlimit::deserialize_with)]
+    pub LimitCORE: Option<Rlimit>,
+    #[config(deserialize_with = Rlimit::deserialize_with)]
+    pub LimitNOFILE: Option<Rlimit>,
+    #[config(deserialize_with = Rlimit::deserialize_with)]
+    pub LimitNPROC: Option<Rlimit>,
 }
 
 impl SectionService {
