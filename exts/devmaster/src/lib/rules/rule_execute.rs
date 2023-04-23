@@ -23,7 +23,7 @@ use std::{
 };
 
 use crate::device_trace;
-use crate::{execute_err, execute_none};
+use crate::{execute_err, execute_err_ignore_ENOENT, execute_none};
 use nix::errno::Errno;
 
 /// the process unit on device uevent
@@ -378,7 +378,7 @@ impl ExecuteManager {
             }
             MatchDevlink => {
                 for devlink in device.devlinks.iter() {
-                    if token.pattern_match(devlink) {
+                    if token.pattern_match(devlink) ^ (token.op == OperatorType::Nomatch) {
                         return Ok(token.op == OperatorType::Match);
                     }
                 }
@@ -415,14 +415,30 @@ impl ExecuteManager {
             }
             MatchTag | MatchParentsTag => {
                 for tag in device.current_tags.iter() {
-                    if token.pattern_match(tag) {
+                    if token.pattern_match(tag) ^ (token.op == OperatorType::Nomatch) {
                         return Ok(token.op == OperatorType::Match);
                     }
                 }
 
                 Ok(token.op == OperatorType::Nomatch)
             }
-            MatchSubsystem => {
+            MatchSubsystem | MatchParentsSubsystem => {
+                let subsystem = execute_err_ignore_ENOENT!(
+                    device.get_subsystem(),
+                    "MatchSubsystem | MatchParentsSubsystem"
+                )?;
+
+                Ok(token.pattern_match(&subsystem))
+            }
+            MatchDriver | MatchParentsDriver => {
+                let driver = execute_err_ignore_ENOENT!(
+                    device.get_driver(),
+                    "MatchDriver | MatchParentsDriver"
+                )?;
+
+                Ok(token.pattern_match(&driver))
+            }
+            MatchAttr | MatchParentsAttr => {
                 todo!()
             }
             AssignDevlink => {
@@ -519,12 +535,15 @@ impl ExecuteManager {
 
 impl RuleToken {
     pub(crate) fn pattern_match(&self, s: &String) -> bool {
+        let mut value_match = false;
         for regex in self.value_regex.iter() {
             if regex.is_match(&s) {
-                return true;
+                value_match = true;
+                break;
             }
         }
-        false
+
+        (self.op == OperatorType::Nomatch) ^ value_match
     }
 }
 
@@ -536,6 +555,26 @@ macro_rules! execute_err {
             msg: format!("Apply '{}' error: {}", $k, err),
             errno: err.get_errno(),
         })
+    };
+}
+
+/// translate execution error from downside call chain
+#[macro_export]
+macro_rules! execute_err_ignore_ENOENT {
+    ($e:expr, $k:expr) => {
+        match $e {
+            Ok(ret) => Ok(ret.to_string()),
+            Err(err) => {
+                if err.get_errno() == Errno::ENOENT {
+                    Ok(String::new())
+                } else {
+                    Err(Error::RulesExecuteError {
+                        msg: format!("Apply '{}' error: {}", $k, err),
+                        errno: err.get_errno(),
+                    })
+                }
+            }
+        }
     };
 }
 
