@@ -228,6 +228,8 @@ pub(super) struct SectionService {
     #[config(default = "none")]
     pub KillMode: KillMode,
     #[config(default = "")]
+    pub RootDirectory: String,
+    #[config(default = "")]
     pub WorkingDirectory: String,
     #[config(default = "")]
     pub User: String,
