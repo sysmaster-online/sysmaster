@@ -18,11 +18,13 @@ use nix::sys::signalfd::SigSet;
 use nix::sys::stat::Mode;
 use nix::unistd::{self, chroot, setresgid, setresuid, ForkResult, Gid, Group, Pid, Uid, User};
 use regex::Regex;
+use std::fs::Permissions;
+use std::os::unix::prelude::PermissionsExt;
 use std::path::PathBuf;
 use std::process;
 use std::rc::Rc;
 use sysmaster::error::*;
-use sysmaster::exec::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
+use sysmaster::exec::{ExecCommand, ExecContext, ExecDirectoryType, ExecFlags, ExecParameters};
 use walkdir::DirEntry;
 use walkdir::WalkDir;
 
@@ -110,6 +112,47 @@ fn apply_working_directory(working_directory: Option<PathBuf>) -> Result<()> {
     std::env::set_current_dir(working_directory).context(IoSnafu)
 }
 
+fn setup_exec_directory(
+    exec_directory: &[Option<Vec<PathBuf>>],
+    user: Option<User>,
+    group: Option<Group>,
+    kind: ExecDirectoryType,
+) -> Result<()> {
+    /* Always change the directory's owner, because sysmaster only
+     * runs under system mode. */
+    let uid = match user {
+        Some(v) => v.uid,
+        None => Uid::from_raw(0),
+    };
+    let gid = match group {
+        Some(v) => v.gid,
+        None => Gid::from_raw(0),
+    };
+    if let Some(directories) = &exec_directory[kind as usize] {
+        for d in directories {
+            /* d should be prefixed already, create it if it doesn't exist */
+            if !d.exists() {
+                if let Err(e) = std::fs::create_dir_all(d) {
+                    log::error!("Failed to setup directory {:?}: {e}", d);
+                    return Err(Error::Io { source: e });
+                }
+            }
+
+            if let Err(e) = nix::unistd::chown(d, Some(uid), Some(gid)) {
+                log::error!("Failed to set the owner of {:?}: {e}", d);
+                return Err(Error::Nix { source: e });
+            }
+
+            /* Hard-coding 755, change this when we implementing XXXDirectoryMode. */
+            if let Err(e) = std::fs::set_permissions(d, Permissions::from_mode(0o755)) {
+                log::error!("Failed to set the permissions of {:?}: {e}", d);
+                return Err(Error::Io { source: e });
+            }
+        }
+    }
+    Ok(())
+}
+
 fn apply_umask(umask: Option<Mode>) -> Result<()> {
     let umask = match umask {
         None => {
@@ -125,17 +168,27 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
     log::debug!("exec context params: {:?}", ctx.envs());
 
     if let Err(e) = apply_root_directory(params.get_root_directory()) {
-        log::error!("Failed to apply root directory: {}", e.to_string());
+        log::error!("Failed to apply root directory: {e}");
+        return;
+    }
+
+    if let Err(e) = setup_exec_directory(
+        params.get_exec_directory(),
+        params.get_user(),
+        params.get_group(),
+        ExecDirectoryType::Runtime,
+    ) {
+        log::error!("Failed to apply exec directory: {e}");
         return;
     }
 
     if let Err(e) = apply_user_and_group(params.get_user(), params.get_group(), params) {
-        log::error!("Failed to apply user or group: {}", e.to_string());
+        log::error!("Failed to apply user or group: {e}");
         return;
     }
 
     if let Err(e) = apply_working_directory(params.get_working_directory()) {
-        log::error!("Failed to apply working directory: {}", e.to_string());
+        log::error!("Failed to apply working directory: {e}");
         return;
     }
 

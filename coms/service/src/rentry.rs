@@ -163,6 +163,35 @@ impl DeserializeWith for ExitStatusSet {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum PreserveMode {
+    #[default]
+    No,
+    Yes,
+    Restart,
+}
+
+impl DeserializeWith for PreserveMode {
+    type Item = Self;
+
+    fn deserialize_with<'de, D>(de: D) -> std::result::Result<Self::Item, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(de)?;
+        let res = match s.as_str() {
+            "no" => PreserveMode::No,
+            "yes" => PreserveMode::Yes,
+            "restart" => PreserveMode::Restart,
+            _ => {
+                log::error!("Failed to parse RuntimeDirectoryPreserve: {s}, assuming no");
+                PreserveMode::No
+            }
+        };
+        Ok(res)
+    }
+}
+
 fn deserialize_pidfile<'de, D>(de: D) -> Result<PathBuf, D::Error>
 where
     D: Deserializer<'de>,
@@ -231,6 +260,11 @@ pub(super) struct SectionService {
     pub RootDirectory: String,
     #[config(default = "")]
     pub WorkingDirectory: String,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    pub RuntimeDirectory: Option<Vec<String>>,
+    #[config(deserialize_with = PreserveMode::deserialize_with)]
+    #[config(default = "no")]
+    pub RuntimeDirectoryPreserve: PreserveMode,
     #[config(default = "")]
     pub User: String,
     #[config(default = "")]

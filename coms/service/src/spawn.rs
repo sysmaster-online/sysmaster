@@ -17,7 +17,9 @@ use super::config::ServiceConfig;
 use super::pid::ServicePid;
 use super::rentry::ServiceType;
 use nix::unistd::Pid;
+use std::cell::RefCell;
 use std::env;
+use std::path::PathBuf;
 use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::exec::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
@@ -28,6 +30,7 @@ pub(super) struct ServiceSpawn {
     config: Rc<ServiceConfig>,
     exec_ctx: Rc<ExecContext>,
     rd: Rc<RunningData>,
+    exec_params: RefCell<Option<ExecParameters>>,
 }
 
 impl ServiceSpawn {
@@ -44,6 +47,7 @@ impl ServiceSpawn {
             config: configr.clone(),
             exec_ctx: exec_ctx.clone(),
             rd: rd.clone(),
+            exec_params: RefCell::new(None),
         }
     }
 
@@ -112,6 +116,13 @@ impl ServiceSpawn {
             return Err(e);
         }
 
+        if let Some(runtime_directories) = &service_config.RuntimeDirectory {
+            if let Err(e) = params.add_runtime_directory(runtime_directories) {
+                log::error!("Failed to add runtime directories: {e}");
+                return Err(e);
+            }
+        }
+
         if let Err(e) = params.add_working_directory(service_config.WorkingDirectory.clone()) {
             log::error!("Failed to add working directory: {e}");
             return Err(e);
@@ -120,16 +131,26 @@ impl ServiceSpawn {
         params.set_watchdog_usec(self.watchdog_timer());
 
         log::debug!("begin to exec spawn");
-        match um.exec_spawn(unit.id(), cmdline, &params, self.exec_ctx.clone()) {
+        let pid = match um.exec_spawn(unit.id(), cmdline, &params, self.exec_ctx.clone()) {
             Ok(pid) => {
                 um.child_watch_pid(unit.id(), pid);
-                Ok(pid)
+                pid
             }
             Err(e) => {
                 log::error!("failed to start service: {}, error:{:?}", unit.id(), e);
-                Err("spawn exec return error".to_string().into())
+                return Err("spawn exec return error".to_string().into());
             }
-        }
+        };
+        *(self.exec_params.borrow_mut()) = Some(params);
+        Ok(pid)
+    }
+
+    pub fn get_runtime_directory(&self) -> Option<Vec<PathBuf>> {
+        self.exec_params
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .get_runtime_directory()
     }
 
     fn collect_socket_fds(&self) -> Vec<i32> {

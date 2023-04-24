@@ -19,7 +19,7 @@ use super::rentry::{
     NotifyState, ServiceCommand, ServiceRestart, ServiceResult, ServiceState, ServiceType,
 };
 use super::spawn::ServiceSpawn;
-use crate::rentry::ExitStatus;
+use crate::rentry::{ExitStatus, PreserveMode};
 use basic::{fd_util, IN_SET};
 use basic::{file_util, process_util};
 use event::{EventState, EventType, Events, Source};
@@ -575,6 +575,20 @@ impl ServiceMng {
         }
 
         self.rd.set_forbid_restart(false);
+
+        let preserve_mode = self
+            .config
+            .config_data()
+            .borrow()
+            .Service
+            .RuntimeDirectoryPreserve;
+        if preserve_mode == PreserveMode::No
+            || preserve_mode == PreserveMode::Restart && !self.rd.will_restart()
+        {
+            if let Some(runtime_directory) = self.spawn.get_runtime_directory() {
+                let _ = self.comm.um().unit_destroy_runtime_data(runtime_directory);
+            }
+        }
 
         if let Some(p) = self.config.pid_file() {
             if let Err(e) = nix::unistd::unlink(&p) {
@@ -1786,6 +1800,16 @@ impl RunningData {
 
     pub(self) fn will_auto_restart(&self) -> bool {
         self.data.borrow().will_auto_restart()
+    }
+
+    pub(self) fn will_restart(&self) -> bool {
+        if self.data.borrow().will_auto_restart() {
+            return true;
+        }
+        if self.mng.borrow().upgrade().unwrap().state() == ServiceState::AutoRestart {
+            return true;
+        }
+        false
     }
 
     pub(self) fn attach_timer(&self, timer: Rc<ServiceTimer>) {

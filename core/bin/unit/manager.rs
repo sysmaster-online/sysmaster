@@ -329,6 +329,15 @@ impl UmIf for UnitManager {
         self.relation_active_or_pending(name)
     }
 
+    fn unit_destroy_runtime_data(&self, runtime_directory: Vec<PathBuf>) -> Result<()> {
+        for d in runtime_directory {
+            if let Err(e) = std::fs::remove_dir_all(&d) {
+                log::info!("Failed to remove {:?}: {e}, ignoring", d);
+            }
+        }
+        Ok(())
+    }
+
     fn unit_start_by_job(&self, name: &str) -> Result<()> {
         self.start_unit(name, false)
     }

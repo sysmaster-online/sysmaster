@@ -96,6 +96,12 @@ pub trait UmIf {
     fn relation_active_or_pending(&self, _name: &str) -> bool {
         false
     }
+
+    /// Destroy Runtime Data, only RuntimeDirectory for now
+    fn unit_destroy_runtime_data(&self, _runtime_directory: Vec<PathBuf>) -> Result<()> {
+        Ok(())
+    }
+
     /// starting a unit by pushing it to job queue
     fn unit_start_by_job(&self, _name: &str) -> Result<()> {
         Ok(())
