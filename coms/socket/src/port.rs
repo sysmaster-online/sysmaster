@@ -75,10 +75,12 @@ impl SocketPort {
             return Ok(());
         }
 
+        let socket_mode = self.config.config_data().borrow().Socket.SocketMode;
+
         let fd = match self.p_conf.p_type() {
             PortType::Socket => {
                 let flag = SockFlag::SOCK_CLOEXEC | SockFlag::SOCK_NONBLOCK;
-                let fd = match self.p_conf.socket_listen(flag, 128) {
+                let fd = match self.p_conf.socket_listen(flag, 128, socket_mode) {
                     Err(e) => {
                         log::error!("Failed to listen {}: {e}", self.p_conf.listen());
                         return Err(Error::Nix { source: e });
@@ -89,7 +91,7 @@ impl SocketPort {
                 fd
             }
             PortType::Fifo => {
-                let fd = match self.p_conf.open_fifo() {
+                let fd = match self.p_conf.open_fifo(socket_mode) {
                     Err(e) => {
                         log::error!("Failed to open FIFO file {}: {e}", self.p_conf.listen());
                         return Err(Error::Nix { source: e });

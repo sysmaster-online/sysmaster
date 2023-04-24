@@ -364,9 +364,14 @@ impl SocketPortConf {
         }
     }
 
-    pub(super) fn socket_listen(&self, flags: SockFlag, backlog: usize) -> Result<i32, Errno> {
+    pub(super) fn socket_listen(
+        &self,
+        flags: SockFlag,
+        backlog: usize,
+        socket_mode: u32,
+    ) -> Result<i32, Errno> {
         if self.p_type() == PortType::Socket {
-            self.sa.socket_listen(flags, backlog)
+            self.sa.socket_listen(flags, backlog, socket_mode)
         } else {
             Err(Errno::ENOTSUP)
         }
@@ -376,19 +381,27 @@ impl SocketPortConf {
         self.sa().unlink()
     }
 
-    pub(super) fn open_fifo(&self) -> Result<i32, Errno> {
+    pub(super) fn open_fifo(&self, socket_mode: u32) -> Result<i32, Errno> {
         let path = match PathBuf::from_str(self.listen()) {
             Err(_) => return Err(Errno::EINVAL),
             Ok(v) => v,
         };
-        nix::unistd::mkfifo(&path, stat::Mode::S_IRWXU)?;
+
+        let old_mask = stat::umask(stat::Mode::from_bits_truncate(!socket_mode));
+
+        stat::umask(stat::Mode::from_bits_truncate(
+            !socket_mode | old_mask.bits(),
+        ));
+        nix::unistd::mkfifo(&path, stat::Mode::from_bits_truncate(socket_mode))?;
+        stat::umask(old_mask);
+
         let oflag = OFlag::O_RDWR
             | OFlag::O_CLOEXEC
             | OFlag::O_NOCTTY
             | OFlag::O_NONBLOCK
             | OFlag::O_NOFOLLOW;
-        let mode = stat::Mode::S_IRWXU;
-        let fd = match open(&path, oflag, mode) {
+
+        let fd = match open(&path, oflag, stat::Mode::from_bits_truncate(socket_mode)) {
             Err(e) => return Err(e),
             Ok(v) => v,
         };
@@ -490,7 +503,12 @@ impl SocketAddress {
         self.sock_addr.family().unwrap()
     }
 
-    pub(super) fn socket_listen(&self, flags: SockFlag, backlog: usize) -> Result<i32, Errno> {
+    pub(super) fn socket_listen(
+        &self,
+        flags: SockFlag,
+        backlog: usize,
+        socket_mode: u32,
+    ) -> Result<i32, Errno> {
         log::debug!(
             "create socket, family: {:?}, type: {:?}, protocol: {:?}",
             self.sock_addr.family().unwrap(),
@@ -509,10 +527,14 @@ impl SocketAddress {
         if let Some(path) = self.path() {
             let parent_path = path.as_path().parent();
             fs::create_dir_all(parent_path.unwrap()).map_err(|_e| Errno::EINVAL)?;
+
+            let old_mask = stat::umask(stat::Mode::from_bits_truncate(!socket_mode));
             if let Err(Errno::EADDRINUSE) = socket::bind(fd, &*self.sock_addr) {
                 self.unlink();
                 socket::bind(fd, &*self.sock_addr)?;
             }
+
+            stat::umask(stat::Mode::from_bits_truncate(old_mask.bits() & 0o777));
         } else {
             socket::bind(fd, &*self.sock_addr)?;
         }
