@@ -395,6 +395,16 @@ fn trans_fallback(
     let kind1 = JobKind::Start;
     let kind2 = JobKind::Verify;
     for other in db.dep_gets_atom(unit, atom) {
+        // trigger
+        if let Some((trigger, _)) = jobs.get_trigger_info(&other) {
+            if trigger.run_kind == kind1 || trigger.run_kind == kind2 {
+                if let Some(del_trigger) = jobs.finish_trigger(&other, f_result) {
+                    del_jobs.push(del_trigger);
+                }
+            }
+        }
+
+        // suspend
         del_jobs.append(&mut jobs.remove_suspends(&other, kind1, Some(kind2), f_result));
     }
     del_jobs
