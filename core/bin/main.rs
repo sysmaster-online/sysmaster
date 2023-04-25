@@ -67,7 +67,7 @@ fn main() -> Result<()> {
     //------------------------Code placed at the top-----------------------------
     // The registration signal is at the beginning and has the highest priority!
     register_reexe_signal(true);
-    install_switch_root_handler();
+
     // Connect init.
     KeepAlive::init();
     //---------------------------------------------------------------------------
@@ -148,6 +148,7 @@ fn initialize_runtime(switch: bool) -> Result<()> {
     })?;
 
     set_child_reaper();
+    install_switch_root_handler();
 
     Ok(())
 }
