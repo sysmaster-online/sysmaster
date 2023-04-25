@@ -13,8 +13,15 @@
 //! the process unit to apply rules on device uevent in worker thread
 //!
 
-use super::{OperatorType, RuleFile, RuleLine, RuleToken, Rules, TokenType::*};
-use crate::error::{Error, Result};
+use super::{
+    FormatSubstitutionType, OperatorType, RuleFile, RuleLine, RuleToken, Rules, SubstituteType,
+    TokenType::*,
+};
+use crate::{
+    error::{Error, Result},
+    rules::FORMAT_SUBST_TABLE,
+    utils::{replace_chars, resolve_subsystem_kernel, DEVMASTER_LEGAL_CHARS},
+};
 use device::{Device, DeviceAction};
 use std::{
     borrow::BorrowMut,
@@ -23,17 +30,20 @@ use std::{
 };
 
 use crate::device_trace;
-use crate::{execute_err, execute_err_ignore_ENOENT, execute_none};
+use crate::{
+    execute_err, execute_err_ignore_ENOENT, execute_none, subst_format_map_err_ignore,
+    subst_format_map_none,
+};
 use nix::errno::Errno;
 
 /// the process unit on device uevent
-#[allow(missing_docs)]
+#[allow(missing_docs, dead_code)]
 struct ExecuteUnit {
     device: Arc<Mutex<Device>>,
     parent: Option<Arc<Mutex<Device>>>,
     // device_db_clone: Option<Device>,
     name: String,
-    // program_result: String,
+    program_result: String,
     // mode: mode_t,
     // uid: uid_t,
     // gid: gid_t,
@@ -64,8 +74,8 @@ impl ExecuteUnit {
             device,
             parent: None,
             // device_db_clone: None,
-            name: String::new(),
-            // program_result: (),
+            name: String::default(),
+            program_result: String::default(),
             // mode: (),
             // uid: (),
             // gid: (),
@@ -85,6 +95,334 @@ impl ExecuteUnit {
             // devlink_final: (),
             // run_final: (),
         }
+    }
+
+    /// apply runtime substitution on all formatters in the string
+    pub fn apply_format(&self, src: &String, replace_whitespace: bool) -> Result<String> {
+        let mut idx: usize = 0;
+        let mut ret = String::new();
+        while idx < src.len() {
+            match Self::get_subst_type(src, &mut idx, false)? {
+                Some((subst, attr)) => {
+                    let v = self.subst_format(subst, attr).map_err(|e| {
+                        log::debug!("failed to apply format: ({})", e);
+                        e
+                    })?;
+                    if replace_whitespace {
+                        ret += v.replace(' ', "_").as_str();
+                    } else {
+                        ret += v.as_str();
+                    }
+                }
+                None => {
+                    ret.push(src.chars().nth(idx).unwrap());
+                    idx += 1;
+                }
+            }
+        }
+
+        Ok(ret)
+    }
+
+    fn subst_format(
+        &self,
+        subst_type: FormatSubstitutionType,
+        attribute: Option<String>,
+    ) -> Result<String> {
+        let mut device = self.device.lock().unwrap();
+        match subst_type {
+            FormatSubstitutionType::Devnode => subst_format_map_err_ignore!(
+                device.get_devname(),
+                "devnode",
+                Errno::ENOENT,
+                String::default()
+            ),
+            FormatSubstitutionType::Attr => {
+                if attribute.is_none() {
+                    return Err(Error::RulesExecuteError {
+                        msg: "Attribute can not be empty for 'attr' formatter.".to_string(),
+                        errno: Errno::EINVAL,
+                    });
+                }
+
+                // try to read attribute value form path '[<SUBSYSTEM>/[SYSNAME]]<ATTRIBUTE>'
+                let value =
+                    if let Ok(v) = resolve_subsystem_kernel(&attribute.clone().unwrap(), true) {
+                        v
+                    } else if let Ok(v) = device.get_sysattr_value(attribute.clone().unwrap()) {
+                        v
+                    } else if self.parent.is_some() {
+                        // try to get sysattr upwards
+                        // we did not check whether self.parent is equal to self.device
+                        // this perhaps will result in problems
+                        if let Ok(v) = self
+                            .parent
+                            .clone()
+                            .unwrap()
+                            .as_ref()
+                            .lock()
+                            .unwrap()
+                            .get_sysattr_value(attribute.clone().unwrap())
+                        {
+                            v
+                        } else {
+                            return Ok(String::default());
+                        }
+                    } else {
+                        return Ok(String::default());
+                    };
+
+                let value = replace_chars(value.trim_end(), DEVMASTER_LEGAL_CHARS);
+
+                Ok(value)
+            }
+            FormatSubstitutionType::Env => {
+                if attribute.is_none() {
+                    return Err(Error::RulesExecuteError {
+                        msg: "Attribute can not be empty for 'env' formatter.".to_string(),
+                        errno: Errno::EINVAL,
+                    });
+                }
+
+                subst_format_map_err_ignore!(
+                    device.get_property_value(attribute.unwrap()),
+                    "env",
+                    Errno::ENOENT,
+                    String::default()
+                )
+            }
+            FormatSubstitutionType::Kernel => {
+                subst_format_map_none!(device.get_sysname(), "kernel", String::default())
+            }
+            FormatSubstitutionType::KernelNumber => subst_format_map_err_ignore!(
+                device.get_sysnum(),
+                "number",
+                Errno::ENOENT,
+                String::default()
+            ),
+            FormatSubstitutionType::Driver => {
+                if self.parent.is_none() {
+                    return Ok(String::default());
+                }
+
+                subst_format_map_err_ignore!(
+                    self.parent.clone().unwrap().lock().unwrap().get_driver(),
+                    "driver",
+                    Errno::ENOENT,
+                    String::default()
+                )
+            }
+            FormatSubstitutionType::Devpath => {
+                subst_format_map_none!(device.get_devpath(), "devpath", String::default())
+            }
+            FormatSubstitutionType::Id => {
+                if self.parent.is_none() {
+                    return Ok(String::default());
+                }
+
+                subst_format_map_none!(
+                    self.parent.clone().unwrap().lock().unwrap().get_sysname(),
+                    "id",
+                    String::default()
+                )
+            }
+            FormatSubstitutionType::Major | FormatSubstitutionType::Minor => {
+                subst_format_map_err_ignore!(
+                    device.get_devnum().map(|n| {
+                        match subst_type {
+                            FormatSubstitutionType::Major => nix::sys::stat::major(n).to_string(),
+                            _ => nix::sys::stat::minor(n).to_string(),
+                        }
+                    }),
+                    "major|minor",
+                    Errno::ENOENT,
+                    0.to_string()
+                )
+            }
+            FormatSubstitutionType::Result => {
+                if self.program_result.is_empty() {
+                    return Ok(String::default());
+                }
+
+                let (index, plus) = match attribute {
+                    Some(a) => {
+                        if a.ends_with('+') {
+                            let idx = match a[0..a.len() - 1].parse::<usize>() {
+                                Ok(i) => i,
+                                Err(_) => {
+                                    return Err(Error::RulesExecuteError {
+                                        msg: format!("invalid index {}", a),
+                                        errno: Errno::EINVAL,
+                                    })
+                                }
+                            };
+                            (idx, true)
+                        } else {
+                            let idx = match a[0..a.len()].parse::<usize>() {
+                                Ok(i) => i,
+                                Err(_) => {
+                                    return Err(Error::RulesExecuteError {
+                                        msg: format!("invalid index {}", a),
+                                        errno: Errno::EINVAL,
+                                    })
+                                }
+                            };
+                            (idx, false)
+                        }
+                    }
+                    None => (0, true),
+                };
+
+                let result = self.program_result.trim();
+                let mut ret = String::new();
+                for (i, p) in result.split_whitespace().enumerate() {
+                    if !plus {
+                        if i == index {
+                            return Ok(p.to_string());
+                        }
+                    } else if i >= index {
+                        ret += p;
+                        ret += " ";
+                    }
+                }
+                let ret = ret.trim_end().to_string();
+                if ret.is_empty() {
+                    log::debug!("the {}th part of result string is not found.", index)
+                }
+                Ok(ret)
+            }
+            FormatSubstitutionType::Parent => {
+                let parent = match device.get_parent() {
+                    Ok(p) => p,
+                    Err(e) => {
+                        if e.get_errno() == Errno::ENOENT {
+                            return Ok(String::default());
+                        }
+
+                        return Err(Error::RulesExecuteError {
+                            msg: format!("failed to substitute formatter 'parent': ({})", e),
+                            errno: e.get_errno(),
+                        });
+                    }
+                };
+                let devname = parent.lock().unwrap().get_devname();
+                subst_format_map_err_ignore!(devname, "parent", Errno::ENOENT, String::default())
+                    .map(|v| v.trim_start_matches("/dev/").to_string())
+            }
+            FormatSubstitutionType::Name => {
+                if !self.name.is_empty() {
+                    Ok(self.name.clone())
+                } else if let Ok(devname) = device.get_devname() {
+                    Ok(devname.trim_start_matches("/dev/").to_string())
+                } else {
+                    subst_format_map_none!(device.get_sysname(), "name", String::default())
+                }
+            }
+            FormatSubstitutionType::Links => {
+                let mut ret = String::new();
+                for link in device.devlinks.iter() {
+                    ret += link.trim_start_matches("/dev/");
+                    ret += " ";
+                }
+                Ok(ret.trim_end().to_string())
+            }
+            FormatSubstitutionType::Root => Ok("/dev".to_string()),
+            FormatSubstitutionType::Sys => Ok("/sys".to_string()),
+            FormatSubstitutionType::Invalid => Err(Error::RulesExecuteError {
+                msg: "invalid substitution formatter type.".to_string(),
+                errno: Errno::EINVAL,
+            }),
+        }
+    }
+
+    fn get_subst_type(
+        s: &String,
+        idx: &mut usize,
+        strict: bool,
+    ) -> Result<Option<(FormatSubstitutionType, Option<String>)>> {
+        if *idx >= s.len() {
+            return Err(Error::RulesExecuteError {
+                msg: "the idx is greater than the string length".to_string(),
+                errno: Errno::EINVAL,
+            });
+        }
+
+        let mut subst = FormatSubstitutionType::Invalid;
+        let mut attr: Option<String> = None;
+        let mut idx_b = *idx;
+
+        if s.chars().nth(idx_b) == Some('$') {
+            idx_b += 1;
+            if s.chars().nth(idx_b) == Some('$') {
+                *idx = idx_b;
+                return Ok(None);
+            }
+
+            if let Some(sub) = s.get(idx_b..) {
+                for ent in FORMAT_SUBST_TABLE.iter() {
+                    if sub.starts_with(ent.0) {
+                        subst = ent.2;
+                        idx_b += ent.0.len();
+                        break;
+                    }
+                }
+            }
+        } else if s.chars().nth(idx_b) == Some('%') {
+            idx_b += 1;
+            if s.chars().nth(idx_b) == Some('%') {
+                *idx = idx_b;
+                return Ok(None);
+            }
+
+            if let Some(sub) = s.get(idx_b..) {
+                for ent in FORMAT_SUBST_TABLE.iter() {
+                    if sub.starts_with(ent.1) {
+                        subst = ent.2;
+                        idx_b += 1;
+                        break;
+                    }
+                }
+            }
+        } else {
+            return Ok(None);
+        }
+
+        if subst == FormatSubstitutionType::Invalid {
+            if strict {
+                return Err(Error::RulesExecuteError {
+                    msg: "single $ or % symbol is invalid.".to_string(),
+                    errno: Errno::EINVAL,
+                });
+            } else {
+                return Ok(None);
+            }
+        }
+
+        if s.chars().nth(idx_b) == Some('{') {
+            let left = idx_b + 1;
+            let right = if let Some(sub) = s.get(left..) {
+                match sub.find('}') {
+                    Some(i) => left + i,
+                    None => {
+                        return Err(Error::RulesExecuteError {
+                            msg: "unclosed brackets.".to_string(),
+                            errno: Errno::EINVAL,
+                        })
+                    }
+                }
+            } else {
+                return Err(Error::RulesExecuteError {
+                    msg: "unclosed brackets.".to_string(),
+                    errno: Errno::EINVAL,
+                });
+            };
+
+            attr = Some(s.get(left..right).unwrap().to_string());
+            idx_b = right + 1;
+        }
+
+        *idx = idx_b;
+        Ok(Some((subst, attr)))
     }
 }
 
@@ -216,7 +554,10 @@ impl ExecuteManager {
             .clone();
 
         loop {
-            let next_line = self.apply_rule_line()?;
+            let next_line = self.apply_rule_line().map_err(|e| {
+                log::debug!("{}", e);
+                e
+            })?;
 
             self.current_rule_line = next_line;
             if self.current_rule_line.is_none() {
@@ -346,7 +687,7 @@ impl ExecuteManager {
             .unwrap()
             .r#type;
 
-        let mut device = device.as_ref().lock().unwrap();
+        // let mut device = device.as_ref().lock().unwrap();
 
         let token = self
             .current_rule_token
@@ -358,26 +699,33 @@ impl ExecuteManager {
 
         match token_type {
             MatchAction => {
-                let action = execute_err!(device.get_action(), "MatchAction")?;
+                let action = execute_err!(
+                    device.as_ref().lock().unwrap().borrow_mut().get_action(),
+                    "MatchAction"
+                )?;
 
                 Ok(token.pattern_match(&action.to_string()))
             }
             MatchDevpath => {
-                let devpath = execute_none!(device.get_devpath(), "MatchDevpath", "DEVPATH")?;
+                let devpath = execute_none!(
+                    device.as_ref().lock().unwrap().borrow_mut().get_devpath(),
+                    "MatchDevpath",
+                    "DEVPATH"
+                )?;
 
-                Ok(token.pattern_match(&devpath.to_string()))
+                Ok(token.pattern_match(&devpath))
             }
             MatchKernel | MatchParentsKernel => {
                 let sysname = execute_none!(
-                    device.get_sysname(),
+                    device.as_ref().lock().unwrap().borrow_mut().get_sysname(),
                     "MatchKernel|MatchParentsKernel",
                     "SYSNAME"
                 )?;
 
-                Ok(token.pattern_match(&sysname.to_string()))
+                Ok(token.pattern_match(&sysname))
             }
             MatchDevlink => {
-                for devlink in device.devlinks.iter() {
+                for devlink in device.as_ref().lock().unwrap().borrow_mut().devlinks.iter() {
                     if token.pattern_match(devlink) ^ (token.op == OperatorType::Nomatch) {
                         return Ok(token.op == OperatorType::Match);
                     }
@@ -391,7 +739,13 @@ impl ExecuteManager {
                 Ok(token.pattern_match(&name))
             }
             MatchEnv => {
-                let value = match device.get_property_value(token.attr.clone().unwrap()) {
+                let value = match device
+                    .as_ref()
+                    .lock()
+                    .unwrap()
+                    .borrow_mut()
+                    .get_property_value(token.attr.clone().unwrap())
+                {
                     Ok(v) => v,
                     Err(e) => {
                         if e.get_errno() != Errno::ENOENT {
@@ -414,7 +768,14 @@ impl ExecuteManager {
                 todo!()
             }
             MatchTag | MatchParentsTag => {
-                for tag in device.current_tags.iter() {
+                for tag in device
+                    .as_ref()
+                    .lock()
+                    .unwrap()
+                    .borrow_mut()
+                    .current_tags
+                    .iter()
+                {
                     if token.pattern_match(tag) ^ (token.op == OperatorType::Nomatch) {
                         return Ok(token.op == OperatorType::Match);
                     }
@@ -424,7 +785,7 @@ impl ExecuteManager {
             }
             MatchSubsystem | MatchParentsSubsystem => {
                 let subsystem = execute_err_ignore_ENOENT!(
-                    device.get_subsystem(),
+                    device.as_ref().lock().unwrap().borrow_mut().get_subsystem(),
                     "MatchSubsystem | MatchParentsSubsystem"
                 )?;
 
@@ -432,14 +793,14 @@ impl ExecuteManager {
             }
             MatchDriver | MatchParentsDriver => {
                 let driver = execute_err_ignore_ENOENT!(
-                    device.get_driver(),
+                    device.as_ref().lock().unwrap().borrow_mut().get_driver(),
                     "MatchDriver | MatchParentsDriver"
                 )?;
 
                 Ok(token.pattern_match(&driver))
             }
             MatchAttr | MatchParentsAttr => {
-                todo!()
+                token.attr_match(device, self.current_unit.as_ref().unwrap())
             }
             AssignDevlink => {
                 println!("\x1b[31mHello world!\x1b[0m");
@@ -534,10 +895,10 @@ impl ExecuteManager {
 }
 
 impl RuleToken {
-    pub(crate) fn pattern_match(&self, s: &String) -> bool {
+    fn pattern_match(&self, s: &str) -> bool {
         let mut value_match = false;
         for regex in self.value_regex.iter() {
-            if regex.is_match(&s) {
+            if regex.is_match(s) {
                 value_match = true;
                 break;
             }
@@ -545,52 +906,67 @@ impl RuleToken {
 
         (self.op == OperatorType::Nomatch) ^ value_match
     }
-}
 
-/// translate execution error from downside call chain
-#[macro_export]
-macro_rules! execute_err {
-    ($e:expr, $k:expr) => {
-        $e.map_err(|err| Error::RulesExecuteError {
-            msg: format!("Apply '{}' error: {}", $k, err),
-            errno: err.get_errno(),
-        })
-    };
-}
+    fn attr_match(&self, device: Arc<Mutex<Device>>, unit: &ExecuteUnit) -> Result<bool> {
+        let attr = self.attr.clone().unwrap_or_default();
 
-/// translate execution error from downside call chain
-#[macro_export]
-macro_rules! execute_err_ignore_ENOENT {
-    ($e:expr, $k:expr) => {
-        match $e {
-            Ok(ret) => Ok(ret.to_string()),
-            Err(err) => {
-                if err.get_errno() == Errno::ENOENT {
-                    Ok(String::new())
-                } else {
-                    Err(Error::RulesExecuteError {
-                        msg: format!("Apply '{}' error: {}", $k, err),
-                        errno: err.get_errno(),
+        let val = match self.attr_subst_type {
+            SubstituteType::Plain => {
+                if let Ok(v) = device
+                    .as_ref()
+                    .lock()
+                    .unwrap()
+                    .borrow_mut()
+                    .get_sysattr_value(attr)
+                    .map_err(|e| Error::RulesExecuteError {
+                        msg: format!("failed to match sysattr: ({})", e),
+                        errno: e.get_errno(),
                     })
+                {
+                    v
+                } else {
+                    return Ok(false);
                 }
             }
-        }
-    };
-}
+            SubstituteType::Format => {
+                let attr_name =
+                    unit.apply_format(&attr, false)
+                        .map_err(|e| Error::RulesExecuteError {
+                            msg: format!("failed to match sysattr: ({})", e),
+                            errno: e.get_errno(),
+                        })?;
+                if let Ok(v) = device
+                    .as_ref()
+                    .lock()
+                    .unwrap()
+                    .borrow_mut()
+                    .get_sysattr_value(attr_name)
+                    .map_err(|e| Error::RulesExecuteError {
+                        msg: format!("failed to match sysattr: ({})", e),
+                        errno: e.get_errno(),
+                    })
+                {
+                    v
+                } else {
+                    return Ok(false);
+                }
+            }
+            SubstituteType::Subsys => {
+                resolve_subsystem_kernel(&attr, true).map_err(|e| Error::RulesExecuteError {
+                    msg: format!("failed to match sysattr: ({})", e),
+                    errno: e.get_errno(),
+                })?
+            }
+            _ => {
+                return Err(Error::RulesExecuteError {
+                    msg: "invalid substitute type.".to_string(),
+                    errno: Errno::EINVAL,
+                })
+            }
+        };
 
-/// translate execution error on none return from downside call chain
-#[macro_export]
-macro_rules! execute_none {
-    ($e:expr, $k:expr, $v:expr) => {
-        if $e.is_none() {
-            Err(Error::RulesExecuteError {
-                msg: format!("Apply '{}' error: have no {}", $k, $v),
-                errno: Errno::EINVAL,
-            })
-        } else {
-            Ok($e.unwrap())
-        }
-    };
+        Ok(self.pattern_match(&val))
+    }
 }
 
 /// tokens iterator
@@ -616,5 +992,226 @@ impl Iterator for RuleTokenIter {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore]
+    fn test_subst_format() {
+        let device = Arc::new(Mutex::new(
+            Device::from_path("/dev/sda1".to_string()).unwrap(),
+        ));
+        let unit = ExecuteUnit::new(device);
+        println!(
+            "{:?}",
+            unit.subst_format(FormatSubstitutionType::Devnode, None)
+                .unwrap()
+        );
+        println!(
+            "{:?}",
+            unit.subst_format(
+                FormatSubstitutionType::Attr,
+                Some("[net/lo]address".to_string())
+            )
+            .unwrap()
+        );
+
+        let device = Arc::new(Mutex::new(
+            Device::from_subsystem_sysname("net".to_string(), "lo".to_string()).unwrap(),
+        ));
+        let unit = ExecuteUnit::new(device);
+        println!(
+            "{:?}",
+            unit.subst_format(FormatSubstitutionType::Attr, Some("address".to_string()))
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_apply_format() {
+        let device = Arc::new(Mutex::new(
+            Device::from_subsystem_sysname("net".to_string(), "lo".to_string()).unwrap(),
+        ));
+        let unit = ExecuteUnit::new(device);
+        // test long substitution formatter
+        // $kernel
+        assert_eq!(
+            unit.apply_format(&"$kernel".to_string(), false).unwrap(),
+            "lo"
+        );
+        // $number
+        assert_eq!(
+            unit.apply_format(&"$number".to_string(), false).unwrap(),
+            ""
+        );
+        // $devpath
+        assert_eq!(
+            unit.apply_format(&"$devpath".to_string(), false).unwrap(),
+            "/devices/virtual/net/lo"
+        );
+        // $id
+        assert_eq!(unit.apply_format(&"$id".to_string(), false).unwrap(), "");
+        // $driver
+        assert_eq!(
+            unit.apply_format(&"$driver".to_string(), false).unwrap(),
+            ""
+        );
+        // $attr{sysattr}
+        assert_eq!(
+            unit.apply_format(&"$attr{address}".to_string(), false)
+                .unwrap(),
+            "00:00:00:00:00:00"
+        );
+        // $env{key}
+        assert_eq!(
+            unit.apply_format(&"$env{DEVPATH}".to_string(), false)
+                .unwrap(),
+            "/devices/virtual/net/lo"
+        );
+        // $major
+        assert_eq!(
+            unit.apply_format(&"$major".to_string(), false).unwrap(),
+            "0"
+        );
+        // $minor
+        assert_eq!(
+            unit.apply_format(&"$minor".to_string(), false).unwrap(),
+            "0"
+        );
+        // $result
+        assert_eq!(
+            unit.apply_format(&"$result".to_string(), false).unwrap(),
+            ""
+        );
+        // $result{index}
+        assert_eq!(
+            unit.apply_format(&"$result{1}".to_string(), false).unwrap(),
+            ""
+        );
+        // $result{index+}
+        assert_eq!(
+            unit.apply_format(&"$result{1+}".to_string(), false)
+                .unwrap(),
+            ""
+        );
+        // $parent
+        assert_eq!(
+            unit.apply_format(&"$parent".to_string(), false).unwrap(),
+            ""
+        );
+        // $name
+        assert_eq!(
+            unit.apply_format(&"$name".to_string(), false).unwrap(),
+            "lo"
+        );
+        // $links
+        assert_eq!(unit.apply_format(&"$links".to_string(), false).unwrap(), "");
+        // $root
+        assert_eq!(
+            unit.apply_format(&"$root".to_string(), false).unwrap(),
+            "/dev"
+        );
+        // $sys
+        assert_eq!(
+            unit.apply_format(&"$sys".to_string(), false).unwrap(),
+            "/sys"
+        );
+        // $devnode
+        assert_eq!(
+            unit.apply_format(&"$devnode".to_string(), false).unwrap(),
+            ""
+        );
+
+        // test short substitution formatter
+        // %k
+        assert_eq!(unit.apply_format(&"%k".to_string(), false).unwrap(), "lo");
+        // %n
+        assert_eq!(unit.apply_format(&"%n".to_string(), false).unwrap(), "");
+        // %p
+        assert_eq!(
+            unit.apply_format(&"%p".to_string(), false).unwrap(),
+            "/devices/virtual/net/lo"
+        );
+        // %b
+        assert_eq!(unit.apply_format(&"%b".to_string(), false).unwrap(), "");
+        // %d
+        assert_eq!(unit.apply_format(&"%d".to_string(), false).unwrap(), "");
+        // %s{sysattr}
+        assert_eq!(
+            unit.apply_format(&"%s{address}".to_string(), false)
+                .unwrap(),
+            "00:00:00:00:00:00"
+        );
+        // %E{key}
+        assert_eq!(
+            unit.apply_format(&"%E{DEVPATH}".to_string(), false)
+                .unwrap(),
+            "/devices/virtual/net/lo"
+        );
+        // %M
+        assert_eq!(unit.apply_format(&"%M".to_string(), false).unwrap(), "0");
+        // %m
+        assert_eq!(unit.apply_format(&"%m".to_string(), false).unwrap(), "0");
+        // %c
+        assert_eq!(unit.apply_format(&"%c".to_string(), false).unwrap(), "");
+        // %c{index}
+        assert_eq!(unit.apply_format(&"%c{1}".to_string(), false).unwrap(), "");
+        // %c{index+}
+        assert_eq!(unit.apply_format(&"%c{1+}".to_string(), false).unwrap(), "");
+        // %P
+        assert_eq!(unit.apply_format(&"%P".to_string(), false).unwrap(), "");
+        // %D
+        assert_eq!(unit.apply_format(&"%D".to_string(), false).unwrap(), "lo");
+        // %L
+        assert_eq!(unit.apply_format(&"%L".to_string(), false).unwrap(), "");
+        // %r
+        assert_eq!(unit.apply_format(&"%r".to_string(), false).unwrap(), "/dev");
+        // %S
+        assert_eq!(unit.apply_format(&"%S".to_string(), false).unwrap(), "/sys");
+        // %N
+        assert_eq!(unit.apply_format(&"%N".to_string(), false).unwrap(), "");
+
+        // $$
+        assert_eq!(unit.apply_format(&"$$".to_string(), false).unwrap(), "$");
+        // %%
+        assert_eq!(unit.apply_format(&"%%".to_string(), false).unwrap(), "%");
+    }
+
+    #[test]
+    #[ignore]
+    fn test_apply_format_2() {
+        let device = Arc::new(Mutex::new(
+            Device::from_subsystem_sysname("block".to_string(), "sda1".to_string()).unwrap(),
+        ));
+        let unit = ExecuteUnit::new(device);
+        assert_eq!(
+            unit.apply_format(&"$number".to_string(), false).unwrap(),
+            "1"
+        );
+        assert_eq!(
+            unit.apply_format(&"$major".to_string(), false).unwrap(),
+            "8"
+        );
+        assert_eq!(
+            unit.apply_format(&"$minor".to_string(), false).unwrap(),
+            "1"
+        );
+        assert_eq!(
+            unit.apply_format(&"$driver".to_string(), false).unwrap(),
+            ""
+        );
+        assert_eq!(unit.apply_format(&"$id".to_string(), false).unwrap(), "");
+        assert_eq!(
+            unit.apply_format(&"$parent".to_string(), false).unwrap(),
+            "sda"
+        );
+        assert_eq!(
+            unit.apply_format(&"$devnode".to_string(), false).unwrap(),
+            "/dev/sda1"
+        );
     }
 }

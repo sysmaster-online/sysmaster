@@ -71,4 +71,23 @@ pub enum Error {
         /// message
         msg: String,
     },
+
+    /// Other errors
+    #[snafu(display("Other error: {}", msg))]
+    Other {
+        /// error message
+        msg: String,
+        /// error number
+        errno: nix::errno::Errno,
+    },
+}
+
+impl Error {
+    pub(crate) fn get_errno(&self) -> nix::errno::Errno {
+        match self {
+            Self::RulesExecuteError { msg: _, errno: n } => *n,
+            Self::Other { msg: _, errno: n } => *n,
+            _ => nix::errno::Errno::EINVAL,
+        }
+    }
 }

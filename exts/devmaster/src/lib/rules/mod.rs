@@ -480,7 +480,7 @@ pub(crate) enum ResolveNameTime {
 }
 
 /// formatter substitution type
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Default, Copy, Clone)]
 pub(crate) enum FormatSubstitutionType {
     Devnode,
     Attr,
@@ -501,6 +501,27 @@ pub(crate) enum FormatSubstitutionType {
     #[default]
     Invalid,
 }
+
+pub(crate) const FORMAT_SUBST_TABLE: [(&str, &str, FormatSubstitutionType); 18] = [
+    ("devnode", "N", FormatSubstitutionType::Devnode),
+    ("tempnode", "N", FormatSubstitutionType::Devnode),
+    ("attr", "s", FormatSubstitutionType::Attr),
+    ("sysfs", "s", FormatSubstitutionType::Attr),
+    ("env", "E", FormatSubstitutionType::Env),
+    ("kernel", "k", FormatSubstitutionType::Kernel),
+    ("number", "n", FormatSubstitutionType::KernelNumber),
+    ("driver", "d", FormatSubstitutionType::Driver),
+    ("devpath", "p", FormatSubstitutionType::Devpath),
+    ("id", "b", FormatSubstitutionType::Id),
+    ("major", "M", FormatSubstitutionType::Major),
+    ("minor", "m", FormatSubstitutionType::Minor),
+    ("result", "c", FormatSubstitutionType::Result),
+    ("parent", "P", FormatSubstitutionType::Parent),
+    ("name", "D", FormatSubstitutionType::Name),
+    ("links", "L", FormatSubstitutionType::Links),
+    ("root", "r", FormatSubstitutionType::Root),
+    ("sys", "S", FormatSubstitutionType::Sys),
+];
 
 impl FromStr for FormatSubstitutionType {
     type Err = Error;
