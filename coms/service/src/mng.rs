@@ -19,7 +19,7 @@ use super::rentry::{
     NotifyState, ServiceCommand, ServiceRestart, ServiceResult, ServiceState, ServiceType,
 };
 use super::spawn::ServiceSpawn;
-use crate::rentry::ExitStatus;
+use crate::rentry::{ExitStatus, PreserveMode};
 use basic::{fd_util, IN_SET};
 use basic::{file_util, process_util};
 use event::{EventState, EventType, Events, Source};
@@ -207,6 +207,7 @@ impl ServiceMng {
             self.rd.set_reset_restart(false);
         }
         self.set_result(ServiceResult::Success);
+        self.rd.set_forbid_restart(false);
         self.enter_contion();
         self.db_update();
     }
@@ -229,17 +230,44 @@ impl ServiceMng {
 
     pub(super) fn stop_action(&self) {
         self.rd.set_forbid_restart(true);
-        let starting_state = vec![
+
+        /* logic same as service_stop() in systemd */
+        if vec![
+            ServiceState::Stop,
+            ServiceState::StopSigterm,
+            ServiceState::StopSigkill,
+            ServiceState::StopPost,
+            ServiceState::FinalWatchdog,
+            ServiceState::FinalSigterm,
+            ServiceState::FinalWatchdog,
+        ]
+        .contains(&self.state())
+        {
+            return;
+        }
+
+        if self.state() == ServiceState::AutoRestart {
+            self.set_state(ServiceState::Dead);
+            return;
+        }
+
+        if vec![
             ServiceState::Condition,
             ServiceState::StartPre,
             ServiceState::Start,
             ServiceState::StartPost,
             ServiceState::Reload,
             ServiceState::StopWatchdog,
-        ];
-        if starting_state.contains(&self.state()) {
+        ]
+        .contains(&self.state())
+        {
             self.enter_signal(ServiceState::StopSigterm, ServiceResult::Success);
             self.db_update();
+            return;
+        }
+
+        if self.state() == ServiceState::Cleaning {
+            self.enter_signal(ServiceState::FinalSigkill, ServiceResult::Success);
             return;
         }
 
@@ -523,7 +551,11 @@ impl ServiceMng {
     fn enter_dead(&self, res: ServiceResult, force_restart: bool) {
         self.log(
             Level::Debug,
-            &format!("Running into dead state, res: {:?}", res),
+            &format!(
+                "Running into dead state, res: {:?}, current res: {:?}, restart: {force_restart}",
+                res,
+                self.result()
+            ),
         );
         let mut restart = force_restart;
 
@@ -555,7 +587,6 @@ impl ServiceMng {
         }
 
         self.set_state(state);
-
         if restart {
             self.rd.set_will_auto_restart(false);
             if let Err(e) = self
@@ -575,6 +606,20 @@ impl ServiceMng {
         }
 
         self.rd.set_forbid_restart(false);
+
+        let preserve_mode = self
+            .config
+            .config_data()
+            .borrow()
+            .Service
+            .RuntimeDirectoryPreserve;
+        if preserve_mode == PreserveMode::No
+            || preserve_mode == PreserveMode::Restart && !self.rd.will_restart()
+        {
+            if let Some(runtime_directory) = self.spawn.get_runtime_directory() {
+                let _ = self.comm.um().unit_destroy_runtime_data(runtime_directory);
+            }
+        }
 
         if let Some(p) = self.config.pid_file() {
             if let Err(e) = nix::unistd::unlink(&p) {
@@ -1786,6 +1831,20 @@ impl RunningData {
 
     pub(self) fn will_auto_restart(&self) -> bool {
         self.data.borrow().will_auto_restart()
+    }
+
+    pub(self) fn will_restart(&self) -> bool {
+        if self.data.borrow().will_auto_restart() {
+            return true;
+        }
+        if self.mng.borrow().upgrade().unwrap().state() == ServiceState::AutoRestart {
+            return true;
+        }
+        let u = match self.comm.owner() {
+            None => return false,
+            Some(v) => v,
+        };
+        self.comm.um().has_start_job(u.id())
     }
 
     pub(self) fn attach_timer(&self, timer: Rc<ServiceTimer>) {

@@ -23,7 +23,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::str::FromStr;
 use std::{cell::RefCell, collections::HashMap};
-use std::{ffi::CString, path::PathBuf, rc::Rc};
+use std::{ffi::CString, path::Path, path::PathBuf, rc::Rc};
 
 /// the Rlimit soft and hard value
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -215,6 +215,21 @@ impl ExecContext {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+///
+pub enum ExecDirectoryType {
+    ///
+    Runtime = 0,
+    ///
+    State = 1,
+    ///
+    Cache = 2,
+    ///
+    Logs = 3,
+    ///
+    Config = 4,
+}
+
 /// the environment that will be set when start a new command
 pub struct ExecParameters {
     environment: Rc<EnvData>,
@@ -222,6 +237,7 @@ pub struct ExecParameters {
     notify_sock: Option<PathBuf>,
     root_directory: Option<PathBuf>,
     working_directory: Option<PathBuf>,
+    exec_directory: Vec<Option<Vec<PathBuf>>>,
     user: Option<User>,
     group: Option<Group>,
     umask: Option<Mode>,
@@ -269,12 +285,14 @@ impl Default for ExecParameters {
 impl ExecParameters {
     /// create  a new instance of ExecParameters
     pub fn new() -> ExecParameters {
+        let exec_directory: Vec<Option<Vec<PathBuf>>> = vec![None, None, None, None, None];
         ExecParameters {
             environment: Rc::new(EnvData::new()),
             fds: Vec::new(),
             notify_sock: None,
             root_directory: None,
             working_directory: None,
+            exec_directory,
             user: None,
             group: None,
             umask: None,
@@ -342,9 +360,42 @@ impl ExecParameters {
         Ok(())
     }
 
+    /// add RuntimeDirectory
+    pub fn add_runtime_directory(&mut self, runtime_directories: &Vec<String>) -> Result<()> {
+        if runtime_directories.is_empty() {
+            return Ok(());
+        }
+        let mut directories: Vec<PathBuf> = Vec::new();
+        for d in runtime_directories {
+            /* Different from RootDirectory or WorkingDirectory, we don't
+             * check if the specified directory exists. We will create it
+             * later if it doesn't exist. */
+            directories.push(Path::new("/run").join(d));
+        }
+        self.exec_directory[ExecDirectoryType::Runtime as usize] = Some(directories);
+        Ok(())
+    }
+
     /// get RootDirectory
     pub fn get_root_directory(&self) -> Option<PathBuf> {
         self.root_directory.clone()
+    }
+
+    /// get ExecDirectory
+    pub fn get_exec_directory(&self) -> &Vec<Option<Vec<PathBuf>>> {
+        &self.exec_directory
+    }
+
+    /// get RuntimeDirectory
+    pub fn get_runtime_directory(&self) -> Option<Vec<PathBuf>> {
+        self.exec_directory[ExecDirectoryType::Runtime as usize].as_ref()?;
+        let res: Vec<PathBuf> = self.exec_directory[ExecDirectoryType::Runtime as usize]
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(PathBuf::from)
+            .collect();
+        Some(res)
     }
 
     /// add WorkingDirectory

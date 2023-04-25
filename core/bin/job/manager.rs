@@ -200,7 +200,11 @@ impl JobManager {
     }
 
     pub(crate) fn has_stop_job(&self, unit: &Rc<UnitX>) -> bool {
-        self.data.get_suspends(unit).is_some()
+        self.data.jobs.get_suspend(unit, JobKind::Stop).is_some()
+    }
+
+    pub(crate) fn has_start_job(&self, unit: &Rc<UnitX>) -> bool {
+        self.data.jobs.get_suspend(unit, JobKind::Start).is_some()
     }
 
     pub(crate) fn has_start_like_job(&self, unit: &Rc<UnitX>) -> bool {
@@ -544,10 +548,6 @@ impl JobManagerData {
 
     pub(self) fn calc_jobs_ready(&self) -> bool {
         self.jobs.calc_ready()
-    }
-
-    pub(self) fn get_suspends(&self, unit: &Rc<UnitX>) -> Option<JobInfo> {
-        self.jobs.get_suspend(unit, JobKind::Stop)
     }
 
     fn remove_unit(&self, unit: &UnitX) {

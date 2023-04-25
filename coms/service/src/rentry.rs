@@ -18,7 +18,7 @@ use macros::EnumDisplay;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::path::Path;
 use std::path::PathBuf;
@@ -163,6 +163,35 @@ impl DeserializeWith for ExitStatusSet {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum PreserveMode {
+    #[default]
+    No,
+    Yes,
+    Restart,
+}
+
+impl DeserializeWith for PreserveMode {
+    type Item = Self;
+
+    fn deserialize_with<'de, D>(de: D) -> std::result::Result<Self::Item, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(de)?;
+        let res = match s.as_str() {
+            "no" => PreserveMode::No,
+            "yes" => PreserveMode::Yes,
+            "restart" => PreserveMode::Restart,
+            _ => {
+                log::error!("Failed to parse RuntimeDirectoryPreserve: {s}, assuming no");
+                PreserveMode::No
+            }
+        };
+        Ok(res)
+    }
+}
+
 fn deserialize_pidfile<'de, D>(de: D) -> Result<PathBuf, D::Error>
 where
     D: Deserializer<'de>,
@@ -170,13 +199,10 @@ where
     let file = String::deserialize(de)?;
     let pid_file_path = Path::new(&file);
     if pid_file_path.is_absolute() {
-        return pid_file_path.canonicalize().map_err(de::Error::custom);
+        return Ok(PathBuf::from(pid_file_path));
     }
 
-    Path::new(EXEC_RUNTIME_PREFIX)
-        .join(pid_file_path)
-        .canonicalize()
-        .map_err(de::Error::custom)
+    Ok(Path::new(EXEC_RUNTIME_PREFIX).join(pid_file_path))
 }
 
 fn deserialize_timeout<'de, D>(de: D) -> Result<u64, D::Error>
@@ -231,6 +257,11 @@ pub(super) struct SectionService {
     pub RootDirectory: String,
     #[config(default = "")]
     pub WorkingDirectory: String,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    pub RuntimeDirectory: Option<Vec<String>>,
+    #[config(deserialize_with = PreserveMode::deserialize_with)]
+    #[config(default = "no")]
+    pub RuntimeDirectoryPreserve: PreserveMode,
     #[config(default = "")]
     pub User: String,
     #[config(default = "")]
