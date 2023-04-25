@@ -259,10 +259,18 @@ impl Condition {
                 v.unwrap()
             }
         };
+        log::debug!("Found kernel command line value: {value}");
         if has_equal {
+            /* has an equal, "crashkernel=512M matches crashkernel=512M" */
             self.params.eq(&value) as i8
         } else {
-            1
+            /* Check if the value has an equal */
+            match value.split_once('=') {
+                /* doesn't has an equal, "rd matches rd" */
+                None => self.params.eq(&value) as i8,
+                /* has an equal, "crashkernel matches crashkernel=512M" */
+                Some(v) => self.params.eq(v.0) as i8,
+            }
         }
     }
 
