@@ -92,6 +92,11 @@ pub trait UmIf {
         false
     }
 
+    /// check if there is already a start job in process
+    fn has_start_job(&self, _name: &str) -> bool {
+        false
+    }
+
     /// check the unit that will be triggered by {name} is in active or activating state
     fn relation_active_or_pending(&self, _name: &str) -> bool {
         false

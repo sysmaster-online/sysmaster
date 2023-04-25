@@ -18,7 +18,7 @@ use macros::EnumDisplay;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::path::Path;
 use std::path::PathBuf;
@@ -199,13 +199,10 @@ where
     let file = String::deserialize(de)?;
     let pid_file_path = Path::new(&file);
     if pid_file_path.is_absolute() {
-        return pid_file_path.canonicalize().map_err(de::Error::custom);
+        return Ok(PathBuf::from(pid_file_path));
     }
 
-    Path::new(EXEC_RUNTIME_PREFIX)
-        .join(pid_file_path)
-        .canonicalize()
-        .map_err(de::Error::custom)
+    Ok(Path::new(EXEC_RUNTIME_PREFIX).join(pid_file_path))
 }
 
 fn deserialize_timeout<'de, D>(de: D) -> Result<u64, D::Error>

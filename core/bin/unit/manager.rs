@@ -324,6 +324,11 @@ impl UmIf for UnitManager {
     fn has_stop_job(&self, name: &str) -> bool {
         self.has_stop_job(name)
     }
+
+    fn has_start_job(&self, name: &str) -> bool {
+        self.has_start_job(name)
+    }
+
     /// check the unit that will be triggered by {name} is in active or activating state
     fn relation_active_or_pending(&self, name: &str) -> bool {
         self.relation_active_or_pending(name)
@@ -572,13 +577,20 @@ impl UnitManager {
 
     /// check if there is already a stop job in process
     fn has_stop_job(&self, name: &str) -> bool {
-        let u = if let Some(unit) = self.db.units_get(name) {
-            unit
-        } else {
-            return false;
+        let u = match self.db.units_get(name) {
+            None => return false,
+            Some(v) => v,
         };
-
         self.jm.has_stop_job(&u)
+    }
+
+    /// check if there is already a start job in process
+    fn has_start_job(&self, name: &str) -> bool {
+        let u = match self.db.units_get(name) {
+            None => return false,
+            Some(v) => v,
+        };
+        self.jm.has_start_job(&u)
     }
 
     ///
