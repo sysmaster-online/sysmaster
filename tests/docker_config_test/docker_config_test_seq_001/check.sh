@@ -1,1 +1,0 @@
-../../config_test/unit_config_test/seq_001/check.sh

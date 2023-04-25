@@ -15,8 +15,7 @@ function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/timeout.service ${SYSMST_LIB_PATH} || return 1
     sed -i '/Service/ a TimeoutSec=0' ${SYSMST_LIB_PATH}/timeout.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     # TimeoutSec=0 means infinity
     sctl start timeout &
     sleep 1
@@ -52,13 +51,11 @@ function test01() {
     sctl status timeout
     sctl status timeout | grep 'inactive (dead)'
     expect_eq $? 0
-    # clean
-    kill_sysmaster
 
     # TimeoutSec=1, start-pre and stop-post both timeout
     sed -i 's/TimeoutSec=.*/TimeoutSec=1/' ${SYSMST_LIB_PATH}/timeout.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
+    echo > "${SYSMST_LOG}"
     sctl start timeout &
     sleep 0.9
     sctl status timeout
@@ -73,13 +70,12 @@ function test01() {
     sctl status timeout | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${startpre_log}" "${stoppost_log}"
+    expect_eq $? 0
     grep -aE "${startpost_log}|${stop_log}" "${SYSMST_LOG}"
-    # clean
-    kill_sysmaster
 
     # TimeoutSec=3, no timeout
     sed -i 's/TimeoutSec=.*/TimeoutSec=3/' ${SYSMST_LIB_PATH}/timeout.service
-    run_sysmaster || return 1
+    sctl daemon-reload
     # TimeoutSec > ExecStartPre + ExecStartPost, no timeout
     sctl start timeout &
     sleep 1
@@ -115,13 +111,11 @@ function test01() {
     sctl status timeout
     sctl status timeout | grep 'inactive (dead)'
     expect_eq $? 0
-    # clean
-    kill_sysmaster
 
     # TimeoutSec=2, only start-post timeout
     sed -i 's/TimeoutSec=.*/TimeoutSec=2/' ${SYSMST_LIB_PATH}/timeout.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
+    echo > "${SYSMST_LOG}"
     # TimeoutSec < ExecStartPre + ExecStartPost, timeout
     # TimeoutSec > single ExecStop, TimeoutSec > ExecStopPost, no timeout
     sctl start timeout &
@@ -142,16 +136,15 @@ function test01() {
     sctl status timeout | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${startpost_log}"
+    expect_eq $? 0
     grep -aE "${startpre_log}|${stop_log}|${stoppost_log}" "${SYSMST_LOG}"
     expect_eq $? 1
-    # clean
-    kill_sysmaster
 
     # TimeoutSec=1, only start-pre timeout
     sed -i 's/ExecStopPost=.*/ExecStopPost="/bin/sleep 0.5"/' ${SYSMST_LIB_PATH}/timeout.service
     sed -i 's/TimeoutSec=.*/TimeoutSec=1/' ${SYSMST_LIB_PATH}/timeout.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
+    echo > "${SYSMST_LOG}"
     sctl start timeout &
     sleep 0.9
     sctl status timeout
@@ -166,10 +159,9 @@ function test01() {
     sctl status timeout | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${startpre_log}"
+    expect_eq $? 0
     grep -aE "${startpost_log}|${stop_log}|${stoppost_log}" "${SYSMST_LOG}"
     expect_eq $? 1
-    # clean
-    kill_sysmaster
 }
 
 # usage: test TimeoutStartSec/TimeoutStopSec
@@ -178,8 +170,7 @@ function test02() {
     cp -arf "${work_dir}"/tmp_units/timeout.service ${SYSMST_LIB_PATH} || return 1
     sed -i '/Service/ a TimeoutStartSec=0' ${SYSMST_LIB_PATH}/timeout.service
     sed -i '/Service/ a TimeoutStopSec=0' ${SYSMST_LIB_PATH}/timeout.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     # TimeoutStartSec/TimeoutStopSec=0 means infinity
     sctl start timeout &
     sleep 1
@@ -215,15 +206,14 @@ function test02() {
     sctl status timeout
     sctl status timeout | grep 'inactive (dead)'
     expect_eq $? 0
-    # clean
-    kill_sysmaster
 
     # TimeoutStartSec/TimeoutStopSec have higher priority than TimeoutSec
     # only stop timeout (the first ExecStop + ExecStopPost)
     sed -i '/ExecStartPre/ i TimeoutSec=0' ${SYSMST_LIB_PATH}/timeout.service
     sed -i 's/TimeoutStartSec=.*/TimeoutStartSec=3/' ${SYSMST_LIB_PATH}/timeout.service
     sed -i 's/TimeoutStopSec=.*/TimeoutStopSec=1/' ${SYSMST_LIB_PATH}/timeout.service
-    run_sysmaster || return 1
+    sctl daemon-reload
+    echo > "${SYSMST_LOG}"
     # TimeoutStartSec > ExecStartPre + ExecStartPost, no timeout
     sctl start timeout &
     sleep 1
@@ -257,15 +247,15 @@ function test02() {
     sctl status timeout | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${stop_log}" "${stoppost_log}"
+    expect_eq $? 0
     grep -aE "${startpre_log}|${startpost_log}" "${SYSMST_LOG}"
     expect_eq $? 1
-    # clean
-    kill_sysmaster
 
     # only stop timeout (the second ExecStop)
     sed -i 's/ExecStop=.*/ExecStop="/bin/sleep 0.9; /bin/sleep 1.5"/' ${SYSMST_LIB_PATH}/timeout.service
     sed -i 's/ExecStopPost=.*/ExecStopPost="/bin/sleep 0.9"/' ${SYSMST_LIB_PATH}/timeout.service
-    run_sysmaster || return 1
+    sctl daemon-reload
+    echo > "${SYSMST_LOG}"
     # TimeoutStartSec > ExecStartPre + ExecStartPost, no timeout
     sctl start timeout &
     sleep 1
@@ -305,15 +295,15 @@ function test02() {
     sctl status timeout | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${stop_log}"
+    expect_eq $? 0
     grep -aE "${startpre_log}|${startpost_log}|${stoppost_log}" "${SYSMST_LOG}"
     expect_eq $? 1
-    # clean
-    kill_sysmaster
 
     # only stop-post timeout
     sed -i 's/ExecStop=.*/ExecStop="/bin/sleep 0.9; /bin/sleep 0.9"/' ${SYSMST_LIB_PATH}/timeout.service
     sed -i 's/ExecStopPost=.*/ExecStopPost="/bin/sleep 1.5"/' ${SYSMST_LIB_PATH}/timeout.service
-    run_sysmaster || return 1
+    sctl daemon-reload
+    echo > "${SYSMST_LOG}"
     # TimeoutStartSec > ExecStartPre + ExecStartPost, no timeout
     sctl start timeout &
     sleep 1
@@ -352,16 +342,15 @@ function test02() {
     sctl status timeout | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${stoppost_log}"
+    expect_eq $? 0
     grep -aE "${startpre_log}|${startpost_log}|${stop_log}" "${SYSMST_LOG}"
     expect_eq $? 1
-    # clean
-    kill_sysmaster
 
     # only start timeout
     sed -i 's/TimeoutStartSec=.*/TimeoutStartSec=2/' ${SYSMST_LIB_PATH}/timeout.service
     sed -i 's/TimeoutStopSec=.*/TimeoutStopSec=2/' ${SYSMST_LIB_PATH}/timeout.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
+    echo > "${SYSMST_LOG}"
     sctl start timeout &
     sleep 1
     sctl status timeout
@@ -380,12 +369,12 @@ function test02() {
     sctl status timeout | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${startpost_log}"
+    expect_eq $? 0
     grep -aE "${startpre_log}|${stop_log}|${stoppost_log}" "${SYSMST_LOG}"
     expect_eq $? 1
-    # clean
-    kill_sysmaster
 }
 
+run_sysmaster || exit 1
 test01 || exit 1
 test02 || exit 1
 exit "${EXPECT_FAIL}"
