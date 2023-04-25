@@ -143,3 +143,29 @@ pub fn uid_is_system(uid: Uid) -> bool {
     const SYSTEM_UID_MAX: uid_t = 999;
     uid.as_raw() <= SYSTEM_UID_MAX
 }
+
+/// get user creds
+pub fn get_user_creds(user: &String) -> Result<User> {
+    if let Ok(u) = parse_uid(user) {
+        return Ok(u);
+    }
+    if let Ok(Some(u)) = User::from_name(user) {
+        return Ok(u);
+    }
+    Err(Error::Invalid {
+        what: "invalid user name".to_string(),
+    })
+}
+
+/// get group creds
+pub fn get_group_creds(group: &String) -> Result<Group> {
+    if let Ok(g) = parse_gid(group) {
+        return Ok(g);
+    }
+    if let Ok(Some(g)) = Group::from_name(group) {
+        return Ok(g);
+    }
+    Err(Error::Invalid {
+        what: "invalid group name".to_string(),
+    })
+}

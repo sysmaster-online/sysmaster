@@ -71,3 +71,7 @@ SOCK_SEQPACKET只有在Unix套接子时才有效。
 * 类型：布尔值
 
 配置在socket单元停止后是否删除建立的socket文件，以及由`Symlinks`配置生成的软链接。配置为`true`时，删除；配置为`false`时，不删除。默认为`false`。
+
+## SocketUser、SocketGroup
+
+设置文件所属的用户和用户组，当为unix套接子或为FIFO类型的文件时有效，默认值为空字符串，支持配置为用户名或对应的用户id。

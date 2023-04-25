@@ -20,10 +20,14 @@ use super::{
     rentry::{PortType, SocketCommand, SocketRe, SocketReFrame, SocketResult, SocketState},
     spawn::SocketSpawn,
 };
-use basic::IN_SET;
+use basic::{
+    user_group_util::{get_group_creds, get_user_creds},
+    IN_SET,
+};
 use event::EventState;
 use event::{EventType, Events, Source};
 use nix::sys::wait::WaitStatus;
+use nix::unistd::{Gid, Uid};
 use nix::{
     libc::{self},
     unistd::unlink,
@@ -286,6 +290,18 @@ impl SocketMng {
         log::debug!("enter start chown command");
         match self.open_fds() {
             Ok(_) => {
+                let socket_data = self.config.config_data();
+                let user = &socket_data.borrow().Socket.SocketUser;
+                let group = &socket_data.borrow().Socket.SocketGroup;
+
+                if !user.is_empty() || !group.is_empty() {
+                    if let Err(e) = self.socket_chown(user, group) {
+                        log::error!("chown path error: {}", e);
+                        self.enter_stop_pre(SocketResult::FailureResources);
+                        return;
+                    }
+                }
+
                 self.enter_start_post();
             }
             Err(_) => self.enter_stop_pre(SocketResult::FailureResources),
@@ -782,6 +798,26 @@ impl SocketMng {
         }
 
         self.db_update();
+    }
+
+    fn socket_chown(&self, user: &String, group: &String) -> Result<()> {
+        let mut uid = Uid::from_raw(u32::MAX);
+        let mut gid = Gid::from_raw(u32::MAX);
+        if !user.is_empty() {
+            let user = get_user_creds(user)?;
+            uid = user.uid;
+            gid = user.gid;
+        }
+
+        if !group.is_empty() {
+            let group = get_group_creds(group)?;
+            gid = group.gid
+        }
+        for port in self.ports().iter() {
+            port.chown(uid, gid)?;
+        }
+
+        Ok(())
     }
 }
 
