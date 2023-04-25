@@ -13,10 +13,7 @@
 //! utilities
 //!
 
-use crate::{
-    error::{Error, Result},
-    rules::FormatSubstitutionType,
-};
+use crate::{error::*, rules::FormatSubstitutionType};
 use basic::errno_util::errno_is_privilege;
 use device::Device;
 use lazy_static::lazy_static;
@@ -260,6 +257,40 @@ pub(crate) fn resolve_subsystem_kernel(s: &String, read: bool) -> Result<String>
     }
 }
 
+pub(crate) fn sysattr_subdir_subst(sysattr: &str) -> Result<String> {
+    match sysattr.find("/*/") {
+        Some(idx) => {
+            let dir = &sysattr[0..idx + 1];
+            let tail = &sysattr[idx + 3..];
+            for entry in (std::fs::read_dir(dir).map_err(|e| Error::Other {
+                msg: format!("failed to read directory '{}': ({})", dir, e),
+                errno: nix::errno::Errno::ENOENT,
+            })?)
+            .flatten()
+            {
+                if let Ok(md) = entry.metadata() {
+                    if md.is_dir() {
+                        let file = dir.to_string()
+                            + entry.file_name().to_str().unwrap_or_default()
+                            + "/"
+                            + tail;
+                        let path = std::path::Path::new(&file);
+                        if path.exists() {
+                            return Ok(file);
+                        }
+                    }
+                }
+            }
+        }
+        None => return Ok(sysattr.to_string()),
+    }
+
+    Err(Error::Other {
+        msg: format!("sysattr is not found: '{}'", sysattr),
+        errno: nix::errno::Errno::ENOENT,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use device::Device;
@@ -373,6 +404,17 @@ mod tests {
         assert_eq!(
             replace_chars("abcd\tefg", DEVMASTER_LEGAL_CHARS),
             "abcd efg"
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn test_sysattr_subdir_subst() {
+        let device = Device::from_path("/dev/sda".to_string()).unwrap();
+        let syspath = device.get_syspath().unwrap();
+        println!(
+            "{}",
+            sysattr_subdir_subst(&(syspath.to_string() + "/sda1/*/runtime_status")).unwrap()
         );
     }
 }
