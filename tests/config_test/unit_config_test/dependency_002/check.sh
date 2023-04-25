@@ -9,169 +9,236 @@ set +e
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
-    run_sysmaster || return 1
-
-    sctl enable base &> log
+    cp -arf ${SYSMST_LIB_PATH}/base.service ${SYSMST_LIB_PATH}/wantedby.service || return 1
+    cp -arf ${SYSMST_LIB_PATH}/base.service ${SYSMST_LIB_PATH}/requiredby.service || return 1
+    sctl daemon-reload
+    sctl enable base
     expect_eq $? 0
-    check_log log 'The unit files have no installation config'
-    ls ${SYSMST_ETC_PATH} && find ${SYSMST_ETC_PATH} -name base.service | grep base.service
-    expect_ne $? 0
+    ls ${SYSMST_ETC_PATH}
+    expect_eq $? 2
 
-    # clean
-    rm -rf log
-    kill_sysmaster
+    # dropin path config
+    echo "[Install]
+WantedBy=\"wantedby.service\"" >> ${SYSMST_LIB_PATH}/base.service
+    mkdir -p ${SYSMST_ETC_PATH}/base.service.d
+    echo "[Install]
+WantedBy=\"requiredby.service\"" > ${SYSMST_ETC_PATH}/base.service.d/install.conf
+    sctl daemon-reload
+    sctl enable base
+    expect_eq $? 0
+    ls ${SYSMST_ETC_PATH}/requiredby.service.wants/base.service
+    expect_eq $? 0 || return 1
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service
+    expect_eq $? 0
+    expect_str_eq "$(realpath ${SYSMST_ETC_PATH}/requiredby.service.wants/base.service)" "${SYSMST_LIB_PATH}/base.service"
+    expect_str_eq "$(realpath ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service)" "${SYSMST_LIB_PATH}/base.service"
+    sctl disable base
+    expect_eq $? 0
+    ls ${SYSMST_ETC_PATH}/requiredby.service.wants/base.service || ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service
+    expect_eq $? 2
+    ls ${SYSMST_ETC_PATH}/requiredby.service.wants ${SYSMST_ETC_PATH}/wantedby.service.wants
+    expect_eq $? 0
+
+    cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH}
+    sctl daemon-reload
+    sctl enable base
+    expect_eq $? 0
+    ls ${SYSMST_ETC_PATH}/requiredby.service.wants/base.service
+    expect_eq $? 0 || return 1
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service
+    expect_eq $? 2
+    expect_str_eq "$(realpath ${SYSMST_ETC_PATH}/requiredby.service.wants/base.service)" "${SYSMST_LIB_PATH}/base.service"
+    sctl disable base
+    expect_eq $? 0
+    ls ${SYSMST_ETC_PATH}/requiredby.service.wants/base.service || ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service
+    expect_eq $? 2
+    ls ${SYSMST_ETC_PATH}/requiredby.service.wants ${SYSMST_ETC_PATH}/wantedby.service.wants
+    expect_eq $? 0
+
+    rm -rf ${SYSMST_ETC_PATH}/base.service.d ${SYSMST_ETC_PATH}/wantedby.service.wants ${SYSMST_ETC_PATH}/requiredby.service.wants
+    sctl daemon-reload
 }
 
 # usage: test WantedBy
 function test02() {
     log_info "===== test02 ====="
-    cp -arf ${SYSMST_LIB_PATH}/base.service ${SYSMST_LIB_PATH}/wantedby.service
-    cp -arf ${SYSMST_LIB_PATH}/base.service ${SYSMST_LIB_PATH}/requiredby.service
-    echo "\[Install]" >> ${SYSMST_LIB_PATH}/base.service
-    echo "WantedBy=\"wantedby.service\"" >> ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-
+    echo "[Install]
+WantedBy=\"wantedby.service\"" >> ${SYSMST_LIB_PATH}/base.service
+    sctl daemon-reload
     sctl enable base
     expect_eq $? 0
-    ls ${SYSMST_ETC_PATH}/system/wantedby.service.wants/base.service
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service
     expect_eq $? 0
 
     sctl start wantedby
     check_status wantedby active
+    expect_eq $? 0
     check_status base active
+    expect_eq $? 0
     sctl stop base
     check_status base inactive
+    expect_eq $? 0
     check_status wantedby active
+    expect_eq $? 0
 
     sctl disable base
     expect_eq $? 0
-    ls ${SYSMST_ETC_PATH}/system/wantedby.service.wants/base.service
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service
     expect_eq $? 2
     sctl start wantedby
     check_status wantedby active
+    expect_eq $? 0
     check_status base inactive
+    expect_eq $? 0
 
     # clean
     sctl stop wantedby
-    kill_sysmaster
 }
 
 # usage: test RequiredBy
 function test03() {
     log_info "===== test03 ====="
     sed -i "s/WantedBy=.*/RequiredBy=\"requiredby.service\"/" ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     sctl enable base
     expect_eq $? 0
-    ls ${SYSMST_ETC_PATH}/system/requiredby.service.wants/base.service
+    ls ${SYSMST_ETC_PATH}/requiredby.service.requires/base.service
     expect_eq $? 0
 
     sctl start requiredby
     check_status requiredby active
+    expect_eq $? 0
     check_status requiredby active
+    expect_eq $? 0
     sctl stop base
     check_status base inactive
+    expect_eq $? 0
     check_status requiredby inactive
+    expect_eq $? 0
 
     sctl disable base
     expect_eq $? 0
-    ls ${SYSMST_ETC_PATH}/system/requiredby.service.wants/base.service
+    ls ${SYSMST_ETC_PATH}/requiredby.service.requires/base.service
     expect_eq $? 2
     sctl start requiredby
     check_status requiredby active
+    expect_eq $? 0
     check_status base inactive
+    expect_eq $? 0
 
     # clean
     sctl stop requiredby
-    kill_sysmaster
 }
 
 # usage: test multiple Also
 function test04() {
     log_info "===== test04 ====="
-    cp -arf ${SYSMST_LIB_PATH}/wantedby.service ${SYSMST_LIB_PATH}/wantedby2.service
-    echo "Also=\"wantedby.service wantedby2.service\"" >> ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-
+    cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH}
+    cp -arf ${SYSMST_LIB_PATH}/base.service ${SYSMST_LIB_PATH}/base1.service
+    cp -arf ${SYSMST_LIB_PATH}/base.service ${SYSMST_LIB_PATH}/base2.service
+    echo "[Install]
+Also=\"base1.service;base2.service\"
+WantedBy=\"wantedby.service\"" >> ${SYSMST_LIB_PATH}/base.service
+    sctl daemon-reload
     sctl enable base
     expect_eq $? 0
-    ls ${SYSMST_ETC_PATH}/system/requiredby.service.wants/{wantedby.service,wantedby2.service}
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service
+    expect_eq $? 0
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base1.service
+    expect_eq $? 2
+    sctl disable base
+    expect_eq $? 0
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service
+    expect_eq $? 2
+
+    echo "[Install]
+WantedBy=\"requiredby.service\"" >> ${SYSMST_LIB_PATH}/base1.service
+    echo "[Install]
+WantedBy=\"requiredby.service\"" >> ${SYSMST_LIB_PATH}/base2.service
+    sctl daemon-reload
+    sctl enable base
+    expect_eq $? 0
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service
+    expect_eq $? 0
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base1.service
+    expect_eq $? 2
+    ls ${SYSMST_ETC_PATH}/requiredby.service.wants/{base1.service,base2.service}
+    expect_eq $? 0
+    expect_str_eq "$(realpath ${SYSMST_ETC_PATH}/requiredby.service.wants/base1.service)" "${SYSMST_LIB_PATH}/base1.service"
+    expect_str_eq "$(realpath ${SYSMST_ETC_PATH}/requiredby.service.wants/base2.service)" "${SYSMST_LIB_PATH}/base2.service"
+    sctl disable base1
+    expect_eq $? 0
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service
+    expect_eq $? 0
+    ls ${SYSMST_ETC_PATH}/requiredby.service.wants/base1.service
+    expect_eq $? 2
+    ls ${SYSMST_ETC_PATH}/requiredby.service.wants/base2.service
     expect_eq $? 0
     sctl disable base
     expect_eq $? 0
-    ls ${SYSMST_ETC_PATH}/system/requiredby.service.wants | grep base
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants | grep base
     expect_eq $? 1
-
-    # clean
-    kill_sysmaster
+    ls ${SYSMST_ETC_PATH}/requiredby.service.wants | grep base
+    expect_eq $? 1
 }
 
 # usage: test multiple Alias
 function test05() {
     log_info "===== test05 ====="
     sed -i '/Also/d' ${SYSMST_LIB_PATH}/base.service
-    echo "Alias=\"base1.service base2.service\"" >> ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-
+    echo "Alias=\"base1.service;base2.service\"" >> ${SYSMST_LIB_PATH}/base.service
+    rm -rf ${SYSMST_LIB_PATH}/{base1.service,base2.service}
+    sctl daemon-reload
     sctl enable base
     expect_eq $? 0
-    ls ${SYSMST_ETC_PATH}/system/requiredby.service.wants/{base1.service,base2.service}
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base.service
     expect_eq $? 0
-    sctl start base1
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants/base1.service
+    expect_eq $? 2
+    ls ${SYSMST_ETC_PATH}/requiredby.service.wants | grep base
+    expect_eq $? 1
+    ls ${SYSMST_ETC_PATH}/{base1.service,base2.service}
     expect_eq $? 0
-    check_status base active
-    check_status base1 active
-    check_status base2 active
+    expect_str_eq "$(realpath ${SYSMST_ETC_PATH}/base1.service)" "${SYSMST_LIB_PATH}/base.service"
+    expect_str_eq "$(realpath ${SYSMST_ETC_PATH}/base2.service)" "${SYSMST_LIB_PATH}/base.service"
+
+    sctl restart base
+    check_status base 'active'
+    expect_eq $? 0
+    check_status base1 'active'
+    expect_eq $? 0
+    check_status base2 'active'
+    expect_eq $? 0
     sctl stop base
+    check_status base 'inactive'
     expect_eq $? 0
-    check_status base inactive
-    check_status base1 inactive
-    check_status base2 inactive
-
-    sctl disable base
+    check_status base1 'inactive'
     expect_eq $? 0
-    ls ${SYSMST_ETC_PATH}/system/requiredby.service.wants | grep base
-    expect_eq $? 1
-    sctl start base1 &> log
-    expect_eq $? 1
-    check_log log 'No such file'
-    sctl start base
-    check_status base active
-    sctl status base2 | grep 'No such file'
-    expect_eq $? 0 || sctl status base2
+    check_status base2 'inactive'
+    expect_eq $? 0
 
-    # clean
-    rm -rf log
-    kill_sysmaster
+    sctl disable base1
+    expect_eq $? 0
+    ls ${SYSMST_ETC_PATH}/wantedby.service.wants | grep base
+    expect_eq $? 1
+    ls ${SYSMST_ETC_PATH}/base1.service || ls ${SYSMST_ETC_PATH}/base2.service
+    expect_eq $? 2
+    sctl restart base
+    check_status base 'active'
+    expect_eq $? 0
+    check_status base1 'inactive'
+    expect_eq $? 0
+    check_status base2 'inactive'
+    expect_eq $? 0
+    sctl stop base
+    check_status base 'inactive'
+    expect_eq $? 0
 }
 
-# usage: test duplicate Alias
-function test06() {
-    log_info "===== test06 ====="
-    echo "Alias=\"base1.service base3.service base4\"" >> ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-
-    sctl enable base
-    expect_eq $? 0
-    ls ${SYSMST_ETC_PATH}/system/requiredby.service.wants/{base1.service,base2.service,base3.service}
-    expect_eq $? 0
-    ls ${SYSMST_ETC_PATH}/system/requiredby.service.wants | grep base4
-    expect_eq $? 1
-
-    sctl disable base
-    expect_eq $? 0
-    ls ${SYSMST_ETC_PATH}/system/requiredby.service.wants | grep base
-    expect_eq $? 1
-
-    # clean
-    kill_sysmaster
-}
-
+run_sysmaster || exit 1
 test01 || exit 1
 test02 || exit 1
 test03 || exit 1
 test04 || exit 1
 test05 || exit 1
-test06 || exit 1
 exit "${EXPECT_FAIL}"

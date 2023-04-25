@@ -3,6 +3,7 @@
 export EXPECT_FAIL=0
 export SYSMST_LIB_PATH='/usr/lib/sysmaster'
 export SYSMST_ETC_PATH='/etc/sysmaster'
+export SYSMST_RUN_PATH='/run/sysmaster'
 export SYSMST_LOG='/opt/sysmaster.log'
 export RELIAB_SWITCH_PATH='/run/sysmaster/reliability'
 export RELIAB_SWITCH='switch.debug'
@@ -176,10 +177,8 @@ function check_log() {
     cat "${file_name}" | sed "s/\x00//g" || return 1
 
     shift 1
-    expect_gt $# 0 'Parameter missing: key log info not defined!' || return 1
     while [ $# -gt 0 ]; do
-        cat "${file_name}" | sed "s/\x00//g" | grep -aE "$1"
-        expect_eq $? 0 "check log failed, '$1' not found in ${file_name}!" || return 1
+        cat "${file_name}" | sed "s/\x00//g" | grep -aE "$1" || return 1
         shift 1
     done
 }
@@ -194,7 +193,6 @@ function check_status() {
     for ((cnt = 0; cnt < 3; ++cnt)); do
         sctl status "${service}" |& grep -w 'Active:' | head -n1 | grep -w "${exp_status}" && return 0 || sleep 1
     done
-    add_failure
     # debug
     sctl status "${service}"
     return 1
@@ -210,7 +208,6 @@ function check_load() {
     for ((cnt = 0; cnt < 3; ++cnt)); do
         sctl status "${service}" |& grep -w 'Loaded:' | head -n1 | awk '{print $2}' | grep -w "${exp_status}" && return 0 || sleep 1
     done
-    add_failure
     # debug
     sctl status "${service}"
     return 1
@@ -244,6 +241,5 @@ function check_netstat() {
     local path="$1"
     local type="$2"
 
-    netstat -nap | grep -w "${path}" | grep -w "${type}"
-    expect_eq $? 0
+    netstat -nap | grep -w "${path}" | grep -w "${type}" || return 1
 }
