@@ -26,7 +26,6 @@ use std::{
 
 pub mod rule_execute;
 pub mod rule_load;
-pub mod utils;
 
 /// encapsulate all rule files
 #[derive(Debug, Clone)]
@@ -110,15 +109,24 @@ pub struct RuleLine {
 ///     attr: [^\{\}]+
 ///     value: [^\"]+
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RuleToken {
     r#type: TokenType,
     op: OperatorType,
-    // match_type: MatchType,
+    match_type: MatchType,
+    value_regex: Vec<regex::Regex>,
+    attr_subst_type: SubstituteType,
     // attr_subst_type: SubstituteType,
     attr: Option<String>,
     value: String,
     prev: Option<Arc<RwLock<RuleToken>>>,
     next: Option<Arc<RwLock<RuleToken>>>,
+}
+
+impl RuleToken {
+    pub(crate) fn is_for_parents(&self) -> bool {
+        self.r#type >= TokenType::MatchParentsKernel && self.r#type <= TokenType::MatchParentsTag
+    }
 }
 
 /// token type
@@ -417,8 +425,18 @@ bitflags! {
 //     }
 // }
 
+/// match type
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
+pub(crate) enum MatchType {
+    Pattern,
+    Subsystem,
+    Invalid,
+}
+
 /// substitute string
-#[derive(Eq, PartialEq)]
+/// can not use multiple kinds of substitution formatter
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) enum SubstituteType {
     /// no substitution
     Plain,
@@ -426,6 +444,8 @@ pub(crate) enum SubstituteType {
     Format,
     /// [<SBUSTYEM>|<KERNEL>]<attribute>
     Subsys,
+    /// invalid
+    Invalid,
 }
 
 impl FromStr for SubstituteType {

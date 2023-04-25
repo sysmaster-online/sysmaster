@@ -13,7 +13,6 @@
 //! utilities
 //!
 
-use super::{RuleToken, TokenType};
 use crate::{
     error::{Error, Result},
     rules::FormatSubstitutionType,
@@ -21,12 +20,7 @@ use crate::{
 use lazy_static::lazy_static;
 use regex::Regex;
 
-impl RuleToken {
-    pub(crate) fn is_for_parents(&self) -> bool {
-        self.r#type >= TokenType::MatchParentsKernel && self.r#type <= TokenType::MatchParentsTag
-    }
-}
-
+/// check whether the formatters in the value are valid
 pub(crate) fn check_value_format(key: &str, value: &str, nonempty: bool) -> Result<()> {
     if nonempty && value.is_empty() {
         return Err(Error::RulesLoadError {
@@ -37,6 +31,7 @@ pub(crate) fn check_value_format(key: &str, value: &str, nonempty: bool) -> Resu
     check_format(key, value)
 }
 
+/// check whether the formatters in the attribute are valid
 pub(crate) fn check_attr_format(key: &str, attr: &str) -> Result<()> {
     if attr.is_empty() {
         return Err(Error::RulesLoadError {
@@ -47,6 +42,7 @@ pub(crate) fn check_attr_format(key: &str, attr: &str) -> Result<()> {
     check_format(key, attr)
 }
 
+/// check whether the format of the value is valid
 pub(crate) fn check_format(key: &str, value: &str) -> Result<()> {
     lazy_static! {
         static ref VALUE_RE: Regex =
@@ -106,8 +102,26 @@ pub(crate) fn check_format(key: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
+/// log key point on device processing
+#[macro_export]
+macro_rules! device_trace {
+    // Match rule that takes any number of arguments
+    ($p:tt, $d:expr, $($arg:expr),*) => {
+        let action = $d.get_action().unwrap_or_default().to_string();
+        let sysname = $d.get_sysname().unwrap_or("no_sysname").to_string();
+        let syspath = $d.get_syspath().unwrap_or("no_syspath").to_string();
+        let subsystem = $d.get_subsystem().unwrap_or("no_subsystem".to_string());
+        // Generate a string with formatted arguments
+        let mut s: String = format!("{} {} {} {} {}",$p ,action, sysname, syspath, subsystem);
+        $(s.push_str(format!(" {}", $arg).as_str());)*
+        log::debug!("{}", s);
+    };
+}
+
 #[cfg(test)]
 mod tests {
+    use device::Device;
+
     use super::check_value_format;
 
     #[test]
@@ -151,5 +165,13 @@ mod tests {
         check_value_format("", "aaa$result bbb", false).unwrap();
         check_value_format("", "aaa$result", false).unwrap();
         check_value_format("", "aaa$result{0}bbb", false).unwrap();
+    }
+
+    #[test]
+    #[ignore]
+    fn test_device_trace() {
+        let mut device = Device::from_path("/dev/sda".to_string()).unwrap();
+
+        device_trace!("test", device, "aaa");
     }
 }
