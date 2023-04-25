@@ -74,7 +74,8 @@ pub(super) struct SectionSocket {
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub Symlinks: Option<Vec<String>>,
     pub PassSecurity: Option<bool>,
-    pub SocketMode: Option<u32>,
+    #[config(default = 0o666)]
+    pub SocketMode: u32,
 
     #[config(deserialize_with = KillMode::deserialize_with)]
     #[config(default = "none")]

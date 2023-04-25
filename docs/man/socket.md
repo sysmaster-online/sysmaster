@@ -56,7 +56,7 @@ SOCK_SEQPACKET只有在Unix套接子时才有效。
 
 ## SocketMode
 
-设置文件的访问模式， 仅unix套接字文件时有效。
+设置文件的访问模式， 当为unix套接字或FIFO文件时有效， 默认值为0o666。
 
 ## Symlinks
 
