@@ -76,7 +76,10 @@ pub(super) struct SectionSocket {
     pub PassSecurity: Option<bool>,
     #[config(default = 0o666)]
     pub SocketMode: u32,
-
+    #[config(default = "")]
+    pub SocketUser: String,
+    #[config(default = "")]
+    pub SocketGroup: String,
     #[config(deserialize_with = KillMode::deserialize_with)]
     #[config(default = "none")]
     pub KillMode: KillMode,

@@ -27,6 +27,7 @@ use nix::sys::socket::{
     SockaddrLike, UnixAddr,
 };
 use nix::sys::stat::{self, fstat};
+use nix::unistd::{Gid, Uid};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt;
@@ -451,6 +452,20 @@ impl SocketPortConf {
             return false;
         }
         true
+    }
+
+    pub(super) fn chown(&self, uid: Uid, gid: Gid) -> Result<()> {
+        let path = if self.p_type == PortType::Fifo {
+            PathBuf::from(&self.listen)
+        } else if let Some(path) = self.sa.path() {
+            path
+        } else {
+            return Ok(());
+        };
+
+        nix::unistd::chown(&path, Some(uid), Some(gid))?;
+
+        Ok(())
     }
 }
 

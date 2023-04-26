@@ -19,6 +19,7 @@ use crate::{
     rentry::PortType,
 };
 use basic::{fd_util, fs_util, io_util, socket_util};
+use nix::unistd::{Gid, Uid};
 use nix::{
     errno::Errno,
     poll::PollFlags,
@@ -28,6 +29,7 @@ use nix::{
         AddressFamily, SockFlag,
     },
 };
+
 use std::{cell::RefCell, fmt, os::unix::prelude::RawFd, rc::Rc};
 use sysmaster::error::*;
 
@@ -292,6 +294,10 @@ impl SocketPort {
                 );
             }
         }
+    }
+
+    pub(super) fn chown(&self, uid: Uid, gid: Gid) -> Result<()> {
+        self.p_conf.chown(uid, gid)
     }
 
     fn family(&self) -> AddressFamily {
