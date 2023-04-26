@@ -44,6 +44,10 @@ impl StartLimit {
         self.start_limit.borrow_mut().ratelimit_below()
     }
 
+    pub(super) fn reset_limit(&self) {
+        self.start_limit.borrow_mut().reset_ratelimit()
+    }
+
     pub(super) fn init_from_config(&self, interval: u64, burst: u32) {
         self.start_limit
             .borrow_mut()
@@ -87,6 +91,10 @@ impl RateLimit {
         }
 
         false
+    }
+
+    fn reset_ratelimit(&mut self) {
+        self.nums = 0;
     }
 
     fn ratelimit_enabled(&self) -> bool {

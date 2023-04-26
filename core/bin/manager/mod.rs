@@ -109,6 +109,10 @@ impl ExecuterAction for CommandActionMgr {
         self.um.reload(unit_name)
     }
 
+    fn reset_failed(&self, unit_name: &str) -> cmdproto::error::Result<(), Self::Error> {
+        self.um.reset_failed(unit_name)
+    }
+
     fn status(&self, unit_name: &str) -> Result<UnitStatus, Self::Error> {
         self.um.get_unit_status(unit_name)
     }

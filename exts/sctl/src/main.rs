@@ -41,34 +41,40 @@ struct Args {
 
 #[derive(Parser, Debug)]
 enum SubCmd {
-    /// [unit] start the unit
+    /// [units] start the units
     #[clap(display_order = 1)]
     Start {
         #[clap(required = true)]
         units: Vec<String>,
     },
 
-    /// [unit] stop the unit
+    /// [units] stop the units
     #[clap(display_order = 2)]
     Stop {
         #[clap(required = true)]
         units: Vec<String>,
     },
 
-    /// [unit] restart the unit
+    /// [units] restart the units
     #[clap(display_order = 3)]
     Restart { units: Vec<String> },
 
-    /// [unit] status of the unit
+    /// [units] status of the units
     #[clap(display_order = 4)]
     Status {
         #[clap(required = true)]
         units: Vec<String>,
     },
 
-    /// [units ...] reload the units
+    /// [units] reload the units
     #[clap(display_order = 5)]
     Reload {
+        #[clap(required = true)]
+        units: Vec<String>,
+    },
+
+    /// [units] reset the failed units
+    ResetFailed {
         #[clap(required = true)]
         units: Vec<String>,
     },
@@ -143,6 +149,9 @@ fn generate_command_request(args: Args) -> Option<CommandRequest> {
         SubCmd::Status { units } => CommandRequest::new_unitcomm(unit_comm::Action::Status, units),
 
         SubCmd::Reload { units } => CommandRequest::new_unitcomm(unit_comm::Action::Reload, units),
+        SubCmd::ResetFailed { units } => {
+            CommandRequest::new_unitcomm(unit_comm::Action::Resetfailed, units)
+        }
 
         SubCmd::Mask { unit_file } => {
             CommandRequest::new_unitfile(unit_file::Action::Mask, unit_file)

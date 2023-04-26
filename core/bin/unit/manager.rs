@@ -135,6 +135,10 @@ impl UnitManagerX {
         self.data.reload(name)
     }
 
+    pub(crate) fn reset_failed(&self, name: &str) -> Result<()> {
+        self.data.reset_failed(name)
+    }
+
     pub(crate) fn restart_unit(&self, name: &str, is_manual: bool) -> Result<()> {
         self.data.restart_unit(name, is_manual)
     }
@@ -808,6 +812,17 @@ impl UnitManager {
             Ok(())
         } else {
             Err(Error::Internal)
+        }
+    }
+
+    pub(self) fn reset_failed(&self, name: &str) -> Result<()> {
+        if let Some(unit) = self.load_unitx(name) {
+            unit.reset_failed();
+            Ok(())
+        } else {
+            Err(Error::LoadError {
+                msg: format!("Failed to load {name}"),
+            })
         }
     }
 

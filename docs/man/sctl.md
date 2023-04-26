@@ -24,7 +24,7 @@
 
 通过`sctl status`命令获取一个或多个unit的当前状态。
 
-## 返回值
+### 命令的返回值：
 
 当命令执行成功时，返回0，否则，返回一个正数表示对应的linux标准错误码。
 
@@ -32,3 +32,7 @@
 
 1. systemd根据单元状态修改返回值的逻辑不统一，如`systemctl status`的返回值受单元状态变化，但是`systemctl start`却不会。
 2. systemd不建议通过命令的返回值判断服务的状态，请参考：<https://www.freedesktop.org/software/systemd/man/systemctl.html#Exit%20status>
+
+## reset-failed
+
+通过`sctl reset-failed`命令重置一个或多个unit的Failed状态为Dead。

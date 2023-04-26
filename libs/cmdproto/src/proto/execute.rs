@@ -44,6 +44,8 @@ pub trait ExecuterAction {
     fn restart(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// reload the unit_name
     fn reload(&self, unit_name: &str) -> Result<(), Self::Error>;
+    /// reset the failed unit_name
+    fn reset_failed(&self, unit_name: &str) -> Result<(), Self::Error>;
     /// show the status of unit_name
     fn status(&self, unit_name: &str) -> Result<Self::Status, Self::Error>;
     /// list all units
@@ -169,6 +171,15 @@ impl Executer for UnitComm {
                     if let Err(e) = manager.reload(&unit) {
                         new_line_break(&mut reply);
                         reply = format!("{reply}Failed to reload {unit}: {e}");
+                        error_code = e.into() as u32;
+                    }
+                }
+            }
+            unit_comm::Action::Resetfailed => {
+                for unit in units {
+                    if let Err(e) = manager.reset_failed(&unit) {
+                        new_line_break(&mut reply);
+                        reply = format!("{reply}Failed to reset-failed {unit}: {e}");
                         error_code = e.into() as u32;
                     }
                 }
