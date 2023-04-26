@@ -11,9 +11,11 @@ function test_stop() {
     local flag=0
 
     sctl restart "${service}"
-    check_status "${service}" active || return 1
+    check_status "${service}" active
+    expect_eq $? 0 || return 1
     sctl stop "${service}"
-    check_status "${service}" inactive || flag=1
+    check_status "${service}" inactive
+    expect_eq $? 0 || flag=1
     sctl status "${service}"
     return "${flag}"
 }
@@ -35,11 +37,13 @@ function test_success(){
     fi
 
     sctl restart "${service}"
-    check_status "${service}" active || return 1
+    check_status "${service}" active
+    expect_eq $? 0 || return 1
     main_pid_1="$(get_pids "${service}")"
     expect_eq $? 0 || return 1
     sleep 1.5
-    check_status "${service}" "${status}" || flag=1
+    check_status "${service}" "${status}"
+    expect_eq $? 0 || flag=1
     sctl status "${service}"
 
     if [ "${restart}" = yes ]; then
@@ -70,11 +74,14 @@ function test_fail(){
     fi
 
     sctl restart "${service}" &
-    check_status "${service}" activating || return 1
-    check_status "${service}" failed || return 1
-    # restart_002 has Restart=2
+    check_status "${service}" activating
+    expect_eq $? 0 || return 1
+    check_status "${service}" failed
+    expect_eq $? 0 || return 1
+    # restart_002 has RestartSec=2
     sleep 2
-    check_status "${service}" "${status}" || flag=1
+    check_status "${service}" "${status}"
+    expect_eq $? 0 || flag=1
     sctl status "${service}"
 
     # sctl reset-failed "${service}"
@@ -95,11 +102,13 @@ function test_signal(){
     [ "${restart}" = yes ] && status='active'
 
     sctl restart "${service}"
-    check_status "${service}" 'active' || return 1
+    check_status "${service}" 'active'
+    expect_eq $? 0 || return 1
     main_pid_1="$(get_pids "${service}")"
     expect_eq $? 0 || return 1
     kill -"${sig}" "${main_pid}"
-    check_status "${service}" "${status}" || flag=1
+    check_status "${service}" "${status}"
+    expect_eq $? 0 || flag=1
     sctl status "${service}"
 
     if [ "${restart}" = yes ]; then
@@ -131,14 +140,17 @@ function test_timeout(){
     fi
 
     sctl restart "${service}" &
-    check_status "${service}" activating || return 1
+    check_status "${service}" activating
+    expect_eq $? 0 || return 1
     main_pid_1="$(get_pids "${service}")"
     expect_eq $? 0 || return 1
     sleep 2.5
-    check_status "${service}" failed || return 1
-    # restart_002 has Restart=2
+    check_status "${service}" failed
+    expect_eq $? 0 || return 1
+    # restart_002 has RestartSec=2
     sleep 2
-    check_status "${service}" "${status}" || flag=1
+    check_status "${service}" "${status}"
+    expect_eq $? 0 || flag=1
     sctl status "${service}"
 
     if [ "${restart}" = yes ]; then
@@ -160,8 +172,7 @@ function test01() {
     for sev in ${SYSMST_LIB_PATH}/restart_00*.service; do
         sed -i 's/^Restart=.*/Restart="always"/' "${sev}"
     done
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     # stop manually: no restart
     test_stop || return 1
     # finish successfully : restart
@@ -189,11 +200,15 @@ function test01() {
     sctl stop restart_003
     sctl stop restart_004
     check_status restart_001 inactive
+    expect_eq $? 0
     check_status restart_002 inactive
+    expect_eq $? 0
     check_status restart_003 inactive
+    expect_eq $? 0
     check_status restart_004 inactive
-    kill_sysmaster
+    expect_eq $? 0
 }
 
+run_sysmaster || exit 1
 test01 || exit 1
 exit "${EXPECT_FAIL}"

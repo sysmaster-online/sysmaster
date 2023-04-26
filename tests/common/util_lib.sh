@@ -190,6 +190,7 @@ function check_status() {
     local service="$1"
     local exp_status="$2"
 
+    sleep 0.1
     for ((cnt = 0; cnt < 3; ++cnt)); do
         sctl status "${service}" |& grep -w 'Active:' | head -n1 | grep -w "${exp_status}" && return 0 || sleep 1
     done
@@ -205,6 +206,7 @@ function check_load() {
     local service="$1"
     local exp_status="$2"
 
+    sleep 0.1
     for ((cnt = 0; cnt < 3; ++cnt)); do
         sctl status "${service}" |& grep -w 'Loaded:' | head -n1 | awk '{print $2}' | grep -w "${exp_status}" && return 0 || sleep 1
     done

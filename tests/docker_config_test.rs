@@ -54,8 +54,12 @@ fn docker_config_test_dependency_004() {
 
 #[test]
 #[ignore]
-fn docker_config_test_seq_001() {
-    common::run_script("docker_config_test", "docker_config_test_seq_001", "1");
+fn docker_config_test_dependency_005() {
+    common::run_script(
+        "docker_config_test",
+        "docker_config_test_dependency_005",
+        "1",
+    );
 }
 
 #[test]

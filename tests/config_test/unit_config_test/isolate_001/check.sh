@@ -9,44 +9,44 @@ set +e
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/{base.service,reboot.target} ${SYSMST_LIB_PATH} || return 1
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     # default AllowIsolate: false
     sctl isolate reboot.target
     expect_eq $? 1
     check_log "${SYSMST_LOG}" 'asdasd'
-    # clean
-    kill_sysmaster
+    expect_eq $? 0
 
     # AllowIsolate=true
     # default IgnoreOnIsolate: false
     echo 'AllowIsolate=true' >> ${SYSMST_LIB_PATH}/reboot.target
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl isolate reboot.target
     expect_eq $? 0
-    check_status reboot.target active || return 1
-    check_status base inactive || return 1
-    # clean
-    kill_sysmaster
+    check_status reboot.target active
+    expect_eq $? 0 || return 1
+    check_status base inactive
+    expect_eq $? 0 || return 1
 
     # IgnoreOnIsolate=true
     sed -i 's/^Description=.*/IgnoreOnIsolate=true/' ${SYSMST_LIB_PATH}/base.service
-    run_sysmaster || return 1
-
+    sctl daemon-reload
     sctl restart base
-    check_status base active || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl isolate reboot.target
     expect_eq $? 0
-    check_status reboot.target active || return 1
-    check_status base active || return 1
+    check_status reboot.target active
+    expect_eq $? 0 || return 1
+    check_status base active
+    expect_eq $? 0 || return 1
     sctl stop base
-    check_status base inactive || return 1
-    # clean
-    kill_sysmaster
+    check_status base inactive
+    expect_eq $? 0 || return 1
 }
 
+run_sysmaster || exit 1
 test01 || exit 1
 exit "${EXPECT_FAIL}"
