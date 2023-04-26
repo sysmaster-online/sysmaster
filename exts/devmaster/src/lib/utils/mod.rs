@@ -13,11 +13,19 @@
 //! utilities
 //!
 
+use std::{
+    io::Read,
+    process::{Command, Stdio},
+    time::Duration,
+};
+
 use crate::{error::*, rules::FormatSubstitutionType};
 use basic::errno_util::errno_is_privilege;
 use device::Device;
 use lazy_static::lazy_static;
 use regex::Regex;
+use shell_words::split;
+use wait_timeout::ChildExt;
 
 pub(crate) mod macros;
 
@@ -291,9 +299,112 @@ pub(crate) fn sysattr_subdir_subst(sysattr: &str) -> Result<String> {
     })
 }
 
+/// if the command is not absolute path, try to find it under lib directory first.
+pub(crate) fn spawn(cmd_str: &String, timeout: Duration) -> Result<(String, i32)> {
+    lazy_static! {
+        static ref LIB_DIRS: Vec<String> =
+            vec!["/lib/udev/".to_string(), "/lib/devmaster/".to_string()];
+    }
+
+    let cmd_tokens = split(cmd_str).map_err(|e| Error::Other {
+        msg: format!(
+            "failed to split command '{}' into shell tokens: ({})",
+            cmd_str, e
+        ),
+        errno: nix::errno::Errno::EINVAL,
+    })?;
+
+    if cmd_tokens.is_empty() {
+        return Err(Error::Other {
+            msg: "failed to spawn empty command.".to_string(),
+            errno: nix::errno::Errno::EINVAL,
+        });
+    }
+
+    let mut cmd = if !cmd_tokens[0].starts_with('/') {
+        LIB_DIRS
+            .iter()
+            .map(|lib| lib.clone() + cmd_tokens[0].as_str())
+            .find(|path| std::fs::metadata(path).is_ok())
+            .map_or_else(|| Command::new(&cmd_tokens[0]), Command::new)
+    } else {
+        Command::new(&cmd_tokens[0])
+    };
+
+    let cmd = cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    for arg in &cmd_tokens[1..] {
+        cmd.arg(arg);
+    }
+
+    let mut child = cmd.spawn().map_err(|e| Error::Other {
+        msg: format!("failed to spawn command '{:?}': {}", cmd, e),
+        errno: nix::errno::Errno::EINVAL,
+    })?;
+    let pid = child.id();
+
+    match child.wait_timeout(timeout).map_err(|e| Error::Other {
+        msg: format!("failed to kill child process {} '{:?}': ({})", pid, cmd, e),
+        errno: nix::errno::Errno::EINVAL,
+    })? {
+        Some(status) => {
+            log::debug!("Process {} exited with status {:?}", pid, status);
+            // status.code()
+            let mut stdout = child.stdout.take().unwrap();
+            let mut stderr = child.stderr.take().unwrap();
+            let retno = status.code().unwrap();
+
+            let mut stdout_buf = String::new();
+            stdout
+                .read_to_string(&mut stdout_buf)
+                .map_err(|e| Error::Other {
+                    msg: format!(
+                        "failed to read stdout for child process {} '{:?}': ({})",
+                        pid, cmd, e
+                    ),
+                    errno: nix::errno::Errno::EINVAL,
+                })?;
+
+            let mut stderr_buf = String::new();
+            stderr
+                .read_to_string(&mut stderr_buf)
+                .map_err(|e| Error::Other {
+                    msg: format!(
+                        "failed to read stderr for child process {} '{:?}': ({})",
+                        pid, cmd, e
+                    ),
+                    errno: nix::errno::Errno::EINVAL,
+                })?;
+
+            if !stderr_buf.is_empty() {
+                log::debug!(
+                    "stderr from child process {} {:?}: {}",
+                    pid,
+                    cmd,
+                    stderr_buf
+                );
+            }
+
+            Ok((stdout_buf, retno))
+        }
+        None => {
+            child.kill().map_err(|e| Error::Other {
+                msg: format!("failed to kill child process {} '{:?}': ({})", pid, cmd, e),
+                errno: nix::errno::Errno::EINVAL,
+            })?;
+            Err(Error::Other {
+                msg: format!("child process {} '{:?}' timed out", pid, cmd),
+                errno: nix::errno::Errno::EINVAL,
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use basic::logger::init_log_to_console;
     use device::Device;
+    use log::LevelFilter;
 
     use super::*;
 
@@ -415,6 +526,59 @@ mod tests {
         println!(
             "{}",
             sysattr_subdir_subst(&(syspath.to_string() + "/sda1/*/runtime_status")).unwrap()
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn test_spawn() {
+        init_log_to_console("test_spawn", LevelFilter::Debug);
+
+        println!(
+            "{}",
+            spawn(&"echo hello world".to_string(), Duration::from_secs(1),)
+                .unwrap()
+                .0
+        );
+
+        println!(
+            "{}",
+            spawn(&"/bin/echo hello world".to_string(), Duration::from_secs(1),)
+                .unwrap()
+                .0
+        );
+
+        println!(
+            "{}",
+            spawn(&"sleep 2".to_string(), Duration::from_secs(1),).unwrap_err()
+        );
+
+        println!(
+            "{}",
+            spawn(&"sleep 1".to_string(), Duration::from_secs(10),)
+                .unwrap()
+                .0
+        );
+
+        println!(
+            "{}",
+            spawn(
+                &"sh -c '/bin/echo test shell'".to_string(),
+                Duration::from_secs(1),
+            )
+            .unwrap()
+            .0
+        );
+
+        // scsi_id is provided by udev and is located in /lib/udev/
+        println!(
+            "{}",
+            spawn(
+                &"scsi_id --export --whitelisted -d /dev/sda".to_string(),
+                Duration::from_secs(1),
+            )
+            .unwrap()
+            .0
         );
     }
 }

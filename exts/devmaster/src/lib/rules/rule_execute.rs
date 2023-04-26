@@ -20,7 +20,9 @@ use super::{
 use crate::{
     error::{Error, Result},
     rules::FORMAT_SUBST_TABLE,
-    utils::{replace_chars, resolve_subsystem_kernel, sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS},
+    utils::{
+        replace_chars, resolve_subsystem_kernel, spawn, sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
+    },
 };
 use device::{Device, DeviceAction};
 use libc::mode_t;
@@ -29,6 +31,7 @@ use std::{
     collections::HashMap,
     os::unix::fs::PermissionsExt,
     sync::{Arc, Mutex, RwLock},
+    time::{Duration, SystemTime},
 };
 
 use crate::device_trace;
@@ -52,7 +55,7 @@ struct ExecuteUnit {
     // seclabel_list: HashMap<String, String>,
     // run_list: HashMap<String, String>,
     // exec_delay_usec: useconds_t,
-    // birth_sec: useconds_t,
+    birth_sec: SystemTime,
     // rtnl: Option<Rc<RefCell<Netlink>>>,
     // builtin_run: u32,
     // builtin_ret: u32,
@@ -84,7 +87,7 @@ impl ExecuteUnit {
             // seclabel_list: (),
             // run_list: (),
             // exec_delay_usec: (),
-            // birth_sec: (),
+            birth_sec: SystemTime::now(),
             // rtnl: (),
             // builtin_run: (),
             // builtin_ret: (),
@@ -439,6 +442,8 @@ pub struct ExecuteManager {
     current_unit: Option<ExecuteUnit>,
 
     properties: HashMap<String, String>,
+
+    unit_spawn_timeout_usec: u64,
 }
 
 impl ExecuteManager {
@@ -451,6 +456,7 @@ impl ExecuteManager {
             current_rule_token: None,
             current_unit: None,
             properties: HashMap::new(),
+            unit_spawn_timeout_usec: 3,
         }
     }
 
@@ -879,9 +885,47 @@ impl ExecuteManager {
                     }
                 }
             }
+            MatchProgram => {
+                let cmd = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::debug!("failed to apply formatter: ({})", e);
+                        return Ok(false);
+                    }
+                };
+
+                let result = match spawn(&cmd, Duration::from_secs(self.unit_spawn_timeout_usec)) {
+                    Ok(s) => {
+                        if s.1 != 0 {
+                            return Ok(token.op == OperatorType::Nomatch);
+                        }
+                        s.0
+                    }
+                    Err(e) => {
+                        log::debug!("Apply 'MatchProgram' failed: ({})", e);
+                        return Ok(false);
+                    }
+                };
+
+                let result = replace_chars(result.trim_end(), DEVMASTER_LEGAL_CHARS);
+
+                log::debug!(
+                    "\x1b[34mCapture stdout from command '{}': '{}'\x1b[0m",
+                    cmd,
+                    &result
+                );
+
+                self.current_unit.as_mut().unwrap().program_result = result;
+
+                Ok(token.op == OperatorType::Match)
+            }
             AssignDevlink => {
-                println!("\x1b[31m{}\x1b[0m", token.value);
-                Ok(true)
+                todo!()
             }
             _ => {
                 todo!();
