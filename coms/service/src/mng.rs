@@ -1315,6 +1315,22 @@ impl ServiceMng {
             _ => u64::MAX,
         }
     }
+
+    pub fn reset_failed(&self) {
+        if self.state() == ServiceState::Failed {
+            self.set_state(ServiceState::Dead);
+        }
+        self.set_result(ServiceResult::Success);
+        self.set_reload_result(ServiceResult::Success);
+        let unit = match self.comm.owner() {
+            None => {
+                log::warn!("Failed to get the unit, thus we can't reset the StartLimit");
+                return;
+            }
+            Some(v) => v,
+        };
+        unit.reset_start_limit();
+    }
 }
 
 impl ServiceMng {

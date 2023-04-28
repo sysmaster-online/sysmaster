@@ -29,6 +29,8 @@ pub trait UnitBase {
     ///
     fn test_start_limit(&self) -> bool;
     ///
+    fn reset_start_limit(&self);
+    ///
     fn kill_context(
         &self,
         k_context: Rc<KillContext>,

@@ -61,6 +61,7 @@ pub mod unit_comm {
         Restart = 3,
         Reload = 4,
         Kill = 5,
+        Resetfailed = 6,
     }
 }
 #[rustfmt::skip]

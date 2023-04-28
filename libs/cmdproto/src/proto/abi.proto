@@ -36,6 +36,7 @@ message UnitComm {
     RESTART = 3;
     RELOAD = 4;
     KILL = 5;
+    RESETFAILED = 6;
   }
   Action action = 1;
   repeated string units = 2;

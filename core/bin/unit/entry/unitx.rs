@@ -101,8 +101,11 @@ impl UnitX {
     pub(crate) fn sigchld_events(&self, wait_status: WaitStatus) {
         self.0.sigchld_events(wait_status)
     }
-    #[allow(dead_code)]
-    pub(crate) fn reset_failed(&self) {}
+
+    pub(crate) fn reset_failed(&self) {
+        self.0.reset_failed()
+    }
+
     pub(crate) fn trigger(&self, _other: &Self) {}
     pub(crate) fn in_load_queue(&self) -> bool {
         self.0.in_load_queue()

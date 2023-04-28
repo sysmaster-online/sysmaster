@@ -124,6 +124,10 @@ impl UnitBase for Unit {
         self.test_start_limit()
     }
 
+    fn reset_start_limit(&self) {
+        self.reset_start_limit()
+    }
+
     fn kill_context(
         &self,
         k_context: Rc<KillContext>,
@@ -521,6 +525,10 @@ impl Unit {
         false
     }
 
+    fn reset_start_limit(&self) {
+        self.start_limit.reset_limit()
+    }
+
     ///
     pub(super) fn get_config(&self) -> Rc<UeConfig> {
         self.config.clone()
@@ -685,6 +693,10 @@ impl Unit {
                 _ => Err(e),
             },
         }
+    }
+
+    pub(super) fn reset_failed(&self) {
+        self.sub.reset_failed()
     }
 
     pub(super) fn sigchld_events(&self, wait_status: WaitStatus) {

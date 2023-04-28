@@ -139,7 +139,7 @@ impl SubUnit for ServiceUnit {
     }
 
     fn reset_failed(&self) {
-        todo!()
+        self.mng.reset_failed()
     }
 
     fn current_active_state(&self) -> UnitActiveState {
