@@ -28,6 +28,7 @@ service服务的类型，当前支持`simple`、`forking`、`oneshot`、`notify`
 1. 配置的命令必须为绝对路径
 2. 除非服务的类型配置为`OneShot`，否则只允许配置一条命令
 3. 命令的绝对路径前支持添加前缀：`-`（暂不支持其他systemd支持的前缀，如`@`，`:`)。前缀`-`的含义是，即使后面列出的命令执行失败也当作成功处理。
+4. 当前不支持命令行中的环境变量展开，即与systemd添加`:`前缀的行为一致。即同时配置`Environment={name="test"}, ExecStart="/bin/echo $name"`，sysMaster输出为"$name"，而systemd输出为"test"。如果systemd的服务配置文件修改为"ExecStart=:/bin/echo $name"，则输出也为"$name"。
 
 ## PIDFile
 
@@ -95,6 +96,8 @@ service服务的类型，当前支持`simple`、`forking`、`oneshot`、`notify`
 配置进程的环境变量，采用toml内联表的格式，如Environment = {var0="val0", var2="val1"};
 
 其中环境变量定义在花括号`{}`中，多个键值对以`,`分割，value的值以双引号`""`包含。
+
+**注意：** 环境变量不会默认在命令行中展开，和systemd在ExecXXX字段显式配置`:`的行为一致。
 
 ## EnvironmentFile
 
