@@ -55,11 +55,11 @@ pub fn cmdline_get_value(key: &str) -> Result<Option<String>, Error> {
 /// `foo` will return None.
 pub fn cmdline_get_item(item: &str) -> Result<Option<String>, Error> {
     let buf = cmdline_content()?;
-
+    let pair_item = item.to_string() + "=";
     let cmdline: Vec<&str> = buf.split_whitespace().collect();
 
     for cmd in cmdline.iter() {
-        if cmd.starts_with(item) {
+        if cmd.starts_with(&pair_item) || cmd.eq(&item) {
             return Ok(Some(cmd.to_string()));
         }
     }
