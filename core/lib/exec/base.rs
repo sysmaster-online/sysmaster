@@ -186,14 +186,14 @@ impl ExecContext {
                     continue;
                 }
 
-                let content: Vec<&str> = line.split('=').map(|s| s.trim()).collect();
-                if content.len() != 2 {
-                    continue;
-                }
+                let content = match line.split_once('=') {
+                    None => continue,
+                    Some(v) => (v.0.trim(), v.1.trim()),
+                };
 
                 self.envs
                     .borrow_mut()
-                    .insert(content[0].to_string(), content[1].to_string());
+                    .insert(content.0.to_string(), content.1.to_string());
             }
         }
 
