@@ -215,7 +215,7 @@ impl ExecContext {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 ///
 pub enum ExecDirectoryType {
     ///
@@ -373,6 +373,20 @@ impl ExecParameters {
             directories.push(Path::new("/run").join(d));
         }
         self.exec_directory[ExecDirectoryType::Runtime as usize] = Some(directories);
+        Ok(())
+    }
+
+    /// add StateDirectory
+    pub fn add_state_directory(&mut self, state_directories: &Vec<String>) -> Result<()> {
+        /* Similar with RuntimeDirectory */
+        if state_directories.is_empty() {
+            return Ok(());
+        }
+        let mut directories: Vec<PathBuf> = Vec::new();
+        for d in state_directories {
+            directories.push(Path::new("/var/lib").join(d));
+        }
+        self.exec_directory[ExecDirectoryType::State as usize] = Some(directories);
         Ok(())
     }
 
