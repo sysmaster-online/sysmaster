@@ -146,13 +146,13 @@ impl Worker {
 
                     let mut execute_mgr = rules::rule_execute::ExecuteManager::new(rules.clone());
 
-                    let device = Rc::new(RefCell::new(device));
+                    let device = Arc::new(Mutex::new(device));
                     let _ = execute_mgr.process_device(device.clone());
 
                     log::info!("Worker {id}: finished job");
 
                     broadcaster
-                        .send_device(&mut device.as_ref().borrow_mut(), None)
+                        .send_device(&mut device.as_ref().lock().unwrap(), None)
                         .unwrap();
 
                     let mut tcp_stream =

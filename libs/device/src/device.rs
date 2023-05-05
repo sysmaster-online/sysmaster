@@ -458,7 +458,7 @@ impl Device {
             }
         }
 
-        let syspath = format!("/sys/class/{}/devices/{}", subsystem, sysname);
+        let syspath = format!("/sys/class/{}/{}", subsystem, sysname);
         match Device::from_syspath(syspath, true) {
             Ok(d) => return Ok(d),
             Err(e) => {
@@ -474,7 +474,7 @@ impl Device {
             }
         }
 
-        let syspath = format!("/sys/firmware/{}/devices/{}", subsystem, sysname);
+        let syspath = format!("/sys/firmware/{}/{}", subsystem, sysname);
         match Device::from_syspath(syspath, true) {
             Ok(d) => return Ok(d),
             Err(e) => {
@@ -1022,7 +1022,7 @@ impl Device {
                         ),
                         source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
                     })?;
-                    value.replace("\n\r", "\0")
+                    value.trim_end().to_string()
                 }
             }
 

@@ -17,8 +17,14 @@ use crate::{
     error::{Error, Result},
     rules::FormatSubstitutionType,
 };
+use basic::errno_util::errno_is_privilege;
+use device::Device;
 use lazy_static::lazy_static;
 use regex::Regex;
+
+pub(crate) mod macros;
+
+pub(crate) const DEVMASTER_LEGAL_CHARS: &str = "/ $%?,";
 
 /// check whether the formatters in the value are valid
 pub(crate) fn check_value_format(key: &str, value: &str, nonempty: bool) -> Result<()> {
@@ -102,6 +108,49 @@ pub(crate) fn check_format(key: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn valid_devnode_chars(c: char, white_list: &str) -> bool {
+    c.is_ascii_digit() || c.is_alphabetic() || "#+-.:=@_".contains(c) || white_list.contains(c)
+}
+
+/// replace invalid chars with '_', except for white list, plain ascii, hex-escaping and valid utf8
+/// as Rust strings are always encoded as utf8, we don't need to check whether chars are valid utf8
+pub(crate) fn replace_chars(s: &str, white_list: &str) -> String {
+    let mut ret: String = String::new();
+    let l = s.len();
+    let mut i = 0;
+    loop {
+        if i >= l {
+            break;
+        }
+
+        let c = s.chars().nth(i).unwrap();
+        if valid_devnode_chars(c, white_list) {
+            ret.push(c);
+            i += 1;
+            continue;
+        }
+
+        if c == '\\' && i + 1 < l && s.chars().nth(i + 1).unwrap() == 'x' {
+            ret.push('\\');
+            ret.push('x');
+            i += 2;
+            continue;
+        }
+
+        // if whitespace is in white list, replace whitespace with ordinary space
+        if c.is_whitespace() && white_list.contains(' ') {
+            ret.push(' ');
+            i += 1;
+            continue;
+        }
+
+        ret.push('_');
+        i += 1;
+    }
+
+    ret
+}
+
 /// log key point on device processing
 #[macro_export]
 macro_rules! device_trace {
@@ -118,11 +167,104 @@ macro_rules! device_trace {
     };
 }
 
+/// resolve [<SUBSYSTEM>/<KERNEL>]<attribute> string
+/// if 'read' is true, read the attribute from sysfs device tree and return the value
+/// else just return the attribute path under sysfs device tree.
+pub(crate) fn resolve_subsystem_kernel(s: &String, read: bool) -> Result<String> {
+    lazy_static! {
+        static ref PATTERN: Regex = Regex::new(
+            "\\[(?P<subsystem>[^/\\[\\]]+)/(?P<sysname>[^/\\[\\]]+)\\](?P<attribute>.*)"
+        )
+        .unwrap();
+    }
+
+    match PATTERN.captures(s) {
+        Some(c) => {
+            let subsystem = c
+                .name("subsystem")
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
+            let sysname = c
+                .name("sysname")
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
+            let attribute = c
+                .name("attribute")
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default()
+                .trim_start_matches('/')
+                .to_string();
+
+            if read && attribute.is_empty() {
+                return Err(Error::Other {
+                    msg: format!("can not read empty sysattr: '{s}'",),
+                    errno: nix::errno::Errno::EINVAL,
+                });
+            }
+
+            let mut device = Device::from_subsystem_sysname(subsystem.clone(), sysname.clone())
+                .map_err(|e| Error::Other {
+                    msg: format!("failed to get device: ({})", e),
+                    errno: e.get_errno(),
+                })?;
+
+            if read {
+                let attr_value = match device.get_sysattr_value(attribute.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        if e.get_errno() == nix::errno::Errno::ENOENT
+                            || errno_is_privilege(e.get_errno())
+                        {
+                            "".to_string()
+                        } else {
+                            return Err(Error::Other {
+                                msg: format!("failed to read sysattr: ({})", e),
+                                errno: e.get_errno(),
+                            });
+                        }
+                    }
+                };
+
+                log::debug!(
+                    "the sysattr value of '[{subsystem}/{sysname}]{attribute}' is '{attr_value}'"
+                );
+                Ok(attr_value)
+            } else {
+                let syspath = match device.get_syspath() {
+                    Some(s) => s,
+                    None => {
+                        return Err(Error::Other {
+                            msg: format!("it is weird not to get syspath for '{}'", sysname),
+                            errno: nix::errno::Errno::EINVAL,
+                        })
+                    }
+                }
+                .to_string();
+
+                let attr_path = if attribute.is_empty() {
+                    syspath
+                } else {
+                    syspath + "/" + attribute.as_str()
+                };
+                log::debug!("resolve path '[{subsystem}/{sysname}]{attribute}' as '{attr_path}'");
+                Ok(attr_path)
+            }
+        }
+        None => Err(Error::Other {
+            msg: format!(
+                "invalid '[<SUBSYSTEM>/<KERNEL>]<attribute>' pattern: ({})",
+                s
+            ),
+            errno: nix::errno::Errno::EINVAL,
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use device::Device;
 
-    use super::check_value_format;
+    use super::*;
 
     #[test]
     fn test_check_value_format() {
@@ -173,5 +315,64 @@ mod tests {
         let mut device = Device::from_path("/dev/sda".to_string()).unwrap();
 
         device_trace!("test", device, "aaa");
+    }
+
+    #[test]
+    #[ignore]
+    fn test_resolve_subsystem_kernel() {
+        assert!(resolve_subsystem_kernel(&"[net]".to_string(), false).is_err());
+        assert!(resolve_subsystem_kernel(&"[net/]".to_string(), false).is_err());
+        assert!(resolve_subsystem_kernel(&"[net/lo".to_string(), false).is_err());
+        assert!(resolve_subsystem_kernel(&"[net".to_string(), false).is_err());
+        assert!(resolve_subsystem_kernel(&"net/lo".to_string(), false).is_err());
+
+        assert_eq!(
+            resolve_subsystem_kernel(&"[net/lo]".to_string(), false).unwrap(),
+            "/sys/devices/virtual/net/lo"
+        );
+        assert_eq!(
+            resolve_subsystem_kernel(&"[net/lo]/".to_string(), false).unwrap(),
+            "/sys/devices/virtual/net/lo"
+        );
+        assert_eq!(
+            resolve_subsystem_kernel(&"[net/lo]hoge".to_string(), false).unwrap(),
+            "/sys/devices/virtual/net/lo/hoge"
+        );
+        assert_eq!(
+            resolve_subsystem_kernel(&"[net/lo]/hoge".to_string(), false).unwrap(),
+            "/sys/devices/virtual/net/lo/hoge"
+        );
+
+        assert!(resolve_subsystem_kernel(&"[net/lo]".to_string(), true).is_err());
+        assert!(resolve_subsystem_kernel(&"[net/lo]/".to_string(), true).is_err());
+        assert_eq!(
+            resolve_subsystem_kernel(&"[net/lo]hoge".to_string(), true).unwrap(),
+            ""
+        );
+        assert_eq!(
+            resolve_subsystem_kernel(&"[net/lo]/hoge".to_string(), true).unwrap(),
+            ""
+        );
+        assert_eq!(
+            resolve_subsystem_kernel(&"[net/lo]address".to_string(), true).unwrap(),
+            "00:00:00:00:00:00"
+        );
+        assert_eq!(
+            resolve_subsystem_kernel(&"[net/lo]/address".to_string(), true).unwrap(),
+            "00:00:00:00:00:00"
+        );
+    }
+
+    #[test]
+    fn test_replace_chars() {
+        assert_eq!(replace_chars("abcd!efg", DEVMASTER_LEGAL_CHARS), "abcd_efg");
+        assert_eq!(
+            replace_chars("abcd\\xefg", DEVMASTER_LEGAL_CHARS),
+            "abcd\\xefg"
+        );
+        assert_eq!(
+            replace_chars("abcd\tefg", DEVMASTER_LEGAL_CHARS),
+            "abcd efg"
+        );
     }
 }
