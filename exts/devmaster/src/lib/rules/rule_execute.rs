@@ -20,12 +20,14 @@ use super::{
 use crate::{
     error::{Error, Result},
     rules::FORMAT_SUBST_TABLE,
-    utils::{replace_chars, resolve_subsystem_kernel, DEVMASTER_LEGAL_CHARS},
+    utils::{replace_chars, resolve_subsystem_kernel, sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS},
 };
 use device::{Device, DeviceAction};
+use libc::mode_t;
 use std::{
     borrow::BorrowMut,
     collections::HashMap,
+    os::unix::fs::PermissionsExt,
     sync::{Arc, Mutex, RwLock},
 };
 
@@ -802,12 +804,86 @@ impl ExecuteManager {
             MatchAttr | MatchParentsAttr => {
                 token.attr_match(device, self.current_unit.as_ref().unwrap())
             }
+            MatchTest => {
+                let mut val = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::debug!("failed to apply formatter: ({})", e);
+                        return Ok(token.op == OperatorType::Nomatch);
+                    }
+                };
+
+                // if the value is not an absolute path, try to find it under sysfs
+                if !val.starts_with('/') {
+                    val = match resolve_subsystem_kernel(&val, false) {
+                        Ok(v) => v,
+                        Err(_) => {
+                            // only throw out error when getting the syspath of device
+                            let syspath = execute_none!(
+                                device.as_ref().lock().unwrap().get_syspath(),
+                                "MatchTest",
+                                "SYSPATH"
+                            )
+                            .map_err(|e| {
+                                log::debug!("Apply 'MatchTest' error: {}", e);
+                                e
+                            })?;
+
+                            syspath + "/" + val.as_str()
+                        }
+                    }
+                }
+
+                match sysattr_subdir_subst(&val) {
+                    Ok(s) => {
+                        let path = std::path::Path::new(&s);
+
+                        if !path.exists() {
+                            return Ok(token.op == OperatorType::Nomatch);
+                        }
+
+                        if let Some(attr) = &token.attr {
+                            let mode = mode_t::from_str_radix(attr, 8).unwrap_or_else(|_| {
+                                log::debug!("failed to parse mode: {}", attr);
+                                0
+                            });
+
+                            let metadata = match std::fs::metadata(path) {
+                                Ok(m) => m,
+                                Err(_) => {
+                                    return Ok(token.op == OperatorType::Nomatch);
+                                }
+                            };
+
+                            let permissions = metadata.permissions().mode();
+
+                            Ok((mode & permissions > 0) ^ (token.op == OperatorType::Nomatch))
+                        } else {
+                            Ok(token.op == OperatorType::Match)
+                        }
+                    }
+                    Err(e) => {
+                        if e.get_errno() == nix::errno::Errno::ENOENT {
+                            return Ok(token.op == OperatorType::Nomatch);
+                        }
+
+                        Err(Error::RulesExecuteError {
+                            msg: format!("Apply 'MatchTest' error: {}", e),
+                            errno: e.get_errno(),
+                        })
+                    }
+                }
+            }
             AssignDevlink => {
-                println!("\x1b[31mHello world!\x1b[0m");
+                println!("\x1b[31m{}\x1b[0m", token.value);
                 Ok(true)
             }
             _ => {
-                println!("cjy");
                 todo!();
             }
         }
