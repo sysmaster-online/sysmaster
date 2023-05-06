@@ -40,7 +40,8 @@ impl<T: SignalDispatcher> Source for Signals<T> {
     }
 
     fn signals(&self) -> Vec<libc::c_int> {
-        vec![libc::SIGCHLD, libc::SIGTERM, libc::SIGINT]
+        /* SIGSEGV/SIGBUS... should be dispatched in crash_handlers */
+        vec![libc::SIGCHLD, libc::SIGTERM, libc::SIGINT, libc::SIGHUP]
     }
 
     fn epoll_event(&self) -> u32 {

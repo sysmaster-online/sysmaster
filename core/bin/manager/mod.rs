@@ -64,9 +64,13 @@ impl SignalMgr {
 
 impl SignalDispatcher for SignalMgr {
     fn dispatch_signal(&self, signal: &libc::signalfd_siginfo) -> Result<i32> {
+        /* Received signal should be in the set defined in SignalDispatcher::signals */
         match signal.ssi_signo as libc::c_int {
-            libc::SIGHUP | libc::SIGSEGV => self.reexec(),
+            libc::SIGHUP | libc::SIGTERM => self.reexec(),
             libc::SIGCHLD => Ok(self.um.child_sigchld_enable(true)),
+            /* Kernel will send SIGINT to PID1 when users press ctrl-alt-del,
+             * init should forward SIGINT to sysmaster. */
+            libc::SIGINT => self.um.start_unit("ctrl-alt-del.target", false).map(|_| 1),
             _ => todo!(),
         }
     }

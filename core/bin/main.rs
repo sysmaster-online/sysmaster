@@ -51,8 +51,8 @@ use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::rel;
 
-const MANAGER_SIG_OFFSET: i32 = 7;
-const SIG_SWITCH_ROOT: i32 = 10;
+const SIG_MANAGER_REEXEC_OFFSET: i32 = 7;
+const SIG_SWITCH_ROOT_OFFSET: i32 = 10;
 
 /// parse program arguments
 #[derive(Parser, Debug)]
@@ -65,8 +65,15 @@ struct Args {
 
 fn main() -> Result<()> {
     //------------------------Code placed at the top-----------------------------
+
+    /* systemd use reset_all_signal_handlers, we can't because sysmaster is not PID1.
+     * We choose to ignore all signals explicitly, and then register signals we are
+     * interested in. But there are still some differences, see docs/man/signal.md
+     * for details. */
+    ignore_all_signals();
+
     // The registration signal is at the beginning and has the highest priority!
-    register_reexe_signal(true);
+    register_reexec_signal(true);
     install_switch_root_handler();
     // Connect init.
     KeepAlive::init();
@@ -111,7 +118,7 @@ fn main() -> Result<()> {
             manager.debug_clear_restore();
         }
         // if switch is false unregister init's reexec signal.
-        register_reexe_signal(false);
+        register_reexec_signal(false);
         log::info!("debug: clear data restored.");
     }
 
@@ -254,9 +261,9 @@ extern "C" fn crash_none(_signo: c_int, _siginfo: *mut libc::siginfo_t, _con: *m
     // nothing to do.
 }
 
-fn register_reexe_signal(enable: bool) {
+fn register_reexec_signal(enable: bool) {
     let manager_signal: signal::Signal =
-        unsafe { std::mem::transmute(libc::SIGRTMIN() + MANAGER_SIG_OFFSET) };
+        unsafe { std::mem::transmute(libc::SIGRTMIN() + SIG_MANAGER_REEXEC_OFFSET) };
     let handler = match enable {
         true => SigHandler::SigAction(crash_reexec),
         false => SigHandler::SigAction(crash_none),
@@ -269,7 +276,7 @@ fn register_reexe_signal(enable: bool) {
 
 fn install_switch_root_handler() {
     let manager_signal: signal::Signal =
-        unsafe { std::mem::transmute(libc::SIGRTMIN() + SIG_SWITCH_ROOT) };
+        unsafe { std::mem::transmute(libc::SIGRTMIN() + SIG_SWITCH_ROOT_OFFSET) };
     let handler = SigHandler::Handler(switch_root);
     let flags = SaFlags::SA_NODEFER;
     let action = SigAction::new(handler, flags, SigSet::empty());
@@ -281,7 +288,7 @@ fn install_switch_root_handler() {
 }
 
 extern "C" fn switch_root(sig: libc::c_int) {
-    if sig != libc::SIGRTMIN() + SIG_SWITCH_ROOT {
+    if sig != libc::SIGRTMIN() + SIG_SWITCH_ROOT_OFFSET {
         return;
     }
     log::info!("sysMaster switch root");
@@ -321,18 +328,38 @@ fn rlimit_nofile_safe() {
 }
 
 fn reset_all_signal_handlers() {
-    for it in nix::sys::signal::Signal::iterator() {
-        if it == Signal::SIGKILL || it == Signal::SIGSTOP {
+    for sig in nix::sys::signal::Signal::iterator() {
+        /* SIGKILL and SIGSTOP is invalid, see sigaction(2) */
+        if sig == Signal::SIGKILL || sig == Signal::SIGSTOP {
             continue;
         }
-
         let flags = SaFlags::SA_RESTART;
         let sig_handler = SigHandler::SigDfl;
         let sig_action = SigAction::new(sig_handler, flags, SigSet::empty());
         unsafe {
-            if let Err(e) = signal::sigaction(it, &sig_action) {
-                log::warn!("reset {} signal failed:{}", it, e);
+            if let Err(e) = signal::sigaction(sig, &sig_action) {
+                log::warn!("Failed to reset signal {}: {e}", sig);
             }
+        }
+    }
+}
+
+fn ignore_all_signals() {
+    /* nix::sys::signal::Signal doesn't support SIGRTMAX, use libc. */
+    for sig in 1..libc::SIGRTMAX() + 1 {
+        if [libc::SIGKILL, libc::SIGSTOP].contains(&sig) {
+            continue;
+        }
+        let mut sig_action: libc::sigaction = unsafe { std::mem::zeroed() };
+        sig_action.sa_flags = libc::SA_RESTART;
+        sig_action.sa_sigaction = libc::SIG_IGN;
+        let r = unsafe { libc::sigaction(sig, &sig_action, std::ptr::null_mut()) };
+        if r < 0 {
+            log::warn!(
+                "Failed to ignore signal {}: {}",
+                sig,
+                nix::Error::from_i32(r)
+            );
         }
     }
 }
