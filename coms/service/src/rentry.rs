@@ -258,6 +258,8 @@ pub(super) struct SectionService {
     #[config(default = "")]
     pub WorkingDirectory: String,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
+    pub StateDirectory: Option<Vec<String>>,
+    #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub RuntimeDirectory: Option<Vec<String>>,
     #[config(deserialize_with = PreserveMode::deserialize_with)]
     #[config(default = "no")]

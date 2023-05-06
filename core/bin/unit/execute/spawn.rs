@@ -172,14 +172,14 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
         return;
     }
 
-    if let Err(e) = setup_exec_directory(
-        params.get_exec_directory(),
-        params.get_user(),
-        params.get_group(),
-        ExecDirectoryType::Runtime,
-    ) {
-        log::error!("Failed to apply exec directory: {e}");
-        return;
+    let exec_directory = params.get_exec_directory();
+    for kind in [ExecDirectoryType::Runtime, ExecDirectoryType::State] {
+        if let Err(e) =
+            setup_exec_directory(exec_directory, params.get_user(), params.get_group(), kind)
+        {
+            log::error!("Failed to apply {:?} directory: {e}", kind);
+            continue;
+        }
     }
 
     if let Err(e) = apply_user_and_group(params.get_user(), params.get_group(), params) {

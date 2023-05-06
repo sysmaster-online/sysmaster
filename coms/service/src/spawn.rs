@@ -123,6 +123,13 @@ impl ServiceSpawn {
             }
         }
 
+        if let Some(state_directories) = &service_config.StateDirectory {
+            if let Err(e) = params.add_state_directory(state_directories) {
+                log::error!("Failed to add state directories: {e}");
+                return Err(e);
+            }
+        }
+
         if let Err(e) = params.add_working_directory(service_config.WorkingDirectory.clone()) {
             log::error!("Failed to add working directory: {e}");
             return Err(e);

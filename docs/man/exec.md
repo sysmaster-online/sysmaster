@@ -16,11 +16,16 @@ sysmaster的`socket`、`service`会拉起进程，该文档描述他们独有的
 
 配置进程的根目录，仅支持绝对路径。命令执行前，sysmaster会调用[chroot(2)](https://man7.org/linux/man-pages/man2/chroot.2.html)修改命令执行的根目录。
 
-## RuntimeDirectory
+## RuntimeDirectory/StateDirectory
 
 * 类型：字符串
 
-配置进程在`/run`下的运行时目录，仅支持相对路径。如果服务配置了`RuntimeDirectory`，sysmaster会在服务启动时，在`/run`目录下创建配置的目录。如果服务同时配置了`User`，`Group`，会修改目录的属组、属主。
+配置进程的运行时目录，仅支持相对路径。sysmaster会在启动服务时，在相应的目录（参考下表）下创建配置的运行时目录，如果服务同时配置了`User`，`Group`，会修改运行时目录的属组、属主。
+
+| 配置 | 在哪儿创建运行时目录 |
+|-|-|
+| RuntimeDirectory | /run |
+| StateDirectory | /var/lib |
 
 ## RuntimeDirectoryPreserve
 
