@@ -46,7 +46,7 @@ pub enum Error {
     #[snafu(display("Builtin: {}", msg))]
     BuiltinCommandError {
         /// message
-        msg: &'static str,
+        msg: String,
     },
 
     /// Error encountered in rules loader

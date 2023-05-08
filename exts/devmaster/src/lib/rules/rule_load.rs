@@ -774,10 +774,9 @@ impl RuleToken {
                 ))?
             }
             "ATTRS" => {
-                if let Err(e) = check_attr_format(
-                    key.as_str(),
-                    attr.clone().unwrap_or("".to_string()).as_str(),
-                ) {
+                if let Err(e) =
+                    check_attr_format(key.as_str(), attr.clone().unwrap_or_default().as_str())
+                {
                     log::warn!("{}", e);
                     return Err(e);
                 }
@@ -1193,7 +1192,7 @@ impl RuleToken {
                     log::warn!("{}", e);
                 }
 
-                let attr_content = attr.clone().unwrap_or("".to_string());
+                let attr_content = attr.clone().unwrap_or_default();
                 if attr.is_none() || attr_content == "program" {
                     Ok(RuleToken::new(TokenType::AssignRunProgram, op, None, value))?
                 } else if attr_content == "builtin" {

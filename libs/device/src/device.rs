@@ -668,6 +668,41 @@ impl Device {
         return Ok(self.parent.as_ref().unwrap().clone());
     }
 
+    /// get the parent of the device
+    pub fn get_parent_with_subsystem_devtype(
+        &mut self,
+        subsystem: &str,
+        devtype: Option<&str>,
+    ) -> Result<Arc<Mutex<Device>>, Error> {
+        let mut parent = match self.get_parent() {
+            Ok(parent) => parent,
+            Err(e) => return Err(e),
+        };
+
+        loop {
+            let parent_subsystem = parent.lock().unwrap().get_subsystem();
+
+            if parent_subsystem.is_ok() && parent_subsystem.unwrap() == subsystem {
+                if devtype.is_none() {
+                    break;
+                }
+
+                let parent_devtype = parent.lock().unwrap().get_devtype();
+                if parent_devtype.is_ok() && parent_devtype.unwrap() == devtype.unwrap() {
+                    break;
+                }
+            }
+
+            let tmp = parent.lock().unwrap().get_parent().map_err(|e| Error::Nix {
+                msg: format!("get_parent_with_subsystem_devtype failed: failed to find satisfied parent ({})", e),
+                source: e.get_errno(),
+            })?;
+            parent = tmp;
+        }
+
+        Ok(parent)
+    }
+
     /// get subsystem
     pub fn get_subsystem(&mut self) -> Result<String, Error> {
         if !self.subsystem_set {
@@ -1334,7 +1369,7 @@ impl Device {
                 if !path.is_dir() {
                     return Err(Error::Nix {
                         msg: format!("set_syspath failed: {:?} is not a directory", path),
-                        source: Errno::ENOTDIR,
+                        source: Errno::ENODEV,
                     });
                 }
 
@@ -1342,7 +1377,7 @@ impl Device {
                 if !uevent_path.exists() {
                     return Err(Error::Nix {
                         msg: format!("set_syspath failed: {:?} does not contain uevent", path),
-                        source: Errno::ENOENT,
+                        source: Errno::ENODEV,
                     });
                 }
             } else if !path.is_dir() {
