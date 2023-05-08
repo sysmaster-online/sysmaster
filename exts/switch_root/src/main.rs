@@ -17,7 +17,7 @@ use nix::{errno::Errno, unistd};
 use std::{env, ffi::CString, path::Path};
 use switch_root::switch_root;
 
-const SIG_SWITCH_ROOT_OFFSET: i32 = 10;
+use constants::SIG_SWITCH_ROOT_OFFSET;
 
 fn main() {
     let mut args: Vec<String> = env::args().collect();

@@ -32,7 +32,7 @@ use std::path::Path;
 use std::process::{exit, Command};
 use std::rc::Rc;
 
-use self::signals::SIG_SWITCH_ROOT_OFFSET;
+use constants::SIG_SWITCH_ROOT_OFFSET;
 const INVALID_PID: i32 = -1;
 const MANAGER_SIG_OFFSET: i32 = 7;
 const SYSMASTER_PATH: &str = "/usr/lib/sysmaster/sysmaster";

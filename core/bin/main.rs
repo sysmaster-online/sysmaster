@@ -51,8 +51,8 @@ use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::rel;
 
-const SIG_MANAGER_REEXEC_OFFSET: i32 = 7;
-const SIG_SWITCH_ROOT_OFFSET: i32 = 10;
+use constants::SIG_MANAGER_REEXEC_OFFSET;
+use constants::SIG_SWITCH_ROOT_OFFSET;
 
 /// parse program arguments
 #[derive(Parser, Debug)]

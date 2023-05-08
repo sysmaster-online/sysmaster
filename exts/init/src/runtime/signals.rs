@@ -21,9 +21,7 @@ use std::ops::Neg;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
 
-pub const SIG_RUN_UNRECOVER_OFFSET: i32 = 8;
-pub const SIG_RESTART_MANAGER_OFFSET: i32 = 9;
-pub const SIG_SWITCH_ROOT_OFFSET: i32 = 10;
+use constants::{SIG_RESTART_MANAGER_OFFSET, SIG_RUN_UNRECOVER_OFFSET, SIG_SWITCH_ROOT_OFFSET};
 const INVALID_FD: i32 = -1;
 
 pub(crate) struct SigSet {
