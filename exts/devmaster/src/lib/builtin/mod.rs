@@ -67,6 +67,29 @@ pub trait Builtin {
     fn run_once(&self) -> bool {
         false
     }
+
+    /// add property into device
+    fn add_property(
+        &self,
+        device: Arc<Mutex<Device>>,
+        test: bool,
+        key: String,
+        value: String,
+    ) -> Result<(), Error> {
+        device
+            .lock()
+            .unwrap()
+            .add_property(key.clone(), value.clone())
+            .map_err(|e| Error::BuiltinCommandError {
+                msg: format!("Failed to add property '{}'='{}': ({})", key, value, e),
+            })?;
+
+        if test {
+            println!("{}={}", key, value);
+        }
+
+        Ok(())
+    }
 }
 
 /// enumerator of builtin commands
@@ -233,28 +256,6 @@ impl BuiltinManager {
             .unwrap()
             .cmd(device, ret_rtnl, argc, argv, test)
     }
-}
-
-/// add property into device
-pub fn builtin_add_property(
-    device: Arc<Mutex<Device>>,
-    test: bool,
-    key: String,
-    value: String,
-) -> Result<(), Error> {
-    device
-        .lock()
-        .unwrap()
-        .add_property(key.clone(), value.clone())
-        .map_err(|e| Error::BuiltinCommandError {
-            msg: format!("Failed to add property '{}'='{}': ({})", key, value, e),
-        })?;
-
-    if test {
-        println!("{}={}", key, value);
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

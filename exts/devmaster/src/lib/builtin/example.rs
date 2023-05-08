@@ -13,7 +13,6 @@
 //! example to implement a builtin command
 //!
 
-use super::builtin_add_property;
 use crate::builtin::Builtin;
 use crate::builtin::Netlink;
 use crate::error::{Error, Result};
@@ -47,11 +46,10 @@ impl Builtin for Example {
 
         ret_rtnl.replace(Some(Netlink {}));
 
-        builtin_add_property(device, test, "ID_EXAMPLE_SYSPATH".to_string(), syspath).map_err(
-            |_| Error::BuiltinCommandError {
+        self.add_property(device, test, "ID_EXAMPLE_SYSPATH".to_string(), syspath)
+            .map_err(|_| Error::BuiltinCommandError {
                 msg: "add property failed".to_string(),
-            },
-        )?;
+            })?;
 
         Ok(true)
     }

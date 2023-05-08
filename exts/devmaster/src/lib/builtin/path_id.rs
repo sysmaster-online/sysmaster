@@ -13,7 +13,6 @@
 //! path_id builtin
 //!
 
-use super::builtin_add_property;
 use crate::builtin::Builtin;
 use crate::builtin::Netlink;
 use crate::error::{Error, Result};
@@ -100,12 +99,12 @@ impl Builtin for PathId {
             tag.push('_');
         }
         /* strip trailing '_' */
-        while !tag.is_empty() && tag.ends_with('_') {
-            tag.pop();
-        }
+        tag = tag.trim_end_matches('_').to_string();
 
-        builtin_add_property(device.clone(), test, "ID_PATH".to_string(), path).unwrap_or(());
-        builtin_add_property(device.clone(), test, "ID_PATH_TAG".to_string(), tag).unwrap_or(());
+        self.add_property(device.clone(), test, "ID_PATH".to_string(), path)
+            .unwrap_or(());
+        self.add_property(device.clone(), test, "ID_PATH_TAG".to_string(), tag)
+            .unwrap_or(());
 
         /*
          * Compatible link generation for ATA devices
@@ -113,7 +112,7 @@ impl Builtin for PathId {
          * ID_PATH_ATA_COMPAT
          */
         if !compat_path.is_empty() {
-            builtin_add_property(device, test, "ID_PATH_ATA_COMPAT".to_string(), compat_path)
+            self.add_property(device, test, "ID_PATH_ATA_COMPAT".to_string(), compat_path)
                 .unwrap_or(());
         }
 
@@ -781,7 +780,7 @@ impl PathId {
             Err(_) => return Some(parent.clone()),
         };
 
-        if devtype != "usb_interface" || devtype != "usb_device" {
+        if devtype != "usb_interface" && devtype != "usb_device" {
             return Some(parent);
         }
 
