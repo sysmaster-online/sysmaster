@@ -36,3 +36,5 @@ clap = { version = "3.1.8", features = ["derive"] }
 lazy_static = "1.4.0"
 regex = "1.7.0"
 fnmatch-regex = "0.2.0"
+wait-timeout = "0.2.0"
+shell-words = "1.1.0"
