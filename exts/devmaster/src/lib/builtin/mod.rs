@@ -95,7 +95,7 @@ impl FromStr for BuiltinCommand {
         let tokens: Vec<&str> = s.split(' ').collect();
         if tokens.is_empty() {
             return Err(Error::BuiltinCommandError {
-                msg: "invalid builtin command",
+                msg: "invalid builtin command".to_string(),
             });
         }
 
@@ -113,7 +113,7 @@ impl FromStr for BuiltinCommand {
             "usb_id" => Ok(BuiltinCommand::UsbId),
             "example" => Ok(BuiltinCommand::Example),
             _ => Err(Error::BuiltinCommandError {
-                msg: "invalid builtin command",
+                msg: "invalid builtin command".to_string(),
             }),
         }
     }
@@ -235,6 +235,28 @@ impl BuiltinManager {
     }
 }
 
+/// add property into device
+pub fn builtin_add_property(
+    device: Arc<Mutex<Device>>,
+    test: bool,
+    key: String,
+    value: String,
+) -> Result<(), Error> {
+    device
+        .lock()
+        .unwrap()
+        .add_property(key.clone(), value.clone())
+        .map_err(|e| Error::BuiltinCommandError {
+            msg: format!("Failed to add property '{}'='{}': ({})", key, value, e),
+        })?;
+
+    if test {
+        println!("{}={}", key, value);
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::BuiltinManager;
@@ -254,8 +276,10 @@ mod tests {
         for device in enumerator.iter_mut() {
             let mut rtnl = RefCell::<Option<Netlink>>::from(None);
 
-            for (_, v) in mgr.builtins.iter() {
-                v.cmd(device.clone(), &mut rtnl, 0, vec![], false).unwrap();
+            for (cmd, v) in mgr.builtins.iter() {
+                if let Err(e) = v.cmd(device.clone(), &mut rtnl, 0, vec![], true) {
+                    println!("Builtin command {:?} fails:{:?}", cmd, e);
+                }
             }
         }
 

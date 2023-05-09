@@ -13,6 +13,7 @@
 //! example to implement a builtin command
 //!
 
+use super::builtin_add_property;
 use crate::builtin::Builtin;
 use crate::builtin::Netlink;
 use crate::error::{Error, Result};
@@ -31,7 +32,7 @@ impl Builtin for Example {
         ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         _argv: Vec<String>,
-        _test: bool,
+        test: bool,
     ) -> Result<bool> {
         println!("example builtin run");
 
@@ -39,20 +40,18 @@ impl Builtin for Example {
             Some(p) => String::from(p),
             None => {
                 return Err(Error::BuiltinCommandError {
-                    msg: "syspath invalid",
+                    msg: "syspath invalid".to_string(),
                 })
             }
         };
 
         ret_rtnl.replace(Some(Netlink {}));
 
-        device
-            .lock()
-            .unwrap()
-            .add_property("ID_EXAMPLE_SYSPATH".to_string(), syspath)
-            .map_err(|_| Error::BuiltinCommandError {
-                msg: "add property failed",
-            })?;
+        builtin_add_property(device, test, "ID_EXAMPLE_SYSPATH".to_string(), syspath).map_err(
+            |_| Error::BuiltinCommandError {
+                msg: "add property failed".to_string(),
+            },
+        )?;
 
         Ok(true)
     }
@@ -99,7 +98,7 @@ mod tests {
 
             let builtin = Example {};
             builtin
-                .cmd(device.clone(), &mut rtnl, 0, vec![], false)
+                .cmd(device.clone(), &mut rtnl, 0, vec![], true)
                 .unwrap();
 
             device
