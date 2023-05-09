@@ -21,9 +21,7 @@ use std::ops::Neg;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
 
-pub const RUN_UNRECOVER_SIG_OFFSET: i32 = 8;
-pub const RESTART_MANAGER_SIG_OFFSET: i32 = 9;
-pub const SIG_SWITCH_ROOT: i32 = 10;
+use constants::{SIG_RESTART_MANAGER_OFFSET, SIG_RUN_UNRECOVER_OFFSET, SIG_SWITCH_ROOT_OFFSET};
 const INVALID_FD: i32 = -1;
 
 pub(crate) struct SigSet {
@@ -77,9 +75,9 @@ impl Signals {
             oldset: SigSet::empty(),
             signals,
             zombie_signal: libc::SIGCHLD,
-            unrecover_signal: libc::SIGRTMIN() + RUN_UNRECOVER_SIG_OFFSET,
-            restart_signal: libc::SIGRTMIN() + RESTART_MANAGER_SIG_OFFSET,
-            switch_root_signal: libc::SIGRTMIN() + SIG_SWITCH_ROOT,
+            unrecover_signal: libc::SIGRTMIN() + SIG_RUN_UNRECOVER_OFFSET,
+            restart_signal: libc::SIGRTMIN() + SIG_RESTART_MANAGER_OFFSET,
+            switch_root_signal: libc::SIGRTMIN() + SIG_SWITCH_ROOT_OFFSET,
         }
     }
 

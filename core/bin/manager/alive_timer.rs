@@ -10,13 +10,13 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use constants::ALIVE;
 use event::{EventState, EventType, Events, Source};
 use nix::errno::Errno;
 use nix::sys::socket::{self, MsgFlags};
 use std::cell::RefCell;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
-const ALIVE: &str = "ALIVE01234567890";
 
 pub(super) struct AliveTimer {
     sub: Rc<AliveTimerSub>,
