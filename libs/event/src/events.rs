@@ -265,7 +265,15 @@ impl EventsData {
             | EventType::TimerBoottime
             | EventType::TimerMonotonic
             | EventType::TimerRealtimeAlarm
-            | EventType::TimerBoottimeAlarm => (),
+            | EventType::TimerBoottimeAlarm => {
+                if self.timer.is_empty(&t) {
+                    let fd = self.timerfd.remove(&t);
+                    if let Some(fd) = fd {
+                        self.poller.unregister(fd.as_raw_fd())?;
+                        let _ = nix::unistd::close(fd);
+                    }
+                }
+            }
             // todo: implement
             EventType::Watchdog => todo!(),
         }
@@ -374,13 +382,6 @@ impl EventsData {
             | EventType::TimerRealtimeAlarm
             | EventType::TimerBoottimeAlarm => {
                 self.timer.remove(&et, source.clone());
-
-                if self.timer.is_empty(&et) {
-                    let fd = self.timerfd.remove(&et);
-                    if let Some(fd) = fd {
-                        self.poller.unregister(fd.as_raw_fd())?
-                    }
-                }
             }
             EventType::Inotify => {
                 self.poller.unregister(self.inotify.as_raw_fd())?;
