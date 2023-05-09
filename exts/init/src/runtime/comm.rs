@@ -25,8 +25,7 @@ const LISTEN_BACKLOG: usize = 10;
 const INVALID_FD: i32 = -1;
 const ACCEPT_COUNT: i32 = 3;
 const BUF_SIZE: usize = 16; //The communication string length is fixed to 16 characters.
-const INIT_SOCKET: &str = "/run/sysmaster/init";
-const ALIVE: &str = "ALIVE01234567890";
+use constants::{ALIVE, INIT_SOCKET};
 
 pub struct Comm {
     epoll: Rc<Epoll>,

@@ -32,7 +32,7 @@ use std::path::Path;
 use std::process::{exit, Command};
 use std::rc::Rc;
 
-use self::signals::SIG_SWITCH_ROOT;
+use constants::SIG_SWITCH_ROOT_OFFSET;
 const INVALID_PID: i32 = -1;
 const MANAGER_SIG_OFFSET: i32 = 7;
 const SYSMASTER_PATH: &str = "/usr/lib/sysmaster/sysmaster";
@@ -290,12 +290,12 @@ impl RunTime {
         let res = unsafe {
             libc::kill(
                 self.sysmaster_pid.into(),
-                libc::SIGRTMIN() + SIG_SWITCH_ROOT,
+                libc::SIGRTMIN() + SIG_SWITCH_ROOT_OFFSET,
             )
         };
         if let Err(err) = Errno::result(res).map(drop) {
             eprintln!(
-                "Failed to send sysmaster SIG_SWITCH_ROOT:{:?}  err:{:?} change state to switch_root",
+                "Failed to send sysmaster switch-root signal:{:?}  err:{:?} change state to switch_root",
                 self.sysmaster_pid, err
             );
         }

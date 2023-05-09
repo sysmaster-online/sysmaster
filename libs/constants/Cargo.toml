@@ -1,12 +1,8 @@
 [package]
-name = "switch_root"
+name = "constants"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nix = "0.24"
-log = "0.4"
-libc = "0.2.*"
-constants = { version = "0.1.0", path = "../../libs/constants" }
