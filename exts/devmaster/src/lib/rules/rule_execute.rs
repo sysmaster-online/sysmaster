@@ -19,6 +19,7 @@ use super::{
 };
 use crate::{
     error::{Error, Result},
+    log_rule_token_debug,
     rules::FORMAT_SUBST_TABLE,
     utils::{
         replace_chars, resolve_subsystem_kernel, spawn, sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
@@ -463,8 +464,8 @@ impl ExecuteManager {
     /// process a device object
     pub fn process_device(&mut self, device: Arc<Mutex<Device>>) -> Result<()> {
         log::debug!(
-            "Processing device {}",
-            device.as_ref().lock().unwrap().devpath
+            "{}",
+            device_trace!("Start processing device", device.as_ref().lock().unwrap(),)
         );
 
         self.current_unit = Some(ExecuteUnit::new(device));
@@ -490,8 +491,6 @@ impl ExecuteManager {
         let unit = self.current_unit.as_mut().unwrap();
 
         let action = unit.device.as_ref().lock().unwrap().action;
-
-        println!("{}", action);
 
         if action == DeviceAction::Remove {
             return self.execute_rules_on_remove();
@@ -562,10 +561,7 @@ impl ExecuteManager {
             .clone();
 
         loop {
-            let next_line = self.apply_rule_line().map_err(|e| {
-                log::debug!("{}", e);
-                e
-            })?;
+            let next_line = self.apply_rule_line()?;
 
             self.current_rule_line = next_line;
             if self.current_rule_line.is_none() {
@@ -584,39 +580,12 @@ impl ExecuteManager {
             None => return Ok(None),
         };
 
-        device_trace!(
-            "Apply Rule Line:",
-            self.current_unit
-                .as_ref()
-                .unwrap()
-                .device
-                .as_ref()
-                .lock()
-                .unwrap(),
-            self.get_current_rule_file(),
-            self.get_current_line_number()
-        );
-
         // only apply rule token on parent device once
         // that means if some a parent device matches the token, do not match any parent tokens in the following
         let mut parents_done = false;
 
         for token in RuleToken::iter(self.current_rule_token.clone()) {
             self.current_rule_token = Some(token.clone());
-
-            device_trace!(
-                "Apply Rule Token:",
-                self.current_unit
-                    .as_ref()
-                    .unwrap()
-                    .device
-                    .as_ref()
-                    .lock()
-                    .unwrap(),
-                self.get_current_rule_file(),
-                self.get_current_line_number(),
-                token.as_ref().read().unwrap()
-            );
 
             if self
                 .current_rule_token
@@ -631,6 +600,9 @@ impl ExecuteManager {
                     continue;
                 }
                 if !self.apply_rule_token_on_parent()? {
+                    // if current rule token does not match, abort applying the rest tokens in this line
+                    log_rule_token_debug!(token.as_ref().read().unwrap(), "fails to match.");
+
                     return Ok(self
                         .current_rule_line
                         .clone()
@@ -648,6 +620,8 @@ impl ExecuteManager {
 
             if !self.apply_rule_token(self.current_unit.as_ref().unwrap().device.clone())? {
                 // if current rule token does not match, abort applying the rest tokens in this line
+                log_rule_token_debug!(token.as_ref().read().unwrap(), "fails to match.");
+
                 return Ok(self
                     .current_rule_line
                     .clone()
@@ -695,8 +669,6 @@ impl ExecuteManager {
             .unwrap()
             .r#type;
 
-        // let mut device = device.as_ref().lock().unwrap();
-
         let token = self
             .current_rule_token
             .as_ref()
@@ -705,19 +677,21 @@ impl ExecuteManager {
             .read()
             .unwrap();
 
+        log_rule_token_debug!(token, "applying token");
+
         match token_type {
             MatchAction => {
                 let action = execute_err!(
-                    device.as_ref().lock().unwrap().borrow_mut().get_action(),
-                    "MatchAction"
+                    token,
+                    device.as_ref().lock().unwrap().borrow_mut().get_action()
                 )?;
 
                 Ok(token.pattern_match(&action.to_string()))
             }
             MatchDevpath => {
                 let devpath = execute_none!(
+                    token,
                     device.as_ref().lock().unwrap().borrow_mut().get_devpath(),
-                    "MatchDevpath",
                     "DEVPATH"
                 )?;
 
@@ -725,8 +699,8 @@ impl ExecuteManager {
             }
             MatchKernel | MatchParentsKernel => {
                 let sysname = execute_none!(
+                    token,
                     device.as_ref().lock().unwrap().borrow_mut().get_sysname(),
-                    "MatchKernel|MatchParentsKernel",
                     "SYSNAME"
                 )?;
 
@@ -758,7 +732,7 @@ impl ExecuteManager {
                     Err(e) => {
                         if e.get_errno() != Errno::ENOENT {
                             return Err(Error::RulesExecuteError {
-                                msg: format!("Apply 'MatchEnv' error: {}", e),
+                                msg: format!("{}", e),
                                 errno: e.get_errno(),
                             });
                         }
@@ -793,16 +767,16 @@ impl ExecuteManager {
             }
             MatchSubsystem | MatchParentsSubsystem => {
                 let subsystem = execute_err_ignore_ENOENT!(
-                    device.as_ref().lock().unwrap().borrow_mut().get_subsystem(),
-                    "MatchSubsystem | MatchParentsSubsystem"
+                    token,
+                    device.as_ref().lock().unwrap().borrow_mut().get_subsystem()
                 )?;
 
                 Ok(token.pattern_match(&subsystem))
             }
             MatchDriver | MatchParentsDriver => {
                 let driver = execute_err_ignore_ENOENT!(
-                    device.as_ref().lock().unwrap().borrow_mut().get_driver(),
-                    "MatchDriver | MatchParentsDriver"
+                    token,
+                    device.as_ref().lock().unwrap().borrow_mut().get_driver()
                 )?;
 
                 Ok(token.pattern_match(&driver))
@@ -831,8 +805,8 @@ impl ExecuteManager {
                         Err(_) => {
                             // only throw out error when getting the syspath of device
                             let syspath = execute_none!(
+                                token,
                                 device.as_ref().lock().unwrap().get_syspath(),
-                                "MatchTest",
                                 "SYSPATH"
                             )
                             .map_err(|e| {
@@ -990,27 +964,6 @@ impl ExecuteManager {
     /// execute run
     pub(crate) fn execute_run(&mut self) -> Result<()> {
         Ok(())
-    }
-
-    /// get the current rule file name
-    pub(crate) fn get_current_rule_file(&self) -> String {
-        self.current_rule_file
-            .as_ref()
-            .unwrap()
-            .read()
-            .unwrap()
-            .file_name
-            .clone()
-    }
-
-    /// get the current rule line number
-    pub(crate) fn get_current_line_number(&self) -> u32 {
-        self.current_rule_line
-            .as_ref()
-            .unwrap()
-            .read()
-            .unwrap()
-            .line_number
     }
 }
 

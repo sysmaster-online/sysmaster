@@ -16,10 +16,19 @@
 /// translate execution error from downside call chain
 #[macro_export]
 macro_rules! execute_err {
-    ($e:expr, $k:expr) => {
-        $e.map_err(|err| Error::RulesExecuteError {
-            msg: format!("Apply '{}' error: {}", $k, err),
-            errno: err.get_errno(),
+    ($t:expr, $e:expr) => {
+        $e.map_err(|err| {
+            log::error!(
+                "{}:{}:'{}' {}",
+                $t.rule_file,
+                $t.line_number,
+                $t.content,
+                err
+            );
+            Error::RulesExecuteError {
+                msg: format!("Apply '{}' error: {}", $t.content, err),
+                errno: err.get_errno(),
+            }
         })
     };
 }
@@ -27,15 +36,22 @@ macro_rules! execute_err {
 /// translate execution error from downside call chain
 #[macro_export]
 macro_rules! execute_err_ignore_ENOENT {
-    ($e:expr, $k:expr) => {
+    ($t:expr, $e:expr) => {
         match $e {
             Ok(ret) => Ok(ret.to_string()),
             Err(err) => {
                 if err.get_errno() == Errno::ENOENT {
                     Ok(String::new())
                 } else {
+                    log::error!(
+                        "{}:{}:'{}' {}",
+                        $t.rule_file,
+                        $t.line_number,
+                        $t.content,
+                        err
+                    );
                     Err(Error::RulesExecuteError {
-                        msg: format!("Apply '{}' error: {}", $k, err),
+                        msg: format!("Apply '{}' error: {}", $t.content, err),
                         errno: err.get_errno(),
                     })
                 }
@@ -47,10 +63,17 @@ macro_rules! execute_err_ignore_ENOENT {
 /// translate execution error on none return from downside call chain
 #[macro_export]
 macro_rules! execute_none {
-    ($e:expr, $k:expr, $v:expr) => {
+    ($t:expr, $e:expr, $v:expr) => {
         if $e.is_none() {
+            log::error!(
+                "{}:{}:'{}' {}",
+                $t.rule_file,
+                $t.line_number,
+                $t.content,
+                format!("failed to get {}", $v)
+            );
             Err(Error::RulesExecuteError {
-                msg: format!("Apply '{}' error: have no {}", $k, $v),
+                msg: format!("Apply '{}' error: have no {}", $t, $v),
                 errno: Errno::EINVAL,
             })
         } else {
@@ -104,5 +127,47 @@ macro_rules! subst_format_map_none {
                 Ok($d)
             }
         }
+    };
+}
+
+/// log info message for rule token
+#[macro_export]
+macro_rules! log_rule_token_info {
+    ($t:expr, $m:expr) => {
+        log::info!(
+            "{}:{}:'{}' {}",
+            $t.rule_file,
+            $t.line_number,
+            $t.content,
+            $m
+        );
+    };
+}
+
+/// log debug message for rule token
+#[macro_export]
+macro_rules! log_rule_token_debug {
+    ($t:expr, $m:expr) => {
+        log::debug!(
+            "{}:{}:'{}' {}",
+            $t.rule_file,
+            $t.line_number,
+            $t.content,
+            $m
+        );
+    };
+}
+
+/// log error message for rule token
+#[macro_export]
+macro_rules! log_rule_token_error {
+    ($t:expr, $m:expr) => {
+        log::error!(
+            "{}:{}:'{}' {}",
+            $t.rule_file,
+            $t.line_number,
+            $t.content,
+            $m
+        );
     };
 }
