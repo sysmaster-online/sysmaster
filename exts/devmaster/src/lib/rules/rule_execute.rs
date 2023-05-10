@@ -19,10 +19,11 @@ use super::{
 };
 use crate::{
     error::{Error, Result},
-    log_rule_token_debug,
+    log_rule_token_debug, log_rule_token_error,
     rules::FORMAT_SUBST_TABLE,
     utils::{
-        replace_chars, resolve_subsystem_kernel, spawn, sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
+        get_property_from_string, replace_chars, resolve_subsystem_kernel, spawn,
+        sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
     },
 };
 use device::{Device, DeviceAction};
@@ -30,6 +31,8 @@ use libc::mode_t;
 use std::{
     borrow::BorrowMut,
     collections::HashMap,
+    fs::OpenOptions,
+    io::Read,
     os::unix::fs::PermissionsExt,
     sync::{Arc, Mutex, RwLock},
     time::{Duration, SystemTime},
@@ -810,7 +813,7 @@ impl ExecuteManager {
                                 "SYSPATH"
                             )
                             .map_err(|e| {
-                                log::debug!("Apply 'MatchTest' error: {}", e);
+                                log::debug!("Apply '{}' error: {}", token.content, e);
                                 e
                             })?;
 
@@ -853,11 +856,70 @@ impl ExecuteManager {
                         }
 
                         Err(Error::RulesExecuteError {
-                            msg: format!("Apply 'MatchTest' error: {}", e),
+                            msg: format!("Apply '{}' error: {}", token.content, e),
                             errno: e.get_errno(),
                         })
                     }
                 }
+            }
+            MatchImportFile => {
+                let file_name = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::debug!("failed to apply formatter: ({})", e);
+                        return Ok(false);
+                    }
+                };
+
+                log_rule_token_debug!(
+                    token,
+                    format!("Importing properties from file '{}'", file_name)
+                );
+
+                let mut file = match OpenOptions::new().read(true).open(&file_name) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        if e.kind() != std::io::ErrorKind::NotFound {
+                            log_rule_token_error!(
+                                token,
+                                format!("failed to open '{}'.", file_name)
+                            );
+                            return Err(Error::RulesExecuteError {
+                                msg: e.to_string(),
+                                errno: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
+                            });
+                        }
+
+                        return Ok(token.op == OperatorType::Nomatch);
+                    }
+                };
+
+                let mut content = String::new();
+                if let Err(e) = file.read_to_string(&mut content) {
+                    log_rule_token_debug!(token, format!("failed to read '{}': {}", file_name, e));
+                    return Ok(token.op == OperatorType::Nomatch);
+                }
+
+                for line in content.split('\n') {
+                    match get_property_from_string(line) {
+                        Ok((key, value)) => {
+                            execute_err!(
+                                token,
+                                device.as_ref().lock().unwrap().add_property(key, value)
+                            )?;
+                        }
+                        Err(e) => {
+                            log_rule_token_debug!(token, e);
+                        }
+                    }
+                }
+
+                Ok(token.op == OperatorType::Match)
             }
             MatchProgram => {
                 let cmd = match self

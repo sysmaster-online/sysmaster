@@ -23,6 +23,7 @@ use crate::{error::*, rules::FormatSubstitutionType};
 use basic::errno_util::errno_is_privilege;
 use device::Device;
 use lazy_static::lazy_static;
+use nix::errno::Errno;
 use regex::Regex;
 use shell_words::split;
 use wait_timeout::ChildExt;
@@ -397,6 +398,43 @@ pub(crate) fn spawn(cmd_str: &String, timeout: Duration) -> Result<(String, i32)
     }
 }
 
+pub(crate) fn get_property_from_string(s: &str) -> Result<(String, String)> {
+    lazy_static! {
+        static ref RE_KEY_VALUE: Regex =
+            Regex::new("(?P<key>[^=]*)\\s*=\\s*(?P<value>.*)").unwrap();
+    }
+
+    let s = s.trim();
+
+    if s.starts_with('#') {
+        return Err(Error::Other {
+            msg: format!("ignore commented line '{}'", s),
+            errno: Errno::EINVAL,
+        });
+    }
+
+    let capture = RE_KEY_VALUE.captures(s).ok_or(Error::Other {
+        msg: format!("failed to parse key and value for '{}'", s),
+        errno: Errno::EINVAL,
+    })?;
+
+    let key = capture.name("key").unwrap().as_str();
+    let value = capture.name("value").unwrap().as_str();
+
+    if key.is_empty() || value.is_empty() {
+        return Err(Error::Other {
+            msg: format!("key or value can not be empty '{}'", s),
+            errno: Errno::EINVAL,
+        });
+    }
+
+    if value.starts_with(['"', '\'']) {
+        Ok((key.to_string(), value[1..value.len() - 1].to_string()))
+    } else {
+        Ok((key.to_string(), value[0..].to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use basic::logger::init_log_to_console;
@@ -577,5 +615,24 @@ mod tests {
             .unwrap()
             .0
         );
+    }
+
+    #[test]
+    fn test_get_property_from_string() {
+        assert_eq!(
+            get_property_from_string("A=B").unwrap(),
+            ("A".to_string(), "B".to_string())
+        );
+        assert_eq!(
+            get_property_from_string("A=\"B\"").unwrap(),
+            ("A".to_string(), "B".to_string())
+        );
+        assert_eq!(
+            get_property_from_string("A='B'").unwrap(),
+            ("A".to_string(), "B".to_string())
+        );
+        assert!(get_property_from_string("#A=B").is_err());
+        assert!(get_property_from_string("=B").is_err());
+        assert!(get_property_from_string("A=").is_err());
     }
 }
