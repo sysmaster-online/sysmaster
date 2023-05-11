@@ -400,8 +400,10 @@ pub(crate) fn spawn(cmd_str: &String, timeout: Duration) -> Result<(String, i32)
 
 pub(crate) fn get_property_from_string(s: &str) -> Result<(String, String)> {
     lazy_static! {
-        static ref RE_KEY_VALUE: Regex =
-            Regex::new("(?P<key>[^=]*)\\s*=\\s*(?P<value>.*)").unwrap();
+        static ref RE_KEY_VALUE: Regex = Regex::new(
+            "(?P<key>[^=]*)\\s*=\\s*(?P<value>([^\"']$)|([^\"'].*[^\"']$)|(\".*\"$)|('.*'$))"
+        )
+        .unwrap();
     }
 
     let s = s.trim();
@@ -624,6 +626,10 @@ mod tests {
             ("A".to_string(), "B".to_string())
         );
         assert_eq!(
+            get_property_from_string("A=BB").unwrap(),
+            ("A".to_string(), "BB".to_string())
+        );
+        assert_eq!(
             get_property_from_string("A=\"B\"").unwrap(),
             ("A".to_string(), "B".to_string())
         );
@@ -631,8 +637,30 @@ mod tests {
             get_property_from_string("A='B'").unwrap(),
             ("A".to_string(), "B".to_string())
         );
+        assert_eq!(
+            get_property_from_string("A=\"C=D\"").unwrap(),
+            ("A".to_string(), "C=D".to_string())
+        );
+        assert_eq!(
+            get_property_from_string("A='C=D'").unwrap(),
+            ("A".to_string(), "C=D".to_string())
+        );
+        assert_eq!(
+            get_property_from_string("A=C=D").unwrap(),
+            ("A".to_string(), "C=D".to_string())
+        );
+        assert_eq!(
+            get_property_from_string("A=C D").unwrap(),
+            ("A".to_string(), "C D".to_string())
+        );
         assert!(get_property_from_string("#A=B").is_err());
         assert!(get_property_from_string("=B").is_err());
         assert!(get_property_from_string("A=").is_err());
+        assert!(get_property_from_string("A='B\"").is_err());
+        assert!(get_property_from_string("A=\"B'").is_err());
+        assert!(get_property_from_string("A=\"B").is_err());
+        assert!(get_property_from_string("A='B").is_err());
+        assert!(get_property_from_string("A=B\"").is_err());
+        assert!(get_property_from_string("A=B'").is_err());
     }
 }
