@@ -93,22 +93,22 @@ pub trait Builtin {
 }
 
 /// enumerator of builtin commands
-#[derive(Eq, PartialEq, Hash, Debug)]
+#[derive(Eq, PartialEq, Hash, Debug, Copy, Clone)]
 #[allow(missing_docs)]
 pub enum BuiltinCommand {
-    Blkid,
-    Btrfs,
-    Hwdb,
-    InputId,
-    Keyboard,
-    Kmod,
-    NetId,
-    NetSetupLink,
-    PathId,
-    Uaccess,
-    UsbId,
-    Example,
-    Max,
+    Blkid = 0,
+    Btrfs = 1,
+    Hwdb = 2,
+    InputId = 3,
+    Keyboard = 4,
+    Kmod = 5,
+    NetId = 6,
+    NetSetupLink = 7,
+    PathId = 8,
+    Uaccess = 9,
+    UsbId = 10,
+    Example = 11,
+    Max = 12,
 }
 
 impl FromStr for BuiltinCommand {

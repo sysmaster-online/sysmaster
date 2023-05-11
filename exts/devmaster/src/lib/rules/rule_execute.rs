@@ -18,6 +18,7 @@ use super::{
     TokenType::*,
 };
 use crate::{
+    builtin::{BuiltinCommand, BuiltinManager, Netlink},
     error::{Error, Result},
     log_rule_token_debug, log_rule_token_error,
     rules::FORMAT_SUBST_TABLE,
@@ -30,6 +31,7 @@ use device::{Device, DeviceAction};
 use libc::mode_t;
 use std::{
     borrow::BorrowMut,
+    cell::RefCell,
     collections::HashMap,
     fs::OpenOptions,
     io::Read,
@@ -60,9 +62,10 @@ struct ExecuteUnit {
     // run_list: HashMap<String, String>,
     // exec_delay_usec: useconds_t,
     birth_sec: SystemTime,
-    // rtnl: Option<Rc<RefCell<Netlink>>>,
-    // builtin_run: u32,
-    // builtin_ret: u32,
+    rtnl: RefCell<Option<Netlink>>,
+    builtin_run: u32,
+    /// set mask bit to 1 if the builtin failed or returned false
+    builtin_ret: u32,
     // escape_type: RuleEscapeType,
     // inotify_watch: bool,
     // inotify_watch_final: bool,
@@ -92,9 +95,9 @@ impl ExecuteUnit {
             // run_list: (),
             // exec_delay_usec: (),
             birth_sec: SystemTime::now(),
-            // rtnl: (),
-            // builtin_run: (),
-            // builtin_ret: (),
+            rtnl: RefCell::new(None),
+            builtin_run: 0,
+            builtin_ret: 0,
             // inotify_watch: (),
             // inotify_watch_final: (),
             // group_final: (),
@@ -438,6 +441,7 @@ impl ExecuteUnit {
 /// manage processing units
 pub struct ExecuteManager {
     rules: Arc<RwLock<Rules>>,
+    builtin_mgr: BuiltinManager,
 
     current_rule_file: Option<Arc<RwLock<RuleFile>>>,
     current_rule_line: Option<Arc<RwLock<RuleLine>>>,
@@ -453,8 +457,13 @@ pub struct ExecuteManager {
 impl ExecuteManager {
     /// create a execute manager object
     pub fn new(rules: Arc<RwLock<Rules>>) -> ExecuteManager {
+        let builtin_mgr = BuiltinManager::new();
+
+        builtin_mgr.init();
+
         ExecuteManager {
             rules,
+            builtin_mgr,
             current_rule_file: None,
             current_rule_line: None,
             current_rule_token: None,
@@ -813,7 +822,7 @@ impl ExecuteManager {
                                 "SYSPATH"
                             )
                             .map_err(|e| {
-                                log::debug!("Apply '{}' error: {}", token.content, e);
+                                log_rule_token_debug!(token, "failed to apply token.");
                                 e
                             })?;
 
@@ -921,7 +930,7 @@ impl ExecuteManager {
 
                 Ok(token.op == OperatorType::Match)
             }
-            MatchProgram => {
+            MatchImportProgram => {
                 let cmd = match self
                     .current_unit
                     .as_ref()
@@ -935,6 +944,133 @@ impl ExecuteManager {
                     }
                 };
 
+                log_rule_token_debug!(
+                    token,
+                    format!("Importing properties from output of cmd '{}'", cmd)
+                );
+
+                let result = match spawn(&cmd, Duration::from_secs(self.unit_spawn_timeout_usec)) {
+                    Ok(s) => {
+                        if s.1 < 0 {
+                            log_rule_token_debug!(
+                                token,
+                                format!("command returned {}, ignoring.", s.1)
+                            );
+                            return Ok(token.op == OperatorType::Nomatch);
+                        }
+                        s.0
+                    }
+                    Err(e) => {
+                        log_rule_token_debug!(token, format!("failed execute command: ({})", e));
+                        return Ok(token.op == OperatorType::Nomatch);
+                    }
+                };
+
+                for line in result.split('\n') {
+                    let line = replace_chars(line.trim_end(), DEVMASTER_LEGAL_CHARS);
+                    match get_property_from_string(&line) {
+                        Ok((key, value)) => {
+                            execute_err!(
+                                token,
+                                device.as_ref().lock().unwrap().add_property(key, value)
+                            )?;
+                        }
+                        Err(e) => {
+                            log_rule_token_debug!(token, e);
+                        }
+                    }
+                }
+
+                Ok(token.op == OperatorType::Match)
+            }
+            MatchImportBuiltin => {
+                let builtin = match token.value.parse::<BuiltinCommand>() {
+                    Ok(cmd) => cmd,
+                    Err(_) => {
+                        log_rule_token_error!(token, "invalid builtin command.");
+                        return Ok(false);
+                    }
+                };
+
+                let mask = 0b1 << builtin as u32;
+                let already_run = self.current_unit.as_ref().unwrap().builtin_run;
+                let run_result = self.current_unit.as_ref().unwrap().builtin_ret;
+
+                if self.builtin_mgr.run_once(builtin) {
+                    if already_run & mask != 0 {
+                        log_rule_token_debug!(
+                            token,
+                            format!(
+                                "builtin '{}' can only run once and has run before.",
+                                builtin
+                            )
+                        );
+                        return Ok((token.op == OperatorType::Match) ^ (run_result & mask > 0));
+                    }
+
+                    self.current_unit.as_mut().unwrap().builtin_run = already_run | mask;
+                }
+
+                let cmd = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log_rule_token_error!(token, format!("failed to apply formatter: ({})", e));
+                        return Ok(false);
+                    }
+                };
+
+                let argv = shell_words::split(&cmd).map_err(|e| Error::RulesExecuteError {
+                    msg: format!(
+                        "failed to split command '{}' into shell tokens: ({})",
+                        cmd, e
+                    ),
+                    errno: nix::errno::Errno::EINVAL,
+                })?;
+
+                log_rule_token_debug!(
+                    token,
+                    format!("Importing properties from builtin cmd '{}'", cmd)
+                );
+
+                match self.builtin_mgr.run(
+                    self.current_unit.as_ref().unwrap().device.clone(),
+                    &mut self.current_unit.as_mut().unwrap().rtnl,
+                    builtin,
+                    argv.len() as i32,
+                    argv,
+                    false,
+                ) {
+                    Ok(ret) => {
+                        // if builtin command returned false, set the mask bit to 1
+                        self.current_unit.as_mut().unwrap().builtin_ret =
+                            run_result | ((!ret as u32) << builtin as u32);
+                        Ok((token.op == OperatorType::Nomatch) ^ ret)
+                    }
+                    Err(e) => {
+                        log_rule_token_error!(token, format!("failed to run builtin ({})", e));
+                        Ok(token.op == OperatorType::Nomatch)
+                    }
+                }
+            }
+            MatchProgram => {
+                let cmd = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log_rule_token_error!(token, format!("failed to apply formatter: ({})", e));
+                        return Ok(false);
+                    }
+                };
+
                 let result = match spawn(&cmd, Duration::from_secs(self.unit_spawn_timeout_usec)) {
                     Ok(s) => {
                         if s.1 != 0 {
@@ -943,7 +1079,7 @@ impl ExecuteManager {
                         s.0
                     }
                     Err(e) => {
-                        log::debug!("Apply 'MatchProgram' failed: ({})", e);
+                        log_rule_token_debug!(token, format!("failed to apply token: ({})", e));
                         return Ok(false);
                     }
                 };
