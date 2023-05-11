@@ -816,7 +816,7 @@ impl UnitManager {
     }
 
     pub(self) fn reset_failed(&self, name: &str) -> Result<()> {
-        if let Some(unit) = self.load_unitx(name) {
+        if let Some(unit) = self.units_get(name) {
             unit.reset_failed();
             Ok(())
         } else {
