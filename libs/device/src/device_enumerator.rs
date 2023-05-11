@@ -24,17 +24,22 @@ use std::{
 };
 
 /// decide pattern recognition
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum FilterType {
     /// fnmatch-style glob pattern
-    #[default]
     Glob,
     /// regular expression
     _Regular,
 }
 
+impl Default for FilterType {
+    fn default() -> Self {
+        Self::Glob
+    }
+}
+
 /// decide how to match devices
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MatchInitializedType {
     /// only match devices without db entry
     No,
@@ -43,8 +48,13 @@ pub enum MatchInitializedType {
     /// match all devices
     ALL,
     /// match devices that have no devnode/ifindex of have a db entry
-    #[default]
     Compat,
+}
+
+impl Default for MatchInitializedType {
+    fn default() -> Self {
+        Self::Compat
+    }
 }
 
 /// enumerate devices or subsystems under /sys
@@ -100,15 +110,20 @@ pub struct DeviceEnumerator {
 }
 
 /// decide enumerate devices or subsystems
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceEnumerationType {
-    #[default]
     /// only enumerate devices
     Devices,
     /// only enumerate subsystems
     Subsystems,
     /// enumerate both devices and subsystems
     All,
+}
+
+impl Default for DeviceEnumerationType {
+    fn default() -> Self {
+        Self::Devices
+    }
 }
 
 /// iterator of device enumerator

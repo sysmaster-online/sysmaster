@@ -480,7 +480,7 @@ pub(crate) enum ResolveNameTime {
 }
 
 /// formatter substitution type
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Default, Copy, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone)]
 pub(crate) enum FormatSubstitutionType {
     Devnode,
     Attr,
@@ -498,7 +498,6 @@ pub(crate) enum FormatSubstitutionType {
     Links,
     Root,
     Sys,
-    #[default]
     Invalid,
 }
 
@@ -574,5 +573,11 @@ impl Display for FormatSubstitutionType {
         };
 
         write!(f, "{}", s)
+    }
+}
+
+impl Default for FormatSubstitutionType {
+    fn default() -> Self {
+        Self::Invalid
     }
 }
