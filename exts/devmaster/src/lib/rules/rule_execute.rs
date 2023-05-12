@@ -52,7 +52,7 @@ use nix::errno::Errno;
 struct ExecuteUnit {
     device: Arc<Mutex<Device>>,
     parent: Option<Arc<Mutex<Device>>>,
-    // device_db_clone: Option<Device>,
+    device_db_clone: RefCell<Option<Device>>,
     name: String,
     program_result: String,
     // mode: mode_t,
@@ -85,7 +85,7 @@ impl ExecuteUnit {
         ExecuteUnit {
             device,
             parent: None,
-            // device_db_clone: None,
+            device_db_clone: RefCell::new(None),
             name: String::default(),
             program_result: String::default(),
             // mode: (),
@@ -197,7 +197,7 @@ impl ExecuteUnit {
                 }
 
                 subst_format_map_err_ignore!(
-                    device.get_property_value(attribute.unwrap()),
+                    device.get_property_value(&attribute.unwrap()),
                     "env",
                     Errno::ENOENT,
                     String::default()
@@ -510,11 +510,42 @@ impl ExecuteManager {
 
         // inotify watch end: todo
 
-        // clone device with db: todo
+        // clone device with db
+        unit.device_db_clone = RefCell::new(Some(
+            unit.device
+                .as_ref()
+                .lock()
+                .unwrap()
+                .clone_with_db()
+                .map_err(|e| Error::RulesExecuteError {
+                    msg: format!("failed to clone with db ({})", e),
+                    errno: e.get_errno(),
+                })?,
+        ));
 
-        // copy all tags to device with db: todo
+        // copy all tags to device with db
+        for tag in unit.device.as_ref().lock().unwrap().all_tags.iter() {
+            unit.device_db_clone
+                .borrow_mut()
+                .as_mut()
+                .unwrap()
+                .add_tag(tag.clone(), false)
+                .map_err(|e| Error::RulesExecuteError {
+                    msg: format!("failed to add tag ({})", e),
+                    errno: e.get_errno(),
+                })?;
+        }
 
         // add property to device with db: todo
+        unit.device_db_clone
+            .borrow_mut()
+            .as_mut()
+            .unwrap()
+            .add_property("ID_RENAMING".to_string(), "".to_string())
+            .map_err(|e| Error::RulesExecuteError {
+                msg: format!("failed to add tag ({})", e),
+                errno: e.get_errno(),
+            })?;
 
         self.apply_rules()?;
 
@@ -738,7 +769,7 @@ impl ExecuteManager {
                     .lock()
                     .unwrap()
                     .borrow_mut()
-                    .get_property_value(token.attr.clone().unwrap())
+                    .get_property_value(&token.attr.clone().unwrap())
                 {
                     Ok(v) => v,
                     Err(e) => {
@@ -1056,6 +1087,56 @@ impl ExecuteManager {
                         Ok(token.op == OperatorType::Nomatch)
                     }
                 }
+            }
+            MatchImportDb => {
+                let mut dev_db_clone = self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .device_db_clone
+                    .borrow_mut();
+
+                if dev_db_clone.is_none() {
+                    return Ok(token.op == OperatorType::Nomatch);
+                }
+
+                let val = match dev_db_clone
+                    .as_mut()
+                    .unwrap()
+                    .get_property_value(&token.value)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        if e.get_errno() == Errno::ENOENT {
+                            return Ok(token.op == OperatorType::Nomatch);
+                        }
+
+                        log_rule_token_error!(
+                            token,
+                            format!("failed to get property '{}' from db: ({})", token.value, e)
+                        );
+                        return Err(Error::RulesExecuteError {
+                            msg: format!("Apply '{}' error: {}", token.content, e),
+                            errno: e.get_errno(),
+                        });
+                    }
+                };
+
+                log_rule_token_debug!(
+                    token,
+                    format!("Importing property '{}={}' from db", token.value, val)
+                );
+
+                execute_err!(
+                    token,
+                    device
+                        .as_ref()
+                        .lock()
+                        .unwrap()
+                        .add_property(token.value.clone(), val)
+                )?;
+
+                Ok(token.op == OperatorType::Match)
             }
             MatchProgram => {
                 let cmd = match self

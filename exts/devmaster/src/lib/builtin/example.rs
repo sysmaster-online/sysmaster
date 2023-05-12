@@ -102,7 +102,7 @@ mod tests {
             device
                 .lock()
                 .unwrap()
-                .get_property_value("ID_EXAMPLE_SYSPATH".to_string())
+                .get_property_value("ID_EXAMPLE_SYSPATH")
                 .unwrap();
             rtnl.take().unwrap();
         }

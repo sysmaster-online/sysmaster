@@ -949,33 +949,33 @@ impl Device {
     }
 
     /// check whether the device has the tag
-    pub fn has_tag(&mut self, tag: String) -> Result<bool, Error> {
+    pub fn has_tag(&mut self, tag: &str) -> Result<bool, Error> {
         self.read_db().map_err(|e| Error::Nix {
             msg: format!("has_tag failed: failed to read db ({})", e),
             source: e.get_errno(),
         })?;
 
-        Ok(self.all_tags.contains(&tag))
+        Ok(self.all_tags.contains(tag))
     }
 
     /// check whether the device has the current tag
-    pub fn has_current_tag(&mut self, tag: String) -> Result<bool, Error> {
+    pub fn has_current_tag(&mut self, tag: &str) -> Result<bool, Error> {
         self.read_db().map_err(|e| Error::Nix {
             msg: format!("has_tag failed: failed to read db ({})", e),
             source: e.get_errno(),
         })?;
 
-        Ok(self.current_tags.contains(&tag))
+        Ok(self.current_tags.contains(tag))
     }
 
     /// get the value of specific device property
-    pub fn get_property_value(&mut self, key: String) -> Result<String, Error> {
+    pub fn get_property_value(&mut self, key: &str) -> Result<String, Error> {
         self.properties_prepare().map_err(|e| Error::Nix {
             msg: format!("get_property_value failed: properties_prepare ({})", e),
             source: e.get_errno(),
         })?;
 
-        match self.properties.get(&key) {
+        match self.properties.get(key) {
             Some(v) => Ok(v.clone()),
             None => Err(Error::Nix {
                 msg: format!("get_property_value failed: no key {}", key),
@@ -1199,7 +1199,7 @@ impl Device {
             msg: format!("open failed: failed to get_is_initialized ({})", e),
             source: e.get_errno(),
         })? {
-            match self.get_property_value("ID_IGNORE_DISKSEQ".to_string()) {
+            match self.get_property_value("ID_IGNORE_DISKSEQ") {
                 Ok(value) => {
                     if !value.parse::<bool>().map_err(|e| Error::Nix {
                         msg: format!(
@@ -1277,6 +1277,34 @@ impl Device {
                 })?;
         }
 
+        Ok(())
+    }
+
+    /// shadow clone a device object and import properties from db
+    pub fn clone_with_db(&mut self) -> Result<Device, Error> {
+        let mut device = self.shallow_clone().map_err(|e| Error::Nix {
+            msg: format!("clone_with_db failed: failed to shallow_clone ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        device.read_db().map_err(|e| Error::Nix {
+            msg: format!("clone_with_db failed: failed to read_db ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        device.sealed = true;
+
+        Ok(device)
+    }
+
+    /// add tag to the device object
+    pub fn add_tag(&mut self, tag: String, both: bool) -> Result<(), Error> {
+        self.all_tags.insert(tag.clone());
+
+        if both {
+            self.current_tags.insert(tag);
+        }
+        self.property_tags_outdated = true;
         Ok(())
     }
 }
@@ -1525,17 +1553,6 @@ impl Device {
             self.properties_buf_outdated = true;
         }
 
-        Ok(())
-    }
-
-    /// add tag to the device object
-    pub(crate) fn add_tag(&mut self, tag: String, both: bool) -> Result<(), Error> {
-        self.all_tags.insert(tag.clone());
-
-        if both {
-            self.current_tags.insert(tag);
-        }
-        self.property_tags_outdated = true;
         Ok(())
     }
 
@@ -2205,6 +2222,94 @@ impl Device {
 
         Ok(())
     }
+
+    /// shallow clone a device object
+    pub(crate) fn shallow_clone(&mut self) -> Result<Device, Error> {
+        let mut device = Self::default();
+
+        let syspath = self
+            .get_syspath()
+            .ok_or(Error::Nix {
+                msg: "do not have syspath".to_string(),
+                source: Errno::EINVAL,
+            })?
+            .to_string();
+
+        device.set_syspath(syspath, false).map_err(|e| Error::Nix {
+            msg: format!("shallow_clone failed: failed to set_syspath ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        let subsystem = self.get_subsystem().map_err(|e| Error::Nix {
+            msg: format!("shallow_clone failed: failed to get_subsystem ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        device
+            .set_subsystem(subsystem.clone())
+            .map_err(|e| Error::Nix {
+                msg: format!("shallow_clone failed: failed to set_subsystem ({})", e),
+                source: e.get_errno(),
+            })?;
+
+        if subsystem == "drivers" {
+            device.driver_subsystem = self.driver_subsystem.clone();
+        }
+
+        if let Ok(ifindex) = self.get_property_value("IFINDEX") {
+            device.set_ifindex(ifindex).map_err(|e| Error::Nix {
+                msg: format!("shallow_clone failed: failed to set_ifindex ({})", e),
+                source: e.get_errno(),
+            })?;
+        }
+
+        if let Ok(major) = self.get_property_value("MAJOR") {
+            let minor = self.get_property_value("MINOR").unwrap();
+            device.set_devnum(major, minor).map_err(|e| Error::Nix {
+                msg: format!("shallow_clone failed: failed to set_devnum ({})", e),
+                source: e.get_errno(),
+            })?;
+        }
+
+        device.read_uevent_file().map_err(|e| Error::Nix {
+            msg: format!("shallow_clone failed: failed to read_uevent_file ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        Ok(device)
+    }
+}
+
+/// iterator over all tags of device object
+pub struct DeviceTagIter<'a> {
+    device_tag_iter: std::collections::hash_set::Iter<'a, String>,
+}
+
+impl Device {
+    /// return the tag iterator
+    pub fn tag_iter_mut(&mut self) -> DeviceTagIter<'_> {
+        if let Err(e) = self.read_db() {
+            log::error!(
+                "failed to read db of '{}': ({})",
+                self.get_device_id()
+                    .unwrap_or_else(|_| self.devpath.clone()),
+                e
+            )
+        }
+
+        DeviceTagIter {
+            device_tag_iter: self.all_tags.iter(),
+        }
+    }
+}
+
+impl<'a> Iterator for DeviceTagIter<'a> {
+    type Item = &'a String;
+
+    /// get the next tag
+    fn next(&mut self) -> Option<Self::Item> {
+        self.device_tag_iter.next()
+    }
 }
 
 #[cfg(test)]
@@ -2287,7 +2392,7 @@ mod tests {
                         // test get_usec_since_initialized: todo
                     }
 
-                    match device.get_property_value("ID_NET_DRIVER".to_string()) {
+                    match device.get_property_value("ID_NET_DRIVER") {
                         Ok(_) => {}
                         Err(e) => {
                             assert_eq!(e.get_errno(), Errno::ENOENT);
@@ -2486,5 +2591,18 @@ mod tests {
         device
             .set_sysattr_value("uevent".to_string(), Some("change".to_string()))
             .unwrap();
+    }
+
+    /// test device tag iterator
+    #[ignore]
+    #[test]
+    fn test_device_tag_iterator() {
+        // let mut dev = Device::from_path("/dev/sdb".to_string()).unwrap();
+        let mut dev = Device::from_device_id("b8:1".to_string()).unwrap();
+        println!("{}", dev.get_syspath().unwrap());
+        dev.add_tag("test_tag".to_string(), true).unwrap();
+        for tag in dev.tag_iter_mut() {
+            println!("{}", tag);
+        }
     }
 }
