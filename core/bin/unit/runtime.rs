@@ -264,7 +264,6 @@ impl UnitRTData {
                         }
                         Err(e) => {
                             log::error!("load unit [{}] failed: {}", unit.id(), e.to_string());
-                            self.db.unit_remove(unit.id());
                         }
                     }
                     self.reli.clear_last_unit();

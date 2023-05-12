@@ -135,18 +135,12 @@ impl UnitLoadData {
     }
 
     pub(self) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-        let u = match self.prepare_unit(name) {
-            None => return None,
-            Some(v) => v,
-        };
-        log::debug!("Try to load {name} by dispatching the load queue.");
-        self.rt.dispatch_load_queue();
-        log::debug!("The loading state of {name}: {:?}", u.load_state());
-        if u.load_state() == UnitLoadState::NotFound {
-            None
-        } else {
-            Some(u)
-        }
+        self.prepare_unit(name).map(|u| {
+            log::debug!("Try to load {name} by dispatching the load queue.");
+            self.rt.dispatch_load_queue();
+            log::debug!("The loading state of {name}: {:?}", u.load_state());
+            u
+        })
     }
 
     pub(self) fn set_um(&self, um: &Rc<UnitManager>) {

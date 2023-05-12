@@ -695,7 +695,7 @@ impl Unit {
         }
     }
 
-    pub(super) fn reset_failed(&self) {
+    pub(crate) fn reset_failed(&self) {
         self.sub.reset_failed()
     }
 
