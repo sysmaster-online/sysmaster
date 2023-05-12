@@ -14,12 +14,6 @@ mod common;
 
 #[test]
 #[ignore]
-fn docker_reliable_random_kill_001() {
-    common::run_script("docker_reliable", "docker_reliable_random_kill_001", "1");
-}
-
-#[test]
-#[ignore]
-fn docker_reliable_reload_001() {
-    common::run_script("docker_reliable", "docker_reliable_reload_001", "1");
+fn docker_perf_cpu_time_001() {
+    common::run_script("docker_perf", "docker_perf_cpu_time_001", "1");
 }

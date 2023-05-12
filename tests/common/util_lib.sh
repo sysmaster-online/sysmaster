@@ -129,7 +129,7 @@ function run_sysmaster() {
 
     cp -arf "${work_dir}"/tmp_units/*.target ${SYSMST_LIB_PATH} || return 1
     if [ "${user}" = root ]; then
-        /usr/bin/init &> "${SYSMST_LOG}" &
+        RUST_BACKTRACE=full /usr/bin/init &> "${SYSMST_LOG}" &
     else
         chmod 777 /usr/bin/init
         chmod -R 777 /usr/lib/sysmaster /run
