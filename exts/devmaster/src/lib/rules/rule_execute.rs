@@ -27,6 +27,7 @@ use crate::{
         sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
     },
 };
+use basic::proc_cmdline::cmdline_get_item;
 use device::{Device, DeviceAction};
 use libc::mode_t;
 use std::{
@@ -1136,6 +1137,38 @@ impl ExecuteManager {
                         .lock()
                         .unwrap()
                         .add_property(token.value.clone(), val)
+                )?;
+
+                Ok(token.op == OperatorType::Match)
+            }
+            MatchImportCmdline => {
+                let s = cmdline_get_item(&token.value).map_err(|e| {
+                    log_rule_token_error!(token, e);
+                    Error::RulesExecuteError {
+                        msg: format!("Apply '{}' failed: {}", token.content, e),
+                        errno: Errno::EINVAL,
+                    }
+                })?;
+
+                if s.is_none() {
+                    return Ok(token.op == OperatorType::Nomatch);
+                }
+
+                let value = match s.as_ref().unwrap().split_once('=') {
+                    Some(ret) => ret.1,
+                    None => "",
+                };
+
+                execute_err!(
+                    token,
+                    device.as_ref().lock().unwrap().add_property(
+                        token.value.clone(),
+                        if value.is_empty() {
+                            "1".to_string()
+                        } else {
+                            value.to_string()
+                        }
+                    )
                 )?;
 
                 Ok(token.op == OperatorType::Match)
