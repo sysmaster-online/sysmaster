@@ -824,9 +824,12 @@ impl ExecuteManager {
 
                 Ok(token.pattern_match(&driver))
             }
-            MatchAttr | MatchParentsAttr => {
-                token.attr_match(device, self.current_unit.as_ref().unwrap())
-            }
+            MatchAttr | MatchParentsAttr => token
+                .attr_match(device, self.current_unit.as_ref().unwrap())
+                .map_err(|e| {
+                    log_rule_token_debug!(token, e);
+                    e
+                }),
             MatchTest => {
                 let mut val = match self
                     .current_unit
@@ -998,8 +1001,7 @@ impl ExecuteManager {
                 };
 
                 for line in result.split('\n') {
-                    let line = replace_chars(line.trim_end(), DEVMASTER_LEGAL_CHARS);
-                    match get_property_from_string(&line) {
+                    match get_property_from_string(line) {
                         Ok((key, value)) => {
                             execute_err!(
                                 token,

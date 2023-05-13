@@ -19,11 +19,13 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use confique::Config;
 use event::{EventState, Events};
 
-use crate::rules::{rule_load::DEFAULT_RULES_DIRS, ResolveNameTime, Rules};
+use crate::rules::{ResolveNameTime, Rules};
 
 use super::{
+    configure::{Conf, DEFAULT_CONFIG},
     control_manager::{ControlManager, CONTROL_MANAGER_LISTEN_ADDR},
     job_queue::JobQueue,
     uevent_monitor::UeventMonitor,
@@ -50,7 +52,12 @@ pub struct Devmaster {
 impl Devmaster {
     /// generate a devmaster object
     pub fn new(events: Rc<Events>) -> Rc<RefCell<Devmaster>> {
-        let rules = Rules::load_rules(&DEFAULT_RULES_DIRS, ResolveNameTime::Early);
+        let config = Conf::builder()
+            .file(DEFAULT_CONFIG)
+            .load()
+            .unwrap_or_default();
+
+        let rules = Rules::load_rules(config.rules_d, ResolveNameTime::Early);
 
         log::debug!("{}", rules.as_ref().read().unwrap());
 

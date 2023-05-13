@@ -1,0 +1,24 @@
+# Description: test MatchImportFile
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchImportFile Xiaoming Male 188': 'test MatchImportFile Xiaoming Male 188'
+KERNEL=="sda1", IMPORT{file}="/run/devmaster/test/properties.txt", PROGRAM="/bin/echo test MatchImportFile $env{PEOPLE} $env{GENDER} $env{HEIGHT}"
+
+# Description: test MatchImportProgram
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchImportProgram Xiaoming Male 188': 'test MatchImportProgram Xiaoming Male 188'
+KERNEL=="sda1", IMPORT{program}=="/bin/cat /run/devmaster/test/properties.txt", PROGRAM="/bin/echo test MatchImportProgram $env{PEOPLE} $env{GENDER} $env{HEIGHT}"
+
+# Description: test MatchImportBuiltin
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchImportBuiltin pci-0000:00:10.0 pci-0000_00_10_0': 'test MatchImportBuiltin pci-0000:00:10.0 pci-0000_00_10_0'
+KERNEL=="sda1", IMPORT{builtin}=="path_id $devpath", PROGRAM=="/bin/echo test MatchImportBuiltin $env{ID_PATH} $env{ID_PATH_TAG}"
+
+# Description: test MatchImportDb
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchImportDb ext4': 'test MatchImportDb ext4'
+KERNEL=="sda1", IMPORT{db}=="ID_FS_TYPE", PROGRAM=="/bin/echo test MatchImportDb $env{ID_FS_TYPE}"
+
+# Description: test previously imported properties
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test imported properties Xiaoming Male 188 ext4': 'test imported properties Xiaoming Male 188 ext4'
+KERNEL=="sda1", PROGRAM=="/bin/echo test imported properties $env{PEOPLE} $env{GENDER} $env{HEIGHT} $env{ID_FS_TYPE}"
