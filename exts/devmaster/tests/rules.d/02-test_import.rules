@@ -37,3 +37,14 @@ KERNEL=="sda1", IMPORT{cmdline}=="rhgb", PROGRAM=="/bin/echo test MatchImportCmd
 # Trigger: devctl trigger /dev/sda1
 # Expect: Capture stdout from command '/bin/echo test MatchImportCmdline 3': 'test MatchImportCmdline 3'
 KERNEL=="sda1", IMPORT{cmdline}!="none", PROGRAM=="/bin/echo test MatchImportCmdline 3"
+
+# Description: test MatchImportParent, import property from parent device
+# Trigger: follow the steps below
+#     1. create /etc/udev/rules.d/00-test.rules
+#     2. add rule to 00-test.rules: KERNEL=="sda", IMPORT{program}=="/bin/echo TEST_%M_%m=%N"
+#     3. reload udevd: udevadm control -R
+#     4. add property 'TEST_8_0=/dev/sda' to udev database: udevadm trigger /dev/sda
+#     5. run devmaster
+#     6: run cmd in shell: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchImportParent 1 /dev/sda': 'test MatchImportParent 1 /dev/sda'
+KERNEL=="sda1", IMPORT{parent}=="TEST_%M_[0-9]", PROGRAM=="/bin/echo test MatchImportParent 1 $env{TEST_8_0}"

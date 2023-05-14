@@ -1992,7 +1992,11 @@ impl Device {
         Ok(self.device_id.clone())
     }
 
-    /// prepare properties
+    /// prepare properties:
+    /// 1. read from uevent file
+    /// 2. read database
+    /// 3. if self devlinks are outdated, add to internal property
+    /// 4. if self tags are outdated ,add to internal property
     pub(crate) fn properties_prepare(&mut self) -> Result<(), Error> {
         self.read_uevent_file().map_err(|e| Error::Nix {
             msg: format!("properties_prepare failed: read_uevent_file ({})", e),
@@ -2313,6 +2317,31 @@ impl<'a> Iterator for DeviceTagIter<'a> {
     }
 }
 
+/// iterator over all properties of device object
+pub struct DevicePropertyIter<'a> {
+    device_property_iter: std::collections::hash_map::Iter<'a, String, String>,
+}
+
+impl Device {
+    /// return the tag iterator
+    pub fn property_iter_mut(&mut self) -> Result<DevicePropertyIter<'_>, Error> {
+        self.properties_prepare()?;
+
+        Ok(DevicePropertyIter {
+            device_property_iter: self.properties.iter(),
+        })
+    }
+}
+
+impl<'a> Iterator for DevicePropertyIter<'a> {
+    type Item = (&'a String, &'a String);
+
+    /// get the next tag
+    fn next(&mut self) -> Option<Self::Item> {
+        self.device_property_iter.next()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::BorrowMut;
@@ -2598,12 +2627,27 @@ mod tests {
     #[ignore]
     #[test]
     fn test_device_tag_iterator() {
-        // let mut dev = Device::from_path("/dev/sdb".to_string()).unwrap();
         let mut dev = Device::from_device_id("b8:1".to_string()).unwrap();
         println!("{}", dev.get_syspath().unwrap());
         dev.add_tag("test_tag".to_string(), true).unwrap();
         for tag in dev.tag_iter_mut() {
             println!("{}", tag);
+        }
+    }
+
+    /// test device property iterator
+    #[ignore]
+    #[test]
+    fn test_device_property_iterator() {
+        let mut dev = Device::from_path("/dev/sda".to_string()).unwrap();
+        let mut dev_clone = dev.shallow_clone().unwrap();
+
+        for (k, v) in dev_clone.properties.iter() {
+            println!("Shallow: {}={}", k, v);
+        }
+
+        for (k, v) in dev_clone.property_iter_mut().unwrap() {
+            println!("Prepared: {}={}", k, v);
         }
     }
 }
