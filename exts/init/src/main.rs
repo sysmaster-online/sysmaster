@@ -38,7 +38,10 @@ fn main() {
             }
             run_time.clear();
         }
-        Err(err) => eprintln!("Failed to new init{:?}", err),
+        Err(err) => eprintln!(
+            "Failed to new init, it may be necessary to run it as root :{:?}",
+            err
+        ),
     }
 
     // freeze, after RunTime::new fails or signal_fd or timer_fd generates epoll error.

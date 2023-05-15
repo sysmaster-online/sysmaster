@@ -77,7 +77,7 @@ pub(crate) fn dispatch<T>(cmd: CommandRequest, manager: Rc<T>) -> CommandRespons
 where
     T: ExecuterAction,
 {
-    println!("commandRequest :{cmd:?}");
+    // log::trace!("commandRequest :{cmd:?}");
     let call_back = |unit_name: &str| {
         // If users didn't specify the unit type, treat it as
 
@@ -88,15 +88,13 @@ where
         }
     };
 
-    let res = match cmd.request_data {
+    match cmd.request_data {
         Some(RequestData::Ucomm(param)) => param.execute(manager, Some(call_back)),
         Some(RequestData::Mcomm(param)) => param.execute(manager, None),
         Some(RequestData::Syscomm(param)) => param.execute(manager, Some(call_back)),
         Some(RequestData::Ufile(param)) => param.execute(manager, Some(call_back)),
         _ => CommandResponse::default(),
-    };
-    println!("CommandResponse :{res:?}");
-    res
+    }
 }
 
 fn new_line_break(s: &mut String) {
