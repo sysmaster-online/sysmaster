@@ -14,12 +14,12 @@
 //!
 
 use super::{
-    FormatSubstitutionType, OperatorType, RuleFile, RuleLine, RuleToken, Rules, SubstituteType,
-    TokenType::*,
+    EscapeType, FormatSubstitutionType, OperatorType, RuleFile, RuleLine, RuleToken, Rules,
+    SubstituteType, TokenType::*,
 };
 use crate::{
     builtin::{BuiltinCommand, BuiltinManager, Netlink},
-    error::{Error, Result},
+    error::*,
     log_rule_token_debug, log_rule_token_error,
     rules::FORMAT_SUBST_TABLE,
     utils::{
@@ -30,6 +30,7 @@ use crate::{
 use basic::proc_cmdline::cmdline_get_item;
 use device::{Device, DeviceAction};
 use libc::mode_t;
+use snafu::ResultExt;
 use std::{
     borrow::BorrowMut,
     cell::RefCell,
@@ -42,10 +43,7 @@ use std::{
 };
 
 use crate::device_trace;
-use crate::{
-    execute_err, execute_err_ignore_ENOENT, execute_none, subst_format_map_err_ignore,
-    subst_format_map_none,
-};
+use crate::{execute_err, execute_err_ignore_ENOENT, subst_format_map_err_ignore};
 use nix::errno::Errno;
 
 /// the process unit on device uevent
@@ -67,9 +65,9 @@ struct ExecuteUnit {
     builtin_run: u32,
     /// set mask bit to 1 if the builtin failed or returned false
     builtin_ret: u32,
-    // escape_type: RuleEscapeType,
-    // inotify_watch: bool,
-    // inotify_watch_final: bool,
+    escape_type: EscapeType,
+    watch: bool,
+    watch_final: bool,
     // group_final: bool,
     // owner_final: bool,
     // mode_final: bool,
@@ -99,8 +97,9 @@ impl ExecuteUnit {
             rtnl: RefCell::new(None),
             builtin_run: 0,
             builtin_ret: 0,
-            // inotify_watch: (),
-            // inotify_watch_final: (),
+            escape_type: EscapeType::Unset,
+            watch: false,
+            watch_final: false,
             // group_final: (),
             // owner_final: (),
             // mode_final: (),
@@ -204,9 +203,13 @@ impl ExecuteUnit {
                     String::default()
                 )
             }
-            FormatSubstitutionType::Kernel => {
-                subst_format_map_none!(device.get_sysname(), "kernel", String::default())
-            }
+            FormatSubstitutionType::Kernel => Ok(device
+                .get_sysname()
+                .unwrap_or_else(|_| {
+                    log::debug!("formatter 'kernel' got empty value.");
+                    ""
+                })
+                .to_string()),
             FormatSubstitutionType::KernelNumber => subst_format_map_err_ignore!(
                 device.get_sysnum(),
                 "number",
@@ -225,19 +228,30 @@ impl ExecuteUnit {
                     String::default()
                 )
             }
-            FormatSubstitutionType::Devpath => {
-                subst_format_map_none!(device.get_devpath(), "devpath", String::default())
-            }
+            FormatSubstitutionType::Devpath => Ok(device
+                .get_devpath()
+                .unwrap_or_else(|_| {
+                    log::debug!("formatter 'devpath' got empty value.");
+                    ""
+                })
+                .to_string()),
             FormatSubstitutionType::Id => {
                 if self.parent.is_none() {
                     return Ok(String::default());
                 }
 
-                subst_format_map_none!(
-                    self.parent.clone().unwrap().lock().unwrap().get_sysname(),
-                    "id",
-                    String::default()
-                )
+                Ok(self
+                    .parent
+                    .clone()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_sysname()
+                    .unwrap_or_else(|_| {
+                        log::debug!("formatter 'id' got empty value.");
+                        ""
+                    })
+                    .to_string())
             }
             FormatSubstitutionType::Major | FormatSubstitutionType::Minor => {
                 subst_format_map_err_ignore!(
@@ -328,7 +342,13 @@ impl ExecuteUnit {
                 } else if let Ok(devname) = device.get_devname() {
                     Ok(devname.trim_start_matches("/dev/").to_string())
                 } else {
-                    subst_format_map_none!(device.get_sysname(), "name", String::default())
+                    Ok(device
+                        .get_sysname()
+                        .unwrap_or_else(|_| {
+                            log::debug!("formatter 'name' got empty value.");
+                            ""
+                        })
+                        .to_string())
                 }
             }
             FormatSubstitutionType::Links => {
@@ -733,20 +753,20 @@ impl ExecuteManager {
                 Ok(token.pattern_match(&action.to_string()))
             }
             MatchDevpath => {
-                let devpath = execute_none!(
+                let devpath = execute_err!(
                     token,
-                    device.as_ref().lock().unwrap().borrow_mut().get_devpath(),
-                    "DEVPATH"
-                )?;
+                    device.as_ref().lock().unwrap().borrow_mut().get_devpath()
+                )?
+                .to_string();
 
                 Ok(token.pattern_match(&devpath))
             }
             MatchKernel | MatchParentsKernel => {
-                let sysname = execute_none!(
+                let sysname = execute_err!(
                     token,
-                    device.as_ref().lock().unwrap().borrow_mut().get_sysname(),
-                    "SYSNAME"
-                )?;
+                    device.as_ref().lock().unwrap().borrow_mut().get_sysname()
+                )?
+                .to_string();
 
                 Ok(token.pattern_match(&sysname))
             }
@@ -851,15 +871,13 @@ impl ExecuteManager {
                         Ok(v) => v,
                         Err(_) => {
                             // only throw out error when getting the syspath of device
-                            let syspath = execute_none!(
-                                token,
-                                device.as_ref().lock().unwrap().get_syspath(),
-                                "SYSPATH"
-                            )
-                            .map_err(|e| {
-                                log_rule_token_debug!(token, "failed to apply token.");
-                                e
-                            })?;
+                            let syspath =
+                                execute_err!(token, device.as_ref().lock().unwrap().get_syspath())
+                                    .map_err(|e| {
+                                        log_rule_token_debug!(token, "failed to apply token.");
+                                        e
+                                    })?
+                                    .to_string();
 
                             syspath + "/" + val.as_str()
                         }
@@ -1254,6 +1272,9 @@ impl ExecuteManager {
 
                 Ok(token.op == OperatorType::Match)
             }
+            MatchResult => {
+                Ok(token.pattern_match(&self.current_unit.as_ref().unwrap().program_result))
+            }
             MatchProgram => {
                 let cmd = match self
                     .current_unit
@@ -1292,6 +1313,37 @@ impl ExecuteManager {
                 self.current_unit.as_mut().unwrap().program_result = result;
 
                 Ok(token.op == OperatorType::Match)
+            }
+            AssignOptionsStringEscapeNone => {
+                self.current_unit.as_mut().unwrap().escape_type = EscapeType::None;
+                Ok(true)
+            }
+            AssignOptionsStringEscapeReplace => {
+                self.current_unit.as_mut().unwrap().escape_type = EscapeType::Replace;
+                Ok(true)
+            }
+            AssignOptionsDbPersist => {
+                device.as_ref().lock().unwrap().set_db_persist();
+                Ok(true)
+            }
+            AssignOptionsWatch => {
+                if self.current_unit.as_ref().unwrap().watch_final {
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().watch_final = true;
+                }
+
+                // token.value is either "0" or "1"
+                self.current_unit.as_mut().unwrap().watch =
+                    token.value.parse::<bool>().context(ParseBoolSnafu)?;
+                Ok(true)
+            }
+            AssignOptionsDevlinkPriority => {
+                let r = token.value.parse::<i32>().context(ParseIntSnafu)?;
+                device.as_ref().lock().unwrap().set_devlink_priority(r);
+                Ok(true)
             }
             AssignDevlink => {
                 todo!()

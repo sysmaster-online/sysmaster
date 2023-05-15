@@ -12,7 +12,7 @@
 
 //! enumerate /sys to collect devices
 //!
-use crate::{device::Device, error::Error, utils::*};
+use crate::{device::Device, err_wrapper, error::Error, utils::*};
 use bitflags::bitflags;
 use nix::errno::Errno;
 use std::{
@@ -305,15 +305,7 @@ impl DeviceEnumerator {
 
     /// add match parent
     pub fn add_match_parent_incremental(&mut self, parent: &Device) -> Result<(), Error> {
-        let syspath = match parent.get_syspath() {
-            Some(path) => path,
-            None => {
-                return Err(Error::Nix {
-                    msg: "add_match_parent_incremental failed: get_syspath".to_string(),
-                    source: Errno::EINVAL,
-                })
-            }
-        };
+        let syspath = err_wrapper!(parent.get_syspath(), "add_match_parent_incremental")?;
         self.match_parent.insert(syspath.to_string());
         self.scan_up_to_date = false;
         Ok(())
@@ -390,16 +382,7 @@ impl DeviceEnumerator {
                 // avoid get repeated devices from the hashmap later
                 for device in devices.iter().skip(m) {
                     let binding = device.lock().unwrap();
-                    let syspath = match binding.get_syspath() {
-                        Some(path) => path,
-                        None => {
-                            return Err(Error::Nix {
-                                msg: "sort_devices failed: encounter device with empty syspath"
-                                    .to_string(),
-                                source: Errno::EINVAL,
-                            })
-                        }
-                    };
+                    let syspath = err_wrapper!(binding.get_syspath(), "sort_devices")?;
 
                     self.devices_by_syspath.remove(syspath);
                 }
@@ -452,15 +435,7 @@ impl DeviceEnumerator {
     /// add device
     pub(crate) fn add_device(&mut self, device: Arc<Mutex<Device>>) -> Result<bool, Error> {
         let mut binding = device.lock().unwrap();
-        let syspath = match binding.borrow_mut().get_syspath() {
-            Some(path) => path,
-            None => {
-                return Err(Error::Nix {
-                    msg: "add_device failed: device should have available syspath".to_string(),
-                    source: Errno::EINVAL,
-                });
-            }
-        };
+        let syspath = err_wrapper!(binding.borrow_mut().get_syspath(), "add_device")?;
 
         match self
             .devices_by_syspath

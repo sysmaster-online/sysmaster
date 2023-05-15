@@ -267,8 +267,8 @@ impl PathId {
 
     fn hanlde_scsi_tape(&self, dev: Arc<Mutex<Device>>, path: &mut String) {
         let name = match dev.lock().unwrap().get_sysname() {
-            Some(name) => String::from(name),
-            None => return,
+            Ok(name) => String::from(name),
+            Err(_) => return,
         };
 
         if "nst" == name || "st" == name {
@@ -304,8 +304,8 @@ impl PathId {
         }
 
         let name = match parent.lock().unwrap().get_syspath() {
-            Some(name) => String::from(name),
-            None => return None,
+            Ok(name) => String::from(name),
+            Err(_) => return None,
         };
 
         if name == "/rport-" {
@@ -349,8 +349,8 @@ impl PathId {
             Err(_) => return None,
         };
         let sysname = match targetdev.lock().unwrap().get_sysname() {
-            Some(sysname) => String::from(sysname),
-            None => return None,
+            Ok(sysname) => String::from(sysname),
+            Err(_) => return None,
         };
         let mut fcdev = match Device::from_subsystem_sysname("fc_transport".to_string(), sysname) {
             Ok(dev) => dev,
@@ -386,8 +386,8 @@ impl PathId {
             Err(_) => return None,
         };
         let sysname = match target_parent.lock().unwrap().get_sysname() {
-            Some(sysname) => String::from(sysname),
-            None => return None,
+            Ok(sysname) => String::from(sysname),
+            Err(_) => return None,
         };
         let mut asadev = match Device::from_subsystem_sysname("sas_device".to_string(), sysname) {
             Ok(dev) => dev,
@@ -420,8 +420,8 @@ impl PathId {
                 Err(_) => return None,
             };
             sysname = match transportdev.lock().unwrap().get_sysname() {
-                Some(name) => String::from(name),
-                None => return None,
+                Ok(name) => String::from(name),
+                Err(_) => return None,
             };
             if sysname.starts_with("session") {
                 break;
@@ -476,8 +476,8 @@ impl PathId {
         compat_path: &mut String,
     ) -> Option<Arc<Mutex<Device>>> {
         let sysname = match parent.lock().unwrap().get_sysname() {
-            Some(name) => String::from(name),
-            None => return None,
+            Ok(name) => String::from(name),
+            Err(_) => return None,
         };
         let mut host: u32 = 0;
         let mut bus: u32 = 0;
@@ -514,8 +514,8 @@ impl PathId {
         };
 
         let sysname = match target_parent.lock().unwrap().get_sysname() {
-            Some(name) => String::from(name),
-            None => return None,
+            Ok(name) => String::from(name),
+            Err(_) => return None,
         };
 
         let mut atadev = match Device::from_subsystem_sysname("ata_port".to_string(), sysname) {
@@ -601,8 +601,8 @@ impl PathId {
             Err(_) => return None,
         };
         let name = match parent.lock().unwrap().get_sysname() {
-            Some(name) => String::from(name),
-            None => return None,
+            Ok(name) => String::from(name),
+            Err(_) => return None,
         };
 
         let mut host: i32 = 0;
@@ -643,8 +643,8 @@ impl PathId {
          * get into the way of this "I hope it works" logic.
          */
         let base = match hostdev.lock().unwrap().get_syspath() {
-            Some(base) => String::from(base),
-            None => return None,
+            Ok(base) => String::from(base),
+            Err(_) => return None,
         };
         let pos = match base.rfind('/') {
             Some(n) => n,
@@ -740,8 +740,8 @@ impl PathId {
         path: &mut String,
     ) -> Option<Arc<Mutex<Device>>> {
         let name = match parent.lock().unwrap().get_sysname() {
-            Some(s) => String::from(s),
-            None => return None,
+            Ok(s) => String::from(s),
+            Err(_) => return None,
         };
         let mut controller: u32 = 0;
         let mut disk: u32 = 0;
@@ -778,8 +778,8 @@ impl PathId {
         }
 
         let sysname = match parent.lock().unwrap().get_sysname() {
-            Some(sysname) => String::from(sysname),
-            None => return Some(parent.clone()),
+            Ok(sysname) => String::from(sysname),
+            Err(_) => return Some(parent.clone()),
         };
 
         let pos = match sysname.find('-') {
@@ -798,8 +798,8 @@ impl PathId {
         path: &mut String,
     ) -> Option<Arc<Mutex<Device>>> {
         let sysname = match parent.lock().unwrap().get_sysname() {
-            Some(sysname) => String::from(sysname),
-            None => return None,
+            Ok(sysname) => String::from(sysname),
+            Err(_) => return None,
         };
 
         let mut core: u32 = 0;
@@ -857,7 +857,7 @@ impl PathId {
         let func = parent.lock().unwrap().get_sysattr_value("ap_functions");
         if systype.is_ok() && func.is_ok() {
             self.path_prepend(path, format!("ap-{}-{}", systype.unwrap(), func.unwrap()));
-        } else if let Some(sysname) = parent.lock().unwrap().get_sysname() {
+        } else if let Ok(sysname) = parent.lock().unwrap().get_sysname() {
             self.path_prepend(path, format!("ap-{}", sysname));
         }
 
@@ -936,8 +936,8 @@ impl PathId {
          *   /sys/devices/pci0000:00/0000:00:1c.4/0000:3c:00.0/nvme/nvme0 */
 
         let sysname = match dev.lock().unwrap().get_sysname() {
-            Some(name) => String::from(name),
-            None => {
+            Ok(name) => String::from(name),
+            Err(_) => {
                 return Err(Error::BuiltinCommandError {
                     msg: "Failed to get_sysname".to_string(),
                 })

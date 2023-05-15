@@ -77,3 +77,8 @@ KERNEL == "sda1", PROGRAM=="sh -c 'sleep 4; echo test program 4'"
 # Trigger: devctl trigger /dev/sda1
 # Expect: Capture stdout from command 'scsi_id --export --whitelisted -d /dev/sda1': 'ID_SCSI=1 ID_VENDOR=VMware_ ID_VENDOR_ENC=VMware\x2c\x20 ID_MODEL=VMware_Virtual_S ID_MODEL_ENC=VMware\x20Virtual\x20S ID_REVISION=1.0 ID_TYPE=disk'
 KERNEL == "sda1", PROGRAM=="scsi_id --export --whitelisted -d $devnode"
+
+# Description: test MatchResult
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchResult': 'test MatchResult'
+KERNEL == "sda1", PROGRAM=="/bin/echo MatchResultFlag", RESULT=="MatchResultFlag", PROGRAM=="/bin/echo test MatchResult"

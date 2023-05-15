@@ -23,44 +23,23 @@ pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 #[allow(missing_docs)]
 pub enum Error {
     /// Error from device
-    #[snafu(context)]
+    #[snafu(display("Device error: {}", source))]
     Device { source: device::error::Error },
-
-    #[snafu(display("filename: {}, error: {}", filename, source))]
+    #[snafu(display("Failed to IO on '{}': {:?}", filename, source))]
     Io {
         filename: String,
         source: std::io::Error,
     },
-
     #[snafu(context)]
     ReadTooShort { filename: String },
-
-    #[snafu(display("Fail to access : {}, error: {}", filename, source))]
-    FailToAccess {
-        filename: String,
-        source: device::error::Error,
-    },
-
-    #[snafu(display("Fail to get devtype : {}", source))]
-    FailToGetDevType { source: device::error::Error },
-
-    #[snafu(display("Fail to get sysattr : {}", source))]
-    GetSysAttr { source: device::error::Error },
-
-    #[snafu(display("Fail to sscanf : {}", source))]
-    FailToSscanf { source: sscanf::Error },
-
-    #[snafu(display("Fail to get sysattr : {}", source))]
+    #[snafu(display("Failed to sscanf: {}", source))]
+    Sscanf { source: sscanf::Error },
+    #[snafu(display("Failed to parse integer: {}", source))]
     ParseInt { source: std::num::ParseIntError },
-
-    #[snafu(context)]
-    CorruptData { filename: String },
-
-    #[snafu(display("sys_path not found"))]
-    SysPathNotFound,
-
-    #[snafu(display("sys_name not found"))]
-    SysNameNotFound,
+    #[snafu(display("Failed to parse float: {}", source))]
+    ParseFloat { source: std::num::ParseFloatError },
+    #[snafu(display("Failed to parse boolean: {}", source))]
+    ParseBool { source: std::str::ParseBoolError },
 
     /// Error in worker manager
     #[snafu(display("Worker Manager: {}", msg))]

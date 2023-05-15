@@ -1226,7 +1226,7 @@ impl RuleToken {
                         content,
                     ))?,
                     "watch" => Ok(RuleToken::new(
-                        TokenType::AssignOptionsInotifyWatch,
+                        TokenType::AssignOptionsWatch,
                         op,
                         None,
                         "1".to_string(),
@@ -1235,7 +1235,7 @@ impl RuleToken {
                         content,
                     ))?,
                     "nowatch" => Ok(RuleToken::new(
-                        TokenType::AssignOptionsInotifyWatch,
+                        TokenType::AssignOptionsWatch,
                         op,
                         None,
                         "0".to_string(),
