@@ -23,7 +23,7 @@ pub struct ManagerConfig {
     #[config(default = 90)]
     pub DefaultTimeoutSec: u64,
 
-    #[config(default = "debug")]
+    #[config(default = "info")]
     pub LogLevel: log::LevelFilter,
     #[config(default = "console")]
     pub LogTarget: String,

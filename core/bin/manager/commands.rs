@@ -56,16 +56,19 @@ where
     }
 
     fn dispatch(&self, _e: &Events) -> i32 {
-        println!("Dispatching Command!");
+        log::trace!("Dispatching Command!");
 
         self.reli.set_last_frame1(ReliLastFrame::CmdOp as u32);
         match self.fd.incoming().next() {
-            None => println!("None CommandRequest!"),
+            None => log::info!("None CommandRequest!"),
             Some(stream) => {
-                println!("{stream:?}");
+                log::trace!("{stream:?}");
                 if let Ok(s) = stream {
                     let dispatch = ProstServerStream::new(s, self.command_action.clone());
-                    dispatch.process().unwrap();
+                    match dispatch.process() {
+                        Ok(_) => (),
+                        Err(e) => log::error!("Commands failed: {:?}", e),
+                    }
                 }
             }
         }

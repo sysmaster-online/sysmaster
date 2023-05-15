@@ -240,7 +240,7 @@ impl UnitRTData {
     }
 
     pub(self) fn dispatch_load_queue(&self) {
-        log::debug!("dispatch load queue");
+        log::trace!("dispatch load queue");
 
         self.reli
             .set_last_frame2(ReliLastFrame::Queue as u32, ReliLastQue::Load as u32);
@@ -272,7 +272,7 @@ impl UnitRTData {
         }
         self.reli.clear_last_frame();
 
-        log::debug!("dispatch target dep queue");
+        log::trace!("dispatch target dep queue");
         self.reli
             .set_last_frame2(ReliLastFrame::Queue as u32, ReliLastQue::TargetDeps as u32);
         self.dispatch_target_dep_queue();
