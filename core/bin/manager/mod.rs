@@ -45,6 +45,7 @@ use sysmaster::rel::{ReliLastFrame, Reliability};
 use alive_timer::AliveTimer;
 
 use self::config::ManagerConfig;
+use self::signals::EVENT_SIGNALS;
 
 /// maximal size of process's arguments
 pub const MANAGER_ARGS_SIZE_MAX: usize = 5; // 6 - 1
@@ -64,7 +65,10 @@ impl SignalMgr {
 
 impl SignalDispatcher for SignalMgr {
     fn dispatch_signal(&self, signal: &libc::signalfd_siginfo) -> Result<i32> {
-        /* Received signal should be in the set defined in SignalDispatcher::signals */
+        /* Received signal should be in the set defined in EVENT_SIGNALS */
+        if !EVENT_SIGNALS.contains(&(signal.ssi_signo as libc::c_int)) {
+            return Ok(1);
+        }
         match signal.ssi_signo as libc::c_int {
             libc::SIGHUP | libc::SIGTERM => self.reexec(),
             libc::SIGCHLD => Ok(self.um.child_sigchld_enable(true)),

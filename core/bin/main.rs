@@ -41,6 +41,7 @@ use basic::process_util;
 use clap::Parser;
 use libc::{c_int, getppid, prctl, PR_SET_CHILD_SUBREAPER};
 use log::{self};
+use manager::signals::EVENT_SIGNALS;
 use nix::sys::resource::{self, Resource};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use std::convert::TryFrom;
@@ -349,6 +350,10 @@ fn ignore_all_signals() {
     /* nix::sys::signal::Signal doesn't support SIGRTMAX, use libc. */
     for sig in 1..libc::SIGRTMAX() + 1 {
         if [libc::SIGKILL, libc::SIGSTOP].contains(&sig) {
+            continue;
+        }
+        /* These signals will be dispatched by event. */
+        if EVENT_SIGNALS.contains(&sig) {
             continue;
         }
         let mut sig_action: libc::sigaction = unsafe { std::mem::zeroed() };

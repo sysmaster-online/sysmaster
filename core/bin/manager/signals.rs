@@ -15,6 +15,9 @@ use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::rel::{ReliLastFrame, Reliability};
 
+pub(crate) const EVENT_SIGNALS: [i32; 4] =
+    [libc::SIGCHLD, libc::SIGTERM, libc::SIGINT, libc::SIGHUP];
+
 pub(super) struct Signals<T> {
     // associated objects
     reli: Rc<Reliability>,
@@ -40,8 +43,7 @@ impl<T: SignalDispatcher> Source for Signals<T> {
     }
 
     fn signals(&self) -> Vec<libc::c_int> {
-        /* SIGSEGV/SIGBUS... should be dispatched in crash_handlers */
-        vec![libc::SIGCHLD, libc::SIGTERM, libc::SIGINT, libc::SIGHUP]
+        Vec::from(EVENT_SIGNALS)
     }
 
     fn epoll_event(&self) -> u32 {
