@@ -15,7 +15,7 @@ done
 rpm -qi gcc openssl-libs python3-pip musl-gcc > /dev/null 2>&1
 if [ $? -ne 0 ]; then
 sudo sed -i "s:repo.openeuler.org:repo.huaweicloud.com/openeuler:g" /etc/yum.repos.d/*.repo
-sudo yum install --refresh --disablerepo OS --disablerepo EPOL --disablerepo source --disablerepo update --disablerepo EPOL-UPDATE --disablerepo debuginfo  -y gcc openssl-libs python3-pip musl-gcc clang util-linux-devel
+sudo yum install --refresh --disablerepo OS --disablerepo EPOL --disablerepo source --disablerepo update --disablerepo EPOL-UPDATE --disablerepo debuginfo  -y gcc openssl-libs python3-pip musl-gcc
 if [ $? -ne 0 ]; then
     exit 1
 fi
