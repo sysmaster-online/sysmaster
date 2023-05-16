@@ -824,7 +824,7 @@ mod tests {
         let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
         let rentry = Rc::new(JobRe::new(&reli));
         let unit_test1 = prepare_unit(&reli);
-        let mut id: u32 = 0;
+        let mut id: u128 = 0;
         id = id.wrapping_add(1); // ++
         let kind = JobKind::Start;
         let job = Rc::new(Job::new(
@@ -1253,7 +1253,7 @@ mod tests {
         mode: JobMode,
     ) -> (Rc<Job>, Rc<Job>, Rc<Job>, Rc<Job>, Rc<Job>) {
         let rentry = Rc::new(JobRe::new(relir));
-        let mut id: u32 = 0;
+        let mut id: u128 = 0;
 
         id = id.wrapping_add(1); // ++
         let kind = JobKind::Nop;

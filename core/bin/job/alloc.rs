@@ -15,7 +15,6 @@ use super::rentry::{JobKind, JobRe};
 use crate::unit::{DataManager, UnitX};
 use event::Events;
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::rc::Rc;
 use sysmaster::rel::Reliability;
 
@@ -66,24 +65,17 @@ impl JobAlloc {
 
 #[derive(Debug)]
 struct JobAllocData {
-    // data
-    ids: HashSet<u32>,
-
     // status
-    last_id: u32,
+    last_id: u128,
 }
 
 // the declaration "pub(self)" is for identification only.
 impl JobAllocData {
     pub(self) fn new() -> JobAllocData {
-        JobAllocData {
-            ids: HashSet::new(),
-            last_id: 0,
-        }
+        JobAllocData { last_id: 0 }
     }
 
     pub(self) fn clear(&mut self) {
-        self.ids.clear();
         self.last_id = 0;
     }
 
@@ -110,16 +102,9 @@ impl JobAllocData {
         job
     }
 
-    fn alloc_id(&mut self) -> u32 {
-        loop {
-            let (id, _) = self.last_id.overflowing_add(1); // ++
-            self.last_id = id;
-            if !self.ids.insert(id) {
-                // the 'id' has been allocated
-                continue; // try next ++
-            }
-
-            return id;
-        }
+    fn alloc_id(&mut self) -> u128 {
+        let id = self.last_id;
+        self.last_id += 1;
+        id
     }
 }

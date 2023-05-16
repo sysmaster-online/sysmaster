@@ -188,14 +188,14 @@ impl JobManager {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn remove(&self, id: u32) -> Result<()> {
+    pub(crate) fn remove(&self, id: u128) -> Result<()> {
         self.data.remove(id)?;
         self.try_enable();
         Ok(())
     }
 
     #[allow(dead_code)]
-    pub(crate) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
+    pub(crate) fn get_jobinfo(&self, id: u128) -> Option<JobInfo> {
         self.data.get_jobinfo(id)
     }
 
@@ -505,7 +505,7 @@ impl JobManagerData {
     }
 
     #[allow(dead_code)]
-    pub(self) fn remove(&self, id: u32) -> Result<()> {
+    pub(self) fn remove(&self, id: u128) -> Result<()> {
         assert!(!*self.running.borrow());
 
         let jinfo = self.jobs.get(id);
@@ -534,7 +534,7 @@ impl JobManagerData {
     }
 
     #[allow(dead_code)]
-    pub(self) fn get_jobinfo(&self, id: u32) -> Option<JobInfo> {
+    pub(self) fn get_jobinfo(&self, id: u128) -> Option<JobInfo> {
         self.jobs.get(id)
     }
 

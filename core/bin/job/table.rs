@@ -26,8 +26,8 @@ pub(super) struct JobTable {
 
     // owned objects
     // key: job-id | unit, value: job
-    t_id: RefCell<HashMap<u32, Rc<Job>>>, // guarantee the uniqueness of job-id
-    t_unit: RefCell<JobUnitTable>,        // the running time of job is organized by unit
+    t_id: RefCell<HashMap<u128, Rc<Job>>>, // guarantee the uniqueness of job-id
+    t_unit: RefCell<JobUnitTable>,         // the running time of job is organized by unit
 }
 
 impl JobTable {
@@ -251,7 +251,7 @@ impl JobTable {
         self.t_unit.borrow().ready_len()
     }
 
-    pub(super) fn get(&self, id: u32) -> Option<JobInfo> {
+    pub(super) fn get(&self, id: u128) -> Option<JobInfo> {
         self.t_id.borrow().get(&id).map(|job| JobInfo::map(job))
     }
 
@@ -278,7 +278,7 @@ impl JobTable {
         self.t_unit.borrow().is_unit_empty(unit)
     }
 
-    pub(super) fn is_trigger(&self, id: u32) -> bool {
+    pub(super) fn is_trigger(&self, id: u128) -> bool {
         if let Some(job_info) = self.get(id) {
             if let Some((t_info, _)) = self.get_trigger_info(&job_info.unit) {
                 return t_info.id == job_info.id;
@@ -288,7 +288,7 @@ impl JobTable {
     }
 
     #[allow(dead_code)]
-    pub(super) fn is_suspend(&self, id: u32) -> bool {
+    pub(super) fn is_suspend(&self, id: u128) -> bool {
         if let Some(job_info) = self.get(id) {
             if let Some(s_info) = self.get_suspend(&job_info.unit, job_info.kind) {
                 return s_info.id == job_info.id;
