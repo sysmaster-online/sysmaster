@@ -457,7 +457,7 @@ mod tests {
         let (reli, _, unit_test1) = prepare_unit_single();
         let rentry = Rc::new(JobRe::new(&reli));
         let stat = JobStat::new();
-        let mut id: u32 = 0;
+        let mut id: u128 = 0;
         id = id.wrapping_add(1); // ++
         let kind = JobKind::Start;
         let job = Rc::new(Job::new(

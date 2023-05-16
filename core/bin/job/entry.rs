@@ -154,7 +154,7 @@ impl Source for JobTimer {
 
 #[derive(Clone)]
 pub(crate) struct JobInfo {
-    pub(crate) id: u32,
+    pub(crate) id: u128,
     pub(crate) unit: Rc<UnitX>,
     pub(crate) kind: JobKind,
     pub(crate) attr: JobAttr,
@@ -197,7 +197,7 @@ pub(super) struct Job {
 
     // owned objects
     // key: input
-    id: u32,
+    id: u128,
     timer: Rc<JobTimer>,
 
     // data
@@ -240,7 +240,7 @@ impl Job {
         rentryr: &Rc<JobRe>,
         eventsr: &Rc<Events>,
         dmr: &Rc<DataManager>,
-        id: u32,
+        id: u128,
         unit: Rc<UnitX>,
         kind: JobKind,
     ) -> Job {
@@ -426,7 +426,7 @@ impl Job {
         self.attr.borrow().clone()
     }
 
-    pub(super) fn get_id(&self) -> u32 {
+    pub(super) fn get_id(&self) -> u128 {
         self.id
     }
 
