@@ -45,7 +45,11 @@ impl ReliHistory {
     pub fn new(dir_str: &str, max: u32) -> ReliHistory {
         // init environment
         let path = Path::new(dir_str).join(RELI_HISTORY_DIR);
-        let env = EnvOpenOptions::new().max_dbs(max).open(path).unwrap();
+        let env = EnvOpenOptions::new()
+            .map_size(10 * 1024 * 1024)
+            .max_dbs(max)
+            .open(path)
+            .unwrap();
 
         // return
         ReliHistory {
