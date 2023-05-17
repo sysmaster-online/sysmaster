@@ -52,8 +52,8 @@ where
 
     pub fn clear(&mut self) {
         // clear all, including data and subscribers
+        self.data_clear();
         self.subscribers.clear();
-        self.data.clear();
     }
 
     pub fn insert(&mut self, k: K, v: V) -> Option<V> {

@@ -24,7 +24,7 @@ use sysmaster::rel::Reliability;
 use sysmaster::unit::{UmIf, UnitBase};
 
 pub(crate) struct SocketUnitComm {
-    owner: RefCell<Option<Rc<dyn UnitBase>>>,
+    owner: RefCell<Option<Weak<dyn UnitBase>>>,
     umcomm: Arc<SocketUmComm>,
 }
 
@@ -37,7 +37,7 @@ impl SocketUnitComm {
     }
 
     pub(super) fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
-        self.owner.replace(Some(unit));
+        self.owner.replace(Some(Rc::downgrade(&unit)));
     }
 
     pub(super) fn attach_um(&self, um: Rc<dyn UmIf>) {
@@ -50,7 +50,7 @@ impl SocketUnitComm {
 
     pub(super) fn owner(&self) -> Option<Rc<dyn UnitBase>> {
         if let Some(ref unit) = *self.owner.borrow() {
-            Some(Rc::clone(unit))
+            unit.upgrade()
         } else {
             None
         }

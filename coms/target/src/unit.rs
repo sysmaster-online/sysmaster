@@ -20,7 +20,6 @@ use super::comm::TargetUnitComm;
 use super::mng::TargetMng;
 use basic::logger;
 use nix::sys::wait::WaitStatus;
-use std::cell::RefCell;
 use std::{path::PathBuf, rc::Rc};
 use sysmaster::error::*;
 use sysmaster::rel::{ReStation, Reliability};
@@ -31,7 +30,6 @@ use sysmaster::unit::{
 };
 
 struct Target {
-    owner: RefCell<Option<Rc<dyn UnitBase>>>,
     um: Rc<dyn UmIf>,
     comm: Rc<TargetUnitComm>,
     mng: Rc<TargetMng>,
@@ -65,7 +63,6 @@ impl Target {
     fn new(um_if: Rc<dyn UmIf>) -> Target {
         let _comm = Rc::new(TargetUnitComm::new());
         Target {
-            owner: RefCell::new(None),
             um: Rc::clone(&um_if),
             comm: Rc::clone(&_comm),
             mng: Rc::new(TargetMng::new(&_comm)),
@@ -73,7 +70,7 @@ impl Target {
     }
 
     pub(self) fn owner(&self) -> Option<Rc<dyn UnitBase>> {
-        if let Some(ref unit) = *self.owner.borrow() {
+        if let Some(ref unit) = self.comm.owner() {
             Some(Rc::clone(unit))
         } else {
             None
@@ -140,7 +137,6 @@ impl SubUnit for Target {
 
     fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
         self.comm.attach_unit(Rc::clone(&unit));
-        self.owner.replace(Some(unit));
         self.db_insert();
     }
 
