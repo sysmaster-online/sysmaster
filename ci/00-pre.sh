@@ -43,11 +43,13 @@ source ~/.bashrc
 cargo -v
 if [ $? -ne 0 ]; then
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustlang.sh
-sh rustlang.sh -y
+sh rustlang.sh -y --default-toolchain none
 rm -rf rustlang.sh
 fi
 
 source ~/.bashrc
+
+rustup default 1.64
 
 ##Fix cargo clippy timeout : replace cargo crates with ustc
 arch=`uname -m`
