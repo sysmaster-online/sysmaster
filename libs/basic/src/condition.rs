@@ -309,7 +309,7 @@ impl Condition {
             }
             Ok(v) => v,
         };
-        let fd = std::os::fd::AsRawFd::as_raw_fd(&file);
+        let fd = std::os::unix::prelude::AsRawFd::as_raw_fd(&file);
         let path_name = CString::new(self.params.as_str()).unwrap();
         let mut statxbuf: statx = unsafe { std::mem::zeroed() };
         unsafe {

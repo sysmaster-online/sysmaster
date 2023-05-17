@@ -72,7 +72,8 @@ overflow-checks = true # 使用溢出检查进行整数运算。
 # `cargo test --release`,  包括本地 library 或 binary).
 [profile.release]
 opt-level = 'z'
-strip = true
+# for generating debuginfo
+strip = false
 debug = false
 rpath = false
 lto = false
