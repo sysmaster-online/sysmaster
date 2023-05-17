@@ -80,5 +80,10 @@ KERNEL == "sda1", PROGRAM=="scsi_id --export --whitelisted -d $devnode"
 
 # Description: test MatchResult
 # Trigger: devctl trigger /dev/sda1
-# Expect: Capture stdout from command '/bin/echo test MatchResult': 'test MatchResult'
-KERNEL == "sda1", PROGRAM=="/bin/echo MatchResultFlag", RESULT=="MatchResultFlag", PROGRAM=="/bin/echo test MatchResult"
+# Expect: Capture stdout from command '/bin/echo test MatchResult 1': 'test MatchResult 1'
+KERNEL == "sda1", PROGRAM=="/bin/echo MatchResultFlag", RESULT=="MatchResultFlag", PROGRAM=="/bin/echo test MatchResult 1"
+
+# Description: test MatchResult, pattern match
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchResult 2': 'test MatchResult 2'
+KERNEL == "sda1", PROGRAM=="/bin/echo MatchResultFlag", RESULT=="MatchResult*", PROGRAM=="/bin/echo test MatchResult 2"

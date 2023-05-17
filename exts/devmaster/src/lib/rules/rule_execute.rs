@@ -27,9 +27,9 @@ use crate::{
         sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
     },
 };
-use basic::proc_cmdline::cmdline_get_item;
+use basic::{proc_cmdline::cmdline_get_item, user_group_util::get_user_creds};
 use device::{Device, DeviceAction};
-use libc::mode_t;
+use libc::{mode_t, uid_t};
 use snafu::ResultExt;
 use std::{
     borrow::BorrowMut,
@@ -45,6 +45,7 @@ use std::{
 use crate::device_trace;
 use crate::{execute_err, execute_err_ignore_ENOENT, subst_format_map_err_ignore};
 use nix::errno::Errno;
+use nix::unistd::{Gid, Uid};
 
 /// the process unit on device uevent
 #[allow(missing_docs, dead_code)]
@@ -55,8 +56,8 @@ struct ExecuteUnit {
     name: String,
     program_result: String,
     // mode: mode_t,
-    // uid: uid_t,
-    // gid: gid_t,
+    uid: Option<Uid>,
+    gid: Option<Gid>,
     // seclabel_list: HashMap<String, String>,
     // run_list: HashMap<String, String>,
     // exec_delay_usec: useconds_t,
@@ -68,8 +69,8 @@ struct ExecuteUnit {
     escape_type: EscapeType,
     watch: bool,
     watch_final: bool,
-    // group_final: bool,
-    // owner_final: bool,
+    group_final: bool,
+    owner_final: bool,
     // mode_final: bool,
     // name_final: bool,
     // devlink_final: bool,
@@ -88,8 +89,8 @@ impl ExecuteUnit {
             name: String::default(),
             program_result: String::default(),
             // mode: (),
-            // uid: (),
-            // gid: (),
+            uid: None,
+            gid: None,
             // seclabel_list: (),
             // run_list: (),
             // exec_delay_usec: (),
@@ -100,8 +101,8 @@ impl ExecuteUnit {
             escape_type: EscapeType::Unset,
             watch: false,
             watch_final: false,
-            // group_final: (),
-            // owner_final: (),
+            group_final: false,
+            owner_final: false,
             // mode_final: (),
             // name_final: (),
             // devlink_final: (),
@@ -1316,18 +1317,34 @@ impl ExecuteManager {
             }
             AssignOptionsStringEscapeNone => {
                 self.current_unit.as_mut().unwrap().escape_type = EscapeType::None;
+                log_rule_token_debug!(token, "set string escape to 'none'");
                 Ok(true)
             }
             AssignOptionsStringEscapeReplace => {
                 self.current_unit.as_mut().unwrap().escape_type = EscapeType::Replace;
+                log_rule_token_debug!(token, "set string escape to 'replace'");
                 Ok(true)
             }
             AssignOptionsDbPersist => {
                 device.as_ref().lock().unwrap().set_db_persist();
+                log_rule_token_debug!(
+                    token,
+                    format!(
+                        "set db '{}' to persistence",
+                        execute_err!(token, device.as_ref().lock().unwrap().get_device_id())?
+                    )
+                );
                 Ok(true)
             }
             AssignOptionsWatch => {
                 if self.current_unit.as_ref().unwrap().watch_final {
+                    log_rule_token_debug!(
+                        token,
+                        format!(
+                            "watch is fixed to '{}'",
+                            self.current_unit.as_mut().unwrap().watch
+                        )
+                    );
                     return Ok(true);
                 }
 
@@ -1335,14 +1352,79 @@ impl ExecuteManager {
                     self.current_unit.as_mut().unwrap().watch_final = true;
                 }
 
-                // token.value is either "0" or "1"
+                // token.value is either "true" or "false"
                 self.current_unit.as_mut().unwrap().watch =
-                    token.value.parse::<bool>().context(ParseBoolSnafu)?;
+                    execute_err!(token, token.value.parse::<bool>().context(ParseBoolSnafu))?;
+
+                log_rule_token_debug!(token, format!("set watch to '{}'", token.value));
+
                 Ok(true)
             }
             AssignOptionsDevlinkPriority => {
-                let r = token.value.parse::<i32>().context(ParseIntSnafu)?;
+                let r = execute_err!(token, token.value.parse::<i32>().context(ParseIntSnafu))?;
                 device.as_ref().lock().unwrap().set_devlink_priority(r);
+                log_rule_token_debug!(token, format!("set devlink priority to '{}'", r));
+                Ok(true)
+            }
+            AssignOptionsLogLevel => {
+                todo!()
+            }
+            AssignOwner => {
+                if self.current_unit.as_ref().unwrap().owner_final {
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().owner_final = true;
+                }
+
+                let owner = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log_rule_token_error!(token, format!("failed to apply formatter: ({})", e));
+                        return Ok(false);
+                    }
+                };
+
+                match get_user_creds(&owner) {
+                    Ok(u) => {
+                        log_rule_token_debug!(
+                            token,
+                            format!("assign uid '{}' from owner '{}'", u.uid, owner)
+                        );
+
+                        self.current_unit.as_mut().unwrap().uid = Some(u.uid);
+                    }
+                    Err(_) => {
+                        log_rule_token_error!(token, format!("unknown user '{}'", owner));
+                    }
+                }
+
+                Ok(true)
+            }
+            AssignOwnerId => {
+                /*
+                 *  owner id is already resolved during rules loading, token.value is the uid string
+                 */
+                if self.current_unit.as_ref().unwrap().owner_final {
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().owner_final = true;
+                }
+
+                log_rule_token_debug!(token, format!("assign uid '{}'", token.value));
+
+                let uid = execute_err!(token, token.value.parse::<uid_t>().context(ParseIntSnafu))?;
+
+                self.current_unit.as_mut().unwrap().uid = Some(Uid::from_raw(uid));
+
                 Ok(true)
             }
             AssignDevlink => {

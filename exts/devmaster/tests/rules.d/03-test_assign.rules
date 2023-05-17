@@ -1,0 +1,46 @@
+# Description: test AssignOptionsStringEscapeNone
+# Trigger: devctl trigger /dev/sda1
+# Expect: set string escape to 'none'
+KERNEL=="sda1", OPTIONS="string_escape=none"
+
+# Description: test AssignOptionsStringEscapeReplace
+# Trigger: devctl trigger /dev/sda1
+# Expect: set string escape to 'replace'
+KERNEL=="sda1", OPTIONS="string_escape=replace"
+
+# Description: test AssignOptionsDbPersist
+# Trigger: devctl trigger /dev/sda1
+# Expect: set db 'b8:1' to persistence
+KERNEL=="sda1", OPTIONS="db_persist"
+
+# Description: test AssignOptionsWatch
+# Trigger: devctl trigger /dev/sda1
+# Expect: set watch to 'true'
+KERNEL=="sda1", OPTIONS="watch"
+
+# Description: test AssignOptionsWatch
+# Trigger: devctl trigger /dev/sda1
+# Expect: set watch to 'false'
+KERNEL=="sda1", OPTIONS="nowatch"
+
+# Description: test AssignOptionsDevlinkPriority
+# Trigger: devctl trigger /dev/sda1
+# Expect: set devlink priority to '-100'
+KERNEL=="sda1", OPTIONS="link_priority=-100"
+
+# Description: test AssignOwner, the owner name is formatted during rules executing
+# Trigger: devctl trigger /dev/sda1
+# Expect: assign uid '987' from owner 'tss'
+KERNEL=="sda1", IMPORT{program}=="/bin/echo user=tss", OWNER="$env{user}"
+
+# Description: test AssignOwnerId, the owner name is resolved during rules loading if 'resolve_name_time' is set to 'early'
+# Trigger: devctl trigger /dev/sda1
+# Expect:
+#   1. libdevmaster::rules::rule_load /root/sysmaster/exts/devmaster/tests/rules.d/03-test_assign.rules:46:'OWNER="tss"' owner 'tss' is parsed into uid '987' during rules loading
+#   2. libdevmaster::rules::rule_execute /root/sysmaster/exts/devmaster/tests/rules.d/03-test_assign.rules:46:'OWNER="tss"' assign uid '987'
+KERNEL=="sda1", OWNER="tss"
+
+# Description: test AssignOwnerId
+# Trigger: devctl trigger /dev/sda1
+# Expect: libdevmaster::rules::rule_execute /root/sysmaster/exts/devmaster/tests/rules.d/03-test_assign.rules:51:'OWNER="987"' assign uid '987'
+KERNEL=="sda1", OWNER="987"

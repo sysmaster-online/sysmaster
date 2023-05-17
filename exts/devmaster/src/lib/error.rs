@@ -87,6 +87,11 @@ impl Error {
     pub(crate) fn get_errno(&self) -> nix::errno::Errno {
         match self {
             Self::RulesExecuteError { msg: _, errno: n } => *n,
+            Self::Io {
+                filename: _,
+                source,
+            } => nix::errno::from_i32(source.raw_os_error().unwrap_or_default()),
+            Self::Device { source } => source.get_errno(),
             Self::Other { msg: _, errno: n } => *n,
             _ => nix::errno::Errno::EINVAL,
         }

@@ -1327,6 +1327,46 @@ impl Device {
     pub fn set_devlink_priority(&mut self, priority: i32) {
         self.devlink_priority = priority;
     }
+
+    /// get the device id
+    /// device id is used to identify database file in /run/devmaster/data/
+    pub fn get_device_id(&mut self) -> Result<String, Error> {
+        if self.device_id.is_empty() {
+            let subsystem = self.get_subsystem().map_err(|e| Error::Nix {
+                msg: format!("get_device_id failed: get_subsystem ({})", e),
+                source: e.get_errno(),
+            })?;
+
+            let id: String;
+            if let Ok(devnum) = self.get_devnum() {
+                id = format!(
+                    "{}{}:{}",
+                    if subsystem == "block" { 'b' } else { 'c' },
+                    major(devnum),
+                    minor(devnum)
+                );
+            } else if let Ok(ifindex) = self.get_ifindex() {
+                id = format!("n{}", ifindex);
+            } else {
+                let sysname = self
+                    .get_sysname()
+                    .map_err(|e| Error::Nix {
+                        msg: format!("get_device_id failed: ({})", e),
+                        source: e.get_errno(),
+                    })?
+                    .to_string();
+
+                if subsystem == "drivers" {
+                    id = format!("+drivers:{}:{}", self.driver_subsystem, sysname);
+                } else {
+                    id = format!("+{}:{}", subsystem, sysname);
+                }
+            }
+            self.device_id = id;
+        }
+
+        Ok(self.device_id.clone())
+    }
 }
 
 /// internal methods
@@ -1959,46 +1999,6 @@ impl Device {
 
             parent = parent.unwrap().parent();
         }
-    }
-
-    /// get the device id
-    /// device id is used to identify hwdb file in /run/devmaster/data/
-    pub(crate) fn get_device_id(&mut self) -> Result<String, Error> {
-        if self.device_id.is_empty() {
-            let subsystem = self.get_subsystem().map_err(|e| Error::Nix {
-                msg: format!("get_device_id failed: get_subsystem ({})", e),
-                source: e.get_errno(),
-            })?;
-
-            let id: String;
-            if let Ok(devnum) = self.get_devnum() {
-                id = format!(
-                    "{}{}:{}",
-                    if subsystem == "block" { 'b' } else { 'c' },
-                    major(devnum),
-                    minor(devnum)
-                );
-            } else if let Ok(ifindex) = self.get_ifindex() {
-                id = format!("n{}", ifindex);
-            } else {
-                let sysname = self
-                    .get_sysname()
-                    .map_err(|e| Error::Nix {
-                        msg: format!("get_device_id failed: ({})", e),
-                        source: e.get_errno(),
-                    })?
-                    .to_string();
-
-                if subsystem == "drivers" {
-                    id = format!("+drivers:{}:{}", self.driver_subsystem, sysname);
-                } else {
-                    id = format!("+{}:{}", subsystem, sysname);
-                }
-            }
-            self.device_id = id;
-        }
-
-        Ok(self.device_id.clone())
     }
 
     /// prepare properties:
