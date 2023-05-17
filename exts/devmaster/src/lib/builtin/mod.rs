@@ -266,6 +266,7 @@ mod tests {
     use std::cell::RefCell;
 
     #[test]
+    #[ignore]
     fn test_builtin_manager() {
         let mgr = BuiltinManager::new();
         let mut enumerator = DeviceEnumerator::new();

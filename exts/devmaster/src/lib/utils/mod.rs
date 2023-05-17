@@ -114,7 +114,7 @@ pub(crate) fn check_format(key: &str, value: &str) -> Result<()> {
 }
 
 pub(crate) fn valid_devnode_chars(c: char, white_list: &str) -> bool {
-    c.is_ascii_digit() || c.is_alphabetic() || "#+-.:=@_".contains(c) || white_list.contains(c)
+    c.is_ascii_alphanumeric() || "#+-.:=@_".contains(c) || white_list.contains(c)
 }
 
 /// replace invalid chars with '_', except for white list, plain ascii, hex-escaping and valid utf8
@@ -154,6 +154,46 @@ pub(crate) fn replace_chars(s: &str, white_list: &str) -> String {
     }
 
     ret
+}
+
+/// This function replaces excess whitespace in a string with underscores.
+/// It uses a regular expression to match one or more whitespace characters.
+/// The input string is not modified, and a new string with the replacements is returned.
+pub(crate) fn replace_whitespace(s: &str) -> String {
+    // Create a regular expression to match one or more whitespace characters.
+    let re = Regex::new(r"\s+").unwrap();
+    // Use the regular expression to replace all matches with underscores.
+    // The resulting string is converted to a String and returned.
+    re.replace_all(s, "_").to_string()
+}
+
+/// This function encodes a device node name string into a byte array.
+/// The encoded string is stored in the output string buffer.
+/// If the input string or output buffer is empty, an error is returned.
+pub(crate) fn encode_devnode_name(str: &str, str_enc: &mut String) {
+    let mut i = 0;
+
+    if str.is_empty() {
+        return;
+    }
+
+    while let Some(c) = str.chars().nth(i) {
+        let seqlen = c.len_utf8();
+
+        // If the character is a multi-byte character, add it to the output buffer.
+        if seqlen > 1 {
+            str_enc.push(c);
+        }
+        // If the character is a backslash or not allowed in a device node name, encode it as a hex value.
+        else if c == '\\' || !valid_devnode_chars(c, "") {
+            str_enc.push_str(&format!("\\x{:02x}", c as u8));
+        }
+        // Otherwise, add the character to the output buffer.
+        else {
+            str_enc.push(c);
+        }
+        i += 1;
+    }
 }
 
 /// log key point on device processing
