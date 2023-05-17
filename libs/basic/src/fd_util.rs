@@ -161,7 +161,7 @@ pub fn fd_get_diskseq(fd: i32) -> Result<u64> {
 mod tests {
     use crate::fd_util::{stat_is_char, stat_is_reg};
     use nix::sys::stat::fstat;
-    use std::{fs::File, os::fd::AsRawFd, path::Path};
+    use std::{fs::File, os::unix::prelude::AsRawFd, path::Path};
 
     #[test]
     fn test_stats() {
