@@ -55,6 +55,7 @@ impl Timer {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn is_time_out(&mut self, event: EpollEvent) -> Result<bool, Errno> {
         if self.epoll.is_err(event) {
             return Err(Errno::EIO);

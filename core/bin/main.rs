@@ -169,7 +169,7 @@ fn set_child_reaper() {
     }
 }
 
-fn do_reexecute(args: &Vec<String>, reload: bool) {
+fn do_reexecute(args: &[String], reload: bool) {
     let args_size = args.len().max(MANAGER_ARGS_SIZE_MAX);
 
     let path;

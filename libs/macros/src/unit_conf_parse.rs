@@ -128,13 +128,12 @@ fn gererate_setter_functions(
     let mut final_stream = proc_macro2::TokenStream::new();
 
     for (ident, _type) in idents.iter().zip(types.iter()) {
-        let token_piece;
         let set_field_name = format!("set_{}", ident.as_ref().unwrap());
         let get_field_name = format!("get_{}", ident.as_ref().unwrap());
         let set_field_ident = syn::Ident::new(&set_field_name, ident.span());
         let get_field_ident = syn::Ident::new(&get_field_name, ident.span());
-        if let Some(inner_ty) = get_option_inner_type(_type) {
-            token_piece = quote! {
+        let token_piece = if let Some(inner_ty) = get_option_inner_type(_type) {
+            quote! {
                 #vis fn #set_field_ident(&mut self, #ident: #inner_ty) -> &mut Self{
                     self.#ident = std::option::Option::Some(#ident);
                     self
@@ -146,9 +145,9 @@ fn gererate_setter_functions(
                         return std::option::Option::Some(self.#ident.as_ref().unwrap().clone());
                     }
                 }
-            };
+            }
         } else {
-            token_piece = quote! {
+            quote! {
                 #vis fn #set_field_ident(&mut self, #ident: #_type) -> &mut Self{
                     self.#ident = #ident;
                     self
@@ -156,8 +155,8 @@ fn gererate_setter_functions(
                 #vis fn #get_field_ident(&self) -> #_type{
                     return self.#ident.clone();
                 }
-            };
-        }
+            }
+        };
         final_stream.extend(token_piece);
     }
     Ok(final_stream)

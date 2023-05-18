@@ -259,8 +259,7 @@ fn build_run_args(
     let cmd = std::ffi::CString::new(cmdline.path().clone()).unwrap();
     let exec_name = std::ffi::CString::new(cmdline.path().clone()).unwrap();
 
-    let mut args = Vec::new();
-    args.push(exec_name);
+    let mut args = vec![exec_name];
 
     let var_regex = Regex::new(r"(\$[A-Z_]+)|(\$\{[A-Z_]+\})").unwrap();
     for arg in cmdline.argv() {
@@ -356,7 +355,7 @@ fn close_all_fds(fds: &[i32]) -> bool {
     true
 }
 
-fn shift_fds(fds: &mut Vec<i32>) -> bool {
+fn shift_fds(fds: &mut [i32]) -> bool {
     let mut start = 0;
     loop {
         let mut restart = -1;

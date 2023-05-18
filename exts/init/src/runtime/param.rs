@@ -13,7 +13,7 @@ const DEFAULT_TIMECNT: i64 = 5;
 const DEFAULT_TIMEWAIT: i64 = 10;
 const INIT_PARAM: i32 = 0;
 // const SYSMASTER_PARAM: i32 = 1;
-type Callback = fn(arg: &str, key: &String, init_param: &mut InitParam);
+type Callback = fn(arg: &str, key: &str, init_param: &mut InitParam);
 
 struct Dispatch<'a> {
     key: &'a str,
@@ -34,7 +34,7 @@ const PARAM_TABLE: &[Dispatch] = &[
     },
 ];
 
-fn parse_timecnt(arg: &str, key: &String, init_param: &mut InitParam) {
+fn parse_timecnt(arg: &str, key: &str, init_param: &mut InitParam) {
     let str1 = &arg[key.len()..];
     if let Ok(value) = str1.parse::<i64>() {
         if value >= 2 {
@@ -43,7 +43,7 @@ fn parse_timecnt(arg: &str, key: &String, init_param: &mut InitParam) {
     }
 }
 
-fn parse_timewait(arg: &str, key: &String, init_param: &mut InitParam) {
+fn parse_timewait(arg: &str, key: &str, init_param: &mut InitParam) {
     let str1 = &arg[key.len()..];
     if let Ok(value) = str1.parse::<i64>() {
         if value >= DEFAULT_TIMEWAIT {
@@ -78,7 +78,7 @@ impl Param {
             for table in PARAM_TABLE {
                 if arg.starts_with(table.key) && table.callback.is_some() {
                     if INIT_PARAM == table.param_type {
-                        table.callback.unwrap()(&arg, &table.key.to_string(), &mut self.init_param);
+                        table.callback.unwrap()(&arg, table.key, &mut self.init_param);
                     } else {
                         self.manager_param.push(arg);
                     }

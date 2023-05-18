@@ -126,6 +126,7 @@ impl Timer {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn is_empty(&mut self, et: &EventType) -> bool {
         if let Some(inner) = self.timer_set.get_mut(et) {
             return inner.data.is_empty();

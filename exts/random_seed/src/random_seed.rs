@@ -58,7 +58,7 @@ fn random_pool_size() -> usize {
     }
 }
 
-pub fn get_random(data: &mut Vec<u8>, flags: u32) -> Result<usize, ()> {
+pub fn get_random(data: &mut [u8], flags: u32) -> Result<usize, ()> {
     let size;
     unsafe {
         size = libc::getrandom(data.as_mut_ptr() as *mut libc::c_void, data.len(), flags);
@@ -103,7 +103,7 @@ ioctl_write_ptr!(
     ENTROPY_SETOPTIONS,
     rand_pool_info
 );
-fn random_write_entropy(random_fd: &mut File, data: &mut Vec<u8>, credit: bool) -> bool {
+fn random_write_entropy(random_fd: &mut File, data: &mut [u8], credit: bool) -> bool {
     assert!(!data.is_empty());
 
     if data.is_empty() {

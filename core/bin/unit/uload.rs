@@ -210,14 +210,14 @@ impl UnitLoadData {
         // dependency
         for (relation, list) in config.deps.iter() {
             for o_name in list {
-                let tmp_unit: Rc<UnitX>;
-                if let Some(o_unit) = self.push_dep_unit_into_load_queue(o_name) {
-                    //can not call unit_load directly, will be nested.
-                    tmp_unit = Rc::clone(&o_unit);
-                } else {
-                    log::error!("create unit obj error in unit manager");
-                    return;
-                }
+                let tmp_unit: Rc<UnitX> =
+                    if let Some(o_unit) = self.push_dep_unit_into_load_queue(o_name) {
+                        //can not call unit_load directly, will be nested.
+                        Rc::clone(&o_unit)
+                    } else {
+                        log::error!("create unit obj error in unit manager");
+                        return;
+                    };
 
                 if let Err(_e) = self
                     .db

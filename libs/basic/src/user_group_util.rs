@@ -117,7 +117,7 @@ pub fn parse_gid(gid_str: &String) -> Result<Group> {
 }
 
 /// Parse a string as Username
-pub fn parse_name(name_str: &String) -> Result<User> {
+pub fn parse_name(name_str: &str) -> Result<User> {
     if name_str.is_empty() {
         return Err(Error::Invalid {
             what: "Username is empty".to_string(),

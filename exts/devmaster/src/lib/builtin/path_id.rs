@@ -146,6 +146,7 @@ impl Builtin for PathId {
 }
 
 impl PathId {
+    #[allow(clippy::ptr_arg)]
     fn compose_path(
         &self,
         dev: Arc<Mutex<Device>>,
@@ -284,7 +285,7 @@ impl PathId {
         &self,
         parent: Arc<Mutex<Device>>,
         path: &mut String,
-        compat_path: &mut String,
+        compat_path: &mut str,
         supported_parent: &mut bool,
     ) -> Option<Arc<Mutex<Device>>> {
         let devtype = match parent.lock().unwrap().get_devtype() {
@@ -473,7 +474,7 @@ impl PathId {
         &self,
         parent: Arc<Mutex<Device>>,
         path: &mut String,
-        compat_path: &mut String,
+        compat_path: &mut str,
     ) -> Option<Arc<Mutex<Device>>> {
         let sysname = match parent.lock().unwrap().get_sysname() {
             Ok(name) => String::from(name),
@@ -982,6 +983,7 @@ impl PathId {
     ) -> Option<Arc<Mutex<Device>>> {
         let mut dev = device.clone();
         let mut parent = device;
+        #[allow(clippy::while_let_loop)]
         loop {
             let subsystem = match parent.lock().unwrap().get_subsystem() {
                 Ok(str) => str,

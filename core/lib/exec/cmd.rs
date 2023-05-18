@@ -116,7 +116,6 @@ impl DeserializeWith for ExecCommand {
                 continue;
             }
 
-            #[allow(clippy::trim_split_whitespace)]
             let mut command: Vec<String> = Vec::new();
             let re = Regex::new(r"'([^']*)'|\S+").unwrap();
             for cap in re.captures_iter(cmd) {

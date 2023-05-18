@@ -111,7 +111,7 @@ impl ExecuteUnit {
     }
 
     /// apply runtime substitution on all formatters in the string
-    pub fn apply_format(&self, src: &String, replace_whitespace: bool) -> Result<String> {
+    pub fn apply_format(&self, src: &str, replace_whitespace: bool) -> Result<String> {
         let mut idx: usize = 0;
         let mut ret = String::new();
         while idx < src.len() {
@@ -370,7 +370,7 @@ impl ExecuteUnit {
     }
 
     fn get_subst_type(
-        s: &String,
+        s: &str,
         idx: &mut usize,
         strict: bool,
     ) -> Result<Option<(FormatSubstitutionType, Option<String>)>> {
@@ -1641,146 +1641,102 @@ mod tests {
         let unit = ExecuteUnit::new(device);
         // test long substitution formatter
         // $kernel
-        assert_eq!(
-            unit.apply_format(&"$kernel".to_string(), false).unwrap(),
-            "lo"
-        );
+        assert_eq!(unit.apply_format("$kernel", false).unwrap(), "lo");
         // $number
-        assert_eq!(
-            unit.apply_format(&"$number".to_string(), false).unwrap(),
-            ""
-        );
+        assert_eq!(unit.apply_format("$number", false).unwrap(), "");
         // $devpath
         assert_eq!(
-            unit.apply_format(&"$devpath".to_string(), false).unwrap(),
+            unit.apply_format("$devpath", false).unwrap(),
             "/devices/virtual/net/lo"
         );
         // $id
-        assert_eq!(unit.apply_format(&"$id".to_string(), false).unwrap(), "");
+        assert_eq!(unit.apply_format("$id", false).unwrap(), "");
         // $driver
-        assert_eq!(
-            unit.apply_format(&"$driver".to_string(), false).unwrap(),
-            ""
-        );
+        assert_eq!(unit.apply_format("$driver", false).unwrap(), "");
         // $attr{sysattr}
         assert_eq!(
-            unit.apply_format(&"$attr{address}".to_string(), false)
-                .unwrap(),
+            unit.apply_format("$attr{address}", false).unwrap(),
             "00:00:00:00:00:00"
         );
         // $env{key}
         assert_eq!(
-            unit.apply_format(&"$env{DEVPATH}".to_string(), false)
-                .unwrap(),
+            unit.apply_format("$env{DEVPATH}", false).unwrap(),
             "/devices/virtual/net/lo"
         );
         // $major
-        assert_eq!(
-            unit.apply_format(&"$major".to_string(), false).unwrap(),
-            "0"
-        );
+        assert_eq!(unit.apply_format("$major", false).unwrap(), "0");
         // $minor
-        assert_eq!(
-            unit.apply_format(&"$minor".to_string(), false).unwrap(),
-            "0"
-        );
+        assert_eq!(unit.apply_format("$minor", false).unwrap(), "0");
         // $result
-        assert_eq!(
-            unit.apply_format(&"$result".to_string(), false).unwrap(),
-            ""
-        );
+        assert_eq!(unit.apply_format("$result", false).unwrap(), "");
         // $result{index}
-        assert_eq!(
-            unit.apply_format(&"$result{1}".to_string(), false).unwrap(),
-            ""
-        );
+        assert_eq!(unit.apply_format("$result{1}", false).unwrap(), "");
         // $result{index+}
-        assert_eq!(
-            unit.apply_format(&"$result{1+}".to_string(), false)
-                .unwrap(),
-            ""
-        );
+        assert_eq!(unit.apply_format("$result{1+}", false).unwrap(), "");
         // $parent
-        assert_eq!(
-            unit.apply_format(&"$parent".to_string(), false).unwrap(),
-            ""
-        );
+        assert_eq!(unit.apply_format("$parent", false).unwrap(), "");
         // $name
-        assert_eq!(
-            unit.apply_format(&"$name".to_string(), false).unwrap(),
-            "lo"
-        );
+        assert_eq!(unit.apply_format("$name", false).unwrap(), "lo");
         // $links
-        assert_eq!(unit.apply_format(&"$links".to_string(), false).unwrap(), "");
+        assert_eq!(unit.apply_format("$links", false).unwrap(), "");
         // $root
-        assert_eq!(
-            unit.apply_format(&"$root".to_string(), false).unwrap(),
-            "/dev"
-        );
+        assert_eq!(unit.apply_format("$root", false).unwrap(), "/dev");
         // $sys
-        assert_eq!(
-            unit.apply_format(&"$sys".to_string(), false).unwrap(),
-            "/sys"
-        );
+        assert_eq!(unit.apply_format("$sys", false).unwrap(), "/sys");
         // $devnode
-        assert_eq!(
-            unit.apply_format(&"$devnode".to_string(), false).unwrap(),
-            ""
-        );
+        assert_eq!(unit.apply_format("$devnode", false).unwrap(), "");
 
         // test short substitution formatter
         // %k
-        assert_eq!(unit.apply_format(&"%k".to_string(), false).unwrap(), "lo");
+        assert_eq!(unit.apply_format("%k", false).unwrap(), "lo");
         // %n
-        assert_eq!(unit.apply_format(&"%n".to_string(), false).unwrap(), "");
+        assert_eq!(unit.apply_format("%n", false).unwrap(), "");
         // %p
         assert_eq!(
-            unit.apply_format(&"%p".to_string(), false).unwrap(),
+            unit.apply_format("%p", false).unwrap(),
             "/devices/virtual/net/lo"
         );
         // %b
-        assert_eq!(unit.apply_format(&"%b".to_string(), false).unwrap(), "");
+        assert_eq!(unit.apply_format("%b", false).unwrap(), "");
         // %d
-        assert_eq!(unit.apply_format(&"%d".to_string(), false).unwrap(), "");
+        assert_eq!(unit.apply_format("%d", false).unwrap(), "");
         // %s{sysattr}
         assert_eq!(
-            unit.apply_format(&"%s{address}".to_string(), false)
-                .unwrap(),
+            unit.apply_format("%s{address}", false).unwrap(),
             "00:00:00:00:00:00"
         );
         // %E{key}
         assert_eq!(
-            unit.apply_format(&"%E{DEVPATH}".to_string(), false)
-                .unwrap(),
+            unit.apply_format("%E{DEVPATH}", false).unwrap(),
             "/devices/virtual/net/lo"
         );
         // %M
-        assert_eq!(unit.apply_format(&"%M".to_string(), false).unwrap(), "0");
+        assert_eq!(unit.apply_format("%M", false).unwrap(), "0");
         // %m
-        assert_eq!(unit.apply_format(&"%m".to_string(), false).unwrap(), "0");
+        assert_eq!(unit.apply_format("%m", false).unwrap(), "0");
         // %c
-        assert_eq!(unit.apply_format(&"%c".to_string(), false).unwrap(), "");
+        assert_eq!(unit.apply_format("%c", false).unwrap(), "");
         // %c{index}
-        assert_eq!(unit.apply_format(&"%c{1}".to_string(), false).unwrap(), "");
+        assert_eq!(unit.apply_format("%c{1}", false).unwrap(), "");
         // %c{index+}
-        assert_eq!(unit.apply_format(&"%c{1+}".to_string(), false).unwrap(), "");
+        assert_eq!(unit.apply_format("%c{1+}", false).unwrap(), "");
         // %P
-        assert_eq!(unit.apply_format(&"%P".to_string(), false).unwrap(), "");
+        assert_eq!(unit.apply_format("%P", false).unwrap(), "");
         // %D
-        assert_eq!(unit.apply_format(&"%D".to_string(), false).unwrap(), "lo");
+        assert_eq!(unit.apply_format("%D", false).unwrap(), "lo");
         // %L
-        assert_eq!(unit.apply_format(&"%L".to_string(), false).unwrap(), "");
+        assert_eq!(unit.apply_format("%L", false).unwrap(), "");
         // %r
-        assert_eq!(unit.apply_format(&"%r".to_string(), false).unwrap(), "/dev");
+        assert_eq!(unit.apply_format("%r", false).unwrap(), "/dev");
         // %S
-        assert_eq!(unit.apply_format(&"%S".to_string(), false).unwrap(), "/sys");
+        assert_eq!(unit.apply_format("%S", false).unwrap(), "/sys");
         // %N
-        assert_eq!(unit.apply_format(&"%N".to_string(), false).unwrap(), "");
+        assert_eq!(unit.apply_format("%N", false).unwrap(), "");
 
         // $$
-        assert_eq!(unit.apply_format(&"$$".to_string(), false).unwrap(), "$");
+        assert_eq!(unit.apply_format("$$", false).unwrap(), "$");
         // %%
-        assert_eq!(unit.apply_format(&"%%".to_string(), false).unwrap(), "%");
+        assert_eq!(unit.apply_format("%%", false).unwrap(), "%");
     }
 
     #[test]
@@ -1790,30 +1746,12 @@ mod tests {
             Device::from_subsystem_sysname("block".to_string(), "sda1".to_string()).unwrap(),
         ));
         let unit = ExecuteUnit::new(device);
-        assert_eq!(
-            unit.apply_format(&"$number".to_string(), false).unwrap(),
-            "1"
-        );
-        assert_eq!(
-            unit.apply_format(&"$major".to_string(), false).unwrap(),
-            "8"
-        );
-        assert_eq!(
-            unit.apply_format(&"$minor".to_string(), false).unwrap(),
-            "1"
-        );
-        assert_eq!(
-            unit.apply_format(&"$driver".to_string(), false).unwrap(),
-            ""
-        );
-        assert_eq!(unit.apply_format(&"$id".to_string(), false).unwrap(), "");
-        assert_eq!(
-            unit.apply_format(&"$parent".to_string(), false).unwrap(),
-            "sda"
-        );
-        assert_eq!(
-            unit.apply_format(&"$devnode".to_string(), false).unwrap(),
-            "/dev/sda1"
-        );
+        assert_eq!(unit.apply_format("$number", false).unwrap(), "1");
+        assert_eq!(unit.apply_format("$major", false).unwrap(), "8");
+        assert_eq!(unit.apply_format("$minor", false).unwrap(), "1");
+        assert_eq!(unit.apply_format("$driver", false).unwrap(), "");
+        assert_eq!(unit.apply_format("$id", false).unwrap(), "");
+        assert_eq!(unit.apply_format("$parent", false).unwrap(), "sda");
+        assert_eq!(unit.apply_format("$devnode", false).unwrap(), "/dev/sda1");
     }
 }
