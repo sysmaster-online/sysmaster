@@ -153,11 +153,10 @@ impl ServiceSpawn {
     }
 
     pub fn get_runtime_directory(&self) -> Option<Vec<PathBuf>> {
-        self.exec_params
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .get_runtime_directory()
+        match self.exec_params.borrow().as_ref() {
+            None => None,
+            Some(v) => v.get_runtime_directory(),
+        }
     }
 
     fn collect_socket_fds(&self) -> Vec<i32> {
