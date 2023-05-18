@@ -592,8 +592,8 @@ impl Install {
         let configer = builder.load().context(ConfiqueSnafu)?;
         unit_install.fill_struct(&configer);
 
-        for also in configer.Install.Also {
-            self.unit_install_discover(&also, ctx.clone())?;
+        for also in &configer.Install.Also {
+            self.unit_install_discover(also, ctx.clone())?;
         }
         // fs::remove_file(&tmp);
 

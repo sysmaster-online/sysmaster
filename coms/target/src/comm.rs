@@ -25,7 +25,7 @@ use sysmaster::rel::Reliability;
 use sysmaster::unit::{UmIf, UnitBase};
 
 pub(super) struct TargetUnitComm {
-    owner: RefCell<Option<Rc<dyn UnitBase>>>,
+    owner: RefCell<Option<Weak<dyn UnitBase>>>,
     umcomm: Arc<TargetUmComm>,
 }
 
@@ -42,12 +42,12 @@ impl TargetUnitComm {
     }
 
     pub(super) fn attach_unit(&self, unit: Rc<dyn UnitBase>) {
-        self.owner.replace(Some(unit));
+        self.owner.replace(Some(Rc::downgrade(&unit)));
     }
 
     pub(super) fn owner(&self) -> Option<Rc<dyn UnitBase>> {
         if let Some(ref unit) = *self.owner.borrow() {
-            Some(Rc::clone(unit))
+            unit.upgrade()
         } else {
             None
         }
