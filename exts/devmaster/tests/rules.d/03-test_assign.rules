@@ -33,7 +33,7 @@ KERNEL=="sda1", OPTIONS="link_priority=-100"
 # Expect: assign uid '987' from owner 'tss'
 KERNEL=="sda1", IMPORT{program}=="/bin/echo user=tss", OWNER="$env{user}"
 
-# Description: test AssignOwnerId, the owner name is resolved during rules loading if 'resolve_name_time' is set to 'early'
+# Description: test AssignOwner, the owner name is resolved during rules loading if 'resolve_name_time' is set to 'early'
 # Trigger: devctl trigger /dev/sda1
 # Expect:
 #   1. libdevmaster::rules::rule_load /root/sysmaster/exts/devmaster/tests/rules.d/03-test_assign.rules:46:'OWNER="tss"' owner 'tss' is parsed into uid '987' during rules loading
@@ -44,3 +44,25 @@ KERNEL=="sda1", OWNER="tss"
 # Trigger: devctl trigger /dev/sda1
 # Expect: libdevmaster::rules::rule_execute /root/sysmaster/exts/devmaster/tests/rules.d/03-test_assign.rules:51:'OWNER="987"' assign uid '987'
 KERNEL=="sda1", OWNER="987"
+
+# Description: test AssignOwnerId, if OWNER is final-assigned previously, avoid assignment in future
+# Trigger: devctl trigger /dev/sda1
+# Expect: owner is final-assigned previously, ignore this assignment
+KERNEL=="sda1", OWNER:="987", OWNER="0"
+
+# Description: test AssignGroup, the group name is formatted during rules executing if 'resolve_name_time' is set to 'early'
+# Trigger: devctl trigger /dev/sda1
+# Expect:
+#   1. libdevmaster::rules::rule_load /root/sysmaster/exts/devmaster/tests/rules.d/03-test_assign.rules:41:'OWNER="tss"' owner 'tss' is parsed into uid '987' during rules loading
+#   2. libdevmaster::rules::rule_execute /root/sysmaster/exts/devmaster/tests/rules.d/03-test_assign.rules:56:'GROUP="tss"' assign gid '987'
+KERNEL=="sda1", GROUP="tss"
+
+# Description: test AssignGroupId
+# Trigger: devctl trigger /dev/sda1
+# Expect: assign gid '987'
+KERNEL=="sda1", GROUP="987"
+
+# Description: test AssignGroupId
+# Trigger: devctl trigger /dev/sda1
+# Expect: group is final-assigned previously, ignore this assignment
+KERNEL=="sda1", GROUP:="987", GROUP="0"

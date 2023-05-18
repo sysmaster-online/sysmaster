@@ -27,9 +27,12 @@ use crate::{
         sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
     },
 };
-use basic::{proc_cmdline::cmdline_get_item, user_group_util::get_user_creds};
+use basic::{
+    proc_cmdline::cmdline_get_item,
+    user_group_util::{get_group_creds, get_user_creds},
+};
 use device::{Device, DeviceAction};
-use libc::{mode_t, uid_t};
+use libc::{gid_t, mode_t, uid_t};
 use snafu::ResultExt;
 use std::{
     borrow::BorrowMut,
@@ -1371,6 +1374,10 @@ impl ExecuteManager {
             }
             AssignOwner => {
                 if self.current_unit.as_ref().unwrap().owner_final {
+                    log_rule_token_debug!(
+                        token,
+                        "owner is final-assigned previously, ignore this assignment"
+                    );
                     return Ok(true);
                 }
 
@@ -1387,7 +1394,7 @@ impl ExecuteManager {
                     Ok(v) => v,
                     Err(e) => {
                         log_rule_token_error!(token, format!("failed to apply formatter: ({})", e));
-                        return Ok(false);
+                        return Ok(true);
                     }
                 };
 
@@ -1412,6 +1419,10 @@ impl ExecuteManager {
                  *  owner id is already resolved during rules loading, token.value is the uid string
                  */
                 if self.current_unit.as_ref().unwrap().owner_final {
+                    log_rule_token_debug!(
+                        token,
+                        "owner is final-assigned previously, ignore this assignment"
+                    );
                     return Ok(true);
                 }
 
@@ -1424,6 +1435,72 @@ impl ExecuteManager {
                 let uid = execute_err!(token, token.value.parse::<uid_t>().context(ParseIntSnafu))?;
 
                 self.current_unit.as_mut().unwrap().uid = Some(Uid::from_raw(uid));
+
+                Ok(true)
+            }
+            AssignGroup => {
+                if self.current_unit.as_ref().unwrap().group_final {
+                    log_rule_token_debug!(
+                        token,
+                        "group is final-assigned previously, ignore this assignment"
+                    );
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().group_final = true;
+                }
+
+                let group = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log_rule_token_error!(token, format!("failed to apply formatter: ({})", e));
+                        return Ok(true);
+                    }
+                };
+
+                match get_group_creds(&group) {
+                    Ok(g) => {
+                        log_rule_token_debug!(
+                            token,
+                            format!("assign gid '{}' from group '{}'", g.gid, group)
+                        );
+
+                        self.current_unit.as_mut().unwrap().gid = Some(g.gid);
+                    }
+                    Err(_) => {
+                        log_rule_token_error!(token, format!("unknown group '{}'", group));
+                    }
+                }
+
+                Ok(true)
+            }
+            AssignGroupId => {
+                /*
+                 *  group id is already resolved during rules loading, token.value is the gid string
+                 */
+                if self.current_unit.as_ref().unwrap().group_final {
+                    log_rule_token_debug!(
+                        token,
+                        "group is final-assigned previously, ignore this assignment"
+                    );
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().group_final = true;
+                }
+
+                log_rule_token_debug!(token, format!("assign gid '{}'", token.value));
+
+                let gid = execute_err!(token, token.value.parse::<gid_t>().context(ParseIntSnafu))?;
+
+                self.current_unit.as_mut().unwrap().gid = Some(Gid::from_raw(gid));
 
                 Ok(true)
             }

@@ -1319,7 +1319,9 @@ impl RuleToken {
                 }
 
                 if let Some(rules) = rules {
-                    // only parse 'OWNER' token when rules object is provided.
+                    /*
+                     *  If a legal uid is provided, directly pass the uid to rules executer
+                     */
                     if parse_uid(&value).is_ok() {
                         return Ok(RuleToken::new(
                             TokenType::AssignOwnerId,
@@ -1336,6 +1338,10 @@ impl RuleToken {
                     if time == ResolveNameTime::Early
                         && SubstituteType::Plain == value.parse::<SubstituteType>().unwrap()
                     {
+                        /*
+                         *  If the OWNER value is a legal user name, and resolve_name_time is set to 'Early',
+                         *  try to get the uid by resolving the user name.
+                         */
                         let user = rules.as_ref().write().unwrap().resolve_user(&value)?;
 
                         log::debug!(
@@ -1357,7 +1363,10 @@ impl RuleToken {
                             content,
                         ))?;
                     } else if time != ResolveNameTime::Never {
-                        // early or late
+                        /*
+                         *  If the resolve_name_time is not set to 'Never', try to format the value during rules executing.
+                         *  Here we only check whether the format of value is legal.
+                         */
                         if let Err(e) = check_value_format("OWNER", value.as_str(), true) {
                             log::warn!("{}", e);
                         }
@@ -1397,7 +1406,9 @@ impl RuleToken {
                 }
 
                 if let Some(rules) = rules {
-                    // only parse 'GROUP' token when rules object is provided.
+                    /*
+                     *  If a legal gid is provided, directly pass the gid to rules executer
+                     */
                     if parse_gid(&value).is_ok() {
                         return Ok(RuleToken::new(
                             TokenType::AssignGroupId,
@@ -1414,7 +1425,20 @@ impl RuleToken {
                     if time == ResolveNameTime::Early
                         && SubstituteType::Plain == value.parse::<SubstituteType>().unwrap()
                     {
+                        /*
+                         *  If the GROUP value is a legal group name, and resolve_name_time is set to 'Early',
+                         *  try to get the gid by resolving the group name.
+                         */
                         let group: Group = rules.as_ref().write().unwrap().resolve_group(&value)?;
+
+                        log::debug!(
+                            "{}:{}:'{}' group '{}' is parsed into gid '{}' during rules loading",
+                            rule_file,
+                            line_number,
+                            content,
+                            value,
+                            group.gid
+                        );
 
                         return Ok(RuleToken::new(
                             TokenType::AssignGroupId,
@@ -1426,7 +1450,10 @@ impl RuleToken {
                             content,
                         ))?;
                     } else if time != ResolveNameTime::Never {
-                        // early or late
+                        /*
+                         * If resolve_name_time is not set to 'Never', try to format the value during rules executing.
+                         * Here we only check the format of value is legal.
+                         */
                         if let Err(e) = check_value_format("GROUP", value.as_str(), true) {
                             log::warn!("{}", e);
                         }
