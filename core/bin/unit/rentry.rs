@@ -68,12 +68,11 @@ impl UnitReLoad {
 }
 
 /// jobMode why in UnitRentry? change the name?
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum JobMode {
     #[serde(alias = "fail")]
     Fail,
     #[serde(alias = "replace")]
-    #[default]
     Replace,
     #[serde(alias = "replace_irreversible")]
     ReplaceIrreversible,
@@ -87,6 +86,12 @@ pub(crate) enum JobMode {
     IgnoreRequirements,
     #[serde(alias = "trigger")]
     Trigger,
+}
+
+impl Default for JobMode {
+    fn default() -> Self {
+        Self::Replace
+    }
 }
 
 impl DeserializeWith for JobMode {

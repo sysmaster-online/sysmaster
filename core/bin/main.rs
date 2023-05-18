@@ -186,7 +186,8 @@ fn do_reexecute(args: &Vec<String>, reload: bool) {
     // Remove '--deserialize' from the previous parameter first, as this may be a fault recovery start.
     for index in argv.iter().enumerate() {
         if index.1 == "--deserialize" {
-            argv.remove(index.0);
+            let idx = index.0;
+            argv.remove(idx);
             break;
         }
     }

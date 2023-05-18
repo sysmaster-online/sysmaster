@@ -146,13 +146,18 @@ pub(super) enum SocketCommand {
     StopPost,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub(super) enum PortType {
-    #[default]
     Socket,
     Fifo,
     Special,
     Invalid,
+}
+
+impl Default for PortType {
+    fn default() -> Self {
+        Self::Socket
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

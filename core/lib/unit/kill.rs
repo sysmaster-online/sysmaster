@@ -42,15 +42,20 @@ impl KillOperation {
 }
 
 /// the method to kill the process
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KillMode {
     /// kill all the process in the cgroup of the unit
-    #[default]
     ControlGroup,
     /// only kill the main process
     Process,
     /// send SIGKILL to the process of the cgroup
     Mixed,
+}
+
+impl Default for KillMode {
+    fn default() -> Self {
+        Self::ControlGroup
+    }
 }
 
 impl DeserializeWith for KillMode {

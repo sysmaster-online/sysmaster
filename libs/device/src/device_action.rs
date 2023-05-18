@@ -19,7 +19,7 @@ use nix::errno::Errno;
 
 /// device action based on kobject from kernel
 #[allow(missing_docs)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceAction {
     Add,
     Remove,
@@ -29,8 +29,13 @@ pub enum DeviceAction {
     Offline,
     Bind,
     Unbind,
-    #[default]
     Invalid,
+}
+
+impl Default for DeviceAction {
+    fn default() -> Self {
+        Self::Invalid
+    }
 }
 
 impl FromStr for DeviceAction {

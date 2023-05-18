@@ -39,10 +39,9 @@ struct ServiceReDb<K, V>(ReDb<K, V>);
 const RELI_DB_HSERVICE_CONF: &str = "svcconf";
 const RELI_DB_HSERVICE_MNG: &str = "svcmng";
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy, Default)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy)]
 pub(super) enum ServiceType {
     #[serde(alias = "simple")]
-    #[default]
     Simple,
     #[serde(alias = "forking")]
     Forking,
@@ -54,6 +53,12 @@ pub(super) enum ServiceType {
     Exec,
     TypeMax,
     TypeInvalid = -1,
+}
+
+impl Default for ServiceType {
+    fn default() -> Self {
+        Self::Simple
+    }
 }
 
 impl DeserializeWith for ServiceType {
@@ -82,10 +87,9 @@ pub(super) enum NotifyAccess {
     Main,
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy, Default)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy)]
 pub(super) enum ServiceRestart {
     #[serde(alias = "no")]
-    #[default]
     No,
     #[serde(alias = "on-success")]
     OnSuccess,
@@ -99,6 +103,12 @@ pub(super) enum ServiceRestart {
     OnAbort,
     #[serde(alias = "always")]
     Always,
+}
+
+impl Default for ServiceRestart {
+    fn default() -> Self {
+        Self::No
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -163,12 +173,17 @@ impl DeserializeWith for ExitStatusSet {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PreserveMode {
-    #[default]
     No,
     Yes,
     Restart,
+}
+
+impl Default for PreserveMode {
+    fn default() -> Self {
+        Self::No
+    }
 }
 
 impl DeserializeWith for PreserveMode {
@@ -330,9 +345,8 @@ impl ServiceReConf {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, EnumDisplay, Default)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, EnumDisplay)]
 pub(super) enum ServiceState {
-    #[default]
     Dead,
     Condition,
     StartPre,
@@ -354,7 +368,13 @@ pub(super) enum ServiceState {
     Cleaning,
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, Default)]
+impl Default for ServiceState {
+    fn default() -> Self {
+        Self::Dead
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize)]
 pub(super) enum ServiceResult {
     Success,
     FailureProtocol,
@@ -366,8 +386,13 @@ pub(super) enum ServiceResult {
     FailureCoreDump,
     FailureTimeout,
     SkipCondition,
-    #[default]
     ResultInvalid,
+}
+
+impl Default for ServiceResult {
+    fn default() -> Self {
+        Self::ResultInvalid
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Copy, Clone, Serialize, Deserialize)]
