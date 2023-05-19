@@ -54,11 +54,10 @@ set +e
 for url in ${sources[*]}
 do
     git config --global url."${url}".insteadOf "https://github.com/"
-    git clone https://github.com/pre-commit/pre-commit-hooks && git clone https://github.com/codespell-project/codespell
+    git ls-remote --exit-code https://github.com/pre-commit/pre-commit-hooks &> /dev/null && \
+    git ls-remote --exit-code https://github.com/codespell-project/codespell  &> /dev/null
     if [[ $? -ne 0 ]]; then
         git config --unset --global url."${url}".insteadOf "https://github.com/"
-        rm -rf pre-commit-hooks
-        rm -rf codespell
     else
         set -e
         pre-commit run -vvv --all-files
