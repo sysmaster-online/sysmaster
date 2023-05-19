@@ -1,0 +1,8 @@
+[Unit]
+Description="OpenSSH ed25519 Server Key Generation"
+ConditionFileNotEmpty="|!/etc/ssh/ssh_host_ed25519_key"
+
+[Service]
+Type="oneshot"
+EnvironmentFile="-/etc/sysconfig/sshd"
+ExecStart="/usr/libexec/openssh/sshd-keygen ed25519"
