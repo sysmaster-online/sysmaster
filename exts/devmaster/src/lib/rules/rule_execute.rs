@@ -28,6 +28,7 @@ use crate::{
     },
 };
 use basic::{
+    parse_util::parse_mode,
     proc_cmdline::cmdline_get_item,
     user_group_util::{get_group_creds, get_user_creds},
 };
@@ -58,7 +59,7 @@ struct ExecuteUnit {
     device_db_clone: RefCell<Option<Device>>,
     name: String,
     program_result: String,
-    // mode: mode_t,
+    mode: Option<mode_t>,
     uid: Option<Uid>,
     gid: Option<Gid>,
     // seclabel_list: HashMap<String, String>,
@@ -74,7 +75,7 @@ struct ExecuteUnit {
     watch_final: bool,
     group_final: bool,
     owner_final: bool,
-    // mode_final: bool,
+    mode_final: bool,
     // name_final: bool,
     // devlink_final: bool,
     // run_final: bool,
@@ -91,7 +92,7 @@ impl ExecuteUnit {
             device_db_clone: RefCell::new(None),
             name: String::default(),
             program_result: String::default(),
-            // mode: (),
+            mode: None,
             uid: None,
             gid: None,
             // seclabel_list: (),
@@ -106,7 +107,7 @@ impl ExecuteUnit {
             watch_final: false,
             group_final: false,
             owner_final: false,
-            // mode_final: (),
+            mode_final: false,
             // name_final: (),
             // devlink_final: (),
             // run_final: (),
@@ -1024,12 +1025,18 @@ impl ExecuteManager {
                 };
 
                 for line in result.split('\n') {
+                    if line.is_empty() {
+                        continue;
+                    }
+
                     match get_property_from_string(line) {
                         Ok((key, value)) => {
                             execute_err!(
                                 token,
                                 device.as_ref().lock().unwrap().add_property(key, value)
                             )?;
+
+                            log_rule_token_debug!(token, format!("add key-value ()"))
                         }
                         Err(e) => {
                             log_rule_token_debug!(token, e);
@@ -1501,6 +1508,80 @@ impl ExecuteManager {
                 let gid = execute_err!(token, token.value.parse::<gid_t>().context(ParseIntSnafu))?;
 
                 self.current_unit.as_mut().unwrap().gid = Some(Gid::from_raw(gid));
+
+                Ok(true)
+            }
+            AssignMode => {
+                if self.current_unit.as_ref().unwrap().mode_final {
+                    log_rule_token_debug!(
+                        token,
+                        "mode is final-assigned previously, ignore this assignment"
+                    );
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().mode_final = true;
+                }
+
+                let mode = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log_rule_token_error!(token, format!("failed to apply formatter: ({})", e));
+                        return Ok(true);
+                    }
+                };
+
+                match parse_mode(&mode) {
+                    Ok(v) => {
+                        log_rule_token_debug!(token, format!("assign mode '{}'", v));
+                        self.current_unit.as_mut().unwrap().mode = Some(v);
+                    }
+                    Err(_) => {
+                        log_rule_token_error!(token, format!("unknown mode string '{}'", mode));
+                    }
+                }
+
+                Ok(true)
+            }
+            AssignModeId => {
+                /*
+                 * todo: if the value of 'Mode', 'Owner' or 'Group' is plain string,
+                 * it can be parsed during rules loading. Currently, rules token carries
+                 * string and thus the string will be repeatedly parsed during loading and
+                 * executing. This will lead to performance loss. In future, we can let
+                 * the rules token carry the raw data and automatically transform to
+                 * specific object during executing for acceleration.
+                 */
+                if self.current_unit.as_ref().unwrap().mode_final {
+                    log_rule_token_debug!(
+                        token,
+                        "mode is final-assigned previously, ignore this assignment"
+                    );
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().mode_final = true;
+                }
+
+                match parse_mode(&token.value) {
+                    Ok(v) => {
+                        log_rule_token_debug!(token, format!("assign mode '{}'", v));
+                        self.current_unit.as_mut().unwrap().mode = Some(v);
+                    }
+                    Err(_) => {
+                        log_rule_token_error!(
+                            token,
+                            format!("unknown mode string '{}'", token.value)
+                        );
+                    }
+                }
 
                 Ok(true)
             }

@@ -1493,6 +1493,12 @@ impl RuleToken {
                 }
 
                 if parse_mode(&value).is_ok() {
+                    /*
+                     * todo: if a legal mode is provided, directly pass the mode to rules executer.
+                     * However, currently rules token uses string to carry token value, which leads
+                     * to repeatedly string parse during rules executing. In future, we will let rules
+                     * token carry raw data and transform the data into specific structure object directly.
+                     */
                     Ok(RuleToken::new(
                         TokenType::AssignModeId,
                         op,

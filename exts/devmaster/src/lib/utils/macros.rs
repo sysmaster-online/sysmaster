@@ -132,7 +132,7 @@ macro_rules! log_rule_token_debug {
             $t.line_number,
             $t.content,
             $m
-        );
+        )
     };
 }
 

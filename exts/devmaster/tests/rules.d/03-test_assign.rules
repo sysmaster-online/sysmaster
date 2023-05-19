@@ -66,3 +66,18 @@ KERNEL=="sda1", GROUP="987"
 # Trigger: devctl trigger /dev/sda1
 # Expect: group is final-assigned previously, ignore this assignment
 KERNEL=="sda1", GROUP:="987", GROUP="0"
+
+# Description: test AssignMode
+# Trigger: devctl trigger /dev/sda1
+# Expect: assign mode '444'
+KERNEL=="sda1", IMPORT{program}="/bin/echo mode=444", MODE="$env{mode}"
+
+# Description: test AssignModeId
+# Trigger: devctl trigger /dev/sda1
+# Expect: assign mode '444'
+KERNEL=="sda1", MODE="444"
+
+# Description: test AssignModeId with final-assign operator
+# Trigger: devctl trigger /dev/sda1
+# Expect: mode is final-assigned previously, ignore this assignment
+KERNEL=="sda1", MODE:="444", MODE="666"
