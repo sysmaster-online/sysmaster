@@ -160,6 +160,10 @@ impl UnitDb {
         }
     }
 
+    pub fn child_unwatch_all_pids(&self, id: &str) {
+        self.child.unwatch_all_pids(id);
+    }
+
     pub fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {
         self.child.get_unit_by_pid(pid)
     }

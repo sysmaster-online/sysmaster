@@ -134,6 +134,9 @@ pub trait UmIf {
     /// add all the pid of unit id, read pids from cgroup path.
     fn child_watch_all_pids(&self, _id: &str) {}
 
+    /// remove all the pid of unit id
+    fn child_unwatch_all_pids(&self, _id: &str) {}
+
     ///rentry_trigger_merge
     fn rentry_trigger_merge(&self, _unit_id: &str, _force: bool) {}
 

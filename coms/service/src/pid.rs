@@ -94,6 +94,12 @@ impl ServicePid {
         }
     }
 
+    pub(super) fn child_unwatch_all_pids(&self) {
+        if let Some(u) = self.comm.owner() {
+            self.comm.um().child_unwatch_all_pids(u.id());
+        }
+    }
+
     pub(super) fn main(&self) -> Option<Pid> {
         self.data.borrow().main()
     }

@@ -392,6 +392,10 @@ impl UmIf for UnitManager {
         self.child_watch_all_pids(id)
     }
 
+    fn child_unwatch_all_pids(&self, id: &str) {
+        self.child_unwatch_all_pids(id)
+    }
+
     fn notify_socket(&self) -> Option<PathBuf> {
         self.notify_socket()
     }
@@ -478,6 +482,11 @@ impl UnitManager {
     /// add all the pid of unit id, read pids from cgroup path.
     fn child_watch_all_pids(&self, id: &str) {
         self.db.child_watch_all_pids(id)
+    }
+
+    /// remove all pids
+    fn child_unwatch_all_pids(&self, id: &str) {
+        self.db.child_unwatch_all_pids(id)
     }
 
     /// delete the pid from the db

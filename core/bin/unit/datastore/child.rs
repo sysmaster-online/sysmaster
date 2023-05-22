@@ -57,17 +57,23 @@ impl UnitChild {
     pub(super) fn add_watch_pid(&self, id: &str, pid: Pid) {
         log::debug!("borrow add watch_pids for pid:{}, id:{}", pid, id);
         let unit = self.units.get(id).unwrap();
-        let u = Rc::clone(&unit);
-        self.data.add_watch_pid(unit, pid);
-        u.child_add_pids(pid);
+        self.data.add_watch_pid(unit.clone(), pid);
+        unit.child_add_pids(pid);
     }
 
     pub(super) fn unwatch_pid(&self, id: &str, pid: Pid) {
         let unit = self.units.get(id).unwrap();
-        let u = Rc::clone(&unit);
         log::debug!("borrow remove watch_pids for {}", pid);
-        self.data.unwatch_pid(unit, pid);
-        u.child_remove_pids(pid);
+        self.data.unwatch_pid(unit.clone(), pid);
+        unit.child_remove_pids(pid);
+    }
+
+    pub(super) fn unwatch_all_pids(&self, id: &str) {
+        let unit = self.units.get(id).unwrap();
+        for i in self.data.watch_pids.borrow().keys() {
+            unit.child_remove_pids(*i);
+        }
+        self.data.watch_pids.borrow_mut().clear();
     }
 
     pub(super) fn get_unit_by_pid(&self, pid: Pid) -> Option<Rc<UnitX>> {

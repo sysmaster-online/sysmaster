@@ -845,6 +845,16 @@ impl ServiceMng {
             self.set_cmd_type(None);
         }
 
+        if vec![
+            ServiceState::Dead,
+            ServiceState::Failed,
+            ServiceState::AutoRestart,
+        ]
+        .contains(&state)
+        {
+            self.pid.child_unwatch_all_pids();
+        }
+
         // todo!()
         // trigger the unit the dependency trigger_by
 
