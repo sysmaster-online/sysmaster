@@ -105,6 +105,11 @@ pub fn kill_all_pids(signal: i32) -> HashSet<i32> {
         let file_name = String::from(entry.file_name().to_str().unwrap());
         // Check pid directory.
         if let Ok(pid_raw) = file_name.parse::<i32>() {
+            if Pid::from_raw(pid_raw) <= Pid::from_raw(1)
+                || Pid::from_raw(pid_raw) == nix::unistd::getpid()
+            {
+                continue;
+            }
             unsafe {
                 log::debug!("killing pid: {} by signal {}", pid_raw, signal);
                 kill(pid_raw, signal);

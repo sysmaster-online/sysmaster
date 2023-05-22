@@ -170,12 +170,12 @@ fn generate_command_request(args: Args) -> Option<CommandRequest> {
             CommandRequest::new_syscomm(sys_comm::Action::Shutdown, force)
         }
 
-        SubCmd::Reboot { force } => CommandRequest::new_syscomm(sys_comm::Action::Shutdown, force),
+        SubCmd::Reboot { force } => CommandRequest::new_syscomm(sys_comm::Action::Reboot, force),
 
-        SubCmd::Halt { force } => CommandRequest::new_syscomm(sys_comm::Action::Shutdown, force),
+        SubCmd::Halt { force } => CommandRequest::new_syscomm(sys_comm::Action::Halt, force),
 
         SubCmd::Poweroff { force } => {
-            CommandRequest::new_syscomm(sys_comm::Action::Shutdown, force)
+            CommandRequest::new_syscomm(sys_comm::Action::Poweroff, force)
         }
 
         SubCmd::DaemonReload {} => CommandRequest::new_mngrcomm(mngr_comm::Action::Reload),
