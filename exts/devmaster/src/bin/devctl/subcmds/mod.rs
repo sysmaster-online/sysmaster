@@ -14,4 +14,5 @@
 //!
 
 pub(crate) mod devctl_monitor;
+pub(crate) mod devctl_test_builtin;
 pub(crate) mod devctl_trigger;

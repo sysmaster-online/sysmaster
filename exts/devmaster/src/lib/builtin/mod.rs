@@ -164,8 +164,14 @@ impl Display for BuiltinCommand {
 }
 
 /// manage builtin commands
-struct BuiltinManager {
+pub struct BuiltinManager {
     builtins: HashMap<BuiltinCommand, Box<dyn Builtin>>,
+}
+
+impl Default for BuiltinManager {
+    fn default() -> BuiltinManager {
+        Self::new()
+    }
 }
 
 impl BuiltinManager {

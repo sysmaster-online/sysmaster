@@ -20,6 +20,7 @@ use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
 use log::LevelFilter;
 use std::{io::Write, net::TcpStream};
 use subcmds::devctl_monitor::subcommand_monitor;
+use subcmds::devctl_test_builtin::subcommand_test_builtin;
 use subcmds::devctl_trigger::subcommand_trigger;
 
 /// parse program arguments
@@ -73,6 +74,20 @@ enum SubCmd {
         #[clap(short('n'), long)]
         dry_run: bool,
     },
+
+    /// Test builtin command on a device
+    #[clap(display_order = 5)]
+    TestBuiltin {
+        /// device action
+        #[clap(short, long)]
+        action: Option<String>,
+        /// builtin command
+        #[clap(required = true)]
+        builtin: String,
+        /// device syspath
+        #[clap(required = true)]
+        syspath: String,
+    },
 }
 
 /// subcommand for testing communication
@@ -103,5 +118,10 @@ fn main() {
             devices,
             dry_run,
         } => subcommand_trigger(devices, r#type, verbose, action, dry_run),
+        SubCmd::TestBuiltin {
+            action,
+            builtin,
+            syspath,
+        } => subcommand_test_builtin(action, builtin, syspath),
     }
 }
