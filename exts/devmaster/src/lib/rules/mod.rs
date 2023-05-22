@@ -53,7 +53,7 @@ pub struct Rules {
 #[derive(Debug, Clone)]
 pub struct RuleFile {
     /// the name of the rule file
-    file_name: String,
+    rule_file: String,
 
     /// the linked list to contain all lines in the rule file
     /// keeps in order of line number
@@ -94,7 +94,9 @@ pub struct RuleLine {
     tokens_tail: Option<Arc<RwLock<RuleToken>>>,
 
     /// the rule file to contain this line
-    file: Weak<RwLock<RuleFile>>,
+    rule_file_ptr: Weak<RwLock<RuleFile>>,
+    /// the rule file name
+    rule_file: String,
 
     /// previous rule line
     prev: Option<Arc<RwLock<RuleLine>>>,
@@ -120,6 +122,10 @@ pub struct RuleToken {
     value: String,
     prev: Option<Arc<RwLock<RuleToken>>>,
     next: Option<Arc<RwLock<RuleToken>>>,
+
+    line_number: u32,
+    rule_file: String,
+    content: String,
 }
 
 impl RuleToken {
@@ -291,7 +297,7 @@ impl Rules {
 
 impl Display for RuleFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = format!("File: {}", self.file_name);
+        let mut s = format!("File: {}", self.rule_file);
         for line in self.iter() {
             s.push_str(format!("\n{}", line.as_ref().read().unwrap()).as_str());
         }
@@ -334,13 +340,13 @@ impl Display for RuleLine {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!(
             "{}:{}:  {}",
-            self.file
+            self.rule_file_ptr
                 .upgrade()
                 .unwrap()
                 .as_ref()
                 .read()
                 .unwrap()
-                .file_name,
+                .rule_file,
             self.line_number,
             self.line
         );
@@ -386,8 +392,8 @@ impl Display for RuleToken {
         // let s = String::new();
         write!(
             f,
-            "Token: {:?} {:?} {:?} {}",
-            self.r#type, self.attr, self.op, self.value
+            "Token {}: {:?} {:?} {:?} {}",
+            self.content, self.r#type, self.attr, self.op, self.value
         )
     }
 }
