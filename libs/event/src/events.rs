@@ -108,7 +108,10 @@ impl Events {
         }
 
         let top = first.unwrap();
-        let state = self.data.borrow().source_state(&top).unwrap();
+        let state = match self.data.borrow().source_state(&top) {
+            None => return Ok(0),
+            Some(v) => v,
+        };
         match state {
             EventState::Off => {
                 println!("set_enabled Off: {top:?}");
