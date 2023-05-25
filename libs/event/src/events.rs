@@ -113,9 +113,7 @@ impl Events {
             Some(v) => v,
         };
         match state {
-            EventState::Off => {
-                println!("set_enabled Off: {top:?}");
-            }
+            EventState::Off => {}
             EventState::On => {
                 top.dispatch(self);
                 if top.event_type() == EventType::Defer {
