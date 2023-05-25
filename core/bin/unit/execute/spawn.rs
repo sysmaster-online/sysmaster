@@ -231,31 +231,22 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
     let envs_cstr = envs.iter().map(|v| v.as_c_str()).collect::<Vec<_>>();
     let mut keep_fds = params.fds();
 
-    let ret = close_all_fds(params.fds());
+    /* Be careful! We have closed the log fd from here, Don't log. */
+    let ret = close_all_fds(&keep_fds);
     if !ret {
-        log::error!("close all needless fds failed");
         return;
     }
 
     if !shift_fds(&mut keep_fds) {
-        log::error!("shift all fds error");
         return;
     }
 
     if !flags_fds(&mut keep_fds, params.get_nonblock()) {
-        log::error!("flags set all fds error");
         return;
     }
 
-    log::debug!("exec child envs to execve is: {:?}", envs_cstr);
-    match unistd::execve(&cmd, &cstr_args, &envs_cstr) {
-        Ok(_) => {
-            log::debug!("execv returned Ok()");
-        }
-        Err(e) => {
-            log::error!("exec child failed: {:?}", e);
-            std::process::exit(1);
-        }
+    if unistd::execve(&cmd, &cstr_args, &envs_cstr).is_err() {
+        std::process::exit(1);
     }
 }
 
@@ -337,36 +328,31 @@ fn is_valid_fd(entry: &DirEntry) -> bool {
     false
 }
 
-fn close_all_fds(fds: Vec<i32>) -> bool {
+fn close_all_fds(fds: &[i32]) -> bool {
     let opend_dir = PathBuf::from(format!("/proc/{}/fd", nix::unistd::getpid()));
     for entry in WalkDir::new("/proc/self/fd")
         .min_depth(1)
         .into_iter()
         .filter_entry(|e| !is_valid_fd(e))
     {
-        entry.map_or_else(
-            |_e| {
-                log::error!("walf dir error {:?}", _e);
-            },
-            |_e| {
-                let file_name = _e.file_name().to_str().unwrap();
-                let fd = file_name.parse::<i32>().unwrap();
-                if fds.contains(&fd) {
-                    log::debug!("close file name is {}", file_name);
-                    return;
-                }
+        let de = match entry {
+            Err(_) => continue,
+            Ok(v) => v,
+        };
 
-                let link_name = std::fs::read_link(_e.path()).map_or(PathBuf::from(""), |e| e);
-                if link_name == opend_dir {
-                    log::debug!("not close self opened fd");
-                    return;
-                }
+        let file_name = de.file_name().to_str().unwrap();
+        let fd = file_name.parse::<i32>().unwrap();
+        if fds.contains(&fd) {
+            continue;
+        }
 
-                fd_util::close(fd);
-            },
-        );
+        let link_name = std::fs::read_link(de.path()).map_or(PathBuf::from(""), |e| e);
+        if link_name == opend_dir {
+            continue;
+        }
+
+        fd_util::close(fd);
     }
-
     true
 }
 
@@ -379,13 +365,11 @@ fn shift_fds(fds: &mut Vec<i32>) -> bool {
                 continue;
             }
 
-            let nfd = if let Ok(fd) = nix::fcntl::fcntl(fds[i as usize], FcntlArg::F_DUPFD(i + 3)) {
-                fd
-            } else {
-                return false;
+            let nfd = match nix::fcntl::fcntl(fds[i as usize], FcntlArg::F_DUPFD(i + 3)) {
+                Err(_) => return false,
+                Ok(v) => v,
             };
 
-            log::debug!("kill older fd: {}, new fd is: {}", fds[i as usize], nfd);
             fd_util::close(fds[i as usize]);
 
             fds[i as usize] = nfd;
@@ -406,15 +390,14 @@ fn shift_fds(fds: &mut Vec<i32>) -> bool {
 
 fn flags_fds(fds: &mut Vec<i32>, nonblock: bool) -> bool {
     for fd in fds {
-        if let Err(_e) = fd_util::fd_nonblock(*fd, nonblock) {
+        if fd_util::fd_nonblock(*fd, nonblock).is_err() {
             return false;
         }
 
-        if let Err(_e) = fd_util::fd_cloexec(*fd, false) {
+        if fd_util::fd_cloexec(*fd, false).is_err() {
             return false;
         }
     }
-
     true
 }
 
