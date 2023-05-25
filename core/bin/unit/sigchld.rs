@@ -99,7 +99,6 @@ impl SigchldSub {
     }
 
     pub(self) fn enable(&self, enable: bool) -> i32 {
-        println!("sigchild enable.");
         let source = Rc::clone(&self.data);
         let state = match enable {
             true => EventState::On,
@@ -141,8 +140,6 @@ impl Source for SigchldData {
     }
 
     fn dispatch(&self, _event: &Events) -> i32 {
-        println!("sigchld dispatch");
-
         self.reli.set_last_frame1(ReliLastFrame::SigChld as u32);
         let enable = self.sigchld_dispatch();
         self.reli.clear_last_frame();

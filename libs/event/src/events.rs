@@ -110,9 +110,7 @@ impl Events {
         let top = first.unwrap();
         let state = self.data.borrow().source_state(&top).unwrap();
         match state {
-            EventState::Off => {
-                println!("set_enabled Off: {top:?}");
-            }
+            EventState::Off => {}
             EventState::On => {
                 top.dispatch(self);
                 if top.event_type() == EventType::Defer {

@@ -49,7 +49,6 @@ mod test {
         }
 
         fn dispatch(&self, e: &Events) -> i32 {
-            println!("Dispatching timer!");
             e.set_exit();
             0
         }
