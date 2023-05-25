@@ -47,6 +47,10 @@ impl ReStation for UnitRT {
         self.data.db_map(reload);
     }
 
+    fn db_insert(&self) {
+        self.data.db_insert();
+    }
+
     // reload
     // repeating protection
     fn entry_clear(&self) {
@@ -237,6 +241,13 @@ impl UnitRTData {
                 }
             }
         }
+    }
+
+    pub(self) fn db_insert(&self) {
+        // If the data changes under db_map() when reload is true, it needs to be inserted.
+        // db_map currently does nothing to do.
+        // QUEUE_LOAD is nothing to do.
+        // QUEUE_TARGET_DEPS is nothing to do.
     }
 
     pub(self) fn dispatch_load_queue(&self) {

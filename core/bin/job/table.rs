@@ -60,11 +60,23 @@ impl JobTable {
         job
     }
 
+    pub(super) fn rentry_insert_suspend(&self) {
+        for job in self.t_unit.borrow().get_all_suspends() {
+            job.rentry_suspends_insert();
+        }
+    }
+
     pub(super) fn rentry_map_trigger(&self, ja: &JobAlloc, config: &JobConf) -> Rc<Job> {
         let job = ja.alloc(config);
         job.rentry_map_trigger();
         self.insert_trigger(Rc::clone(&job)).unwrap();
         job
+    }
+
+    pub(super) fn rentry_insert_trigger(&self) {
+        for job in self.t_unit.borrow().get_all_triggers() {
+            job.rentry_trigger_insert();
+        }
     }
 
     pub(super) fn coldplug_suspend(&self, unit: &UnitX) {
@@ -708,6 +720,24 @@ impl JobUnitTable {
         let mut jobs = Vec::new();
         if let Some(uv) = self.t_data.get(unit) {
             jobs.append(&mut uv.get_suspends());
+        }
+        jobs
+    }
+
+    pub(self) fn get_all_suspends(&self) -> Vec<Rc<Job>> {
+        let mut jobs = Vec::new();
+        for (_, uv) in self.t_data.iter() {
+            jobs.append(&mut uv.get_suspends());
+        }
+        jobs
+    }
+
+    pub(self) fn get_all_triggers(&self) -> Vec<Rc<Job>> {
+        let mut jobs = Vec::new();
+        for (_, uv) in self.t_data.iter() {
+            if let Some(job) = uv.get_trigger() {
+                jobs.push(job);
+            }
         }
         jobs
     }

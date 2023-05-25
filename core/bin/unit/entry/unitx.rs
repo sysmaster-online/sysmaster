@@ -38,6 +38,10 @@ impl ReStation for UnitX {
         self.0.db_map(reload);
     }
 
+    fn db_insert(&self) {
+        self.0.db_insert();
+    }
+
     // reload: entry-only
     fn entry_coldplug(&self) {
         self.0.entry_coldplug();

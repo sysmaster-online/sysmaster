@@ -28,7 +28,7 @@ use std::{env, fs};
 /// K & V that can be deserialized without borrowing any data from the deserializer.
 pub struct ReDb<K, V> {
     // control
-    ignore: RefCell<bool>,
+    switch: RefCell<bool>,
 
     // data
     db: Database<SerdeBincode<K>, SerdeBincode<V>>,
@@ -36,7 +36,8 @@ pub struct ReDb<K, V> {
     add: RefCell<HashMap<K, V>>,
     del: RefCell<HashSet<K>>,
     name: String,
-    //_phantom: PhantomData<&'a K>,
+    buf: RefCell<HashMap<K, V>>, // daemon-reload or daemon-reexec will temporarily store the data here first, and finally refreshes it to db.
+                                 //_phantom: PhantomData<&'a K>,
 }
 
 impl<K, V> ReDbTable for ReDb<K, V>
@@ -52,12 +53,17 @@ where
         self.cache_2_db(db_wtxn);
     }
 
+    /// daemon-reload or daemon-reexec export all data to database
+    fn reexport(&self, db_wtxn: &mut ReDbRwTxn) {
+        self.rebuf_2_db(db_wtxn);
+    }
+
     fn import(&self, db_rtxn: &ReDbRoTxn) {
         self.db_2_cache(db_rtxn);
     }
 
-    fn ignore_set(&self, ignore: bool) {
-        self.set_ignore(ignore);
+    fn switch_set(&self, switch: bool) {
+        self.set_switch(switch);
     }
 }
 
@@ -70,12 +76,13 @@ where
     pub fn new(relir: &Reliability, db_name: &str) -> ReDb<K, V> {
         let db = relir.create_database(Some(db_name)).unwrap();
         ReDb {
-            ignore: RefCell::new(false),
+            switch: RefCell::new(false),
             db,
             cache: RefCell::new(HashMap::new()),
             add: RefCell::new(HashMap::new()),
             del: RefCell::new(HashSet::new()),
             name: String::from(db_name),
+            buf: RefCell::new(HashMap::new()),
             //_phantom: PhantomData,
         }
     }
@@ -89,18 +96,25 @@ where
     }
 
     /// set the ignore flag of data
-    pub fn set_ignore(&self, ignore: bool) {
-        *self.ignore.borrow_mut() = ignore;
+    pub fn set_switch(&self, switch: bool) {
+        *self.switch.borrow_mut() = switch;
     }
 
     /// insert a entry
     pub fn insert(&self, k: K, v: V) {
-        if self.ignore() {
+        let switch = self.switch();
+        log::debug!(
+            "ReDb[{}] switch:{:?} insert, key:{:?}, value:{:?}.",
+            &self.name,
+            switch,
+            &k,
+            &v
+        );
+
+        if switch {
+            self.buf.borrow_mut().insert(k, v);
             return;
         }
-
-        let n = &self.name;
-        log::debug!("ReDb[{}] insert, key: {:?}, value: {:?}.", n, &k, &v);
 
         // remove "del" + insert "add"
         self.del.borrow_mut().remove(&k);
@@ -112,11 +126,14 @@ where
 
     /// remove a entry
     pub fn remove(&self, k: &K) {
-        if self.ignore() {
+        let n = &self.name;
+        let switch = self.switch();
+        log::debug!("ReDb[{}] switch:{:?}, remove, key:{:?}.", n, switch, &k);
+
+        if switch {
+            self.buf.borrow_mut().remove(k);
             return;
         }
-
-        log::debug!("ReDb[{}] remove, key: {:?}.", &self.name, &k);
 
         // remove "add" + insert "del"
         self.add.borrow_mut().remove(k);
@@ -136,6 +153,10 @@ where
 
     /// get the existence of the key
     pub fn contains_key(&self, k: &K) -> bool {
+        if self.switch() {
+            return self.buf.borrow().contains_key(k);
+        }
+
         self.cache.borrow().contains_key(k)
     }
 
@@ -178,6 +199,16 @@ where
         self.del.borrow_mut().clear();
     }
 
+    /// export all data from cache to database
+    pub fn rebuf_2_db(&self, wtxn: &mut ReDbRwTxn) {
+        // "buf" -> db.put + clear "buf"
+        for (k, v) in self.buf.borrow().iter() {
+            self.db.put(&mut wtxn.0, k, v).expect("history.put");
+        }
+
+        self.buf.borrow_mut().clear();
+    }
+
     /// emport all data from database to cache
     pub fn db_2_cache(&self, rtxn: &ReDbRoTxn)
     where
@@ -197,8 +228,8 @@ where
         }
     }
 
-    fn ignore(&self) -> bool {
-        *self.ignore.borrow()
+    fn switch(&self) -> bool {
+        *self.switch.borrow()
     }
 }
 
@@ -228,10 +259,12 @@ pub trait ReDbTable {
     fn clear(&self, wtxn: &mut ReDbRwTxn);
     /// export all data to database
     fn export(&self, wtxn: &mut ReDbRwTxn);
+    /// daemon-reload or daemon-reexec export all data to database
+    fn reexport(&self, wtxn: &mut ReDbRwTxn);
     /// import all data from database
     fn import(&self, rtxn: &ReDbRoTxn);
-    /// set the ignore flag of data
-    fn ignore_set(&self, ignore: bool);
+    /// set the switch flag of data, does switch control whether to use cache or buf
+    fn switch_set(&self, switch: bool);
 }
 
 const RELI_PATH_DIR: &str = "/run/sysmaster/reliability";

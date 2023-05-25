@@ -94,6 +94,17 @@ impl ReStation for Unit {
         self.sub.db_map(reload);
     }
 
+    // data insert
+    fn db_insert(&self) {
+        self.base.db_insert();
+        self.config.db_insert();
+        self.cgroup.db_insert();
+        self.load.db_insert();
+        self.child.db_insert();
+
+        self.sub.db_insert();
+    }
+
     // reload: entry-only
     fn entry_coldplug(&self) {
         // rebuild external connections, like: timer, ...

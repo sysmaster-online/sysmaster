@@ -109,13 +109,14 @@ impl ReStation for SocketMng {
 
     // reload: entry-only
     fn entry_coldplug(&self) {
-        if self.state() != SocketState::Listening {
+        if self.state() == SocketState::Listening {
             self.watch_fds();
         }
     }
 
     fn entry_clear(&self) {
-        self.close_fds();
+        // port fd is a long-term monitoring file and cannot be closed
+        self.unwatch_fds();
     }
 }
 
@@ -690,11 +691,11 @@ impl SocketMng {
     }
 
     fn map_ports_fd(&self, rports: Vec<(PortType, String, RawFd)>) {
-        assert_eq!(rports.len(), self.ports().len());
-
         for (p_type, listen, fd) in rports.iter() {
             match self.ports_find(*p_type, listen) {
-                Some(port) => port.set_fd(self.comm.reli().fd_take(*fd)),
+                Some(port) => {
+                    port.set_fd(self.comm.reli().fd_take(*fd));
+                }
                 None => log::debug!("Not find {:?}:{:?}", *p_type, listen),
             }
         }

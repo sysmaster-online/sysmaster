@@ -90,6 +90,18 @@ impl ReliStation {
         }
     }
 
+    pub fn db_insert(&self) {
+        // level 1
+        for station in self.get_kind(ReStationKind::Level1).iter() {
+            station.db_insert();
+        }
+
+        // level 2
+        for station in self.get_kind(ReStationKind::Level2).iter() {
+            station.db_insert();
+        }
+    }
+
     pub fn make_consistent(
         &self,
         lframe: Option<(u32, Option<u32>, Option<u32>)>,
