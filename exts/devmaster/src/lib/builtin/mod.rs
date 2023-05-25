@@ -73,13 +73,13 @@ pub trait Builtin {
         &self,
         device: Arc<Mutex<Device>>,
         test: bool,
-        key: String,
-        value: String,
+        key: &str,
+        value: &str,
     ) -> Result<(), Error> {
         device
             .lock()
             .unwrap()
-            .add_property(key.clone(), value.clone())
+            .add_property(key.to_string(), value.to_string())
             .map_err(|e| Error::BuiltinCommandError {
                 msg: format!("Failed to add property '{}'='{}': ({})", key, value, e),
             })?;

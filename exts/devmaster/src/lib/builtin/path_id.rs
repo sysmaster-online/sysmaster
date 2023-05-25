@@ -101,9 +101,9 @@ impl Builtin for PathId {
         /* strip trailing '_' */
         tag = tag.trim_end_matches('_').to_string();
 
-        self.add_property(device.clone(), test, "ID_PATH".to_string(), path)
+        self.add_property(device.clone(), test, "ID_PATH", &path)
             .unwrap_or(());
-        self.add_property(device.clone(), test, "ID_PATH_TAG".to_string(), tag)
+        self.add_property(device.clone(), test, "ID_PATH_TAG", &tag)
             .unwrap_or(());
 
         /*
@@ -112,7 +112,7 @@ impl Builtin for PathId {
          * ID_PATH_ATA_COMPAT
          */
         if !compat_path.is_empty() {
-            self.add_property(device, test, "ID_PATH_ATA_COMPAT".to_string(), compat_path)
+            self.add_property(device, test, "ID_PATH_ATA_COMPAT", &compat_path)
                 .unwrap_or(());
         }
 
@@ -296,10 +296,7 @@ impl PathId {
             return Some(parent);
         }
 
-        let id = parent
-            .lock()
-            .unwrap()
-            .get_sysattr_value("ieee1394_id".to_string());
+        let id = parent.lock().unwrap().get_sysattr_value("ieee1394_id");
         if id.is_ok() {
             self.path_prepend(path, format!("ieee1394-0x{}", id.unwrap()));
             *supported_parent = true;
@@ -360,7 +357,7 @@ impl PathId {
             Err(_) => return None,
         };
 
-        let port = match fcdev.get_sysattr_value("port_name".to_string()) {
+        let port = match fcdev.get_sysattr_value("port_name") {
             Ok(port) => port,
             Err(_) => return None,
         };
@@ -397,7 +394,7 @@ impl PathId {
             Err(_) => return None,
         };
 
-        let sas_address = match asadev.get_sysattr_value("asa_address".to_string()) {
+        let sas_address = match asadev.get_sysattr_value("asa_address") {
             Ok(addr) => addr,
             Err(_) => return None,
         };
@@ -438,7 +435,7 @@ impl PathId {
                 Err(_) => return None,
             };
 
-        let target = match sessiondev.get_sysattr_value("asa_address".to_string()) {
+        let target = match sessiondev.get_sysattr_value("asa_address") {
             Ok(port) => port,
             Err(_) => return None,
         };
@@ -454,11 +451,11 @@ impl PathId {
                 Ok(dev) => dev,
                 Err(_) => return None,
             };
-        let addr = match conndev.get_sysattr_value("persistent_address".to_string()) {
+        let addr = match conndev.get_sysattr_value("persistent_address") {
             Ok(addr) => addr,
             Err(_) => return None,
         };
-        let port = match conndev.get_sysattr_value("persistent_port".to_string()) {
+        let port = match conndev.get_sysattr_value("persistent_port") {
             Ok(port) => port,
             Err(_) => return None,
         };
@@ -526,7 +523,7 @@ impl PathId {
             Err(_) => return None,
         };
 
-        let port_no = match atadev.get_sysattr_value("port_no".to_string()) {
+        let port_no = match atadev.get_sysattr_value("port_no") {
             Ok(port) => port,
             Err(_) => return None,
         };
@@ -567,11 +564,7 @@ impl PathId {
             Err(_e) => return None,
         };
 
-        let guid_str = match vmbusdev
-            .lock()
-            .unwrap()
-            .get_sysattr_value("device_id".to_string())
-        {
+        let guid_str = match vmbusdev.lock().unwrap().get_sysattr_value("device_id") {
             Ok(str) => str,
             Err(_e) => return None,
         };
@@ -860,11 +853,8 @@ impl PathId {
         parent: Arc<Mutex<Device>>,
         path: &mut String,
     ) -> Option<Arc<Mutex<Device>>> {
-        let systype = parent.lock().unwrap().get_sysattr_value("type".to_string());
-        let func = parent
-            .lock()
-            .unwrap()
-            .get_sysattr_value("ap_functions".to_string());
+        let systype = parent.lock().unwrap().get_sysattr_value("type");
+        let func = parent.lock().unwrap().get_sysattr_value("ap_functions");
         if systype.is_ok() && func.is_ok() {
             self.path_prepend(path, format!("ap-{}-{}", systype.unwrap(), func.unwrap()));
         } else if let Some(sysname) = parent.lock().unwrap().get_sysname() {
@@ -883,7 +873,7 @@ impl PathId {
         supported_parent: &mut bool,
         supported_transport: &mut bool,
     ) -> Option<Arc<Mutex<Device>>> {
-        if let Ok(nsid) = dev.lock().unwrap().get_sysattr_value("nsid".to_string()) {
+        if let Ok(nsid) = dev.lock().unwrap().get_sysattr_value("nsid") {
             self.path_prepend(path, format!("nvme-{}", nsid));
             if !compat_path.is_empty() {
                 self.path_prepend(compat_path, format!("nvme-{}", nsid));
@@ -905,7 +895,7 @@ impl PathId {
         supported_parent: &mut bool,
         supported_transport: &mut bool,
     ) -> Result<Option<Arc<Mutex<Device>>>> {
-        if let Ok(nsid) = dev.lock().unwrap().get_sysattr_value("nsid".to_string()) {
+        if let Ok(nsid) = dev.lock().unwrap().get_sysattr_value("nsid") {
             self.path_prepend(path, format!("nvme-{}", nsid));
             if !compat_path.is_empty() {
                 self.path_prepend(compat_path, format!("nvme-{}", nsid));

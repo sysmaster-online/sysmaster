@@ -991,9 +991,9 @@ impl Device {
 
     /// get the value of specific device sysattr
     /// firstly check whether the sysattr is cached, otherwise lookup it from the sysfs and cache it
-    pub fn get_sysattr_value(&mut self, sysattr: String) -> Result<String, Error> {
+    pub fn get_sysattr_value(&mut self, sysattr: &str) -> Result<String, Error> {
         // check whether the sysattr is already cached
-        match self.get_cached_sysattr_value(sysattr.clone()) {
+        match self.get_cached_sysattr_value(sysattr.to_string()) {
             Ok(v) => {
                 return Ok(v);
             }
@@ -1008,12 +1008,12 @@ impl Device {
         }
 
         let syspath = self.get_syspath().unwrap().to_string();
-        let sysattr_path = syspath + "/" + sysattr.as_str();
+        let sysattr_path = syspath + "/" + sysattr;
         // let sysattr_path = sysattr_path.as_str();
         let value = match lstat(sysattr_path.as_str()) {
             Ok(stat) => {
                 if stat.st_mode & S_IFMT == S_IFLNK {
-                    if ["driver", "subsystem", "module"].contains(&sysattr.as_str()) {
+                    if ["driver", "subsystem", "module"].contains(&sysattr) {
                         readlink_value(sysattr_path)?
                     } else {
                         return Err(Error::Nix {
@@ -1062,7 +1062,8 @@ impl Device {
             }
 
             Err(e) => {
-                self.remove_cached_sysattr_value(sysattr).unwrap();
+                self.remove_cached_sysattr_value(sysattr.to_string())
+                    .unwrap();
                 return Err(Error::Nix {
                     msg: format!("get_sysattr_value failed: lstat {}", sysattr_path),
                     source: e,
@@ -1070,7 +1071,7 @@ impl Device {
             }
         };
 
-        self.cache_sysattr_value(sysattr, value.clone())
+        self.cache_sysattr_value(sysattr.to_string(), value.clone())
             .map_err(|e| Error::Nix {
                 msg: format!("get_sysattr_value failed: cache_sysattr_value ({})", e),
                 source: e.get_errno(),
@@ -2520,7 +2521,7 @@ mod tests {
             }
         }
 
-        match device.get_sysattr_value("nsid".to_string()) {
+        match device.get_sysattr_value("nsid") {
             Ok(value) => {
                 println!("{}", value);
                 value.trim().parse::<u32>().unwrap();

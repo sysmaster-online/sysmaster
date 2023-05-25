@@ -41,11 +41,11 @@ do
     egrep '#!\[deny\(warnings\)\]' $rustlist || sed -i '1i\#![deny(warnings)]' $rustlist 2>/dev/null || true
 done
 
-cargo clean
 #fix cargo clippy fail in pre-commit when build.rs is changed
 RUSTC_WRAPPER="" cargo clippy --all-targets --features "default" --all -- -Dwarnings || exit 1
 
 # run base check
+
 #filelist=`git diff origin/master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`
 # ln -s `which python3` /home/jenkins/.local/bin/python
 # pre-commit autoupdate || pre-commit autoupdate || pre-commit autoupdate

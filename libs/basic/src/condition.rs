@@ -18,6 +18,7 @@ use nix::{
         statvfs::{fstatvfs, FsFlags},
     },
 };
+use std::os::unix::prelude::AsRawFd;
 
 use libc::{glob, glob_t, GLOB_NOSORT};
 #[cfg(not(target_env = "musl"))]
@@ -309,7 +310,7 @@ impl Condition {
             }
             Ok(v) => v,
         };
-        let fd = std::os::unix::prelude::AsRawFd::as_raw_fd(&file);
+        let fd = AsRawFd::as_raw_fd(&file);
         let path_name = CString::new(self.params.as_str()).unwrap();
         let mut statxbuf: statx = unsafe { std::mem::zeroed() };
         unsafe {
@@ -431,11 +432,10 @@ impl Condition {
 
 #[cfg(test)]
 mod test {
+    use super::{Condition, ConditionType};
     use crate::{logger, proc_cmdline};
     use libtests::get_project_root;
     use std::path::Path;
-
-    use super::{Condition, ConditionType};
 
     #[test]
     fn test_condition_test() {
