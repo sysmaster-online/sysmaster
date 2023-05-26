@@ -20,46 +20,71 @@ pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum Error {
+    /// Error from device
+    #[snafu(context)]
+    Device { source: device::error::Error },
+
+    #[snafu(display("filename: {}, error: {}", filename, source))]
+    Io {
+        filename: String,
+        source: std::io::Error,
+    },
+
+    #[snafu(context)]
+    ReadTooShort { filename: String },
+
+    #[snafu(display("Fail to access : {}, error: {}", filename, source))]
+    FailToAccess {
+        filename: String,
+        source: device::error::Error,
+    },
+
+    #[snafu(display("Fail to get devtype : {}", source))]
+    FailToGetDevType { source: device::error::Error },
+
+    #[snafu(display("Fail to get sysattr : {}", source))]
+    GetSysAttr { source: device::error::Error },
+
+    #[snafu(display("Fail to sscanf : {}", source))]
+    FailToSscanf { source: sscanf::Error },
+
+    #[snafu(display("Fail to get sysattr : {}", source))]
+    ParseInt { source: std::num::ParseIntError },
+
+    #[snafu(context)]
+    CorruptData { filename: String },
+
+    #[snafu(display("sys_path not found"))]
+    SysPathNotFound,
+
+    #[snafu(display("sys_name not found"))]
+    SysNameNotFound,
+
     /// Error in worker manager
     #[snafu(display("Worker Manager: {}", msg))]
-    WorkerManagerError {
-        /// message
-        msg: &'static str,
-    },
+    WorkerManagerError { msg: &'static str },
 
     /// Error in job queue
     #[snafu(display("Job Queue: {}", msg))]
-    JobQueueError {
-        /// message
-        msg: &'static str,
-    },
+    JobQueueError { msg: &'static str },
 
     /// Error in control manager
     #[snafu(display("Control Manager: {}", msg))]
-    ControlManagerError {
-        /// message
-        msg: &'static str,
-    },
+    ControlManagerError { msg: &'static str },
 
     /// Error encountered in builtin commands
     #[snafu(display("Builtin: {}", msg))]
-    BuiltinCommandError {
-        /// message
-        msg: String,
-    },
+    BuiltinCommandError { msg: String },
 
     /// Error encountered in rules loader
     #[snafu(display("Failed to load rule: {}", msg))]
-    RulesLoadError {
-        /// message
-        msg: String,
-    },
+    RulesLoadError { msg: String },
 
     /// Error encountered in rules loader
     #[snafu(display("Failed to execute rule: {}", msg))]
     RulesExecuteError {
-        /// message
         msg: String,
         /// error number
         errno: nix::errno::Errno,
@@ -67,10 +92,7 @@ pub enum Error {
 
     /// Errors that can be ignored
     #[snafu(display("Ignore error: {}", msg))]
-    IgnoreError {
-        /// message
-        msg: String,
-    },
+    IgnoreError { msg: String },
 
     /// Other errors
     #[snafu(display("Other error: {}", msg))]

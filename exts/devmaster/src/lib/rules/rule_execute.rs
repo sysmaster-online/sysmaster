@@ -156,33 +156,33 @@ impl ExecuteUnit {
                         errno: Errno::EINVAL,
                     });
                 }
+                let attr = attribute.unwrap();
 
                 // try to read attribute value form path '[<SUBSYSTEM>/[SYSNAME]]<ATTRIBUTE>'
-                let value =
-                    if let Ok(v) = resolve_subsystem_kernel(&attribute.clone().unwrap(), true) {
+                let value = if let Ok(v) = resolve_subsystem_kernel(&attr, true) {
+                    v
+                } else if let Ok(v) = device.get_sysattr_value(&attr) {
+                    v
+                } else if self.parent.is_some() {
+                    // try to get sysattr upwards
+                    // we did not check whether self.parent is equal to self.device
+                    // this perhaps will result in problems
+                    if let Ok(v) = self
+                        .parent
+                        .clone()
+                        .unwrap()
+                        .as_ref()
+                        .lock()
+                        .unwrap()
+                        .get_sysattr_value(&attr)
+                    {
                         v
-                    } else if let Ok(v) = device.get_sysattr_value(attribute.clone().unwrap()) {
-                        v
-                    } else if self.parent.is_some() {
-                        // try to get sysattr upwards
-                        // we did not check whether self.parent is equal to self.device
-                        // this perhaps will result in problems
-                        if let Ok(v) = self
-                            .parent
-                            .clone()
-                            .unwrap()
-                            .as_ref()
-                            .lock()
-                            .unwrap()
-                            .get_sysattr_value(attribute.clone().unwrap())
-                        {
-                            v
-                        } else {
-                            return Ok(String::default());
-                        }
                     } else {
                         return Ok(String::default());
-                    };
+                    }
+                } else {
+                    return Ok(String::default());
+                };
 
                 let value = replace_chars(value.trim_end(), DEVMASTER_LEGAL_CHARS);
 
@@ -1269,7 +1269,7 @@ impl RuleToken {
                     .lock()
                     .unwrap()
                     .borrow_mut()
-                    .get_sysattr_value(attr)
+                    .get_sysattr_value(&attr)
                     .map_err(|e| Error::RulesExecuteError {
                         msg: format!("failed to match sysattr: ({})", e),
                         errno: e.get_errno(),
@@ -1292,7 +1292,7 @@ impl RuleToken {
                     .lock()
                     .unwrap()
                     .borrow_mut()
-                    .get_sysattr_value(attr_name)
+                    .get_sysattr_value(&attr_name)
                     .map_err(|e| Error::RulesExecuteError {
                         msg: format!("failed to match sysattr: ({})", e),
                         errno: e.get_errno(),
