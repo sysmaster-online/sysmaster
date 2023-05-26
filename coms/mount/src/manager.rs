@@ -274,8 +274,6 @@ impl Source for MountMonitorDefer {
     }
 
     fn dispatch(&self, _event: &Events) -> i32 {
-        println!("mount monitor dispatch");
-
         self.reli()
             .set_last_frame2(ReliLastFrame::SubManager as u32, UnitType::UnitMount as u32);
         self.rentry().set_last_frame(MountReFrame::Monitor);
