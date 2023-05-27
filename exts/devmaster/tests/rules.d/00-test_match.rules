@@ -1,0 +1,79 @@
+# Description: test MatchAction, MatchKernel
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo uevent of sda1': 'uevent of sda1'
+KERNEL=="sda1", PROGRAM=="/bin/echo uevent of sda1"
+
+# Description: test MatchAttr with attribute formatter
+# Trigger: devctl trigger /dev/sda1
+# Expect: tests/rules.d/00-test.rules:9:'ATTR{$parent}!="sda"' fails to match.
+KERNEL=="sda1", ATTR{$parent}!="sda", PROGRAM=="/bin/echo test MatchAttr 1"
+
+# Description: test MatchAttr with attribute formatter
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchAttr 2 devnum is 8:1': 'test MatchAttr 2 devnum is 8:1'
+KERNEL=="sda1", ATTR{../$kernel/dev}=="8:1", PROGRAM=="/bin/echo test MatchAttr 2 devnum is 8:1"
+
+# Description: test MatchAttr with subsystem kernel attribute
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchAttr 3': 'test MatchAttr 3'
+KERNEL=="sda1", ATTR{[block/sda1]/dev}=="8:1", PROGRAM=="/bin/echo test MatchAttr 3"
+
+# Description: test MatchTest, search for 'sda1/*/runtime_status' under subdirectory of sda
+# Trigger: devctl trigger /dev/sda
+# Expect: Capture stdout from command '/bin/echo test MatchTest 1': 'test MatchTest 1'
+KERNEL=="sda", TEST=="sda1/*/runtime_status", PROGRAM=="/bin/echo test MatchTest 1"
+
+# Description: test MatchTest, search for '*/runtime_status' under subdirectory of sda1, and the file mode is intersected with 777
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchTest 2': 'test MatchTest 2'
+KERNEL=="sda1", TEST{777}=="*/runtime_status", PROGRAM=="/bin/echo test MatchTest 2"
+
+# Description: test MatchTest, search for 'runtime_status' under subdirectory of sda1, and the file mode is intersected with 111
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchTest 3': 'test MatchTest 3'
+KERNEL=="sda1", TEST{111}!="*/runtime_status", PROGRAM=="/bin/echo test MatchTest 3"
+
+# Description: test sda has 'sda1/partition' attribute
+# Trigger: devctl trigger /dev/sda
+# Expect: Capture stdout from command '/bin/echo test MatchTest 4': 'test MatchTest 4'
+KERNEL=="sda", TEST=="sda1/partition", PROGRAM=="/bin/echo test MatchTest 4"
+
+# Description: test sda has 'sda1/partition' attribute with mode intersected with 444
+# Trigger: devctl trigger /dev/sda
+# Expect: Capture stdout from command '/bin/echo test MatchTest 5': 'test MatchTest 5'
+KERNEL=="sda", TEST{444}=="sda1/*/runtime_status", PROGRAM=="/bin/echo test MatchTest 5"
+
+# Description: test sda1 has 'power/runtime_status' attribute with mode intersected with 444
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchTest 6': 'test MatchTest 6'
+KERNEL=="sda1", TEST{444}=="power/runtime_status", PROGRAM=="/bin/echo test MatchTest 6"
+
+# Description: test sda1 has 'power/runtime_status' attribute with mode intersected with 400
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchTest 7': 'test MatchTest 7'
+KERNEL=="sda1", TEST{400}=="power/runtime_status", PROGRAM=="/bin/echo test MatchTest 7"
+
+# Description: test sda does not have 'runtime_status' attribute with mode
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchTest 8': 'test MatchTest 8'
+KERNEL=="sda1", TEST!="[block/sda]/partition", PROGRAM=="/bin/echo test MatchTest 8"
+
+# Description: test sda2 has 'partition' attribute
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchTest 9': 'test MatchTest 9'
+KERNEL=="sda1", TEST=="[block/sda2]/partition", PROGRAM=="/bin/echo test MatchTest 9"
+
+# Description: test spawning program not timeout
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command 'sh -c 'sleep 1; echo test program 3'': 'test program 3'
+KERNEL == "sda1", PROGRAM=="sh -c 'sleep 1; echo test program 3'"
+
+# Description: test spawning program timeout
+# Trigger: devctl trigger /dev/sda1
+# Expect: failed to apply token: (Other error: child process <PID> '"sh" "-c" "sleep 4; echo test program 4"' timed out)
+KERNEL == "sda1", PROGRAM=="sh -c 'sleep 4; echo test program 4'"
+
+# Description: test running external command
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command 'scsi_id --export --whitelisted -d /dev/sda1': 'ID_SCSI=1 ID_VENDOR=VMware_ ID_VENDOR_ENC=VMware\x2c\x20 ID_MODEL=VMware_Virtual_S ID_MODEL_ENC=VMware\x20Virtual\x20S ID_REVISION=1.0 ID_TYPE=disk'
+KERNEL == "sda1", PROGRAM=="scsi_id --export --whitelisted -d $devnode"

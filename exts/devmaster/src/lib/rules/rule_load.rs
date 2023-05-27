@@ -26,18 +26,20 @@ use regex::Regex;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
+lazy_static! {
 /// directories for searching rule files
-pub const DEFAULT_RULES_DIRS: [&str; 4] = [
-    "/etc/udev/rules.d",
-    "/run/udev/rules.d",
-    "/usr/local/lib/udev/rules.d",
-    "/usr/lib/udev/rules.d",
+pub(crate) static ref DEFAULT_RULES_DIRS: Vec<String> = vec![
+    "/etc/udev/rules.d".to_string(),
+    "/run/udev/rules.d".to_string(),
+    "/usr/local/lib/udev/rules.d".to_string(),
+    "/usr/lib/udev/rules.d".to_string(),
 ];
+}
 
 impl Rules {
     /// load all rules under specified directories
     pub(crate) fn load_rules(
-        dirs: &[&str],
+        dirs: Vec<String>,
         resolve_name_time: ResolveNameTime,
     ) -> Arc<RwLock<Rules>> {
         let rules = Arc::new(RwLock::new(Self::new(dirs, resolve_name_time)));
@@ -48,17 +50,11 @@ impl Rules {
     }
 
     /// enumerate all .rules file under the directories and generate the rules object
-    pub(crate) fn new(dirs: &[&str], resolve_name_time: ResolveNameTime) -> Rules {
-        let mut dirs_tmp = vec![];
-
-        for d in dirs {
-            dirs_tmp.push(d.to_string());
-        }
-
+    pub(crate) fn new(dirs: Vec<String>, resolve_name_time: ResolveNameTime) -> Rules {
         Rules {
             files: None,
             files_tail: None,
-            dirs: dirs_tmp,
+            dirs,
             resolve_name_time,
             users: HashMap::new(),
             groups: HashMap::new(),
@@ -1653,7 +1649,7 @@ SYMLINK += \"test111111\"",
         init_log_to_console("test_rules_new", LevelFilter::Debug);
         clear_test_rules_dir("test_rules_new");
         create_test_rules_dir("test_rules_new");
-        let rules = Rules::load_rules(&DEFAULT_RULES_DIRS, ResolveNameTime::Early);
+        let rules = Rules::load_rules(DEFAULT_RULES_DIRS.to_vec(), ResolveNameTime::Early);
         println!("{}", rules.read().unwrap());
         clear_test_rules_dir("test_rules_new");
     }
@@ -1851,7 +1847,10 @@ SYMLINK += \"test111111\"",
     fn test_rules_share_among_threads() {
         create_test_rules_dir("test_rules_share_among_threads");
         let rules = Rules::new(
-            &["test_rules_new_1", "test_rules_new_2"],
+            vec![
+                "test_rules_new_1".to_string(),
+                "test_rules_new_2".to_string(),
+            ],
             ResolveNameTime::Early,
         );
         let mut handles = Vec::<JoinHandle<()>>::new();
@@ -1875,7 +1874,7 @@ SYMLINK += \"test111111\"",
     #[test]
     #[ignore]
     fn test_resolve_user() {
-        let mut rules = Rules::new(&[], ResolveNameTime::Early);
+        let mut rules = Rules::new(vec![], ResolveNameTime::Early);
         assert!(rules.resolve_user("tss").is_ok());
         assert!(rules.resolve_user("root").is_ok());
         assert!(rules.users.contains_key("tss"));

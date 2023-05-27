@@ -1,0 +1,14 @@
+# Description: test MatchParentsKernel
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchParentsKernel 1': 'test MatchParentsKernel 1'
+KERNELS=="sda", PROGRAM=="/bin/echo test MatchParentsKernel 1"
+
+# Description: test MatchParentsSubsystem, the subsystem of parent device is 'block'
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test MatchParentsKernel 2': 'test MatchParentsKernel 2'
+KERNEL=="sda1", SUBSYSTEMS=="block", PROGRAM=="/bin/echo test MatchParentsKernel 2"
+
+# Description: test MatchParentsDriver, the driver of parent device is 'usb'
+# Trigger: devctl trigger /dev/bus/usb/002/002
+# Expect: Capture stdout from command '/bin/echo test MatchParentsKernel 3': 'test MatchParentsKernel 3'
+KERNEL=="2-1", DRIVERS=="usb", PROGRAM=="/bin/echo test MatchParentsKernel 3"
