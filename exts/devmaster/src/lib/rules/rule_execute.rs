@@ -27,6 +27,7 @@ use crate::{
         sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
     },
 };
+use basic::proc_cmdline::cmdline_get_item;
 use device::{Device, DeviceAction};
 use libc::mode_t;
 use std::{
@@ -1137,6 +1138,119 @@ impl ExecuteManager {
                         .unwrap()
                         .add_property(token.value.clone(), val)
                 )?;
+
+                Ok(token.op == OperatorType::Match)
+            }
+            MatchImportCmdline => {
+                let s = cmdline_get_item(&token.value).map_err(|e| {
+                    log_rule_token_error!(token, e);
+                    Error::RulesExecuteError {
+                        msg: format!("Apply '{}' failed: {}", token.content, e),
+                        errno: Errno::EINVAL,
+                    }
+                })?;
+
+                if s.is_none() {
+                    return Ok(token.op == OperatorType::Nomatch);
+                }
+
+                let value = match s.as_ref().unwrap().split_once('=') {
+                    Some(ret) => ret.1,
+                    None => "",
+                };
+
+                execute_err!(
+                    token,
+                    device.as_ref().lock().unwrap().add_property(
+                        token.value.clone(),
+                        if value.is_empty() {
+                            "1".to_string()
+                        } else {
+                            value.to_string()
+                        }
+                    )
+                )?;
+
+                Ok(token.op == OperatorType::Match)
+            }
+            MatchImportParent => {
+                let value = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::debug!("failed to apply formatter: ({})", e);
+                        return Ok(false);
+                    }
+                };
+
+                let mut regex: Vec<regex::Regex> = Vec::new();
+
+                // generate regular expression depending on the formatted value
+                for s in value.split('|') {
+                    match fnmatch_regex::glob_to_regex(s) {
+                        Ok(r) => {
+                            regex.push(r);
+                        }
+                        Err(_) => {
+                            log_rule_token_error!(token, "invalid pattern");
+                            return Err(Error::RulesExecuteError {
+                                msg: "Failed to parse token value to regex.".to_string(),
+                                errno: Errno::EINVAL,
+                            });
+                        }
+                    }
+                }
+
+                let parent = match device.as_ref().lock().unwrap().get_parent() {
+                    Ok(p) => p,
+                    Err(e) => {
+                        // do not match if the device has no parent
+                        if e.get_errno() == Errno::ENOENT {
+                            return Ok(token.op == OperatorType::Nomatch);
+                        }
+
+                        log_rule_token_error!(token, e);
+
+                        return Err(Error::RulesExecuteError {
+                            msg: format!("Apply '{}' failed: {}", token.content, e),
+                            errno: e.get_errno(),
+                        });
+                    }
+                };
+
+                let mut parent_lock = parent.as_ref().lock().unwrap();
+                let iter = execute_err!(token, parent_lock.property_iter_mut())?;
+
+                for (k, v) in iter {
+                    // check whether the key of property matches the
+                    if !{
+                        let mut matched = false;
+                        for r in regex.iter() {
+                            if r.is_match(k) {
+                                matched = true;
+                                break;
+                            }
+                        }
+                        matched
+                    } {
+                        continue;
+                    }
+
+                    log_rule_token_debug!(token, format!("Importing '{}={}' from parent.", k, v));
+
+                    execute_err!(
+                        token,
+                        device
+                            .as_ref()
+                            .lock()
+                            .unwrap()
+                            .add_property(k.to_string(), v.to_string())
+                    )?;
+                }
 
                 Ok(token.op == OperatorType::Match)
             }

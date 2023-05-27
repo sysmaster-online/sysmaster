@@ -139,7 +139,7 @@ impl RuleToken {
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub(crate) enum TokenType {
     // the left value should take match == or unmatch != operator
-    /// key = "ACTION", operator = "==|!="
+    // the matching pattern is generated during loading rules
     MatchAction,
     MatchDevpath,
     MatchKernel,
@@ -160,7 +160,9 @@ pub(crate) enum TokenType {
     MatchParentsAttr,
     MatchParentsTag,
 
-    //
+    MatchResult,
+
+    // no need to generate matching pattern
     MatchTest,
     MatchProgram,
     MatchImportFile,
@@ -168,8 +170,9 @@ pub(crate) enum TokenType {
     MatchImportBuiltin,
     MatchImportDb,
     MatchImportCmdline,
+
+    // the matching pattern is generated during applying rules
     MatchImportParent,
-    MatchResult,
 
     // the left value should take assign = += -= := operators
     AssignOptionsStringEscapeNone,
