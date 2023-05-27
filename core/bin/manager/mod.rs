@@ -24,7 +24,7 @@ use crate::keep_alive::KeepAlive;
 use crate::unit::UnitManagerX;
 use basic::path_lookup::LookupPaths;
 use basic::process_util::{self};
-use basic::special::{BASIC_TARGET, CGROUP_SYSMASTER};
+use basic::special::{CGROUP_SYSMASTER, MULTI_USER_TARGET};
 use cgroup::CgController;
 use cgroup::{cg_create_and_attach, CgFlags};
 use cmdproto::proto::execute::ExecuterAction;
@@ -240,8 +240,8 @@ impl Manager {
     fn add_default_job(&self) -> Result<i32> {
         self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);
         // add target "SPECIAL_DEFAULT_TARGET"
-        if let Err(e) = self.um.start_unit(BASIC_TARGET, false) {
-            log::error!("Failed to start basic.target: {:?}", e);
+        if let Err(e) = self.um.start_unit(MULTI_USER_TARGET, false) {
+            log::error!("Failed to start multi-user.target: {:?}", e);
         }
         self.reli.clear_last_frame();
         Ok(0)

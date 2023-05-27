@@ -14,13 +14,13 @@
 
 ### 小系统制作
 
-**1.**为了避免小系统中systemd的影响，需要重新制作一个不包含systemd的initrd。可以使用如下命令制作：
+**1.** 为了避免小系统中systemd的影响，需要重新制作一个不包含systemd的initrd。可以使用如下命令制作：
 
 ```
 dracut -f --omit "systemd systemd-initrd systemd-networkd dracut-systemd" /boot/initrd_withoutsd.img
 ```
 
-**2.**得到上述initrd后，修改grub.cfg增加启动项(`aarch64:/boot/efi/EFI/openEuler/grub.cfg;x86_64:/boot/grub2/grub.cfg`)，也避免对原系统有影响：
+**2.** 得到上述initrd后，修改grub.cfg增加启动项(`aarch64:/boot/efi/EFI/openEuler/grub.cfg;x86_64:/boot/grub2/grub.cfg`)，也避免对原系统有影响：
 
 ```
 ...
@@ -86,12 +86,12 @@ menuentry 'openEuler (5.10.0-60.18.0.50.oe2203.aarch64) 22.03 LTS without system
 
 **3.** `yum -y install net-tools`，安装ifconfig以及route工具，为步骤4的`setip.service`启动提供准备。
 
-**4.** 修改`/usr/lib/sysmaster/basic.target`，将需要默认启动拉起的进程添加到`Requires`字段中。建议将`Requires="sysinit.target"`更改为`Requires="sysinit.target;fstab.service;loopback-up.service;sshd.service;udevd.service;setip.service;getty-tty1.service;serial-getty-ttyAMA0.service"`。
+**4.** 修改`/usr/lib/sysmaster/Multi-user.target`，将需要默认启动拉起的进程添加到`Requires`字段中。建议将`Requires="sysinit.target"`更改为`Requires="sysinit.target;fstab.service;loopback-up.service;sshd.service;udevd.service;setip.service;getty-tty1.service;serial-getty-ttyAMA0.service";lvm-activate-openeuler.service;set-hostname.service`；或者通过sctl enable 上述服务实现开机启动。
 
 **注意：**
 
 - 上述配置中`serial-getty-ttyAMA0.service`服务是实现aarch64架构平台串口登陆所需的服务；如果是x86_64，那么需要将服务改为`serial-getty-ttyS0.service`，此服务主要针对有console串口的情况，例如`virsh console`进入串口，私人笔记本创建的虚拟机，默认应该都是只有tty1。
-- 需要根据各自环境修改`setip.service`内点`ExecStart`的**ip地址及网关**；这里的ip地址可以设置为当前虚拟机的ip地址，可通过ip a获取；网关可以通过`netstat -nr`查询。这里设置成功虚拟机启动后即可以通过ssh登陆环境。
+- 需要根据各自环境修改`setip.service`内`ExecStart`的setip.sh脚本内**ip地址及网关**；这里的ip地址可以设置为当前虚拟机的ip地址，可通过ip a获取；网关可以通过`netstat -nr`查询。这里设置成功虚拟机启动后即可以通过ssh登陆环境。
 
 **5.** 由于sysmaster日志默认输出到串口，会影响串口登陆，同时sysmaster日志也无法详细查看。建议配置`/etc/sysmaster/system.toml`，将日志输出到本地文件中。
 

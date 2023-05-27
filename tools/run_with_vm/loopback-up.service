@@ -3,3 +3,6 @@ Description="up loopback device"
 
 [Service]
 ExecStart="/usr/sbin/ip link set lo up"
+
+[Install]
+WantedBy="multi-user.target"

@@ -2,6 +2,7 @@
 Description="set ip for ssh"
 
 [Service]
-Type="oneshot"
-ExecStartPre="/usr/sbin/ifconfig eth0 0.0.0.0 up"
-ExecStart="/usr/sbin/ifconfig eth0 x.xx.xx.xx/xx;/usr/sbin/route add default gw xx.xx.xx.xx"
+ExecStart="/usr/lib/sysmaster/setip.sh"
+
+[Install]
+WantedBy="multi-user.target"
