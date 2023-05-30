@@ -84,6 +84,21 @@ impl ReliHistory {
         db_wtxn.0.commit().expect("history.commit");
     }
 
+    /// daemon-reload or daemon-reexec clear db and data reflush to db
+    pub fn reflush(&self) {
+        // create transaction
+        let mut db_wtxn = ReDbRwTxn::new(&self.env).expect("history.write_txn");
+
+        // flush to db
+        for (_, db) in self.dbs.borrow().iter() {
+            db.clear(&mut db_wtxn);
+            db.reexport(&mut db_wtxn);
+        }
+
+        // commit
+        db_wtxn.0.commit().expect("history.commit");
+    }
+
     pub fn import(&self) {
         let db_rtxn = ReDbRoTxn::new(&self.env).expect("history.write_txn");
 
@@ -93,11 +108,11 @@ impl ReliHistory {
         }
     }
 
-    pub fn ignore_set(&self, ignore: bool) {
-        // set ignore
-        *self.ignore.borrow_mut() = ignore;
+    pub fn switch_set(&self, switch: bool) {
+        // set switch
+        *self.ignore.borrow_mut() = switch;
         for (_, db) in self.dbs.borrow().iter() {
-            db.ignore_set(ignore);
+            db.switch_set(switch);
         }
     }
 

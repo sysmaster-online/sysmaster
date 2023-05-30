@@ -598,12 +598,16 @@ impl ReDbTable for ServiceReDb<String, ServiceReConf> {
         self.0.cache_2_db(db_wtxn);
     }
 
+    fn reexport(&self, db_wtxn: &mut ReDbRwTxn) {
+        self.0.rebuf_2_db(db_wtxn);
+    }
+
     fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
         self.0.db_2_cache(db_rtxn);
     }
 
-    fn ignore_set(&self, ignore: bool) {
-        self.0.set_ignore(ignore);
+    fn switch_set(&self, switch: bool) {
+        self.0.set_switch(switch);
     }
 }
 
@@ -616,11 +620,15 @@ impl ReDbTable for ServiceReDb<String, ServiceReMng> {
         self.0.cache_2_db(db_wtxn);
     }
 
+    fn reexport(&self, db_wtxn: &mut ReDbRwTxn) {
+        self.0.rebuf_2_db(db_wtxn);
+    }
+
     fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
         self.0.db_2_cache(db_rtxn);
     }
 
-    fn ignore_set(&self, ignore: bool) {
-        self.0.set_ignore(ignore);
+    fn switch_set(&self, switch: bool) {
+        self.0.set_switch(switch);
     }
 }

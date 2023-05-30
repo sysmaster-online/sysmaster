@@ -108,6 +108,10 @@ impl ReStation for JobManager {
         self.data.db_map();
     }
 
+    fn db_insert(&self) {
+        self.data.db_insert();
+    }
+
     // reload: special entry_coldplug
     // repeating protection
     fn entry_clear(&self) {
@@ -384,6 +388,11 @@ impl JobManagerData {
         self.stat
             .update_changes(&(&suspends, &Vec::new(), &Vec::new()));
         self.stat.clear_cnt(); // no history
+    }
+
+    pub(self) fn db_insert(&self) {
+        self.jobs.rentry_insert_trigger();
+        self.jobs.rentry_insert_suspend();
     }
 
     pub(self) fn coldplug_unit(&self, unit: &UnitX) {

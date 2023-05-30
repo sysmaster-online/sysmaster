@@ -37,6 +37,10 @@ impl ReStation for UnitChild {
         self.data.db_map(&self.units);
     }
 
+    fn db_insert(&self) {
+        self.data.db_insert();
+    }
+
     // reload
     fn entry_clear(&self) {
         self.data.entry_clear();
@@ -130,6 +134,11 @@ impl UnitChildData {
                 self.add_watch_pid(Rc::clone(&unit), *pid);
             }
         }
+    }
+
+    pub(self) fn db_insert(&self) {
+        // [key:pid, data:unit[s]] and [key:unit, data:pid[s]](RELI_DB_HUNIT_CHILD) are equivalent
+        // So here [key:unit, data:pids] is reused and [key:pid, data:unit[s]] is not stored in the database.
     }
 
     pub(self) fn add_watch_pid(&self, unit: Rc<UnitX>, pid: Pid) {

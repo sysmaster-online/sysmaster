@@ -472,7 +472,7 @@ impl Job {
         last_rkind != rkind
     }
 
-    fn rentry_trigger_insert(&self) {
+    pub(super) fn rentry_trigger_insert(&self) {
         self.rentry
             .trigger_insert(self.unit.id(), self.kind, &self.attr.borrow());
     }
@@ -485,7 +485,7 @@ impl Job {
         self.rentry.trigger_get(self.unit.id())
     }
 
-    fn rentry_suspends_insert(&self) {
+    pub(super) fn rentry_suspends_insert(&self) {
         self.rentry
             .suspends_insert(self.unit.id(), self.kind, &self.attr.borrow());
     }

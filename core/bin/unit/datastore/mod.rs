@@ -70,6 +70,14 @@ impl UnitDb {
         self.child.db_map(reload);
     }
 
+    pub(super) fn db_insert_excl_units(&self) {
+        // dep
+        self.dep.db_insert();
+
+        // child
+        self.child.db_insert();
+    }
+
     pub fn units_insert(&self, name: String, unit: Rc<UnitX>) -> Option<Rc<UnitX>> {
         self.units.insert(name, unit)
     }

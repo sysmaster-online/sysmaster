@@ -39,6 +39,11 @@ impl ReStation for UnitDep {
         self.sub.data.borrow_mut().db_map();
     }
 
+    fn db_insert(&self) {
+        // If the data changes under db_map() when reload is true, it needs to be inserted.
+        // db_map currently does nothing to do.
+    }
+
     // reload
     fn entry_clear(&self) {
         self.sub.data.borrow_mut().clear();

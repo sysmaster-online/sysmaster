@@ -1198,6 +1198,28 @@ impl ReStation for UnitManager {
         self.sms.db_map(reload);
     }
 
+    // data
+    fn db_insert(&self) {
+        for unit in self.db.units_get_all(None).iter() {
+            unit.db_insert();
+        }
+
+        /* others: unit-dep and unit-child */
+        self.db.db_insert_excl_units();
+
+        // rt
+        self.rt.db_insert();
+
+        // job
+        self.jm.db_insert();
+
+        // notify
+        self.notify.db_insert();
+
+        // sub-manager
+        self.sms.db_insert();
+    }
+
     // reload
     fn register_ex(&self) {
         // notify
@@ -1287,6 +1309,12 @@ mod unit_submanager {
         pub(super) fn db_map(&self, reload: bool) {
             for (_, sub) in self.db.borrow().iter() {
                 sub.db_map(reload);
+            }
+        }
+
+        pub(super) fn db_insert(&self) {
+            for (_, sub) in self.db.borrow().iter() {
+                sub.db_insert();
             }
         }
 

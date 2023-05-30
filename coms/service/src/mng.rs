@@ -130,6 +130,7 @@ impl ReStation for ServiceMng {
     }
 
     fn entry_clear(&self) {
+        // pid_file is a transient file that can be directly closed
         self.unwatch_pid_file();
 
         self.stop_watchdog();
