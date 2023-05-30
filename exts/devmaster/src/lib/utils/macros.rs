@@ -60,28 +60,6 @@ macro_rules! execute_err_ignore_ENOENT {
     };
 }
 
-/// translate execution error on none return from downside call chain
-#[macro_export]
-macro_rules! execute_none {
-    ($t:expr, $e:expr, $v:expr) => {
-        if $e.is_none() {
-            log::error!(
-                "{}:{}:'{}' {}",
-                $t.rule_file,
-                $t.line_number,
-                $t.content,
-                format!("failed to get {}", $v)
-            );
-            Err(Error::RulesExecuteError {
-                msg: format!("Apply '{}' error: have no {}", $t, $v),
-                errno: Errno::EINVAL,
-            })
-        } else {
-            Ok($e.unwrap().to_string())
-        }
-    };
-}
-
 /// translate substitute formatter error into execute error
 #[macro_export]
 macro_rules! subst_format_map_err {

@@ -17,7 +17,6 @@ use crate::builtin::Builtin;
 use crate::builtin::Netlink;
 use crate::error::*;
 use device::Device;
-use snafu::OptionExt;
 use snafu::ResultExt;
 use sscanf::sscanf;
 use std::cell::RefCell;
@@ -126,7 +125,7 @@ impl UsbId {
         let mut buf = [0u8; 18 + 65535];
         let mut pos = 0;
 
-        let size = file.read(&mut buf).context(IoSnafu {
+        let size: usize = file.read(&mut buf).context(IoSnafu {
             filename: syspath.to_string(),
         })?;
         if size < 18 {
@@ -142,8 +141,9 @@ impl UsbId {
                 break;
             }
             if desc.bLength > (size - std::mem::size_of::<UsbInterfaceDescriptor>()) as u8 {
-                return Err(Error::CorruptData {
-                    filename: syspath.to_string(),
+                return Err(Error::Other {
+                    msg: syspath.to_string(),
+                    errno: nix::errno::Errno::EINVAL,
                 });
             }
             pos += desc.bLength as usize;
@@ -178,12 +178,10 @@ impl UsbId {
     fn interface_directory(&self, device: &mut Device, info: &mut UsbInfo) -> Result<bool> {
         let dev_interface = device
             .get_parent_with_subsystem_devtype("usb", Some("usb_interface"))
-            .context(FailToAccessSnafu {
-                filename: "usb_interface".to_string(),
-            })?;
+            .context(DeviceSnafu)?;
         let mut dev_interface = dev_interface.lock().unwrap();
 
-        let _interface_syspath = dev_interface.get_syspath().context(SysPathNotFoundSnafu)?;
+        let _interface_syspath = dev_interface.get_syspath().context(DeviceSnafu)?;
 
         info.ifnum = dev_interface
             .get_sysattr_value("bInterfacceNumber")
@@ -195,7 +193,7 @@ impl UsbId {
 
         info.if_class = dev_interface
             .get_sysattr_value("bInterfaceClass")
-            .context(GetSysAttrSnafu)?;
+            .context(DeviceSnafu)?;
 
         info.type_str = match info.if_class.parse::<i32>().context(ParseIntSnafu)? {
             8 => {
@@ -216,43 +214,34 @@ impl UsbId {
         if [2, 6].contains(&info.protocol) {
             let dev_scsi = device
                 .get_parent_with_subsystem_devtype("scsi", Some("scsi_device"))
-                .context(FailToAccessSnafu {
-                    filename: "usb_interface".to_string(),
-                })?;
+                .context(DeviceSnafu)?;
             let mut dev_scsi = dev_scsi.lock().unwrap().to_owned();
 
-            let scsi_sysname = dev_scsi.get_sysname().context(SysNameNotFoundSnafu)?;
+            let scsi_sysname = dev_scsi.get_sysname().context(DeviceSnafu)?;
 
             let (_host, _buss, target, lun) =
-                sscanf!(&scsi_sysname, "{}:{}:{}:{}", i32, i32, i32, i32)
-                    .context(FailToSscanfSnafu)?;
+                sscanf!(&scsi_sysname, "{}:{}:{}:{}", i32, i32, i32, i32).context(SscanfSnafu)?;
 
-            let scsi_vendor = dev_scsi
-                .get_sysattr_value("vendor")
-                .context(GetSysAttrSnafu)?;
+            let scsi_vendor: String = dev_scsi.get_sysattr_value("vendor").context(DeviceSnafu)?;
             // scsi_vendor to vendor
             crate::utils::encode_devnode_name(&scsi_vendor, &mut info.vendor_enc);
             info.vendor = crate::utils::replace_whitespace(&scsi_vendor);
             info.vendor = crate::utils::replace_chars(&info.vendor, "");
 
-            let scsi_model = dev_scsi
-                .get_sysattr_value("model")
-                .context(GetSysAttrSnafu)?;
+            let scsi_model = dev_scsi.get_sysattr_value("model").context(DeviceSnafu)?;
             // scsi_model to model
             crate::utils::encode_devnode_name(&scsi_model, &mut info.model_enc);
             info.model = crate::utils::replace_whitespace(&scsi_model);
             info.model = crate::utils::replace_chars(&info.model, "");
 
-            let scsi_type_str = dev_scsi
-                .get_sysattr_value("type")
-                .context(GetSysAttrSnafu)?;
+            let scsi_type_str = dev_scsi.get_sysattr_value("type").context(DeviceSnafu)?;
 
             // scsi_type_str to type_str
             if let Some(s) = UsbId::scsi_type(&scsi_type_str) {
                 info.type_str = s.to_string();
             };
 
-            let scsi_revision = dev_scsi.get_sysattr_value("rev").context(GetSysAttrSnafu)?;
+            let scsi_revision = dev_scsi.get_sysattr_value("rev").context(DeviceSnafu)?;
 
             // scsi_revision to revision, unimplemented!()
             info.revision = crate::utils::replace_whitespace(&scsi_revision);
@@ -264,13 +253,9 @@ impl UsbId {
     }
 
     fn set_sysattr(&self, device: &mut Device, info: &mut UsbInfo) -> Result<bool> {
-        info.vendor_id = device
-            .get_sysattr_value("idVendor")
-            .context(GetSysAttrSnafu)?;
+        info.vendor_id = device.get_sysattr_value("idVendor").context(DeviceSnafu)?;
 
-        info.product_id = device
-            .get_sysattr_value("idProduct")
-            .context(GetSysAttrSnafu)?;
+        info.product_id = device.get_sysattr_value("idProduct").context(DeviceSnafu)?;
 
         if info.vendor.is_empty() {
             let usb_vendor = match device.get_sysattr_value("manufacturer") {
@@ -342,21 +327,9 @@ impl Builtin for UsbId {
         let mut info = UsbInfo::default();
         let mut usb_device = Arc::new(Mutex::new(Device::default()));
 
-        let _syspath = device
-            .lock()
-            .unwrap()
-            .get_syspath()
-            .context(SysPathNotFoundSnafu)?;
-        let _sysname = device
-            .lock()
-            .unwrap()
-            .get_sysname()
-            .context(SysNameNotFoundSnafu)?;
-        let devtype = device
-            .lock()
-            .unwrap()
-            .get_devtype()
-            .context(FailToGetDevTypeSnafu)?;
+        let _syspath = device.lock().unwrap().get_syspath().context(DeviceSnafu)?;
+        let _sysname = device.lock().unwrap().get_sysname().context(DeviceSnafu)?;
+        let devtype = device.lock().unwrap().get_devtype().context(DeviceSnafu)?;
 
         #[allow(clippy::never_loop)]
         loop {
@@ -378,9 +351,7 @@ impl Builtin for UsbId {
                 .lock()
                 .unwrap()
                 .get_parent_with_subsystem_devtype("usb", Some("usb_interface"))
-                .context(FailToAccessSnafu {
-                    filename: "usb_interface".to_string(),
-                })?;
+                .context(DeviceSnafu)?;
 
             let _ = Self::dev_if_packed_info(&dev_usb.lock().unwrap(), &mut info);
 
@@ -546,7 +517,7 @@ mod test {
             let mut rtnl = RefCell::<Option<Netlink>>::from(None);
 
             let builtin = UsbId {};
-            if let Some(str) = device.lock().unwrap().get_devpath() {
+            if let Ok(str) = device.lock().unwrap().get_devpath() {
                 if !str.contains("usb") {
                     continue;
                 }

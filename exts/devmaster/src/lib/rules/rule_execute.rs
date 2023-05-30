@@ -14,12 +14,12 @@
 //!
 
 use super::{
-    FormatSubstitutionType, OperatorType, RuleFile, RuleLine, RuleToken, Rules, SubstituteType,
-    TokenType::*,
+    EscapeType, FormatSubstitutionType, OperatorType, RuleFile, RuleLine, RuleToken, Rules,
+    SubstituteType, TokenType::*,
 };
 use crate::{
     builtin::{BuiltinCommand, BuiltinManager, Netlink},
-    error::{Error, Result},
+    error::*,
     log_rule_token_debug, log_rule_token_error,
     rules::FORMAT_SUBST_TABLE,
     utils::{
@@ -27,9 +27,10 @@ use crate::{
         sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
     },
 };
-use basic::proc_cmdline::cmdline_get_item;
+use basic::{proc_cmdline::cmdline_get_item, user_group_util::get_user_creds};
 use device::{Device, DeviceAction};
-use libc::mode_t;
+use libc::{mode_t, uid_t};
+use snafu::ResultExt;
 use std::{
     borrow::BorrowMut,
     cell::RefCell,
@@ -42,11 +43,9 @@ use std::{
 };
 
 use crate::device_trace;
-use crate::{
-    execute_err, execute_err_ignore_ENOENT, execute_none, subst_format_map_err_ignore,
-    subst_format_map_none,
-};
+use crate::{execute_err, execute_err_ignore_ENOENT, subst_format_map_err_ignore};
 use nix::errno::Errno;
+use nix::unistd::{Gid, Uid};
 
 /// the process unit on device uevent
 #[allow(missing_docs, dead_code)]
@@ -57,8 +56,8 @@ struct ExecuteUnit {
     name: String,
     program_result: String,
     // mode: mode_t,
-    // uid: uid_t,
-    // gid: gid_t,
+    uid: Option<Uid>,
+    gid: Option<Gid>,
     // seclabel_list: HashMap<String, String>,
     // run_list: HashMap<String, String>,
     // exec_delay_usec: useconds_t,
@@ -67,11 +66,11 @@ struct ExecuteUnit {
     builtin_run: u32,
     /// set mask bit to 1 if the builtin failed or returned false
     builtin_ret: u32,
-    // escape_type: RuleEscapeType,
-    // inotify_watch: bool,
-    // inotify_watch_final: bool,
-    // group_final: bool,
-    // owner_final: bool,
+    escape_type: EscapeType,
+    watch: bool,
+    watch_final: bool,
+    group_final: bool,
+    owner_final: bool,
     // mode_final: bool,
     // name_final: bool,
     // devlink_final: bool,
@@ -90,8 +89,8 @@ impl ExecuteUnit {
             name: String::default(),
             program_result: String::default(),
             // mode: (),
-            // uid: (),
-            // gid: (),
+            uid: None,
+            gid: None,
             // seclabel_list: (),
             // run_list: (),
             // exec_delay_usec: (),
@@ -99,10 +98,11 @@ impl ExecuteUnit {
             rtnl: RefCell::new(None),
             builtin_run: 0,
             builtin_ret: 0,
-            // inotify_watch: (),
-            // inotify_watch_final: (),
-            // group_final: (),
-            // owner_final: (),
+            escape_type: EscapeType::Unset,
+            watch: false,
+            watch_final: false,
+            group_final: false,
+            owner_final: false,
             // mode_final: (),
             // name_final: (),
             // devlink_final: (),
@@ -204,9 +204,13 @@ impl ExecuteUnit {
                     String::default()
                 )
             }
-            FormatSubstitutionType::Kernel => {
-                subst_format_map_none!(device.get_sysname(), "kernel", String::default())
-            }
+            FormatSubstitutionType::Kernel => Ok(device
+                .get_sysname()
+                .unwrap_or_else(|_| {
+                    log::debug!("formatter 'kernel' got empty value.");
+                    ""
+                })
+                .to_string()),
             FormatSubstitutionType::KernelNumber => subst_format_map_err_ignore!(
                 device.get_sysnum(),
                 "number",
@@ -225,19 +229,30 @@ impl ExecuteUnit {
                     String::default()
                 )
             }
-            FormatSubstitutionType::Devpath => {
-                subst_format_map_none!(device.get_devpath(), "devpath", String::default())
-            }
+            FormatSubstitutionType::Devpath => Ok(device
+                .get_devpath()
+                .unwrap_or_else(|_| {
+                    log::debug!("formatter 'devpath' got empty value.");
+                    ""
+                })
+                .to_string()),
             FormatSubstitutionType::Id => {
                 if self.parent.is_none() {
                     return Ok(String::default());
                 }
 
-                subst_format_map_none!(
-                    self.parent.clone().unwrap().lock().unwrap().get_sysname(),
-                    "id",
-                    String::default()
-                )
+                Ok(self
+                    .parent
+                    .clone()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get_sysname()
+                    .unwrap_or_else(|_| {
+                        log::debug!("formatter 'id' got empty value.");
+                        ""
+                    })
+                    .to_string())
             }
             FormatSubstitutionType::Major | FormatSubstitutionType::Minor => {
                 subst_format_map_err_ignore!(
@@ -328,7 +343,13 @@ impl ExecuteUnit {
                 } else if let Ok(devname) = device.get_devname() {
                     Ok(devname.trim_start_matches("/dev/").to_string())
                 } else {
-                    subst_format_map_none!(device.get_sysname(), "name", String::default())
+                    Ok(device
+                        .get_sysname()
+                        .unwrap_or_else(|_| {
+                            log::debug!("formatter 'name' got empty value.");
+                            ""
+                        })
+                        .to_string())
                 }
             }
             FormatSubstitutionType::Links => {
@@ -733,20 +754,20 @@ impl ExecuteManager {
                 Ok(token.pattern_match(&action.to_string()))
             }
             MatchDevpath => {
-                let devpath = execute_none!(
+                let devpath = execute_err!(
                     token,
-                    device.as_ref().lock().unwrap().borrow_mut().get_devpath(),
-                    "DEVPATH"
-                )?;
+                    device.as_ref().lock().unwrap().borrow_mut().get_devpath()
+                )?
+                .to_string();
 
                 Ok(token.pattern_match(&devpath))
             }
             MatchKernel | MatchParentsKernel => {
-                let sysname = execute_none!(
+                let sysname = execute_err!(
                     token,
-                    device.as_ref().lock().unwrap().borrow_mut().get_sysname(),
-                    "SYSNAME"
-                )?;
+                    device.as_ref().lock().unwrap().borrow_mut().get_sysname()
+                )?
+                .to_string();
 
                 Ok(token.pattern_match(&sysname))
             }
@@ -851,15 +872,13 @@ impl ExecuteManager {
                         Ok(v) => v,
                         Err(_) => {
                             // only throw out error when getting the syspath of device
-                            let syspath = execute_none!(
-                                token,
-                                device.as_ref().lock().unwrap().get_syspath(),
-                                "SYSPATH"
-                            )
-                            .map_err(|e| {
-                                log_rule_token_debug!(token, "failed to apply token.");
-                                e
-                            })?;
+                            let syspath =
+                                execute_err!(token, device.as_ref().lock().unwrap().get_syspath())
+                                    .map_err(|e| {
+                                        log_rule_token_debug!(token, "failed to apply token.");
+                                        e
+                                    })?
+                                    .to_string();
 
                             syspath + "/" + val.as_str()
                         }
@@ -1254,6 +1273,9 @@ impl ExecuteManager {
 
                 Ok(token.op == OperatorType::Match)
             }
+            MatchResult => {
+                Ok(token.pattern_match(&self.current_unit.as_ref().unwrap().program_result))
+            }
             MatchProgram => {
                 let cmd = match self
                     .current_unit
@@ -1292,6 +1314,118 @@ impl ExecuteManager {
                 self.current_unit.as_mut().unwrap().program_result = result;
 
                 Ok(token.op == OperatorType::Match)
+            }
+            AssignOptionsStringEscapeNone => {
+                self.current_unit.as_mut().unwrap().escape_type = EscapeType::None;
+                log_rule_token_debug!(token, "set string escape to 'none'");
+                Ok(true)
+            }
+            AssignOptionsStringEscapeReplace => {
+                self.current_unit.as_mut().unwrap().escape_type = EscapeType::Replace;
+                log_rule_token_debug!(token, "set string escape to 'replace'");
+                Ok(true)
+            }
+            AssignOptionsDbPersist => {
+                device.as_ref().lock().unwrap().set_db_persist();
+                log_rule_token_debug!(
+                    token,
+                    format!(
+                        "set db '{}' to persistence",
+                        execute_err!(token, device.as_ref().lock().unwrap().get_device_id())?
+                    )
+                );
+                Ok(true)
+            }
+            AssignOptionsWatch => {
+                if self.current_unit.as_ref().unwrap().watch_final {
+                    log_rule_token_debug!(
+                        token,
+                        format!(
+                            "watch is fixed to '{}'",
+                            self.current_unit.as_mut().unwrap().watch
+                        )
+                    );
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().watch_final = true;
+                }
+
+                // token.value is either "true" or "false"
+                self.current_unit.as_mut().unwrap().watch =
+                    execute_err!(token, token.value.parse::<bool>().context(ParseBoolSnafu))?;
+
+                log_rule_token_debug!(token, format!("set watch to '{}'", token.value));
+
+                Ok(true)
+            }
+            AssignOptionsDevlinkPriority => {
+                let r = execute_err!(token, token.value.parse::<i32>().context(ParseIntSnafu))?;
+                device.as_ref().lock().unwrap().set_devlink_priority(r);
+                log_rule_token_debug!(token, format!("set devlink priority to '{}'", r));
+                Ok(true)
+            }
+            AssignOptionsLogLevel => {
+                todo!()
+            }
+            AssignOwner => {
+                if self.current_unit.as_ref().unwrap().owner_final {
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().owner_final = true;
+                }
+
+                let owner = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log_rule_token_error!(token, format!("failed to apply formatter: ({})", e));
+                        return Ok(false);
+                    }
+                };
+
+                match get_user_creds(&owner) {
+                    Ok(u) => {
+                        log_rule_token_debug!(
+                            token,
+                            format!("assign uid '{}' from owner '{}'", u.uid, owner)
+                        );
+
+                        self.current_unit.as_mut().unwrap().uid = Some(u.uid);
+                    }
+                    Err(_) => {
+                        log_rule_token_error!(token, format!("unknown user '{}'", owner));
+                    }
+                }
+
+                Ok(true)
+            }
+            AssignOwnerId => {
+                /*
+                 *  owner id is already resolved during rules loading, token.value is the uid string
+                 */
+                if self.current_unit.as_ref().unwrap().owner_final {
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().owner_final = true;
+                }
+
+                log_rule_token_debug!(token, format!("assign uid '{}'", token.value));
+
+                let uid = execute_err!(token, token.value.parse::<uid_t>().context(ParseIntSnafu))?;
+
+                self.current_unit.as_mut().unwrap().uid = Some(Uid::from_raw(uid));
+
+                Ok(true)
             }
             AssignDevlink => {
                 todo!()

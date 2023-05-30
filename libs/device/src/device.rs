@@ -24,6 +24,7 @@ use std::path::Path;
 use std::result::Result;
 use std::sync::{Arc, Mutex};
 
+use crate::err_wrapper;
 use crate::utils::readlink_value;
 use crate::{error::Error, DeviceAction};
 
@@ -122,6 +123,8 @@ pub struct Device {
     pub is_initialized: bool,
     /// don not read more information from uevent/db
     pub sealed: bool,
+    /// persist device db during switching root from initrd
+    pub db_persist: bool,
 }
 
 impl Default for Device {
@@ -177,6 +180,7 @@ impl Device {
             sealed: false,
             database_version: 0,
             devlink_priority: 0,
+            db_persist: false,
         }
     }
 
@@ -613,31 +617,36 @@ impl Device {
     }
 
     /// get the syspath of the device
-    pub fn get_syspath(&self) -> Option<&str> {
+    pub fn get_syspath(&self) -> Result<&str, Error> {
         if self.syspath.is_empty() {
-            return None;
+            return Err(Error::Nix {
+                msg: "syspath is not found".to_string(),
+                source: Errno::ENOENT,
+            });
         }
 
-        Some(&self.syspath)
+        Ok(&self.syspath)
     }
 
     /// get the devpath of the device
-    pub fn get_devpath(&self) -> Option<&str> {
+    pub fn get_devpath(&self) -> Result<&str, Error> {
         if self.devpath.is_empty() {
-            return None;
+            return Err(Error::Nix {
+                msg: "devpath is not found".to_string(),
+                source: Errno::ENOENT,
+            });
         }
 
-        Some(&self.devpath)
+        Ok(&self.devpath)
     }
 
     /// get the sysname of the device
-    pub fn get_sysname(&mut self) -> Option<&str> {
-        if self.sysname.is_empty() && self.set_sysname_and_sysnum().is_err() {
-            log::error!("device failed to set sysname and sysnum {}", self.devpath);
-            return None;
+    pub fn get_sysname(&mut self) -> Result<&str, Error> {
+        if self.sysname.is_empty() {
+            err_wrapper!(self.set_sysname_and_sysnum(), "get_sysname")?;
         }
 
-        Some(&self.sysname)
+        Ok(&self.sysname)
     }
 
     /// get the parent of the device
@@ -1308,6 +1317,56 @@ impl Device {
         self.property_tags_outdated = true;
         Ok(())
     }
+
+    /// set device db as persist
+    pub fn set_db_persist(&mut self) {
+        self.db_persist = true;
+    }
+
+    /// set the link priority of device node
+    pub fn set_devlink_priority(&mut self, priority: i32) {
+        self.devlink_priority = priority;
+    }
+
+    /// get the device id
+    /// device id is used to identify database file in /run/devmaster/data/
+    pub fn get_device_id(&mut self) -> Result<String, Error> {
+        if self.device_id.is_empty() {
+            let subsystem = self.get_subsystem().map_err(|e| Error::Nix {
+                msg: format!("get_device_id failed: get_subsystem ({})", e),
+                source: e.get_errno(),
+            })?;
+
+            let id: String;
+            if let Ok(devnum) = self.get_devnum() {
+                id = format!(
+                    "{}{}:{}",
+                    if subsystem == "block" { 'b' } else { 'c' },
+                    major(devnum),
+                    minor(devnum)
+                );
+            } else if let Ok(ifindex) = self.get_ifindex() {
+                id = format!("n{}", ifindex);
+            } else {
+                let sysname = self
+                    .get_sysname()
+                    .map_err(|e| Error::Nix {
+                        msg: format!("get_device_id failed: ({})", e),
+                        source: e.get_errno(),
+                    })?
+                    .to_string();
+
+                if subsystem == "drivers" {
+                    id = format!("+drivers:{}:{}", self.driver_subsystem, sysname);
+                } else {
+                    id = format!("+{}:{}", subsystem, sysname);
+                }
+            }
+            self.device_id = id;
+        }
+
+        Ok(self.device_id.clone())
+    }
 }
 
 /// internal methods
@@ -1899,15 +1958,7 @@ impl Device {
 
     /// new from child
     pub(crate) fn new_from_child(device: &mut Device) -> Result<Device, Error> {
-        let syspath = match device.get_syspath() {
-            Some(ret) => Path::new(ret),
-            None => {
-                return Err(Error::Nix {
-                    msg: "new_from_child failed: can not get syspath".to_string(),
-                    source: Errno::EINVAL,
-                });
-            }
-        };
+        let syspath = Path::new(err_wrapper!(device.get_syspath(), "new_from_child")?);
 
         let mut parent = syspath.parent();
 
@@ -1948,48 +1999,6 @@ impl Device {
 
             parent = parent.unwrap().parent();
         }
-    }
-
-    /// get the device id
-    /// device id is used to identify hwdb file in /run/devmaster/data/
-    pub(crate) fn get_device_id(&mut self) -> Result<String, Error> {
-        if self.device_id.is_empty() {
-            let subsystem = self.get_subsystem().map_err(|e| Error::Nix {
-                msg: format!("get_device_id failed: get_subsystem ({})", e),
-                source: e.get_errno(),
-            })?;
-
-            let id: String;
-            if let Ok(devnum) = self.get_devnum() {
-                id = format!(
-                    "{}{}:{}",
-                    if subsystem == "block" { 'b' } else { 'c' },
-                    major(devnum),
-                    minor(devnum)
-                );
-            } else if let Ok(ifindex) = self.get_ifindex() {
-                id = format!("n{}", ifindex);
-            } else {
-                let sysname = match self.get_sysname() {
-                    Some(s) => s.to_string(),
-                    None => {
-                        return Err(Error::Nix {
-                            msg: "get_device_id failed: no sysname".to_string(),
-                            source: Errno::EINVAL,
-                        });
-                    }
-                };
-
-                if subsystem == "drivers" {
-                    id = format!("+drivers:{}:{}", self.driver_subsystem, sysname);
-                } else {
-                    id = format!("+{}:{}", subsystem, sysname);
-                }
-            }
-            self.device_id = id;
-        }
-
-        Ok(self.device_id.clone())
     }
 
     /// prepare properties:
@@ -2234,9 +2243,9 @@ impl Device {
 
         let syspath = self
             .get_syspath()
-            .ok_or(Error::Nix {
-                msg: "do not have syspath".to_string(),
-                source: Errno::EINVAL,
+            .map_err(|e| Error::Nix {
+                msg: format!("shallow_clone failed: ({})", e),
+                source: e.get_errno(),
             })?
             .to_string();
 

@@ -178,7 +178,7 @@ pub(crate) enum TokenType {
     AssignOptionsStringEscapeNone,
     AssignOptionsStringEscapeReplace,
     AssignOptionsDbPersist,
-    AssignOptionsInotifyWatch,
+    AssignOptionsWatch,
     AssignOptionsDevlinkPriority,
     AssignOptionsLogLevel,
     AssignOwner,
@@ -589,4 +589,11 @@ impl Default for FormatSubstitutionType {
     fn default() -> Self {
         Self::Invalid
     }
+}
+
+/// escape type of execute unit
+pub(crate) enum EscapeType {
+    Unset,
+    None,
+    Replace,
 }

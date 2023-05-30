@@ -26,6 +26,7 @@ use lazy_static::lazy_static;
 use nix::errno::Errno;
 use regex::Regex;
 use shell_words::split;
+use snafu::ResultExt;
 use wait_timeout::ChildExt;
 
 pub(crate) mod macros;
@@ -273,16 +274,7 @@ pub(crate) fn resolve_subsystem_kernel(s: &String, read: bool) -> Result<String>
                 );
                 Ok(attr_value)
             } else {
-                let syspath = match device.get_syspath() {
-                    Some(s) => s,
-                    None => {
-                        return Err(Error::Other {
-                            msg: format!("it is weird not to get syspath for '{}'", sysname),
-                            errno: nix::errno::Errno::EINVAL,
-                        })
-                    }
-                }
-                .to_string();
+                let syspath = device.get_syspath().context(DeviceSnafu)?.to_string();
 
                 let attr_path = if attribute.is_empty() {
                     syspath

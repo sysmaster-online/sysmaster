@@ -15,8 +15,9 @@
 
 use crate::builtin::Builtin;
 use crate::builtin::Netlink;
-use crate::error::{Error, Result};
+use crate::error::*;
 use device::Device;
+use snafu::ResultExt;
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
@@ -35,14 +36,12 @@ impl Builtin for Example {
     ) -> Result<bool> {
         println!("example builtin run");
 
-        let syspath = match device.lock().unwrap().get_syspath() {
-            Some(p) => String::from(p),
-            None => {
-                return Err(Error::BuiltinCommandError {
-                    msg: "syspath invalid".to_string(),
-                })
-            }
-        };
+        let syspath = device
+            .lock()
+            .unwrap()
+            .get_syspath()
+            .context(DeviceSnafu)?
+            .to_string();
 
         ret_rtnl.replace(Some(Netlink {}));
 

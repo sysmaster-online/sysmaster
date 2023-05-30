@@ -1226,19 +1226,19 @@ impl RuleToken {
                         content,
                     ))?,
                     "watch" => Ok(RuleToken::new(
-                        TokenType::AssignOptionsInotifyWatch,
+                        TokenType::AssignOptionsWatch,
                         op,
                         None,
-                        "1".to_string(),
+                        "true".to_string(),
                         line_number,
                         rule_file,
                         content,
                     ))?,
                     "nowatch" => Ok(RuleToken::new(
-                        TokenType::AssignOptionsInotifyWatch,
+                        TokenType::AssignOptionsWatch,
                         op,
                         None,
-                        "0".to_string(),
+                        "false".to_string(),
                         line_number,
                         rule_file,
                         content,
@@ -1337,6 +1337,15 @@ impl RuleToken {
                         && SubstituteType::Plain == value.parse::<SubstituteType>().unwrap()
                     {
                         let user = rules.as_ref().write().unwrap().resolve_user(&value)?;
+
+                        log::debug!(
+                            "{}:{}:'{}' owner '{}' is parsed into uid '{}' during rules loading",
+                            rule_file,
+                            line_number,
+                            content,
+                            value,
+                            user.uid
+                        );
 
                         return Ok(RuleToken::new(
                             TokenType::AssignOwnerId,
