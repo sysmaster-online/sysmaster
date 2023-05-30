@@ -203,7 +203,7 @@ fn main() {
     let stream = match TcpStream::connect(&addrs[..]) {
         Err(e) => {
             eprintln!("Failed to connect to sysmaster: {}", e);
-            exit(e.raw_os_error().unwrap() as i32);
+            exit(e.raw_os_error().unwrap());
         }
         Ok(v) => v,
     };

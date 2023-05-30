@@ -148,17 +148,11 @@ impl Signals {
         }
     }
 
-    pub fn recycle_zombie(&mut self, dest_pid: unistd::Pid) {
+    pub fn recycle_zombie(&mut self) {
         // peek signal
         let flags = WaitPidFlag::WEXITED | WaitPidFlag::WNOHANG | WaitPidFlag::WNOWAIT;
         loop {
-            // get wait information
-            let mut id_flag = Id::All;
-            if dest_pid.as_raw() > 0 {
-                id_flag = Id::Pid(dest_pid);
-            }
-
-            let wait_status = match wait::waitid(id_flag, flags) {
+            let wait_status = match wait::waitid(Id::All, flags) {
                 Ok(status) => status,
                 Err(_) => return,
             };

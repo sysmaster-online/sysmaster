@@ -18,7 +18,6 @@ mod timer;
 
 use comm::{Comm, CommType};
 use epoll::Epoll;
-use libc::signalfd_siginfo;
 use nix::errno::Errno;
 use nix::libc;
 use nix::sys::epoll::EpollEvent;
@@ -190,7 +189,7 @@ impl RunTime {
         if let Some(siginfo) = self.signals.read(event)? {
             let signo = siginfo.ssi_signo as i32;
             match signo {
-                _x if self.signals.is_zombie(signo) => self.do_recycle(siginfo),
+                _x if self.signals.is_zombie(signo) => self.do_recycle(),
                 _x if self.signals.is_restart(signo) => self.do_reexec(),
                 _x if self.signals.is_unrecover(signo) => self.change_to_unrecover(),
                 _ => {}
@@ -203,7 +202,7 @@ impl RunTime {
         if let Some(siginfo) = self.signals.read(event)? {
             let signo = siginfo.ssi_signo as i32;
             match signo {
-                _x if self.signals.is_zombie(signo) => self.do_recycle(siginfo),
+                _x if self.signals.is_zombie(signo) => self.do_recycle(),
                 _x if self.signals.is_restart(signo) => self.do_reexec(),
                 _x if self.signals.is_switch_root(signo) => self.send_switch_root_signal(),
                 _ => {}
@@ -217,10 +216,9 @@ impl RunTime {
             let signo = siginfo.ssi_signo as i32;
             match signo {
                 _x if self.signals.is_zombie(signo) => {
+                    self.signals.recycle_zombie();
                     if self.is_sysmaster(siginfo.ssi_pid as i32) && self.switching {
                         self.reexec_self()
-                    } else {
-                        self.signals.recycle_zombie(Pid::from_raw(0))
                     }
                 }
                 _x if self.signals.is_restart(signo) => self.do_recreate(),
@@ -233,8 +231,7 @@ impl RunTime {
     fn change_to_unrecover(&mut self) {
         println!("change run state to unrecover");
         self.state = InitState::Unrecover;
-        // Attempt to recycle the zombie sysmaster.
-        self.signals.recycle_zombie(Pid::from_raw(0));
+        self.signals.recycle_zombie();
     }
 
     fn do_reexec(&mut self) {
@@ -250,11 +247,8 @@ impl RunTime {
         }
     }
 
-    fn do_recycle(&mut self, siginfo: signalfd_siginfo) {
-        let pid = siginfo.ssi_pid as i32;
-        if !self.is_sysmaster(pid) {
-            self.signals.recycle_zombie(Pid::from_raw(pid));
-        }
+    fn do_recycle(&mut self) {
+        self.signals.recycle_zombie();
     }
 
     fn create_sysmaster(&mut self) -> Result<(), Errno> {
