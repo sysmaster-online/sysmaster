@@ -77,8 +77,11 @@ impl Epoll {
     }
 
     pub(crate) fn register(&mut self, fd: RawFd, event: &mut epoll_event) -> Result<()> {
-        self.n_sources.fetch_add(1, Ordering::Relaxed);
-        syscall!(epoll_ctl(self.epoll_fd, EPOLL_CTL_ADD, fd, event)).map(|_| ())
+        let res = syscall!(epoll_ctl(self.epoll_fd, EPOLL_CTL_ADD, fd, event)).map(|_| ());
+        if res.is_ok() {
+            self.n_sources.fetch_add(1, Ordering::Relaxed);
+        }
+        res
     }
 
     pub(crate) fn reregister(&mut self, fd: RawFd, event: &mut epoll_event) -> Result<()> {

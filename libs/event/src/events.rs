@@ -53,6 +53,11 @@ impl Events {
         self.data.borrow_mut().add_source(source)
     }
 
+    /// for all: check if the source exists
+    pub fn has_source(&self, source: Rc<dyn Source>) -> bool {
+        self.data.borrow().has_source(source)
+    }
+
     /// for all: delete source
     pub fn del_source(&self, source: Rc<dyn Source>) -> Result<i32> {
         self.data.borrow_mut().del_source(source)
@@ -233,6 +238,11 @@ impl EventsData {
         Ok(0)
     }
 
+    pub(self) fn has_source(&self, source: Rc<dyn Source>) -> bool {
+        let token = source.token();
+        self.sources.contains_key(&token)
+    }
+
     pub(self) fn del_source(&mut self, source: Rc<dyn Source>) -> Result<i32> {
         self.source_offline(&source)?;
 
@@ -287,7 +297,11 @@ impl EventsData {
 
     pub(self) fn set_enabled(&mut self, source: Rc<dyn Source>, state: EventState) -> Result<i32> {
         let token = source.token();
-
+        if let Some(current_state) = self.state.get(&token) {
+            if current_state == &state {
+                return Ok(0);
+            }
+        }
         match state {
             EventState::On | EventState::OneShot => {
                 self.source_online(&source)?;

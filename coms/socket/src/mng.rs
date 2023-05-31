@@ -576,8 +576,9 @@ impl SocketMng {
                 continue;
             }
             let source = Rc::clone(mport);
-            events.add_source(source).unwrap();
-            let source = Rc::clone(mport);
+            if !events.has_source(source.clone()) {
+                events.add_source(source.clone()).unwrap();
+            }
             events.set_enabled(source, EventState::On).unwrap();
         }
     }
