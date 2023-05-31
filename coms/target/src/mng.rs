@@ -112,7 +112,7 @@ impl TargetMng {
         unit.notify(
             old_unit_state,
             new_unit_state,
-            UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
+            UnitNotifyFlags::RELOAD_FAILURE,
         );
 
         self.db_update();

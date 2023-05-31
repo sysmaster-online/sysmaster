@@ -621,7 +621,7 @@ fn job_process_unit_reload(
     flags: UnitNotifyFlags,
 ) -> (Option<JobResult>, bool) {
     let mut result = JobResult::Done;
-    if flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE) {
+    if flags.intersects(UnitNotifyFlags::RELOAD_FAILURE) {
         result = JobResult::Failed;
     }
     match ns {

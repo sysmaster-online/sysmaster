@@ -862,14 +862,14 @@ impl ServiceMng {
         let os = service_state_to_unit_state(self.config.service_type(), original_state);
         let ns = service_state_to_unit_state(self.config.service_type(), state);
         if let Some(u) = self.comm.owner() {
-            let mut flags = UnitNotifyFlags::UNIT_NOTIFY_SUCCESS;
+            let mut flags = UnitNotifyFlags::EMPTY;
 
             if self.rd.will_auto_restart() {
-                flags |= UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART;
+                flags |= UnitNotifyFlags::WILL_AUTO_RESTART;
             }
 
             if self.reload_result() != ServiceResult::Success {
-                flags |= UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE;
+                flags |= UnitNotifyFlags::RELOAD_FAILURE;
             }
             u.notify(os, ns, flags)
         }

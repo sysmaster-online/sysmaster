@@ -650,7 +650,7 @@ impl SocketMng {
             u.notify(
                 original_state.to_unit_active_state(),
                 state.to_unit_active_state(),
-                UnitNotifyFlags::UNIT_NOTIFY_RELOAD_FAILURE,
+                UnitNotifyFlags::RELOAD_FAILURE,
             )
         }
     }

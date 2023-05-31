@@ -268,7 +268,6 @@ impl Source for JobManagerData {
 
     fn dispatch(&self, _event: &Events) -> i32 {
         log::debug!("job manager data dispatch");
-
         self.reli.set_last_frame1(ReliLastFrame::JobManager as u32);
         self.run(None);
         self.reli.clear_last_frame();
@@ -728,7 +727,7 @@ impl JobManagerData {
     ) {
         // OnFailure=
         if ns != os
-            && !flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART)
+            && !flags.intersects(UnitNotifyFlags::WILL_AUTO_RESTART)
             && ns == UnitActiveState::UnitFailed
         {
             let job_mode = unit
@@ -746,7 +745,7 @@ impl JobManagerData {
 
         // OnSuccess=
         if ns == UnitActiveState::UnitInActive
-            && !flags.intersects(UnitNotifyFlags::UNIT_NOTIFY_WILL_AUTO_RESTART)
+            && !flags.intersects(UnitNotifyFlags::WILL_AUTO_RESTART)
         {
             match os {
                 UnitActiveState::UnitFailed

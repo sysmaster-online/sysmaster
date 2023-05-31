@@ -694,11 +694,7 @@ impl Unit {
             Ok(_) => Ok(()),
             Err(e) => match e {
                 Error::UnitActionEOpNotSupp => {
-                    self.notify(
-                        active_state,
-                        active_state,
-                        UnitNotifyFlags::UNIT_NOTIFY_SUCCESS,
-                    );
+                    self.notify(active_state, active_state, UnitNotifyFlags::EMPTY);
                     Ok(())
                 }
                 _ => Err(e),

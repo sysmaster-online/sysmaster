@@ -1051,7 +1051,6 @@ impl UnitManager {
         if let Err(_e) = self.jm.try_finish(&unitx, state.os, state.ns, state.flags) {
             // debug
         }
-
         let atom = UnitRelationAtom::UnitAtomTriggeredBy;
         for other in self.db.dep_gets_atom(&unitx, atom) {
             other.trigger(&unitx);
