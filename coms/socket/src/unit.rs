@@ -115,6 +115,22 @@ impl SubUnit for SocketUnit {
         Ok(())
     }
 
+    fn trigger(&self, other: &String) {
+        let um = self.comm.um();
+        let service_state = um.get_subunit_state(other);
+        if [
+            "dead".to_string(),
+            "failed".to_string(),
+            "finalsigterm".to_string(),
+            "finalsigkill".to_string(),
+            "autorestart".to_string(),
+        ]
+        .contains(&service_state)
+        {
+            self.mng.enter_listening();
+        }
+    }
+
     fn sigchld_events(&self, wait_status: WaitStatus) {
         self.mng.sigchld_event(wait_status)
     }

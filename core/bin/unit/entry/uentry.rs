@@ -545,6 +545,11 @@ impl Unit {
         self.config.clone()
     }
 
+    pub(super) fn trigger(&self, other: &Self) {
+        let other_unit_id = other.id();
+        self.sub.trigger(other_unit_id);
+    }
+
     pub(super) fn in_load_queue(&self) -> bool {
         self.load.in_load_queue()
     }

@@ -127,6 +127,9 @@ pub trait SubUnit: ReStation + UnitMngUtil {
         Vec::new()
     }
 
+    ///
+    fn trigger(&self, _other: &String) {}
+
     ///Get the the unit state
     ///
     /// Every sub unit  can define self states and map to [`UnitActiveState`]

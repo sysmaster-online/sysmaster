@@ -106,7 +106,9 @@ impl UnitX {
         self.0.sigchld_events(wait_status)
     }
 
-    pub(crate) fn trigger(&self, _other: &Self) {}
+    pub(crate) fn trigger(&self, other: &Self) {
+        self.0.trigger(other);
+    }
     pub(crate) fn in_load_queue(&self) -> bool {
         self.0.in_load_queue()
     }
