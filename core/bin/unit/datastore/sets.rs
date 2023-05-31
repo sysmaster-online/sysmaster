@@ -62,7 +62,7 @@ impl UnitSets {
             .borrow()
             .get_all()
             .iter()
-            .map(|ur| Rc::clone(ur))
+            .map(Rc::clone)
             .collect::<Vec<_>>()
     }
 

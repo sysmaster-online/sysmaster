@@ -290,6 +290,7 @@ impl From<event::Error> for Error {
 /// new Result
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
+/// check if the error is disconnect
 pub fn error_is_disconnect(e: &Errno) -> bool {
     [
         Errno::ECONNABORTED,
@@ -310,10 +311,12 @@ pub fn error_is_disconnect(e: &Errno) -> bool {
     .contains(e)
 }
 
+/// check if the error is transient
 pub fn error_is_transient(e: &Errno) -> bool {
     [Errno::EAGAIN, Errno::EINTR].contains(e)
 }
 
+/// check if the error is accept or again
 pub fn error_is_accept_again(e: &Errno) -> bool {
     error_is_disconnect(e) || error_is_transient(e) || e == &Errno::EOPNOTSUPP
 }

@@ -60,8 +60,7 @@ impl DataManager {
         ud_config: UnitDepConf,
     ) -> Option<UnitDepConf> {
         {
-            let old = self.tables.0.insert(u_name, ud_config);
-            old
+            self.tables.0.insert(u_name, ud_config)
         }
     }
 

@@ -22,8 +22,8 @@ use crate::{
 };
 use basic::logger;
 use nix::sys::wait::WaitStatus;
-use std::{path::PathBuf, rc::Rc};
 use std::any::Any;
+use std::{path::PathBuf, rc::Rc};
 use sysmaster::error::*;
 use sysmaster::exec::ExecContext;
 use sysmaster::rel::{ReStation, Reliability};
@@ -115,7 +115,7 @@ impl SubUnit for SocketUnit {
         Ok(())
     }
 
-    fn trigger(&self, other: &String) {
+    fn trigger(&self, other: &str) {
         let um = self.comm.um();
         let service_state = um.get_subunit_state(other);
         if [

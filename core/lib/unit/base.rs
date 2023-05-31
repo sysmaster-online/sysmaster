@@ -128,7 +128,7 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     }
 
     ///
-    fn trigger(&self, _other: &String) {}
+    fn trigger(&self, _other: &str) {}
 
     ///Get the the unit state
     ///

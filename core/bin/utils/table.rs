@@ -82,11 +82,7 @@ where
     }
 
     pub fn get_all(&self) -> Vec<V> {
-        self.data
-            .borrow()
-            .values()
-            .map(|v| v.clone())
-            .collect::<Vec<V>>()
+        self.data.borrow().values().cloned().collect::<Vec<V>>()
     }
 
     pub fn subscribe(
