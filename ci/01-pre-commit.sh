@@ -55,10 +55,10 @@ for url in ${sources[*]}
 do
     git config --global url."${url}".insteadOf "https://github.com/"
     git clone https://github.com/pre-commit/pre-commit-hooks
-    set -e
     if [[ $? -ne 0 ]]; then
         git config --unset --global url."${url}".insteadOf "https://github.com/"
     else
+        set -e
         pre-commit run -vvv --all-files
         break
     fi
