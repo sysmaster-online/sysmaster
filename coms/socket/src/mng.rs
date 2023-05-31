@@ -593,8 +593,9 @@ impl SocketMng {
 
     fn flush_ports(&self) {
         for port in self.ports().iter() {
-            port.flush_accept();
-
+            if port.fd() < 0 {
+                continue;
+            }
             port.flush_fd();
         }
     }
