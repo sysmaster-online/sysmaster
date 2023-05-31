@@ -49,7 +49,7 @@ fi
 
 source ~/.bashrc
 
-rustup default 1.64
+rustup default 1.60
 
 ##Fix cargo clippy timeout : replace cargo crates with ustc
 arch=`uname -m`

@@ -49,4 +49,17 @@ RUSTC_WRAPPER="" cargo clippy --all-targets --features "default" --all -- -Dwarn
 #filelist=`git diff origin/master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`
 # ln -s `which python3` /home/jenkins/.local/bin/python
 # pre-commit autoupdate || pre-commit autoupdate || pre-commit autoupdate
-pre-commit run -vvv --all-files
+sources=("https://gitclone.com/github.com/" "https://gh.api.99988866.xyz/https://github.com/" "https://github.com/")
+set +e
+for url in ${sources[*]}
+do
+    git config --global url."${url}".insteadOf "https://github.com/"
+    git clone https://github.com/pre-commit/pre-commit-hooks
+    set -e
+    if [[ $? -ne 0 ]]; then
+        git config --unset --global url."${url}".insteadOf "https://github.com/"
+    else
+        pre-commit run -vvv --all-files
+        break
+    fi
+done
