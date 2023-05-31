@@ -289,3 +289,31 @@ impl From<event::Error> for Error {
 
 /// new Result
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+pub fn error_is_disconnect(e: &Errno) -> bool {
+    [
+        Errno::ECONNABORTED,
+        Errno::ECONNREFUSED,
+        Errno::ECONNRESET,
+        Errno::EHOSTDOWN,
+        Errno::EHOSTUNREACH,
+        Errno::ENETDOWN,
+        Errno::ENETRESET,
+        Errno::ENONET,
+        Errno::ENOPROTOOPT,
+        Errno::ENOTCONN,
+        Errno::EPIPE,
+        Errno::EPROTO,
+        Errno::ESHUTDOWN,
+        Errno::ETIMEDOUT,
+    ]
+    .contains(e)
+}
+
+pub fn error_is_transient(e: &Errno) -> bool {
+    [Errno::EAGAIN, Errno::EINTR].contains(e)
+}
+
+pub fn error_is_accept_again(e: &Errno) -> bool {
+    error_is_disconnect(e) || error_is_transient(e) || e == &Errno::EOPNOTSUPP
+}

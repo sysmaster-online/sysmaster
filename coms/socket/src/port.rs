@@ -151,29 +151,43 @@ impl SocketPort {
         }
     }
 
-    pub(super) fn flush_accept(&self) {
+    pub(super) fn flush_accept(&self) -> Result<()> {
         if let Ok(true) = socket::getsockopt(self.fd(), sockopt::AcceptConn) {
             for _i in 1..1024 {
-                while let Err(e) = io_util::wait_for_events(self.fd(), PollFlags::POLLIN, 0) {
-                    if let basic::Error::Nix {
-                        source: Errno::EINTR,
-                    } = e
-                    {
-                        continue;
+                let events = match io_util::wait_for_events(self.fd(), PollFlags::POLLIN, 0) {
+                    Err(e) => {
+                        if let basic::Error::Nix {
+                            source: Errno::EINTR,
+                        } = e
+                        {
+                            continue;
+                        }
+                        return Err(e.into());
                     }
-                    return;
+                    Ok(v) => v,
+                };
+                if events == 0 {
+                    return Ok(());
                 }
-                match socket::accept4(self.fd(), SockFlag::SOCK_NONBLOCK | SockFlag::SOCK_CLOEXEC)
-                    .map(|_| fd_util::close(self.fd()))
-                {
-                    Ok(_) => {}
-                    Err(_e) => {
-                        // todo!(): if e == Errno::EAGAIN { return; }
-                        return;
+                let cfd = match socket::accept4(
+                    self.fd(),
+                    SockFlag::SOCK_NONBLOCK | SockFlag::SOCK_CLOEXEC,
+                ) {
+                    Err(e) => {
+                        if e == Errno::EAGAIN {
+                            return Ok(());
+                        }
+                        if error_is_accept_again(&e) {
+                            continue;
+                        }
+                        return Err(e.into());
                     }
-                }
+                    Ok(v) => v,
+                };
+                fd_util::close(cfd);
             }
         }
+        Ok(())
     }
 
     pub(super) fn flush_fd(&self) {
@@ -356,7 +370,7 @@ mod tests {
         assert_ne!(port.fd(), SOCKET_INVALID_FD);
         assert_eq!(port.family(), AddressFamily::Inet);
 
-        port.flush_accept();
+        assert!(port.flush_accept().is_ok());
         port.flush_fd();
         port.close(false);
     }
@@ -387,7 +401,7 @@ mod tests {
         assert_ne!(port.fd(), SOCKET_INVALID_FD);
         assert_eq!(port.family(), AddressFamily::Unix);
 
-        port.flush_accept();
+        assert!(port.flush_accept().is_ok());
         port.flush_fd();
         port.close(false);
     }
@@ -424,7 +438,7 @@ mod tests {
         assert_ne!(port.fd(), SOCKET_INVALID_FD);
         assert_eq!(port.family(), AddressFamily::Netlink);
 
-        port.flush_accept();
+        assert!(port.flush_accept().is_ok());
         port.flush_fd();
         port.close(false);
     }
@@ -519,7 +533,7 @@ mod tests {
         }
 
         // Rosource reclaim
-        port.flush_accept();
+        assert!(port.flush_accept().is_ok());
         port.flush_fd();
         port.close(false);
     }

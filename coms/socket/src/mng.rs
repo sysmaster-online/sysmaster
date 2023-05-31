@@ -597,6 +597,7 @@ impl SocketMng {
             if port.fd() < 0 {
                 continue;
             }
+            let _ = port.flush_accept();
             port.flush_fd();
         }
     }
