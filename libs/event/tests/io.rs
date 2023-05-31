@@ -54,7 +54,6 @@ mod test {
         }
 
         fn dispatch(&self, _: &Events) -> i32 {
-            println!("Dispatching IO!");
             0
         }
 

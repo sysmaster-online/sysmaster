@@ -332,8 +332,6 @@ impl Source for Notify {
     }
 
     fn dispatch(&self, _e: &Events) -> i32 {
-        log::debug!("begin to dispatch notify event");
-
         self.reli.set_last_frame1(ReliLastFrame::Notify as u32);
         let ret = self.notify_dispatch();
         self.reli.clear_last_frame();

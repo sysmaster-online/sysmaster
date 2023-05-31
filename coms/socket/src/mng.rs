@@ -848,8 +848,6 @@ impl Source for SocketMngPort {
     }
 
     fn dispatch(&self, _: &Events) -> i32 {
-        println!("Dispatching IO!");
-
         self.reli().set_last_frame2(
             ReliLastFrame::SubManager as u32,
             UnitType::UnitSocket as u32,

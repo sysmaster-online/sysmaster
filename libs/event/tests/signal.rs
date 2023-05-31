@@ -47,7 +47,6 @@ impl Source for Signals {
     }
 
     fn dispatch(&self, e: &Events) -> i32 {
-        println!("Dispatching signal!");
         match e.read_signals() {
             Ok(Some(info)) => {
                 println!("read signo: {:?}", info.ssi_signo);
