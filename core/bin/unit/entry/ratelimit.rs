@@ -17,7 +17,7 @@ pub(super) struct StartLimit {
     start_limit: RefCell<RateLimit>,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub(crate) enum StartLimitResult {
     StartLimitNotHit,
     StartLimitHit,

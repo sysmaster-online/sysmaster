@@ -10,6 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::rc::Rc;
@@ -30,47 +31,45 @@ pub trait TableSubscribe<K, V> {
 
 //#[derive(Debug)]
 pub struct Table<K, V> {
-    data: HashMap<K, V>,                                        // key + value
-    subscribers: HashMap<String, Rc<dyn TableSubscribe<K, V>>>, // key: name, value: subscriber
+    data: RefCell<HashMap<K, V>>, // key + value
+    subscribers: RefCell<HashMap<String, Rc<dyn TableSubscribe<K, V>>>>, // key: name, value: subscriber
 }
 
 impl<K, V> Table<K, V>
 where
     K: Eq + Hash + Clone,
+    V: Clone,
 {
     pub fn new() -> Table<K, V> {
         Table {
-            data: HashMap::new(),
-            subscribers: HashMap::new(),
+            data: RefCell::new(HashMap::new()),
+            subscribers: RefCell::new(HashMap::new()),
         }
     }
 
-    pub fn data_clear(&mut self) {
+    pub fn data_clear(&self) {
         // clear all data without notifying subscribers
-        self.data.clear();
+        self.data.borrow_mut().clear();
     }
 
-    pub fn clear(&mut self) {
+    pub fn clear(&self) {
         // clear all, including data and subscribers
         self.data_clear();
-        self.subscribers.clear();
+        self.subscribers.borrow_mut().clear();
     }
 
-    pub fn insert(&mut self, k: K, v: V) -> Option<V> {
+    pub fn insert(&self, k: K, v: V) -> Option<V> {
         let key = k.clone();
-        let ret = self.data.insert(k, v);
-        let value = self
-            .data
-            .get(&key)
-            .expect("something inserted is not found.");
-        let op = TableOp::TableInsert(&key, value);
+        let ret = self.data.borrow_mut().insert(k, v);
+        let value = self.get(&key).expect("something inserted is not found.");
+        let op = TableOp::TableInsert(&key, &value);
         self.notify(&op);
         ret
     }
 
     #[allow(dead_code)]
-    pub fn remove(&mut self, k: &K) -> Option<V> {
-        let ret = self.data.remove(k);
+    pub fn remove(&self, k: &K) -> Option<V> {
+        let ret = self.data.borrow_mut().remove(k);
         if let Some(v) = &ret {
             let op = TableOp::TableRemove(k, v);
             self.notify(&op);
@@ -78,29 +77,33 @@ where
         ret
     }
 
-    pub fn get(&self, k: &K) -> Option<&V> {
-        self.data.get(k)
+    pub fn get(&self, k: &K) -> Option<V> {
+        self.data.borrow().get(k).cloned()
     }
 
-    pub fn get_all(&self) -> Vec<&V> {
-        self.data.values().collect::<Vec<_>>()
+    pub fn get_all(&self) -> Vec<V> {
+        self.data
+            .borrow()
+            .values()
+            .map(|v| v.clone())
+            .collect::<Vec<V>>()
     }
 
     pub fn subscribe(
-        &mut self,
+        &self,
         name: String,
         subscriber: Rc<dyn TableSubscribe<K, V>>,
     ) -> Option<Rc<dyn TableSubscribe<K, V>>> {
-        self.subscribers.insert(name, subscriber)
+        self.subscribers.borrow_mut().insert(name, subscriber)
     }
 
     #[allow(dead_code)]
-    pub fn unsubscribe(&mut self, name: &str) -> Option<Rc<dyn TableSubscribe<K, V>>> {
-        self.subscribers.remove(name)
+    pub fn unsubscribe(&self, name: &str) -> Option<Rc<dyn TableSubscribe<K, V>>> {
+        self.subscribers.borrow_mut().remove(name)
     }
 
     fn notify(&self, op: &TableOp<'_, K, V>) {
-        for (_, subscriber) in self.subscribers.iter() {
+        for (_, subscriber) in self.subscribers.borrow().iter() {
             if subscriber.filter(op) {
                 subscriber.notify(op);
             }
@@ -115,7 +118,7 @@ mod tests {
 
     #[test]
     fn table_insert() {
-        let mut table: Table<u32, char> = Table::new();
+        let table: Table<u32, char> = Table::new();
 
         let old = table.insert(1, 'a');
         assert_eq!(old, None);
@@ -129,7 +132,7 @@ mod tests {
 
     #[test]
     fn table_remove() {
-        let mut table: Table<u32, char> = Table::new();
+        let table: Table<u32, char> = Table::new();
 
         let old = table.remove(&1);
         assert_eq!(old, None);
@@ -148,25 +151,25 @@ mod tests {
 
     #[test]
     fn table_get() {
-        let mut table: Table<u32, char> = Table::new();
+        let table: Table<u32, char> = Table::new();
 
         let value = table.get(&1);
         assert_eq!(value, None);
 
         table.insert(1, 'a');
         let value = table.get(&1);
-        assert_eq!(value.cloned(), Some('a'));
+        assert_eq!(value, Some('a'));
         let value = table.get(&2);
         assert_eq!(value, None);
 
         table.insert(2, 'b');
         let value = table.get(&2);
-        assert_eq!(value.cloned(), Some('b'));
+        assert_eq!(value, Some('b'));
     }
 
     #[test]
     fn table_subscribe() {
-        let mut table: Table<u32, char> = Table::new();
+        let table: Table<u32, char> = Table::new();
         let sub_test1 = Rc::new(TableTest::new());
         let sub_test2 = Rc::new(TableTest::new());
 
@@ -185,7 +188,7 @@ mod tests {
 
     #[test]
     fn table_unsubscribe() {
-        let mut table: Table<u32, char> = Table::new();
+        let table: Table<u32, char> = Table::new();
         let sub_test1 = Rc::new(TableTest::new());
         let sub_test2 = Rc::new(TableTest::new());
 
@@ -209,7 +212,7 @@ mod tests {
 
     #[test]
     fn table_notify() {
-        let mut table: Table<u32, char> = Table::new();
+        let table: Table<u32, char> = Table::new();
         let sub_test1 = Rc::new(TableTest::new());
         let sub_test2 = Rc::new(TableTest::new());
 

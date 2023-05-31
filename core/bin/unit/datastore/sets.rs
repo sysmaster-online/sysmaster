@@ -54,7 +54,7 @@ impl UnitSets {
     }
 
     pub(super) fn get(&self, name: &str) -> Option<Rc<UnitX>> {
-        self.t.borrow().get(&name.to_string()).cloned()
+        self.t.borrow().get(&name.to_string())
     }
 
     pub(super) fn get_all(&self) -> Vec<Rc<UnitX>> {

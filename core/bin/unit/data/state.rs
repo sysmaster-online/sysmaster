@@ -12,7 +12,7 @@
 
 use sysmaster::unit::{UnitActiveState, UnitNotifyFlags};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct UnitState {
     pub(crate) os: UnitActiveState,
     pub(crate) ns: UnitActiveState,

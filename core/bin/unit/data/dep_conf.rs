@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 use sysmaster::unit::UnitRelations;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct UnitDepConf {
     pub deps: HashMap<UnitRelations, Vec<String>>,
 }

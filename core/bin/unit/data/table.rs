@@ -15,17 +15,16 @@ use super::state::UnitState;
 use crate::job::JobResult;
 use crate::unit::entry::StartLimitResult;
 use crate::utils::table::{Table, TableSubscribe};
-use std::cell::RefCell;
 use std::rc::Rc;
 use sysmaster::rel::ReStation;
 
 #[allow(clippy::type_complexity)]
 pub struct DataManager {
     tables: (
-        RefCell<Table<String, UnitDepConf>>,      // [0]unit-dep-config
-        RefCell<Table<String, UnitState>>,        // [1]unit-state
-        RefCell<Table<String, StartLimitResult>>, // [2]unit-start-limit-hit
-        RefCell<Table<String, JobResult>>,        // [3] unit-job-timeout
+        Table<String, UnitDepConf>,      // [0]unit-dep-config
+        Table<String, UnitState>,        // [1]unit-state
+        Table<String, StartLimitResult>, // [2]unit-start-limit-hit
+        Table<String, JobResult>,        // [3] unit-job-timeout
     ),
 }
 
@@ -35,8 +34,8 @@ impl ReStation for DataManager {
 
     // reload
     fn entry_clear(&self) {
-        self.tables.0.borrow_mut().data_clear();
-        self.tables.1.borrow_mut().data_clear();
+        self.tables.0.data_clear();
+        self.tables.1.data_clear();
     }
 }
 
@@ -51,12 +50,7 @@ impl Drop for DataManager {
 impl DataManager {
     pub fn new() -> DataManager {
         DataManager {
-            tables: (
-                RefCell::new(Table::new()),
-                RefCell::new(Table::new()),
-                RefCell::new(Table::new()),
-                RefCell::new(Table::new()),
-            ),
+            tables: (Table::new(), Table::new(), Table::new(), Table::new()),
         }
     }
 
@@ -66,7 +60,7 @@ impl DataManager {
         ud_config: UnitDepConf,
     ) -> Option<UnitDepConf> {
         {
-            let old = self.tables.0.borrow_mut().insert(u_name, ud_config);
+            let old = self.tables.0.insert(u_name, ud_config);
             old
         }
     }
@@ -76,8 +70,7 @@ impl DataManager {
         name: &str,
         subscriber: Rc<dyn TableSubscribe<String, UnitDepConf>>,
     ) -> Option<Rc<dyn TableSubscribe<String, UnitDepConf>>> {
-        let mut table = self.tables.0.borrow_mut();
-        table.subscribe(name.to_string(), subscriber)
+        self.tables.0.subscribe(name.to_string(), subscriber)
     }
 
     pub(crate) fn insert_unit_state(
@@ -85,8 +78,7 @@ impl DataManager {
         u_name: String,
         u_state: UnitState,
     ) -> Option<UnitState> {
-        let mut table = self.tables.1.borrow_mut();
-        table.insert(u_name, u_state)
+        self.tables.1.insert(u_name, u_state)
     }
 
     pub(crate) fn register_unit_state(
@@ -94,8 +86,7 @@ impl DataManager {
         name: &str,
         subscriber: Rc<dyn TableSubscribe<String, UnitState>>,
     ) -> Option<Rc<dyn TableSubscribe<String, UnitState>>> {
-        let mut table = self.tables.1.borrow_mut();
-        table.subscribe(name.to_string(), subscriber)
+        self.tables.1.subscribe(name.to_string(), subscriber)
     }
 
     pub(crate) fn insert_start_limit_result(
@@ -103,8 +94,7 @@ impl DataManager {
         u_name: String,
         start_limit_res: StartLimitResult,
     ) -> Option<StartLimitResult> {
-        let mut table = self.tables.2.borrow_mut();
-        table.insert(u_name, start_limit_res)
+        self.tables.2.insert(u_name, start_limit_res)
     }
 
     pub(crate) fn register_start_limit_result(
@@ -112,8 +102,7 @@ impl DataManager {
         name: &str,
         subscriber: Rc<dyn TableSubscribe<String, StartLimitResult>>,
     ) -> Option<Rc<dyn TableSubscribe<String, StartLimitResult>>> {
-        let mut table = self.tables.2.borrow_mut();
-        table.subscribe(name.to_string(), subscriber)
+        self.tables.2.subscribe(name.to_string(), subscriber)
     }
 
     pub(crate) fn insert_job_result(
@@ -121,8 +110,7 @@ impl DataManager {
         u_name: String,
         job_result: JobResult,
     ) -> Option<JobResult> {
-        let mut table = self.tables.3.borrow_mut();
-        table.insert(u_name, job_result)
+        self.tables.3.insert(u_name, job_result)
     }
 
     pub(crate) fn register_job_result(
@@ -130,19 +118,20 @@ impl DataManager {
         name: &str,
         subscriber: Rc<dyn TableSubscribe<String, JobResult>>,
     ) -> Option<Rc<dyn TableSubscribe<String, JobResult>>> {
-        let mut table = self.tables.3.borrow_mut();
-        table.subscribe(name.to_string(), subscriber)
+        self.tables.3.subscribe(name.to_string(), subscriber)
     }
 
     // repeating protection
     pub(crate) fn clear(&self) {
-        self.tables.0.borrow_mut().clear();
-        self.tables.1.borrow_mut().clear();
+        self.tables.0.clear();
+        self.tables.1.clear();
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+
     use super::*;
     use crate::unit::UnitRelations;
     use crate::utils::table::TableOp;
