@@ -71,6 +71,10 @@ impl ReStation for ServiceUnit {
 }
 
 impl SubUnit for ServiceUnit {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn init(&self) {
         todo!()
     }

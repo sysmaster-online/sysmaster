@@ -64,6 +64,10 @@ impl MountUnit {
 }
 
 impl SubUnit for MountUnit {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn load(&self, _paths: Vec<PathBuf>) -> Result<()> {
         if let Some(u) = self.comm.owner() {
             u.set_ignore_on_isolate(true)

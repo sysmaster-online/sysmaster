@@ -17,6 +17,7 @@ use super::umif::UnitMngUtil;
 use crate::error::*;
 use nix::sys::wait::WaitStatus;
 use nix::{sys::socket::UnixCredentials, unistd::Pid};
+use std::any::Any;
 use std::{collections::HashMap, path::PathBuf, rc::Rc};
 
 ///The trait Defining Shared Behavior from Base Unit  to SUB unit
@@ -72,6 +73,8 @@ pub trait UnitBase {
 /// difference sub unit ref by dynamic trait
 ///
 pub trait SubUnit: ReStation + UnitMngUtil {
+    ///
+    fn as_any(&self) -> &dyn Any;
     ///
     fn init(&self) {}
 

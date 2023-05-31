@@ -23,6 +23,7 @@ use crate::{
 use basic::logger;
 use nix::sys::wait::WaitStatus;
 use std::{path::PathBuf, rc::Rc};
+use std::any::Any;
 use sysmaster::error::*;
 use sysmaster::exec::ExecContext;
 use sysmaster::rel::{ReStation, Reliability};
@@ -68,6 +69,10 @@ impl ReStation for SocketUnit {
 }
 
 impl SubUnit for SocketUnit {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn load(&self, paths: Vec<PathBuf>) -> Result<()> {
         log::debug!("socket begin to load conf file");
         self.config.load(paths, true)?;

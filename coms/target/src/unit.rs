@@ -120,6 +120,10 @@ impl Target {
 }
 
 impl SubUnit for Target {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn load(&self, _conf_str: Vec<PathBuf>) -> Result<()> {
         //todo add default dependency funnction need add
         log::debug!("load for target");
