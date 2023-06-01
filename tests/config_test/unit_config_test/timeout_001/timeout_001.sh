@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: test for JobTimeoutSec/JobTimeoutAction
 
 TEST_SCRIPT="$(basename "$0")"

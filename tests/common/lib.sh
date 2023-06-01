@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: global variables and common functions
 
 if test -f "${BUILD_PATH}/target/release/sysmaster"; then

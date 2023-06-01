@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 busybox_file=/usr/share/busybox/busybox.links
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 work_dir="$(dirname "$0")"
 source "${work_dir}"/util_lib.sh

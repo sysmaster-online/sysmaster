@@ -13,7 +13,7 @@
 
 # Prepare test configuration and run devmaster
 
-#!/bin/bash
+#!/usr/bin/env bash
 
 function prepare()
 {

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ## PARAMS 1:input tarball name, for example:sysmasterwithbusybox.aarch64-1.0.tar.xz
 TARPATH=$1
 ## PARAMS 2:specify turing version, for example:V1, V2

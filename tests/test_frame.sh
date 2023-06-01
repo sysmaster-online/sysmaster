@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: test frame functions for docker & vm integration test
 
 TEST_PATH="${BUILD_PATH}"/tests

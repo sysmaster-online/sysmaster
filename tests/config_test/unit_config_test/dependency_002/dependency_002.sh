@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: test for WantedBy/RequiredBy/Also/Alias
 
 TEST_SCRIPT="$(basename "$0")"

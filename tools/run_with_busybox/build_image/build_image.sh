@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 WORKDIR="/tmp/image"
 REPO=http://repo.openeuler.org/openEuler-22.09/everything/aarch64/

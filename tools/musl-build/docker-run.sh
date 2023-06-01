@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 #1.check cargo musl build
 #echo -e "---!!!CHECK CARGO AND DOCKER!!!---"

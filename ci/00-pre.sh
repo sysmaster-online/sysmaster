@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ## one PR ? Commit
 # oldnum=`git rev-list origin/master --no-merges --count`

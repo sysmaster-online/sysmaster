@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 p_w_d=`pwd`
 echo $p_w_d
 

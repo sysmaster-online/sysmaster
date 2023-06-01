@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: test for KillMode/KillSignal
 
 TEST_SCRIPT="$(basename "$0")"

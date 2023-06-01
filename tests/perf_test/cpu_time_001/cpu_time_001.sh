@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: unit restart time performance test
 
 TEST_SCRIPT="$(basename "$0")"

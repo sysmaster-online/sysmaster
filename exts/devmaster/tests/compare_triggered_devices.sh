@@ -10,7 +10,7 @@
 # NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 # See the Mulan PSL v2 for more details.
 
-#!/bin/bash
+#!/usr/bin/env bash
 
 # compare triggered devices by udevadm and devctl
 

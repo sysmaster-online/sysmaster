@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: docker common functions
 
 OS_VER="openEuler-22.03-LTS-SP1"

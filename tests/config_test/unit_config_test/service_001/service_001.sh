@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: test for Description/Documentation/RemainAfterExit/DefaultDependencies
 
 TEST_SCRIPT="$(basename "$0")"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: test for ListenDatagram/ListenStream/ListenSequentialPacket/ListenNetlink
 
 TEST_SCRIPT="$(basename "$0")"

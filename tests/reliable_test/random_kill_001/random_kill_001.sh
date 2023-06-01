@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: reliability test
 
 TEST_SCRIPT="$(basename "$0")"

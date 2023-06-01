@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: test for service exec configures:
 #              ExecStart/ExecStartPre/ExecStartPost/ExecStop/ExecStopPost/ExecReload/ExecCondition
 

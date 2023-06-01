@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 set -x
 # install needed tools
 #sudo yum clean all

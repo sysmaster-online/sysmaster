@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: test for Wants/Requires/Conflicts/BindsTo/Requisite/PartOf
 
 TEST_SCRIPT="$(basename "$0")"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: test for ConditionPathExists/ConditionFileNotEmpty/ConditionPathIsReadWrite
 #                       ConditionDirectoryNotEmpty/ConditionFileIsExecutable
 #                       ConditionPathExistsGlob/ConditionPathIsDirectory/ConditionPathIsMountPoint/ConditionPathIsSymbolicLink

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Description: test for Before/After
 
 TEST_SCRIPT="$(basename "$0")"

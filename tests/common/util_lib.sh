@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 export EXPECT_FAIL=0
 export SYSMST_LIB_PATH='/usr/lib/sysmaster'
