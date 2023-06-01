@@ -16,7 +16,7 @@ use std::os::unix::io::RawFd;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-const INIT_SOCKET: &str = "/run/sysmaster/init";
+use constants::INIT_SOCKET;
 
 static INSTANCE: Lazy<Arc<KeepAlive>> = Lazy::new(|| {
     let keep_alive = KeepAlive::new();
