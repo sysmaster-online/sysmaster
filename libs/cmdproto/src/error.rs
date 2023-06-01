@@ -33,6 +33,9 @@ pub enum Error {
     #[snafu(display("ReadStreamFailed"))]
     ReadStream { msg: String },
 
+    #[snafu(display("SendStreamFailed"))]
+    SendStream { msg: String },
+
     #[snafu(display("ManagerStartFailed"))]
     ManagerStart { msg: String },
 }

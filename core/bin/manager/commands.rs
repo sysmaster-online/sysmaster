@@ -73,21 +73,28 @@ where
     }
 
     fn dispatch(&self, _e: &Events) -> i32 {
-        log::trace!("Dispatching Command!");
-
         self.reli.set_last_frame1(ReliLastFrame::CmdOp as u32);
-        match self.fd.incoming().next() {
-            None => log::info!("None CommandRequest!"),
-            Some(stream) => {
-                log::trace!("{stream:?}");
-                if let Ok(s) = stream {
-                    let dispatch = ProstServerStream::new(s, self.command_action.clone());
-                    match dispatch.process() {
-                        Ok(_) => (),
-                        Err(e) => log::error!("Commands failed: {:?}", e),
-                    }
-                }
+        let client = match socket::accept(self.socket_fd) {
+            Err(e) => {
+                log::error!("Failed to accept connection: {}, ignoring.", e);
+                return 0;
             }
+            Ok(v) => v,
+        };
+        let cred = match socket::getsockopt(client, socket::sockopt::PeerCredentials) {
+            Err(e) => {
+                log::error!(
+                    "Failed to get the credentials of the connection: {}, refuse any request.",
+                    e
+                );
+                None
+            }
+            Ok(v) => Some(v),
+        };
+        let dispatch = ProstServerStream::new(client, self.command_action.clone(), cred);
+        match dispatch.process() {
+            Ok(_) => (),
+            Err(e) => log::error!("Commands failed: {:?}", e),
         }
         self.reli.clear_last_frame();
 

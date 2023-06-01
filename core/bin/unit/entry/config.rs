@@ -136,14 +136,12 @@ impl UeConfig {
 
         let unit_conf_frag = files.get_unit_id_fragment_pathbuf(name);
         if unit_conf_frag.is_empty() {
-            log::error!("config file for {} is not exist", name);
-            return Err(format!("config file for {name} is not exist").into());
+            return Err(format!("{name} doesn't have corresponding config file").into());
         }
         // fragment
         for v in unit_conf_frag {
             if !v.exists() {
-                log::error!("config file is not exist");
-                return Err(format!("config file is not exist {name}").into());
+                return Err(format!("Config file {:?} of {name} doesn't exist", v).into());
             }
             builder = builder.file(&v);
         }

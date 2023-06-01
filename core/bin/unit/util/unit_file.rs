@@ -133,12 +133,39 @@ impl UnitFileData {
                 format!("{v}/{name}")
             };
             let tmp = Path::new(&path);
-            if tmp.exists() && !tmp.is_symlink() {
-                let path = format!("{}.toml", tmp.to_string_lossy());
-                if let Err(e) = std::fs::copy(tmp, &path) {
+            if !tmp.exists() {
+                continue;
+            }
+            /* Add .toml to the original path name */
+            if !tmp.is_symlink() {
+                let path_toml = format!("{}.toml", tmp.to_string_lossy());
+                let to = Path::new(&path_toml);
+                if let Err(e) = std::fs::copy(tmp, to) {
                     log::warn!("copy file content to toml file error: {}", e);
                 }
-                let to = Path::new(&path);
+                pathbuf_fragment.push(to.to_path_buf());
+            } else {
+                let real_path = match std::fs::read_link(tmp) {
+                    Err(e) => {
+                        log::error!("Failed to chase the symlink {:?}: {e}", tmp);
+                        continue;
+                    }
+                    Ok(v) => v,
+                };
+                /* Only support one-level symlink. */
+                if real_path.is_symlink() {
+                    continue;
+                }
+                let real_path = tmp.parent().unwrap().join(real_path);
+                let real_path = fs::canonicalize(&real_path).unwrap();
+                let path_toml = format!("{}.toml", real_path.to_string_lossy());
+                let to = Path::new(&path_toml);
+                if let Err(e) = std::fs::copy(&real_path, to) {
+                    log::warn!(
+                        "copy file content {:?} to toml file {path_toml} error: {e}",
+                        real_path
+                    );
+                }
                 pathbuf_fragment.push(to.to_path_buf());
             }
         }

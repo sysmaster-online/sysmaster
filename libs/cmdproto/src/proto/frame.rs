@@ -12,6 +12,7 @@
 
 //! Encapsulate the command request into a frame
 use crate::error::*;
+use nix::sys::socket::{self, UnixCredentials};
 use prost::bytes::{BufMut, BytesMut};
 use prost::Message;
 use std::{
@@ -48,8 +49,49 @@ where
 impl FrameCoder for CommandRequest {}
 impl FrameCoder for CommandResponse {}
 
+/// Read frame from accept fd.
+pub fn read_frame_from_fd(fd: i32, buf: &mut BytesMut) -> Result<()> {
+    // 1. Got the message length
+    let mut msg_len = [0_u8; USIZE_TO_U8_LENGTH];
+    match socket::recv(fd, &mut msg_len, socket::MsgFlags::empty()) {
+        Ok(len) => {
+            if len != USIZE_TO_U8_LENGTH {
+                return Err(Error::ReadStream {
+                    msg: "Invalid message length".to_string(),
+                });
+            }
+        }
+        Err(e) => {
+            return Err(Error::ReadStream { msg: e.to_string() });
+        }
+    }
+    let msg_len = get_msg_len(msg_len);
+
+    // 2. Got the message
+    let mut tmp = vec![0; MAX_FRAME];
+    let mut cur_len: usize = 0;
+    loop {
+        match socket::recv(fd, &mut tmp, socket::MsgFlags::empty()) {
+            Ok(len) => {
+                cur_len += len;
+                buf.put_slice(&tmp[..len]);
+                /* If there is no more message (len < MAX_FRAME), or
+                 * we have got enough message (cur_len >= msg_len),
+                 * then we finish reading. */
+                if len < MAX_FRAME || cur_len >= msg_len {
+                    break;
+                }
+            }
+            Err(e) => {
+                return Err(Error::ReadStream { msg: e.to_string() });
+            }
+        }
+    }
+    Ok(())
+}
+
 /// read frame from stream
-pub fn read_frame<S>(stream: &mut S, buf: &mut BytesMut) -> Result<()>
+pub fn read_frame_from_stream<S>(stream: &mut S, buf: &mut BytesMut) -> Result<()>
 where
     S: Read + Unpin + Send,
 {
@@ -66,6 +108,9 @@ where
             Ok(len) => {
                 cur_len += len;
                 buf.put_slice(&tmp[..len]);
+                /* If there is no more message (len < MAX_FRAME), or
+                 * we have got enough message (cur_len >= msg_len),
+                 * then we finish reading. */
                 if len < MAX_FRAME || cur_len >= msg_len {
                     break;
                 }
@@ -89,9 +134,10 @@ fn get_msg_len(message: [u8; USIZE_TO_U8_LENGTH]) -> usize {
 }
 
 /// Handle read and write of server-side socket
-pub struct ProstServerStream<S, T> {
-    inner: S,
+pub struct ProstServerStream<T> {
+    accept_fd: i32,
     manager: Rc<T>,
+    cred: Option<UnixCredentials>,
 }
 
 /// Handle read and write of client-side socket
@@ -99,23 +145,23 @@ pub struct ProstClientStream<S> {
     inner: S,
 }
 
-impl<S, T> ProstServerStream<S, T>
+impl<T> ProstServerStream<T>
 where
-    S: Read + Write + Unpin + Send,
     T: ExecuterAction,
 {
     /// new ProstServerStream
-    pub fn new(stream: S, manager: Rc<T>) -> Self {
+    pub fn new(accept_fd: i32, manager: Rc<T>, cred: Option<UnixCredentials>) -> Self {
         Self {
-            inner: stream,
+            accept_fd,
             manager,
+            cred,
         }
     }
 
     /// process frame in server-side
     pub fn process(mut self) -> Result<()> {
         if let Ok(cmd) = self.recv() {
-            let res = execute::dispatch(cmd, Rc::clone(&self.manager));
+            let res = execute::dispatch(cmd, Rc::clone(&self.manager), self.cred);
             self.send(res)?;
         };
         Ok(())
@@ -126,16 +172,32 @@ where
         msg.encode_frame(&mut buf)?;
         let encoded = buf.freeze();
         let msg_len = msg_len_vec(encoded.len());
-        self.inner.write_all(&msg_len).context(IoSnafu)?;
-        self.inner.write_all(&encoded).context(IoSnafu)?;
-        self.inner.flush().context(IoSnafu)?;
+        match socket::send(self.accept_fd, &msg_len, socket::MsgFlags::empty()) {
+            Ok(len) => {
+                if len != msg_len.len() {
+                    return Err(Error::SendStream {
+                        msg: "Invalid message length".to_string(),
+                    });
+                }
+            }
+            Err(e) => return Err(Error::SendStream { msg: e.to_string() }),
+        }
+        match socket::send(self.accept_fd, &encoded, socket::MsgFlags::empty()) {
+            Ok(len) => {
+                if len != encoded.len() {
+                    return Err(Error::SendStream {
+                        msg: "Invalid message length".to_string(),
+                    });
+                }
+            }
+            Err(e) => return Err(Error::SendStream { msg: e.to_string() }),
+        }
         Ok(())
     }
 
     fn recv(&mut self) -> Result<CommandRequest> {
         let mut buf = BytesMut::new();
-        let stream = &mut self.inner;
-        read_frame(stream, &mut buf)?;
+        read_frame_from_fd(self.accept_fd, &mut buf)?;
         CommandRequest::decode_frame(&mut buf)
     }
 }
@@ -169,8 +231,7 @@ where
 
     fn recv(&mut self) -> Result<CommandResponse> {
         let mut buf = BytesMut::new();
-        let stream = &mut self.inner;
-        read_frame(stream, &mut buf)?;
+        read_frame_from_stream(&mut self.inner, &mut buf)?;
         CommandResponse::decode_frame(&mut buf)
     }
 }

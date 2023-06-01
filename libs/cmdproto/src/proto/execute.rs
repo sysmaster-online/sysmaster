@@ -18,7 +18,7 @@ use super::{
 
 use crate::error::*;
 use http::StatusCode;
-use nix;
+use nix::{self, sys::socket::UnixCredentials};
 use std::{fmt::Display, rc::Rc};
 
 pub(crate) trait Executer {
@@ -27,6 +27,7 @@ pub(crate) trait Executer {
         self,
         manager: Rc<impl ExecuterAction>,
         call_back: Option<fn(&str) -> String>,
+        cred: Option<UnixCredentials>,
     ) -> CommandResponse;
 }
 
@@ -73,7 +74,11 @@ pub trait ExecuterAction {
 }
 
 /// Depending on the type of request
-pub(crate) fn dispatch<T>(cmd: CommandRequest, manager: Rc<T>) -> CommandResponse
+pub(crate) fn dispatch<T>(
+    cmd: CommandRequest,
+    manager: Rc<T>,
+    cred: Option<UnixCredentials>,
+) -> CommandResponse
 where
     T: ExecuterAction,
 {
@@ -89,10 +94,10 @@ where
     };
 
     match cmd.request_data {
-        Some(RequestData::Ucomm(param)) => param.execute(manager, Some(call_back)),
-        Some(RequestData::Mcomm(param)) => param.execute(manager, None),
-        Some(RequestData::Syscomm(param)) => param.execute(manager, Some(call_back)),
-        Some(RequestData::Ufile(param)) => param.execute(manager, Some(call_back)),
+        Some(RequestData::Ucomm(param)) => param.execute(manager, Some(call_back), cred),
+        Some(RequestData::Mcomm(param)) => param.execute(manager, None, cred),
+        Some(RequestData::Syscomm(param)) => param.execute(manager, Some(call_back), cred),
+        Some(RequestData::Ufile(param)) => param.execute(manager, Some(call_back), cred),
         _ => CommandResponse::default(),
     }
 }
@@ -103,12 +108,45 @@ fn new_line_break(s: &mut String) {
     }
 }
 
+fn response_if_credential_dissatisfied(
+    cred: Option<UnixCredentials>,
+    command_is_allowed_for_nonroot: bool,
+) -> Option<CommandResponse> {
+    let sender = match cred {
+        None => {
+            return Some(CommandResponse {
+                status: StatusCode::OK.as_u16() as _,
+                error_code: 1,
+                message: "Failed to execute your command: cannot determine user credentials."
+                    .to_string(),
+            })
+        }
+        Some(v) => v.uid(),
+    };
+    if sender != 0 && !command_is_allowed_for_nonroot {
+        return Some(CommandResponse {
+            status: StatusCode::OK.as_u16() as _,
+            error_code: 1,
+            message: "Failed to execute your command: Operation not permitted.".to_string(),
+        });
+    }
+    None
+}
+
 impl Executer for UnitComm {
     fn execute(
         self,
         manager: Rc<impl ExecuterAction>,
         call_back: Option<fn(&str) -> String>,
+        cred: Option<UnixCredentials>,
     ) -> CommandResponse {
+        if let Some(v) = response_if_credential_dissatisfied(
+            cred,
+            [unit_comm::Action::Status].contains(&self.action()),
+        ) {
+            return v;
+        }
+
         let mut reply = String::new();
         let mut units: Vec<String> = Vec::new();
         let mut error_code: u32 = 0;
@@ -197,7 +235,15 @@ impl Executer for MngrComm {
         self,
         manager: Rc<impl ExecuterAction>,
         _call_back: Option<fn(&str) -> String>,
+        cred: Option<UnixCredentials>,
     ) -> CommandResponse {
+        if let Some(v) = response_if_credential_dissatisfied(
+            cred,
+            [mngr_comm::Action::Listunits].contains(&self.action()),
+        ) {
+            return v;
+        }
+
         match self.action() {
             mngr_comm::Action::Reexec => {
                 manager.daemon_reexec();
@@ -241,7 +287,12 @@ impl Executer for SysComm {
         self,
         manager: Rc<impl ExecuterAction>,
         _call_back: Option<fn(&str) -> String>,
+        cred: Option<UnixCredentials>,
     ) -> CommandResponse {
+        if let Some(v) = response_if_credential_dissatisfied(cred, false) {
+            return v;
+        }
+
         let ret = if self.force {
             let unit_name = self.action().to_string() + ".target";
             match manager.start(&unit_name) {
@@ -279,7 +330,12 @@ impl Executer for UnitFile {
         self,
         manager: Rc<impl ExecuterAction>,
         call_back: Option<fn(&str) -> String>,
+        cred: Option<UnixCredentials>,
     ) -> CommandResponse {
+        if let Some(v) = response_if_credential_dissatisfied(cred, false) {
+            return v;
+        }
+
         let mut reply = String::new();
         let mut units: Vec<String> = Vec::new();
         let mut error_code: u32 = 0;
