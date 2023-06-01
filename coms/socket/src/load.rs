@@ -70,7 +70,7 @@ impl SocketLoad {
         let u_name = unit_name.unwrap();
         let stem_name = Path::new(&u_name).file_stem().unwrap().to_str().unwrap();
         let relate_name = format!("{stem_name}.{suffix}");
-        self.config.set_unit_ref(relate_name)?;
+        self.config.set_unit_ref(relate_name);
         Ok(())
     }
 

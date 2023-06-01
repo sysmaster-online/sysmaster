@@ -578,7 +578,17 @@ impl Unit {
             Ok(_) => {
                 let paths = self.load.get_unit_id_fragment_pathbuf();
                 log::debug!("Begin exec sub class load");
-                self.sub.load(paths)?;
+
+                if let Err(err) = self.sub.load(paths) {
+                    if let Error::Nix { source } = err {
+                        if source == nix::Error::ENOEXEC {
+                            self.load.set_load_state(UnitLoadState::BadSetting);
+                            return Err(err);
+                        }
+                    }
+                    self.load.set_load_state(UnitLoadState::Error);
+                    return Err(err);
+                }
 
                 self.load.set_load_state(UnitLoadState::Loaded);
                 Ok(())

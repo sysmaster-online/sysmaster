@@ -98,7 +98,7 @@ impl ReStation for SocketConfig {
 
             // UnitRef
             if let Some(svc) = service {
-                self.set_unit_ref(svc).unwrap();
+                self.set_unit_ref(svc);
             }
 
             // SocketPortConf
@@ -168,15 +168,9 @@ impl SocketConfig {
         self.data.borrow().get_exec_cmds(cmd_type)
     }
 
-    pub(super) fn set_unit_ref(&self, service: String) -> Result<()> {
-        if !self.comm.um().load_unit_success(&service) {
-            return Err(format!("failed to load unit {service}").into());
-        }
-
+    pub(super) fn set_unit_ref(&self, service: String) {
         self.set_ref(service);
         self.db_update();
-
-        Ok(())
     }
 
     pub(super) fn unit_ref_target(&self) -> Option<String> {
@@ -190,12 +184,11 @@ impl SocketConfig {
     fn parse_service(&self) -> Result<()> {
         if let Some(service) = self.config_data().borrow().Socket.Service.clone() {
             if !service.ends_with(".service") {
-                return Err("socket service must be end with .service"
-                    .to_string()
-                    .into());
+                log::warn!("socket service must be end with .service, ignoring:{service}");
+                return Ok(());
             }
 
-            self.set_unit_ref(service)?;
+            self.set_unit_ref(service);
         }
 
         Ok(())
@@ -245,7 +238,8 @@ impl SocketConfig {
 
             let socket_addr = match parse_func(v, socket_type) {
                 Err(_) => {
-                    return Err(format!("Invalid socket configuration: {v}").into());
+                    log::warn!("Invalid socket configuration: {v}");
+                    return Ok(());
                 }
                 Ok(v) => v,
             };

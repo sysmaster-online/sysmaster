@@ -204,6 +204,13 @@ impl SocketUnit {
     }
 
     fn verify(&self) -> Result<()> {
+        if self.config.ports().is_empty() {
+            log::error!("Unit has no Listen setting (ListenStream=, ListenDatagram=, ListenFIFO=, ...). Refusing.");
+            return Err(Error::Nix {
+                source: nix::Error::ENOEXEC,
+            });
+        }
+
         let config = self.config.config_data();
         if config.borrow().Socket.Symlinks.is_some()
             && !config.borrow().Socket.Symlinks.as_ref().unwrap().is_empty()
@@ -212,6 +219,9 @@ impl SocketUnit {
             /* Set to None, so we won't create symlinks by mistake. */
             config.borrow_mut().Socket.Symlinks = None;
             log::error!("Symlinks in [Socket] is configured, but there are none or more than one listen files.");
+            return Err(Error::Nix {
+                source: nix::Error::ENOEXEC,
+            });
         }
         Ok(())
     }
