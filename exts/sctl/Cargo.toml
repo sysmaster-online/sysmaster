@@ -10,3 +10,4 @@ clap = { version = "3.1.8", features = ["derive"] }
 cmdproto = { path = "../../libs/cmdproto" }
 basic = { path = "../../libs/basic" }
 nix = "0.24"
+constants = { version = "0.1.0", path = "../../libs/constants" }

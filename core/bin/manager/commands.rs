@@ -13,10 +13,13 @@
 use cmdproto::proto::execute::ExecuterAction;
 use cmdproto::proto::ProstServerStream;
 use event::{EventType, Events, Source};
-use std::net::{SocketAddr, TcpListener};
+use nix::sys::{socket, stat};
 use std::os::unix::io::RawFd;
+use std::path::Path;
 use std::{os::unix::prelude::AsRawFd, rc::Rc};
 use sysmaster::rel::{ReliLastFrame, Reliability};
+
+use constants::SCTL_SOCKET;
 
 pub(super) struct Commands<T> {
     // associated objects
@@ -24,21 +27,35 @@ pub(super) struct Commands<T> {
     command_action: Rc<T>,
 
     // owned objects
-    fd: TcpListener,
+    socket_fd: i32,
 }
 
 impl<T> Commands<T> {
     pub(super) fn new(relir: &Rc<Reliability>, comm_action: T) -> Self {
-        let addrs = [
-            SocketAddr::from(([127, 0, 0, 1], 9526)),
-            SocketAddr::from(([127, 0, 0, 1], 9527)),
-        ];
-        let fd = TcpListener::bind(&addrs[..]).unwrap();
-        fd.set_nonblocking(true).expect("set non-blocking");
+        let sctl_socket_path = Path::new(SCTL_SOCKET);
+        /* remove the old socket if it exists */
+        if sctl_socket_path.exists() && !sctl_socket_path.is_symlink() {
+            let _ = std::fs::remove_file(sctl_socket_path);
+        }
+        let sctl_socket_addr = socket::UnixAddr::new(Path::new(SCTL_SOCKET)).unwrap();
+        let socket_fd = socket::socket(
+            socket::AddressFamily::Unix,
+            socket::SockType::Stream,
+            socket::SockFlag::empty(),
+            None,
+        )
+        .unwrap();
+        /* create the socket with mode 666 */
+        let old_mask = stat::umask(stat::Mode::from_bits_truncate(!0o666));
+        let _ = socket::bind(socket_fd, &sctl_socket_addr);
+        /* restore our umask */
+        let _ = stat::umask(old_mask);
+        /* Allow at most 10 incomming connections can queue */
+        let _ = socket::listen(socket_fd, 10);
         Commands {
             reli: Rc::clone(relir),
             command_action: Rc::new(comm_action),
-            fd,
+            socket_fd,
         }
     }
 }
@@ -83,7 +100,7 @@ where
     }
 
     fn fd(&self) -> RawFd {
-        self.fd.as_raw_fd()
+        self.socket_fd.as_raw_fd()
     }
 
     fn priority(&self) -> i8 {

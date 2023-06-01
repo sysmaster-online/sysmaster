@@ -17,11 +17,9 @@ use cmdproto::proto::{
     abi::{sys_comm, unit_comm, CommandRequest},
     mngr_comm, unit_file, ProstClientStream,
 };
-use std::io::Write;
-use std::{
-    net::{SocketAddr, TcpStream},
-    process::exit,
-};
+use constants::SCTL_SOCKET;
+use std::process::exit;
+use std::{io::Write, os::unix::net::UnixStream};
 
 /// parse program arguments
 #[derive(Parser, Debug)]
@@ -195,12 +193,7 @@ fn main() {
         Some(v) => v,
     };
 
-    let addrs = [
-        SocketAddr::from(([127, 0, 0, 1], 9526)),
-        SocketAddr::from(([127, 0, 0, 1], 9527)),
-    ];
-
-    let stream = match TcpStream::connect(&addrs[..]) {
+    let stream = match UnixStream::connect(SCTL_SOCKET) {
         Err(e) => {
             eprintln!("Failed to connect to sysmaster: {}", e);
             exit(e.raw_os_error().unwrap());

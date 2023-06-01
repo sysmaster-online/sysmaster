@@ -25,3 +25,6 @@ pub const SIG_SWITCH_ROOT_OFFSET: i32 = 10;
 pub const INIT_SOCKET: &str = "/run/sysmaster/init";
 /// sysmaster send this to init to keep alive
 pub const ALIVE: &str = "ALIVE01234567890";
+
+/// Socket used to transfer message between sysmaster and sctl
+pub const SCTL_SOCKET: &str = "/run/sysmaster/sctl";
