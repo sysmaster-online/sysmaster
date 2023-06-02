@@ -50,7 +50,7 @@ impl<T> Commands<T> {
         let _ = socket::bind(socket_fd, &sctl_socket_addr);
         /* restore our umask */
         let _ = stat::umask(old_mask);
-        /* Allow at most 10 incomming connections can queue */
+        /* Allow at most 10 incoming connections can queue */
         let _ = socket::listen(socket_fd, 10);
         Commands {
             reli: Rc::clone(relir),
