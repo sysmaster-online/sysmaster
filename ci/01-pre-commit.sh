@@ -20,8 +20,6 @@ do
 done
 
 export PATH="$PATH:/home/jenkins/.local/bin"
-pip3 config set global.index-url http://pypi.tuna.tsinghua.edu.cn/simple
-pip3 config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 pip3 install pre-commit ruamel.yaml || pip3 install pre-commit ruamel.yaml -i http://mirrors.aliyun.com/pypi/simple/ || pip3 install  -i https://pypi.tuna.tsinghua.edu.cn/simple/ pre-commit ruamel.yaml
 
 
