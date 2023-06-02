@@ -11,16 +11,11 @@
 // See the Mulan PSL v2 for more details.
 
 //! devmaster daemon
-use basic::logger::*;
 use event::Events;
 use libdevmaster::framework::devmaster::Devmaster;
-use log::LevelFilter;
 use std::rc::Rc;
 
 fn main() {
-    init_log_to_console("devmaster", LevelFilter::Debug);
-    log::info!("daemon start");
-
     let events = Rc::new(Events::new().unwrap());
 
     let devmaster = Devmaster::new(events);

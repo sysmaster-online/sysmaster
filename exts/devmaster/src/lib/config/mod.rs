@@ -13,21 +13,38 @@
 //! parse the configuration of devmaster
 //!
 
-use crate::rules::rule_load::DEFAULT_RULES_DIRS;
 use confique::Config;
-use serde::{Deserialize, Serialize};
+use lazy_static::lazy_static;
+use log::LevelFilter;
 
+/// default configuration path
 pub(crate) const DEFAULT_CONFIG: &str = "/etc/devmaster/config.toml";
 
-#[derive(Config, Serialize, Deserialize, Debug)]
+lazy_static! {
+/// directories for searching rule files
+pub(crate) static ref DEFAULT_RULES_DIRS: Vec<String> = vec![
+    "/etc/devmaster/rules.d".to_string(),
+    "/run/devmaster/rules.d".to_string(),
+    "/usr/local/lib/devmaster/rules.d".to_string(),
+    "/usr/lib/devmaster/rules.d".to_string(),
+];
+}
+
+/// configuration of devmaster
+#[allow(missing_docs)]
+#[derive(Config, Debug)]
 pub(crate) struct Conf {
-    pub(crate) rules_d: Vec<String>,
+    pub rules_d: Vec<String>,
+    pub children_max: u32,
+    pub log_level: LevelFilter,
 }
 
 impl Default for Conf {
     fn default() -> Self {
         Conf {
             rules_d: DEFAULT_RULES_DIRS.to_vec(),
+            children_max: 3,
+            log_level: LevelFilter::Info,
         }
     }
 }

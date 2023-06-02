@@ -26,16 +26,6 @@ use regex::Regex;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-lazy_static! {
-/// directories for searching rule files
-pub(crate) static ref DEFAULT_RULES_DIRS: Vec<String> = vec![
-    "/etc/udev/rules.d".to_string(),
-    "/run/udev/rules.d".to_string(),
-    "/usr/local/lib/udev/rules.d".to_string(),
-    "/usr/lib/udev/rules.d".to_string(),
-];
-}
-
 impl Rules {
     /// load all rules under specified directories
     pub(crate) fn load_rules(
@@ -1660,6 +1650,7 @@ impl RuleToken {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::*;
     use basic::logger::init_log_to_console;
     use log::LevelFilter;
 

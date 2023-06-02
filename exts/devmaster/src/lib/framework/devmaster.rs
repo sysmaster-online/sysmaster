@@ -19,18 +19,17 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use confique::Config;
-use event::{EventState, Events};
-
-use crate::rules::{ResolveNameTime, Rules};
-
 use super::{
-    configure::{Conf, DEFAULT_CONFIG},
     control_manager::{ControlManager, CONTROL_MANAGER_LISTEN_ADDR},
     job_queue::JobQueue,
     uevent_monitor::UeventMonitor,
     worker_manager::{WorkerManager, WORKER_MANAGER_LISTEN_ADDR},
 };
+use crate::config::{Conf, DEFAULT_CONFIG};
+use crate::rules::{ResolveNameTime, Rules};
+use basic::logger::init_log_to_console;
+use confique::Config;
+use event::{EventState, Events};
 
 /// encapsulate all submanagers
 #[derive(Debug)]
@@ -57,6 +56,9 @@ impl Devmaster {
             .load()
             .unwrap_or_default();
 
+        init_log_to_console("devmaster", config.log_level);
+        log::info!("daemon start");
+
         let rules = Rules::load_rules(config.rules_d, ResolveNameTime::Early);
 
         log::debug!("{}", rules.as_ref().read().unwrap());
@@ -71,7 +73,7 @@ impl Devmaster {
 
         // initialize submanagers
         let worker_manager = Rc::new(WorkerManager::new(
-            3,
+            config.children_max,
             String::from(WORKER_MANAGER_LISTEN_ADDR),
             events.clone(),
             Rc::downgrade(&ret),

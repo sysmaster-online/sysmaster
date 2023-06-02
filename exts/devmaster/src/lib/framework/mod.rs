@@ -13,7 +13,6 @@
 //! the module of devmaster framework
 //!
 
-pub mod configure;
 pub mod control_manager;
 pub mod devmaster;
 pub mod job_queue;

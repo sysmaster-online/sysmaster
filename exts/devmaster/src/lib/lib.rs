@@ -13,6 +13,7 @@
 //! libdevmaster
 //!
 pub mod builtin;
+pub mod config;
 pub mod error;
 pub mod framework;
 pub mod rules;
