@@ -1647,6 +1647,40 @@ impl ExecuteManager {
 
                 Ok(true)
             }
+            AssignTag => {
+                let value = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log_rule_token_error!(token, format!("failed to apply formatter: ({})", e));
+                        return Ok(true);
+                    }
+                };
+
+                if token.op == OperatorType::Assign {
+                    device.as_ref().lock().unwrap().cleanup_tags();
+                }
+
+                if value
+                    .find(|c: char| !(c.is_alphanumeric() || "-_".contains(c)))
+                    .is_some()
+                {
+                    log_rule_token_error!(token, format!("Invalid tag name '{}'", value));
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::Remove {
+                    device.as_ref().lock().unwrap().remove_tag(&value);
+                } else {
+                    execute_err!(token, device.as_ref().lock().unwrap().add_tag(value, true))?;
+                }
+
+                Ok(true)
+            }
             AssignDevlink => {
                 todo!()
             }

@@ -96,3 +96,18 @@ KERNEL=="sda", ENV{AssignEnv}+="test2", PROGRAM=="/bin/echo test AssignEnv 2 $en
 # Trigger: devctl trigger /dev/sda
 # Expect: Capture stdout from command '/bin/echo test AssignEnv 3 test1_test2_test3': 'test AssignEnv 3 test1_test2_test3'
 KERNEL=="sda", OPTIONS="string_escape=replace", ENV{AssignEnv}+="test3", PROGRAM=="/bin/echo test AssignEnv 3 $env{AssignEnv}"
+
+# Description: test AssignTag
+# Trigger: devctl trigger /dev/sda
+# Expect: Capture stdout from command '/bin/echo test AssignTag 1 tag1': 'test AssignTag 1 tag1'
+KERNEL=="sda", TAG+="tag1", PROGRAM=="/bin/echo test AssignTag 1 $env{TAGS}"
+
+# Description: test AssignTag
+# Trigger: devctl trigger /dev/sda
+# Expect: Capture stdout from command '/bin/echo test AssignTag 2 tag2': 'test AssignTag 2 tag2'
+KERNEL=="sda", TAG="tag2", PROGRAM=="/bin/echo test AssignTag 2 $env{TAGS}"
+
+# Description: test AssignTag, if operator is remove, remove the tag from current_tags but keep that in all_tags.
+# Trigger: devctl trigger /dev/sda
+# Expect: Capture stdout from command '/bin/echo test AssignTag 3 tag3:tag2 tag3': 'test AssignTag 3 tag3:tag2 tag3'
+KERNEL=="sda", TAG+="tag3", TAG-="tag2", PROGRAM=="/bin/echo test AssignTag 3 $env{TAGS} $env{CURRENT_TAGS}"

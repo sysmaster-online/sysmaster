@@ -1318,6 +1318,20 @@ impl Device {
         Ok(())
     }
 
+    /// remove specific tag
+    pub fn remove_tag(&mut self, tag: &String) {
+        self.current_tags.remove(tag);
+        self.property_tags_outdated = true;
+    }
+
+    /// cleanup all tags
+    pub fn cleanup_tags(&mut self) {
+        self.all_tags.clear();
+        self.current_tags.clear();
+
+        self.property_tags_outdated = true;
+    }
+
     /// set device db as persist
     pub fn set_db_persist(&mut self) {
         self.db_persist = true;
