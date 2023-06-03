@@ -21,14 +21,14 @@ use basic::gpt::GPT_ESP;
 use basic::gpt::GPT_ROOT_NATIVE;
 use basic::gpt::GPT_XBOOTLDR;
 use basic::uuid::Uuid;
+use blkid_rs::BlkidFltr;
+use blkid_rs::BlkidPartition;
+use blkid_rs::BlkidProbPartsFlags;
+use blkid_rs::BlkidProbe;
+use blkid_rs::BlkidSublksFlags;
+use blkid_rs::BlkidUsageFlags;
 use clap::Parser;
 use device::Device;
-use libblkid_rs::BlkidFltr;
-use libblkid_rs::BlkidPartition;
-use libblkid_rs::BlkidProbPartsFlags;
-use libblkid_rs::BlkidProbe;
-use libblkid_rs::BlkidSublksFlags;
-use libblkid_rs::BlkidUsageFlags;
 use nix::fcntl::OFlag;
 use std::cell::RefCell;
 use std::fs::File;
@@ -103,13 +103,13 @@ impl Blkid {
                     device.clone(),
                     test,
                     "ID_FS_UUID",
-                    &libblkid_rs::safe_string(value).unwrap(),
+                    &blkid_rs::safe_string(value).unwrap(),
                 )?;
                 self.add_property(
                     device,
                     test,
                     "ID_FS_UUID_ENC",
-                    &libblkid_rs::encode_string(value).unwrap(),
+                    &blkid_rs::encode_string(value).unwrap(),
                 )
             }
             "UUID_SUB" => {
@@ -117,13 +117,13 @@ impl Blkid {
                     device.clone(),
                     test,
                     "ID_FS_UUID_SUB",
-                    &libblkid_rs::safe_string(value).unwrap(),
+                    &blkid_rs::safe_string(value).unwrap(),
                 )?;
                 self.add_property(
                     device,
                     test,
                     "ID_FS_UUID_SUB_ENC",
-                    &libblkid_rs::encode_string(value).unwrap(),
+                    &blkid_rs::encode_string(value).unwrap(),
                 )
             }
             "LABEL" => {
@@ -131,13 +131,13 @@ impl Blkid {
                     device.clone(),
                     test,
                     "ID_FS_LABEL",
-                    &libblkid_rs::safe_string(value).unwrap(),
+                    &blkid_rs::safe_string(value).unwrap(),
                 )?;
                 self.add_property(
                     device,
                     test,
                     "ID_FS_LABEL_ENC",
-                    &libblkid_rs::encode_string(value).unwrap(),
+                    &blkid_rs::encode_string(value).unwrap(),
                 )
             }
             "PTTYPE" => self.add_property(device, test, "ID_PART_TABLE_TYPE", value),
@@ -146,13 +146,13 @@ impl Blkid {
                 device,
                 test,
                 "ID_PART_ENTRY_NAME",
-                &libblkid_rs::encode_string(value).unwrap(),
+                &blkid_rs::encode_string(value).unwrap(),
             ),
             "PART_ENTRY_TYPE" => self.add_property(
                 device,
                 test,
                 "ID_PART_ENTRY_TYPE",
-                &libblkid_rs::encode_string(value).unwrap(),
+                &blkid_rs::encode_string(value).unwrap(),
             ),
             start_with if start_with.starts_with("PART_ENTRY_") => {
                 self.add_property(device, test, &("ID_".to_string() + start_with), value)
@@ -161,49 +161,49 @@ impl Blkid {
                 device,
                 test,
                 "ID_FS_SYSTEM_ID",
-                &libblkid_rs::encode_string(value).unwrap(),
+                &blkid_rs::encode_string(value).unwrap(),
             ),
             "PUBLISHER_ID" => self.add_property(
                 device,
                 test,
                 "ID_FS_PUBLISHER_ID",
-                &libblkid_rs::encode_string(value).unwrap(),
+                &blkid_rs::encode_string(value).unwrap(),
             ),
             "APPLICATION_ID" => self.add_property(
                 device,
                 test,
                 "ID_FS_APPLICATION_ID",
-                &libblkid_rs::encode_string(value).unwrap(),
+                &blkid_rs::encode_string(value).unwrap(),
             ),
             "BOOT_SYSTEM_ID" => self.add_property(
                 device,
                 test,
                 "ID_FS_BOOT_SYSTEM_ID",
-                &libblkid_rs::encode_string(value).unwrap(),
+                &blkid_rs::encode_string(value).unwrap(),
             ),
             "VOLUME_ID" => self.add_property(
                 device,
                 test,
                 "ID_FS_VOLUME_ID",
-                &libblkid_rs::encode_string(value).unwrap(),
+                &blkid_rs::encode_string(value).unwrap(),
             ),
             "LOGICAL_VOLUME_ID" => self.add_property(
                 device,
                 test,
                 "ID_FS_LOGICAL_VOLUME_ID",
-                &libblkid_rs::encode_string(value).unwrap(),
+                &blkid_rs::encode_string(value).unwrap(),
             ),
             "VOLUME_SET_ID" => self.add_property(
                 device,
                 test,
                 "ID_FS_VOLUME_SET_ID",
-                &libblkid_rs::encode_string(value).unwrap(),
+                &blkid_rs::encode_string(value).unwrap(),
             ),
             "DATA_PREPARER_ID" => self.add_property(
                 device,
                 test,
                 "ID_FS_DATA_PREPARER_ID",
-                &libblkid_rs::encode_string(value).unwrap(),
+                &blkid_rs::encode_string(value).unwrap(),
             ),
             _ => {
                 log::warn!("not match key: {name}={value}");

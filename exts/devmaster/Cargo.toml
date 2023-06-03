@@ -23,6 +23,7 @@ path = "src/lib/lib.rs"
 device = { path = "../../libs/device" }
 event = { path = "../../libs/event" }
 basic = { path = "../../libs/basic" }
+blkid_rs = {path = "../../libs/blkid_rs"}
 
 # third libraries
 libc = "0.2.*"
@@ -41,4 +42,3 @@ shell-words = "1.1.0"
 sscanf = "0.4.0"
 serde = "1.0.130"
 confique = { version = "0.1.3", default-features = false, features = ['toml'] }
-libblkid_rs = {path = "./libblkid_rs"}

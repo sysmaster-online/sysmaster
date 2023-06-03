@@ -129,6 +129,7 @@ members = [
   "libs/libtests",
   "libs/watchdog",
   "libs/device",
+  "libs/blkid_rs",
   #components crates
   "coms/service",
   "coms/socket",
