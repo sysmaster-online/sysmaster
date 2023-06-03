@@ -1,8 +1,0 @@
-[Unit]
-Description="set ip for ssh"
-
-[Service]
-ExecStart="/usr/lib/sysmaster/setip.sh"
-
-[Install]
-WantedBy="multi-user.target"
