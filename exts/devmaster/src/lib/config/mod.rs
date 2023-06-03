@@ -34,19 +34,11 @@ pub(crate) static ref DEFAULT_RULES_DIRS: Vec<String> = vec![
 #[allow(missing_docs)]
 #[derive(Config, Debug)]
 pub(crate) struct Conf {
-    pub rules_d: Vec<String>,
-    pub children_max: u32,
-    pub log_level: LevelFilter,
-}
-
-impl Default for Conf {
-    fn default() -> Self {
-        Conf {
-            rules_d: DEFAULT_RULES_DIRS.to_vec(),
-            children_max: 3,
-            log_level: LevelFilter::Info,
-        }
-    }
+    pub(crate) rules_d: Option<Vec<String>>,
+    #[config(default = 3)]
+    pub(crate) children_max: u32,
+    #[config(default = "info")]
+    pub(crate) log_level: LevelFilter,
 }
 
 #[cfg(test)]
@@ -60,10 +52,14 @@ mod tests {
         let config_s = "rules_d = [\"/root/rules.d\"]";
         fs::write("./tmp.toml", config_s).unwrap();
         let config: Conf = Conf::builder().file("./tmp.toml").load().unwrap();
-        assert_eq!(config.rules_d, vec!["/root/rules.d".to_string()]);
+        assert_eq!(config.rules_d.unwrap(), vec!["/root/rules.d".to_string()]);
+        assert_eq!(config.children_max, 3);
+        assert_eq!(config.log_level, LevelFilter::Info);
         fs::remove_file("./tmp.toml").unwrap();
 
-        let default_conf = Conf::builder().load().unwrap_or_default();
-        assert_eq!(default_conf.rules_d, DEFAULT_RULES_DIRS.to_vec());
+        let default_conf = Conf::builder().load().unwrap();
+        assert_eq!(default_conf.rules_d, None);
+        assert_eq!(config.children_max, 3);
+        assert_eq!(config.log_level, LevelFilter::Info);
     }
 }

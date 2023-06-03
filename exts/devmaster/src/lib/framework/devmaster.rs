@@ -25,7 +25,7 @@ use super::{
     uevent_monitor::UeventMonitor,
     worker_manager::{WorkerManager, WORKER_MANAGER_LISTEN_ADDR},
 };
-use crate::config::{Conf, DEFAULT_CONFIG};
+use crate::config::{Conf, DEFAULT_CONFIG, DEFAULT_RULES_DIRS};
 use crate::rules::{ResolveNameTime, Rules};
 use basic::logger::init_log_to_console;
 use confique::Config;
@@ -51,15 +51,17 @@ pub struct Devmaster {
 impl Devmaster {
     /// generate a devmaster object
     pub fn new(events: Rc<Events>) -> Rc<RefCell<Devmaster>> {
-        let config = Conf::builder()
-            .file(DEFAULT_CONFIG)
-            .load()
-            .unwrap_or_default();
+        let config = Conf::builder().file(DEFAULT_CONFIG).load().unwrap();
 
         init_log_to_console("devmaster", config.log_level);
         log::info!("daemon start");
 
-        let rules = Rules::load_rules(config.rules_d, ResolveNameTime::Early);
+        let rules = Rules::load_rules(
+            config
+                .rules_d
+                .unwrap_or_else(|| DEFAULT_RULES_DIRS.to_vec()),
+            ResolveNameTime::Early,
+        );
 
         log::debug!("{}", rules.as_ref().read().unwrap());
 
