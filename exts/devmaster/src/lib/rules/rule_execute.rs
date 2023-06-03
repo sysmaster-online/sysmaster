@@ -1585,6 +1585,68 @@ impl ExecuteManager {
 
                 Ok(true)
             }
+            AssignSeclabel => {
+                todo!()
+            }
+            AssignEnv => {
+                if token.value.is_empty() {
+                    if token.op == OperatorType::Add {
+                        return Ok(true);
+                    }
+
+                    /*
+                     * The attribute of token is checked to be non-empty during rules loading,
+                     * thus we can safely unwrap it.
+                     */
+                    execute_err!(
+                        token,
+                        device
+                            .as_ref()
+                            .lock()
+                            .unwrap()
+                            .add_property(token.attr.clone().unwrap(), token.value.clone())
+                    )?;
+                    return Ok(true);
+                }
+
+                let mut value: String = String::new();
+
+                if token.op == OperatorType::Add {
+                    if let Ok(old_value) = device
+                        .as_ref()
+                        .lock()
+                        .unwrap()
+                        .get_property_value(token.attr.as_ref().unwrap())
+                    {
+                        value.push_str(&old_value);
+                        value.push(' ');
+                    }
+                }
+
+                value.push_str(&execute_err!(
+                    token,
+                    self.current_unit
+                        .as_ref()
+                        .unwrap()
+                        .apply_format(&token.value, false)
+                )?);
+
+                let v = if self.current_unit.as_ref().unwrap().escape_type == EscapeType::Replace {
+                    replace_chars(&value, "")
+                } else {
+                    value
+                };
+
+                execute_err!(
+                    token,
+                    device
+                        .lock()
+                        .unwrap()
+                        .add_property(token.attr.clone().unwrap(), v)
+                )?;
+
+                Ok(true)
+            }
             AssignDevlink => {
                 todo!()
             }

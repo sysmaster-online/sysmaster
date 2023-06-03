@@ -81,3 +81,18 @@ KERNEL=="sda1", MODE="444"
 # Trigger: devctl trigger /dev/sda1
 # Expect: mode is final-assigned previously, ignore this assignment
 KERNEL=="sda1", MODE:="444", MODE="666"
+
+# Description: test AssignEnv with assigning operator
+# Trigger: devctl trigger /dev/sda
+# Expect: Capture stdout from command '/bin/echo test AssignEnv 1 test1': 'test AssignEnv 1 test1'
+KERNEL=="sda", ENV{AssignEnv}="test1", PROGRAM=="/bin/echo test AssignEnv 1 $env{AssignEnv}"
+
+# Description: test AssignEnv with add-assigning operator
+# Trigger: devctl trigger /dev/sda
+# Expect: Capture stdout from command '/bin/echo test AssignEnv 2 test1 test2': 'test AssignEnv 2 test1 test2'
+KERNEL=="sda", ENV{AssignEnv}+="test2", PROGRAM=="/bin/echo test AssignEnv 2 $env{AssignEnv}"
+
+# Description: test AssignEnv with add-assigning operator, and set the string escape type to 'replace'
+# Trigger: devctl trigger /dev/sda
+# Expect: Capture stdout from command '/bin/echo test AssignEnv 3 test1_test2_test3': 'test AssignEnv 3 test1_test2_test3'
+KERNEL=="sda", OPTIONS="string_escape=replace", ENV{AssignEnv}+="test3", PROGRAM=="/bin/echo test AssignEnv 3 $env{AssignEnv}"

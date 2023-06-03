@@ -592,6 +592,7 @@ impl Default for FormatSubstitutionType {
 }
 
 /// escape type of execute unit
+#[derive(PartialEq, Eq)]
 pub(crate) enum EscapeType {
     Unset,
     None,
