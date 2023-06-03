@@ -70,7 +70,7 @@ KERNEL=="sda1", GROUP:="987", GROUP="0"
 # Description: test AssignMode
 # Trigger: devctl trigger /dev/sda1
 # Expect: assign mode '444'
-KERNEL=="sda1", IMPORT{program}="/bin/echo mode=444", MODE="$env{mode}"
+KERNEL=="sda1", IMPORT{program}=="/bin/echo mode=444", MODE="$env{mode}"
 
 # Description: test AssignModeId
 # Trigger: devctl trigger /dev/sda1

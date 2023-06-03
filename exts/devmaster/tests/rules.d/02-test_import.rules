@@ -1,7 +1,7 @@
 # Description: test MatchImportFile
 # Trigger: devctl trigger /dev/sda1
 # Expect: Capture stdout from command '/bin/echo test MatchImportFile Xiaoming Male 188': 'test MatchImportFile Xiaoming Male 188'
-KERNEL=="sda1", IMPORT{file}="/run/devmaster/test/properties.txt", PROGRAM="/bin/echo test MatchImportFile $env{PEOPLE} $env{GENDER} $env{HEIGHT}"
+KERNEL=="sda1", IMPORT{file}=="/run/devmaster/test/properties.txt", PROGRAM="/bin/echo test MatchImportFile $env{PEOPLE} $env{GENDER} $env{HEIGHT}"
 
 # Description: test MatchImportProgram
 # Trigger: devctl trigger /dev/sda1
