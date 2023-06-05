@@ -31,6 +31,10 @@ pip3 install pre-commit ruamel.yaml || pip3 install pre-commit ruamel.yaml -i ht
 # add doc for src code
 for rustlist in `git diff origin/master --name-only | grep \.rs$ | tr '\n' ' '`
 do
+    # Allow libblkid/mod.rs to use, because it is auto generated.
+    if [[ $rustlist =~ "libblkid/mod.rs" ]]; then
+        continue
+    fi
     # do not use global #!allow, exclude non_snake_case
     sed -i 's/#!\[allow(/\/\/#!\[allow(/g' $rustlist 2>/dev/null || true
     sed -i 's/\/\/#!\[allow(non_snake_case)\]/#!\[allow(non_snake_case)\]/g' $rustlist 2>/dev/null || true
