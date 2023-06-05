@@ -31,13 +31,19 @@ pub struct ReDb<K, V> {
     switch: RefCell<bool>,
 
     // data
+    /* database */
     db: Database<SerdeBincode<K>, SerdeBincode<V>>,
+
+    /* cache */
     cache: RefCell<HashMap<K, V>>,
     add: RefCell<HashMap<K, V>>,
     del: RefCell<HashSet<K>>,
+
+    /* buffer */
+    buffer: RefCell<HashMap<K, V>>, // daemon-reload or daemon-reexec will temporarily store the data here first, and finally refreshes it to db.
+
+    /* property */
     name: String,
-    buf: RefCell<HashMap<K, V>>, // daemon-reload or daemon-reexec will temporarily store the data here first, and finally refreshes it to db.
-                                 //_phantom: PhantomData<&'a K>,
 }
 
 impl<K, V> ReDbTable for ReDb<K, V>
@@ -53,9 +59,8 @@ where
         self.cache_2_db(db_wtxn);
     }
 
-    /// daemon-reload or daemon-reexec export all data to database
-    fn reexport(&self, db_wtxn: &mut ReDbRwTxn) {
-        self.rebuf_2_db(db_wtxn);
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn) {
+        self.buffer_2_db(db_wtxn);
     }
 
     fn import(&self, db_rtxn: &ReDbRoTxn) {
@@ -63,7 +68,7 @@ where
     }
 
     fn switch_set(&self, switch: bool) {
-        self.set_switch(switch);
+        self.switch_buffer(switch);
     }
 }
 
@@ -81,9 +86,8 @@ where
             cache: RefCell::new(HashMap::new()),
             add: RefCell::new(HashMap::new()),
             del: RefCell::new(HashSet::new()),
+            buffer: RefCell::new(HashMap::new()),
             name: String::from(db_name),
-            buf: RefCell::new(HashMap::new()),
-            //_phantom: PhantomData,
         }
     }
 
@@ -95,52 +99,56 @@ where
         self.del.borrow_mut().clear();
     }
 
-    /// set the ignore flag of data
-    pub fn set_switch(&self, switch: bool) {
+    /// set the buffer-switch flag of data
+    pub fn switch_buffer(&self, switch: bool) {
         *self.switch.borrow_mut() = switch;
     }
 
     /// insert a entry
     pub fn insert(&self, k: K, v: V) {
         let switch = self.switch();
-        log::debug!(
-            "ReDb[{}] switch:{:?} insert, key:{:?}, value:{:?}.",
-            &self.name,
-            switch,
-            &k,
-            &v
-        );
+        log::debug!("ReDb[{}] insert, key:{:?}, value:{:?}.", &self.name, &k, &v);
+        log::debug!("insert with switch:{:?}.", switch);
 
         if switch {
-            self.buf.borrow_mut().insert(k, v);
-            return;
+            // update buffer only
+            self.buffer.borrow_mut().insert(k, v);
+        } else {
+            // remove "del" + insert "add"
+            self.del.borrow_mut().remove(&k);
+            self.add.borrow_mut().insert(k.clone(), v.clone());
+
+            // update cache
+            self.cache.borrow_mut().insert(k, v);
         }
-
-        // remove "del" + insert "add"
-        self.del.borrow_mut().remove(&k);
-        self.add.borrow_mut().insert(k.clone(), v.clone());
-
-        // update cache
-        self.cache.borrow_mut().insert(k, v);
     }
 
     /// remove a entry
     pub fn remove(&self, k: &K) {
-        let n = &self.name;
         let switch = self.switch();
-        log::debug!("ReDb[{}] switch:{:?}, remove, key:{:?}.", n, switch, &k);
+        log::debug!("ReDb[{}] remove, key:{:?}.", &self.name, &k);
+        log::debug!("remove with switch:{:?}.", switch);
 
         if switch {
-            self.buf.borrow_mut().remove(k);
-            return;
+            // update buffer only
+            self.buffer.borrow_mut().remove(k);
+        } else {
+            // remove "add" + insert "del"
+            self.add.borrow_mut().remove(k);
+            self.del.borrow_mut().insert(k.clone());
+
+            // update cache
+            self.cache.borrow_mut().remove(k);
         }
+    }
 
-        // remove "add" + insert "del"
-        self.add.borrow_mut().remove(k);
-        self.del.borrow_mut().insert(k.clone());
-
-        // update cache
-        self.cache.borrow_mut().remove(k);
+    /// get the existence of the key
+    pub fn contains_key(&self, k: &K) -> bool {
+        if self.switch() {
+            self.buffer.borrow().contains_key(k)
+        } else {
+            self.cache.borrow().contains_key(k)
+        }
     }
 
     /// get a entry
@@ -149,15 +157,6 @@ where
         let n = &self.name;
         log::debug!("ReDb[{}] get, key: {:?}, value: {:?}.", n, k, &value);
         value
-    }
-
-    /// get the existence of the key
-    pub fn contains_key(&self, k: &K) -> bool {
-        if self.switch() {
-            return self.buf.borrow().contains_key(k);
-        }
-
-        self.cache.borrow().contains_key(k)
     }
 
     /// get all keys
@@ -184,7 +183,7 @@ where
         entries
     }
 
-    /// export all data from cache to database
+    /// export changed data from cache to database
     pub fn cache_2_db(&self, wtxn: &mut ReDbRwTxn) {
         // "add" -> db.put + clear "add"
         for (k, v) in self.add.borrow().iter() {
@@ -199,17 +198,19 @@ where
         self.del.borrow_mut().clear();
     }
 
-    /// export all data from cache to database
-    pub fn rebuf_2_db(&self, wtxn: &mut ReDbRwTxn) {
-        // "buf" -> db.put + clear "buf"
-        for (k, v) in self.buf.borrow().iter() {
+    /// flush all data from buffer to database
+    pub fn buffer_2_db(&self, wtxn: &mut ReDbRwTxn) {
+        // clear all data, including "db" and "cache"
+        self.do_clear(wtxn);
+
+        // "buffer" -> db.put + clear "buffer"
+        for (k, v) in self.buffer.borrow().iter() {
             self.db.put(&mut wtxn.0, k, v).expect("history.put");
         }
-
-        self.buf.borrow_mut().clear();
+        self.buffer.borrow_mut().clear();
     }
 
-    /// emport all data from database to cache
+    /// import all data from database to cache
     pub fn db_2_cache(&self, rtxn: &ReDbRoTxn)
     where
         K: DeserializeOwned,
@@ -257,13 +258,13 @@ impl<'e> ReDbRoTxn<'e> {
 pub trait ReDbTable {
     /// clear all data
     fn clear(&self, wtxn: &mut ReDbRwTxn);
-    /// export all data to database
+    /// export the changed data to database
     fn export(&self, wtxn: &mut ReDbRwTxn);
-    /// daemon-reload or daemon-reexec export all data to database
-    fn reexport(&self, wtxn: &mut ReDbRwTxn);
+    /// flush all data to database
+    fn flush(&self, wtxn: &mut ReDbRwTxn);
     /// import all data from database
     fn import(&self, rtxn: &ReDbRoTxn);
-    /// set the switch flag of data, does switch control whether to use cache or buf
+    /// set the switch flag of data, does switch control whether to use cache or buffer
     fn switch_set(&self, switch: bool);
 }
 

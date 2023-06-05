@@ -19,3 +19,11 @@ sysmaster支持从`/etc/sysmaster/system.toml`中读取系统配置，用于配�
 ### LogFile
 
 支持配置为`"`括起来的绝对路径，仅当`"LogTarget"`配置为`"file"`时生效。如果配置为空或不配置，将强制修改`LogTarget`为`"console"`。
+
+## 外置db配置
+
+支持通过`DbSize`等配置调整外置db参量。
+
+### DbSize
+
+DbSize参量支持配置为最大内存占用规格，单位为字节。当配置值小于当前sysmaster所用内存值时，以当前sysmaster所用内存值为准。此配置在系统启动或者daemon-reexec后生效。

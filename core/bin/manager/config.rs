@@ -15,6 +15,7 @@
 use confique::Config;
 
 pub const SYSTEM_CONFIG: &str = "/etc/sysmaster/system.toml";
+const RELI_HISTORY_MAPSIZE_DEFAULT: usize = 1048576; // 1M
 
 #[derive(Config, Debug)]
 pub struct ManagerConfig {
@@ -29,6 +30,9 @@ pub struct ManagerConfig {
     pub LogTarget: String,
     #[config(default = "")]
     pub LogFile: String,
+
+    #[config(default = 1048576)] // RELI_HISTORY_MAPSIZE_DEFAULT
+    pub DbSize: usize,
 }
 
 impl ManagerConfig {
@@ -51,6 +55,7 @@ impl Default for ManagerConfig {
             LogLevel: log::LevelFilter::Debug,
             LogTarget: "console".to_string(),
             LogFile: String::new(),
+            DbSize: RELI_HISTORY_MAPSIZE_DEFAULT,
         }
     }
 }

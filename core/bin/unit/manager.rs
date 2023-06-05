@@ -1404,6 +1404,7 @@ mod tests {
     use nix::sys::wait::WaitStatus;
     use std::thread;
     use std::time::Duration;
+    use sysmaster::rel::ReliConf;
     use sysmaster::unit::UnitActiveState;
 
     fn init_dm_for_test() -> (Rc<DataManager>, Rc<Events>, Rc<UnitManager>) {
@@ -1414,7 +1415,9 @@ mod tests {
 
         let event = Rc::new(Events::new().unwrap());
         let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let state = Rc::new(RefCell::new(State::Init));
         let um = UnitManager::new(
             &event,

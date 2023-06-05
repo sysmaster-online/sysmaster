@@ -817,11 +817,13 @@ mod tests {
     use crate::unit::{JobMode, UnitRe};
     use basic::logger;
     use event::Events;
-    use sysmaster::rel::Reliability;
+    use sysmaster::rel::{ReliConf, Reliability};
 
     #[test]
     fn juv_api_len() {
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let rentry = Rc::new(JobRe::new(&reli));
         let unit_test1 = prepare_unit(&reli);
         let mut id: u128 = 0;
@@ -848,7 +850,9 @@ mod tests {
 
     #[test]
     fn juv_api_merge() {
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let unit_test1 = prepare_unit(&reli);
         let (_, job_start, _, _, _) = prepare_jobs(&reli, &unit_test1, JobMode::Replace);
         let (_, stage_start, _, _, _) = prepare_jobs(&reli, &unit_test1, JobMode::Replace);
@@ -881,7 +885,9 @@ mod tests {
 
     #[test]
     fn juv_api_reshuffle() {
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let unit_test1 = prepare_unit(&reli);
         let (job_nop, job_start, job_reload, job_restart, _) =
             prepare_jobs(&reli, &unit_test1, JobMode::Replace);
@@ -923,7 +929,9 @@ mod tests {
 
     #[test]
     fn juv_api_replace_with_unirreversible() {
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let unit_test1 = prepare_unit(&reli);
         let mode = JobMode::Replace;
         let (_, uv_start, _, _, uv_stop) = prepare_jobs(&reli, &unit_test1, mode);
@@ -958,7 +966,9 @@ mod tests {
 
     #[test]
     fn juv_api_replace_with_irreversible() {
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let unit_test1 = prepare_unit(&reli);
         let mode = JobMode::ReplaceIrreversible;
         let (_, uv_start, _, _, uv_stop) = prepare_jobs(&reli, &unit_test1, mode);
@@ -993,7 +1003,9 @@ mod tests {
 
     #[test]
     fn juv_api_order_with_unignore() {
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let unit_test1 = prepare_unit(&reli);
         let mode = JobMode::Replace;
         let (uv_nop, uv_start, _, _, uv_stop) = prepare_jobs(&reli, &unit_test1, mode);
@@ -1093,7 +1105,9 @@ mod tests {
 
     #[test]
     fn juv_api_order_with_ignore() {
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let unit_test1 = prepare_unit(&reli);
         let mode = JobMode::IgnoreDependencies;
         let (uv_nop, uv_start, _, _, uv_stop) = prepare_jobs(&reli, &unit_test1, mode);
@@ -1192,7 +1206,9 @@ mod tests {
 
     #[test]
     fn juv_calc_ready() {
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let unit_test1 = prepare_unit(&reli);
         let (job_nop, job_start, _, _, _) = prepare_jobs(&reli, &unit_test1, JobMode::Replace);
         let uv = JobUnit::new(Rc::clone(&unit_test1));

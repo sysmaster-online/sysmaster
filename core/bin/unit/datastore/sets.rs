@@ -89,12 +89,14 @@ mod tests {
     use crate::unit::rentry::UnitRe;
     use crate::unit::test::test_utils;
     use basic::logger;
-    use sysmaster::rel::Reliability;
+    use sysmaster::rel::{ReliConf, Reliability};
 
     #[test]
     fn sets_insert() {
         let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let rentry = Rc::new(UnitRe::new(&reli));
         let sets = UnitSets::new();
         let name_test1 = String::from("test1.service");
@@ -115,7 +117,9 @@ mod tests {
     #[test]
     fn sets_remove() {
         let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let rentry = Rc::new(UnitRe::new(&reli));
         let sets = UnitSets::new();
         let name_test1 = String::from("test1.service");
@@ -142,7 +146,9 @@ mod tests {
     #[test]
     fn sets_get() {
         let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let rentry = Rc::new(UnitRe::new(&reli));
         let sets = UnitSets::new();
         let name_test1 = String::from("test1.service");
@@ -167,7 +173,9 @@ mod tests {
     #[test]
     fn sets_getall() {
         let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let rentry = Rc::new(UnitRe::new(&reli));
         let sets = UnitSets::new();
         let name_test1 = String::from("test1.service");

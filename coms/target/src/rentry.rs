@@ -77,8 +77,8 @@ impl ReDbTable for TargetReDb<String, TargetReMng> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn reexport(&self, db_wtxn: &mut ReDbRwTxn) {
-        self.0.rebuf_2_db(db_wtxn);
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn) {
+        self.0.buffer_2_db(db_wtxn);
     }
 
     fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
@@ -86,6 +86,6 @@ impl ReDbTable for TargetReDb<String, TargetReMng> {
     }
 
     fn switch_set(&self, switch: bool) {
-        self.0.set_switch(switch);
+        self.0.switch_buffer(switch);
     }
 }

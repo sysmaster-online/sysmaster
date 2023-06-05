@@ -392,12 +392,14 @@ mod tests {
     use crate::unit::data::DataManager;
     use crate::unit::test::test_utils;
     use basic::logger;
-    use sysmaster::rel::Reliability;
+    use sysmaster::rel::{ReliConf, Reliability};
 
     #[test]
     fn dep_insert() {
         let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let rentry = Rc::new(UnitRe::new(&reli));
         let sets = UnitSets::new();
         let dep = UnitDep::new(&rentry, &Rc::new(sets));
@@ -440,7 +442,9 @@ mod tests {
     #[test]
     fn dep_gets_atom() {
         let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let rentry = Rc::new(UnitRe::new(&reli));
         let sets = UnitSets::new();
         let dep = UnitDep::new(&rentry, &Rc::new(sets));
@@ -495,7 +499,9 @@ mod tests {
     #[test]
     fn dep_is_dep_atom_with() {
         let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let rentry = Rc::new(UnitRe::new(&reli));
         let sets = UnitSets::new();
         let dep = UnitDep::new(&rentry, &Rc::new(sets));

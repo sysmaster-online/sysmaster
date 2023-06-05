@@ -763,13 +763,15 @@ mod tests {
     use crate::unit::test::test_utils::UmIfD;
     use basic::{logger, path_lookup::LookupPaths};
     use std::rc::Rc;
-    use sysmaster::rel::Reliability;
+    use sysmaster::rel::{ReliConf, Reliability};
     use sysmaster::unit::UnitType;
 
     use crate::{plugin::Plugin, unit::data::DataManager, unit::util::UnitFile};
     fn unit_init() -> Rc<Unit> {
         logger::init_log_to_console("test_unit_entry", log::LevelFilter::Trace);
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let rentry = Rc::new(UnitRe::new(&reli));
 
         let mut l_path = LookupPaths::new();

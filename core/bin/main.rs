@@ -117,10 +117,10 @@ fn main() -> Result<()> {
     if !switch {
         if !args.deserialize {
             manager.debug_clear_restore();
+            log::info!("debug: clear data restored.");
         }
         // if switch is false unregister init's reexec signal.
         register_reexec_signal(false);
-        log::info!("debug: clear data restored.");
     }
 
     manager.setup_cgroup()?;

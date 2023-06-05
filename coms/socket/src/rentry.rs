@@ -335,8 +335,8 @@ impl ReDbTable for SocketReDb<String, SocketReConf> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn reexport(&self, db_wtxn: &mut ReDbRwTxn) {
-        self.0.rebuf_2_db(db_wtxn);
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn) {
+        self.0.buffer_2_db(db_wtxn);
     }
 
     fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
@@ -344,7 +344,7 @@ impl ReDbTable for SocketReDb<String, SocketReConf> {
     }
 
     fn switch_set(&self, switch: bool) {
-        self.0.set_switch(switch);
+        self.0.switch_buffer(switch);
     }
 }
 
@@ -357,8 +357,8 @@ impl ReDbTable for SocketReDb<String, SocketReMng> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn reexport(&self, db_wtxn: &mut ReDbRwTxn) {
-        self.0.rebuf_2_db(db_wtxn);
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn) {
+        self.0.buffer_2_db(db_wtxn);
     }
 
     fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
@@ -366,7 +366,7 @@ impl ReDbTable for SocketReDb<String, SocketReMng> {
     }
 
     fn switch_set(&self, switch: bool) {
-        self.0.set_switch(switch);
+        self.0.switch_buffer(switch);
     }
 }
 
@@ -379,8 +379,8 @@ impl ReDbTable for SocketReDb<u32, SocketReFrame> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn reexport(&self, db_wtxn: &mut ReDbRwTxn) {
-        self.0.rebuf_2_db(db_wtxn);
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn) {
+        self.0.buffer_2_db(db_wtxn);
     }
 
     fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
@@ -388,6 +388,6 @@ impl ReDbTable for SocketReDb<u32, SocketReFrame> {
     }
 
     fn switch_set(&self, switch: bool) {
-        self.0.set_switch(switch);
+        self.0.switch_buffer(switch);
     }
 }

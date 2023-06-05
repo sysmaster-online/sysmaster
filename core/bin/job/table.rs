@@ -1022,12 +1022,14 @@ mod tests {
     use crate::unit::UnitRe;
     use basic::logger;
     use event::Events;
-    use sysmaster::rel::Reliability;
+    use sysmaster::rel::{ReliConf, Reliability};
 
     #[test]
     fn job_table_record_suspend() {
         let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let rentry = Rc::new(UnitRe::new(&reli));
         let db = Rc::new(UnitDb::new(&rentry));
         let job_rentry = Rc::new(JobRe::new(&reli));

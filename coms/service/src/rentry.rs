@@ -623,8 +623,8 @@ impl ReDbTable for ServiceReDb<String, ServiceReConf> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn reexport(&self, db_wtxn: &mut ReDbRwTxn) {
-        self.0.rebuf_2_db(db_wtxn);
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn) {
+        self.0.buffer_2_db(db_wtxn);
     }
 
     fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
@@ -632,7 +632,7 @@ impl ReDbTable for ServiceReDb<String, ServiceReConf> {
     }
 
     fn switch_set(&self, switch: bool) {
-        self.0.set_switch(switch);
+        self.0.switch_buffer(switch);
     }
 }
 
@@ -645,8 +645,8 @@ impl ReDbTable for ServiceReDb<String, ServiceReMng> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn reexport(&self, db_wtxn: &mut ReDbRwTxn) {
-        self.0.rebuf_2_db(db_wtxn);
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn) {
+        self.0.buffer_2_db(db_wtxn);
     }
 
     fn import<'a>(&self, db_rtxn: &ReDbRoTxn) {
@@ -654,6 +654,6 @@ impl ReDbTable for ServiceReDb<String, ServiceReMng> {
     }
 
     fn switch_set(&self, switch: bool) {
-        self.0.set_switch(switch);
+        self.0.switch_buffer(switch);
     }
 }

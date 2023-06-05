@@ -12,18 +12,29 @@
 
 use super::base::{ReDbRoTxn, ReDbRwTxn, ReDbTable};
 use crate::error::*;
-use heed::{Env, EnvOpenOptions};
+use heed::{CompactionOption, Env, EnvOpenOptions};
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::path::Path;
+use std::fmt;
+use std::fs::{self, File};
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::{fmt, fs};
+
+const RELI_HISTORY_A_DIR: &str = "a";
+const RELI_HISTORY_B_DIR: &str = "b";
+const RELI_HISTORY_BFLAG_FILE: &str = "b.effect";
 
 const RELI_HISTORY_DIR: &str = "history.mdb";
+const RELI_HISTORY_DATA_FILE: &str = "data.mdb";
+const RELI_HISTORY_LOCK_FILE: &str = "lock.mdb";
 
 pub struct ReliHistory {
     // control
-    ignore: RefCell<bool>,
+    switch: RefCell<bool>,
+
+    // directory
+    b_exist: bool,
+    hdir: String, // home-directory
 
     // environment
     env: Env,
@@ -42,18 +53,19 @@ impl fmt::Debug for ReliHistory {
 }
 
 impl ReliHistory {
-    pub fn new(dir_str: &str, max: u32) -> ReliHistory {
-        // init environment
-        let path = Path::new(dir_str).join(RELI_HISTORY_DIR);
-        let env = EnvOpenOptions::new()
-            .map_size(10 * 1024 * 1024)
-            .max_dbs(max)
-            .open(path)
-            .unwrap();
+    pub fn new(dir_str: &str, map_size: Option<usize>, max_dbs: Option<u32>) -> ReliHistory {
+        // init environment, path: dir/history.mdb/(a|b)/
+        let history = history_path_get(dir_str);
+        let b_exist = bflag_path_get(history.clone()).exists();
+        let path = history.join(&subdir_cur_get(b_exist));
+        let env = open_env(path.clone(), map_size, max_dbs).expect("history open env");
+        log::info!("history with path {:?} successfully.", path);
 
         // return
         ReliHistory {
-            ignore: RefCell::new(false),
+            switch: RefCell::new(false),
+            b_exist,
+            hdir: String::from(dir_str),
             env,
             dbs: RefCell::new(HashMap::new()),
         }
@@ -75,7 +87,7 @@ impl ReliHistory {
         // create transaction
         let mut db_wtxn = ReDbRwTxn::new(&self.env).expect("history.write_txn");
 
-        // flush to db
+        // export to db
         for (_, db) in self.dbs.borrow().iter() {
             db.export(&mut db_wtxn);
         }
@@ -84,15 +96,13 @@ impl ReliHistory {
         db_wtxn.0.commit().expect("history.commit");
     }
 
-    /// daemon-reload or daemon-reexec clear db and data reflush to db
-    pub fn reflush(&self) {
+    pub(super) fn flush(&self) {
         // create transaction
         let mut db_wtxn = ReDbRwTxn::new(&self.env).expect("history.write_txn");
 
         // flush to db
         for (_, db) in self.dbs.borrow().iter() {
-            db.clear(&mut db_wtxn);
-            db.reexport(&mut db_wtxn);
+            db.flush(&mut db_wtxn);
         }
 
         // commit
@@ -108,9 +118,48 @@ impl ReliHistory {
         }
     }
 
+    pub(super) fn compact(&self) -> Result<()> {
+        // a -> b or b -> a
+        // prepare next
+        let history = history_path_get(&self.hdir);
+        let next_path = history.join(&subdir_next_get(self.b_exist));
+        let next_file = next_path.join(RELI_HISTORY_DATA_FILE);
+
+        // clear next: delete and re-create the whole directory
+        fs::remove_dir_all(next_path.clone()).context(IoSnafu)?;
+        fs::create_dir_all(next_path).context(IoSnafu)?;
+
+        // copy to next
+        self.env
+            .copy_to_path(next_file.clone(), CompactionOption::Disabled)
+            .context(HeedSnafu)?;
+        log::info!("compact to file {:?} successfully.", next_file);
+
+        // remark the next flag at last: the another one
+        let bflag = bflag_path_get(history.clone());
+        if self.b_exist {
+            fs::remove_file(bflag).context(IoSnafu)?;
+        } else {
+            File::create(bflag).context(IoSnafu)?;
+        }
+
+        // try to clear previous: it would be done in the next re-exec, but we try to delete it as soon as possible.
+        let cur_path = history.join(subdir_cur_get(self.b_exist));
+        let cur_data = cur_path.join(RELI_HISTORY_DATA_FILE);
+        let cur_lock = cur_path.join(RELI_HISTORY_LOCK_FILE);
+        if let Err(e) = fs::remove_file(cur_data.clone()) {
+            log::error!("remove data file {:?} failed, err = {:?}", cur_data, e);
+        }
+        if let Err(e) = fs::remove_file(cur_lock.clone()) {
+            log::error!("remove lock file {:?} failed, err = {:?}", cur_lock, e);
+        }
+
+        Ok(())
+    }
+
     pub fn switch_set(&self, switch: bool) {
         // set switch
-        *self.ignore.borrow_mut() = switch;
+        *self.switch.borrow_mut() = switch;
         for (_, db) in self.dbs.borrow().iter() {
             db.switch_set(switch);
         }
@@ -124,16 +173,67 @@ impl ReliHistory {
         self.dbs.borrow_mut().clear();
     }
 
-    pub fn ignore(&self) -> bool {
-        *self.ignore.borrow()
+    pub fn switch(&self) -> bool {
+        *self.switch.borrow()
     }
 }
 
 pub fn prepare(dir_str: &str) -> Result<()> {
-    let history = Path::new(dir_str).join(RELI_HISTORY_DIR);
+    // directory
+    let history = history_path_get(dir_str);
     if !history.exists() {
         fs::create_dir_all(&history).context(IoSnafu)?;
     }
 
+    // sub-directory
+    let a = history.join(RELI_HISTORY_A_DIR);
+    if !a.exists() {
+        fs::create_dir_all(&a).context(IoSnafu)?;
+    }
+
+    let b = history.join(RELI_HISTORY_B_DIR);
+    if !b.exists() {
+        fs::create_dir_all(&b).context(IoSnafu)?;
+    }
+
     Ok(())
+}
+
+fn open_env(path: PathBuf, map_size: Option<usize>, max_dbs: Option<u32>) -> heed::Result<Env> {
+    let mut eoo = EnvOpenOptions::new();
+    if let Some(size) = map_size {
+        eoo.map_size(size);
+    }
+    if let Some(max) = max_dbs {
+        eoo.max_dbs(max);
+    }
+    eoo.open(path)
+}
+
+fn subdir_next_get(b_exist: bool) -> String {
+    if b_exist {
+        // b->a
+        String::from(RELI_HISTORY_A_DIR)
+    } else {
+        // a->b
+        String::from(RELI_HISTORY_B_DIR)
+    }
+}
+
+fn subdir_cur_get(b_exist: bool) -> String {
+    if b_exist {
+        // b
+        String::from(RELI_HISTORY_B_DIR)
+    } else {
+        // a
+        String::from(RELI_HISTORY_A_DIR)
+    }
+}
+
+fn bflag_path_get(history: PathBuf) -> PathBuf {
+    history.join(RELI_HISTORY_BFLAG_FILE)
+}
+
+fn history_path_get(dir: &str) -> PathBuf {
+    Path::new(dir).join(RELI_HISTORY_DIR)
 }

@@ -40,7 +40,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::rc::Rc;
 use sysmaster::error::*;
-use sysmaster::rel::{ReliLastFrame, Reliability};
+use sysmaster::rel::{ReliConf, ReliLastFrame, Reliability};
 
 use alive_timer::AliveTimer;
 
@@ -203,7 +203,11 @@ impl Manager {
     /// create factory instance
     pub fn new(mode: Mode, action: Action, manager_config: Rc<ManagerConfig>) -> Self {
         let event = Rc::new(Events::new().unwrap());
-        let reli = Rc::new(Reliability::new(rentry::RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new()
+                .set_map_size(manager_config.DbSize)
+                .set_max_dbs(rentry::RELI_HISTORY_MAX_DBS),
+        ));
         let mut l_path = LookupPaths::new();
         l_path.init_lookup_paths();
         let lookup_path = Rc::new(l_path);
@@ -386,6 +390,9 @@ impl Manager {
     fn prepare_reexec(&self) -> Result<()> {
         // restore external resource, like: fd, ...
         // do nothing now
+
+        // compact db
+        self.reli.compact()?;
         Ok(())
     }
 

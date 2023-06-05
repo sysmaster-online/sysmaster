@@ -36,6 +36,41 @@ const RELI_DEBUG_PANIC_FILE: &str = "panic.debug";
 const RELI_DEBUG_PFIRST_FILE: &str = "panic_first.debug";
 const RELI_DEBUG_SLEEP_FILE: &str = "sleep.debug";
 
+/// the configuration of reliability instance
+pub struct ReliConf {
+    // history
+    map_size: Option<usize>,
+    max_dbs: Option<u32>,
+}
+
+impl ReliConf {
+    /// create the configuration
+    pub fn new() -> ReliConf {
+        ReliConf {
+            map_size: None,
+            max_dbs: None,
+        }
+    }
+
+    /// set the map size
+    pub fn set_map_size(&mut self, map_size: usize) -> &mut Self {
+        self.map_size = Some(map_size);
+        self
+    }
+
+    /// set the max numbers of db
+    pub fn set_max_dbs(&mut self, max_dbs: u32) -> &mut Self {
+        self.max_dbs = Some(max_dbs);
+        self
+    }
+}
+
+impl Default for ReliConf {
+    fn default() -> Self {
+        ReliConf::new()
+    }
+}
+
 /// reliability instance
 #[derive(Debug)]
 pub struct Reliability {
@@ -62,13 +97,13 @@ impl Drop for Reliability {
 
 impl Reliability {
     /// create reliability instance
-    pub fn new(max_db: u32) -> Reliability {
+    pub fn new(conf: &ReliConf) -> Reliability {
         let dir_s = reli_prepare().expect("reliability prepare");
         let reli = Reliability {
             dir_string: dir_s.clone(),
             enable: ReliEnable::new(&dir_s),
             last: ReliLast::new(&dir_s),
-            history: ReliHistory::new(&dir_s, max_db),
+            history: ReliHistory::new(&dir_s, conf.map_size, conf.max_dbs),
             pending: ReliPending::new(&dir_s),
             station: ReliStation::new(),
         };
@@ -154,7 +189,7 @@ impl Reliability {
         if reload {
             // If daemon-reload or daemon-reexec, we need to update all changes, clear db, and submit all changes to db.
             self.db_insert();
-            self.history.reflush();
+            self.history.flush();
             // Due to changes in db, we need to reload the data from db to cache.
             self.history.import();
         }
@@ -166,6 +201,11 @@ impl Reliability {
         // clear last
         self.last.clear_unit();
         self.last.clear_frame();
+    }
+
+    /// compact the database
+    pub fn compact(&self) -> Result<()> {
+        self.history.compact()
     }
 
     /// get the enable flag
@@ -205,9 +245,9 @@ impl Reliability {
         self.last.ignore()
     }
 
-    /// get the ignore flag of history data
-    pub fn history_ignore(&self) -> bool {
-        self.history.ignore()
+    /// get the switch flag of history data
+    pub fn history_switch(&self) -> bool {
+        self.history.switch()
     }
 
     /// do the debug action: enable the recover process

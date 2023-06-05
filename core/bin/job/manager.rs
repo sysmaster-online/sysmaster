@@ -814,12 +814,15 @@ mod tests {
     use crate::unit::DataManager;
     use crate::unit::{UnitRe, UnitRelations};
     use basic::logger;
+    use sysmaster::rel::ReliConf;
 
     //#[test]
     #[allow(dead_code)]
     fn job_reli() {
         logger::init_log_to_console("test_unit_load", log::LevelFilter::Trace);
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let event = Rc::new(Events::new().unwrap());
         let rentry = Rc::new(UnitRe::new(&reli));
         let db = Rc::new(UnitDb::new(&rentry));
@@ -1148,7 +1151,9 @@ mod tests {
     ) {
         let event = Rc::new(Events::new().unwrap());
         let dm = Rc::new(DataManager::new());
-        let reli = Rc::new(Reliability::new(RELI_HISTORY_MAX_DBS));
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
         let rentry = Rc::new(UnitRe::new(&reli));
         let db = Rc::new(UnitDb::new(&rentry));
         let name_test1 = String::from("test1.service");
