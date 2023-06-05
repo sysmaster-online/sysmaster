@@ -23,11 +23,12 @@ use crate::{
     log_rule_token_debug, log_rule_token_error,
     rules::FORMAT_SUBST_TABLE,
     utils::{
-        get_property_from_string, replace_chars, resolve_subsystem_kernel, spawn,
+        get_property_from_string, replace_chars, replace_ifname, resolve_subsystem_kernel, spawn,
         sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
     },
 };
 use basic::{
+    naming_scheme::{naming_scheme_has, NamingSchemeFlags},
     parse_util::parse_mode,
     proc_cmdline::cmdline_get_item,
     user_group_util::{get_group_creds, get_user_creds},
@@ -76,7 +77,7 @@ struct ExecuteUnit {
     group_final: bool,
     owner_final: bool,
     mode_final: bool,
-    // name_final: bool,
+    name_final: bool,
     // devlink_final: bool,
     // run_final: bool,
 }
@@ -108,7 +109,7 @@ impl ExecuteUnit {
             group_final: false,
             owner_final: false,
             mode_final: false,
-            // name_final: (),
+            name_final: false,
             // devlink_final: (),
             // run_final: (),
         }
@@ -1678,6 +1679,55 @@ impl ExecuteManager {
                 } else {
                     execute_err!(token, device.as_ref().lock().unwrap().add_tag(value, true))?;
                 }
+
+                Ok(true)
+            }
+            AssignName => {
+                if self.current_unit.as_ref().unwrap().name_final {
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().name_final = true;
+                }
+
+                if device.lock().unwrap().get_ifindex().is_err() {
+                    log_rule_token_error!(
+                        token,
+                        "Only network interfaces can be renamed, ignoring this token"
+                    );
+
+                    return Ok(true);
+                }
+
+                let value = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log_rule_token_error!(token, format!("failed to apply formatter: ({})", e));
+                        return Ok(true);
+                    }
+                };
+
+                let name = if [EscapeType::Unset, EscapeType::Replace]
+                    .contains(&self.current_unit.as_ref().unwrap().escape_type)
+                {
+                    if naming_scheme_has(NamingSchemeFlags::REPLACE_STRICTLY) {
+                        replace_ifname(&value)
+                    } else {
+                        replace_chars(&value, "/")
+                    }
+                } else {
+                    value
+                };
+
+                log_rule_token_debug!(token, format!("renaming network interface to '{}'", name));
+
+                self.current_unit.as_mut().unwrap().name = name;
 
                 Ok(true)
             }

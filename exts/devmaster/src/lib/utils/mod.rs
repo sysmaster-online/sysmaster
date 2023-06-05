@@ -119,6 +119,14 @@ pub(crate) fn valid_devnode_chars(c: char, white_list: &str) -> bool {
     c.is_ascii_alphanumeric() || "#+-.:=@_".contains(c) || white_list.contains(c)
 }
 
+pub(crate) fn valid_ifname_chars(c: char) -> bool {
+    if c as u32 <= 32 || c as u32 >= 127 || ":/%".contains(c) {
+        return false;
+    }
+
+    true
+}
+
 /// replace invalid chars with '_', except for white list, plain ascii, hex-escaping and valid utf8
 /// as Rust strings are always encoded as utf8, we don't need to check whether chars are valid utf8
 pub(crate) fn replace_chars(s: &str, white_list: &str) -> String {
@@ -156,6 +164,10 @@ pub(crate) fn replace_chars(s: &str, white_list: &str) -> String {
     }
 
     ret
+}
+
+pub(crate) fn replace_ifname(s: &str) -> String {
+    s.replace(|c| !valid_ifname_chars(c), "_")
 }
 
 /// This function replaces excess whitespace in a string with underscores.
@@ -694,5 +706,13 @@ mod tests {
         assert!(get_property_from_string("A='B").is_err());
         assert!(get_property_from_string("A=B\"").is_err());
         assert!(get_property_from_string("A=B'").is_err());
+    }
+
+    #[test]
+    fn test_replace_ifname() {
+        assert_eq!(replace_ifname("aaa/bbb"), "aaa_bbb");
+        assert_eq!(replace_ifname("aaa:bbb"), "aaa_bbb");
+        assert_eq!(replace_ifname("aaa%bbb"), "aaa_bbb");
+        assert_eq!(replace_ifname("aaa bbb"), "aaa_bbb");
     }
 }

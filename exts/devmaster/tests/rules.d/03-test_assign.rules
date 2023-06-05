@@ -111,3 +111,28 @@ KERNEL=="sda", TAG="tag2", PROGRAM=="/bin/echo test AssignTag 2 $env{TAGS}"
 # Trigger: devctl trigger /dev/sda
 # Expect: Capture stdout from command '/bin/echo test AssignTag 3 tag3:tag2 tag3': 'test AssignTag 3 tag3:tag2 tag3'
 KERNEL=="sda", TAG+="tag3", TAG-="tag2", PROGRAM=="/bin/echo test AssignTag 3 $env{TAGS} $env{CURRENT_TAGS}"
+
+# Description: test AssignName,
+# Trigger: devctl trigger /sys/class/net/ens33
+# Expect:
+#   1. basic::naming_scheme Using net name scheme 'latest'
+#   2. Capture stdout from command '/bin/echo test AssignName 1 hello_world': 'test AssignName 1 hello_world'
+SUBSYSTEM=="net", NAME="hello/world", PROGRAM=="/bin/echo test AssignName 1 $name"
+
+# Description: test AssignName,
+# Trigger:
+#   1. set environment variable 'NET_NAMING_SCHEME=v023'
+#   2. devctl trigger /sys/class/net/ens33
+# Expect:
+#   1. basic::naming_scheme Using net name scheme 'v023'
+#   2. Capture stdout from command '/bin/echo test AssignName 2 hello_world': 'test AssignName 2 hello_world'
+SUBSYSTEM=="net", NAME="hello/world", PROGRAM=="/bin/echo test AssignName 2 $name"
+
+# Description: test AssignName,
+# Trigger:
+#   1. set environment variable 'NET_NAMING_SCHEME=v000' or 'NET_NAMING_SCHEME=0'
+#   2. devctl trigger /sys/class/net/ens33
+# Expect:
+#   1. basic::naming_scheme Using net name scheme 'v000'
+#   2. Capture stdout from command '/bin/echo test AssignName 3 hello/world': 'test AssignName 3 hello/world'
+SUBSYSTEM=="net", NAME="hello/world", PROGRAM=="/bin/echo test AssignName 3 $name"

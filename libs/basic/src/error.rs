@@ -49,6 +49,9 @@ pub enum Error {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
 
+    #[snafu(display("Invalid naming scheme string: {}", what))]
+    ParseNamingScheme { what: String },
+
     #[snafu(display("Not exist): '{}'.", what))]
     NotExisted { what: String },
 

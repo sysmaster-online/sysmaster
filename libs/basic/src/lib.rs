@@ -25,6 +25,7 @@ pub mod io_util;
 pub mod logger;
 pub mod macros;
 pub mod mount_util;
+pub mod naming_scheme;
 pub mod parse_util;
 pub mod path_lookup;
 pub mod path_util;
