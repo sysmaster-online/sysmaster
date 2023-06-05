@@ -3,7 +3,7 @@
 set -x
 # install needed tools
 #sudo yum clean all
-sudo yum install -y gcc openssl-libs python3-pip musl-gcc
+sudo yum install -y gcc openssl-libs python3-pip musl-gcc clang util-linux-devel
 
 #git加速并安装rust工具链
 git config --global url."https://github.91chi.fun/https://github.com/".insteadOf "https://github.com/"
