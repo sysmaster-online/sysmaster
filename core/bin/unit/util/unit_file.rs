@@ -157,7 +157,7 @@ impl UnitFileData {
                     continue;
                 }
                 let real_path = tmp.parent().unwrap().join(real_path);
-                let real_path = fs::canonicalize(&real_path).unwrap();
+                let real_path = fs::canonicalize(real_path).unwrap();
                 let path_toml = format!("{}.toml", real_path.to_string_lossy());
                 let to = Path::new(&path_toml);
                 if let Err(e) = std::fs::copy(&real_path, to) {
