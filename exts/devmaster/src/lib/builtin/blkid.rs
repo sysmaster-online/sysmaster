@@ -23,6 +23,7 @@ use basic::gpt::GPT_XBOOTLDR;
 use basic::uuid::Uuid;
 use blkid_rs::BlkidFltr;
 use blkid_rs::BlkidPartition;
+#[cfg(blkid = "libblkid_2_37")]
 use blkid_rs::BlkidProbPartsFlags;
 use blkid_rs::BlkidProbe;
 use blkid_rs::BlkidSublksFlags;
@@ -66,6 +67,7 @@ impl Args {
         self.noraid
     }
 
+    #[cfg(blkid = "libblkid_2_37")]
     fn hint(&self) -> Option<&str> {
         if self.hint.is_empty() {
             None
@@ -237,7 +239,7 @@ impl Blkid {
                 return Ok(());
             }
         }
-
+        #[cfg(blkid = "libblkid_2_37")]
         if let Err(e) = probe.set_partitions_flags(BlkidProbPartsFlags::ENTRY_DETAILS) {
             log::warn!("set partitions flags error: {:?}", e);
         }
@@ -418,6 +420,7 @@ impl Builtin for Blkid {
                 .map_err(op_command_err!("filter superblock usage error"))?;
         }
 
+        #[cfg(blkid = "libblkid_2_37")]
         if let Some(hint) = args.hint() {
             probe
                 .set_hint(hint, 0)

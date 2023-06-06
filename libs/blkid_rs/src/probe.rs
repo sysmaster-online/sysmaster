@@ -9,13 +9,16 @@
 // KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
+//
 
 use std::{ffi::CString, os::unix::io::RawFd, ptr};
 
 use crate::{
-    errno_ret, libblkid, partition::BlkidPartlist, BlkidFltr, BlkidProbPartsFlags,
-    BlkidSublksFlags, BlkidUsageFlags,
+    errno_ret, libblkid, partition::BlkidPartlist, BlkidFltr, BlkidSublksFlags, BlkidUsageFlags,
 };
+
+#[cfg(blkid = "libblkid_2_37")]
+use crate::BlkidProbPartsFlags;
 
 type Result<T> = std::result::Result<T, i32>;
 
@@ -177,6 +180,7 @@ impl BlkidProbe {
     }
 
     /// Set hint
+    #[cfg(blkid = "libblkid_2_37")]
     pub fn set_hint(&mut self, name: &str, value: u64) -> Result<()> {
         let name_cstring = CString::new(name).unwrap();
         errno_ret!(unsafe { libblkid::blkid_probe_set_hint(self.0, name_cstring.as_ptr(), value) });
@@ -184,6 +188,7 @@ impl BlkidProbe {
     }
 
     ///Set partitions flags
+    #[cfg(blkid = "libblkid_2_37")]
     pub fn set_partitions_flags(&mut self, flags: BlkidProbPartsFlags) -> Result<()> {
         errno_ret!(unsafe { libblkid::blkid_probe_set_partitions_flags(self.0, flags.bits()) });
         Ok(())

@@ -68,16 +68,6 @@ bitflags! {
         const ONLYIN = libblkid::BLKID_FLTR_ONLYIN as i32;
     }
 
-    /// BlkidProbPartsFlags
-    pub struct BlkidProbPartsFlags: i32 {
-        /// force gpt
-        const FORCE_GPT = libblkid::BLKID_PARTS_FORCE_GPT as i32;
-        /// get entry details info
-        const ENTRY_DETAILS= libblkid::BLKID_PARTS_ENTRY_DETAILS as i32;
-        /// magic
-        const MAGIC = libblkid::BLKID_PARTS_MAGIC as i32;
-    }
-
     /// BlkidUsageFlags
     pub struct BlkidUsageFlags: i32 {
         /// filesystemd
@@ -89,6 +79,19 @@ bitflags! {
         /// other
         const OTHER = libblkid::BLKID_USAGE_OTHER as i32;
     }
+}
+
+#[cfg(blkid = "libblkid_2_37")]
+bitflags! {
+        /// BlkidProbPartsFlags
+        pub struct BlkidProbPartsFlags: i32 {
+            /// force gpt
+            const FORCE_GPT = libblkid::BLKID_PARTS_FORCE_GPT as i32;
+            /// get entry details info
+            const ENTRY_DETAILS= libblkid::BLKID_PARTS_ENTRY_DETAILS as i32;
+            /// magic
+            const MAGIC = libblkid::BLKID_PARTS_MAGIC as i32;
+        }
 }
 
 // Shared code for encoding methods
