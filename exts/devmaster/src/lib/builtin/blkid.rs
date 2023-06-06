@@ -375,6 +375,23 @@ impl Builtin for Blkid {
         argv: Vec<String>,
         test: bool,
     ) -> Result<bool> {
+        let subsystem = device
+            .lock()
+            .map_err(op_command_err!("device lock error"))?
+            .get_subsystem()
+            .map_err(op_command_err!("device get_subsystem error"))?;
+
+        if subsystem != *"block" {
+            let syspath = device
+                .lock()
+                .map_err(op_command_err!("device lock error"))?
+                .get_syspath()
+                .map_err(op_command_err!("device get_syspath error"))?
+                .to_string();
+            log::warn!("blkid can only probe block devices, ignoring {syspath}");
+            return Ok(false);
+        }
+
         let args = Args::try_parse_from(argv).map_err(op_command_err!("parse argv error"))?;
         if !args.is_set_offset() {
             return Err(Error::BuiltinCommandError {
