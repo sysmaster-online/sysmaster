@@ -28,6 +28,7 @@ use crate::{
     },
 };
 use basic::{
+    file_util::write_string_file,
     naming_scheme::{naming_scheme_has, NamingSchemeFlags},
     parse_util::parse_mode,
     proc_cmdline::cmdline_get_item,
@@ -1897,6 +1898,60 @@ impl ExecuteManager {
                         execute_err!(token, device.as_ref().lock().unwrap().add_devlink(devlink))?;
                     }
                 }
+
+                Ok(true)
+            }
+            AssignAttr => {
+                let attr = token.attr.clone().unwrap_or_default();
+
+                let buf = if let Ok(v) = resolve_subsystem_kernel(&attr, false) {
+                    v
+                } else {
+                    let syspath =
+                        execute_err!(token, device.as_ref().lock().unwrap().get_syspath())?
+                            .to_string();
+                    format!("{}/{}", syspath, attr)
+                };
+
+                let sysattr = match sysattr_subdir_subst(&buf) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        log_rule_token!(
+                            error,
+                            token,
+                            format!("could not find matching sysattr '{}': {}", attr, e)
+                        );
+                        return Ok(true);
+                    }
+                };
+
+                let value = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log_rule_token!(
+                            error,
+                            token,
+                            format!("failed to apply formatter: ({})", e)
+                        );
+                        return Ok(true);
+                    }
+                };
+
+                log_rule_token!(
+                    debug,
+                    token,
+                    format!("ATTR '{}' is set to '{}'", sysattr, value)
+                );
+
+                execute_err!(
+                    token,
+                    write_string_file(&sysattr, value).context(IoSnafu { filename: sysattr })
+                )?;
 
                 Ok(true)
             }

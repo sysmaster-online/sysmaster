@@ -140,7 +140,7 @@ SUBSYSTEM=="net", NAME="hello/world", PROGRAM=="/bin/echo test AssignName 3 $nam
 # Description: test AssignDevlink
 # Trigger: devctl trigger /dev/sda1
 # Expect: Capture stdout from command '/bin/echo test AssignDevlink 1 /dev/by-disk/f6e86a53-01': 'test AssignDevlink 1 /dev/by-disk/f6e86a53-01'
-KERNEL=="sda1", IMPORT{builtin}="blkid", SYMLINK+="by-disk/$env{ID_PART_ENTRY_UUID}", PROGRAM=="/bin/echo test AssignDevlink 1 $env{DEVLINKS}"
+KERNEL=="sda1", IMPORT{builtin}=="blkid", SYMLINK+="by-disk/$env{ID_PART_ENTRY_UUID}", PROGRAM=="/bin/echo test AssignDevlink 1 $env{DEVLINKS}"
 
 # Description: test AssignDevlink
 # Trigger: devctl trigger /dev/sda1
@@ -164,3 +164,19 @@ KERNEL=="sda1", OPTIONS="string_escape=none", SYMLINK="aaa bbb", PROGRAM=="/bin/
 # Trigger: devctl trigger /dev/sda
 # Expect: 03-test_assign.rules:158: mask does not match, ignoring this line
 KERNEL=="sda"
+
+# Description: test AssignAttr, the attribute uses '[<subsys>/<sysname>]<attr>' format.
+# Trigger: devctl trigger /dev/sda2
+# Expect:
+#   1. ATTR '/sys/devices/pci0000:00/0000:00:10.0/host2/target2:0:1/2:0:1:0/block/sdb/uevent' is set to 'change'
+#   2. Capture stdout from command '/bin/echo test AssignAttr': 'test AssignAttr'
+KERNEL=="sda2", ATTR{[block/sdb]uevent}="change"
+ACTION=="change", KERNEL=="sdb", PROGRAM=="/bin/echo test AssignAttr"
+
+# Description: test AssignAttr
+# Trigger: devctl trigger /dev/sdb --action add
+# Expect:
+#   1. ATTR '/sys/devices/pci0000:00/0000:00:10.0/host2/target2:0:1/2:0:1:0/block/sdb/uevent' is set to 'change'
+#   2. Capture stdout from command '/bin/echo test AssignAttr 2': 'test AssignAttr 2'
+ACTION=="add", KERNEL=="sdb", ATTR{uevent}="change"
+ACTION=="change", KERNEL=="sdb", PROGRAM=="/bin/echo test AssignAttr 2"

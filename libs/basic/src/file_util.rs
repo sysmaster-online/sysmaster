@@ -13,8 +13,10 @@
 //! the utils of the file operation
 //!
 use crate::error::*;
+use std::fs::OpenOptions;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::Write;
 use std::path::Path;
 
 /// read first line from a file
@@ -26,4 +28,13 @@ pub fn read_first_line(path: &Path) -> Result<String> {
     let _ = buffer.read_line(&mut first_line);
 
     Ok(first_line)
+}
+
+/// write string to file
+pub fn write_string_file<P: AsRef<Path>>(path: P, value: String) -> std::io::Result<()> {
+    let mut file = OpenOptions::new().write(true).open(&path)?;
+
+    let _ = file.write(value.as_bytes())?;
+
+    Ok(())
 }
