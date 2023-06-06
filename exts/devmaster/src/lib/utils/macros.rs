@@ -108,25 +108,11 @@ macro_rules! subst_format_map_none {
     };
 }
 
-/// log info message for rule token
+/// log message for rule token
 #[macro_export]
-macro_rules! log_rule_token_info {
-    ($t:expr, $m:expr) => {
-        log::info!(
-            "{}:{}:'{}' {}",
-            $t.rule_file,
-            $t.line_number,
-            $t.content,
-            $m
-        );
-    };
-}
-
-/// log debug message for rule token
-#[macro_export]
-macro_rules! log_rule_token_debug {
-    ($t:expr, $m:expr) => {
-        log::debug!(
+macro_rules! log_rule_token {
+    ($l:ident, $t:expr, $m:expr) => {
+        log::$l!(
             "{}:{}:'{}' {}",
             $t.rule_file,
             $t.line_number,
@@ -136,16 +122,10 @@ macro_rules! log_rule_token_debug {
     };
 }
 
-/// log error message for rule token
+/// log message for rule line
 #[macro_export]
-macro_rules! log_rule_token_error {
-    ($t:expr, $m:expr) => {
-        log::error!(
-            "{}:{}:'{}' {}",
-            $t.rule_file,
-            $t.line_number,
-            $t.content,
-            $m
-        );
+macro_rules! log_rule_line {
+    ($l:ident, $t:expr, $m:expr) => {
+        log::$l!("{}:{}: {}", $t.rule_file, $t.line_number, $m)
     };
 }

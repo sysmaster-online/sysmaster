@@ -341,17 +341,49 @@ value:  {}",
             )?;
             match rule_token.r#type {
                 TokenType::Goto => {
-                    rule_line.goto_label = Some(rule_token.value);
+                    rule_line.goto_label = Some(rule_token.value.clone());
                     rule_line.r#type |= RuleLineType::HAS_GOTO;
                 }
                 TokenType::Label => {
-                    rule_line.label = Some(rule_token.value);
+                    rule_line.label = Some(rule_token.value.clone());
                     rule_line.r#type |= RuleLineType::HAS_LABEL;
                 }
-                _ => {
-                    rule_line.add_token(rule_token);
+                TokenType::AssignName => {
+                    rule_line.r#type |= RuleLineType::HAS_NAME;
+                }
+
+                t => {
+                    if [
+                        TokenType::AssignDevlink,
+                        TokenType::AssignOwner,
+                        TokenType::AssignGroup,
+                        TokenType::AssignMode,
+                        TokenType::AssignOwnerId,
+                        TokenType::AssignGroupId,
+                        TokenType::AssignModeId,
+                    ]
+                    .contains(&t)
+                    {
+                        rule_line.r#type |= RuleLineType::HAS_DEVLINK;
+                    } else if TokenType::AssignOptionsStaticNode == t {
+                        rule_line.r#type |= RuleLineType::HAS_STATIC_NODE;
+                    } else if t >= TokenType::AssignOptionsStringEscapeNone
+                        || [
+                            TokenType::MatchProgram,
+                            TokenType::MatchImportFile,
+                            TokenType::MatchImportProgram,
+                            TokenType::MatchImportBuiltin,
+                            TokenType::MatchImportDb,
+                            TokenType::MatchImportCmdline,
+                            TokenType::MatchImportParent,
+                        ]
+                        .contains(&t)
+                    {
+                        rule_line.r#type |= RuleLineType::UPDATE_SOMETHING;
+                    }
                 }
             }
+            rule_line.add_token(rule_token);
         }
 
         Ok(Arc::<RwLock<RuleLine>>::new(RwLock::<RuleLine>::new(

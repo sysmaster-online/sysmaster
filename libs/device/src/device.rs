@@ -1381,6 +1381,20 @@ impl Device {
 
         Ok(self.device_id.clone())
     }
+
+    /// cleanup devlinks
+    pub fn cleanup_devlinks(&mut self) {
+        self.devlinks.clear();
+        self.property_devlinks_outdated = true;
+    }
+
+    /// add devlink records to the device object
+    pub fn add_devlink(&mut self, devlink: String) -> Result<(), Error> {
+        self.devlinks.insert(devlink);
+        self.property_devlinks_outdated = true;
+
+        Ok(())
+    }
 }
 
 /// internal methods
@@ -1626,14 +1640,6 @@ impl Device {
         if !db {
             self.properties_buf_outdated = true;
         }
-
-        Ok(())
-    }
-
-    /// add devlink records to the device object
-    pub(crate) fn add_devlink(&mut self, devlink: String) -> Result<(), Error> {
-        self.devlinks.insert(devlink);
-        self.property_devlinks_outdated = true;
 
         Ok(())
     }

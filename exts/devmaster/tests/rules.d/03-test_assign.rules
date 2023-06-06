@@ -136,3 +136,31 @@ SUBSYSTEM=="net", NAME="hello/world", PROGRAM=="/bin/echo test AssignName 2 $nam
 #   1. basic::naming_scheme Using net name scheme 'v000'
 #   2. Capture stdout from command '/bin/echo test AssignName 3 hello/world': 'test AssignName 3 hello/world'
 SUBSYSTEM=="net", NAME="hello/world", PROGRAM=="/bin/echo test AssignName 3 $name"
+
+# Description: test AssignDevlink
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test AssignDevlink 1 /dev/by-disk/f6e86a53-01': 'test AssignDevlink 1 /dev/by-disk/f6e86a53-01'
+KERNEL=="sda1", IMPORT{builtin}="blkid", SYMLINK+="by-disk/$env{ID_PART_ENTRY_UUID}", PROGRAM=="/bin/echo test AssignDevlink 1 $env{DEVLINKS}"
+
+# Description: test AssignDevlink
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test AssignDevlink 2 /dev/bbb /dev/aaa /dev/by-disk/f6e86a53-01': 'test AssignDevlink 2 /dev/bbb /dev/aaa /dev/by-disk/f6e86a53-01'
+KERNEL=="sda1", SYMLINK+="aaa bbb", PROGRAM=="/bin/echo test AssignDevlink 2 $env{DEVLINKS}"
+
+# Description: test AssignDevlink, if escape is unset or set to 'replace', the token value will be treated as a single symlink
+# Trigger: devctl trigger /dev/sda1
+# Expect: Capture stdout from command '/bin/echo test AssignDevlink 2 /dev/aaa_bbb': 'test AssignDevlink 2 /dev/aaa_bbb'
+KERNEL=="sda1", OPTIONS="string_escape=replace", SYMLINK="aaa bbb", PROGRAM=="/bin/echo test AssignDevlink 2 $env{DEVLINKS}"
+
+# Description: test AssignDevlink, if escape is set to 'none', the token value will be split by whitespace
+# Trigger: devctl trigger /dev/sda1
+# Expect:
+#   1. Capture stdout from command '/bin/echo test AssignDevlink 3 /dev/bbb /dev/aaa': 'test AssignDevlink 3 /dev/bbb /dev/aaa'
+#   2. Capture stdout from command '/bin/echo test AssignDevlink 4 /dev/bbb /dev/aaa': 'test AssignDevlink 4 /dev/bbb /dev/aaa'
+KERNEL=="sda1", SYMLINK="aaa bbb", PROGRAM=="/bin/echo test AssignDevlink 3 $env{DEVLINKS}"
+KERNEL=="sda1", OPTIONS="string_escape=none", SYMLINK="aaa bbb", PROGRAM=="/bin/echo test AssignDevlink 4 $env{DEVLINKS}"
+
+# Description: test ignoring rule line if its line type does not match the mask
+# Trigger: devctl trigger /dev/sda
+# Expect: 03-test_assign.rules:158: mask does not match, ignoring this line
+KERNEL=="sda"
