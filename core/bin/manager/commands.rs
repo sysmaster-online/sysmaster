@@ -96,6 +96,7 @@ where
             Ok(_) => (),
             Err(e) => log::error!("Commands failed: {:?}", e),
         }
+        basic::fd_util::close(client);
         self.reli.clear_last_frame();
 
         0
