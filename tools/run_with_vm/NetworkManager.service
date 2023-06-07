@@ -1,0 +1,8 @@
+[Unit]
+Description="Network Manager Service"
+Requires="dbus.service"
+After="dbus.service"
+
+[Service]
+ExecStart="/usr/sbin/NetworkManager --no-daemon"
+KillMode="process"
