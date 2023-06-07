@@ -158,7 +158,6 @@ impl ReliHistory {
     }
 
     pub fn switch_set(&self, switch: bool) {
-        // set switch
         *self.switch.borrow_mut() = switch;
         for (_, db) in self.dbs.borrow().iter() {
             db.switch_set(switch);

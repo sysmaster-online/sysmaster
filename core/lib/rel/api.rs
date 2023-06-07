@@ -187,11 +187,7 @@ impl Reliability {
         self.db_compensate();
         self.db_map(reload);
         if reload {
-            // If daemon-reload or daemon-reexec, we need to update all changes, clear db, and submit all changes to db.
-            self.db_insert();
-            self.history.flush();
-            // Due to changes in db, we need to reload the data from db to cache.
-            self.history.import();
+            self.db_flush();
         }
         self.make_consistent();
 
@@ -309,12 +305,10 @@ impl Reliability {
     }
 
     fn input_rebuild(&self) {
-        // ignore history's input
         self.history.switch_set(true);
 
         self.station.input_rebuild();
 
-        // restore history's ignore
         self.history.switch_set(false);
     }
 
@@ -331,22 +325,28 @@ impl Reliability {
     /// map data from database
     /// reload determine whether the configuration needs to be reloaded based on the situation.
     fn db_map(&self, reload: bool) {
-        // control use buf
         self.history.switch_set(true);
 
         self.station.db_map(reload);
 
-        // control use cache
         self.history.switch_set(false);
     }
 
-    /// map-data insert to buf, switch is true indicating either daemon-reload or daemon-reexec
-    fn db_insert(&self) {
+    /// flush all data from buffer to db
+    fn db_flush(&self) {
+        // clear data before using buffer
         self.history.switch_set(true);
 
+        // update all changes to buffer
         self.station.db_insert();
 
+        // clear db, submit data from all buffers to db, clear buffer
+        self.history.flush();
+
         self.history.switch_set(false);
+
+        // Due to changes in db, reload the data from db to cache.
+        self.history.import();
     }
 
     fn make_consistent(&self) {

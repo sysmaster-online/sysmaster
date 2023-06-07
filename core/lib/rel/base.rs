@@ -27,8 +27,7 @@ use std::{env, fs};
 /// the reliability database
 /// K & V that can be deserialized without borrowing any data from the deserializer.
 pub struct ReDb<K, V> {
-    // control
-    switch: RefCell<bool>,
+    switch: RefCell<bool>, // if switch is true use buffer, if switch is false use cache
 
     // data
     /* database */
@@ -97,10 +96,15 @@ where
         self.cache.borrow_mut().clear();
         self.add.borrow_mut().clear();
         self.del.borrow_mut().clear();
+        // Do not clear the buffer because its data is transient.
     }
 
-    /// set the buffer-switch flag of data
+    /// switch between cache and buffer
     pub fn switch_buffer(&self, switch: bool) {
+        if switch {
+            // Before using the buffer, data needs to be cleared.
+            self.buffer.borrow_mut().clear();
+        }
         *self.switch.borrow_mut() = switch;
     }
 
