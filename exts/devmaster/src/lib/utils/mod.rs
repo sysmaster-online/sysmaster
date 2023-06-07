@@ -214,7 +214,7 @@ pub(crate) fn encode_devnode_name(str: &str, str_enc: &mut String) {
 #[macro_export]
 macro_rules! device_trace {
     // Match rule that takes any number of arguments
-    ($p:tt, $d:expr, $($arg:expr),*) => {{
+    ($p:tt, $d:expr) => {{
         let action = $d.get_action().unwrap_or_default().to_string();
         let sysname = $d.get_sysname().unwrap_or("no_sysname").to_string();
         let syspath = $d.get_syspath().unwrap_or("no_syspath").to_string();
@@ -537,7 +537,7 @@ mod tests {
     fn test_device_trace() {
         let mut device = Device::from_path("/dev/sda".to_string()).unwrap();
 
-        device_trace!("test", device, "aaa");
+        device_trace!("test", device);
     }
 
     #[test]

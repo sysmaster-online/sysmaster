@@ -180,3 +180,51 @@ ACTION=="change", KERNEL=="sdb", PROGRAM=="/bin/echo test AssignAttr"
 #   2. Capture stdout from command '/bin/echo test AssignAttr 2': 'test AssignAttr 2'
 ACTION=="add", KERNEL=="sdb", ATTR{uevent}="change"
 ACTION=="change", KERNEL=="sdb", PROGRAM=="/bin/echo test AssignAttr 2"
+
+# Description: test AssignRunProgram, if run type is not set, the default type is program
+# Trigger: devctl trigger /dev/sda
+# Expect:
+#   1. insert Run program '/bin/echo test AssignRunProgram 1'
+#   2. Running program '/bin/echo test AssignRunProgram 1'
+#   3. Process 2866513 exited with status ExitStatus(unix_wait_status(0))
+KERNEL=="sda", RUN="/bin/echo test AssignRunProgram 1"
+
+# Description: test AssignRunProgram
+# Trigger: devctl trigger /dev/sda
+# Expect:
+#   1. insert Run program '/bin/echo test AssignRunProgram 1'
+#   2. Running program '/bin/echo test AssignRunProgram 1'
+#   3. Process <PID> exited with status ExitStatus(unix_wait_status(0))
+KERNEL=="sda", RUN+="/bin/echo test AssignRunProgram 1"
+
+# Description: test AssignRunProgram
+# Trigger: devctl trigger /dev/sda
+# Expect:
+#   1. insert Run program '/bin/echo test AssignRunProgram 2'
+#   2. Running program '/bin/echo test AssignRunProgram 2'
+#   3. Process <PID> exited with status ExitStatus(unix_wait_status(0))
+KERNEL=="sda", RUN{program}+="/bin/echo test AssignRunProgram 2"
+
+# Description: test AssignRunBuiltin
+# Trigger: devctl trigger /dev/sda
+# Expect:
+#   1. insert Run builtin 'blkid'
+#   2. Running builtin command 'blkid'
+KERNEL=="sda", RUN{builtin}="blkid"
+
+# Description: test AssignRunBuiltin
+# Trigger: devctl trigger /dev/sda
+# Expect:
+#   1. insert Run builtin 'blkid'
+#   2. Running builtin command 'blkid'
+KERNEL=="sda", RUN{builtin}+="blkid"
+
+# Description: test AssignRun, if final-assigned, neither program nor run list can insert more command
+# Trigger: devctl trigger /dev/sda
+# Expect:
+#   1. insert Run program '/bin/echo test AssignRun final-assigned'
+#   2. Running program '/bin/echo test AssignRun final-assigned'
+#   3. Process <PID> exited with status ExitStatus(unix_wait_status(0))
+KERNEL=="sda", RUN:="/bin/echo test AssignRun final-assigned"
+KERNEL=="sda", RUN+="/bin/echo test AssignRun final-assigned 1"
+KERNEL=="sda", RUN{builtin}+="blkid"

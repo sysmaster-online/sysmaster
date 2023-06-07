@@ -40,6 +40,8 @@ pub enum Error {
     ParseFloat { source: std::num::ParseFloatError },
     #[snafu(display("Failed to parse boolean: {}", source))]
     ParseBool { source: std::str::ParseBoolError },
+    #[snafu(display("Failed to parse shell words: {}", source))]
+    ParseShellWords { source: shell_words::ParseError },
 
     /// Error in worker manager
     #[snafu(display("Worker Manager: {}", msg))]

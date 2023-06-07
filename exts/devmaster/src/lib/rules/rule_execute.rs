@@ -20,7 +20,7 @@ use super::{
 use crate::{
     builtin::{BuiltinCommand, BuiltinManager, Netlink},
     error::*,
-    log_rule_line, log_rule_token,
+    log_device_lock, log_rule_line, log_rule_token,
     rules::FORMAT_SUBST_TABLE,
     utils::{
         get_property_from_string, replace_chars, replace_ifname, resolve_subsystem_kernel, spawn,
@@ -65,7 +65,10 @@ struct ExecuteUnit {
     uid: Option<Uid>,
     gid: Option<Gid>,
     // seclabel_list: HashMap<String, String>,
-    // run_list: HashMap<String, String>,
+    /// builtin or program in run_list will execute in the end of rule execution
+    builtin_run_list: Vec<String>,
+    program_run_list: Vec<String>,
+
     // exec_delay_usec: useconds_t,
     birth_sec: SystemTime,
     rtnl: RefCell<Option<Netlink>>,
@@ -80,7 +83,8 @@ struct ExecuteUnit {
     mode_final: bool,
     name_final: bool,
     devlink_final: bool,
-    // run_final: bool,
+
+    run_final: bool,
 }
 
 impl ExecuteUnit {
@@ -98,7 +102,9 @@ impl ExecuteUnit {
             uid: None,
             gid: None,
             // seclabel_list: (),
-            // run_list: (),
+            builtin_run_list: vec![],
+            program_run_list: vec![],
+
             // exec_delay_usec: (),
             birth_sec: SystemTime::now(),
             rtnl: RefCell::new(None),
@@ -112,7 +118,7 @@ impl ExecuteUnit {
             mode_final: false,
             name_final: false,
             devlink_final: false,
-            // run_final: (),
+            run_final: false,
         }
     }
 
@@ -505,21 +511,26 @@ impl ExecuteManager {
     pub fn process_device(&mut self, device: Arc<Mutex<Device>>) -> Result<()> {
         log::debug!(
             "{}",
-            device_trace!("Start processing device", device.as_ref().lock().unwrap(),)
+            device_trace!("Start processing device", device.as_ref().lock().unwrap())
         );
 
-        self.current_unit = Some(ExecuteUnit::new(device));
+        self.current_unit = Some(ExecuteUnit::new(device.clone()));
         // lock whole disk: todo
 
         // mark block device read only: todo
 
         self.execute_rules()?;
 
-        self.execute_run()?;
+        self.execute_run();
 
         // update rtnl: todo
 
         // begin inotify watch: todo
+
+        log::debug!(
+            "{}",
+            device_trace!("Finish processing device", device.as_ref().lock().unwrap())
+        );
 
         self.current_unit = None;
 
@@ -1955,6 +1966,55 @@ impl ExecuteManager {
 
                 Ok(true)
             }
+            AssignRunBuiltin | AssignRunProgram => {
+                if self.current_unit.as_ref().unwrap().run_final {
+                    return Ok(true);
+                }
+
+                if token.op == OperatorType::AssignFinal {
+                    self.current_unit.as_mut().unwrap().run_final = true;
+                }
+
+                if [OperatorType::Assign, OperatorType::AssignFinal].contains(&token.op) {
+                    self.current_unit.as_mut().unwrap().builtin_run_list.clear();
+                    self.current_unit.as_mut().unwrap().program_run_list.clear();
+                }
+
+                let cmd = match self
+                    .current_unit
+                    .as_ref()
+                    .unwrap()
+                    .apply_format(&token.value, false)
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log_rule_token!(
+                            error,
+                            token,
+                            format!("failed to apply formatter: ({})", e)
+                        );
+                        return Ok(true);
+                    }
+                };
+
+                if token.attr.is_some() {
+                    self.current_unit
+                        .as_mut()
+                        .unwrap()
+                        .builtin_run_list
+                        .push(cmd.clone());
+                    log_rule_token!(debug, token, format!("insert Run builtin '{}'", cmd));
+                } else {
+                    self.current_unit
+                        .as_mut()
+                        .unwrap()
+                        .program_run_list
+                        .push(cmd.clone());
+                    log_rule_token!(debug, token, format!("insert Run program '{}'", cmd));
+                }
+
+                Ok(true)
+            }
             _ => {
                 todo!();
             }
@@ -2016,8 +2076,86 @@ impl ExecuteManager {
     }
 
     /// execute run
-    pub(crate) fn execute_run(&mut self) -> Result<()> {
-        Ok(())
+    pub(crate) fn execute_run(&mut self) {
+        self.execute_run_builtin();
+        self.execute_run_program();
+    }
+
+    pub(crate) fn execute_run_builtin(&mut self) {
+        /*
+         * todo: redundant string vector clone
+         */
+        for builtin_str in self
+            .current_unit
+            .as_ref()
+            .unwrap()
+            .builtin_run_list
+            .clone()
+            .iter()
+        {
+            if let Ok(builtin) = builtin_str.parse::<BuiltinCommand>() {
+                let argv = match shell_words::split(builtin_str) {
+                    Ok(ret) => ret,
+                    Err(e) => {
+                        log_device_lock!(
+                            debug,
+                            self.current_unit.as_ref().unwrap().device,
+                            format!("Failed to run builtin command '{}': {}", builtin_str, e)
+                        );
+                        continue;
+                    }
+                };
+
+                log_device_lock!(
+                    debug,
+                    self.current_unit.as_ref().unwrap().device,
+                    format!("Running builtin command '{}'", builtin_str)
+                );
+
+                if let Err(e) = self.builtin_mgr.run(
+                    self.current_unit.as_ref().unwrap().device.clone(),
+                    &mut self.current_unit.as_mut().unwrap().rtnl,
+                    builtin,
+                    argv.len() as i32,
+                    argv,
+                    false,
+                ) {
+                    log_device_lock!(
+                        debug,
+                        self.current_unit.as_ref().unwrap().device,
+                        format!("Failed to run builtin command '{}': '{}'", builtin_str, e)
+                    );
+                }
+            }
+        }
+    }
+
+    pub(crate) fn execute_run_program(&mut self) {
+        /*
+         * todo: redundant string vector clone
+         */
+        for cmd_str in self
+            .current_unit
+            .as_ref()
+            .unwrap()
+            .program_run_list
+            .clone()
+            .iter()
+        {
+            log_device_lock!(
+                debug,
+                self.current_unit.as_ref().unwrap().device,
+                format!("Running program '{}'", cmd_str)
+            );
+
+            if let Err(e) = spawn(cmd_str, Duration::from_secs(self.unit_spawn_timeout_usec)) {
+                log_device_lock!(
+                    debug,
+                    self.current_unit.as_ref().unwrap().device,
+                    format!("Failed to run program '{}': '{}'", cmd_str, e)
+                );
+            }
+        }
     }
 }
 

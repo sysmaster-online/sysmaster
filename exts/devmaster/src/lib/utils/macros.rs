@@ -129,3 +129,15 @@ macro_rules! log_rule_line {
         log::$l!("{}:{}: {}", $t.rule_file, $t.line_number, $m)
     };
 }
+
+/// log message about device
+#[macro_export]
+macro_rules! log_device_lock {
+    ($l:ident, $d:expr, $m:expr) => {
+        log::$l!(
+            "{}: {}",
+            $d.lock().unwrap().get_sysname().unwrap_or_default(),
+            $m
+        )
+    };
+}
