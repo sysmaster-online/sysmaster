@@ -41,7 +41,7 @@ impl<T> Commands<T> {
         let socket_fd = socket::socket(
             socket::AddressFamily::Unix,
             socket::SockType::Stream,
-            socket::SockFlag::empty(),
+            socket::SockFlag::SOCK_CLOEXEC | socket::SockFlag::SOCK_NONBLOCK,
             None,
         )
         .unwrap();
@@ -112,6 +112,6 @@ where
     }
 
     fn priority(&self) -> i8 {
-        10i8
+        0i8
     }
 }
