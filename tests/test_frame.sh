@@ -15,7 +15,13 @@ function test_setup() {
     install_sysmaster || return 1
 
     if [ "${DOCKER_TEST}" == '1' ]; then
-        setup_docker || return 1
+        if which isula-build; then
+            setup_isula || return 1
+        elif which docker; then
+            setup_docker || return 1
+        else
+            return 1
+        fi
     else
         test -f /usr/bin/sctl && return 0
         cp -arf "${BUILD_PATH}"/target/install/usr/* /usr/ || return 1
@@ -25,17 +31,28 @@ function test_setup() {
 }
 
 function setup_docker() {
+    export DOCKER_CMD='docker'
     TMP_DIR="$(mktemp -d /tmp/"${TEST_SCRIPT%.sh}"_XXXX)"
 
-    if ! which docker; then
-        sudo yum install -y docker || return 1
-    fi
     docker images | grep "${SYSMST_BASE_IMG}" && return 0
 
     if ! docker images | grep "${BASE_IMG}"; then
         load_docker_img || return 1
     fi
     build_base_img || return 1
+}
+
+function setup_isula() {
+    export DOCKER_CMD='isula'
+    export opts='--net=host'
+    TMP_DIR="$(mktemp -d /tmp/"${TEST_SCRIPT%.sh}"_XXXX)"
+
+    isula images | grep "${SYSMST_BASE_IMG}" && return 0
+
+    if ! isula-build ctr-img images | grep "${BASE_IMG}"; then
+        load_isula_img || return 1
+    fi
+    build_isula_img || return 1
 }
 
 function test_cleanup() {
@@ -50,12 +67,13 @@ function test_cleanup() {
 }
 
 function cleanup_docker() {
-    if docker ps -a | grep -v 'CONTAINER ID'; then
-        docker ps -a | sed -n '2,$p' | awk '{print $1}' | xargs docker rm -f
-        docker ps -a
+    if ${DOCKER_CMD} ps -a | grep -v 'CONTAINER ID'; then
+        ${DOCKER_CMD} ps -a | sed -n '2,$p' | awk '{print $1}' | xargs ${DOCKER_CMD} stop
+        ${DOCKER_CMD} ps -a | sed -n '2,$p' | awk '{print $1}' | xargs ${DOCKER_CMD} rm
+        ${DOCKER_CMD} ps -a
     fi
-    if docker images | grep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}"; then
-        docker images | grep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}" | awk '{print $3}' | xargs docker rmi -f
+    if ${DOCKER_CMD} images | grep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}"; then
+        ${DOCKER_CMD} images | grep -vEw "IMAGE ID|${BASE_IMG}|${SYSMST_BASE_IMG}" | awk '{print $3}' | xargs ${DOCKER_CMD} rmi
     fi
 }
 

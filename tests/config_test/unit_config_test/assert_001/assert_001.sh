@@ -26,7 +26,7 @@ function test_run() {
         cp -arf "$(realpath check.sh)" "${TMP_DIR}"/opt
         cp -arf "${TEST_PATH}"/common/util_lib.sh tmp_units "${TMP_DIR}"/opt
         chmod -R 777 "${TMP_DIR}"
-        docker run --privileged --rm -v "${TMP_DIR}"/opt:/opt "${SYSMST_BASE_IMG}" sh -c "condition_test=${condition_test} sh -x /opt/check.sh &> /opt/check.log"
+        ${DOCKER_CMD} run --privileged --rm -v "${TMP_DIR}"/opt:/opt ${opts} "${SYSMST_BASE_IMG}" sh -c "condition_test=${condition_test} sh -x /opt/check.sh &> /opt/check.log"
         ret=$?
         cat "${TMP_DIR}"/opt/check.log
         cat "${TMP_DIR}"/opt/sysmaster.log
