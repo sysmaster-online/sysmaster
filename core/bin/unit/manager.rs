@@ -470,6 +470,15 @@ impl UmIf for UnitManager {
     fn get_log_target(&self) -> &str {
         self.get_log_target()
     }
+
+    /// set the service's socket fd
+    fn service_set_socket_fd(&self, service_name: &str, fd: i32) {
+        let service = match self.units_get(service_name) {
+            None => return,
+            Some(v) => v,
+        };
+        service.set_socket_fd(fd);
+    }
 }
 
 /// the declaration "pub(self)" is for identification only.

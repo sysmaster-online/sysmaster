@@ -1342,6 +1342,10 @@ impl ServiceMng {
         };
         unit.reset_start_limit();
     }
+
+    pub(super) fn set_socket_fd(&self, fd: i32) {
+        self.spawn.set_socket_fd(fd)
+    }
 }
 
 impl ServiceMng {

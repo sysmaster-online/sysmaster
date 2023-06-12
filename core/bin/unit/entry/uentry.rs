@@ -745,6 +745,10 @@ impl Unit {
         self.sub.collect_fds()
     }
 
+    pub(crate) fn set_socket_fd(&self, fd: i32) {
+        self.sub.set_socket_fd(fd)
+    }
+
     pub(crate) fn notify_message(
         &self,
         ucred: &UnixCredentials,

@@ -168,6 +168,9 @@ pub trait UmIf {
         Vec::new()
     }
 
+    /// set the service's socket fd
+    fn service_set_socket_fd(&self, _service_name: &str, _fd: i32) {}
+
     /// get all unit in sysmaster
     fn units_get_all(&self, _unit_type: Option<UnitType>) -> Vec<String> {
         Vec::new()

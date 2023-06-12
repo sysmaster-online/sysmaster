@@ -27,6 +27,7 @@ use sysmaster::exec::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
 pub(super) struct ServiceSpawn {
     comm: Rc<ServiceUnitComm>,
     pid: Rc<ServicePid>,
+    socket_fd: RefCell<i32>,
     config: Rc<ServiceConfig>,
     exec_ctx: Rc<ExecContext>,
     rd: Rc<RunningData>,
@@ -44,6 +45,7 @@ impl ServiceSpawn {
         ServiceSpawn {
             comm: Rc::clone(commr),
             pid: Rc::clone(pidr),
+            socket_fd: RefCell::new(-1),
             config: configr.clone(),
             exec_ctx: exec_ctx.clone(),
             rd: rd.clone(),
@@ -165,5 +167,13 @@ impl ServiceSpawn {
 
     fn watchdog_timer(&self) -> u64 {
         self.config.config_data().borrow().Service.WatchdogSec
+    }
+
+    pub(super) fn set_socket_fd(&self, fd: i32) {
+        *self.socket_fd.borrow_mut() = fd;
+    }
+
+    pub(super) fn get_socket_fd(&self) -> i32 {
+        self.socket_fd.borrow().clone()
     }
 }

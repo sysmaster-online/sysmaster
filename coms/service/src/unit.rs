@@ -173,6 +173,10 @@ impl SubUnit for ServiceUnit {
         );
         self.mng.notify_message(ucred, messages, fds)
     }
+
+    fn set_socket_fd(&self, fd: i32) {
+        self.mng.set_socket_fd(fd);
+    }
 }
 
 impl UnitMngUtil for ServiceUnit {
