@@ -162,7 +162,11 @@ impl ServiceSpawn {
     }
 
     fn collect_socket_fds(&self) -> Vec<i32> {
-        self.comm.um().collect_socket_fds(&self.comm.get_owner_id())
+        if self.get_socket_fd() >= 0 {
+            vec![self.get_socket_fd()]
+        } else {
+            self.comm.um().collect_socket_fds(&self.comm.get_owner_id())
+        }
     }
 
     fn watchdog_timer(&self) -> u64 {
