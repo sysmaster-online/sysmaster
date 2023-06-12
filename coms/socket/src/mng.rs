@@ -884,7 +884,7 @@ impl SocketMngPort {
     }
 
     fn dispatch_io(&self) -> Result<i32> {
-        let afd: i32 = -1;
+        let mut afd: i32 = -1;
 
         if self.mng().state() != SocketState::Listening {
             return Ok(0);
@@ -894,7 +894,7 @@ impl SocketMngPort {
             && self.port.p_type() == PortType::Socket
             && self.port.can_accept()
         {
-            let afd = self.port.accept().map_err(|_e| Error::Other {
+            afd = self.port.accept().map_err(|_e| Error::Other {
                 msg: "accept err".to_string(),
             })?;
 
