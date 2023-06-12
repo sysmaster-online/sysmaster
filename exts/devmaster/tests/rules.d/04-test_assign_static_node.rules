@@ -1,0 +1,19 @@
+# Description: test AssignOptionsStaticNode
+# Trigger: start devmaster
+# Expect: libdevmaster::rules::node setting permission for '/dev/sdb', uid='987', gid='987', mode='444'
+MODE="0444", OWNER="tss", GROUP="tss", OPTIONS="static_node=sdb"
+
+# Description: test AssignOptionsStaticNode, if group is set, but mode is not set, set default mode to '0666'
+# Trigger: start devmaster
+# Expect: libdevmaster::rules::node setting permission for '/dev/sdb', uid='987', gid='987', mode='660'
+OWNER="tss", GROUP="tss", OPTIONS="static_node=sdb"
+
+# Description: test AssignOptionsStaticNode, if group is set, but mode is not set, set default mode to '0666'
+# Trigger: start devmaster
+# Expect: libdevmaster::rules::node setting permission for '/dev/sdb', uid='0', gid='987', mode='444'
+MODE="0444", OWNER="root", OPTIONS="static_node=sdb"
+
+# Description: test AssignOptionsStaticNode, if group is set, but mode is not set, set default mode to '0666'
+# Trigger: start devmaster
+# Expect: libdevmaster::rules::node setting permission for '/dev/sdb', uid='0', gid='0', mode='444'
+MODE="0444", GROUP="root", OPTIONS="static_node=sdb"

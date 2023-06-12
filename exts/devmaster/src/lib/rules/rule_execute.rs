@@ -14,13 +14,13 @@
 //!
 
 use super::{
-    EscapeType, FormatSubstitutionType, OperatorType, RuleFile, RuleLine, RuleLineType, RuleToken,
-    Rules, SubstituteType, TokenType::*,
+    node::static_node_apply_permissions, EscapeType, FormatSubstitutionType, OperatorType,
+    RuleFile, RuleLine, RuleLineType, RuleToken, Rules, SubstituteType, TokenType::*,
 };
 use crate::{
     builtin::{BuiltinCommand, BuiltinManager, Netlink},
     error::*,
-    log_device_lock, log_rule_line, log_rule_token,
+    log_dev_lock, log_rule_line, log_rule_token,
     rules::FORMAT_SUBST_TABLE,
     utils::{
         get_property_from_string, replace_chars, replace_ifname, resolve_subsystem_kernel, spawn,
@@ -2015,6 +2015,13 @@ impl ExecuteManager {
 
                 Ok(true)
             }
+            AssignOptionsStaticNode => {
+                /*
+                 * This token is used to set the permission of static device node after
+                 * devmaster started and is not applied during rule executing.
+                 */
+                Ok(true)
+            }
             _ => {
                 todo!();
             }
@@ -2097,7 +2104,7 @@ impl ExecuteManager {
                 let argv = match shell_words::split(builtin_str) {
                     Ok(ret) => ret,
                     Err(e) => {
-                        log_device_lock!(
+                        log_dev_lock!(
                             debug,
                             self.current_unit.as_ref().unwrap().device,
                             format!("Failed to run builtin command '{}': {}", builtin_str, e)
@@ -2106,7 +2113,7 @@ impl ExecuteManager {
                     }
                 };
 
-                log_device_lock!(
+                log_dev_lock!(
                     debug,
                     self.current_unit.as_ref().unwrap().device,
                     format!("Running builtin command '{}'", builtin_str)
@@ -2120,7 +2127,7 @@ impl ExecuteManager {
                     argv,
                     false,
                 ) {
-                    log_device_lock!(
+                    log_dev_lock!(
                         debug,
                         self.current_unit.as_ref().unwrap().device,
                         format!("Failed to run builtin command '{}': '{}'", builtin_str, e)
@@ -2142,14 +2149,14 @@ impl ExecuteManager {
             .clone()
             .iter()
         {
-            log_device_lock!(
+            log_dev_lock!(
                 debug,
                 self.current_unit.as_ref().unwrap().device,
                 format!("Running program '{}'", cmd_str)
             );
 
             if let Err(e) = spawn(cmd_str, Duration::from_secs(self.unit_spawn_timeout_usec)) {
-                log_device_lock!(
+                log_dev_lock!(
                     debug,
                     self.current_unit.as_ref().unwrap().device,
                     format!("Failed to run program '{}': '{}'", cmd_str, e)
@@ -2257,6 +2264,69 @@ impl Iterator for RuleTokenIter {
         }
 
         None
+    }
+}
+
+impl Rules {
+    pub(crate) fn apply_static_dev_permission(&self) -> Result<()> {
+        for file in self.iter() {
+            for line in file.as_ref().read().unwrap().iter() {
+                line.as_ref()
+                    .read()
+                    .unwrap()
+                    .apply_static_dev_permission()?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl RuleLine {
+    fn apply_static_dev_permission(&self) -> Result<()> {
+        if !self.r#type.intersects(RuleLineType::HAS_STATIC_NODE) {
+            return Ok(());
+        }
+
+        let mut uid: Option<Uid> = None;
+        let mut gid: Option<Gid> = None;
+        let mut mode: Option<mode_t> = None;
+        let mut tags: Vec<String> = vec![];
+
+        for token in self.iter() {
+            let token = token.as_ref().read().unwrap();
+
+            match token.r#type {
+                AssignOwnerId => {
+                    let v =
+                        execute_err!(token, token.value.parse::<uid_t>().context(ParseIntSnafu))?;
+                    uid = Some(Uid::from_raw(v));
+                }
+                AssignGroupId => {
+                    let v =
+                        execute_err!(token, token.value.parse::<gid_t>().context(ParseIntSnafu))?;
+                    gid = Some(Gid::from_raw(v));
+                }
+                AssignModeId => {
+                    let v = execute_err!(
+                        token,
+                        mode_t::from_str_radix(&token.value, 8).context(ParseIntSnafu)
+                    )?;
+                    mode = Some(v);
+                }
+                AssignTag => {
+                    tags.push(token.value.clone());
+                }
+                AssignOptionsStaticNode => {
+                    static_node_apply_permissions(token.value.clone(), mode, uid, gid, &tags)?;
+                }
+                _ => {
+                    // do nothing for other types of token
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

@@ -25,8 +25,11 @@ use super::{
     uevent_monitor::UeventMonitor,
     worker_manager::{WorkerManager, WORKER_MANAGER_LISTEN_ADDR},
 };
-use crate::config::{Conf, DEFAULT_CONFIG, DEFAULT_RULES_DIRS};
 use crate::rules::{ResolveNameTime, Rules};
+use crate::{
+    config::{Conf, DEFAULT_CONFIG, DEFAULT_RULES_DIRS},
+    error::Log,
+};
 use basic::logger::init_log_to_console;
 use confique::Config;
 use event::{EventState, Events};
@@ -63,7 +66,14 @@ impl Devmaster {
             ResolveNameTime::Early,
         );
 
-        log::debug!("{}", rules.as_ref().read().unwrap());
+        log::info!("rules loaded");
+
+        let _ = rules
+            .as_ref()
+            .read()
+            .unwrap()
+            .apply_static_dev_permission()
+            .log_error();
 
         let ret = Rc::new(RefCell::new(Devmaster {
             events: events.clone(),

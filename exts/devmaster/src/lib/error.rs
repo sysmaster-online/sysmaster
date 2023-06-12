@@ -12,7 +12,12 @@
 
 //! utils of libdevmaster
 //!
+use std::sync::{Arc, Mutex};
+
+use device::Device;
 use snafu::prelude::*;
+
+use crate::{log_dev, log_dev_lock, log_dev_lock_option};
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -42,6 +47,12 @@ pub enum Error {
     ParseBool { source: std::str::ParseBoolError },
     #[snafu(display("Failed to parse shell words: {}", source))]
     ParseShellWords { source: shell_words::ParseError },
+
+    #[snafu(display("Nix error: {}", source))]
+    Nix { source: nix::Error },
+
+    #[snafu(display("libbasic error: {}", source))]
+    Basic { source: basic::Error },
 
     /// Error in worker manager
     #[snafu(display("Worker Manager: {}", msg))]
@@ -97,5 +108,95 @@ impl Error {
             Self::Other { msg: _, errno: n } => *n,
             _ => nix::errno::Errno::EINVAL,
         }
+    }
+}
+
+pub(crate) trait Log {
+    fn log_error(self) -> Self;
+    fn log_debug(self) -> Self;
+    fn log_info(self) -> Self;
+    fn log_dev_error(self, dev: &mut Device) -> Self;
+    fn log_dev_debug(self, dev: &mut Device) -> Self;
+    fn log_dev_info(self, dev: &mut Device) -> Self;
+    fn log_dev_lock_option_error(self, dev: Option<Arc<Mutex<Device>>>) -> Self;
+    fn log_dev_lock_option_debug(self, dev: Option<Arc<Mutex<Device>>>) -> Self;
+    fn log_dev_lock_option_info(self, dev: Option<Arc<Mutex<Device>>>) -> Self;
+    fn log_dev_lock_error(self, dev: Arc<Mutex<Device>>) -> Self;
+    fn log_dev_lock_debug(self, dev: Arc<Mutex<Device>>) -> Self;
+    fn log_dev_lock_info(self, dev: Arc<Mutex<Device>>) -> Self;
+}
+
+impl<T> Log for std::result::Result<T, Error> {
+    fn log_info(self) -> Self {
+        self.map_err(|e| {
+            log::info!("{}", e);
+            e
+        })
+    }
+    fn log_debug(self) -> Self {
+        self.map_err(|e| {
+            log::debug!("{}", e);
+            e
+        })
+    }
+    fn log_error(self) -> Self {
+        self.map_err(|e| {
+            log::error!("{}", e);
+            e
+        })
+    }
+    fn log_dev_error(self, dev: &mut Device) -> Self {
+        self.map_err(|e| {
+            log_dev!(error, dev, e);
+            e
+        })
+    }
+    fn log_dev_debug(self, dev: &mut Device) -> Self {
+        self.map_err(|e| {
+            log_dev!(debug, dev, e);
+            e
+        })
+    }
+    fn log_dev_info(self, dev: &mut Device) -> Self {
+        self.map_err(|e| {
+            log_dev!(info, dev, e);
+            e
+        })
+    }
+    fn log_dev_lock_option_error(self, dev: Option<Arc<Mutex<Device>>>) -> Self {
+        self.map_err(|e| {
+            log_dev_lock_option!(error, dev, e);
+            e
+        })
+    }
+    fn log_dev_lock_option_debug(self, dev: Option<Arc<Mutex<Device>>>) -> Self {
+        self.map_err(|e| {
+            log_dev_lock_option!(debug, dev, e);
+            e
+        })
+    }
+    fn log_dev_lock_option_info(self, dev: Option<Arc<Mutex<Device>>>) -> Self {
+        self.map_err(|e| {
+            log_dev_lock_option!(info, dev, e);
+            e
+        })
+    }
+    fn log_dev_lock_error(self, dev: Arc<Mutex<Device>>) -> Self {
+        self.map_err(|e| {
+            log_dev_lock!(error, dev, e);
+            e
+        })
+    }
+    fn log_dev_lock_debug(self, dev: Arc<Mutex<Device>>) -> Self {
+        self.map_err(|e| {
+            log_dev_lock!(debug, dev, e);
+            e
+        })
+    }
+    fn log_dev_lock_info(self, dev: Arc<Mutex<Device>>) -> Self {
+        self.map_err(|e| {
+            log_dev_lock!(info, dev, e);
+            e
+        })
     }
 }

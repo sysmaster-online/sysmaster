@@ -41,3 +41,11 @@ macro_rules! IN_SET {
         }
     };
 }
+
+/// generate /proc/self/fd/{fd}
+#[macro_export]
+macro_rules! format_proc_fd_path {
+    ($f:expr) => {
+        format!("/proc/self/fd/{}", $f)
+    };
+}

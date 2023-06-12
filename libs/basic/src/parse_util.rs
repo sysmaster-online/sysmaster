@@ -73,9 +73,9 @@ pub fn parse_ifindex(s: String) -> Result<u32> {
 
 /// parse the string into mode_t
 pub fn parse_mode(mode: &str) -> Result<mode_t> {
-    match mode.parse::<mode_t>() {
+    match mode_t::from_str_radix(mode, 8) {
         Ok(v) => {
-            if v > 7777 {
+            if v > 0o7777 {
                 return Err(Error::Nix {
                     source: nix::errno::Errno::ERANGE,
                 });
