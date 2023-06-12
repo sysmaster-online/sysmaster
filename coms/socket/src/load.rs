@@ -36,7 +36,7 @@ impl SocketLoad {
 
     pub(super) fn socket_add_extras(&self) -> Result<()> {
         log::debug!("socket add extras");
-        if self.can_accept() {
+        if self.have_non_accept_socket() {
             if self.config.unit_ref_target().is_none() {
                 self.load_related_unit(UnitType::UnitService)?;
             }
@@ -74,15 +74,11 @@ impl SocketLoad {
         Ok(())
     }
 
-    fn can_accept(&self) -> bool {
+    fn have_non_accept_socket(&self) -> bool {
         if !self.config.config_data().borrow().Socket.Accept {
             return true;
-        };
+        }
 
-        self.no_accept_socket()
-    }
-
-    fn no_accept_socket(&self) -> bool {
         for port in self.config.ports().iter() {
             if port.p_type() != PortType::Socket {
                 return true;
