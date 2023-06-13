@@ -177,6 +177,10 @@ impl SubUnit for ServiceUnit {
     fn set_socket_fd(&self, fd: i32) {
         self.mng.set_socket_fd(fd);
     }
+
+    fn release_socket_fd(&self, fd: i32) {
+        self.mng.release_socket_fd(fd);
+    }
 }
 
 impl UnitMngUtil for ServiceUnit {

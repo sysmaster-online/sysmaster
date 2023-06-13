@@ -131,6 +131,9 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     fn set_socket_fd(&self, _fd: i32) {}
 
     ///
+    fn release_socket_fd(&self, _fd: i32) {}
+
+    ///
     fn trigger(&self, _other: &str) {}
 
     ///Get the the unit state

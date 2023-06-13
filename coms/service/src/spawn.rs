@@ -16,6 +16,7 @@ use super::comm::ServiceUnitComm;
 use super::config::ServiceConfig;
 use super::pid::ServicePid;
 use super::rentry::ServiceType;
+use basic::fd_util;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::env;
@@ -179,5 +180,10 @@ impl ServiceSpawn {
 
     pub(super) fn get_socket_fd(&self) -> i32 {
         self.socket_fd.borrow().clone()
+    }
+
+    pub(super) fn release_socket_fd(&self, fd: i32) {
+        fd_util::close(fd);
+        *self.socket_fd.borrow_mut() = -1;
     }
 }

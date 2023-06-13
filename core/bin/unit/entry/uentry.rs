@@ -749,6 +749,10 @@ impl Unit {
         self.sub.set_socket_fd(fd)
     }
 
+    pub(crate) fn release_socket_fd(&self, fd: i32) {
+        self.sub.release_socket_fd(fd)
+    }
+
     pub(crate) fn notify_message(
         &self,
         ucred: &UnixCredentials,

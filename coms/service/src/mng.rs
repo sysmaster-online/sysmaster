@@ -1346,6 +1346,10 @@ impl ServiceMng {
     pub(super) fn set_socket_fd(&self, fd: i32) {
         self.spawn.set_socket_fd(fd)
     }
+
+    pub(super) fn release_socket_fd(&self, fd: i32) {
+        self.spawn.release_socket_fd(fd)
+    }
 }
 
 impl ServiceMng {

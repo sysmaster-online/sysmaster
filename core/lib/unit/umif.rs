@@ -128,6 +128,7 @@ pub trait UmIf {
 
     /// add pid and its correspond unit to
     fn child_watch_pid(&self, _id: &str, _pid: Pid) {}
+
     /// delete the pid from the db
     fn child_unwatch_pid(&self, _id: &str, _pid: Pid) {}
 
@@ -158,6 +159,7 @@ pub trait UmIf {
     fn notify_socket(&self) -> Option<PathBuf> {
         None
     }
+
     /// check the pid corresponding unit is the same with the unit
     fn same_unit_with_pid(&self, _unit: &str, _pid: Pid) -> bool {
         false
@@ -167,9 +169,6 @@ pub trait UmIf {
     fn collect_socket_fds(&self, _name: &str) -> Vec<i32> {
         Vec::new()
     }
-
-    /// set the service's socket fd
-    fn service_set_socket_fd(&self, _service_name: &str, _fd: i32) {}
 
     /// get all unit in sysmaster
     fn units_get_all(&self, _unit_type: Option<UnitType>) -> Vec<String> {
@@ -200,6 +199,13 @@ pub trait UmIf {
     fn get_log_target(&self) -> &str {
         ""
     }
+
+    /* ========== ONLY VALID IN SERVICE ========== */
+    /// set the service's socket fd
+    fn service_set_socket_fd(&self, _service_name: &str, _fd: i32) {}
+
+    /// release the service's socket fd
+    fn service_release_socket_fd(&self, _service_name: &str, _fd: i32) {}
 }
 
 /// the trait used for attach UnitManager to sub unit

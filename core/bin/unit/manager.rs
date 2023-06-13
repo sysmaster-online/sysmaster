@@ -479,6 +479,16 @@ impl UmIf for UnitManager {
         };
         service.set_socket_fd(fd);
     }
+
+    /// release the service's socket fd
+    fn service_release_socket_fd(&self, service_name: &str, fd: i32) {
+        let service = match self.units_get(service_name) {
+            None => return,
+            Some(v) => v,
+        };
+        service.release_socket_fd(fd);
+        
+    }
 }
 
 /// the declaration "pub(self)" is for identification only.
