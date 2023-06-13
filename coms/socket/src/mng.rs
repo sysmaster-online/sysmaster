@@ -26,7 +26,7 @@ use basic::{
 };
 use event::EventState;
 use event::{EventType, Events, Source};
-use nix::sys::wait::WaitStatus;
+use nix::sys::{socket, wait::WaitStatus};
 use nix::unistd::{Gid, Uid};
 use nix::{
     libc::{self},
@@ -35,11 +35,14 @@ use nix::{
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
 use std::{cell::RefCell, collections::VecDeque};
-use sysmaster::error::*;
 use sysmaster::exec::{ExecCommand, ExecContext};
 use sysmaster::rel::ReliLastFrame;
 use sysmaster::rel::{ReStation, Reliability};
 use sysmaster::unit::{KillOperation, UnitActiveState, UnitNotifyFlags, UnitType};
+use sysmaster::{
+    error::*,
+    unit::{UnitDependencyMask, UnitRelations},
+};
 
 impl SocketState {
     pub(super) fn to_unit_active_state(self) -> UnitActiveState {
@@ -128,6 +131,7 @@ pub(crate) struct SocketMng {
     // owned objects
     pid: SocketPid,
     spawn: SocketSpawn,
+    n_accept: RefCell<i32>,
     ports: RefCell<Vec<Rc<SocketMngPort>>>,
     state: RefCell<SocketState>,
     result: RefCell<SocketResult>,
@@ -149,6 +153,7 @@ impl SocketMng {
 
             pid: SocketPid::new(commr),
             spawn: SocketSpawn::new(commr, exec_ctx),
+            n_accept: RefCell::new(0),
             ports: RefCell::new(Vec::new()),
             state: RefCell::new(SocketState::StateMax),
             result: RefCell::new(SocketResult::Success),
@@ -354,6 +359,7 @@ impl SocketMng {
     }
 
     fn enter_running(&self, fd: i32) {
+        log::info!("enter running, fd: {}", fd);
         if let Some(u) = self.comm.owner() {
             if self.comm.um().has_stop_job(u.id()) {
                 if fd >= 0 {
@@ -382,8 +388,56 @@ impl SocketMng {
                 }
                 self.set_state(SocketState::Running);
             } else {
-                // template support
-                todo!()
+                /* When Accept is set to yes, we can no longer use "Service=" in
+                 * the socket file. The corresponding service name will be forily
+                 * set to "socket prefix + @ + automatically generated instance".
+                 * i.e. the service name of test.socket may be test@1-5427-0.service,
+                 * where 1 is the total accept number, 5247 is PID, 0 is UID. */
+
+                /* 1. build service name */
+                let socket_prefix = match u.id().split_once(".") {
+                    None => {
+                        log::error!("Invalid socket name: {}, weired.", u.id());
+                        return;
+                    }
+                    Some(v) => v.0,
+                };
+                let n_accept = self.get_accept_number();
+                let instance = Self::instance_from_socket_fd(fd, n_accept);
+                let service = socket_prefix.to_string() + "@" + &instance + ".service";
+
+                /* 2. load the service */
+                if !self.comm.um().load_unit_success(&service) {
+                    log::error!("Failed to load the triggered service: {}", service);
+                    return;
+                }
+                /* 3. add dependency */
+                if self
+                    .comm
+                    .um()
+                    .unit_add_two_dependency(
+                        u.id(),
+                        UnitRelations::UnitBefore,
+                        UnitRelations::UnitTriggers,
+                        &service,
+                        false,
+                        UnitDependencyMask::Implicit,
+                    )
+                    .is_err()
+                {
+                    log::error!("Failed to add dependency for {} -> {}", u.id(), service);
+                    return;
+                }
+                /* 4. set the service socket fd */
+                self.comm.um().service_set_socket_fd(&service, fd);
+                self.increase_accept_number();
+                /* 5. start */
+                let ret = self.comm.um().unit_start_by_job(&service);
+                if ret.is_err() {
+                    self.comm.um().service_release_socket_fd(&service, fd);
+                    self.enter_stop_pre(SocketResult::FailureResources);
+                    return;
+                }
             }
         }
     }
@@ -823,6 +877,28 @@ impl SocketMng {
         }
 
         Ok(())
+    }
+
+    fn get_accept_number(&self) -> i32 {
+        self.n_accept.borrow().clone()
+    }
+
+    fn increase_accept_number(&self) {
+        let current = self.get_accept_number();
+        *self.n_accept.borrow_mut() = current + 1;
+    }
+
+    fn instance_from_socket_fd(fd: i32, n_accept: i32) -> String {
+        match socket::getsockopt(fd, socket::sockopt::PeerCredentials) {
+            Err(e) => {
+                log::error!(
+                    "Failed to get the credentials when building instance name: {}, use unknown.",
+                    e
+                );
+                return format!("{n_accept}-unknown").to_string();
+            }
+            Ok(v) => format!("{n_accept}-{}-{}", v.pid(), v.uid()).to_string(),
+        }
     }
 }
 
