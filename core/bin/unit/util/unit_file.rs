@@ -178,17 +178,21 @@ impl UnitFileData {
         for v in &self.lookup_path.search_path {
             let path = format!("{v}/{name}.{suffix}");
             let dir = Path::new(&path);
-            if dir.is_dir() {
-                for entry in dir.read_dir().unwrap() {
-                    let symlink_unit = entry.unwrap().path();
-                    if symlink_unit.is_symlink() {
-                        if let Ok(abs_path) = symlink_unit.canonicalize() {
-                            let mut file_name = PathBuf::new();
-                            file_name.push(abs_path.file_name().unwrap());
-                            pathbuf_dropin.push(file_name);
-                        }
-                    }
+            if !dir.is_dir() {
+                continue;
+            }
+            for entry in dir.read_dir().unwrap() {
+                let symlink_unit = entry.unwrap().path();
+                if !symlink_unit.is_symlink() {
+                    continue;
                 }
+                let abs_path = match symlink_unit.canonicalize() {
+                    Err(_) => continue,
+                    Ok(v) => v,
+                };
+                let mut file_name = PathBuf::new();
+                file_name.push(abs_path.file_name().unwrap());
+                pathbuf_dropin.push(file_name);
             }
         }
 
@@ -206,20 +210,21 @@ impl UnitFileData {
     pub(self) fn lookup_paths_updated(&mut self) -> bool {
         let mut siphash24 = SipHasher24::new_with_keys(0, 0);
         for dir in &self.lookup_path.search_path {
-            match fs::metadata(dir) {
-                Ok(metadata) => match metadata.modified() {
-                    Ok(time) => {
-                        siphash24.write_u128(time_util::timespec_load(time));
-                    }
-                    _ => {
-                        log::error!("failed to get mtime {}", dir);
-                    }
-                },
-                Err(_e) => {
-                    log::debug!("unit file config lookup path {}  not found", dir);
+            let metadata = match fs::metadata(dir) {
+                Err(e) => {
+                    log::debug!("Couldn't find unit config lookup path {dir}: {e}");
                     continue;
                 }
-            }
+                Ok(v) => v,
+            };
+            let time =  match metadata.modified() {
+                Err(_) => {
+                    log::error!("Failed to get mtime of {dir}");
+                    continue;
+                }
+                Ok(v) => v,
+            };
+            siphash24.write_u128(time_util::timespec_load(time));
         }
 
         let updated: u64 = siphash24.finish();
