@@ -428,7 +428,7 @@ pub fn mount_cgroup_controllers() -> Result<()> {
         } else {
             (controllers[index].to_string(), "".to_string())
         };
-
+        m_point.options = Some(target.to_string());
         let target_dir = Path::new(CG_BASE_DIR).join(target);
         let target = target_dir.to_str().expect("invalid cgroup path");
         m_point.set_target(target);
