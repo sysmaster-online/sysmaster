@@ -31,8 +31,8 @@ impl UnitFile {
         }
     }
 
-    pub fn build_name_map(&self, name: String, has_loaded: bool) -> bool {
-        self.data.borrow_mut().build_id_map(name, has_loaded)
+    pub fn build_name_map(&self, name: String, has_loaded: bool) {
+        self.data.borrow_mut().build_id_map(name, has_loaded);
     }
 
     pub fn get_unit_id_fragment_pathbuf(&self, name: &String) -> Vec<PathBuf> {
@@ -92,13 +92,12 @@ impl UnitFileData {
         }
     }
 
-    pub(self) fn build_id_map(&mut self, name: String, has_loaded: bool) -> bool {
+    pub(self) fn build_id_map(&mut self, name: String, has_loaded: bool) {
         if !has_loaded || self.lookup_paths_updated() {
             self.build_id_fragment(&name);
             self.build_id_dropin(&name, "wants".to_string());
             self.build_id_dropin(&name, "requires".to_string());
         }
-        false
     }
 
     fn build_id_fragment(&mut self, name: &String) {
