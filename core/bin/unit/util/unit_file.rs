@@ -114,8 +114,7 @@ impl UnitFileData {
                 if !fragment.is_file() {
                     continue;
                 }
-                let file_name =
-                    String::from(fragment.file_name().unwrap().to_str().unwrap());
+                let file_name = String::from(fragment.file_name().unwrap().to_str().unwrap());
                 if file_name.starts_with('.') || file_name.ends_with(".toml") {
                     continue;
                 }
@@ -157,7 +156,8 @@ impl UnitFileData {
             pathbuf_fragment.append(&mut v);
         }
         if !pathbuf_fragment.is_empty() || !name.contains('@') {
-            self.unit_id_fragment.insert(name.to_string(), pathbuf_fragment);
+            self.unit_id_fragment
+                .insert(name.to_string(), pathbuf_fragment);
             return;
         }
         let template_name = name.split_once('@').unwrap().0.to_string() + "@.service";
@@ -168,7 +168,8 @@ impl UnitFileData {
             };
             pathbuf_fragment.append(&mut v);
         }
-        self.unit_id_fragment.insert(name.to_string(), pathbuf_fragment);
+        self.unit_id_fragment
+            .insert(name.to_string(), pathbuf_fragment);
     }
 
     fn build_id_dropin(&mut self, name: &String, suffix: String) {
@@ -215,7 +216,7 @@ impl UnitFileData {
                 }
                 Ok(v) => v,
             };
-            let time =  match metadata.modified() {
+            let time = match metadata.modified() {
                 Err(_) => {
                     log::error!("Failed to get mtime of {dir}");
                     continue;

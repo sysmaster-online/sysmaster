@@ -395,9 +395,9 @@ impl SocketMng {
                  * where 1 is the total accept number, 5247 is PID, 0 is UID. */
 
                 /* 1. build service name */
-                let socket_prefix = match u.id().split_once(".") {
+                let socket_prefix = match u.id().split_once('.') {
                     None => {
-                        log::error!("Invalid socket name: {}, weired.", u.id());
+                        log::error!("Invalid socket name: {}, weird.", u.id());
                         return;
                     }
                     Some(v) => v.0,
@@ -436,7 +436,6 @@ impl SocketMng {
                 if ret.is_err() {
                     self.comm.um().service_release_socket_fd(&service, fd);
                     self.enter_stop_pre(SocketResult::FailureResources);
-                    return;
                 }
             }
         }
@@ -880,7 +879,7 @@ impl SocketMng {
     }
 
     fn get_accept_number(&self) -> i32 {
-        self.n_accept.borrow().clone()
+        *self.n_accept.borrow()
     }
 
     fn increase_accept_number(&self) {
@@ -895,9 +894,9 @@ impl SocketMng {
                     "Failed to get the credentials when building instance name: {}, use unknown.",
                     e
                 );
-                return format!("{n_accept}-unknown").to_string();
+                return format!("{n_accept}-unknown");
             }
-            Ok(v) => format!("{n_accept}-{}-{}", v.pid(), v.uid()).to_string(),
+            Ok(v) => format!("{n_accept}-{}-{}", v.pid(), v.uid()),
         }
     }
 }

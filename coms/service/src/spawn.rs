@@ -179,7 +179,7 @@ impl ServiceSpawn {
     }
 
     pub(super) fn get_socket_fd(&self) -> i32 {
-        self.socket_fd.borrow().clone()
+        *self.socket_fd.borrow()
     }
 
     pub(super) fn release_socket_fd(&self, fd: i32) {

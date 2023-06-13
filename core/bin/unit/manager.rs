@@ -487,7 +487,6 @@ impl UmIf for UnitManager {
             Some(v) => v,
         };
         service.release_socket_fd(fd);
-        
     }
 }
 
