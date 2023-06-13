@@ -100,77 +100,75 @@ impl UnitFileData {
         }
     }
 
-    fn build_id_fragment(&mut self, name: &String) {
-        let mut pathbuf_fragment = Vec::new();
-        for v in &self.lookup_path.search_path {
-            if let Err(_e) = fs::metadata(v) {
-                continue;
-            }
-            let pathd = format!("{v}/{name}.d");
-            let dir = Path::new(&pathd);
-            if dir.is_dir() {
-                for entry in dir.read_dir().unwrap() {
-                    let fragment = entry.unwrap().path();
-                    if fragment.is_file() {
-                        let file_name =
-                            String::from(fragment.file_name().unwrap().to_str().unwrap());
-                        if file_name.starts_with('.') || file_name.ends_with(".toml") {
-                            continue;
-                        }
-                        let path = format!("{}.toml", fragment.to_string_lossy());
-
-                        if let Err(e) = std::fs::copy(fragment, &path) {
-                            log::warn!("copy file content to toml file error: {}", e);
-                        }
-                        pathbuf_fragment.push(Path::new(&path).to_path_buf());
-                    }
-                }
-            }
-            let path = if v.ends_with('/') {
-                format!("{v}{name}")
-            } else {
-                format!("{v}/{name}")
-            };
-            let tmp = Path::new(&path);
-            if !tmp.exists() {
-                continue;
-            }
-            /* Add .toml to the original path name */
-            if !tmp.is_symlink() {
-                let path_toml = format!("{}.toml", tmp.to_string_lossy());
-                let to = Path::new(&path_toml);
-                if let Err(e) = std::fs::copy(tmp, to) {
-                    log::warn!("copy file content to toml file error: {}", e);
-                }
-                pathbuf_fragment.push(to.to_path_buf());
-            } else {
-                let real_path = match std::fs::read_link(tmp) {
-                    Err(e) => {
-                        log::error!("Failed to chase the symlink {:?}: {e}", tmp);
-                        continue;
-                    }
-                    Ok(v) => v,
-                };
-                /* Only support one-level symlink. */
-                if real_path.is_symlink() {
+    fn build_id_fragment_by_name(path: &String, name: &String) -> Option<Vec<PathBuf>> {
+        let mut res: Vec<PathBuf> = Vec::new();
+        if fs::metadata(path).is_err() {
+            return None;
+        }
+        /* {/etc/sysmaster, /usr/lib/sysmaster}/foo.service.d */
+        let pathd_str = format!("{path}/{name}.d");
+        let dir = Path::new(&pathd_str);
+        if dir.is_dir() {
+            for entry in dir.read_dir().unwrap() {
+                let fragment = entry.unwrap().path();
+                if !fragment.is_file() {
                     continue;
                 }
-                let real_path = tmp.parent().unwrap().join(real_path);
-                let real_path = fs::canonicalize(real_path).unwrap();
-                let path_toml = format!("{}.toml", real_path.to_string_lossy());
-                let to = Path::new(&path_toml);
-                if let Err(e) = std::fs::copy(&real_path, to) {
-                    log::warn!(
-                        "copy file content {:?} to toml file {path_toml} error: {e}",
-                        real_path
-                    );
+                let file_name =
+                    String::from(fragment.file_name().unwrap().to_str().unwrap());
+                if file_name.starts_with('.') || file_name.ends_with(".toml") {
+                    continue;
                 }
-                pathbuf_fragment.push(to.to_path_buf());
+                let path = format!("{}.toml", fragment.to_string_lossy());
+
+                if let Err(e) = std::fs::copy(fragment, &path) {
+                    log::warn!("copy file content to toml file error: {}", e);
+                }
+                res.push(Path::new(&path).to_path_buf());
             }
         }
+        /* {/etc/sysmater, /usr/lib/sysmaster}/foo.service */
+        let config_path = Path::new(path).join(name);
+        if !config_path.exists() {
+            return None;
+        }
+        /* Symlink is complicated, it is related to Alias, skip it for now. */
+        if config_path.is_symlink() {
+            return None;
+        }
+        /* Add .toml to the original path name */
+        let path_toml = format!("{}.toml", config_path.to_string_lossy());
+        let to = Path::new(&path_toml);
+        if let Err(e) = std::fs::copy(config_path, to) {
+            log::warn!("copy file content to toml file error: {}", e);
+            return None;
+        }
+        res.push(to.to_path_buf());
+        Some(res)
+    }
 
-        self.unit_id_fragment
-            .insert(name.to_string(), pathbuf_fragment);
+    fn build_id_fragment(&mut self, name: &String) {
+        let mut pathbuf_fragment = Vec::new();
+        for search_path in &self.lookup_path.search_path {
+            let mut v = match Self::build_id_fragment_by_name(search_path, name) {
+                None => continue,
+                Some(v) => v,
+            };
+            pathbuf_fragment.append(&mut v);
+        }
+        if !pathbuf_fragment.is_empty() || !name.contains('@') {
+            self.unit_id_fragment.insert(name.to_string(), pathbuf_fragment);
+            return;
+        }
+        let template_name = name.split_once('@').unwrap().0.to_string() + "@.service";
+        for search_path in &self.lookup_path.search_path {
+            let mut v = match Self::build_id_fragment_by_name(search_path, &template_name) {
+                None => continue,
+                Some(v) => v,
+            };
+            pathbuf_fragment.append(&mut v);
+        }
+        self.unit_id_fragment.insert(name.to_string(), pathbuf_fragment);
     }
 
     fn build_id_dropin(&mut self, name: &String, suffix: String) {
