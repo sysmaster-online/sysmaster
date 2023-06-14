@@ -363,6 +363,7 @@ impl Builtin for UsbId {
             }
 
             usb_device = dev_usb.clone();
+            break;
         }
 
         self.set_sysattr(&mut usb_device.lock().unwrap().to_owned(), &mut info)?;

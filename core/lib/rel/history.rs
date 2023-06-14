@@ -57,7 +57,7 @@ impl ReliHistory {
         // init environment, path: dir/history.mdb/(a|b)/
         let history = history_path_get(dir_str);
         let b_exist = bflag_path_get(history.clone()).exists();
-        let path = history.join(&subdir_cur_get(b_exist));
+        let path = history.join(subdir_cur_get(b_exist));
         let env = open_env(path.clone(), map_size, max_dbs).expect("history open env");
         log::info!("history with path {:?} successfully.", path);
 
@@ -122,7 +122,7 @@ impl ReliHistory {
         // a -> b or b -> a
         // prepare next
         let history = history_path_get(&self.hdir);
-        let next_path = history.join(&subdir_next_get(self.b_exist));
+        let next_path = history.join(subdir_next_get(self.b_exist));
         let next_file = next_path.join(RELI_HISTORY_DATA_FILE);
 
         // clear next: delete and re-create the whole directory

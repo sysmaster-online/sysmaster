@@ -894,7 +894,7 @@ impl SocketMng {
                     "Failed to get the credentials when building instance name: {}, use unknown.",
                     e
                 );
-                return format!("{n_accept}-unknown");
+                format!("{n_accept}-unknown")
             }
             Ok(v) => format!("{n_accept}-{}-{}", v.pid(), v.uid()),
         }
