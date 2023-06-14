@@ -229,6 +229,8 @@ impl RuleFile {
                 offset = 0;
             }
         }
+
+        self.resolve_goto();
     }
 
     /// push the rule line to the tail of linked list
@@ -241,6 +243,42 @@ impl RuleFile {
         }
 
         self.lines_tail = Some(line);
+    }
+
+    /// bind goto with label lines
+    pub(crate) fn resolve_goto(&mut self) {
+        let mut labels: HashMap<String, Arc<RwLock<RuleLine>>> = HashMap::new();
+
+        for line in self.iter() {
+            if line
+                .as_ref()
+                .read()
+                .unwrap()
+                .r#type
+                .intersects(RuleLineType::HAS_LABEL)
+            {
+                labels.insert(
+                    line.as_ref().read().unwrap().label.clone().unwrap(),
+                    line.clone(),
+                );
+            }
+        }
+
+        for line in self.iter() {
+            if !line
+                .as_ref()
+                .read()
+                .unwrap()
+                .r#type
+                .intersects(RuleLineType::HAS_GOTO)
+            {
+                continue;
+            }
+
+            let label = line.as_ref().read().unwrap().goto_label.clone().unwrap();
+
+            line.as_ref().write().unwrap().goto_line = Some(labels.get(&label).unwrap().clone());
+        }
     }
 }
 

@@ -2022,6 +2022,7 @@ impl ExecuteManager {
                  */
                 Ok(true)
             }
+            Label | Goto => Ok(true),
             _ => {
                 todo!();
             }

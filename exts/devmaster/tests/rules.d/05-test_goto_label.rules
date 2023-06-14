@@ -1,0 +1,21 @@
+# Description: test GOTO/LABEL
+# Trigger:
+#   1. devctl trigger /dev/sda
+# Expect:
+#   1. Capture stdout from command '/bin/echo sda': 'sda'
+# Trigger:
+#   2. devctl trigger /dev/sdb
+# Expect:
+#   2. Capture stdout from command '/bin/echo sdb': 'sdb'
+
+KERNEL=="sda", GOTO="label1"
+KERNEL=="sdb", GOTO="label2"
+
+
+LABEL="label1"
+PROGRAM=="/bin/echo sda", GOTO="end"
+
+LABEL="label2"
+PROGRAM=="/bin/echo sdb", GOTO="end"
+
+LABEL="end"
