@@ -14,10 +14,14 @@ use super::super::rel::ReStation;
 use super::kill::{KillContext, KillOperation};
 use super::state::{UnitActiveState, UnitNotifyFlags};
 use super::umif::UnitMngUtil;
+use super::UnitType;
 use crate::error::*;
+use bitflags::bitflags;
 use nix::sys::wait::WaitStatus;
 use nix::{sys::socket::UnixCredentials, unistd::Pid};
 use std::any::Any;
+use std::num::ParseIntError;
+use std::str::FromStr;
 use std::{collections::HashMap, path::PathBuf, rc::Rc};
 
 ///The trait Defining Shared Behavior from Base Unit  to SUB unit
@@ -205,4 +209,70 @@ macro_rules! declure_unitobj_plugin_with_param {
             Box::into_raw(boxed)
         }
     };
+}
+
+bitflags! {
+    /// used to when check the given unit name is valid
+    pub struct UnitNameFlags: u8 {
+        /// Allow foo.service
+        const PLAIN = 1 << 0;
+        /// Allow foo@.service
+        const TEMPLATE = 1 << 1;
+        /// Allow foo@123.service
+        const INSTANCE = 1 << 2;
+        /// Any of the above
+        const ANY = Self::PLAIN.bits() | Self::TEMPLATE.bits() | Self::INSTANCE.bits();
+    }
+}
+
+/// The maximum length of a valid unit name
+const UNIT_NAME_MAX: usize = 255;
+
+/// check if the given unit name is valid
+pub fn unit_name_is_valid(name: &str, flag: UnitNameFlags) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    if name.len() > UNIT_NAME_MAX {
+        return false;
+    }
+    /* Take foo@123.service for example, "foo@123" is its first_name,
+     * "foo" is prefix, "service" is its last_name, suffix, or type. */
+    let (first_name, last_name) = match name.split_once('.') {
+        None => return false,
+        Some(v) => (v.0, v.1),
+    };
+
+    let unit_type = match unit_type_from_string(last_name) {
+        Err(_) => return false,
+        Ok(v) => v,
+    };
+
+    if unit_type == UnitType::UnitTypeInvalid {
+        return false;
+    }
+
+    match first_name.split_once('@') {
+        None => flag.contains(UnitNameFlags::PLAIN),
+        Some(v) => {
+            /* "@" is the first character */
+            if v.0.is_empty() {
+                return false;
+            }
+            /* "@" is the last character */
+            if v.1.is_empty() {
+                return flag.contains(UnitNameFlags::TEMPLATE);
+            }
+            /* there is more than one "@" */
+            if v.1.contains('@') {
+                return false;
+            }
+            flag.contains(UnitNameFlags::INSTANCE)
+        }
+    }
+}
+
+/// convert the type string of one unit to UnitType
+pub fn unit_type_from_string(type_string: &str) -> Result<UnitType, ParseIntError> {
+    UnitType::from_str(type_string)
 }

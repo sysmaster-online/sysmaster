@@ -22,7 +22,7 @@ use crate::utils::table::{TableOp, TableSubscribe};
 use basic::path_lookup::LookupPaths;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
-use sysmaster::unit::UnitType;
+use sysmaster::unit::{unit_name_is_valid, UnitNameFlags, UnitType};
 
 //#[derive(Debug)]
 pub(super) struct UnitLoad {
@@ -100,6 +100,10 @@ impl UnitLoadData {
     }
 
     pub(self) fn prepare_unit(&self, name: &str) -> Option<Rc<UnitX>> {
+        if !unit_name_is_valid(name, UnitNameFlags::PLAIN | UnitNameFlags::INSTANCE) {
+            return None;
+        }
+
         if let Some(u) = self.db.units_get(name) {
             if u.load_state() != UnitLoadState::NotFound {
                 return Some(Rc::clone(&u));

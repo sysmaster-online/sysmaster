@@ -11,11 +11,12 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-pub use base::{SubUnit, UnitBase};
+pub use base::{unit_name_is_valid, SubUnit, UnitBase, UnitNameFlags};
 pub use deps::{UnitDependencyMask, UnitRelationAtom, UnitRelations, UnitType};
 pub use kill::{KillContext, KillMode, KillOperation};
 pub use state::{UnitActiveState, UnitNotifyFlags, UnitStatus};
 pub use umif::{UmIf, UnitManagerObj, UnitMngUtil};
+
 mod base;
 mod deps;
 mod kill;

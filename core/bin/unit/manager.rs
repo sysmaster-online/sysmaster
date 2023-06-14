@@ -50,7 +50,10 @@ use sysmaster::error::*;
 use sysmaster::exec::ExecParameters;
 use sysmaster::exec::{ExecCommand, ExecContext};
 use sysmaster::rel::{ReStation, ReStationKind, ReliLastFrame, Reliability};
-use sysmaster::unit::{UmIf, UnitActiveState, UnitDependencyMask, UnitStatus, UnitType};
+use sysmaster::unit::{
+    unit_name_is_valid, UmIf, UnitActiveState, UnitDependencyMask, UnitNameFlags, UnitStatus,
+    UnitType,
+};
 use unit_submanager::UnitSubManagers;
 
 //#[derive(Debug)]
@@ -525,6 +528,9 @@ impl UnitManager {
 
     ///
     pub fn units_get(&self, name: &str) -> Option<Rc<Unit>> {
+        if !unit_name_is_valid(name, UnitNameFlags::PLAIN | UnitNameFlags::INSTANCE) {
+            return None;
+        }
         self.db.units_get(name).map(|uxr| uxr.unit())
     }
 
