@@ -1233,9 +1233,9 @@ impl ServiceMng {
     }
 
     fn restart_watchdog(&self) {
-        self.monitor
-            .borrow_mut()
-            .set_original_watchdog(self.config.config_data().borrow().Service.WatchdogSec);
+        self.monitor.borrow_mut().set_original_watchdog(
+            self.config.config_data().borrow().Service.WatchdogSec * 1000000,
+        );
         let watchdog_usec = self.monitor.borrow().watchdog_usec();
         if watchdog_usec == 0 || watchdog_usec == u64::MAX {
             self.stop_watchdog();
@@ -2455,7 +2455,7 @@ impl Source for ServiceTimer {
 struct ServiceMonitorData {
     mng: RefCell<Weak<ServiceMng>>,
     // owned objects
-    time: RefCell<u64>,
+    time: RefCell<u64>, /* usec */
 }
 
 // the declaration "pub(self)" is for identification only.
@@ -2511,7 +2511,7 @@ impl Source for ServiceMonitorData {
     }
 
     fn time_relative(&self) -> u64 {
-        *self.time.borrow() * 1000000
+        *self.time.borrow()
     }
 
     fn dispatch(&self, _: &Events) -> i32 {
@@ -2575,7 +2575,7 @@ mod tests {
         assert!(rt.armd_watchdog());
         assert_eq!(
             rt.watchdog().time(),
-            config.config_data().borrow().Service.WatchdogSec
+            config.config_data().borrow().Service.WatchdogSec * 1000000
         );
     }
 
@@ -2594,7 +2594,7 @@ mod tests {
         assert!(rt.armd_watchdog());
         assert_eq!(
             rt.watchdog().time(),
-            config.config_data().borrow().Service.WatchdogSec
+            config.config_data().borrow().Service.WatchdogSec * 1000000
         );
 
         messages.remove("WATCHDOG");

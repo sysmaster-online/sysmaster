@@ -171,7 +171,7 @@ impl ServiceSpawn {
     }
 
     fn watchdog_timer(&self) -> u64 {
-        self.config.config_data().borrow().Service.WatchdogSec
+        self.config.config_data().borrow().Service.WatchdogSec * 1000000
     }
 
     pub(super) fn set_socket_fd(&self, fd: i32) {
