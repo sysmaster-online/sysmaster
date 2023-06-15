@@ -46,6 +46,7 @@ use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::str::FromStr;
 use sysmaster::error::*;
 use sysmaster::exec::ExecParameters;
 use sysmaster::exec::{ExecCommand, ExecContext};
@@ -126,8 +127,8 @@ impl UnitManagerX {
         self.data.entry_coldplug();
     }
 
-    pub(crate) fn start_unit(&self, name: &str, is_manual: bool) -> Result<()> {
-        self.data.start_unit(name, is_manual)
+    pub(crate) fn start_unit(&self, name: &str, is_manual: bool, job_mode: &str) -> Result<()> {
+        self.data.start_unit(name, is_manual, job_mode)
     }
 
     pub(crate) fn stop_unit(&self, name: &str, is_manual: bool) -> Result<()> {
@@ -351,7 +352,7 @@ impl UmIf for UnitManager {
     }
 
     fn unit_start_by_job(&self, name: &str) -> Result<()> {
-        self.start_unit(name, false)
+        self.start_unit(name, false, "replace")
     }
 
     fn events(&self) -> Rc<Events> {
@@ -655,7 +656,7 @@ impl UnitManager {
         match action {
             UnitEmergencyAction::Reboot => {
                 log::info!("Rebooting by starting reboot.target caused by {}", reason);
-                if self.start_unit("reboot.target", false).is_err() {
+                if self.unit_start_by_job("reboot.target").is_err() {
                     log::error!("Failed to start reboot.target.");
                 }
             }
@@ -675,7 +676,7 @@ impl UnitManager {
                     "Poweroffing by starting poweroff.target caused by {}",
                     reason
                 );
-                if self.start_unit("poweroff.target", false).is_err() {
+                if self.unit_start_by_job("poweroff.target").is_err() {
                     log::error!("Failed to start poweroff.target.");
                 }
             }
@@ -692,7 +693,7 @@ impl UnitManager {
             }
             UnitEmergencyAction::Exit => {
                 log::info!("Exiting by starting exit.target caused by {}", reason);
-                if self.start_unit("exit.target", false).is_err() {
+                if self.unit_start_by_job("exit.target").is_err() {
                     log::error!("Failed to start exit.target.");
                 }
             }
@@ -751,7 +752,7 @@ impl UnitManager {
         false
     }
 
-    fn start_unit(&self, name: &str, is_manual: bool) -> Result<()> {
+    fn start_unit(&self, name: &str, is_manual: bool, job_mode_str: &str) -> Result<()> {
         let unit = match self.load_unitx(name) {
             None => {
                 return Err(Error::UnitActionENoent);
@@ -768,9 +769,16 @@ impl UnitManager {
         {
             return Err(Error::UnitActionERefuseManualStart);
         }
+        let job_mode = match JobMode::from_str(job_mode_str) {
+            Err(e) => {
+                log::info!("Failed to parse job mode: {}, assuming JobMode::Replace", e);
+                JobMode::Replace
+            }
+            Ok(v) => v,
+        };
         self.jm.exec(
             &JobConf::new(&unit, JobKind::Start),
-            JobMode::Replace,
+            job_mode,
             &mut JobAffect::new(false),
         )?;
         log::debug!("job exec success");
@@ -1535,7 +1543,7 @@ mod tests {
     fn test_service_unit_start_conflicts() {
         let dm = init_dm_for_test();
         let conflict_unit_name = String::from("conflict.service");
-        let confilict_unit = dm.2.start_unit(&conflict_unit_name, false);
+        let confilict_unit = dm.2.start_unit(&conflict_unit_name, false, "replace");
 
         assert!(confilict_unit.is_ok());
     }

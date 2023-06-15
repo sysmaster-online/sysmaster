@@ -68,6 +68,12 @@ enum SubCmd {
         units: Vec<String>,
     },
 
+    /// [units] isolate the units
+    Isolate {
+        #[clap(required = true)]
+        units: Vec<String>,
+    },
+
     /// [units] reset the failed units
     ResetFailed {
         #[clap(required = true)]
@@ -144,6 +150,9 @@ fn generate_command_request(args: Args) -> Option<CommandRequest> {
         SubCmd::Status { units } => CommandRequest::new_unitcomm(unit_comm::Action::Status, units),
 
         SubCmd::Reload { units } => CommandRequest::new_unitcomm(unit_comm::Action::Reload, units),
+        SubCmd::Isolate { units } => {
+            CommandRequest::new_unitcomm(unit_comm::Action::Isolate, units)
+        }
         SubCmd::ResetFailed { units } => {
             CommandRequest::new_unitcomm(unit_comm::Action::Resetfailed, units)
         }

@@ -20,7 +20,7 @@ use crate::unit::entry::UnitEmergencyAction;
 use bitflags::bitflags;
 use confique::Config;
 use nix::unistd::Pid;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
@@ -94,15 +94,11 @@ impl Default for JobMode {
     }
 }
 
-impl DeserializeWith for JobMode {
-    type Item = Self;
-    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(de)?;
+impl FromStr for JobMode {
+    type Err = basic::Error;
 
-        match s.as_ref() {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
             "fail" => Ok(JobMode::Fail),
             "replace" => Ok(JobMode::Replace),
             "replace_irreversible" => Ok(JobMode::ReplaceIrreversible),
@@ -113,6 +109,17 @@ impl DeserializeWith for JobMode {
             "trigger" => Ok(JobMode::Trigger),
             &_ => Ok(JobMode::Replace),
         }
+    }
+}
+
+impl DeserializeWith for JobMode {
+    type Item = Self;
+    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(de)?;
+        JobMode::from_str(&s).map_err(de::Error::custom)
     }
 }
 

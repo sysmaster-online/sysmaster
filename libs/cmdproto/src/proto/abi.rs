@@ -60,8 +60,9 @@ pub mod unit_comm {
         Stop = 2,
         Restart = 3,
         Reload = 4,
-        Kill = 5,
-        Resetfailed = 6,
+        Isolate = 5,
+        Kill = 6,
+        Resetfailed = 7,
     }
 }
 #[rustfmt::skip]

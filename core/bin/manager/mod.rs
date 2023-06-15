@@ -74,7 +74,10 @@ impl SignalDispatcher for SignalMgr {
             libc::SIGCHLD => Ok(self.um.child_sigchld_enable(true)),
             /* Kernel will send SIGINT to PID1 when users press ctrl-alt-del,
              * init should forward SIGINT to sysmaster. */
-            libc::SIGINT => self.um.start_unit("ctrl-alt-del.target", false).map(|_| 1),
+            libc::SIGINT => self
+                .um
+                .start_unit("ctrl-alt-del.target", false, "replace")
+                .map(|_| 1),
             _ => todo!(),
         }
     }
@@ -102,7 +105,7 @@ impl ExecuterAction for CommandActionMgr {
     type Status = sysmaster::unit::UnitStatus;
     // type Result<T, Error> = Result<T, E>;
     fn start(&self, unit_name: &str) -> Result<(), Self::Error> {
-        self.um.start_unit(unit_name, true)
+        self.um.start_unit(unit_name, true, "replace")
     }
 
     fn stop(&self, unit_name: &str) -> Result<(), Self::Error> {
@@ -115,6 +118,10 @@ impl ExecuterAction for CommandActionMgr {
 
     fn reload(&self, unit_name: &str) -> Result<(), Self::Error> {
         self.um.reload(unit_name)
+    }
+
+    fn isolate(&self, unit_name: &str) -> Result<(), Self::Error> {
+        self.um.start_unit(unit_name, true, "isolate")
     }
 
     fn reset_failed(&self, unit_name: &str) -> cmdproto::error::Result<(), Self::Error> {
@@ -244,7 +251,7 @@ impl Manager {
     fn add_default_job(&self) -> Result<i32> {
         self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);
         // add target "SPECIAL_DEFAULT_TARGET"
-        if let Err(e) = self.um.start_unit(MULTI_USER_TARGET, false) {
+        if let Err(e) = self.um.start_unit(MULTI_USER_TARGET, false, "replace") {
             log::error!("Failed to start multi-user.target: {:?}", e);
         }
         self.reli.clear_last_frame();
