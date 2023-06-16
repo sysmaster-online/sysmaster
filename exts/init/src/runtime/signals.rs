@@ -81,20 +81,23 @@ impl Signals {
         }
     }
 
-    pub fn is_zombie(&self, signo: i32) -> bool {
-        self.zombie_signal == signo
+    pub fn is_zombie(&self, siginfo: libc::signalfd_siginfo) -> bool {
+        self.zombie_signal as u32 == siginfo.ssi_signo
     }
 
-    pub fn is_restart(&self, signo: i32) -> bool {
-        self.restart_signal == signo
+    pub fn is_restart(&self, siginfo: libc::signalfd_siginfo) -> bool {
+        self.restart_signal as u32 == siginfo.ssi_signo
     }
 
-    pub fn is_unrecover(&self, signo: i32) -> bool {
-        self.unrecover_signal == signo
+    pub fn is_unrecover(&self, siginfo: libc::signalfd_siginfo) -> bool {
+        if 0 == siginfo.ssi_uid {
+            return self.unrecover_signal as u32 == siginfo.ssi_signo;
+        }
+        false
     }
 
-    pub fn is_switch_root(&self, signo: i32) -> bool {
-        self.switch_root_signal == signo
+    pub fn is_switch_root(&self, siginfo: libc::signalfd_siginfo) -> bool {
+        self.switch_root_signal as u32 == siginfo.ssi_signo
     }
 
     pub fn create_signals_epoll(&mut self) -> Result<(), Errno> {

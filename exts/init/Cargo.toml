@@ -9,4 +9,3 @@ edition = "2021"
 constants = { version = "0.1.0", path = "../../libs/constants" }
 libc = "0.2.*"
 nix = "0.24"
-signal-hook-registry = "1.4.0"

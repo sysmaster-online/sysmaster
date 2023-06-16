@@ -39,7 +39,7 @@ use crate::mount::setup;
 use basic::logger::{self};
 use basic::process_util;
 use clap::Parser;
-use libc::{c_int, getppid, prctl, PR_SET_CHILD_SUBREAPER};
+use libc::{c_int, getpid, getppid, prctl, PR_SET_CHILD_SUBREAPER};
 use log::{self};
 use manager::signals::EVENT_SIGNALS;
 use nix::sys::resource::{self, Resource};
@@ -52,7 +52,6 @@ use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::rel;
 
-use constants::SIG_MANAGER_REEXEC_OFFSET;
 use constants::SIG_SWITCH_ROOT_OFFSET;
 
 /// parse program arguments
@@ -106,21 +105,17 @@ fn main() -> Result<()> {
     setup::mount_setup()?;
 
     rel::reli_dir_prepare()?;
-    let switch = rel::reli_debug_get_switch();
-    log::info!("sysmaster initialize with switch: {}.", switch);
+    let self_recovery_enable = rel::reli_debug_get_switch();
+    log::info!("sysmaster self_recovery_enable: {}.", self_recovery_enable);
 
-    initialize_runtime(switch)?;
+    initialize_runtime(self_recovery_enable)?;
 
     let manager = Manager::new(Mode::System, Action::Run, manager_config);
 
-    // enable clear, mutex with install_crash_handler
-    if !switch {
-        if !args.deserialize {
-            manager.debug_clear_restore();
-            log::info!("debug: clear data restored.");
-        }
-        // if switch is false unregister init's reexec signal.
-        register_reexec_signal(false);
+    // enable clear
+    if !self_recovery_enable && !args.deserialize {
+        manager.debug_clear_restore();
+        log::info!("debug: clear data restored.");
     }
 
     manager.setup_cgroup()?;
@@ -144,10 +139,13 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn initialize_runtime(switch: bool) -> Result<()> {
-    if switch {
+fn initialize_runtime(self_recovery_enable: bool) -> Result<()> {
+    if self_recovery_enable {
         install_crash_handler();
         log::info!("install crash handler.");
+    } else {
+        // if self_recovery_enable is false unregister init's reexec signal.
+        register_reexec_signal(false);
     }
 
     #[cfg(feature = "linux")]
@@ -222,7 +220,7 @@ fn install_crash_handler() {
         Signal::SIGABRT,
         Signal::SIGSYS,
     ];
-    let handler = SigHandler::Handler(crash);
+    let handler = SigHandler::SigAction(crash);
     let flags = SaFlags::SA_NODEFER;
     let action = SigAction::new(handler, flags, SigSet::empty());
     for &signal in signals.iter() {
@@ -232,11 +230,14 @@ fn install_crash_handler() {
     }
 }
 
-extern "C" fn crash(signo: c_int) {
-    let _signal = Signal::try_from(signo).unwrap(); // debug
-
-    let args: Vec<String> = env::args().collect();
-    do_reexecute(&args, false);
+extern "C" fn crash(signo: c_int, siginfo: *mut libc::siginfo_t, _con: *mut libc::c_void) {
+    let signal = Signal::try_from(signo).unwrap(); // debug
+    if (signal == Signal::SIGABRT && unsafe { (*siginfo).si_pid() == getppid() })
+        || unsafe { (*siginfo).si_pid() == getpid() }
+    {
+        let args: Vec<String> = env::args().collect();
+        do_reexecute(&args, false);
+    }
 }
 
 fn execarg_build_default() -> (String, Vec<String>) {
@@ -265,8 +266,7 @@ extern "C" fn crash_none(_signo: c_int, _siginfo: *mut libc::siginfo_t, _con: *m
 }
 
 fn register_reexec_signal(enable: bool) {
-    let manager_signal: signal::Signal =
-        unsafe { std::mem::transmute(libc::SIGRTMIN() + SIG_MANAGER_REEXEC_OFFSET) };
+    let manager_signal: Signal = Signal::SIGABRT;
     let handler = match enable {
         true => SigHandler::SigAction(crash_reexec),
         false => SigHandler::SigAction(crash_none),

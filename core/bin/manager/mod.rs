@@ -59,6 +59,12 @@ impl SignalMgr {
         SignalMgr { um: Rc::clone(&um) }
     }
     fn reexec(&self) -> Result<i32> {
+        self.um.set_state(State::ReExecute);
+        Ok(1)
+    }
+
+    fn reload(&self) -> Result<i32> {
+        self.um.set_state(State::ReLoad);
         Ok(1)
     }
 }
@@ -70,7 +76,8 @@ impl SignalDispatcher for SignalMgr {
             return Ok(1);
         }
         match signal.ssi_signo as libc::c_int {
-            libc::SIGHUP | libc::SIGTERM => self.reexec(),
+            libc::SIGHUP => self.reload(),
+            libc::SIGTERM => self.reexec(),
             libc::SIGCHLD => Ok(self.um.child_sigchld_enable(true)),
             /* Kernel will send SIGINT to PID1 when users press ctrl-alt-del,
              * init should forward SIGINT to sysmaster. */

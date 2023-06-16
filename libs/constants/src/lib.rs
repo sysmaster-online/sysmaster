@@ -12,8 +12,6 @@
 
 //! Common used constants by init, sysmaster and other extensions.
 
-/// Signal used to reexecute sysmaster, SIGRTMIN+7
-pub const SIG_MANAGER_REEXEC_OFFSET: i32 = 7;
 /// Signal used run unrecover, SIGRTMIN+8
 pub const SIG_RUN_UNRECOVER_OFFSET: i32 = 8;
 /// Signal used to restart the manager, SIGRTMIN+9

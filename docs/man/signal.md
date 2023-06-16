@@ -4,12 +4,12 @@ sysMaster采用`1+1+N`架构，sysmaster不再作为1号进程，因此内核为
 
 |信号|init|sysmaster|systemd|sysmaster与systemd对外表现是否有差异|
 |-|-|-|-|-|
-|1) SIGHUP|捕获不处理|daemon-reexec|daemon-reload|N|
+|1) SIGHUP|捕获不处理|daemon-reload|daemon-reload|N|
 |2) SIGINT|捕获不处理|start ctrl-alt-del.target|start ctrl-alt-del.target|N|
 |3) SIGQUIT|捕获不处理|故障恢复|crash handler|Y|
 |4) SIGILL|捕获不处理|故障恢复|crash handler|Y|
 |5) SIGTRAP|捕获不处理|IGN|DFL|N|
-|6) SIGABRT|捕获不处理|故障恢复|crash handler|Y|
+|6) SIGABRT|捕获不处理|1号进程下发重执行/故障恢复|crash handler|Y|
 |7) SIGBUS|捕获不处理|故障恢复|crash handler|Y|
 |8) SIGFPE|捕获不处理|故障恢复|crash handler|Y|
 |9) SIGKILL|内核主动屏蔽该信号|DFL|内核主动屏蔽该信号|Y|
@@ -42,7 +42,7 @@ sysMaster采用`1+1+N`架构，sysmaster不再作为1号进程，因此内核为
 |38) SIGRTMIN+4|捕获不处理|IGN|start poweroff.target|Y|
 |39) SIGRTMIN+5|捕获不处理|IGN|start reboot.target|Y|
 |40) SIGRTMIN+6|捕获不处理|IGN|start kexec.target|Y|
-|41) SIGRTMIN+7|捕获不处理|daemon-reexec|DFL|Y|
+|41) SIGRTMIN+7|捕获不处理|IGN|DFL|N|
 |42) SIGRTMIN+8|unrecover state|IGN|DFL|N|
 |43) SIGRTMIN+9|重执行sysmaster|IGN|DFL|N|
 |44) SIGRTMIN+10|switch root|IGN|DFL|Y|
@@ -74,11 +74,11 @@ sysMaster采用`1+1+N`架构，sysmaster不再作为1号进程，因此内核为
 3. init进程：
     - SIGCHLD: 回收所有僵尸子进程。
     - SIGRTMIN+8: 进入不可恢复状态。
-    - SIGRTMIN+9: 下发重执行sysmaster信号。
+    - SIGRTMIN+9: 下发SIGABRT信号重执行sysmaster。
     - SIGRTMIN+10: 只处理sysmaster进程的SIGRTMIN+10信号，其余进程忽略。重执行init自身，重执行sysmaster。
     - init捕获所有可捕获信号，除上述信号做了处理以外，其余都忽略不处理。
 4. sysmaster进程：
     - SIGCHLD: 回收所有僵尸子进程。
-    - SIGSEGV,SIGILL,SIGFPE,SIGBUS,SIGQUIT,SIGABRT,SIGSYS: 故障恢复，重执行sysmaster。
-    - SIGRTMIN+7: 只处理init进程下发的SIGRTMIN+7信号，sysmaster接收到该信号后主动触发热重启。
+    - SIGSEGV,SIGILL,SIGFPE,SIGBUS,SIGQUIT,SIGSYS: 当存在switch.debug配置文件时，执行故障恢复。
+    - SIGABRT：当存在switch.debug配置文件时，用于init重执行sysmaster或执行故障恢复。
     - SIGUSR1、SIGUSR2、SIGWINCH、SIGPWR、SIGRTMIN+{0-6、13-16、20-29}sysmaster与systemd的差异后续能够消除。

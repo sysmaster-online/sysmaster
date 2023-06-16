@@ -33,7 +33,6 @@ use std::rc::Rc;
 
 use constants::SIG_SWITCH_ROOT_OFFSET;
 const INVALID_PID: i32 = -1;
-const MANAGER_SIG_OFFSET: i32 = 7;
 const SYSMASTER_PATH: &str = "/usr/lib/sysmaster/sysmaster";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
@@ -152,12 +151,7 @@ impl RunTime {
 
         self.comm.finish();
 
-        unsafe {
-            libc::kill(
-                self.sysmaster_pid.into(),
-                libc::SIGRTMIN() + MANAGER_SIG_OFFSET,
-            )
-        };
+        unsafe { libc::kill(self.sysmaster_pid.into(), libc::SIGABRT) };
     }
 
     fn reexec_comm_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
@@ -187,11 +181,10 @@ impl RunTime {
 
     fn reexec_signal_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
         if let Some(siginfo) = self.signals.read(event)? {
-            let signo = siginfo.ssi_signo as i32;
-            match signo {
-                _x if self.signals.is_zombie(signo) => self.do_recycle(),
-                _x if self.signals.is_restart(signo) => self.do_reexec(),
-                _x if self.signals.is_unrecover(signo) => self.change_to_unrecover(),
+            match siginfo {
+                _x if self.signals.is_zombie(siginfo) => self.do_recycle(),
+                _x if self.signals.is_restart(siginfo) => self.do_reexec(),
+                _x if self.signals.is_unrecover(siginfo) => self.change_to_unrecover(),
                 _ => {}
             }
         }
@@ -200,11 +193,10 @@ impl RunTime {
 
     fn run_signal_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
         if let Some(siginfo) = self.signals.read(event)? {
-            let signo = siginfo.ssi_signo as i32;
-            match signo {
-                _x if self.signals.is_zombie(signo) => self.do_recycle(),
-                _x if self.signals.is_restart(signo) => self.do_reexec(),
-                _x if self.signals.is_switch_root(signo) => self.send_switch_root_signal(),
+            match siginfo {
+                _x if self.signals.is_zombie(siginfo) => self.do_recycle(),
+                _x if self.signals.is_restart(siginfo) => self.do_reexec(),
+                _x if self.signals.is_switch_root(siginfo) => self.send_switch_root_signal(),
                 _ => {}
             }
         }
@@ -213,15 +205,14 @@ impl RunTime {
 
     fn unrecover_signal_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
         if let Some(siginfo) = self.signals.read(event)? {
-            let signo = siginfo.ssi_signo as i32;
-            match signo {
-                _x if self.signals.is_zombie(signo) => {
+            match siginfo {
+                _x if self.signals.is_zombie(siginfo) => {
                     self.signals.recycle_zombie();
                     if self.is_sysmaster(siginfo.ssi_pid as i32) && self.switching {
                         self.reexec_self()
                     }
                 }
-                _x if self.signals.is_restart(signo) => self.do_recreate(),
+                _x if self.signals.is_restart(siginfo) => self.do_recreate(),
                 _ => {}
             }
         }
