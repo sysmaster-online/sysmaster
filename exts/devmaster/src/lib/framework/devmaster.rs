@@ -101,7 +101,7 @@ impl Devmaster {
         // configure worker manager and monitor
         worker_manager.set_job_queue(&job_queue);
         worker_manager.set_kill_workers_timer();
-        monitor.set_receive_buffer_force(1024 * 1024 * 128);
+        monitor.set_receive_buffer(1024 * 1024 * 128);
 
         events
             .add_source(worker_manager.get_kill_workers_timer().unwrap())

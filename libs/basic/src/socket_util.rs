@@ -51,17 +51,62 @@ pub fn set_pass_cred(fd: RawFd, v: bool) -> Result<()> {
 
 ///
 pub fn set_receive_buffer(fd: RawFd, v: usize) -> Result<()> {
-    socket::setsockopt(fd, sockopt::RcvBuf, &v).context(NixSnafu)
+    /* Type of value is usize, so the v should smaller than the half of the value
+     *  as the value = 2 * n.
+     */
+    if v > (std::isize::MAX) as usize {
+        return Err(Error::Nix {
+            source: Errno::ERANGE,
+        });
+    }
+
+    // Set receive buffer size
+    socket::setsockopt(fd, sockopt::RcvBuf, &v).context(NixSnafu)?;
+
+    // The kernel has limitations of receive buffer, so we need to check if the size v was set.
+    match socket::getsockopt(fd, sockopt::RcvBuf) {
+        Ok(value) => {
+            /* Ops, the walue didn't set successfully, we can try to set with RcvBufForce.
+             *  By the way, the kernel doubles the value in the setsockopt, so we check that
+             *  with 2 * v.
+             */
+            if value != 2 * v {
+                return socket::setsockopt(fd, sockopt::RcvBufForce, &v).context(NixSnafu);
+            }
+            Ok(())
+        }
+        Err(e) => Err(Error::Nix { source: e }),
+    }
 }
 
 ///
 pub fn set_send_buffer(fd: RawFd, v: usize) -> Result<()> {
-    socket::setsockopt(fd, sockopt::SndBuf, &v).context(NixSnafu)
-}
+    /* Type of value is usize, so the v should smaller than the half of the value
+     *  as the value = 2 * n.
+     */
+    if v > (std::isize::MAX) as usize {
+        return Err(Error::Nix {
+            source: Errno::ERANGE,
+        });
+    }
 
-/// Require specific privileges to ignore the kernel limit
-pub fn set_receive_buffer_force(fd: RawFd, v: usize) -> Result<()> {
-    socket::setsockopt(fd, sockopt::RcvBufForce, &v).context(NixSnafu)
+    // Set send buffer size
+    socket::setsockopt(fd, sockopt::SndBuf, &v).context(NixSnafu)?;
+
+    // The kernel has limitations of send buffer, so we need to check if the size v was set.
+    match socket::getsockopt(fd, sockopt::SndBuf) {
+        Ok(value) => {
+            /* Ops, the walue didn't set successfully, we can try to set with SndBufForce.
+             *  By the way, the kernel doubles the value in the setsockopt, so we check that
+             *  with 2 * v.
+             */
+            if value != 2 * v {
+                return socket::setsockopt(fd, sockopt::SndBufForce, &v).context(NixSnafu);
+            }
+            Ok(())
+        }
+        Err(e) => Err(Error::Nix { source: e }),
+    }
 }
 
 /// Set keepalive properties

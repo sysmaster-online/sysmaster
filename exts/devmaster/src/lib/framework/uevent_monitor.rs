@@ -41,8 +41,8 @@ impl UeventMonitor {
     }
 
     /// forcely set the size of socket receive buffer
-    pub fn set_receive_buffer_force(&self, v: usize) {
-        basic::socket_util::set_receive_buffer_force(self.device_monitor.fd(), v).unwrap();
+    pub fn set_receive_buffer(&self, v: usize) {
+        basic::socket_util::set_receive_buffer(self.device_monitor.fd(), v).unwrap();
     }
 }
 

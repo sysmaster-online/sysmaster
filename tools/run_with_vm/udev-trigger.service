@@ -10,7 +10,7 @@
 [Unit]
 DefaultDependencies=false
 Wants="udevd.service"
-After="udevd-kernel.socket;udevd-control.socket;udevd.service"
+After="udevd-kernel.socket;udevd-control.socket"
 Before="sysinit.target"
 ConditionPathIsReadWrite="/sys"
 

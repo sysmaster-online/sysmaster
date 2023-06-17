@@ -13,6 +13,6 @@ ConditionPathIsReadWrite="/sys"
 
 [Socket]
 Service="udevd.service"
-ReceiveBuffer=131072
+ReceiveBuffer=134217728
 ListenNetlink="kobject-uevent 1"
 PassCredentials=true

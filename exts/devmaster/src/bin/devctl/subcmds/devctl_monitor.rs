@@ -12,7 +12,7 @@
 
 //! subcommand for devctl monitor
 //!
-use basic::socket_util::set_receive_buffer_force;
+use basic::socket_util::set_receive_buffer;
 use device::{device_monitor::DeviceMonitor, device_monitor::MonitorNetlinkGroup};
 use event::{EventState, EventType, Events, Source};
 use nix::errno::Errno;
@@ -102,11 +102,11 @@ USERSPACE - broadcasted by devmaster after successful process on device
         prefix: "USERSPACE []".to_string(),
     });
 
-    if let Err(errno) = set_receive_buffer_force(kernel_monitor.fd(), 1024 * 1024 * 128) {
+    if let Err(errno) = set_receive_buffer(kernel_monitor.fd(), 1024 * 1024 * 128) {
         log::error!("Failed to set receive buffer forcely ({errno:?})");
     }
 
-    if let Err(errno) = set_receive_buffer_force(userspace_monitor.fd(), 1024 * 1024 * 128) {
+    if let Err(errno) = set_receive_buffer(userspace_monitor.fd(), 1024 * 1024 * 128) {
         log::error!("Failed to set receive buffer forcely ({errno:?})");
     }
 
