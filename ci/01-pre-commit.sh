@@ -20,8 +20,7 @@ do
 done
 
 export PATH="$PATH:/home/jenkins/.local/bin"
-pip3 install pre-commit ruamel.yaml || pip3 install pre-commit ruamel.yaml -i http://mirrors.aliyun.com/pypi/simple/ || pip3 install  -i https://pypi.tuna.tsinghua.edu.cn/simple/ pre-commit ruamel.yaml
-
+pip3 install pre-commit ruamel.yaml -i https://pypi.mirrors.ustc.edu.cn/simple || pip3 install  -i http://pypi.douban.com/simple/ pre-commit ruamel.yaml || pip3 install pre-commit ruamel.yaml
 
 ## one PR ? Commit
 # oldnum=`git rev-list origin/master --no-merges --count`

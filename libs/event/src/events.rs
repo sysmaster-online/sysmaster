@@ -12,14 +12,12 @@
 
 //! An event scheduling framework based on epoll
 use crate::timer::Timer;
-use crate::{EventState, EventType, Poll, Signals, Source};
-
 use crate::Error;
 use crate::Result;
+use crate::{EventState, EventType, Poll, Signals, Source};
 use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, InotifyEvent, WatchDescriptor};
 use nix::unistd;
 use nix::NixPath;
-
 use std::cell::RefCell;
 use std::collections::{BinaryHeap, HashMap};
 use std::convert::TryInto;
@@ -107,22 +105,23 @@ impl Events {
         if let true = self.data.borrow().exit() {
             return Ok(0);
         }
+
         let first = self.data.borrow_mut().pending_pop();
         if first.is_none() {
             return Ok(0);
         }
 
         let top = first.unwrap();
-        let state = match self.data.borrow().source_state(&top) {
+        let state = match self.data.borrow_mut().source_state(top.token()) {
             None => return Ok(0),
-            Some(v) => v,
+            Some(v) => v.state,
         };
         match state {
             EventState::Off => {}
             EventState::On => {
                 top.dispatch(self);
                 if top.event_type() == EventType::Defer {
-                    self.data.borrow_mut().pending_push(top.clone());
+                    self.data.borrow_mut().pending_push(top.clone(), 0);
                 }
             }
             EventState::OneShot => {
@@ -133,13 +132,17 @@ impl Events {
                 top.dispatch(self);
             }
         }
-
         Ok(0)
     }
 
     /// for signal: read the signal content when signal source emit
     pub fn read_signals(&self) -> std::io::Result<Option<libc::signalfd_siginfo>> {
         self.data.borrow_mut().read_signals()
+    }
+
+    ///The "events" represents the "event_event" returned by epoll_wait.
+    pub fn epoll_event(&self, token: u64) -> u32 {
+        self.data.borrow().epoll_event(token)
     }
 
     /// for inotify: add watch point to inotify event
@@ -164,6 +167,23 @@ impl Events {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct State {
+    state: EventState,
+    epoll_event: u32,
+    in_pending: bool,
+}
+
+impl Default for State {
+    fn default() -> State {
+        State {
+            state: EventState::Off,
+            epoll_event: 0,
+            in_pending: false,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct EventsData {
     poller: Poll,
@@ -173,7 +193,7 @@ pub(crate) struct EventsData {
     post_sources: HashMap<u64, Rc<dyn Source>>,
     exit_sources: HashMap<u64, Rc<dyn Source>>,
     pending: BinaryHeap<Rc<dyn Source>>,
-    state: HashMap<u64, EventState>,
+    state: HashMap<u64, State>,
     children: HashMap<i64, i64>,
     pidfd: RawFd,
     timerfd: HashMap<EventType, RawFd>,
@@ -206,6 +226,7 @@ impl EventsData {
     pub(self) fn add_source(&mut self, source: Rc<dyn Source>) -> Result<i32> {
         let et = source.event_type();
         let token = source.token();
+
         match et {
             EventType::Io
             | EventType::Pidfd
@@ -233,7 +254,7 @@ impl EventsData {
         }
 
         // default state
-        self.state.insert(token, EventState::Off);
+        self.state.insert(token, State::default());
 
         Ok(0)
     }
@@ -297,8 +318,8 @@ impl EventsData {
 
     pub(self) fn set_enabled(&mut self, source: Rc<dyn Source>, state: EventState) -> Result<i32> {
         let token = source.token();
-        if let Some(current_state) = self.state.get(&token) {
-            if current_state == &state {
+        if let Some(current) = self.state.get(&token) {
+            if current.state == state {
                 return Ok(0);
             }
         }
@@ -311,8 +332,9 @@ impl EventsData {
             }
         }
 
-        // renew state
-        self.state.insert(token, state);
+        if let Some(current) = self.state.get_mut(&token) {
+            current.state = state;
+        }
 
         Ok(0)
     }
@@ -356,7 +378,7 @@ impl EventsData {
                 Some(_) => self.timer.push(source.clone()),
             },
             EventType::Defer => {
-                self.pending.push(source.clone());
+                self.pending_push(source.clone(), 0);
             }
             EventType::Inotify => {
                 self.poller.register(self.inotify.as_raw_fd(), &mut event)?;
@@ -372,8 +394,8 @@ impl EventsData {
     /// move the event out of the listening queue
     pub(self) fn source_offline(&mut self, source: &Rc<dyn Source>) -> Result<i32> {
         // unneed unregister when source is already Offline
-        if let Some(event_state) = self.state.get(&source.token()) {
-            if *event_state == EventState::Off {
+        if let Some(current) = self.state.get(&source.token()) {
+            if current.state == EventState::Off {
                 return Ok(0);
             }
         } else {
@@ -422,6 +444,13 @@ impl EventsData {
         self.signal.read_signals()
     }
 
+    pub(crate) fn epoll_event(&self, token: u64) -> u32 {
+        match self.state.get(&token) {
+            Some(t) => t.epoll_event,
+            None => 0u32,
+        }
+    }
+
     /// add watch point to inotify event
     pub(self) fn add_watch<P: ?Sized + NixPath>(
         &self,
@@ -442,22 +471,18 @@ impl EventsData {
     /// Wait for the event event through poller
     /// And add the corresponding events to the pending queue
     pub(self) fn wait(&mut self, timeout: i32) -> bool {
-        let events = {
-            #[allow(clippy::never_loop)]
-            loop {
-                let result = self.poller.poll(timeout);
-
-                match result {
-                    Ok(events) => break events,
-                    Err(_err) => return false,
-                };
-            }
+        let events = if let Ok(s) = self.poller.poll(timeout) {
+            s
+        } else {
+            return false;
         };
 
         for event in events.iter() {
             let token = event.u64;
-            if let Some(s) = self.sources.get(&token) {
-                self.pending.push(s.clone());
+            if let Some(source) = self.sources.get(&token) {
+                #[allow(renamed_and_removed_lints)]
+                #[allow(mutable_borrow_reservation_conflict)]
+                self.pending_push(source.clone(), event.events);
             }
         }
 
@@ -475,7 +500,7 @@ impl EventsData {
                     }
 
                     while let Some(source) = self.timer.pop(&et) {
-                        self.pending_push(source);
+                        self.pending_push(source, 0);
                     }
                 }
             }
@@ -498,7 +523,7 @@ impl EventsData {
             if let Some(next) = self.timer.next(&et) {
                 if self.timer.timerid(&et) >= next {
                     while let Some(source) = self.timer.pop(&et) {
-                        self.pending_push(source);
+                        self.pending_push(source, 0);
                     }
                     ret = true;
                 } else {
@@ -524,15 +549,29 @@ impl EventsData {
     }
 
     pub(self) fn pending_pop(&mut self) -> Option<Rc<dyn Source>> {
-        self.pending.pop()
+        if let Some(top) = self.pending.pop() {
+            if let Some(state) = self.state.get_mut(&top.token()) {
+                state.in_pending = false;
+            }
+            return Some(top);
+        };
+
+        None
     }
 
-    pub(self) fn pending_push(&mut self, source: Rc<dyn Source>) {
-        self.pending.push(source)
+    pub(self) fn pending_push(&mut self, source: Rc<dyn Source>, event: u32) {
+        if let Some(current) = self.state.get_mut(&source.token()) {
+            if current.in_pending {
+                current.epoll_event |= event;
+            } else {
+                self.pending.push(source);
+                current.in_pending = true;
+            }
+        }
     }
 
-    pub(self) fn source_state(&self, source: &Rc<dyn Source>) -> Option<EventState> {
-        self.state.get(&source.token()).cloned()
+    pub(self) fn source_state(&self, token: u64) -> Option<State> {
+        self.state.get(&token).cloned()
     }
 
     pub(self) fn set_exit(&mut self) {

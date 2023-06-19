@@ -1,81 +1,133 @@
 #!/usr/bin/env bash
 
-## one PR ? Commit
-# oldnum=`git rev-list origin/master --no-merges --count`
-# newnum=`git rev-list HEAD --no-merges --count`
-# changenum=$[newnum - oldnum]
+# Function to check if a file contains Chinese characters
+contains_chinese() {
+    grep -Pn '[\p{Han}]' "$1" && echo "DO NOT USE CHINESE CHARACTERS in code, 不要在源码中使用中文!" && exit 1
+}
 
-# do not use chinese in source code
-for rustlist in `git diff origin/master --name-only | grep \.rs$ | tr '\n' ' '`
-do
-    grep -Pn '[\p{Han}]' $rustlist  && echo "DO NOT USE CHANESE CHARACTERS in code, 不要在源码中使用中文!" && exit 1
+# Check for Chinese characters in modified Rust files
+git diff origin/master --name-only | grep -F '.rs' | while IFS= read -r rustfile; do
+    contains_chinese "$rustfile"
 done
 
-# install needed tools
-requirements="gcc openssl-libs python3-pip musl-gcc clang util-linux-devel"
-rpm -qi $requirements > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-sudo sed -i "s:repo.openeuler.org:repo.huaweicloud.com/openeuler:g" /etc/yum.repos.d/*.repo
-sudo yum install --refresh --disablerepo OS --disablerepo EPOL --disablerepo source --disablerepo update --disablerepo EPOL-UPDATE --disablerepo debuginfo  -y $requirements
-if [ $? -ne 0 ]; then
-    exit 1
+# Install required tools if not already installed
+if [ ! -f "/etc/centos-release" ] && [ ! -f "/etc/fedora-release" ]; then
+    required_packages=("gcc" "openssl-libs" "python3-pip" "musl-gcc" "clang" "util-linux-devel")
+else
+    required_packages=("gcc" "openssl-libs" "python3-pip" "musl-gcc" "clang")
 fi
+missing_packages=()
+
+for package in "${required_packages[@]}"; do
+    rpm -qi "$package" > /dev/null 2>&1 || missing_packages+=("$package")
+done
+
+if [ "${#missing_packages[@]}" -gt 0 ]; then
+    sudo sed -i "s:repo.openeuler.org:repo.huaweicloud.com/openeuler:g" /etc/yum.repos.d/*.repo
+    sudo yum install --refresh --disablerepo OS --disablerepo EPOL --disablerepo source --disablerepo update --disablerepo EPOL-UPDATE --disablerepo debuginfo -y "${missing_packages[@]}" || exit 1
 fi
-
-#git加速并安装rust工具链
-repo="https://github.com/rust-lang/release-team.git"
-git config --global http.lowSpeedLimit 5
-git config --global http.lowSpeedTime 30
-git config --global url."https://gitclone.com/github.com/".insteadOf "https://github.com/"
-git clone $repo
-if [ $? -ne 0 ]; then
-    git config --unset --global url."https://gitclone.com/github.com/".insteadOf "https://github.com/"
-    git config --global url."https://gh.api.99988866.xyz/https://github.com/".insteadOf "https://github.com/"
-    git clone $repo
-    if [ $? -ne 0 ]; then
-      git config --unset --global url."https://gh.api.99988866.xyz/https://github.com/".insteadOf "https://github.com/"
-    fi
-fi
-rm -rf ./awesome-rust.git
-
-
 
 source ~/.bashrc
 cargo -v
 if [ $? -ne 0 ]; then
+export RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static
+export RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustlang.sh
 sh rustlang.sh -y --default-toolchain none
 rm -rf rustlang.sh
 fi
 
-source ~/.bashrc
-
+source "$HOME/.cargo/env"
 rustup default 1.60
 
-##Fix cargo clippy timeout : replace cargo crates with ustc
 arch=`uname -m`
+# install musl-build
+rustup target add $arch-unknown-linux-musl
+
+# Define the crate names to test
+crate_names=("https://github.com/rust-lang/crates.io-index" \
+            "https://mirrors.ustc.edu.cn/crates.io-index" \
+            "https://rsproxy.cn/crates.io-index" \
+            "https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git" \
+            "https://code.aliyun.com/rustcc/crates.io-index.git" \
+            "https://mirrors.sjtug.sjtu.edu.cn/git/crates.io-index")
+
+# Initialize minimum latency to a large value
+min_latency=9999999
+
+# Define timeout in seconds
+timeout=10
+
+# Define the fastest source
+fastest_source=""
+
+# Test each crate
+for crate_name in "${crate_names[@]}"; do
+    echo "Running test for $crate_name..."
+
+    # Send an HTTP request to get crate information and measure the execution time
+    start_time=$(date +%s%N)
+    response=$(curl -s -o /dev/null --connect-timeout 10 -w "%{time_total}" "$crate_name" > /dev/null 2>&1)
+    if [ $? -ne 0 ]; then
+        continue
+    fi
+    end_time=$(date +%s%N)
+
+    # Calculate the request time in milliseconds
+    duration=$(( ($end_time - $start_time) / 1000000 ))
+
+    echo "Test result for $crate_name: $duration ms"
+
+    # Check if it's the fastest source
+    if [ "$duration" -lt "$min_latency" ]; then
+        min_latency="$duration"
+        fastest_source="$crate_name"
+    fi
+
+    echo ""
+done
+
+echo "Fastest source: $fastest_source with latency $min_latency ms"
+
+# Fix cargo clippy timeout by replacing cargo crates with the fastest source
+arch=$(uname -m)
+
 # Modify config
+mkdir -p ~/.cargo
 cat << EOF > ~/.cargo/config
 [source.crates-io]
 registry = "https://github.com/rust-lang/crates.io-index"
 
-# 指定镜像
-replace-with = 'ustc'
+# Use the fastest source
+replace-with = 'replace'
 
-# 中国科学技术大学
-[source.ustc]
-registry = "https://mirrors.ustc.edu.cn/crates.io-index"
-
-# 字节跳动
-[source.rsproxy]
-registry = "https://rsproxy.cn/crates.io-index"
+[source.replace]
+registry = "$fastest_source"
 
 [target.$arch-unknown-linux-musl]
 rustflags = ["-C", "target-feature=-crt-static"]
+
+[net]
+git-fetch-with-cli = true
 EOF
 
-# Delete cache
 rm -rf  ~/.cargo/.package-cache
+
+# #git加速并安装rust工具链
+# repo="https://github.com/rust-lang/release-team.git"
+# git config --global http.lowSpeedLimit 5
+# git config --global http.lowSpeedTime 30
+# git config --global url."https://gitclone.com/github.com/".insteadOf "https://github.com/"
+# git clone $repo
+# if [ $? -ne 0 ]; then
+#     git config --unset --global url."https://gitclone.com/github.com/".insteadOf "https://github.com/"
+#     git config --global url."https://gh.api.99988866.xyz/https://github.com/".insteadOf "https://github.com/"
+#     git clone $repo
+#     if [ $? -ne 0 ]; then
+#       git config --unset --global url."https://gh.api.99988866.xyz/https://github.com/".insteadOf "https://github.com/"
+#     fi
+# fi
+# rm -rf ./awesome-rust.git
 
 ##拉取代码
 #rm -rf sysmaster
