@@ -441,8 +441,12 @@ mod test {
     fn test_condition_test() {
         logger::init_log_to_console("test_init_lookup_paths", log::LevelFilter::Debug);
         let project_root = get_project_root().unwrap();
-        let cond_path_not_exists =
-            Condition::new(ConditionType::PathExists, 0, 0, "/home/test".to_string());
+        let cond_path_not_exists = Condition::new(
+            ConditionType::PathExists,
+            0,
+            0,
+            "/home/a_usually_not_existent_file".to_string(),
+        );
         let f_result = cond_path_not_exists.test();
         assert!(!f_result);
         log::debug!("project root {:?}", project_root);
