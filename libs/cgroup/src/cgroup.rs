@@ -188,20 +188,64 @@ pub fn cg_get_pids(cg_path: &PathBuf) -> Vec<Pid> {
 }
 
 fn remove_dir(cg_path: &PathBuf) -> Result<()> {
-    let abs_cg_path: PathBuf = cg_abs_path(cg_path, &PathBuf::from(""))?;
-
-    match fs::remove_dir_all(abs_cg_path.clone()) {
-        Ok(_) => {}
+    if !cg_path.is_absolute() {
+        log::error!("We only support remove absolute directory.");
+        return Err(Error::NotSupported);
+    }
+    /* Note: We can't just call fs::remove_all_dir here. This is because /sys/fs/cgroup
+     * is a pseudo file system, we can only remove directory, but can't remove regular
+     * file. */
+    let read_dir = match cg_path.read_dir() {
         Err(e) => {
-            log::debug!(
-                "remove dir failed：{:?}, err: {}",
-                abs_cg_path,
-                e.to_string()
-            );
+            log::error!("Failed to read dir: {:?}", cg_path);
+            return Err(Error::Io { source: e });
         }
+        Ok(v) => v,
+    };
+
+    for entry in read_dir {
+        let entry = match entry {
+            Err(e) => {
+                log::error!("Failed to get directory entry: {e}");
+                return Err(Error::Io { source: e });
+            }
+            Ok(v) => v,
+        };
+        let entry_file_type = match entry.file_type() {
+            Err(e) => {
+                log::error!(
+                    "Failed to geth the file type of {:?}: {e}",
+                    entry.file_name()
+                );
+                return Err(Error::Io { source: e });
+            }
+            Ok(v) => v,
+        };
+        if !entry_file_type.is_dir() {
+            continue;
+        }
+        remove_dir(&entry.path())?;
     }
 
-    Ok(())
+    /* Sometimes there are still tasks in cg_path, and rmdir will return EBUSY,
+     * we wait 10 us for 10 times. */
+    let mut try_times = 0;
+    loop {
+        let e = match fs::remove_dir(cg_path) {
+            Ok(()) => return Ok(()),
+            Err(e) => e,
+        };
+        let os_errno = match e.raw_os_error() {
+            None => return Err(Error::Io { source: e }),
+            Some(v) => v,
+        };
+        if os_errno == nix::libc::EBUSY && try_times < 10 {
+            std::thread::sleep(std::time::Duration::from_micros(10));
+            try_times += 1;
+            continue;
+        }
+        return Err(Error::Io { source: e });
+    }
 }
 
 fn cg_kill_process(
@@ -291,11 +335,9 @@ pub fn cg_kill_recursive(
     cg_kill(cg_path, signal, flags, pids)?;
 
     if flags.contains(CgFlags::REMOVE) {
-        match remove_dir(cg_path) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
+        let abs_cg_path = cg_abs_path(cg_path, &PathBuf::from(""))?;
+        if let Err(e) = remove_dir(&abs_cg_path) {
+            return Err(e);
         }
     }
 
@@ -645,7 +687,7 @@ mod tests {
             return;
         };
 
-        let cg_path = PathBuf::from("system.slice");
+        let cg_path = PathBuf::from("sysmaster-test.slice");
         let ret = super::cg_create(&cg_path);
         assert!(ret.is_ok());
 
