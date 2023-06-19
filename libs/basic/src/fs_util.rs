@@ -42,17 +42,18 @@ pub fn symlink(target: &str, link: &str, relative: bool) -> Result<()> {
         })?;
 
         let rel_path = diff_paths(target_path, link_path_parent).unwrap();
-        let fd = nix::fcntl::open(&rel_path, OFlag::O_DIRECT, Mode::from_bits(0).unwrap())
-            .context(NixSnafu)?;
+        let fd = nix::fcntl::open(
+            link_path_parent,
+            OFlag::O_DIRECTORY | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW,
+            Mode::from_bits(0).unwrap(),
+        )
+        .context(NixSnafu)?;
         (rel_path, Some(fd))
     } else {
         (target_path.to_path_buf(), None)
     };
 
-    nix::unistd::symlinkat(target_path.as_path(), fd, link_path).map_err(|e| {
-        log::debug!("Failed to create symlink: {} -> {}", link, target);
-        Error::Nix { source: e }
-    })
+    nix::unistd::symlinkat(target_path.as_path(), fd, link_path).context(NixSnafu)
 }
 
 /// chmod based on fd opened with O_PATH
@@ -61,18 +62,14 @@ pub fn fchmod_opath(fd: i32, mode: mode_t) -> Result<()> {
 
     let mut perms = std::fs::metadata(&fd_path).context(IoSnafu)?.permissions();
     perms.set_mode(mode);
-    std::fs::set_permissions(&fd_path, perms).context(IoSnafu)?;
-
-    Ok(())
+    std::fs::set_permissions(&fd_path, perms).context(IoSnafu)
 }
 
 /// chmod based on path
 pub fn chmod(path: &str, mode: mode_t) -> Result<()> {
     let mut perms = std::fs::metadata(path).context(IoSnafu)?.permissions();
     perms.set_mode(mode);
-    std::fs::set_permissions(path, perms).context(IoSnafu)?;
-
-    Ok(())
+    std::fs::set_permissions(path, perms).context(IoSnafu)
 }
 
 /// Safely chmod and chown based on a file description. If ownership
@@ -183,15 +180,23 @@ mod tests {
             return;
         }
 
-        let ret = symlink("/dev/null", "/tmp/test_link_name_39285b", false);
-        assert!(ret.is_ok());
+        symlink("/dev/null", "/tmp/test_link_name_39285b", false).unwrap();
 
-        let ret = unistd::unlinkat(
+        unistd::unlinkat(
             None,
             link_name_path.to_str().unwrap(),
             unistd::UnlinkatFlags::NoRemoveDir,
-        );
-        assert!(ret.is_ok());
+        )
+        .unwrap();
+
+        symlink("/dev/null", "/tmp/test_link_name_39285c", true).unwrap();
+
+        unistd::unlinkat(
+            None,
+            "/tmp/test_link_name_39285c",
+            unistd::UnlinkatFlags::NoRemoveDir,
+        )
+        .unwrap();
     }
 
     /// test changing the mode of a file by file descriptor with O_PATH
