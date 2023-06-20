@@ -120,6 +120,7 @@ members = [
   "exts/sysmonitor",
   "exts/devmaster",
   "exts/switch_root",
+  "exts/hostname_setup",
   #internal libraries crates
   "libs/cmdproto",
   #external libraries crates

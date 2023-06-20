@@ -84,7 +84,7 @@ menuentry 'openEuler (5.10.0-60.18.0.50.oe2203.aarch64) 22.03 LTS without system
 
 **2.** 将`run_with_vm`目录下service和target文件拷贝到`/usr/lib/sysmaster`目录下。
 
-**3.** 通过`sctl enable fstab.service sshd.service udevd.service getty-tty1.service serial-getty-ttyAMA0.service lvm-activate-openeuler.service set-hostname.service NetworkManager.service udev-trigger.service`上述服务实现开机启动。
+**3.** 通过`sctl enable fstab.service sshd.service udevd.service getty-tty1.service serial-getty-ttyAMA0.service lvm-activate-openeuler.service set-hostname.service NetworkManager.service udev-trigger.service hostname-setup.service`上述服务实现开机启动。
 
 **注意：**
 

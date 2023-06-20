@@ -1,0 +1,11 @@
+[package]
+name = "hostname_setup"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nix = "0.24"
+log = "0.4"
+libc = "0.2.*"
+constants = { version = "0.1.0", path = "../../libs/constants" }
+basic = { path = "../../libs/basic" }

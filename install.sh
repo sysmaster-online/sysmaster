@@ -14,6 +14,7 @@ install -Dm0755 -t ${install_dir} ${target_dir}/fstab || exit 1
 install -Dm0755 -t ${install_dir} ${target_dir}/sysmonitor || exit 1
 install -Dm0755 -t ${install_dir} ${target_dir}/random_seed || exit 1
 install -Dm0755 -t ${install_dir} ${target_dir}/rc-local-generator || exit 1
+install -Dm0755 -t ${install_dir} ${target_dir}/hostname_setup || exit 1
 
 strip ${target_dir}/lib*.so
 
