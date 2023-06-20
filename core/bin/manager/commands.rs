@@ -10,6 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use basic::socket_util;
 use cmdproto::proto::execute::ExecuterAction;
 use cmdproto::proto::ProstServerStream;
 use event::{EventType, Events, Source};
@@ -32,6 +33,7 @@ pub(super) struct Commands<T> {
 
 impl<T> Commands<T> {
     pub(super) fn new(relir: &Rc<Reliability>, comm_action: T) -> Self {
+        /* The socket is used to communicate with sctl, panic if any of the following steps fail. */
         let sctl_socket_path = Path::new(SCTL_SOCKET);
         /* remove the old socket if it exists */
         if sctl_socket_path.exists() && !sctl_socket_path.is_symlink() {
@@ -45,13 +47,15 @@ impl<T> Commands<T> {
             None,
         )
         .unwrap();
+        /* set SO_PASSCRED, we need it to check whether sctl is running under root */
+        socket_util::set_pass_cred(socket_fd, true).unwrap();
         /* create the socket with mode 666 */
         let old_mask = stat::umask(stat::Mode::from_bits_truncate(!0o666));
         let _ = socket::bind(socket_fd, &sctl_socket_addr);
         /* restore our umask */
         let _ = stat::umask(old_mask);
-        /* Allow at most 10 incoming connections can queue */
-        let _ = socket::listen(socket_fd, 10);
+        /* Allow at most 4096 incoming connections can queue */
+        let _ = socket::listen(socket_fd, 4096);
         Commands {
             reli: Rc::clone(relir),
             command_action: Rc::new(comm_action),
