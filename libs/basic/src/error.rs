@@ -32,16 +32,16 @@ pub enum Error {
         errno: i32,
     },
 
-    #[snafu(display("Io"))]
+    #[snafu(display("Io: {}", source))]
     Io { source: std::io::Error },
 
-    #[snafu(display("Errno"))]
+    #[snafu(display("Errno: {}", source))]
     Nix { source: nix::Error },
 
-    #[snafu(display("Var"))]
+    #[snafu(display("Var: {}", source))]
     Var { source: std::env::VarError },
 
-    #[snafu(display("procfs"))]
+    #[snafu(display("procfs: {}", source))]
     Proc { source: procfs::ProcError },
 
     #[snafu(display("Error parsing from string: {}", source))]
