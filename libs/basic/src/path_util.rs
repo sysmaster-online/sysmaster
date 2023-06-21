@@ -21,9 +21,44 @@ pub fn path_equal(a: &str, b: &str) -> bool {
     p_a == p_b
 }
 
+/// Remove redundant inner and trailing slashes and unnecessary dots to simplify path.
+/// e.g., //foo//.//bar/ becomes /foo/bar
+/// .//foo//.//bar/ becomes foo/bar
+pub fn path_simplify(s: &str) -> String {
+    let mut ret = String::new();
+
+    let mut pre = "";
+
+    for com in s.split('/') {
+        match com {
+            "" => {
+                if ret.is_empty() && pre.is_empty() {
+                    ret.push('/');
+                }
+            }
+            "." => {
+                if pre.is_empty() {
+                    pre = ".";
+                }
+            }
+            _ => {
+                ret.push_str(com);
+                ret.push('/');
+                pre = com;
+            }
+        }
+    }
+    /* drop the trailing slash */
+    if ret.ends_with('/') {
+        let _ = ret.pop();
+    }
+
+    ret
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::path_util::path_equal;
+    use super::*;
 
     #[test]
     fn test_path_equal() {
@@ -34,5 +69,12 @@ mod tests {
         assert!(path_equal("/x/./y", "/x/y"));
         assert!(path_equal("/x/././y", "/x/y/./."));
         assert!(!path_equal("/etc", "/var"));
+    }
+
+    #[test]
+    fn test_path_simplify() {
+        assert_eq!(path_simplify("//foo//.//bar/"), "/foo/bar");
+        assert_eq!(path_simplify(".//foo//.//bar/"), "foo/bar");
+        assert_eq!(path_simplify("foo//.//bar/"), "foo/bar");
     }
 }
