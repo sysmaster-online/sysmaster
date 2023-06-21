@@ -20,7 +20,7 @@ use nix::{
     unistd::{Gid, Uid},
 };
 use pathdiff::diff_paths;
-use std::{os::unix::prelude::PermissionsExt, path::Path};
+use std::{fs::remove_dir, io::ErrorKind, os::unix::prelude::PermissionsExt, path::Path};
 
 /// open the parent directory of path
 pub fn open_parent(path: &Path, flags: OFlag, mode: Mode) -> Result<i32> {
@@ -164,12 +164,55 @@ pub fn futimens_opath(fd: i32, ts: Option<[timespec; 2]>) -> Result<()> {
     }
 }
 
+/// recursively remove parent directories until specific directory
+pub fn remove_dir_until(path: &str, stop: &str) -> Result<()> {
+    let path = Path::new(path);
+
+    let mut dir = if path.is_dir() {
+        Path::new(path)
+    } else {
+        match path.parent() {
+            Some(p) => p,
+            None => {
+                return Ok(());
+            }
+        }
+    };
+
+    loop {
+        if let Err(e) = remove_dir(dir) {
+            match e.kind() {
+                ErrorKind::NotFound => break,
+                _ => {
+                    return Err(Error::Io { source: e });
+                }
+            }
+        }
+
+        match dir.parent() {
+            Some(p) => {
+                if p.ends_with(stop) {
+                    break;
+                }
+                dir = p;
+            }
+            None => break,
+        };
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::fs_util::symlink;
     use nix::unistd::{self};
-    use std::{fs::File, os::unix::prelude::MetadataExt, time::SystemTime};
+    use std::{
+        fs::{create_dir_all, File},
+        os::unix::prelude::MetadataExt,
+        time::SystemTime,
+    };
 
     #[test]
     fn test_symlink() {
@@ -266,5 +309,22 @@ mod tests {
         assert!(point.duration_since(modify).unwrap().as_nanos() < 10000000);
 
         std::fs::remove_file("/tmp/test_futimens_opath").unwrap();
+    }
+
+    #[test]
+    fn test_remove_dir_until() {
+        create_dir_all("/tmp/test_remove_dir_until_1/test1").unwrap();
+        assert!(Path::new("/tmp/test_remove_dir_until_1/test1").exists());
+        remove_dir_until("/tmp/test_remove_dir_until_1/test1", "/tmp").unwrap();
+        assert!(!Path::new("/tmp/test_remove_dir_until_1/test1").exists());
+        assert!(!Path::new("/tmp/test_remove_dir_until_1").exists());
+
+        create_dir_all("/tmp/test_remove_dir_until_2/test2").unwrap();
+        File::create("/tmp/test_remove_dir_until_2/test_file").unwrap();
+        assert!(Path::new("/tmp/test_remove_dir_until_2/test2").exists());
+        assert!(Path::new("/tmp/test_remove_dir_until_2/test_file").exists());
+        assert!(remove_dir_until("/tmp/test_remove_dir_until_2/test2", "/tmp").is_err());
+        assert!(!Path::new("/tmp/test_remove_dir_until_2/test2").exists());
+        assert!(Path::new("/tmp/test_remove_dir_until_2/test_file").exists());
     }
 }
