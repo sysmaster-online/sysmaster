@@ -15,11 +15,12 @@
 use crate::{error::*, format_proc_fd_path};
 use libc::{fchownat, mode_t, timespec, AT_EMPTY_PATH, S_IFLNK, S_IFMT};
 use nix::{
-    fcntl::OFlag,
+    fcntl::{renameat, OFlag},
     sys::stat::{fstat, Mode},
-    unistd::{Gid, Uid},
+    unistd::{unlinkat, Gid, Uid, UnlinkatFlags},
 };
 use pathdiff::diff_paths;
+use rand::Rng;
 use std::{fs::remove_dir, io::ErrorKind, os::unix::prelude::PermissionsExt, path::Path};
 
 /// open the parent directory of path
@@ -36,7 +37,7 @@ pub fn symlink(target: &str, link: &str, relative: bool) -> Result<()> {
     let link_path = Path::new(&link);
     let target_path = Path::new(&target);
 
-    let (target_path, fd) = if relative {
+    let (target_path, dirfd) = if relative {
         let link_path_parent = link_path.parent().ok_or(Error::NotExisted {
             what: format!("{}'s parent", link_path.to_string_lossy()),
         })?;
@@ -53,7 +54,18 @@ pub fn symlink(target: &str, link: &str, relative: bool) -> Result<()> {
         (target_path.to_path_buf(), None)
     };
 
-    nix::unistd::symlinkat(target_path.as_path(), fd, link_path).context(NixSnafu)
+    let mut rng = rand::thread_rng();
+
+    let tmp_to = format!("{}.{}", link, rng.gen::<u32>());
+
+    nix::unistd::symlinkat(target_path.as_path(), dirfd, tmp_to.as_str()).context(NixSnafu)?;
+
+    if let Err(e) = renameat(dirfd, tmp_to.as_str(), dirfd, link_path) {
+        let _ = unlinkat(dirfd, tmp_to.as_str(), UnlinkatFlags::NoRemoveDir);
+        return Err(Error::Nix { source: e });
+    }
+
+    Ok(())
 }
 
 /// chmod based on fd opened with O_PATH
