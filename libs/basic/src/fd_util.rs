@@ -14,9 +14,9 @@
 use crate::error::*;
 use nix::{
     errno::Errno,
-    fcntl::{FcntlArg, FdFlag, OFlag},
+    fcntl::{openat, FcntlArg, FdFlag, OFlag},
     ioctl_read,
-    sys::stat::SFlag,
+    sys::stat::{Mode, SFlag},
 };
 
 /// check if the given stat.st_mode is regular file
@@ -157,11 +157,33 @@ pub fn fd_get_diskseq(fd: i32) -> Result<u64> {
     Ok(diskseq)
 }
 
+/// open the directory at fd
+pub fn opendirat(dirfd: i32, flags: OFlag) -> Result<nix::dir::Dir> {
+    let nfd = openat(
+        dirfd,
+        ".",
+        OFlag::O_RDONLY | OFlag::O_NONBLOCK | OFlag::O_DIRECTORY | OFlag::O_CLOEXEC | flags,
+        Mode::empty(),
+    )
+    .context(NixSnafu)?;
+
+    nix::dir::Dir::from_fd(nfd).context(NixSnafu)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::fd_util::{stat_is_char, stat_is_reg};
-    use nix::sys::stat::fstat;
-    use std::{fs::File, os::unix::prelude::AsRawFd, path::Path};
+    use nix::{
+        fcntl::{open, OFlag},
+        sys::stat::{fstat, Mode},
+    };
+    use std::{
+        fs::{remove_dir_all, File},
+        os::unix::prelude::AsRawFd,
+        path::Path,
+    };
+
+    use super::opendirat;
 
     #[test]
     fn test_stats() {
@@ -184,5 +206,21 @@ mod tests {
         assert!(fd_non_char_file.as_raw_fd() >= 0);
         let st = fstat(fd_non_char_file.as_raw_fd()).unwrap();
         assert!(!stat_is_char(st.st_mode));
+    }
+
+    #[test]
+    fn test_opendirat() {
+        std::fs::create_dir_all("/tmp/test_opendirat").unwrap();
+        File::create("/tmp/test_opendirat/entry0").unwrap();
+        File::create("/tmp/test_opendirat/entry1").unwrap();
+
+        let dirfd = open("/tmp/test_opendirat", OFlag::O_DIRECTORY, Mode::empty()).unwrap();
+        let mut dir = opendirat(dirfd, OFlag::O_NOFOLLOW).unwrap();
+
+        for e in dir.iter() {
+            let _ = e.unwrap();
+        }
+
+        remove_dir_all("/tmp/test_opendirat").unwrap();
     }
 }
