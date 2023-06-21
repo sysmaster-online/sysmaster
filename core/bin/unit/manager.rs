@@ -38,9 +38,11 @@ use crate::unit::data::{DataManager, UnitState};
 use crate::utils::table::{TableOp, TableSubscribe};
 use basic::path_lookup::LookupPaths;
 use basic::proc_cmdline::get_process_cmdline;
-use basic::process_util;
 use basic::show_table::{CellColor, ShowTable};
+use basic::{initrd_util, process_util, rlimit_util, signal_util};
+use constants::SIG_SWITCH_ROOT_OFFSET;
 use event::Events;
+use libc::getppid;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::convert::TryFrom;
@@ -56,7 +58,6 @@ use sysmaster::unit::{
     UnitType,
 };
 use unit_submanager::UnitSubManagers;
-
 //#[derive(Debug)]
 pub(crate) struct UnitManagerX {
     dm: Rc<DataManager>,
@@ -243,6 +244,47 @@ impl UnitManagerX {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn switch_root(&self, init: &[String]) -> Result<()> {
+        if initrd_util::in_initrd(None) {
+            let mut str_paras = String::new();
+            for para in init {
+                str_paras.push_str(&format!("{}\n", para));
+            }
+            std::fs::remove_file(constants::INIT_PARA_PATH).unwrap_or_else(|err| {
+                log::debug!(
+                    "Failed to remove file of {}: {}.",
+                    constants::INIT_PARA_PATH,
+                    err
+                );
+            });
+            if !str_paras.is_empty() {
+                std::fs::write(constants::INIT_PARA_PATH, str_paras).unwrap_or_else(|err| {
+                    log::error!(
+                        "Failed to write init para to {}: {}",
+                        constants::INIT_PARA_PATH,
+                        err
+                    );
+                });
+            }
+
+            signal_util::reset_all_signal_handlers();
+            signal_util::reset_signal_mask();
+            rlimit_util::rlimit_nofile_safe();
+            let res = unsafe { libc::kill(getppid(), libc::SIGRTMIN() + SIG_SWITCH_ROOT_OFFSET) };
+            if res == 0 {
+                self.set_state(State::SwitchRoot);
+            }
+            Errno::result(res)
+                .map(drop)
+                .map_err(|e| Error::Nix { source: e })
+        } else {
+            log::warn!("not in initrd.");
+            Err(Error::Other {
+                msg: "not in initrd.".to_owned(),
+            })
+        }
     }
 }
 

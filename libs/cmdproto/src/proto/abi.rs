@@ -2,7 +2,7 @@
 #[rustfmt::skip]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandRequest {
-    #[prost(oneof="command_request::RequestData", tags="1, 2, 3, 4, 5")]
+    #[prost(oneof="command_request::RequestData", tags="1, 2, 3, 4, 5, 6")]
     pub request_data: ::core::option::Option<command_request::RequestData>,
 }
 /// Nested message and enum types in `CommandRequest`.
@@ -25,6 +25,9 @@ pub mod command_request {
         ///system commands, reboot/shutdown/halt
         #[prost(message, tag="5")]
         Syscomm(super::SysComm),
+        ///switch root commands
+        #[prost(message, tag="6")]
+        Srcomm(super::SwitchRootComm),
     }
 }
 /// Command Response from server
@@ -144,4 +147,10 @@ pub mod sys_comm {
         Poweroff = 4,
         Hibernate = 5,
     }
+}
+#[rustfmt::skip]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SwitchRootComm {
+    #[prost(string, repeated, tag="1")]
+    pub init: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }

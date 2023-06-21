@@ -13,7 +13,7 @@
 //! Convert the command request into the corresponding execution action
 use super::{
     mngr_comm, sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData,
-    SysComm, UnitComm, UnitFile,
+    SwitchRootComm, SysComm, UnitComm, UnitFile,
 };
 
 use crate::error::*;
@@ -73,6 +73,8 @@ pub trait ExecuterAction {
     fn daemon_reload(&self);
     /// daemon-reexec
     fn daemon_reexec(&self);
+    /// switch root
+    fn switch_root(&self, init: &[String]) -> Result<(), Self::Error>;
 }
 
 /// Depending on the type of request
@@ -100,6 +102,7 @@ where
         Some(RequestData::Mcomm(param)) => param.execute(manager, None, cred),
         Some(RequestData::Syscomm(param)) => param.execute(manager, Some(call_back), cred),
         Some(RequestData::Ufile(param)) => param.execute(manager, Some(call_back), cred),
+        Some(RequestData::Srcomm(param)) => param.execute(manager, None, cred),
         _ => CommandResponse::default(),
     }
 }
@@ -402,6 +405,32 @@ impl Executer for UnitFile {
             status: StatusCode::OK.as_u16() as _,
             error_code,
             message: reply,
+        }
+    }
+}
+
+impl Executer for SwitchRootComm {
+    fn execute(
+        self,
+        manager: Rc<impl ExecuterAction>,
+        _call_back: Option<fn(&str) -> String>,
+        cred: Option<UnixCredentials>,
+    ) -> CommandResponse {
+        if let Some(v) = response_if_credential_dissatisfied(cred, false) {
+            return v;
+        }
+
+        match manager.switch_root(&self.init) {
+            Ok(_) => CommandResponse {
+                status: StatusCode::OK.as_u16() as _,
+                error_code: 0,
+                ..Default::default()
+            },
+            Err(e) => CommandResponse {
+                status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                error_code: e.into() as u32,
+                message: String::from("error."),
+            },
         }
     }
 }

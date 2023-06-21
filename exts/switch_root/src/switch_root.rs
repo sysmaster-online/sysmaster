@@ -10,28 +10,31 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use basic::{initrd_util, IN_SET};
+use libmount::mountinfo;
 use nix::{
     dir::Type,
-    fcntl::{AtFlags, OFlag},
+    errno::Errno,
+    fcntl::{self, AtFlags, OFlag},
     mount::{self, MntFlags, MsFlags},
-    sys::{
-        stat::{self, fstatat, Mode},
-        statfs::{self, FsType},
-    },
-    unistd,
+    sys::stat::{self, fstatat, Mode},
+    unistd::{self, fchownat, FchownatFlags},
 };
 use std::{
     ffi::{CString, OsStr},
-    fs,
+    fs::{self, File},
+    io::Read,
     os::{linux::fs::MetadataExt, unix::prelude::AsRawFd},
     path::Path,
 };
 
-#[cfg(target_env = "musl")]
-type FsTypeT = libc::c_ulong;
-
-#[cfg(not(target_env = "musl"))]
-type FsTypeT = libc::c_long;
+const MODE777: Mode = Mode::S_IRWXU.union(Mode::S_IRWXG).union(Mode::S_IRWXO);
+const MODE755: Mode = Mode::S_IRWXU
+    .union(Mode::S_IRGRP)
+    .union(Mode::S_IRWXO)
+    .union(Mode::S_IROTH)
+    .union(Mode::S_IXOTH);
+const MODE750: Mode = Mode::S_IRWXU.union(Mode::S_IRGRP).union(Mode::S_IXGRP);
 
 pub fn switch_root(new_root: &str) -> bool {
     let old_root = "/";
@@ -40,23 +43,13 @@ pub fn switch_root(new_root: &str) -> bool {
         return false;
     }
 
-    if !root_is_vaild(old_root) {
+    if !root_is_valid(old_root) {
         eprintln!("cannot access /");
         return false;
     }
 
-    if !root_is_vaild(&new_root) {
+    if !root_is_valid(&new_root) {
         eprintln!("cannot access new_root:{}", new_root);
-        return false;
-    }
-
-    let mounts_path = ["/dev", "/proc", "/sys", "/run"];
-    for path in mounts_path {
-        mount_move(path, old_root, new_root);
-    }
-
-    if let Err(e) = unistd::chdir(new_root) {
-        eprintln!("Failed to change directory to {}: {}", &new_root, e);
         return false;
     }
 
@@ -69,6 +62,42 @@ pub fn switch_root(new_root: &str) -> bool {
     };
 
     if let Err(e) = mount::mount(
+        None::<&str>,
+        old_root,
+        None::<&str>,
+        MsFlags::MS_REC | MsFlags::MS_PRIVATE,
+        None::<&str>,
+    ) {
+        log::error!("Failed to set \"/\" mount propagation to private: {e}");
+    }
+
+    let mounts_path = ["/dev", "/proc", "/sys", "/run"];
+    for path in mounts_path {
+        mount_move(path, old_root, new_root);
+    }
+
+    base_filesystem_create(
+        new_root,
+        unistd::Uid::from_raw(0xFFFFFFFF),
+        unistd::Gid::from_raw(0xFFFFFFFF),
+    );
+
+    if let Err(e) = unistd::chdir(new_root) {
+        eprintln!("Failed to change directory to {}: {}", &new_root, e);
+        return false;
+    }
+
+    let old_root_after = "/mnt";
+    let put_old = new_root.to_string() + old_root_after;
+    if !Path::new(&put_old).exists() {
+        if let Err(e) = fs::create_dir_all(&put_old) {
+            log::error!("Failed to crearte {put_old} dir: {e}");
+        }
+    }
+
+    if unistd::pivot_root(new_root, put_old.as_str()).is_ok() {
+        umount_recursive(old_root_after, MntFlags::MNT_DETACH);
+    } else if let Err(e) = mount::mount(
         Some::<&str>(new_root),
         old_root,
         None::<&str>,
@@ -89,10 +118,230 @@ pub fn switch_root(new_root: &str) -> bool {
         return false;
     }
 
-    if in_initrd(old_root) {
+    if initrd_util::in_initrd(None) {
         remove_dir_all_by_dir(old_root_dir);
     }
     true
+}
+
+fn umount_recursive(prefix: &str, mnt_flags: MntFlags) {
+    let mut mount_data = String::new();
+    if let Err(err) = File::open("/proc/self/mountinfo")
+        .unwrap()
+        .read_to_string(&mut mount_data)
+    {
+        eprintln!("Failed to read /proc/self/mountinfo: {}", err);
+        return;
+    }
+
+    let parser = mountinfo::Parser::new(mount_data.as_bytes());
+    for mount_result in parser {
+        match mount_result {
+            Ok(mount) => {
+                if let Some(mount_patch) = mount.mount_point.to_str() {
+                    if !mount_patch.starts_with(prefix) {
+                        continue;
+                    }
+                    if let Err(e) =
+                        nix::mount::umount2(mount_patch, mnt_flags | MntFlags::UMOUNT_NOFOLLOW)
+                    {
+                        println!("Failed to umount {mount_patch}, ignoring:{e}");
+                    }
+                }
+            }
+            Err(err) => {
+                println!("parse mountinfo error: {err}");
+            }
+        }
+    }
+}
+
+macro_rules! LIB_ARCH_TUPLE {
+    () => {
+        if cfg!(target_arch = "x86_64") {
+            BaseFilesystem::new(
+                "lib64",
+                MODE755,
+                vec!["usr/sbin/x86_64-linux-gnu", "usr/lib64"],
+                "ld-linux-x86-64.so.2",
+                false,
+            )
+        } else if cfg!(target_arch = "aarch64") {
+            BaseFilesystem::new(
+                "lib64",
+                MODE777,
+                vec!["usr/sbin/x86_64-linux-gnu", "usr/lib64"],
+                "ld-linux-aarch64.so.1",
+                false,
+            )
+        } else {
+            BaseFilesystem::new(
+                "lib64",
+                MODE777,
+                vec!["usr/sbin/x86_64-linux-gnu", "usr/lib64"],
+                "ld-linux-aarch64.so.1",
+                false,
+            )
+        }
+    };
+}
+
+struct BaseFilesystem<'a> {
+    dir: &'a str,
+    mode: Mode,
+    target: Vec<&'a str>,
+    exists: &'a str,
+    ignore_failure: bool,
+}
+
+impl BaseFilesystem<'_> {
+    const fn new<'a>(
+        dir: &'a str,
+        mode: Mode,
+        target: Vec<&'a str>,
+        exists: &'a str,
+        ignore_failure: bool,
+    ) -> BaseFilesystem<'a> {
+        BaseFilesystem {
+            dir,
+            mode,
+            target,
+            exists,
+            ignore_failure,
+        }
+    }
+}
+
+fn is_valid_uid(uid: unistd::Uid) -> bool {
+    if uid == unistd::Uid::from_raw(0xFFFFFFFF) {
+        return false;
+    }
+
+    if uid == unistd::Uid::from_raw(0xFFFF) {
+        return false;
+    }
+
+    true
+}
+
+fn is_valid_gid(gid: unistd::Gid) -> bool {
+    is_valid_uid(unistd::Uid::from_raw(gid.as_raw()))
+}
+
+fn base_filesystem_create(new_root: &str, uid: unistd::Uid, gid: unistd::Gid) {
+    let table: [BaseFilesystem; 11] = [
+        BaseFilesystem::new("root", MODE750, vec![], "", false),
+        BaseFilesystem::new("usr", MODE755, vec![], "", false),
+        BaseFilesystem::new("var", MODE755, vec![], "", false),
+        BaseFilesystem::new("etc", MODE755, vec![], "", false),
+        BaseFilesystem::new("proc", MODE755, vec![], "", true),
+        BaseFilesystem::new("sys", MODE755, vec![], "", true),
+        BaseFilesystem::new("dev", MODE755, vec![], "", true),
+        BaseFilesystem::new("bin", MODE777, vec!["usr/bin"], "", false),
+        BaseFilesystem::new("lib", MODE777, vec!["usr/lib"], "", true),
+        BaseFilesystem::new("sbin", MODE777, vec!["usr/sbin"], "", false),
+        LIB_ARCH_TUPLE!(),
+    ];
+
+    let new_root_dirfd = match fcntl::open(
+        new_root,
+        OFlag::O_RDONLY
+            | OFlag::O_NONBLOCK
+            | OFlag::O_DIRECTORY
+            | OFlag::O_CLOEXEC
+            | OFlag::O_NOFOLLOW,
+        stat::Mode::empty(),
+    ) {
+        Err(e) => {
+            eprintln!("Failed to open root file system: {e}");
+            return;
+        }
+        Ok(fd) => fd,
+    };
+
+    for base_fs in table.iter() {
+        let path = new_root.to_string() + base_fs.dir;
+        if stat::lstat(path.as_str()).is_ok() {
+            continue;
+        }
+
+        if !base_fs.target.is_empty() {
+            let mut link_to = "";
+            for target in base_fs.target.iter() {
+                let path_target = new_root.to_string() + "/" + *target;
+                if stat::lstat(path_target.as_str()).is_err() {
+                    continue;
+                }
+
+                if !base_fs.exists.is_empty()
+                    && stat::lstat((path_target + "/" + base_fs.exists).as_str()).is_err()
+                {
+                    continue;
+                }
+                link_to = *target;
+                break;
+            }
+
+            if link_to.is_empty() {
+                continue;
+            }
+
+            if let Err(err) = nix::unistd::symlinkat(link_to, Some(new_root_dirfd), base_fs.dir) {
+                eprintln!(
+                    "Failed to create symlink at: {}/{}: {}",
+                    new_root, base_fs.dir, err
+                );
+                if IN_SET!(err, Errno::EEXIST, Errno::EROFS) || base_fs.ignore_failure {
+                    continue;
+                }
+                return;
+            }
+
+            if is_valid_uid(uid) || is_valid_gid(gid) {
+                if let Err(err) = fchownat(
+                    Some(new_root_dirfd),
+                    base_fs.dir,
+                    Some(uid),
+                    Some(gid),
+                    FchownatFlags::NoFollowSymlink,
+                ) {
+                    eprintln!(
+                        "Failed to chown symlink at {}/{}: {}",
+                        new_root, base_fs.dir, err
+                    );
+                    return;
+                }
+            }
+            continue;
+        }
+
+        if let Err(err) = nix::sys::stat::mkdirat(new_root_dirfd, base_fs.dir, base_fs.mode) {
+            eprintln!(
+                "Failed to create directory at: {}/{}: {}",
+                new_root, base_fs.dir, err
+            );
+            if IN_SET!(err, Errno::EEXIST, Errno::EROFS) || base_fs.ignore_failure {
+                continue;
+            }
+            return;
+        }
+
+        if is_valid_uid(uid) || is_valid_gid(gid) {
+            if let Err(err) = fchownat(
+                Some(new_root_dirfd),
+                base_fs.dir,
+                Some(uid),
+                Some(gid),
+                FchownatFlags::NoFollowSymlink,
+            ) {
+                eprintln!(
+                    "Failed to chown directory at: {}/{}: {}",
+                    new_root, base_fs.dir, err
+                );
+                return;
+            }
+        }
+    }
 }
 
 fn remove_dir_all_by_dir(mut dir: nix::dir::Dir) {
@@ -163,7 +412,7 @@ fn remove_dir_all_by_dir(mut dir: nix::dir::Dir) {
     }
 }
 
-fn root_is_vaild<S: AsRef<OsStr> + ?Sized>(s: &S) -> bool {
+fn root_is_valid<S: AsRef<OsStr> + ?Sized>(s: &S) -> bool {
     Path::new(s).exists()
 }
 
@@ -181,16 +430,6 @@ fn mount_move(umount: &str, old_root: &str, new_root: &str) {
     }
 
     mount(&old_mount_path, &new_mount_path);
-}
-
-fn in_initrd(path: &str) -> bool {
-    let is_tmpfs = statfs::statfs(path).map_or(false, |s| {
-        s.filesystem_type() == FsType(libc::TMPFS_MAGIC as FsTypeT)
-    });
-
-    let has_initrd_release = Path::new("/etc/initrd-release").exists();
-
-    is_tmpfs && has_initrd_release
 }
 
 fn same_device_number(str_path_l: &str, str_path_r: &str) -> bool {
@@ -262,6 +501,7 @@ fn mount(source: &str, target: &str) {
 
 #[cfg(test)]
 mod test {
+
     use super::*;
     use std::process::Command;
 
@@ -364,5 +604,36 @@ mod test {
 
         remove_dir_all_by_dir(old_root_dir);
         switch_root_post(old_root, &format!("{old_root}/{}", data.2.as_str()));
+    }
+
+    #[test]
+    fn test_base_filesystem_create() {
+        Command::new("mkdir")
+            .arg("/tmp/new_root")
+            .arg("/tmp/new_root/usr")
+            .arg("/tmp/new_root/usr/lib")
+            .arg("/tmp/new_root/usr/bin")
+            .arg("/tmp/new_root/usr/sbin")
+            .output()
+            .unwrap();
+
+        base_filesystem_create(
+            "/tmp/new_root",
+            unistd::Uid::from_raw(0xFFFFFFFF),
+            unistd::Gid::from_raw(0xFFFFFFFF),
+        );
+
+        let dir = vec![
+            "var", "sys", "root", "proc", "etc", "dev", "sbin", "lib", "bin",
+        ];
+        for dir_ref in dir {
+            assert!(Path::new(("/tmp/new_root/".to_string() + dir_ref).as_str()).exists());
+        }
+
+        Command::new("rm")
+            .arg("-rf")
+            .arg("/tmp/new_root")
+            .output()
+            .unwrap();
     }
 }

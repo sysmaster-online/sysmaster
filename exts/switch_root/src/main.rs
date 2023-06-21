@@ -13,11 +13,9 @@
 //! switch root
 mod switch_root;
 
-use nix::{errno::Errno, unistd};
+use nix::unistd;
 use std::{env, ffi::CString, path::Path};
 use switch_root::switch_root;
-
-use constants::SIG_SWITCH_ROOT_OFFSET;
 
 fn main() {
     let mut args: Vec<String> = env::args().collect();
@@ -34,25 +32,14 @@ fn main() {
         return;
     }
 
-    if args.len() <= 1 {
-        call_sysmaster(args);
-    } else {
-        call_init(args);
-    }
-}
-
-fn call_sysmaster(mut args: Vec<String>) {
-    let mut pid = 1;
-    if !args.is_empty() {
-        pid = args.remove(0).parse().map_or(1, |pid| pid);
-    }
-    let res = unsafe { libc::kill(pid, libc::SIGRTMIN() + SIG_SWITCH_ROOT_OFFSET) };
-    if let Err(err) = Errno::result(res).map(drop) {
-        eprintln!("Failed to kill sysmaster:{err}");
-    }
+    call_init(args);
 }
 
 fn call_init(args: Vec<String>) {
+    if args.is_empty() {
+        return;
+    }
+
     let init_string = args[0].clone();
     if !Path::new(&init_string).exists() {
         eprintln!("{} not exists", &init_string);

@@ -63,6 +63,13 @@ impl CommandRequest {
             })),
         }
     }
+
+    /// Create a new command request for switch root
+    pub fn new_switch_root_comm(init: Vec<String>) -> Self {
+        Self {
+            request_data: Some(RequestData::Srcomm(SwitchRootComm { init })),
+        }
+    }
 }
 
 impl fmt::Display for sys_comm::Action {

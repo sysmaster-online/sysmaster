@@ -136,6 +136,12 @@ enum SubCmd {
         #[clap(required = true)]
         unit_file: Vec<String>,
     },
+
+    // switch root
+    SwitchRoot {
+        #[clap(required = false)]
+        init: Vec<String>,
+    },
 }
 
 /// Generate CommandRequest based on parsed args
@@ -187,6 +193,7 @@ fn generate_command_request(args: Args) -> Option<CommandRequest> {
         SubCmd::DaemonReexec {} => CommandRequest::new_mngrcomm(mngr_comm::Action::Reexec),
 
         SubCmd::ListUnits {} => CommandRequest::new_mngrcomm(mngr_comm::Action::Listunits),
+        SubCmd::SwitchRoot { init } => CommandRequest::new_switch_root_comm(init),
     };
     Some(command_request)
 }

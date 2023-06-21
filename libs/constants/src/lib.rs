@@ -29,3 +29,6 @@ pub const SCTL_SOCKET: &str = "/run/sysmaster/sctl";
 
 /// Default log file path when LogTarget is configured to "file"
 pub const LOG_FILE_PATH: &str = "/var/log/sysmaster/sysmaster.log";
+
+/// A file that stores the init parameters
+pub const INIT_PARA_PATH: &str = "/run/sysmaster/init_para";

@@ -186,6 +186,10 @@ impl ExecuterAction for CommandActionMgr {
     fn daemon_reexec(&self) {
         self.set_state(State::ReExecute);
     }
+
+    fn switch_root(&self, init: &[String]) -> Result<(), Self::Error> {
+        self.um.switch_root(init)
+    }
 }
 
 /// Encapsulate manager and expose api to the outside
@@ -337,6 +341,7 @@ impl Manager {
                 State::Halt => self.reboot(RebootMode::RB_HALT_SYSTEM),
                 State::KExec => self.reboot(RebootMode::RB_KEXEC),
                 State::Suspend => self.reboot(RebootMode::RB_SW_SUSPEND),
+                State::SwitchRoot => return Ok(false),
                 _ => todo!(),
             };
         }

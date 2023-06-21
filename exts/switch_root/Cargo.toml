@@ -10,3 +10,5 @@ nix = "0.24"
 log = "0.4"
 libc = "0.2.*"
 constants = { version = "0.1.0", path = "../../libs/constants" }
+libmount = "0.1.15"
+basic = { path = "../../libs/basic" }

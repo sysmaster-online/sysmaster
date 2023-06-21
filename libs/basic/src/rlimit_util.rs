@@ -14,6 +14,7 @@
 //!
 
 use libc;
+use nix::sys::resource::{self, Resource};
 use std::io::Error;
 use std::mem;
 
@@ -45,5 +46,27 @@ pub fn setrlimit(resource: u8, soft: u64, hard: u64) -> Result<(), Error> {
         Ok(())
     } else {
         Err(Error::last_os_error())
+    }
+}
+
+/// Reset rlimit, ensure safe
+pub fn rlimit_nofile_safe() {
+    let mut limit = match resource::getrlimit(Resource::RLIMIT_NOFILE) {
+        Ok(limit) => limit,
+        Err(e) => {
+            log::warn!("Failed to query RLIMIT_NOFILE: {}", e);
+            return;
+        }
+    };
+
+    log::info!("limit: {}, {}", limit.0, limit.1);
+    if limit.0 <= nix::sys::select::FD_SETSIZE as u64 {
+        return;
+    }
+
+    limit.0 = nix::sys::select::FD_SETSIZE as u64;
+
+    if let Err(e) = resource::setrlimit(Resource::RLIMIT_NOFILE, limit.0, limit.1) {
+        log::warn!("Failed to set RLIMIT_NOFILE: {}", e);
     }
 }

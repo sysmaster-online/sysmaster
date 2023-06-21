@@ -25,13 +25,13 @@ use nix::unistd::{self, ForkResult, Pid};
 use param::Param;
 use signals::Signals;
 use std::ffi::CString;
+use std::io::ErrorKind;
 use std::os::unix::io::RawFd;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{exit, Command};
 use std::rc::Rc;
 
-use constants::SIG_SWITCH_ROOT_OFFSET;
 const INVALID_PID: i32 = -1;
 const SYSMASTER_PATH: &str = "/usr/lib/sysmaster/sysmaster";
 
@@ -50,7 +50,6 @@ pub struct RunTime {
     comm: Comm,
     signals: Signals,
     need_reexec: bool,
-    switching: bool,
 }
 
 impl RunTime {
@@ -68,7 +67,6 @@ impl RunTime {
             comm,
             signals,
             need_reexec: false,
-            switching: false,
         };
 
         run_time.create_sysmaster()?;
@@ -124,26 +122,62 @@ impl RunTime {
         self.epoll.clear();
     }
 
-    pub fn reexec_self(&mut self) {
-        self.clear();
-        let mut args = Vec::new();
-        let mut init_path = CString::new("/usr/bin/init").unwrap();
-        if let Some(str) = std::env::args().next() {
-            init_path = CString::new(str).unwrap();
-            args.push(init_path.clone());
-        }
-        for str in self.cmd.manager_param.iter() {
-            args.push(std::ffi::CString::new(str.to_string()).unwrap());
+    fn reexec_custom_init(&mut self) -> bool {
+        let paras = match std::fs::read(constants::INIT_PARA_PATH) {
+            Err(e) => {
+                if e.kind() != ErrorKind::NotFound {
+                    eprintln!("Failed to read init para file, reexec self init: {}", e);
+                }
+                return false;
+            }
+            Ok(paras) => paras,
+        };
+
+        let paras: Vec<String> = match std::str::from_utf8(&paras) {
+            Ok(str) => str.split('\n').map(|para| para.to_string()).collect(),
+            Err(_) => {
+                return false;
+            }
+        };
+
+        if paras.is_empty() {
+            return false;
         }
 
+        self.exec(&paras[0], &paras)
+    }
+
+    fn exec(&mut self, init_path: &str, args: &[String]) -> bool {
         let cstr_args = args
             .iter()
-            .map(|cstring| cstring.as_c_str())
+            .map(|str| std::ffi::CString::new(str.clone()).unwrap())
             .collect::<Vec<_>>();
 
-        if let Err(e) = unistd::execv(&init_path, &cstr_args) {
-            eprintln!("execv failed: {e}");
+        if let Err(e) = unistd::execv(&CString::new(init_path).unwrap(), &cstr_args) {
+            eprintln!("execv {init_path} failed: {e}");
+            return false;
         }
+        true
+    }
+
+    fn switch_root_run(&mut self) {
+        self.clear();
+        if !self.reexec_custom_init() {
+            self.reexec_self_init();
+        }
+    }
+
+    fn reexec_self_init(&mut self) {
+        let mut args = Vec::new();
+        let mut init_path = String::new();
+
+        for str in std::env::args() {
+            if init_path.is_empty() {
+                init_path = str.clone();
+            }
+            args.push(str);
+        }
+        self.exec(&init_path, &args);
     }
 
     fn reexec_manager(&mut self) {
@@ -196,7 +230,11 @@ impl RunTime {
             match siginfo {
                 _x if self.signals.is_zombie(siginfo) => self.do_recycle(),
                 _x if self.signals.is_restart(siginfo) => self.do_reexec(),
-                _x if self.signals.is_switch_root(siginfo) => self.send_switch_root_signal(),
+                _x if self.signals.is_switch_root(siginfo)
+                    && self.is_sysmaster(siginfo.ssi_pid.try_into().unwrap()) =>
+                {
+                    self.switch_root_run()
+                }
                 _ => {}
             }
         }
@@ -208,9 +246,6 @@ impl RunTime {
             match siginfo {
                 _x if self.signals.is_zombie(siginfo) => {
                     self.signals.recycle_zombie();
-                    if self.is_sysmaster(siginfo.ssi_pid as i32) && self.switching {
-                        self.reexec_self()
-                    }
                 }
                 _x if self.signals.is_restart(siginfo) => self.do_recreate(),
                 _ => {}
@@ -269,23 +304,6 @@ impl RunTime {
                 None => exit(0),
             }
         }
-    }
-
-    fn send_switch_root_signal(&mut self) {
-        let res = unsafe {
-            libc::kill(
-                self.sysmaster_pid.into(),
-                libc::SIGRTMIN() + SIG_SWITCH_ROOT_OFFSET,
-            )
-        };
-        if let Err(err) = Errno::result(res).map(drop) {
-            eprintln!(
-                "Failed to send sysmaster switch-root signal:{:?}  err:{:?} change state to switch_root",
-                self.sysmaster_pid, err
-            );
-        }
-        self.state = InitState::Unrecover;
-        self.switching = true;
     }
 
     fn is_sysmaster(&self, pid: i32) -> bool {
