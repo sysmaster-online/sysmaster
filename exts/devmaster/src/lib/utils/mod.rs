@@ -29,6 +29,7 @@ use shell_words::split;
 use snafu::ResultExt;
 use wait_timeout::ChildExt;
 
+pub(crate) mod loop_device;
 pub(crate) mod macros;
 
 pub(crate) const DEVMASTER_LEGAL_CHARS: &str = "/ $%?,";

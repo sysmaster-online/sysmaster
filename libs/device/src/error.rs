@@ -52,3 +52,21 @@ macro_rules! err_wrapper {
         })
     };
 }
+
+impl Error {
+    /// check whether the device error belongs to specific errno
+    pub fn is_errno(&self, errno: nix::Error) -> bool {
+        match self {
+            Self::Nix { msg: _, source } => *source == errno,
+        }
+    }
+
+    /// check whether the device error indicates the device is absent
+    pub fn is_absent(&self) -> bool {
+        match self {
+            Self::Nix { msg: _, source } => {
+                matches!(source, Errno::ENODEV | Errno::ENXIO | Errno::ENOENT)
+            }
+        }
+    }
+}

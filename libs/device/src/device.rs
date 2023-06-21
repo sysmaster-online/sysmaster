@@ -13,10 +13,11 @@
 //! struct Device
 //!
 use basic::parse_util::{device_path_parse_devnum, parse_devnum, parse_ifindex};
-use libc::{dev_t, mode_t, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT, S_IRUSR};
-use nix::errno::Errno;
+use libc::{dev_t, gid_t, mode_t, uid_t, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT, S_IRUSR};
+use nix::errno::{self, Errno};
 use nix::fcntl::{open, OFlag};
 use nix::sys::stat::{self, lstat, major, makedev, minor, stat};
+use nix::unistd::{Gid, Uid};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
@@ -65,11 +66,11 @@ pub struct Device {
     /// device initialized usec
     pub usec_initialized: u64,
     /// device mode
-    pub devmode: mode_t,
+    pub devmode: Option<mode_t>,
     /// device user id
-    pub devuid: u32,
+    pub devuid: Option<Uid>,
     /// device group id
-    pub devgid: u32,
+    pub devgid: Option<Gid>,
     // only set when device is passed through netlink
     /// uevent action
     pub action: DeviceAction,
@@ -152,9 +153,9 @@ impl Device {
             driver: String::new(),
             device_id: String::new(),
             usec_initialized: 0,
-            devmode: mode_t::MAX,
-            devuid: std::u32::MAX,
-            devgid: std::u32::MAX,
+            devmode: None,
+            devuid: None,
+            devgid: None,
             action: DeviceAction::default(),
             seqnum: 0,
             properties: HashMap::new(),
@@ -199,28 +200,9 @@ impl Device {
             length = length + line.len() + 1;
             let (key, value) = (tokens[0], tokens[1]);
             match key {
-                "DEVPATH" => device.set_syspath("/sys".to_string() + value, false)?,
-                "ACTION" => device.set_action_from_string(value.to_string())?,
-                "SUBSYSTEM" => device.set_subsystem(value.to_string())?,
-                "DEVTYPE" => device.set_devtype(value.to_string())?,
                 "MINOR" => minor = value.to_string(),
                 "MAJOR" => major = value.to_string(),
-                "DEVNAME" => device.set_devname(value.to_string())?,
-                "SEQNUM" => device.set_seqnum_from_string(value.to_string())?,
-                // "PARTN" => {}
-                // "SYNTH_UUID" => {}
-                // "USEC_INITIALIZED" => {}
-                // "DRIVER" => {}
-                // "IFINDEX" => {}
-                // "DEVMODE" => {}
-                // "DEVUID" => {}
-                // "DEVGUID" => {}
-                // "DISKSEQ" => {}
-                // "DEVLINKS" => {}
-                "TAGS" | "CURRENT_TAGS" => {}
-                _ => {
-                    device.add_property_internal(key.to_string(), value.to_string())?;
-                }
+                _ => device.amend_key_value(key, value)?,
             }
         }
 
@@ -1318,6 +1300,15 @@ impl Device {
         Ok(())
     }
 
+    /// add a set of tags, separated by ':'
+    pub fn add_tags(&mut self, tags: String, both: bool) -> Result<(), Error> {
+        for tag in tags.split(':') {
+            self.add_tag(tag.to_string(), both)?;
+        }
+
+        Ok(())
+    }
+
     /// remove specific tag
     pub fn remove_tag(&mut self, tag: &String) {
         self.current_tags.remove(tag);
@@ -1337,9 +1328,16 @@ impl Device {
         self.db_persist = true;
     }
 
-    /// set the link priority of device node
+    /// set the priority of device symlink
     pub fn set_devlink_priority(&mut self, priority: i32) {
         self.devlink_priority = priority;
+    }
+
+    /// get the priority of device symlink
+    pub fn get_devlink_priority(&mut self) -> Result<i32, Error> {
+        self.read_db()?;
+
+        Ok(self.devlink_priority)
     }
 
     /// get the device id
@@ -1388,12 +1386,56 @@ impl Device {
         self.property_devlinks_outdated = true;
     }
 
+    /// add a set of devlinks to the device object
+    pub fn add_devlinks(&mut self, devlinks: String) -> Result<(), Error> {
+        for link in devlinks.split_ascii_whitespace() {
+            self.add_devlink(link.to_string())?;
+        }
+
+        Ok(())
+    }
+
     /// add devlink records to the device object
     pub fn add_devlink(&mut self, devlink: String) -> Result<(), Error> {
         self.devlinks.insert(devlink);
         self.property_devlinks_outdated = true;
 
         Ok(())
+    }
+
+    /// get uid of devnode
+    pub fn get_devnode_uid(&mut self) -> Result<Uid, Error> {
+        self.read_db()?;
+
+        self.devuid.ok_or(Error::Nix {
+            msg: "get_devnode_uid failed: devuid is not set".to_string(),
+            source: errno::Errno::ENOENT,
+        })
+    }
+
+    /// get gid of devnode
+    pub fn get_devnode_gid(&mut self) -> Result<Gid, Error> {
+        self.read_db()?;
+
+        self.devgid.ok_or(Error::Nix {
+            msg: "get_devnode_gid failed: devgid is not set".to_string(),
+            source: errno::Errno::ENOENT,
+        })
+    }
+
+    /// get mode of devnode
+    pub fn get_devnode_mode(&mut self) -> Result<mode_t, Error> {
+        self.read_db()?;
+
+        self.devmode.ok_or(Error::Nix {
+            msg: "get_devnode_mode failed: devmode is not set".to_string(),
+            source: errno::Errno::ENOENT,
+        })
+    }
+
+    /// check whether the device object contains a devlink
+    pub fn has_devlink(&self, devlink: &str) -> bool {
+        self.devlinks.contains(devlink)
     }
 }
 
@@ -1748,18 +1790,15 @@ impl Device {
             let (key, value) = (tokens[0], tokens[1]);
 
             match key {
-                "DEVTYPE" => self.set_devtype(value.to_string())?,
-                "IFINDEX" => self.set_ifindex(value.to_string())?,
-                "DEVNAME" => self.set_devname(value.to_string())?,
-                "DEVMODE" => self.set_devmode(value.to_string())?,
-                "DISKSEQ" => self.set_diskseq(value.to_string())?,
                 "MAJOR" => {
                     major = value.to_string();
                 }
                 "MINOR" => {
                     minor = value.to_string();
                 }
-                _ => {}
+                _ => {
+                    self.amend_key_value(key, value)?;
+                }
             }
         }
 
@@ -1809,17 +1848,38 @@ impl Device {
 
     /// set devmode
     pub(crate) fn set_devmode(&mut self, devmode: String) -> Result<(), Error> {
-        self.add_property_internal("DEVMODE".to_string(), devmode.clone())?;
+        self.devmode = Some(mode_t::from_str_radix(&devmode, 8).map_err(|e| Error::Nix {
+            msg: e.to_string(),
+            source: Errno::EINVAL,
+        })?);
 
-        self.devmode = match devmode.parse() {
-            Ok(m) => m,
-            Err(e) => {
-                return Err(Error::Nix {
-                    msg: e.to_string(),
-                    source: Errno::EINVAL,
-                });
-            }
-        };
+        self.add_property_internal("DEVMODE".to_string(), devmode)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn set_devuid(&mut self, devuid: String) -> Result<(), Error> {
+        let uid = devuid.parse::<uid_t>().map_err(|e| Error::Nix {
+            msg: e.to_string(),
+            source: Errno::EINVAL,
+        })?;
+
+        self.devuid = Some(Uid::from_raw(uid));
+
+        self.add_property_internal("DEVUID".to_string(), devuid)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn set_devgid(&mut self, devgid: String) -> Result<(), Error> {
+        let gid = devgid.parse::<gid_t>().map_err(|e| Error::Nix {
+            msg: e.to_string(),
+            source: Errno::EINVAL,
+        })?;
+
+        self.devgid = Some(Gid::from_raw(gid));
+
+        self.add_property_internal("DEVGID".to_string(), devgid)?;
 
         Ok(())
     }
@@ -1924,7 +1984,15 @@ impl Device {
     }
 
     /// set the initialized timestamp
-    pub(crate) fn set_usec_initialized(&mut self, time: u64) -> Result<(), Error> {
+    pub(crate) fn set_usec_initialized(&mut self, value: String) -> Result<(), Error> {
+        let time = value.parse::<u64>().map_err(|e| Error::Nix {
+            msg: format!(
+                "set_usec_initialized failed: failed to parse initialized time {} ({})",
+                value, e
+            ),
+            source: Errno::EINVAL,
+        })?;
+
         self.add_property_internal("USEC_INITIALIZED".to_string(), time.to_string())?;
         self.usec_initialized = time;
         Ok(())
@@ -2205,21 +2273,14 @@ impl Device {
                     })?;
             }
             "I" => {
-                let time = value.parse::<u64>().map_err(|e| Error::Nix {
-                    msg: format!(
-                        "handle_db_line failed: failed to parse initialized time {} ({})",
-                        value, e
-                    ),
-                    source: Errno::EINVAL,
-                })?;
-
-                self.set_usec_initialized(time).map_err(|e| Error::Nix {
-                    msg: format!(
-                        "handle_db_line failed: failed to set_usec_initialized ({})",
-                        e
-                    ),
-                    source: Errno::EINVAL,
-                })?;
+                self.set_usec_initialized(value.to_string())
+                    .map_err(|e| Error::Nix {
+                        msg: format!(
+                            "handle_db_line failed: failed to set_usec_initialized ({})",
+                            e
+                        ),
+                        source: Errno::EINVAL,
+                    })?;
             }
             "L" => {
                 let priority = value.parse::<i32>().map_err(|e| Error::Nix {
@@ -2311,6 +2372,29 @@ impl Device {
         })?;
 
         Ok(device)
+    }
+
+    pub(crate) fn amend_key_value(&mut self, key: &str, value: &str) -> Result<(), Error> {
+        match key {
+            "DEVPATH" => self.set_syspath("/sys".to_string() + value, false)?,
+            "ACTION" => self.set_action_from_string(value.to_string())?,
+            "SUBSYSTEM" => self.set_subsystem(value.to_string())?,
+            "DEVTYPE" => self.set_devtype(value.to_string())?,
+            "DEVNAME" => self.set_devname(value.to_string())?,
+            "SEQNUM" => self.set_seqnum_from_string(value.to_string())?,
+            "DRIVER" => self.set_driver(value.to_string())?,
+            "IFINDEX" => self.set_ifindex(value.to_string())?,
+            "USEC_INITIALIZED" => self.set_usec_initialized(value.to_string())?,
+            "DEVMODE" => self.set_devmode(value.to_string())?,
+            "DEVUID" => self.set_devuid(value.to_string())?,
+            "DEVGID" => self.set_devgid(value.to_string())?,
+            "DISKSEQ" => self.set_diskseq(value.to_string())?,
+            "DEVLINKS" => self.add_devlinks(value.to_string())?,
+            "TAGS" | "CURRENT_TAGS" => self.add_tags(value.to_string(), key == "CURRENT_TAGS")?,
+            _ => self.add_property_internal(key.to_string(), value.to_string())?,
+        }
+
+        Ok(())
     }
 }
 

@@ -14,8 +14,10 @@
 //!
 
 use super::{
-    node::static_node_apply_permissions, EscapeType, FormatSubstitutionType, OperatorType,
-    RuleFile, RuleLine, RuleLineType, RuleToken, Rules, SubstituteType, TokenType::*,
+    node::{static_node_apply_permissions, update_node},
+    EscapeType, FormatSubstitutionType, OperatorType, RuleFile, RuleLine, RuleLineType, RuleToken,
+    Rules, SubstituteType,
+    TokenType::*,
 };
 use crate::{
     builtin::{BuiltinCommand, BuiltinManager, Netlink},
@@ -58,13 +60,13 @@ use nix::unistd::{Gid, Uid};
 struct ExecuteUnit {
     device: Arc<Mutex<Device>>,
     parent: Option<Arc<Mutex<Device>>>,
-    device_db_clone: RefCell<Option<Device>>,
+    device_db_clone: Arc<Mutex<Device>>,
     name: String,
     program_result: String,
     mode: Option<mode_t>,
     uid: Option<Uid>,
     gid: Option<Gid>,
-    // seclabel_list: HashMap<String, String>,
+    seclabel_list: HashMap<String, String>,
     /// builtin or program in run_list will execute in the end of rule execution
     builtin_run_list: Vec<String>,
     program_run_list: Vec<String>,
@@ -95,13 +97,13 @@ impl ExecuteUnit {
         ExecuteUnit {
             device,
             parent: None,
-            device_db_clone: RefCell::new(None),
+            device_db_clone: Arc::new(Mutex::new(Device::new())),
             name: String::default(),
             program_result: String::default(),
             mode: None,
             uid: None,
             gid: None,
-            // seclabel_list: (),
+            seclabel_list: HashMap::new(),
             builtin_run_list: vec![],
             program_run_list: vec![],
 
@@ -470,6 +472,69 @@ impl ExecuteUnit {
         *idx = idx_b;
         Ok(Some((subst, attr)))
     }
+
+    pub(crate) fn update_devnode(&mut self) -> Result<()> {
+        if let Err(e) = self.device.as_ref().lock().unwrap().get_devnum() {
+            if e.is_errno(Errno::ENOENT) {
+                return Ok(());
+            }
+            log_dev_lock!(error, self.device, e);
+            return Err(Error::Device { source: e });
+        }
+
+        if self.uid.is_none() {
+            match self.device.as_ref().lock().unwrap().get_devnode_uid() {
+                Ok(uid) => self.uid = Some(uid),
+                Err(e) => {
+                    if !e.is_errno(Errno::ENOENT) {
+                        return Err(Error::Device { source: e });
+                    }
+                }
+            }
+        }
+
+        if self.gid.is_none() {
+            match self.device.as_ref().lock().unwrap().get_devnode_gid() {
+                Ok(gid) => self.gid = Some(gid),
+                Err(e) => {
+                    if !e.is_errno(Errno::ENOENT) {
+                        return Err(Error::Device { source: e });
+                    }
+                }
+            }
+        }
+
+        if self.mode.is_none() {
+            match self.device.as_ref().lock().unwrap().get_devnode_mode() {
+                Ok(mode) => self.mode = Some(mode),
+                Err(e) => {
+                    if !e.is_errno(Errno::ENOENT) {
+                        return Err(Error::Device { source: e });
+                    }
+                }
+            }
+        }
+
+        let apply_mac = self
+            .device
+            .as_ref()
+            .lock()
+            .unwrap()
+            .get_action()
+            .map(|action| action == DeviceAction::Add)
+            .unwrap_or(false);
+
+        super::node::node_apply_permissions(
+            self.device.clone(),
+            apply_mac,
+            self.mode,
+            self.uid,
+            self.gid,
+            &self.seclabel_list,
+        )?;
+
+        update_node(self.device.clone(), self.device_db_clone.clone())
+    }
 }
 
 /// manage processing units
@@ -539,58 +604,62 @@ impl ExecuteManager {
 
     /// execute rules
     pub(crate) fn execute_rules(&mut self) -> Result<()> {
-        let unit = self.current_unit.as_mut().unwrap();
+        // restrict the scpoe of execute unit
+        {
+            let unit = self.current_unit.as_mut().unwrap();
 
-        let action = unit.device.as_ref().lock().unwrap().action;
+            let action = unit.device.as_ref().lock().unwrap().action;
 
-        if action == DeviceAction::Remove {
-            return self.execute_rules_on_remove();
-        }
+            if action == DeviceAction::Remove {
+                return self.execute_rules_on_remove();
+            }
 
-        // inotify watch end: todo
+            // inotify watch end: todo
 
-        // clone device with db
-        unit.device_db_clone = RefCell::new(Some(
-            unit.device
+            // clone device with db
+            unit.device_db_clone = Arc::new(Mutex::new(
+                unit.device
+                    .as_ref()
+                    .lock()
+                    .unwrap()
+                    .clone_with_db()
+                    .map_err(|e| Error::RulesExecuteError {
+                        msg: format!("failed to clone with db ({})", e),
+                        errno: e.get_errno(),
+                    })?,
+            ));
+
+            // copy all tags to device with db
+            for tag in unit.device.as_ref().lock().unwrap().all_tags.iter() {
+                unit.device_db_clone
+                    .as_ref()
+                    .lock()
+                    .unwrap()
+                    .add_tag(tag.clone(), false)
+                    .map_err(|e| Error::RulesExecuteError {
+                        msg: format!("failed to add tag ({})", e),
+                        errno: e.get_errno(),
+                    })?;
+            }
+
+            // add property to device with db: todo
+            unit.device_db_clone
                 .as_ref()
                 .lock()
                 .unwrap()
-                .clone_with_db()
-                .map_err(|e| Error::RulesExecuteError {
-                    msg: format!("failed to clone with db ({})", e),
-                    errno: e.get_errno(),
-                })?,
-        ));
-
-        // copy all tags to device with db
-        for tag in unit.device.as_ref().lock().unwrap().all_tags.iter() {
-            unit.device_db_clone
-                .borrow_mut()
-                .as_mut()
-                .unwrap()
-                .add_tag(tag.clone(), false)
+                .add_property("ID_RENAMING".to_string(), "".to_string())
                 .map_err(|e| Error::RulesExecuteError {
                     msg: format!("failed to add tag ({})", e),
                     errno: e.get_errno(),
                 })?;
         }
 
-        // add property to device with db: todo
-        unit.device_db_clone
-            .borrow_mut()
-            .as_mut()
-            .unwrap()
-            .add_property("ID_RENAMING".to_string(), "".to_string())
-            .map_err(|e| Error::RulesExecuteError {
-                msg: format!("failed to add tag ({})", e),
-                errno: e.get_errno(),
-            })?;
-
         self.apply_rules()?;
 
         // rename netif: todo
 
         // update devnode: todo
+        self.current_unit.as_mut().unwrap().update_devnode()?;
 
         // preserve old, or get new initialization timestamp: todo
 
@@ -1199,19 +1268,11 @@ impl ExecuteManager {
                 }
             }
             MatchImportDb => {
-                let mut dev_db_clone = self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .device_db_clone
-                    .borrow_mut();
-
-                if dev_db_clone.is_none() {
-                    return Ok(token.op == OperatorType::Nomatch);
-                }
+                let dev_db_clone = self.current_unit.as_ref().unwrap().device_db_clone.clone();
 
                 let val = match dev_db_clone
-                    .as_mut()
+                    .as_ref()
+                    .lock()
                     .unwrap()
                     .get_property_value(&token.value)
                 {

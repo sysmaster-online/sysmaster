@@ -12,7 +12,10 @@
 
 //! utils of libdevmaster
 //!
-use std::sync::{Arc, Mutex};
+use std::{
+    str::Utf8Error,
+    sync::{Arc, Mutex},
+};
 
 use device::Device;
 use snafu::prelude::*;
@@ -94,6 +97,9 @@ pub enum Error {
         /// error number
         errno: nix::errno::Errno,
     },
+
+    #[snafu(display("Invalid utf8 string: {}", source))]
+    Utf8Error { source: Utf8Error },
 }
 
 impl Error {
@@ -105,6 +111,7 @@ impl Error {
                 source,
             } => nix::errno::from_i32(source.raw_os_error().unwrap_or_default()),
             Self::Device { source } => source.get_errno(),
+            Self::Nix { source } => *source,
             Self::Other { msg: _, errno: n } => *n,
             _ => nix::errno::Errno::EINVAL,
         }
