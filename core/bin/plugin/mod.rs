@@ -309,7 +309,7 @@ impl Plugin {
         };
 
         /* We need the lib*.so pass SubUnit and UnitManagerObj to sysmaster-core, and we check if
-         * subunit_create_with_params and um_obj_create exists in lib*.so, because these two funs
+         * subunit_create_with_params and um_obj_create exist in lib*.so, because these two functions
          * will be used to generate SubUnit and UnitManagerObj. */
 
         type FnTypeSubUnit = fn(um: Rc<dyn UmIf>) -> *mut dyn SubUnit;
@@ -469,10 +469,7 @@ impl Plugin {
             Ok(v) => v,
         };
 
-        log::debug!(
-            "create unit obj with param level filter: {:?}",
-            log::max_level()
-        );
+        log::debug!("create unit obj with params");
         let boxed_raw = fun(um.clone());
         Ok(unsafe { Box::from_raw(boxed_raw) })
     }

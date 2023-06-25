@@ -17,9 +17,7 @@
 
 use crate::mng::SocketMngPort;
 use crate::port::SocketPort;
-use crate::{
-    comm::SocketUnitComm, config::SocketConfig, load::SocketLoad, mng::SocketMng,
-};
+use crate::{comm::SocketUnitComm, config::SocketConfig, load::SocketLoad, mng::SocketMng};
 use nix::sys::wait::WaitStatus;
 use std::any::Any;
 use std::{path::PathBuf, rc::Rc};

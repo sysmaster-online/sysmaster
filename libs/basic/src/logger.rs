@@ -207,7 +207,7 @@ fn build_log_config(
                 .build(),
         ),
         "file" => {
-            let pattern = file_path.to_string() + &".{}";
+            let pattern = file_path.to_string() + ".{}";
             let policy = Box::new(CompoundPolicy::new(
                 Box::new(SizeTrigger::new(file_size as u64 * 1024)),
                 Box::new(
