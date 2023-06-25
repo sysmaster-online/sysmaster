@@ -15,7 +15,12 @@ use log::{LevelFilter, Log};
 use log4rs::{
     append::{
         console::{ConsoleAppender, Target},
-        file::FileAppender,
+        rolling_file::{
+            policy::compound::{
+                roll::fixed_window::FixedWindowRoller, trigger::size::SizeTrigger, CompoundPolicy,
+            },
+            RollingFileAppender,
+        },
         Append,
     },
     config::{Appender, Config, Logger, Root},
@@ -78,13 +83,20 @@ impl log::Log for SysLogger {
     fn flush(&self) {}
 }
 
-fn append_log(app_name: &str, level: LevelFilter, target: &str, file_path: Option<&str>) {
+fn append_log(
+    app_name: &str,
+    level: LevelFilter,
+    target: &str,
+    file_path: &str,
+    file_size: u32,
+    file_number: u32,
+) {
     if target == "syslog" {
         let _ = log::set_boxed_logger(Box::new(SysLogger));
         log::set_max_level(level);
         return;
     }
-    let config = build_log_config(app_name, level, target, file_path);
+    let config = build_log_config(app_name, level, target, file_path, file_size, file_number);
     let logger = log4rs::Logger::new(config);
     log::set_max_level(level);
     let _ = log::set_boxed_logger(Box::new(LogPlugin(logger)));
@@ -99,12 +111,18 @@ fn append_log(app_name: &str, level: LevelFilter, target: &str, file_path: Optio
 /// target: log target
 ///
 /// file_path: file path if the target is set to file
-pub fn init_log_for_subum(app_name: &str, level: LevelFilter, target: &str, file: &str) {
-    let file = if file.is_empty() { None } else { Some(file) };
+pub fn init_log_for_subum(
+    app_name: &str,
+    level: LevelFilter,
+    target: &str,
+    file_path: &str,
+    file_size: u32,
+    file_number: u32,
+) {
     /* We should avoid calling init_log here, or we will get many "attempted
      * to set a logger after the logging system was already initialized" error
      * message. */
-    append_log(app_name, level, target, file);
+    append_log(app_name, level, target, file_path, file_size, file_number);
 }
 
 /// Init and set the log target to console
@@ -113,7 +131,7 @@ pub fn init_log_for_subum(app_name: &str, level: LevelFilter, target: &str, file
 ///
 /// level: maximum log level
 pub fn init_log_to_console(app_name: &str, level: LevelFilter) {
-    init_log(app_name, level, "console", None);
+    init_log(app_name, level, "console", "", 0, 0);
 }
 
 /// Init and set the log target to file
@@ -123,8 +141,14 @@ pub fn init_log_to_console(app_name: &str, level: LevelFilter) {
 /// level: maximum log level
 ///
 /// file_path: log to which file
-pub fn init_log_to_file(app_name: &str, level: LevelFilter, file_path: &str) {
-    init_log(app_name, level, "file", Some(file_path));
+pub fn init_log_to_file(
+    app_name: &str,
+    level: LevelFilter,
+    file_path: &str,
+    file_size: u32,
+    file_number: u32,
+) {
+    init_log(app_name, level, "file", file_path, file_size, file_number);
 }
 
 /// Init and set the logger
@@ -136,13 +160,20 @@ pub fn init_log_to_file(app_name: &str, level: LevelFilter, file_path: &str) {
 /// target: log target
 ///
 /// file_path: file path if the target is set to file
-pub fn init_log(app_name: &str, level: LevelFilter, target: &str, file_path: Option<&str>) {
+pub fn init_log(
+    app_name: &str,
+    level: LevelFilter,
+    target: &str,
+    file_path: &str,
+    file_size: u32,
+    file_number: u32,
+) {
     if target == "syslog" {
         let _ = log::set_boxed_logger(Box::new(SysLogger));
         log::set_max_level(level);
         return;
     }
-    let config = build_log_config(app_name, level, target, file_path);
+    let config = build_log_config(app_name, level, target, file_path, file_size, file_number);
     let r = log4rs::init_config(config);
     if let Err(e) = r {
         println!("{e}");
@@ -153,12 +184,18 @@ fn build_log_config(
     app_name: &str,
     level: LevelFilter,
     target: &str,
-    file: Option<&str>,
+    file_path: &str,
+    file_size: u32,
+    file_number: u32,
 ) -> Config {
     let mut target = target;
     /* If the file is configured to None, use console forcely. */
-    if file.is_none() && target == "file" {
-        println!("LogTarget is configured to `file`, but LogFile is not configured, changing the LogTarget to `console`");
+    if (file_path.is_empty() || file_size == 0 || file_number == 0) && target == "file" {
+        println!(
+            "LogTarget is configured to `file`, but configuration is invalid, changing the \
+             LogTarget to `console`, file: {file_path}, file_size: {file_size}, file_number: \
+             {file_number}"
+        );
         target = "console";
     }
     let encoder = Box::new(PatternEncoder::new(LOG_PATTERN));
@@ -169,12 +206,23 @@ fn build_log_config(
                 .target(Target::Stdout)
                 .build(),
         ),
-        "file" => Box::new(
-            FileAppender::builder()
-                .encoder(encoder)
-                .build(file.unwrap())
-                .unwrap(),
-        ),
+        "file" => {
+            let pattern = file_path.to_string() + &".{}";
+            let policy = Box::new(CompoundPolicy::new(
+                Box::new(SizeTrigger::new(file_size as u64 * 1024)),
+                Box::new(
+                    FixedWindowRoller::builder()
+                        .build(&pattern, file_number)
+                        .unwrap(),
+                ),
+            ));
+            Box::new(
+                RollingFileAppender::builder()
+                    .encoder(encoder)
+                    .build(file_path, policy)
+                    .unwrap(),
+            )
+        }
         _ => Box::new(
             ConsoleAppender::builder()
                 .encoder(encoder)

@@ -1408,15 +1408,24 @@ mod unit_submanager {
 
         fn new_sub(&self, unit_type: UnitType) -> Option<Box<dyn UnitManagerObj>> {
             let um = self.um();
-            let target = um.get_log_target();
-            let file = um.get_log_file();
-            let ret = Plugin::get_instance().create_um_obj(unit_type, target, file);
-            if ret.is_err() {
-                log::info!("create um_obj is not found, type {:?}!", unit_type);
-                return None;
-            }
+            log::info!(
+                "Creating UnitManagerObj for {:?} by __um_obj_create()",
+                unit_type
+            );
+            let sub = match Plugin::get_instance().create_um_obj(
+                unit_type,
+                um.get_log_target(),
+                um.get_log_file(),
+                um.get_log_file_size(),
+                um.get_log_file_number(),
+            ) {
+                Err(_) => {
+                    log::info!("__um_obj_create() of {:?} is not found", unit_type);
+                    return None;
+                }
+                Ok(v) => v,
+            };
 
-            let sub = ret.unwrap();
             let reli = um.reliability();
             sub.attach_um(um);
             sub.attach_reli(reli);

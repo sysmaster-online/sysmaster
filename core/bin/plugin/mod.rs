@@ -475,33 +475,44 @@ impl Plugin {
         unit_type: UnitType,
         target: &str,
         file: &str,
+        file_size: u32,
+        file_number: u32,
     ) -> Result<Box<dyn UnitManagerObj>> {
-        match self.get_lib(unit_type) {
-            Ok(dy_lib) => {
-                #[allow(clippy::type_complexity)]
-                let sym: Result<
-                    Symbol<
-                        fn(level: LevelFilter, target: &str, file: &str) -> *mut dyn UnitManagerObj,
-                    >,
-                > = unsafe {
-                    dy_lib
-                        .lib
-                        .get(b"__um_obj_create")
-                        .map_err(|e| Error::PluginLoad { msg: e.to_string() })
-                };
-                if let Ok(fun) = sym {
-                    let boxed_raw = fun(log::max_level(), target, file);
-                    Ok(unsafe { Box::from_raw(boxed_raw) })
-                } else {
-                    Err(Error::PluginLoad {
-                        msg: format!("The library of {:?} is {:?}", unit_type, sym.err()),
-                    })
-                }
+        let dy_lib = match self.get_lib(unit_type) {
+            Err(_) => {
+                return Err(Error::PluginLoad {
+                    msg: format!("create um, the {unit_type:?} plugin is not exist"),
+                });
             }
-            Err(_) => Err(Error::PluginLoad {
-                msg: format!("create um, the {unit_type:?} plugin is not exist"),
-            }),
-        }
+            Ok(v) => v,
+        };
+
+        type FnType = fn(
+            level: LevelFilter,
+            target: &str,
+            file: &str,
+            file_size: u32,
+            file_number: u32,
+        ) -> *mut dyn UnitManagerObj;
+
+        #[allow(clippy::type_complexity)]
+        let sym: Result<Symbol<FnType>> = unsafe {
+            dy_lib
+                .lib
+                .get(b"__um_obj_create")
+                .map_err(|e| Error::PluginLoad { msg: e.to_string() })
+        };
+        let fun = match sym {
+            Err(_) => {
+                return Err(Error::PluginLoad {
+                    msg: format!("The library of {:?} is {:?}", unit_type, sym.err()),
+                })
+            }
+            Ok(v) => v,
+        };
+
+        let boxed_raw = fun(log::max_level(), target, file, file_size, file_number);
+        Ok(unsafe { Box::from_raw(boxed_raw) })
     }
 
     fn get_lib(&self, unit_type: UnitType) -> Result<Arc<Lib>> {

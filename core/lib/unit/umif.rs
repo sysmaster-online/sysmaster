@@ -250,9 +250,11 @@ macro_rules! declure_umobj_plugin {
         pub fn __um_obj_create(
             level: LevelFilter,
             target: &str,
-            file: &str,
+            file_path: &str,
+            file_size: u32,
+            file_number: u32,
         ) -> *mut dyn $crate::unit::UnitManagerObj {
-            logger::init_log_for_subum($name, level, target, file);
+            logger::init_log_for_subum($name, level, target, file_path, file_size, file_number);
             let construcotr: fn() -> $unit_type = $constructor;
             let obj = construcotr();
             let boxed: Box<dyn $crate::unit::UnitManagerObj> = Box::new(obj);
