@@ -62,10 +62,6 @@ use walkdir::{DirEntry, WalkDir};
 
 const LIB_PLUGIN_PATH: &str = "/usr/lib/sysmaster/plugin/";
 
-const CONSTRUCTOR_NAME_DEFAULT: &[u8; 25] = b"__unit_obj_create_default";
-
-const CONSTRUCTOR_NAME_WITH_PARAM: &[u8; 29] = b"__unit_obj_create_with_params";
-
 static INSTANCE: Lazy<Arc<Plugin>> = Lazy::new(|| {
     let plugin = Plugin::new();
     let default_lib_path = Plugin::get_default_libpath();
@@ -293,65 +289,73 @@ impl Plugin {
         filename: &OsStr,
         reload_handler: &mut dynamic_reload::DynamicReload,
     ) -> Result<()> {
-        if let Some(v) = filename.to_str() {
-            let unit_type = self.get_unit_type(v);
-            if unit_type == UnitType::UnitTypeInvalid {
-                log::error!("lib name {} is invalid, skip it", v);
+        let v = match filename.to_str() {
+            None => return Ok(()),
+            Some(v) => v,
+        };
+
+        let unit_type = self.get_unit_type(v);
+        if unit_type == UnitType::UnitTypeInvalid {
+            log::error!("lib name {} is invalid, skipping", v);
+            return Ok(());
+        }
+
+        let lib = match unsafe { reload_handler.add_library(v, dynamic_reload::PlatformName::No) } {
+            Err(e) => {
+                error!("Unable to loading dynamic lib, err {:?}", e);
                 return Ok(());
             }
+            Ok(v) => v,
+        };
 
-            match unsafe { reload_handler.add_library(v, dynamic_reload::PlatformName::No) } {
-                Ok(lib) => {
-                    #[allow(clippy::type_complexity)]
-                    let symunit: Result<Symbol<fn() -> *mut dyn SubUnit>> = unsafe {
-                        lib.lib
-                            .get(CONSTRUCTOR_NAME_DEFAULT)
-                            .map_err(|e| Error::PluginLoad { msg: e.to_string() })
-                    };
-                    if symunit.is_err() {
-                        log::warn!("Lib {} not contain __unit_obj_create_default try  __unit_obj_create_with_params", v);
-                        type SymType = fn(
-                            um: Rc<dyn UmIf>,
-                            level: LevelFilter,
-                            target: &str,
-                            file: &str,
-                        ) -> *mut dyn SubUnit;
-                        #[allow(clippy::type_complexity)]
-                        let symunit: Result<Symbol<SymType>> = unsafe {
-                            lib.lib
-                                .get(CONSTRUCTOR_NAME_WITH_PARAM)
-                                .map_err(|e| Error::PluginLoad { msg: e.to_string() })
-                        };
-                        if symunit.is_err() {
-                            log::error!("Lib {} not contain __unit_obj_create_default and __unit_obj_create_with_params skip it", v);
-                            return Ok(());
-                        }
-                    }
+        /* We need the lib*.so pass SubUnit and UnitManagerObj to sysmaster-core, and we check if
+         * subunit_create_with_params and um_obj_create exists in lib*.so, because these two funs
+         * will be used to generate SubUnit and UnitManagerObj. */
 
-                    #[allow(clippy::type_complexity)]
-                    let symum: Result<
-                        Symbol<
-                            fn(level: LevelFilter, target: &str, file: &str) -> *mut dyn SubUnit,
-                        >,
-                    > = unsafe {
-                        lib.lib
-                            .get(b"__um_obj_create")
-                            .map_err(|e| Error::PluginLoad { msg: e.to_string() })
-                    };
-                    if symum.is_err() {
-                        log::error!("Lib {} not contain __um_obj_create sym um skip it", v);
-                        return Ok(());
-                    }
-                    log::debug!("Insert unit {:?} dynamic lib into libs", unit_type);
-                    {
-                        let mut wloadlibs = self.load_libs.write().unwrap();
-                        (*wloadlibs).insert(unit_type, lib.clone());
-                    }
-                    log::info!("loading dynamic lib successful");
-                }
-                Err(e) => error!("Unable to loading dynamic lib, err {:?}", e),
-            }
+        type FnTypeSubUnit = fn(um: Rc<dyn UmIf>) -> *mut dyn SubUnit;
+        type FnTypeUnitManagerObj = fn(
+            um: Rc<dyn UmIf>,
+            level: LevelFilter,
+            target: &str,
+            file_path: &str,
+            file_size: u32,
+            file_number: u32,
+        ) -> *mut dyn UnitManagerObj;
+
+        /* 1. check if the lib contains __subunit_create_with_params */
+        #[allow(clippy::type_complexity)]
+        let symunit: Result<Symbol<FnTypeSubUnit>> = unsafe {
+            lib.lib
+                .get(b"__subunit_create_with_params")
+                .map_err(|e| Error::PluginLoad { msg: e.to_string() })
+        };
+
+        if symunit.is_err() {
+            log::error!(
+                "Lib {} doesn't contain __subunit_create_with_params, skipping",
+                v
+            );
+            return Ok(());
         }
+
+        /* 2. check if the lib contains __um_obj_create */
+        #[allow(clippy::type_complexity)]
+        let symum: Result<Symbol<FnTypeUnitManagerObj>> = unsafe {
+            lib.lib
+                .get(b"__um_obj_create")
+                .map_err(|e| Error::PluginLoad { msg: e.to_string() })
+        };
+        if symum.is_err() {
+            log::error!("Lib {} doesn't contain __um_obj_create, skipping", v);
+            return Ok(());
+        }
+
+        /* 3. Insert */
+        log::debug!("Inserting {:?} dynamic lib", unit_type);
+        let mut wloadlibs = self.load_libs.write().unwrap();
+        (*wloadlibs).insert(unit_type, lib.clone());
+        log::info!("Successfully loaded dynamic lib");
+
         Ok(())
     }
 

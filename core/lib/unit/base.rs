@@ -169,24 +169,6 @@ pub trait SubUnit: ReStation + UnitMngUtil {
 }
 
 /// #[macro_use]
-/// the macro for create a sub unit instance
-#[macro_export]
-macro_rules! declure_unitobj_plugin_default {
-    ($unit_type:ty, $constructor:path, $name:expr, $level:expr) => {
-        /// method for create the unit instance
-        #[no_mangle]
-        pub fn __unit_obj_create_default() -> *mut dyn $crate::unit::SubUnit {
-            logger::init_log_for_subum($name, $level, "console", "");
-            let construcotr: fn() -> $unit_type = $constructor;
-
-            let obj = construcotr();
-            let boxed: Box<dyn $crate::unit::SubUnit> = Box::new(obj);
-            Box::into_raw(boxed)
-        }
-    };
-}
-
-/// #[macro_use]
 /// the macro for create a sub unit instance with dyn ref of UmIf,
 /// which sub unit wants invoke um interface, about UmIf see doc of UmIf
 #[macro_export]
