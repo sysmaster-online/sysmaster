@@ -13,10 +13,8 @@
 //! mount unit is entry of mount type of unit，need impl
 //! UnitObj,UnitMngUtil, UnitSubClass trait
 
-use super::base::PLUGIN_NAME;
 use super::comm::MountUnitComm;
 use super::mng::MountMng;
-use basic::logger;
 use nix::sys::wait::WaitStatus;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -137,4 +135,4 @@ impl UnitMngUtil for MountUnit {
 }*/
 
 use sysmaster::declure_unitobj_plugin_with_param;
-declure_unitobj_plugin_with_param!(MountUnit, MountUnit::new, PLUGIN_NAME);
+declure_unitobj_plugin_with_param!(MountUnit, MountUnit::new);

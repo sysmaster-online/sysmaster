@@ -12,13 +12,11 @@
 
 use crate::rentry::ServiceRestart;
 
-use super::base::PLUGIN_NAME;
 use super::comm::ServiceUnitComm;
 use super::config::ServiceConfig;
 use super::mng::RunningData;
 use super::mng::ServiceMng;
 use super::rentry::{NotifyAccess, ServiceCommand, ServiceType};
-use basic::logger;
 use basic::special::{BASIC_TARGET, SHUTDOWN_TARGET, SYSINIT_TARGET};
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
@@ -414,4 +412,4 @@ impl ServiceUnit {
 }*/
 
 use sysmaster::declure_unitobj_plugin_with_param;
-declure_unitobj_plugin_with_param!(ServiceUnit, ServiceUnit::new, PLUGIN_NAME);
+declure_unitobj_plugin_with_param!(ServiceUnit, ServiceUnit::new);

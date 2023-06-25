@@ -791,7 +791,7 @@ mod tests {
         let plugin = Plugin::get_instance();
         let umifd = Rc::new(UmIfD);
         let sub_obj = plugin
-            .create_unit_obj_with_um(UnitType::UnitService, umifd.clone())
+            .create_subunit_with_um(UnitType::UnitService, umifd.clone())
             .unwrap();
         sub_obj.attach_um(umifd);
         sub_obj.attach_reli(Rc::clone(&reli));

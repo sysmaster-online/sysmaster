@@ -157,14 +157,13 @@ impl UnitLoadData {
             return None;
         }
 
-        log::info!(
-            "begin create obj for type {:?}, name {} by plugin",
-            unit_type,
-            name
-        );
         let um = self.um();
         let um_rc = Rc::clone(&um);
-        let subclass = match Plugin::get_instance().create_unit_obj_with_um(unit_type, um_rc) {
+        log::info!(
+            "Creating SubUnit for {:?}: {name} by __subunit_create_with_params()",
+            unit_type
+        );
+        let subclass = match Plugin::get_instance().create_subunit_with_um(unit_type, um_rc) {
             Ok(sub) => sub,
             Err(_e) => {
                 log::error!("Failed to create unit_obj!{}", _e);

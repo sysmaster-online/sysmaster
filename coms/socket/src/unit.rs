@@ -18,9 +18,8 @@
 use crate::mng::SocketMngPort;
 use crate::port::SocketPort;
 use crate::{
-    base::PLUGIN_NAME, comm::SocketUnitComm, config::SocketConfig, load::SocketLoad, mng::SocketMng,
+    comm::SocketUnitComm, config::SocketConfig, load::SocketLoad, mng::SocketMng,
 };
-use basic::logger;
 use nix::sys::wait::WaitStatus;
 use std::any::Any;
 use std::{path::PathBuf, rc::Rc};
@@ -229,4 +228,4 @@ impl SocketUnit {
 
 // define the method to create the instance of the unit
 use sysmaster::declure_unitobj_plugin_with_param;
-declure_unitobj_plugin_with_param!(SocketUnit, SocketUnit::new, PLUGIN_NAME);
+declure_unitobj_plugin_with_param!(SocketUnit, SocketUnit::new);

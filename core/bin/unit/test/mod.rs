@@ -39,7 +39,7 @@ pub(crate) mod test_utils {
         let unit_type = unit_name_to_type(name);
         let umifd = Rc::new(UmIfD);
         let plugins = Plugin::get_instance();
-        let subclass = plugins.create_unit_obj_with_um(unit_type, umifd).unwrap();
+        let subclass = plugins.create_subunit_with_um(unit_type, umifd).unwrap();
         subclass.attach_reli(Rc::clone(relir));
         Rc::new(UnitX::new(dmr, rentryr, &file, unit_type, name, subclass))
     }

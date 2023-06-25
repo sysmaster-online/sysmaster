@@ -15,10 +15,8 @@
 //! Trait UnitObj defines the behavior of the sub unit.
 //! Trait UnitMngUtil is used to attach the Unitmanager to the sub unit.
 //! Trait UnitSubClass implement the convert from sub unit to UnitObj.
-use super::base::PLUGIN_NAME;
 use super::comm::TargetUnitComm;
 use super::mng::TargetMng;
-use basic::logger;
 use nix::sys::wait::WaitStatus;
 use std::{path::PathBuf, rc::Rc};
 use sysmaster::error::*;
@@ -193,4 +191,4 @@ impl UnitMngUtil for Target {
 }*/
 
 use sysmaster::declure_unitobj_plugin_with_param;
-declure_unitobj_plugin_with_param!(Target, Target::new, PLUGIN_NAME);
+declure_unitobj_plugin_with_param!(Target, Target::new);

@@ -430,43 +430,47 @@ impl Plugin {
         }
     }
 
-    /// Create a  obj for subclasses of unit
+    /// Create the subunit trait of unit
     /// each sub unit need reference of declure_unitobj_plugin_with_param
     ///
-    pub fn create_unit_obj_with_um(
+    pub fn create_subunit_with_um(
         &self,
         unit_type: UnitType,
         um: Rc<dyn UmIf>,
     ) -> Result<Box<dyn SubUnit>> {
-        type SymType =
-            fn(um: Rc<dyn UmIf>, level: LevelFilter, target: &str, file: &str) -> *mut dyn SubUnit;
-        match self.get_lib(unit_type) {
-            Ok(dy_lib) => {
-                let sym: Result<Symbol<SymType>> = unsafe {
-                    dy_lib
-                        .lib
-                        .get(CONSTRUCTOR_NAME_WITH_PARAM)
-                        .map_err(|e| Error::PluginLoad { msg: e.to_string() })
-                };
-                log::debug!(
-                    "create unit obj with param level filter: {:?}",
-                    log::max_level()
-                );
-                let target = um.get_log_target();
-                let file = um.get_log_file();
-                if let Ok(fun) = sym {
-                    let boxed_raw = fun(um.clone(), log::max_level(), target, file);
-                    Ok(unsafe { Box::from_raw(boxed_raw) })
-                } else {
-                    Err(Error::PluginLoad {
-                        msg: format!("The library of {:?} is {:?}", unit_type, sym.err()),
-                    })
-                }
+        type FnType = fn(um: Rc<dyn UmIf>) -> *mut dyn SubUnit;
+
+        let dy_lib = match self.get_lib(unit_type) {
+            Err(_) => {
+                return Err(Error::PluginLoad {
+                    msg: format!("create unit, the {unit_type:?} plugin is not exist"),
+                })
             }
-            Err(_) => Err(Error::PluginLoad {
-                msg: format!("create unit, the {unit_type:?} plugin is not exist"),
-            }),
-        }
+            Ok(v) => v,
+        };
+
+        let sym: Result<Symbol<FnType>> = unsafe {
+            dy_lib
+                .lib
+                .get(b"__subunit_create_with_params")
+                .map_err(|e| Error::PluginLoad { msg: e.to_string() })
+        };
+
+        let fun = match sym {
+            Err(_) => {
+                return Err(Error::PluginLoad {
+                    msg: format!("The library of {:?} is {:?}", unit_type, sym.err()),
+                })
+            }
+            Ok(v) => v,
+        };
+
+        log::debug!(
+            "create unit obj with param level filter: {:?}",
+            log::max_level()
+        );
+        let boxed_raw = fun(um.clone());
+        Ok(unsafe { Box::from_raw(boxed_raw) })
     }
     /// Create a  obj for subclasses of unit manager
     /// each sub unit manager need reference of declure_umobj_plugin
@@ -583,7 +587,7 @@ mod tests {
     fn test_plugin_create_unit() {
         let plugin = init_test();
         let umifd = Rc::new(UmIfD);
-        let unitobj = plugin.create_unit_obj_with_um(UnitType::UnitService, umifd);
+        let unitobj = plugin.create_subunit_with_um(UnitType::UnitService, umifd);
         assert!(
             unitobj.is_ok(),
             "create unit [{:?}] failed",
