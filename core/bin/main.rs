@@ -82,16 +82,13 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     let manager_config = Rc::new(ManagerConfig::new(None));
-    let log_file = if manager_config.LogFile.is_empty() {
-        None
-    } else {
-        Some(manager_config.LogFile.as_str())
-    };
     logger::init_log(
         "sysmaster",
         manager_config.LogLevel,
         &manager_config.LogTarget,
-        log_file,
+        &manager_config.LogFile,
+        manager_config.LogFileSize,
+        manager_config.LogFileNumber,
     );
     log::info!("sysmaster running in system mode.");
 

@@ -30,6 +30,10 @@ pub struct ManagerConfig {
     pub LogTarget: String,
     #[config(default = "")]
     pub LogFile: String,
+    #[config(default = 10240)]
+    pub LogFileSize: u32,
+    #[config(default = 10)]
+    pub LogFileNumber: u32,
 
     #[config(default = 1048576)] // RELI_HISTORY_MAPSIZE_DEFAULT
     pub DbSize: usize,
@@ -55,6 +59,8 @@ impl Default for ManagerConfig {
             LogLevel: log::LevelFilter::Debug,
             LogTarget: "console".to_string(),
             LogFile: String::new(),
+            LogFileSize: 10240,
+            LogFileNumber: 10,
             DbSize: RELI_HISTORY_MAPSIZE_DEFAULT,
         }
     }

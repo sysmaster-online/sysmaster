@@ -475,6 +475,14 @@ impl UmIf for UnitManager {
         self.get_log_target()
     }
 
+    fn get_log_file_size(&self) -> u32 {
+        self.get_log_file_size()
+    }
+
+    fn get_log_file_number(&self) -> u32 {
+        self.get_log_file_number()
+    }
+
     /// set the service's socket fd
     fn service_set_socket_fd(&self, service_name: &str, fd: i32) {
         let service = match self.units_get(service_name) {
@@ -1129,6 +1137,14 @@ impl UnitManager {
 
     fn get_log_target(&self) -> &str {
         &self.manager_config.LogTarget
+    }
+
+    fn get_log_file_size(&self) -> u32 {
+        self.manager_config.LogFileSize
+    }
+
+    fn get_log_file_number(&self) -> u32 {
+        self.manager_config.LogFileNumber
     }
 }
 

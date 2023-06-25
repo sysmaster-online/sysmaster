@@ -195,6 +195,16 @@ pub trait UmIf {
         ""
     }
 
+    /// get the log file size
+    fn get_log_file_size(&self) -> u32 {
+        0
+    }
+
+    /// get the log file number
+    fn get_log_file_number(&self) -> u32 {
+        0
+    }
+
     /// get the log target config
     fn get_log_target(&self) -> &str {
         ""
