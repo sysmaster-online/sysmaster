@@ -15,13 +15,15 @@
 use crate::{error::*, format_proc_fd_path};
 use libc::{fchownat, mode_t, timespec, AT_EMPTY_PATH, S_IFLNK, S_IFMT};
 use nix::{
-    fcntl::{renameat, OFlag},
+    fcntl::{readlink, renameat, OFlag},
     sys::stat::{fstat, Mode},
     unistd::{unlinkat, Gid, Uid, UnlinkatFlags},
 };
 use pathdiff::diff_paths;
 use rand::Rng;
-use std::{fs::remove_dir, io::ErrorKind, os::unix::prelude::PermissionsExt, path::Path};
+use std::{
+    ffi::CString, fs::remove_dir, io::ErrorKind, os::unix::prelude::PermissionsExt, path::Path,
+};
 
 /// open the parent directory of path
 pub fn open_parent(path: &Path, flags: OFlag, mode: Mode) -> Result<i32> {
@@ -148,32 +150,56 @@ pub fn fchmod_and_chown(
     Ok(do_chown || do_chmod)
 }
 
-/// if ts are not provided, use the current timestamp by default.
+/// Update the timestamp of a file with fd. If 'ts' is not provided, use the current timestamp by default.
 pub fn futimens_opath(fd: i32, ts: Option<[timespec; 2]>) -> Result<()> {
-    let r = unsafe {
-        libc::utimensat(
-            libc::AT_FDCWD,
-            format_proc_fd_path!(fd).as_ptr() as *const libc::c_char,
-            &ts.unwrap_or([
-                timespec {
-                    tv_sec: 0,
-                    tv_nsec: libc::UTIME_NOW,
-                },
-                timespec {
-                    tv_sec: 0,
-                    tv_nsec: libc::UTIME_NOW,
-                },
-            ])[0],
-            0,
-        )
-    };
-    if r < 0 {
-        Err(Error::Nix {
-            source: nix::Error::from_i32(std::io::Error::last_os_error().raw_os_error().unwrap()),
-        })
-    } else {
-        Ok(())
+    let fd_path = format_proc_fd_path!(fd);
+    let c_string =
+        CString::new(fd_path.clone()).map_err(|e| crate::Error::NulError { source: e })?;
+    let times = ts.unwrap_or([
+        timespec {
+            tv_sec: 0,
+            tv_nsec: libc::UTIME_NOW,
+        },
+        timespec {
+            tv_sec: 0,
+            tv_nsec: libc::UTIME_NOW,
+        },
+    ])[0];
+
+    if unsafe { libc::utimensat(libc::AT_FDCWD, c_string.as_ptr(), &times, 0) } < 0 {
+        let errno = nix::Error::from_i32(
+            std::io::Error::last_os_error()
+                .raw_os_error()
+                .unwrap_or_default(),
+        );
+
+        if errno == nix::Error::ENOENT {
+            /*
+             * In devmaster threads, utimensat will fail with errno of ENOENT, which means
+             * the file path does not exist, if the fd path is used. The fd path is a symlink to
+             * the opened real file. It is weird because the fd path really exists but utimesat
+             * can not find it. To avoid the failure, we try to follow the fd path symlink to the
+             * real file and update the timestamp directly on it.
+             */
+            let target = readlink(fd_path.as_str()).unwrap();
+            let c_string = target
+                .to_str()
+                .ok_or(Error::Nix { source: errno })
+                .map(|s| unsafe { libc::strdup(s.as_ptr() as *const libc::c_char) })?;
+
+            if unsafe { libc::utimensat(libc::AT_FDCWD, c_string, &times, 0) } < 0 {
+                return Err(Error::Nix {
+                    source: nix::Error::from_i32(
+                        std::io::Error::last_os_error().raw_os_error().unwrap(),
+                    ),
+                });
+            }
+        } else {
+            return Err(Error::Nix { source: errno });
+        }
     }
+
+    Ok(())
 }
 
 /// recursively remove parent directories until specific directory

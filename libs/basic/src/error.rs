@@ -44,6 +44,9 @@ pub enum Error {
     #[snafu(display("procfs: {}", source))]
     Proc { source: procfs::ProcError },
 
+    #[snafu(display("NulError: '{}'", source))]
+    NulError { source: std::ffi::NulError },
+
     #[snafu(display("Error parsing from string: {}", source))]
     Parse {
         source: Box<dyn std::error::Error + Send + Sync>,
@@ -52,13 +55,13 @@ pub enum Error {
     #[snafu(display("Invalid naming scheme string: {}", what))]
     ParseNamingScheme { what: String },
 
-    #[snafu(display("Not exist): '{}'.", what))]
+    #[snafu(display("Not exist: '{}'.", what))]
     NotExisted { what: String },
 
     #[snafu(display("Invalid: '{}'.", what))]
     Invalid { what: String },
 
-    #[snafu(display("OtherError): '{}'.", msg))]
+    #[snafu(display("OtherError: '{}'.", msg))]
     Other { msg: String },
 }
 
