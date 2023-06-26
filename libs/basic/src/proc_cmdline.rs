@@ -14,6 +14,7 @@
 use crate::conf_parser;
 use crate::error::*;
 use nix::unistd::Pid;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
@@ -78,6 +79,42 @@ pub fn proc_cmdline_get_bool(key: &str) -> Result<bool, Error> {
     let r = conf_parser::parse_boolean(&val.unwrap())?;
 
     Ok(r)
+}
+
+/// parse cmdline item
+pub fn parse_proc_cmdline_item(key: String, value: String, data: &mut HashSet<String>) {
+    if key.eq("module_blacklist") {
+        if value.is_empty() {
+            return;
+        }
+
+        let k: Vec<&str> = value.split(',').collect();
+
+        for i in k {
+            data.insert(i.to_string());
+        }
+    }
+}
+
+/// parse cmdline
+pub fn proc_cmdline_parse<F, T>(parse_item: F, data: &mut T)
+where
+    F: Fn(String, String, &mut T),
+{
+    let line = get_process_cmdline(&Pid::from_raw(1));
+    if line.is_empty() {
+        log::info!("/proc/1/cmdline is empty!");
+        return;
+    }
+
+    let v: Vec<&str> = line.split(' ').collect();
+    for i in &v {
+        let value = match i.to_string().split('=').nth(1) {
+            None => break,
+            Some(v) => v.to_string(),
+        };
+        parse_item(i.to_string(), value, data);
+    }
 }
 
 /// read /proc/PID/cmdline and return

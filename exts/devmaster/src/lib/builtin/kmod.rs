@@ -17,34 +17,98 @@ use crate::builtin::Builtin;
 use crate::builtin::Netlink;
 use crate::error::Result;
 use device::Device;
+use kmod_rs;
+use kmod_rs::KmodResources;
+use std::borrow::Borrow;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 /// kmod builtin command
-pub struct Kmod;
+pub struct Kmod {
+    /// kmod struct
+    kernel_module: Rc<RefCell<kmod_rs::LibKmod>>,
+}
+
+impl Kmod {
+    /// create Kmod
+    pub fn new() -> Kmod {
+        Kmod {
+            kernel_module: Rc::new(RefCell::new(kmod_rs::LibKmod::new())),
+        }
+    }
+}
+
+impl Default for Kmod {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl Builtin for Kmod {
     /// builtin command
     fn cmd(
         &self,
-        _device: Arc<Mutex<Device>>,
+        device: Arc<Mutex<Device>>,
         _ret_rtnl: &mut RefCell<Option<Netlink>>,
-        _argc: i32,
-        _argv: Vec<String>,
+        argc: i32,
+        argv: Vec<String>,
         _test: bool,
     ) -> Result<bool> {
+        let mut kmod = (*self.kernel_module).borrow_mut();
+
+        if kmod.borrow().is_ctx_null() {
+            return Ok(true);
+        }
+
+        if argc < 2 || argv[1] != *"load" {
+            return Err(crate::error::Error::BuiltinCommandError {
+                msg: "Too few argument".to_string(),
+            });
+        }
+
+        if argc == 2 {
+            let modalias = device
+                .lock()
+                .unwrap()
+                .get_property_value("MODALIAS")
+                .map_or(String::new(), |e| e);
+
+            if !modalias.is_empty() {
+                if let Err(e) = kmod.module_load_and_warn(&modalias) {
+                    log::error!("Load module {} failed: {}", modalias, e);
+                }
+            }
+        } else {
+            for i in 2..argc {
+                if let Err(e) = kmod.module_load_and_warn(&argv[i as usize]) {
+                    log::error!("Load module {} failed, {}", argv[i as usize], e);
+                }
+            }
+        }
         Ok(true)
     }
 
     /// builtin init function
-    fn init(&self) {}
+    fn init(&self) {
+        if let Err(e) = self.kernel_module.as_ref().borrow_mut().load_resources() {
+            log::error!("Load resources failed! {}", e);
+        }
+    }
 
     /// builtin exit function
     fn exit(&self) {}
 
     /// check whether builtin command should reload
     fn should_reload(&self) -> bool {
-        false
+        self.kernel_module
+            .as_ref()
+            .borrow_mut()
+            .validate_resources()
+            .map_or(false, |e| {
+                log::debug!("Kernel module index needs reloading.");
+                e != KmodResources::KmodResourceOk
+            })
     }
 
     /// the help of builtin command

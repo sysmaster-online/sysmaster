@@ -12,9 +12,9 @@ done
 
 # Install required tools if not already installed
 if [ ! -f "/etc/centos-release" ] && [ ! -f "/etc/fedora-release" ]; then
-    required_packages=("gcc" "openssl-libs" "python3-pip" "musl-gcc" "clang" "util-linux-devel")
+    required_packages=("gcc" "openssl-libs" "python3-pip" "musl-gcc" "clang" "util-linux-devel" "kmod-devel")
 else
-    required_packages=("gcc" "openssl-libs" "python3-pip" "musl-gcc" "clang")
+    required_packages=("gcc" "openssl-libs" "python3-pip" "musl-gcc" "clang" "kmod-devel")
 fi
 missing_packages=()
 

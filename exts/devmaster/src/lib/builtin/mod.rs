@@ -187,7 +187,7 @@ impl BuiltinManager {
         builtins.insert(BuiltinCommand::Hwdb, Box::new(hwdb::Hwdb {}));
         builtins.insert(BuiltinCommand::InputId, Box::new(input_id::InputId {}));
         builtins.insert(BuiltinCommand::Keyboard, Box::new(keyboard::Keyboard {}));
-        builtins.insert(BuiltinCommand::Kmod, Box::new(kmod::Kmod {}));
+        builtins.insert(BuiltinCommand::Kmod, Box::new(kmod::Kmod::new()));
         builtins.insert(BuiltinCommand::NetId, Box::new(net_id::NetId {}));
         builtins.insert(
             BuiltinCommand::NetSetupLink,
