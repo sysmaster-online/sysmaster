@@ -18,7 +18,12 @@ sysmaster支持从`/etc/sysmaster/system.toml`中读取系统配置，用于配�
 
 * 类型：字符串
 
-支持配置为`"console"`，`"file"`，`"syslog"`。配置为`"console"`，日志将输出到终端；配置为`"file"`，日志将输出到`LogFile`配置的路径，此时`LogFile`必须配置为合法的绝对地址；配置为`"syslog"`，日志将输出到系统日志。缺省值为`"console"`。
+支持配置为`"console"`，`"file"`，`"rolling_file"`，`"syslog"`。
+
+* 配置为`"console"`，日志将输出到终端。
+* 配置为`"file"`，日志将输出到`LogFile`配置的路径，此时`LogFile`必须配置为合法的绝对地址，文件权限为600。
+* 配置为`"rolling_file"`和配置为`"file"`类似，区别为底层调用log4rs的RollingFileAppender机制，生成的日志文件权限为644。
+* 配置为`"syslog"`，日志将输出到系统日志。缺省值为`"console"`。
 
 ### LogFile
 
