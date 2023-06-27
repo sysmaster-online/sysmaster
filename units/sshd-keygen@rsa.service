@@ -6,3 +6,6 @@ ConditionFileNotEmpty="|!/etc/ssh/ssh_host_rsa_key"
 Type="oneshot"
 EnvironmentFile="-/etc/sysconfig/sshd"
 ExecStart="/usr/libexec/openssh/sshd-keygen rsa"
+
+[Install]
+WantedBy="sshd-keygen.target"

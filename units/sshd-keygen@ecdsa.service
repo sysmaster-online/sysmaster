@@ -6,3 +6,6 @@ ConditionFileNotEmpty="|!/etc/ssh/ssh_host_ecdsa_key"
 Type="oneshot"
 EnvironmentFile="-/etc/sysconfig/sshd"
 ExecStart="/usr/libexec/openssh/sshd-keygen ecdsa"
+
+[Install]
+WantedBy="sshd-keygen.target"
