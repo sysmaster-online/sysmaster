@@ -135,8 +135,6 @@ impl Worker {
 
             let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
 
-            println!("{}", rules.as_ref().read().unwrap());
-
             match msg {
                 WorkerMessage::Job(device) => {
                     // double cloned, may be optimized in future
