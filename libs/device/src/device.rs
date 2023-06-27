@@ -12,6 +12,9 @@
 
 //! struct Device
 //!
+use crate::err_wrapper;
+use crate::utils::readlink_value;
+use crate::{error::Error, DeviceAction};
 use basic::parse_util::{device_path_parse_devnum, parse_devnum, parse_ifindex};
 use libc::{dev_t, gid_t, mode_t, uid_t, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT, S_IRUSR};
 use nix::errno::{self, Errno};
@@ -19,15 +22,14 @@ use nix::fcntl::{open, OFlag};
 use nix::sys::stat::{self, lstat, major, makedev, minor, stat};
 use nix::unistd::{Gid, Uid};
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
+use std::os::unix::io::AsRawFd;
+use std::os::unix::prelude::FromRawFd;
 use std::path::Path;
 use std::result::Result;
 use std::sync::{Arc, Mutex};
-
-use crate::err_wrapper;
-use crate::utils::readlink_value;
-use crate::{error::Error, DeviceAction};
 
 /// database directory path
 pub const DB_DIRECTORY_PATH: &str = "/run/udev/data/";
@@ -1030,7 +1032,7 @@ impl Device {
                     });
                 } else {
                     // read full virtual file
-                    let mut fd = std::fs::OpenOptions::new()
+                    let mut file = std::fs::OpenOptions::new()
                         .read(true)
                         .open(sysattr_path.clone())
                         .map_err(|e| Error::Nix {
@@ -1041,7 +1043,7 @@ impl Device {
                             source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
                         })?;
                     let mut value = String::new();
-                    fd.read_to_string(&mut value).map_err(|e| Error::Nix {
+                    file.read_to_string(&mut value).map_err(|e| Error::Nix {
                         msg: format!(
                             "get_sysattr_value failed: read sysattr file failed {} ({})",
                             sysattr_path, e
@@ -1077,7 +1079,7 @@ impl Device {
     }
 
     /// open device
-    pub fn open(&mut self, oflags: OFlag) -> Result<i32, Error> {
+    pub fn open(&mut self, oflags: OFlag) -> Result<File, Error> {
         let devname = self.get_devname().map_err(|e| {
             if e.get_errno() == Errno::ENOENT {
                 Error::Nix {
@@ -1120,7 +1122,7 @@ impl Device {
             }
         };
 
-        let fd = match open(
+        let file = match open(
             devname.as_str(),
             if oflags.intersects(OFlag::O_PATH) {
                 oflags
@@ -1129,7 +1131,7 @@ impl Device {
             },
             stat::Mode::empty(),
         ) {
-            Ok(fd) => fd,
+            Ok(fd) => unsafe { std::fs::File::from_raw_fd(fd) },
             Err(e) => {
                 return Err(Error::Nix {
                     msg: format!("open failed: failed to open {}", devname),
@@ -1138,11 +1140,15 @@ impl Device {
             }
         };
 
-        let stat = match nix::sys::stat::fstat(fd) {
+        let stat = match nix::sys::stat::fstat(file.as_raw_fd()) {
             Ok(s) => s,
             Err(e) => {
                 return Err(Error::Nix {
-                    msg: format!("open failed: failed to fstat fd {} for {}", fd, devname),
+                    msg: format!(
+                        "open failed: failed to fstat fd {} for {}",
+                        file.as_raw_fd(),
+                        devname
+                    ),
                     source: e,
                 })
             }
@@ -1182,7 +1188,7 @@ impl Device {
 
         // if open flags has O_PATH, then we cannot check diskseq
         if oflags.intersects(OFlag::O_PATH) {
-            return Ok(fd);
+            return Ok(file);
         }
 
         let mut diskseq: u64 = 0;
@@ -1224,20 +1230,24 @@ impl Device {
             }
         }
 
-        let fd2 = basic::fd_util::fd_reopen(fd, oflags).map_err(|e| Error::Nix {
-            msg: format!("open failed: failed to reopen fd {}", fd),
-            source: match e {
-                basic::Error::Nix { source } => source,
-                _ => Errno::EINVAL,
-            },
-        })?;
+        let file2 =
+            basic::fd_util::fd_reopen(file.as_raw_fd(), oflags).map_err(|e| Error::Nix {
+                msg: format!("open failed: {}", e),
+                source: match e {
+                    basic::Error::Nix { source } => source,
+                    _ => Errno::EINVAL,
+                },
+            })?;
 
         if diskseq == 0 {
-            return Ok(fd2);
+            return Ok(file2);
         }
 
-        let q = basic::fd_util::fd_get_diskseq(fd2).map_err(|e| Error::Nix {
-            msg: format!("open failed: failed to get diskseq on fd {}", fd2),
+        let q = basic::fd_util::fd_get_diskseq(file2.as_raw_fd()).map_err(|e| Error::Nix {
+            msg: format!(
+                "open failed: failed to get diskseq on fd {}",
+                file2.as_raw_fd()
+            ),
             source: match e {
                 basic::Error::Nix { source } => source,
                 _ => Errno::EINVAL,
@@ -1254,7 +1264,7 @@ impl Device {
             });
         }
 
-        Ok(fd2)
+        Ok(file2)
     }
 
     /// add property into device
@@ -2577,8 +2587,8 @@ mod tests {
                                     OFlag::O_NOCTTY | OFlag::O_PATH
                                 },
                         ) {
-                            Ok(fd) => {
-                                assert!(fd >= 0)
+                            Ok(f) => {
+                                assert!(f.as_raw_fd() >= 0)
                             }
                             Err(e) => {
                                 assert!(basic::errno_util::errno_is_privilege(e.get_errno()));

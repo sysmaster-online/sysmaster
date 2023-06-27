@@ -34,6 +34,7 @@ use nix::fcntl::OFlag;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::Read;
+use std::os::unix::prelude::AsRawFd;
 use std::sync::{Arc, Mutex};
 
 /// blkid builtin command
@@ -427,14 +428,14 @@ impl Builtin for Blkid {
                 .map_err(op_command_err!("set_hint error"))?;
         }
 
-        let fd = device
+        let file = device
             .lock()
             .map_err(op_command_err!("device lock error"))?
             .open(OFlag::O_CLOEXEC | OFlag::O_RDONLY | OFlag::O_NONBLOCK)
             .map_err(op_command_err!("device open error"))?;
 
         probe
-            .set_device(fd, args.offset(), 0)
+            .set_device(file.as_raw_fd(), args.offset(), 0)
             .map_err(op_command_err!("set device error"))?;
         self.probe_superblocks(&mut probe)?;
 

@@ -23,6 +23,7 @@ use nix::{
     sys::stat::Mode,
     unistd::AccessFlags,
 };
+use std::os::unix::prelude::AsRawFd;
 use std::{
     collections::HashMap,
     fs,
@@ -361,7 +362,7 @@ impl MountPoint {
         // symlink
 
         let path = Path::new(&self.target);
-        let ret = fs_util::open_parent(
+        let file = fs_util::open_parent(
             path,
             OFlag::O_PATH | OFlag::O_CLOEXEC,
             Mode::from_bits(0).unwrap(),
@@ -369,7 +370,11 @@ impl MountPoint {
 
         let last_file_name = path.file_name().unwrap_or_default();
 
-        let ret = mount_util::mount_point_fd_valid(ret, last_file_name.to_str().unwrap(), flags)?;
+        let ret = mount_util::mount_point_fd_valid(
+            file.as_raw_fd(),
+            last_file_name.to_str().unwrap(),
+            flags,
+        )?;
 
         Ok(ret)
     }

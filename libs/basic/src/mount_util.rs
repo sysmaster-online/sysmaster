@@ -11,6 +11,8 @@
 // See the Mulan PSL v2 for more details.
 
 //!
+use std::os::unix::prelude::RawFd;
+
 use crate::error::*;
 use nix::{
     fcntl::AtFlags,
@@ -18,7 +20,7 @@ use nix::{
 };
 
 ///
-pub fn mount_point_fd_valid(fd: i32, file_name: &str, flags: AtFlags) -> Result<bool> {
+pub fn mount_point_fd_valid(fd: RawFd, file_name: &str, flags: AtFlags) -> Result<bool> {
     assert!(fd >= 0);
 
     let flags = if flags.contains(AtFlags::AT_SYMLINK_FOLLOW) {

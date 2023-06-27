@@ -18,7 +18,7 @@ use nix::{
         recv, sendmsg, AddressFamily, MsgFlags, NetlinkAddr, SockFlag, SockProtocol, SockType,
     },
 };
-use std::io::IoSlice;
+use std::{io::IoSlice, os::unix::prelude::RawFd};
 
 use crate::{device::Device, error::Error};
 
@@ -36,7 +36,7 @@ pub enum MonitorNetlinkGroup {
 #[derive(Debug)]
 pub struct DeviceMonitor {
     /// socket fd
-    socket: i32,
+    socket: RawFd,
     /// socket address, currently only support netlink
     _sockaddr: NetlinkAddr,
 }
@@ -142,6 +142,15 @@ impl DeviceMonitor {
         sendmsg(self.fd(), &iov, &[], MsgFlags::empty(), Some(&dest)).unwrap();
 
         Ok(())
+    }
+}
+
+impl Drop for DeviceMonitor {
+    #[inline]
+    fn drop(&mut self) {
+        unsafe {
+            let _ = libc::close(self.socket);
+        }
     }
 }
 

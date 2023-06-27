@@ -22,16 +22,20 @@ use nix::{
 use pathdiff::diff_paths;
 use rand::Rng;
 use std::{
-    ffi::CString, fs::remove_dir, io::ErrorKind, os::unix::prelude::PermissionsExt, path::Path,
+    ffi::CString,
+    fs::{remove_dir, File},
+    io::ErrorKind,
+    os::unix::prelude::{AsRawFd, FromRawFd, PermissionsExt, RawFd},
+    path::Path,
 };
 
 /// open the parent directory of path
-pub fn open_parent(path: &Path, flags: OFlag, mode: Mode) -> Result<i32> {
+pub fn open_parent(path: &Path, flags: OFlag, mode: Mode) -> Result<File> {
     let parent = path.parent().ok_or(Error::Nix {
         source: nix::errno::Errno::EINVAL,
     })?;
 
-    nix::fcntl::open(parent, flags, mode).context(NixSnafu)
+    Ok(unsafe { File::from_raw_fd(nix::fcntl::open(parent, flags, mode).context(NixSnafu)?) })
 }
 
 /// create symlink link_name -> target
@@ -39,7 +43,7 @@ pub fn symlink(target: &str, link: &str, relative: bool) -> Result<()> {
     let link_path = Path::new(&link);
     let target_path = Path::new(&target);
 
-    let (target_path, dirfd) = if relative {
+    let (target_path, dir) = if relative {
         let link_path_parent = link_path.parent().ok_or(Error::NotExisted {
             what: format!("{}'s parent", link_path.to_string_lossy()),
         })?;
@@ -51,19 +55,19 @@ pub fn symlink(target: &str, link: &str, relative: bool) -> Result<()> {
             Mode::from_bits(0).unwrap(),
         )
         .context(NixSnafu)?;
-        (rel_path, Some(fd))
+        (rel_path, Some(unsafe { File::from_raw_fd(fd) }))
     } else {
         (target_path.to_path_buf(), None)
     };
 
     let mut rng = rand::thread_rng();
-
     let tmp_to = format!("{}.{}", link, rng.gen::<u32>());
+    let raw_fd = dir.map(|f| f.as_raw_fd());
 
-    nix::unistd::symlinkat(target_path.as_path(), dirfd, tmp_to.as_str()).context(NixSnafu)?;
+    nix::unistd::symlinkat(target_path.as_path(), raw_fd, tmp_to.as_str()).context(NixSnafu)?;
 
-    if let Err(e) = renameat(dirfd, tmp_to.as_str(), dirfd, link_path) {
-        let _ = unlinkat(dirfd, tmp_to.as_str(), UnlinkatFlags::NoRemoveDir);
+    if let Err(e) = renameat(raw_fd, tmp_to.as_str(), raw_fd, link_path) {
+        let _ = unlinkat(raw_fd, tmp_to.as_str(), UnlinkatFlags::NoRemoveDir);
         return Err(Error::Nix { source: e });
     }
 
@@ -71,7 +75,7 @@ pub fn symlink(target: &str, link: &str, relative: bool) -> Result<()> {
 }
 
 /// chmod based on fd opened with O_PATH
-pub fn fchmod_opath(fd: i32, mode: mode_t) -> Result<()> {
+pub fn fchmod_opath(fd: RawFd, mode: mode_t) -> Result<()> {
     let fd_path = format_proc_fd_path!(fd);
 
     let mut perms = std::fs::metadata(&fd_path).context(IoSnafu)?.permissions();
@@ -91,7 +95,7 @@ pub fn chmod(path: &str, mode: mode_t) -> Result<()> {
 /// the access mode is above the old mode under old owner or the new
 /// mode under new owner.
 pub fn fchmod_and_chown(
-    fd: i32,
+    fd: RawFd,
     path: &str,
     mode: Option<mode_t>,
     uid: Option<Uid>,
@@ -151,7 +155,7 @@ pub fn fchmod_and_chown(
 }
 
 /// Update the timestamp of a file with fd. If 'ts' is not provided, use the current timestamp by default.
-pub fn futimens_opath(fd: i32, ts: Option<[timespec; 2]>) -> Result<()> {
+pub fn futimens_opath(fd: RawFd, ts: Option<[timespec; 2]>) -> Result<()> {
     let fd_path = format_proc_fd_path!(fd);
     let c_string =
         CString::new(fd_path.clone()).map_err(|e| crate::Error::NulError { source: e })?;

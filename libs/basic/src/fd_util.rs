@@ -18,6 +18,8 @@ use nix::{
     ioctl_read,
     sys::stat::{Mode, SFlag},
 };
+use std::os::unix::prelude::FromRawFd;
+use std::{fs::File, os::unix::prelude::RawFd};
 
 /// check if the given stat.st_mode is regular file
 pub fn stat_is_reg(st_mode: u32) -> bool {
@@ -30,7 +32,7 @@ pub fn stat_is_char(st_mode: u32) -> bool {
 }
 
 ///
-pub fn fd_nonblock(fd: i32, nonblock: bool) -> Result<()> {
+pub fn fd_nonblock(fd: RawFd, nonblock: bool) -> Result<()> {
     assert!(fd >= 0);
 
     let flags = nix::fcntl::fcntl(fd, FcntlArg::F_GETFL).context(NixSnafu)?;
@@ -51,7 +53,7 @@ pub fn fd_nonblock(fd: i32, nonblock: bool) -> Result<()> {
 }
 
 ///
-pub fn fd_cloexec(fd: i32, cloexec: bool) -> Result<()> {
+pub fn fd_cloexec(fd: RawFd, cloexec: bool) -> Result<()> {
     assert!(fd >= 0);
 
     let flags = nix::fcntl::fcntl(fd, FcntlArg::F_GETFD).context(NixSnafu)?;
@@ -69,7 +71,7 @@ pub fn fd_cloexec(fd: i32, cloexec: bool) -> Result<()> {
 }
 
 ///
-pub fn fd_is_cloexec(fd: i32) -> bool {
+pub fn fd_is_cloexec(fd: RawFd) -> bool {
     assert!(fd >= 0);
 
     let flags = nix::fcntl::fcntl(fd, FcntlArg::F_GETFD).unwrap_or(0);
@@ -78,7 +80,7 @@ pub fn fd_is_cloexec(fd: i32) -> bool {
 }
 
 ///
-pub fn close(fd: i32) {
+pub fn close(fd: RawFd) {
     if let Err(e) = nix::unistd::close(fd) {
         log::warn!("close fd {} failed, errno: {}", fd, e);
     }
@@ -90,12 +92,12 @@ pub fn close(fd: i32) {
 /// this function can not work on sockets, as they can not be opened
 ///
 /// note that this function implicitly reset the read index to zero
-pub fn fd_reopen(fd: i32, oflags: OFlag) -> Result<i32> {
+pub fn fd_reopen(fd: RawFd, oflags: OFlag) -> Result<File> {
     if oflags.intersects(OFlag::O_DIRECTORY) {
         let new_fd = nix::fcntl::openat(fd, ".", oflags, nix::sys::stat::Mode::empty())
             .map_err(|e| Error::Nix { source: e })?;
 
-        return Ok(new_fd);
+        return Ok(unsafe { File::from_raw_fd(new_fd) });
     }
 
     match nix::fcntl::open(
@@ -103,7 +105,7 @@ pub fn fd_reopen(fd: i32, oflags: OFlag) -> Result<i32> {
         oflags,
         nix::sys::stat::Mode::empty(),
     ) {
-        Ok(n) => Ok(n),
+        Ok(n) => Ok(unsafe { File::from_raw_fd(n) }),
         Err(e) => {
             if e != Errno::ENOENT {
                 return Err(Error::Nix { source: e });
@@ -137,7 +139,7 @@ ioctl_read!(
 );
 
 /// get the diskseq according to fd
-pub fn fd_get_diskseq(fd: i32) -> Result<u64> {
+pub fn fd_get_diskseq(fd: RawFd) -> Result<u64> {
     let mut diskseq: u64 = 0;
     let ptr: *mut u64 = &mut diskseq;
     unsafe {

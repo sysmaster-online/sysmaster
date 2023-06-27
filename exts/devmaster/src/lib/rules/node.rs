@@ -36,9 +36,10 @@ use crate::{error::*, log_dev_lock, log_dev_lock_option};
 use basic::fs_util::{fchmod_and_chown, futimens_opath, symlink};
 use basic::path_util::path_simplify;
 use basic::{fd_util::opendirat, fs_util::remove_dir_until};
-use cluFlock::{FlockLock, ToFlock};
+use cluFlock::ExclusiveFlock;
 use device::Device;
 use libc::{mode_t, S_IFBLK, S_IFCHR, S_IFLNK, S_IFMT};
+use nix::dir::Dir;
 use nix::fcntl::{open, readlinkat, OFlag};
 use nix::sys::stat::{self, fstat, lstat, major, minor, Mode};
 use nix::unistd::unlink;
@@ -46,6 +47,7 @@ use nix::unistd::{symlinkat, unlinkat, Gid, Uid, UnlinkatFlags};
 use snafu::ResultExt;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, File};
+use std::os::unix::prelude::{AsRawFd, FromRawFd, RawFd};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -64,7 +66,7 @@ pub(crate) fn node_apply_permissions(
         .context(DeviceSnafu)
         .log_error()?;
 
-    let fd = match dev.lock().unwrap().open(OFlag::O_PATH | OFlag::O_CLOEXEC) {
+    let file = match dev.lock().unwrap().open(OFlag::O_PATH | OFlag::O_CLOEXEC) {
         Ok(r) => r,
         Err(e) => {
             if e.is_absent() {
@@ -78,7 +80,7 @@ pub(crate) fn node_apply_permissions(
 
     apply_permission_impl(
         Some(dev),
-        fd,
+        file,
         &devnode,
         apply_mac,
         mode,
@@ -101,12 +103,12 @@ pub(crate) fn static_node_apply_permissions(
 
     let devnode = format!("/dev/{}", name);
 
-    let fd = match open(
+    let file = match open(
         devnode.as_str(),
         OFlag::O_PATH | OFlag::O_CLOEXEC,
         stat::Mode::empty(),
     ) {
-        Ok(ret) => ret,
+        Ok(fd) => unsafe { File::from_raw_fd(fd) },
         Err(e) => {
             if e == nix::errno::Errno::ENOENT {
                 return Ok(());
@@ -115,7 +117,7 @@ pub(crate) fn static_node_apply_permissions(
         }
     };
 
-    let stat = fstat(fd).context(NixSnafu)?;
+    let stat = fstat(file.as_raw_fd()).context(NixSnafu)?;
 
     if (stat.st_mode & S_IFMT) != S_IFBLK && (stat.st_mode & S_IFMT) != S_IFCHR {
         log::warn!("'{}' is neither block nor character, ignoring", devnode);
@@ -128,13 +130,13 @@ pub(crate) fn static_node_apply_permissions(
 
     let seclabel_list = HashMap::new();
 
-    apply_permission_impl(None, fd, &devnode, false, mode, uid, gid, &seclabel_list)
+    apply_permission_impl(None, file, &devnode, false, mode, uid, gid, &seclabel_list)
 }
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_permission_impl(
     dev: Option<Arc<Mutex<Device>>>,
-    fd: i32,
+    file: File,
     devnode: &str,
     apply_mac: bool,
     mode: Option<mode_t>,
@@ -142,7 +144,7 @@ pub(crate) fn apply_permission_impl(
     gid: Option<Gid>,
     _seclabel_list: &HashMap<String, String>,
 ) -> Result<()> {
-    let stat = fstat(fd)
+    let stat = fstat(file.as_raw_fd())
         .context(NixSnafu)
         .log_dev_lock_option_error(dev.clone())?;
 
@@ -177,7 +179,7 @@ pub(crate) fn apply_permission_impl(
                 )
             );
 
-            fchmod_and_chown(fd, devnode, mode, uid, gid)
+            fchmod_and_chown(file.as_raw_fd(), devnode, mode, uid, gid)
                 .context(BasicSnafu)
                 .log_dev_lock_option_error(dev.clone())?;
         }
@@ -189,7 +191,7 @@ pub(crate) fn apply_permission_impl(
      * todo: apply SECLABEL
      */
 
-    if let Err(e) = futimens_opath(fd, None).context(BasicSnafu) {
+    if let Err(e) = futimens_opath(file.as_raw_fd(), None).context(BasicSnafu) {
         log_dev_lock_option!(debug, dev, format!("failed to update timestamp: {}", e));
     }
 
@@ -243,28 +245,36 @@ pub(crate) fn update_symlink(dev: Arc<Mutex<Device>>, symlink: &str, add: bool) 
      * Create link priority directory if it does not exist.
      * The directory is locked until finishing updating device symlink.
      */
-    let (dirfd, _lock) = open_prior_dir(symlink)?;
+    let (dir, lock_file) = open_prior_dir(symlink)?;
 
-    /* update or remove old device symlink under '/run/devmaster/links/<escaped symlink>/' */
-    update_prior_dir(dev.clone(), dirfd, add)?;
+    if let Err(e) = ExclusiveFlock::wait_lock(&lock_file) {
+        log_dev_lock!(
+            error,
+            dev,
+            format!("failed to lock priority directory for '{}': {}", symlink, e)
+        );
+    } else {
+        /* update or remove old device symlink under '/run/devmaster/links/<escaped symlink>/' */
+        update_prior_dir(dev.clone(), dir.as_raw_fd(), add)?;
 
-    /*
-     * find available devnode with the highest priority, if found, create a dangling symlink,
-     * otherwise remove old symlink.
-     */
-    match find_prioritized_devnode(dev.clone(), dirfd) {
-        Err(_) => {
-            format!(
-                "failed to determine device node with highest priority for {}",
-                symlink
-            );
-        }
-        Ok(devnode) => {
-            if let Some(s) = devnode {
-                return node_symlink(dev, s.as_str(), symlink);
+        /*
+         * find available devnode with the highest priority, if found, create a dangling symlink,
+         * otherwise remove old symlink.
+         */
+        match find_prioritized_devnode(dev.clone(), dir.as_raw_fd()) {
+            Err(_) => {
+                format!(
+                    "failed to determine device node with highest priority for {}",
+                    symlink
+                );
             }
-        }
-    };
+            Ok(devnode) => {
+                if let Some(s) = devnode {
+                    return node_symlink(dev, s.as_str(), symlink);
+                }
+            }
+        };
+    }
 
     log_dev_lock!(debug, dev, format!("removing symlink '{}'", symlink));
 
@@ -285,7 +295,7 @@ pub(crate) fn update_symlink(dev: Arc<Mutex<Device>>, symlink: &str, add: bool) 
 }
 
 /// create a link priority directory using the escaped symlink name
-pub(crate) fn open_prior_dir(symlink: &str) -> Result<(i32, FlockLock<File>)> {
+pub(crate) fn open_prior_dir(symlink: &str) -> Result<(Dir, File)> {
     let dirname = get_prior_dir(symlink).map_err(|e| {
         log::error!("failed to get link priority directory: {}", e);
         e
@@ -297,27 +307,23 @@ pub(crate) fn open_prior_dir(symlink: &str) -> Result<(i32, FlockLock<File>)> {
         })
         .log_error()?;
 
-    let dirfd = nix::fcntl::open(
-        dirname.as_str(),
-        OFlag::O_CLOEXEC | OFlag::O_DIRECTORY | OFlag::O_NOFOLLOW | OFlag::O_RDONLY,
-        Mode::from_bits(0o755).unwrap(),
+    let dir = nix::dir::Dir::from_fd(
+        nix::fcntl::open(
+            dirname.as_str(),
+            OFlag::O_CLOEXEC | OFlag::O_DIRECTORY | OFlag::O_NOFOLLOW | OFlag::O_RDONLY,
+            Mode::from_bits(0o755).unwrap(),
+        )
+        .context(NixSnafu)
+        .log_error()?,
     )
-    .context(NixSnafu)
-    .log_error()?;
+    .context(NixSnafu)?;
 
     let lock_path = format!("{}/.lock", dirname);
+    let lock_file = File::create(lock_path.as_str()).context(IoSnafu {
+        filename: lock_path,
+    })?;
 
-    let lock = File::create(lock_path.as_str())
-        .context(IoSnafu {
-            filename: lock_path.clone(),
-        })?
-        .wait_exclusive_lock()
-        .map_err(|e| e.into_err())
-        .context(IoSnafu {
-            filename: lock_path,
-        })?;
-
-    Ok((dirfd, lock))
+    Ok((dir, lock_file))
 }
 
 /// get link priority path based on symlink name
@@ -353,7 +359,7 @@ pub(crate) fn escape_prior_dir(symlink: &str) -> String {
 }
 
 /// return true if the link priority directory is updated
-pub(crate) fn update_prior_dir(dev: Arc<Mutex<Device>>, dirfd: i32, add: bool) -> Result<bool> {
+pub(crate) fn update_prior_dir(dev: Arc<Mutex<Device>>, dirfd: RawFd, add: bool) -> Result<bool> {
     let id = dev
         .as_ref()
         .lock()
@@ -406,7 +412,7 @@ pub(crate) fn update_prior_dir(dev: Arc<Mutex<Device>>, dirfd: i32, add: bool) -
 
 /// read a symlink under the link priority directory and get the devnode and pirority
 /// return a tuple: (priority, devnode)
-fn prior_dir_read_one(dirfd: i32, name: &str) -> Result<(i32, String)> {
+fn prior_dir_read_one(dirfd: RawFd, name: &str) -> Result<(i32, String)> {
     let pointee = readlinkat(dirfd, name).context(NixSnafu).log_error()?;
 
     let pointee_str = pointee.to_str().ok_or(Error::Other {
@@ -637,13 +643,13 @@ mod test {
 
                 {
                     match open_prior_dir("/dev/test/update_prior_dir") {
-                        Ok((dirfd, _)) => {
+                        Ok((dir, _)) => {
                             /* create priority link in first time */
-                            assert!(update_prior_dir(arc.clone(), dirfd, true).unwrap());
+                            assert!(update_prior_dir(arc.clone(), dir.as_raw_fd(), true).unwrap());
                             /* priority link already exists, didn't update anything */
-                            assert!(!update_prior_dir(arc.clone(), dirfd, true).unwrap());
+                            assert!(!update_prior_dir(arc.clone(), dir.as_raw_fd(), true).unwrap());
                             /* remove priority link */
-                            assert!(update_prior_dir(arc, dirfd, false).unwrap());
+                            assert!(update_prior_dir(arc, dir.as_raw_fd(), false).unwrap());
                         }
                         Err(e) => {
                             assert!(e.get_errno() == nix::Error::EACCES);
