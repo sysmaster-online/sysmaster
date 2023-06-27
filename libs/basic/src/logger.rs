@@ -201,7 +201,6 @@ impl FileLogger {
         /* 3. Write message */
         if let Err(e) = file.write((msg + "\n").as_bytes()) {
             println!("Failed to log message: {e}");
-            return;
         }
     }
 
@@ -235,13 +234,13 @@ impl FileLogger {
             num_list.push(rotated_num);
         }
 
-        num_list.sort();
+        num_list.sort_unstable();
 
         /* 1. delete surplus rotated file */
         /* We only keep (file_number - 1) rotated files, because we will generate a new one later. */
         let file_number = self.file_number as usize;
-        for i in file_number - 1..num_list.len() {
-            let src = String::from(&file_name_dot) + &num_list[i].to_string();
+        for rotated_num in num_list.iter().skip(file_number - 1) {
+            let src = String::from(&file_name_dot) + &rotated_num.to_string();
             Self::mv_file_in_dir(&src, None, dir);
         }
 
