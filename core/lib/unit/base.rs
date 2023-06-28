@@ -172,7 +172,7 @@ pub trait SubUnit: ReStation + UnitMngUtil {
 /// the macro for create a sub unit instance with dyn ref of UmIf,
 /// which sub unit wants invoke um interface, about UmIf see doc of UmIf
 #[macro_export]
-macro_rules! declure_unitobj_plugin_with_param {
+macro_rules! declare_unitobj_plugin_with_param {
     ($unit_type:ty, $constructor:path) => {
         use log::LevelFilter;
         /// method for create the unit instance

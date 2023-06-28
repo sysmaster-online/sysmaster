@@ -225,5 +225,5 @@ impl SocketUnit {
 }
 
 // define the method to create the instance of the unit
-use sysmaster::declure_unitobj_plugin_with_param;
-declure_unitobj_plugin_with_param!(SocketUnit, SocketUnit::new);
+use sysmaster::declare_unitobj_plugin_with_param;
+declare_unitobj_plugin_with_param!(SocketUnit, SocketUnit::new);

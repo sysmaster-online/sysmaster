@@ -60,5 +60,5 @@ impl Default for ServiceManager {
     }
 }
 
-use sysmaster::declure_umobj_plugin;
-declure_umobj_plugin!(ServiceManager, ServiceManager::default, PLUGIN_NAME);
+use sysmaster::declare_umobj_plugin;
+declare_umobj_plugin!(ServiceManager, ServiceManager::default, PLUGIN_NAME);

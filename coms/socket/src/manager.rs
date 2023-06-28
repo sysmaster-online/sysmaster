@@ -108,5 +108,5 @@ impl Default for SocketManager {
     }
 }
 
-use sysmaster::declure_umobj_plugin;
-declure_umobj_plugin!(SocketManager, SocketManager::default, PLUGIN_NAME);
+use sysmaster::declare_umobj_plugin;
+declare_umobj_plugin!(SocketManager, SocketManager::default, PLUGIN_NAME);

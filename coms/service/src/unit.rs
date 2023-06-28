@@ -411,5 +411,5 @@ impl ServiceUnit {
     }
 }*/
 
-use sysmaster::declure_unitobj_plugin_with_param;
-declure_unitobj_plugin_with_param!(ServiceUnit, ServiceUnit::new);
+use sysmaster::declare_unitobj_plugin_with_param;
+declare_unitobj_plugin_with_param!(ServiceUnit, ServiceUnit::new);

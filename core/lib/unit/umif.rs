@@ -222,7 +222,7 @@ pub trait UnitManagerObj: UnitMngUtil + ReStation {
 /// #[macro_use]
 /// the macro for create a sub unit-manager instance
 #[macro_export]
-macro_rules! declure_umobj_plugin {
+macro_rules! declare_umobj_plugin {
     ($unit_type:ty, $constructor:path, $name:expr) => {
         // method for create the sub-unit-manager instance
         use log::LevelFilter;

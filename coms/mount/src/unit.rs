@@ -134,5 +134,5 @@ impl UnitMngUtil for MountUnit {
     }
 }*/
 
-use sysmaster::declure_unitobj_plugin_with_param;
-declure_unitobj_plugin_with_param!(MountUnit, MountUnit::new);
+use sysmaster::declare_unitobj_plugin_with_param;
+declare_unitobj_plugin_with_param!(MountUnit, MountUnit::new);

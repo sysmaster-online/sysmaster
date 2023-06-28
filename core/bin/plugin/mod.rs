@@ -34,8 +34,8 @@
 //! ```macro_rules
 //! const LOG_LEVEL: u32 = 4;
 //! const PLUGIN_NAME: &str = "TargetUnit";
-//! use sysmaster::declure_unitobj_plugin;
-//! declure_unitobj_plugin!(Target, Target::default, PLUGIN_NAME, LOG_LEVEL);
+//! use sysmaster::declare_unitobj_plugin;
+//! declare_unitobj_plugin!(Target, Target::default, PLUGIN_NAME, LOG_LEVEL);
 //! ````
 //! plugin or find the corresponding so according to the name of the corresponding unit configuration file, and load it dynamically, such as XXX.service to find libservice.so, XXX.socket to find libsocket.so
 //!
@@ -435,7 +435,7 @@ impl Plugin {
     }
 
     /// Create the subunit trait of unit
-    /// each sub unit need reference of declure_unitobj_plugin_with_param
+    /// each sub unit need reference of declare_unitobj_plugin_with_param
     ///
     pub fn create_subunit_with_um(
         &self,
@@ -474,7 +474,7 @@ impl Plugin {
         Ok(unsafe { Box::from_raw(boxed_raw) })
     }
     /// Create a  obj for subclasses of unit manager
-    /// each sub unit manager need reference of declure_umobj_plugin
+    /// each sub unit manager need reference of declare_umobj_plugin
     pub fn create_um_obj(
         &self,
         unit_type: UnitType,

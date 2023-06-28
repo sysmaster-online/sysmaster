@@ -260,10 +260,10 @@ unit作为所管理的系统资源在sysmaster中的投影，unit在通过os接�
     ```
 
 6. 插件注册
-   各类unit以插件方式集成到sysmaster中，unit框架提供了插件注册能力的宏declure_unitobj_plugin，以支持各子unit的注册，插件是一动态库形式加载的，动态库的命名需要和子类的名称保持一致，如service，则动态库的名称应该为libservice.so
+   各类unit以插件方式集成到sysmaster中，unit框架提供了插件注册能力的宏declare_unitobj_plugin，以支持各子unit的注册，插件是一动态库形式加载的，动态库的命名需要和子类的名称保持一致，如service，则动态库的名称应该为libservice.so
 
    ```rust
-   declure_unitobj_plugin!(ServiceUnit, ServiceUnit::default, PLUGIN_NAME, LOG_LEVEL);
+   declare_unitobj_plugin!(ServiceUnit, ServiceUnit::default, PLUGIN_NAME, LOG_LEVEL);
    ```
 
 7. 增加附加功能

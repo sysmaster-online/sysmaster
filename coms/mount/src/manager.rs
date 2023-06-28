@@ -427,8 +427,8 @@ impl Default for MountManager {
     }
 }
 
-use sysmaster::declure_umobj_plugin;
-declure_umobj_plugin!(MountManager, MountManager::default, PLUGIN_NAME);
+use sysmaster::declare_umobj_plugin;
+declare_umobj_plugin!(MountManager, MountManager::default, PLUGIN_NAME);
 
 #[cfg(test)]
 mod test {
