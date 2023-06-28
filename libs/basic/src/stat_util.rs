@@ -14,10 +14,7 @@
 //!
 
 use super::{Error, Result};
-use nix::{
-    errno::Errno,
-    sys::statfs::{self, FsType},
-};
+use nix::sys::statfs::{self, FsType};
 
 #[cfg(any(
     all(target_os = "linux", not(target_env = "musl")),
@@ -42,7 +39,7 @@ pub fn proc_mounted() -> Result<bool> {
         Ok(r) => return Ok(r),
         Err(e) => match e {
             Error::Nix {
-                source: Errno::ENOENT,
+                source: nix::errno::Errno::ENOENT,
             } => {}
             _ => return Err(e),
         },

@@ -89,9 +89,6 @@ done
 
 echo "Fastest source: $fastest_source with latency $min_latency ms"
 
-# Fix cargo clippy timeout by replacing cargo crates with the fastest source
-arch=$(uname -m)
-
 # Modify config
 mkdir -p ~/.cargo
 cat << EOF > ~/.cargo/config
@@ -104,30 +101,11 @@ replace-with = 'replace'
 [source.replace]
 registry = "$fastest_source"
 
-[target.$arch-unknown-linux-musl]
-rustflags = ["-C", "target-feature=-crt-static"]
-
 [net]
 git-fetch-with-cli = true
 EOF
 
 rm -rf  ~/.cargo/.package-cache
-
-# #git加速并安装rust工具链
-# repo="https://github.com/rust-lang/release-team.git"
-# git config --global http.lowSpeedLimit 5
-# git config --global http.lowSpeedTime 30
-# git config --global url."https://gitclone.com/github.com/".insteadOf "https://github.com/"
-# git clone $repo
-# if [ $? -ne 0 ]; then
-#     git config --unset --global url."https://gitclone.com/github.com/".insteadOf "https://github.com/"
-#     git config --global url."https://gh.api.99988866.xyz/https://github.com/".insteadOf "https://github.com/"
-#     git clone $repo
-#     if [ $? -ne 0 ]; then
-#       git config --unset --global url."https://gh.api.99988866.xyz/https://github.com/".insteadOf "https://github.com/"
-#     fi
-# fi
-# rm -rf ./awesome-rust.git
 
 ##拉取代码
 #rm -rf sysmaster

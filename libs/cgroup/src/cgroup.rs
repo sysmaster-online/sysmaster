@@ -336,9 +336,7 @@ pub fn cg_kill_recursive(
 
     if flags.contains(CgFlags::REMOVE) {
         let abs_cg_path = cg_abs_path(cg_path, &PathBuf::from(""))?;
-        if let Err(e) = remove_dir(&abs_cg_path) {
-            return Err(e);
-        }
+        remove_dir(&abs_cg_path)?;
     }
 
     Ok(())

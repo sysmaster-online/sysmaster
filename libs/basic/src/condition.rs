@@ -18,7 +18,6 @@ use nix::{
         statvfs::{fstatvfs, FsFlags},
     },
 };
-use std::os::unix::prelude::AsRawFd;
 
 use libc::{glob, glob_t, GLOB_NOSORT};
 #[cfg(not(target_env = "musl"))]
@@ -301,6 +300,8 @@ impl Condition {
 
     #[cfg(not(target_env = "musl"))]
     fn test_path_is_mount_point(&self) -> i8 {
+        use std::os::unix::prelude::AsRawFd;
+
         if self.params.eq("/") {
             return 1;
         }

@@ -44,47 +44,62 @@ fnmatch-regex = "0.2.0"
 snafu = "0.7"
 clap = { version = "3.1.8", features = ["derive"] }
 
-# 此为 开发配置文件, 给 `cargo build` 所使用.
-[profile.dev]
-opt-level = 0 # 控制编译器构建的`--opt-level`。
-# 0-1适合调试。 2是良好优化的。最大为 3。
-# 's' 企图优化大小, 'z' 则 进一步优化大小.
-debug = true # (u32 or bool) 包括调试信息（调试符号）.
-# 相当于 `-C debuginfo=2` 编译器 标志.
-rpath = false # 控制 编译器 是否应该设置加载器路径.
-# 若为 true, 传递 `-C rpath` 标志 给 编译器.
-lto = false # 链接时间优化通常会减少二进制文件和静态库的大小
-# 但会增加编译时间.
-# 若是 true, 传递 `-C lto` 标志 给 编译器, 和 若是一个
-# 字符串值 像 'thin' ，那会传递 `-C lto=thin`
-# 给 编译器
-debug-assertions = true # 控制是否启用调试断言
-# (e.g. debug_assert!() 和 算术溢出检查)
-codegen-units = 16 # if > 1 并行代码生成，以改善
-# 编译时间, 但阻止了些优化.
-# 传递 `-C codegen-units`.
-panic = 'abort'        # 恐慌策略 (`-C panic=...`), 也可以是 'abort'
-incremental = true     # 是否启用增量编译
-overflow-checks = true # 使用溢出检查进行整数运算。
-# 传递 `-C overflow-checks=...`标志 给 compiler.
+[features]
+default = ["linux"]
+hongmeng = []
+linux = []
 
-# 发布(release)的配置文件, 用于 `cargo build --release` (和 依赖项的
-# `cargo test --release`,  包括本地 library 或 binary).
+# 此为开发配置文件, 给 `cargo build` 所使用.
+[profile.dev]
+opt-level = 'z'           # 控制编译器构建的`--opt-level`。
+                          # 0-1适合调试。 2是良好优化的。最大为 3。
+                          # 's' 企图优化大小, 'z' 则 进一步优化大小.
+debug = true              # (u32 or bool) 包括调试信息（调试符号）.
+                          # 相当于 `-C debuginfo=2` 编译器 标志.
+rpath = false             # 控制 编译器 是否应该设置加载器路径.
+                          # 若为 true, 传递 `-C rpath` 标志 给 编译器.
+lto = false               # 链接时间优化通常会减少二进制文件和静态库的大小
+                          # 但会增加编译时间.
+                          # 若是 true, 传递 `-C lto` 标志 给 编译器, 和 若是一个
+                          # 字符串值 像 'thin' ，那会传递 `-C lto=thin`
+                          # 给 编译器
+debug-assertions = true   # 控制是否启用调试断言
+                          # (e.g. debug_assert!() 和 算术溢出检查)
+codegen-units = 16        # if > 1 并行代码生成，以改善
+                          # 编译时间, 但阻止了些优化.
+                          # 传递 `-C codegen-units`.
+panic = 'abort'           # 恐慌策略 (`-C panic=...`), 也可以是 'abort'
+incremental = true        # 是否启用增量编译
+overflow-checks = true    # 使用溢出检查进行整数运算。
+                          # 传递 `-C overflow-checks=...`标志 给 compiler.
+
 [profile.release]
-opt-level = 'z'
-# for generating debuginfo
-strip = false
+opt-level = 3
+strip = true
 debug = false
 rpath = false
-lto = false
+lto = true
 debug-assertions = false
-codegen-units = 16
+codegen-units = 1
 panic = 'abort'
 incremental = false
 overflow-checks = false
 
-# 测试的配置文件, 用于 `cargo test` (对于 `cargo test --release`，可看
-# `release` 和 `bench` 配置文件).
+# for rpm dist
+[profile.dist]
+inherits = "release"
+opt-level = 3
+# for generating debuginfo
+strip = false
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = false
+
 [profile.test]
 opt-level = 0
 debug = 2
@@ -96,8 +111,6 @@ panic = 'unwind'
 incremental = true
 overflow-checks = true
 
-# 基准的配置文件, 用于`cargo bench` (和 要测试的目标 和
-# 单元测试的 `cargo test --release`).
 [profile.bench]
 opt-level = 3
 debug = false
@@ -139,7 +152,8 @@ members = [
 ]
 exclude = ["config", "tools"]
 
-[features]
-default = ["linux"]
-hongmeng = []
-linux = []
+
+# fix https://github.com/mdaffin/loopdev/issues/65
+[patch.crates-io.loopdev]
+git = 'https://github.com/mulkieran/loopdev'
+branch = 'bump-bindgen-reduce-version'

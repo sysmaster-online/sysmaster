@@ -173,9 +173,7 @@ pub(crate) fn apply_permission_impl(
                     gid.as_ref()
                         .map(|i| i.as_raw())
                         .unwrap_or_else(|| stat.st_gid),
-                    mode.as_ref()
-                        .map(|i| *i as u32)
-                        .unwrap_or_else(|| stat.st_mode),
+                    mode.as_ref().copied().unwrap_or(stat.st_mode),
                 )
             );
 

@@ -160,7 +160,7 @@ macro_rules! log_dev_lock_option {
     ($level:ident, $dev:expr, $msg:expr) => {
         match $dev {
             Some(ref d) => {
-                crate::log_dev_lock!($level, d, $msg);
+                $crate::log_dev_lock!($level, d, $msg);
             }
             None => {
                 log::$level!("{}", $msg);
