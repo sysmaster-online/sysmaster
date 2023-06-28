@@ -269,7 +269,19 @@ pub struct UnitManager {
 impl UmIf for UnitManager {
     /// check the unit s_u_name and t_u_name have atom relation
     fn unit_has_dependecy(&self, s_u_name: &str, atom: UnitRelationAtom, t_u_name: &str) -> bool {
-        self.unit_has_dependecy(s_u_name, atom, t_u_name)
+        let s_unit = if let Some(s_unit) = self.db.units_get(s_u_name) {
+            s_unit
+        } else {
+            return false;
+        };
+
+        let t_unit = if let Some(unit) = self.db.units_get(t_u_name) {
+            unit
+        } else {
+            return false;
+        };
+
+        self.db.dep_is_dep_atom_with(&s_unit, atom, &t_unit)
     }
 
     ///add a unit dependency to th unit deplist
@@ -284,7 +296,20 @@ impl UmIf for UnitManager {
         add_ref: bool,
         mask: UnitDependencyMask,
     ) -> Result<()> {
-        self.unit_add_dependency(unit_name, relation, target_name, add_ref, mask)
+        let s_unit = if let Some(unit) = self.load_unitx(unit_name) {
+            unit
+        } else {
+            return Err(Error::UnitActionENoent);
+        };
+        let t_unit = if let Some(unit) = self.load_unitx(target_name) {
+            unit
+        } else {
+            return Err(Error::UnitActionENoent);
+        };
+
+        self.rt
+            .unit_add_dependency(s_unit, relation, t_unit, add_ref, mask);
+        Ok(())
     }
 
     ///add two unit dependency to the unit
@@ -307,7 +332,11 @@ impl UmIf for UnitManager {
 
     /// load the unit for reference name
     fn load_unit_success(&self, name: &str) -> bool {
-        self.load_unit_success(name)
+        if let Some(unit) = self.load_unitx(name) {
+            return unit.load_state() == UnitLoadState::Loaded;
+        }
+
+        false
     }
 
     fn unit_enabled(&self, name: &str) -> Result<()> {
@@ -329,17 +358,36 @@ impl UmIf for UnitManager {
         Ok(())
     }
 
+    /// check if there is already a stop job in process
     fn has_stop_job(&self, name: &str) -> bool {
-        self.has_stop_job(name)
+        let u = match self.db.units_get(name) {
+            None => return false,
+            Some(v) => v,
+        };
+        self.jm.has_stop_job(&u)
     }
 
+    /// check if there is already a start job in process
     fn has_start_job(&self, name: &str) -> bool {
-        self.has_start_job(name)
+        let u = match self.db.units_get(name) {
+            None => return false,
+            Some(v) => v,
+        };
+        self.jm.has_start_job(&u)
     }
 
     /// check the unit that will be triggered by {name} is in active or activating state
     fn relation_active_or_pending(&self, name: &str) -> bool {
-        self.relation_active_or_pending(name)
+        let deps = self.db.dep_gets(name, UnitRelations::UnitTriggers);
+        let mut pending: bool = false;
+        for dep in deps.iter() {
+            if dep.active_or_activating() {
+                pending = true;
+                break;
+            }
+        }
+
+        pending
     }
 
     fn unit_destroy_runtime_data(&self, runtime_directory: Vec<PathBuf>) -> Result<()> {
@@ -355,8 +403,9 @@ impl UmIf for UnitManager {
         self.start_unit(name, false, "replace")
     }
 
+    ///
     fn events(&self) -> Rc<Events> {
-        self.events()
+        Rc::clone(&self.events)
     }
 
     fn child_unwatch_pid(&self, id: &str, pid: Pid) {
@@ -388,32 +437,66 @@ impl UmIf for UnitManager {
         }
     }
 
+    /// add pid and its correspond unit to
     fn child_watch_pid(&self, id: &str, pid: Pid) {
-        self.child_watch_pid(id, pid)
+        self.db.child_add_watch_pid(id, pid)
     }
 
     fn child_watch_all_pids(&self, id: &str) {
-        self.child_watch_all_pids(id)
+        self.db.child_watch_all_pids(id)
     }
 
     fn child_unwatch_all_pids(&self, id: &str) {
-        self.child_unwatch_all_pids(id)
+        self.db.child_unwatch_all_pids(id)
     }
 
     fn notify_socket(&self) -> Option<PathBuf> {
-        self.notify_socket()
+        self.notify.notify_sock()
     }
 
     fn same_unit_with_pid(&self, unit: &str, pid: Pid) -> bool {
-        self.same_unit_with_pid(unit, pid)
+        if !process_util::valid_pid(pid) {
+            return false;
+        }
+
+        let p_unit = self.db.get_unit_by_pid(pid);
+        if p_unit.is_none() {
+            return false;
+        }
+
+        if p_unit.unwrap().id() == unit {
+            return true;
+        }
+
+        false
     }
 
     fn collect_socket_fds(&self, name: &str) -> Vec<i32> {
-        self.collect_socket_fds(name)
+        let deps = self.db.dep_gets(name, UnitRelations::UnitTriggeredBy);
+        let mut fds = Vec::new();
+        for dep in deps.iter() {
+            if dep.unit_type() != UnitType::UnitSocket {
+                continue;
+            }
+
+            fds.extend(dep.collect_fds())
+        }
+
+        fds
     }
 
-    fn get_dependency_list(&self, _unit_name: &str, _atom: UnitRelationAtom) -> Vec<String> {
-        self.get_dependency_list(_unit_name, _atom)
+    fn get_dependency_list(&self, unit_name: &str, atom: UnitRelationAtom) -> Vec<String> {
+        let s_unit = if let Some(unit) = self.db.units_get(unit_name) {
+            unit
+        } else {
+            log::error!("unit [{}] not found!!!!!", unit_name);
+            return Vec::new();
+        };
+        let dep_units = self.db.dep_gets_atom(&s_unit, atom);
+        dep_units
+            .iter()
+            .map(|uxr| uxr.unit().id().to_string())
+            .collect::<Vec<_>>()
     }
 
     fn unit_has_default_dependecy(&self, _unit_name: &str) -> bool {
@@ -426,7 +509,11 @@ impl UmIf for UnitManager {
     }
 
     fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<String> {
-        self.units_get_all(unit_type)
+        let units = self.db.units_get_all(unit_type);
+        units
+            .iter()
+            .map(|uxr| uxr.unit().id().to_string())
+            .collect::<Vec<_>>()
     }
 
     fn current_active_state(&self, _unit_name: &str) -> UnitActiveState {
@@ -464,23 +551,40 @@ impl UmIf for UnitManager {
     }
 
     fn restart_unit(&self, name: &str, is_manual: bool) -> Result<()> {
-        self.restart_unit(name, is_manual)
-    }
+        let unit = match self.load_unitx(name) {
+            None => {
+                return Err(Error::UnitActionENoent);
+            }
+            Some(v) => v,
+        };
 
-    fn get_log_file(&self) -> &str {
-        self.get_log_file()
-    }
+        if is_manual
+            && unit
+                .get_config()
+                .config_data()
+                .borrow()
+                .Unit
+                .RefuseManualStop
+        {
+            return Err(Error::UnitActionERefuseManualStop);
+        }
 
-    fn get_log_target(&self) -> &str {
-        self.get_log_target()
-    }
+        if unit
+            .get_config()
+            .config_data()
+            .borrow()
+            .Unit
+            .RefuseManualStart
+        {
+            return Err(Error::UnitActionERefuseManualStart);
+        }
 
-    fn get_log_file_size(&self) -> u32 {
-        self.get_log_file_size()
-    }
-
-    fn get_log_file_number(&self) -> u32 {
-        self.get_log_file_number()
+        self.jm.exec(
+            &JobConf::new(&unit, JobKind::Restart),
+            JobMode::Replace,
+            &mut JobAffect::new(false),
+        )?;
+        Ok(())
     }
 
     /// set the service's socket fd
@@ -504,21 +608,6 @@ impl UmIf for UnitManager {
 
 /// the declaration "pub(self)" is for identification only.
 impl UnitManager {
-    /// add pid and its correspond unit to
-    fn child_watch_pid(&self, id: &str, pid: Pid) {
-        self.db.child_add_watch_pid(id, pid)
-    }
-
-    /// add all the pid of unit id, read pids from cgroup path.
-    fn child_watch_all_pids(&self, id: &str) {
-        self.db.child_watch_all_pids(id)
-    }
-
-    /// remove all pids
-    fn child_unwatch_all_pids(&self, id: &str) {
-        self.db.child_unwatch_all_pids(id)
-    }
-
     /// delete the pid from the db
     fn child_unwatch_pid(&self, id: &str, pid: Pid) {
         self.db.child_unwatch_pid(id, pid)
@@ -541,102 +630,6 @@ impl UnitManager {
             return None;
         }
         self.db.units_get(name).map(|uxr| uxr.unit())
-    }
-
-    ///
-    fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<String> {
-        let units = self.db.units_get_all(unit_type);
-        units
-            .iter()
-            .map(|uxr| uxr.unit().id().to_string())
-            .collect::<Vec<_>>()
-    }
-
-    /// load the unit for reference name
-    fn load_unit_success(&self, name: &str) -> bool {
-        if let Some(unit) = self.load_unitx(name) {
-            return unit.load_state() == UnitLoadState::Loaded;
-        }
-
-        false
-    }
-
-    /// check the unit s_u_name and t_u_name have atom relation
-    fn unit_has_dependecy(&self, s_u_name: &str, atom: UnitRelationAtom, t_u_name: &str) -> bool {
-        let s_unit = if let Some(s_unit) = self.db.units_get(s_u_name) {
-            s_unit
-        } else {
-            return false;
-        };
-
-        let t_unit = if let Some(unit) = self.db.units_get(t_u_name) {
-            unit
-        } else {
-            return false;
-        };
-
-        self.db.dep_is_dep_atom_with(&s_unit, atom, &t_unit)
-    }
-
-    ///add a unit dependency to th unit deplist
-    /// can called by sub unit
-    /// sub unit add some default dependency
-    ///
-    pub fn unit_add_dependency(
-        &self,
-        unit_name: &str,
-        relation: UnitRelations,
-        target_name: &str,
-        add_ref: bool,
-        mask: UnitDependencyMask,
-    ) -> Result<()> {
-        let s_unit = if let Some(unit) = self.load_unitx(unit_name) {
-            unit
-        } else {
-            return Err(Error::UnitActionENoent);
-        };
-        let t_unit = if let Some(unit) = self.load_unitx(target_name) {
-            unit
-        } else {
-            return Err(Error::UnitActionENoent);
-        };
-
-        self.rt
-            .unit_add_dependency(s_unit, relation, t_unit, add_ref, mask);
-        Ok(())
-    }
-
-    /// get the unit the has atom relation with the unit
-    fn get_dependency_list(&self, unit_name: &str, atom: UnitRelationAtom) -> Vec<String> {
-        let s_unit = if let Some(unit) = self.db.units_get(unit_name) {
-            unit
-        } else {
-            log::error!("unit [{}] not found!!!!!", unit_name);
-            return Vec::new();
-        };
-        let dep_units = self.db.dep_gets_atom(&s_unit, atom);
-        dep_units
-            .iter()
-            .map(|uxr| uxr.unit().id().to_string())
-            .collect::<Vec<_>>()
-    }
-
-    /// check if there is already a stop job in process
-    fn has_stop_job(&self, name: &str) -> bool {
-        let u = match self.db.units_get(name) {
-            None => return false,
-            Some(v) => v,
-        };
-        self.jm.has_stop_job(&u)
-    }
-
-    /// check if there is already a start job in process
-    fn has_start_job(&self, name: &str) -> bool {
-        let u = match self.db.units_get(name) {
-            None => return false,
-            Some(v) => v,
-        };
-        self.jm.has_start_job(&u)
     }
 
     ///
@@ -713,53 +706,6 @@ impl UnitManager {
         }
     }
 
-    /// return the fds that trigger the unit {name};
-    fn collect_socket_fds(&self, name: &str) -> Vec<i32> {
-        let deps = self.db.dep_gets(name, UnitRelations::UnitTriggeredBy);
-        let mut fds = Vec::new();
-        for dep in deps.iter() {
-            if dep.unit_type() != UnitType::UnitSocket {
-                continue;
-            }
-
-            fds.extend(dep.collect_fds())
-        }
-
-        fds
-    }
-
-    /// check the unit that will be triggered by {name} is in active or activating state
-    fn relation_active_or_pending(&self, name: &str) -> bool {
-        let deps = self.db.dep_gets(name, UnitRelations::UnitTriggers);
-        let mut pending: bool = false;
-        for dep in deps.iter() {
-            if dep.active_or_activating() {
-                pending = true;
-                break;
-            }
-        }
-
-        pending
-    }
-
-    /// check the pid corresponding unit is the same with the unit
-    fn same_unit_with_pid(&self, unit: &str, pid: Pid) -> bool {
-        if !process_util::valid_pid(pid) {
-            return false;
-        }
-
-        let p_unit = self.db.get_unit_by_pid(pid);
-        if p_unit.is_none() {
-            return false;
-        }
-
-        if p_unit.unwrap().id() == unit {
-            return true;
-        }
-
-        false
-    }
-
     fn start_unit(&self, name: &str, is_manual: bool, job_mode_str: &str) -> Result<()> {
         let unit = match self.load_unitx(name) {
             None => {
@@ -791,16 +737,6 @@ impl UnitManager {
         )?;
         log::debug!("job exec success");
         Ok(())
-    }
-
-    /// return the notify path
-    fn notify_socket(&self) -> Option<PathBuf> {
-        self.notify.notify_sock()
-    }
-
-    ///
-    pub fn events(&self) -> Rc<Events> {
-        Rc::clone(&self.events)
     }
 
     ///
@@ -873,43 +809,6 @@ impl UnitManager {
                 msg: format!("Failed to load {name}"),
             })
         }
-    }
-
-    pub(self) fn restart_unit(&self, name: &str, is_manual: bool) -> Result<()> {
-        let unit = match self.load_unitx(name) {
-            None => {
-                return Err(Error::UnitActionENoent);
-            }
-            Some(v) => v,
-        };
-
-        if is_manual
-            && unit
-                .get_config()
-                .config_data()
-                .borrow()
-                .Unit
-                .RefuseManualStop
-        {
-            return Err(Error::UnitActionERefuseManualStop);
-        }
-
-        if unit
-            .get_config()
-            .config_data()
-            .borrow()
-            .Unit
-            .RefuseManualStart
-        {
-            return Err(Error::UnitActionERefuseManualStart);
-        }
-
-        self.jm.exec(
-            &JobConf::new(&unit, JobKind::Restart),
-            JobMode::Replace,
-            &mut JobAffect::new(false),
-        )?;
-        Ok(())
     }
 
     fn get_unit_cgroup_path(&self, unit: Rc<Unit>) -> String {

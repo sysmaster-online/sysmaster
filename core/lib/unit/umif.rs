@@ -190,26 +190,6 @@ pub trait UmIf {
         Ok(())
     }
 
-    /// get the log file config
-    fn get_log_file(&self) -> &str {
-        ""
-    }
-
-    /// get the log file size
-    fn get_log_file_size(&self) -> u32 {
-        0
-    }
-
-    /// get the log file number
-    fn get_log_file_number(&self) -> u32 {
-        0
-    }
-
-    /// get the log target config
-    fn get_log_target(&self) -> &str {
-        ""
-    }
-
     /* ========== ONLY VALID IN SERVICE ========== */
     /// set the service's socket fd
     fn service_set_socket_fd(&self, _service_name: &str, _fd: i32) {}
