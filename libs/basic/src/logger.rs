@@ -207,7 +207,7 @@ impl log::Log for FileLogger {
 
 impl FileLogger {
     fn file_open(file_path: &PathBuf, file_mode: u32) -> File {
-        /* Panic if we cann't open a log file. */
+        /* Panic if we can't open a log file. */
         let dir = file_path.parent().unwrap();
         if !dir.exists() {
             fs::create_dir_all(dir).unwrap();
@@ -480,7 +480,6 @@ pub fn init_log(
             file_number,
         )));
         log::set_max_level(level);
-        return;
     }
 }
 
