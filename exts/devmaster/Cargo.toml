@@ -44,6 +44,8 @@ serde = "1.0.130"
 confique = { version = "0.1.3", default-features = false, features = ['toml'] }
 loopdev = "0.4.0"
 cluFlock = "1.2.7"
+input-event-codes = "5.16.8"
+ioctls = "0.6.1"
 
 [build-dependencies]
 basic = { path = "../../libs/basic" }
