@@ -1,0 +1,5 @@
+LogLevel="info"
+LogTarget="syslog"
+LogFile="/var/log/sysmaster/sysmaster.log"
+LogFileSize=10240
+LogFileNumber=10
