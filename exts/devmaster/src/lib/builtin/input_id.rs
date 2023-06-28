@@ -23,6 +23,7 @@ use ioctls::{eviocgabs, input_absinfo};
 use libc::input_id;
 use nix::fcntl::OFlag;
 use std::cell::RefCell;
+use std::os::unix::prelude::AsRawFd;
 use std::sync::{Arc, Mutex};
 
 macro_rules! bits_per_long {
@@ -681,8 +682,8 @@ impl InputId {
         };
 
         unsafe {
-            if eviocgabs(fd, input_event_codes::ABS_X!(), &mut xabsinfo) < 0
-                || eviocgabs(fd, input_event_codes::ABS_Y!(), &mut yabsinfo) < 0
+            if eviocgabs(fd.as_raw_fd(), input_event_codes::ABS_X!(), &mut xabsinfo) < 0
+                || eviocgabs(fd.as_raw_fd(), input_event_codes::ABS_Y!(), &mut yabsinfo) < 0
             {
                 return;
             }
