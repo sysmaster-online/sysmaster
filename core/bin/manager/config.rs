@@ -26,7 +26,7 @@ pub struct ManagerConfig {
 
     #[config(default = "info")]
     pub LogLevel: log::LevelFilter,
-    #[config(default = "console")]
+    #[config(default = "syslog")]
     pub LogTarget: String,
     #[config(default = "")]
     pub LogFile: String,
@@ -57,7 +57,7 @@ impl Default for ManagerConfig {
             DefaultRestartSec: 100,
             DefaultTimeoutSec: 90,
             LogLevel: log::LevelFilter::Debug,
-            LogTarget: "console".to_string(),
+            LogTarget: "syslog".to_string(),
             LogFile: String::new(),
             LogFileSize: 10240,
             LogFileNumber: 10,
