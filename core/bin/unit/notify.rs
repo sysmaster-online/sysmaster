@@ -109,7 +109,7 @@ impl NotifyManager {
     }
 }
 
-const NOTIFY_INVALID_FD: i32 = -1;
+use constants::INVALID_FD;
 const NOTIFY_INVALID_PID: libc::pid_t = -1;
 
 struct Notify {
@@ -135,7 +135,7 @@ impl Notify {
             rentry: Rc::clone(rentryr),
             db: Rc::clone(dbr),
             config: Rc::clone(configr),
-            fd: RefCell::new(NOTIFY_INVALID_FD),
+            fd: RefCell::new(INVALID_FD),
         }
     }
 

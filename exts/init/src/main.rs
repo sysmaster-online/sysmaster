@@ -23,21 +23,14 @@ fn main() {
     // Run: Monitor the sysmaster's liveliness and acceptance of message.
     // Unrecover: On-site problem collection or recreate new sysmaster.
     match RunTime::new(cmd) {
-        Ok(mut run_time) => {
-            loop {
-                let state = run_time.state();
-                let ret = match state {
-                    InitState::Reexec => run_time.reexec(),
-                    InitState::Run => run_time.run(),
-                    InitState::Unrecover => run_time.unrecover(),
-                };
-                if let Err(err) = ret {
-                    eprintln!("Failed to {:?}:{:?} ", state, err);
-                    break;
-                }
+        Ok(mut run_time) => loop {
+            let state = run_time.state();
+            match state {
+                InitState::Reexec => run_time.reexec(),
+                InitState::Run => run_time.run(),
+                InitState::Unrecover => run_time.unrecover(),
             }
-            run_time.clear();
-        }
+        },
         Err(err) => eprintln!(
             "Failed to new init, it may be necessary to run it as root :{:?}",
             err

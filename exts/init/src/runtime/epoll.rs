@@ -10,6 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use constants::INVALID_FD;
 use nix::errno::Errno;
 use nix::sys::epoll::{self, EpollEvent, EpollFlags, EpollOp};
 use nix::unistd;
@@ -21,7 +22,7 @@ pub struct Epoll {
 
 impl Epoll {
     pub(crate) fn new() -> Result<Epoll, Errno> {
-        let epoll_fd = epoll::epoll_create1(epoll::EpollCreateFlags::empty())?;
+        let epoll_fd = epoll::epoll_create1(epoll::EpollCreateFlags::EPOLL_CLOEXEC)?;
         Ok(Epoll { epoll_fd })
     }
 
@@ -61,10 +62,6 @@ impl Epoll {
         false
     }
 
-    pub(crate) fn clear(&self) {
-        self.safe_close(self.epoll_fd);
-    }
-
     pub(crate) fn safe_close(&self, fd: RawFd) {
         if fd <= 0 {
             return;
@@ -73,5 +70,12 @@ impl Epoll {
         if let Err(err) = unistd::close(fd) {
             eprintln!("failed to close fd:{:?} err:{:?}", fd, err);
         };
+    }
+}
+
+impl Drop for Epoll {
+    fn drop(&mut self) {
+        self.safe_close(self.epoll_fd);
+        self.epoll_fd = INVALID_FD;
     }
 }

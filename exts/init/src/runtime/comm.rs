@@ -14,18 +14,18 @@ use super::epoll::Epoll;
 use super::timer::Timer;
 use nix::errno::Errno;
 use nix::sys::epoll::EpollEvent;
+use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};
 use nix::sys::socket::{self, AddressFamily, SockFlag, SockType, UnixAddr};
 use nix::unistd;
+use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
 use std::rc::Rc;
-use std::str;
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, str};
 
 const LISTEN_BACKLOG: usize = 10;
-const INVALID_FD: i32 = -1;
 const ACCEPT_COUNT: i32 = 3;
 const BUF_SIZE: usize = 16; //The communication string length is fixed to 16 characters.
-use constants::{ALIVE, INIT_SOCKET};
+use constants::{ALIVE, INIT_SOCKET, INVALID_FD};
 
 pub struct Comm {
     epoll: Rc<Epoll>,
@@ -33,6 +33,8 @@ pub struct Comm {
     connect_fd: RawFd,
     online_fd: RawFd, // Specsify either listen_fd or connect_fd.
     timer: Timer,
+    inotify: Inotify,
+    wd: WatchDescriptor,
 }
 
 #[derive(PartialEq, Eq)]
@@ -47,28 +49,7 @@ impl Comm {
     pub fn new(epoll: &Rc<Epoll>, time_wait: i64, time_cnt: i64) -> Result<Comm, Errno> {
         let timer = Timer::new(epoll, time_wait, time_cnt)?;
 
-        let sock_path = PathBuf::from(INIT_SOCKET);
-        let listen_fd = socket::socket(
-            AddressFamily::Unix,
-            SockType::Stream,
-            SockFlag::SOCK_CLOEXEC,
-            None,
-        )?;
-
-        let parent_path = sock_path.as_path().parent();
-        match parent_path {
-            Some(path) => fs::create_dir_all(path)
-                .map_err(|e| Errno::from_i32(e.raw_os_error().unwrap_or(Errno::EINVAL as i32)))?,
-            None => return Err(Errno::EINVAL),
-        }
-
-        if let Err(e) = unistd::unlink(&sock_path) {
-            eprintln!("Failed to unlink path:{:?}, error:{}", sock_path, e);
-        }
-
-        let addr = UnixAddr::new(&sock_path)?;
-        socket::bind(listen_fd, &addr)?;
-        socket::listen(listen_fd, LISTEN_BACKLOG)?;
+        let (listen_fd, inotify, wd) = create_listen_fd(epoll)?;
 
         let mut comm = Comm {
             epoll: epoll.clone(),
@@ -76,51 +57,50 @@ impl Comm {
             connect_fd: INVALID_FD,
             online_fd: INVALID_FD,
             timer,
+            inotify,
+            wd,
         };
 
         comm.set_online_fd(comm.listen_fd)?;
-
         Ok(comm)
     }
 
     pub fn is_fd(&self, fd: RawFd) -> bool {
-        if fd == self.online_fd || fd == self.timer.fd() {
-            return true;
-        }
-        false
+        fd == self.online_fd || fd == self.timer.fd() || fd == self.inotify.as_raw_fd()
     }
 
-    pub fn proc(&mut self, event: EpollEvent) -> Result<CommType, Errno> {
+    pub fn proc(&mut self, event: EpollEvent) -> CommType {
         if self.timer.fd() as u64 == event.data() {
-            if self.timer.is_time_out(event)? {
-                return Ok(CommType::PipTMOUT);
+            if self.timer.is_time_out(event) {
+                return CommType::PipTMOUT;
             }
-            return Ok(CommType::Succeed);
+            return CommType::Succeed;
         }
 
-        // When online_fd fails, ensure that connect_fd is closed, and then execute again after timeout.
+        if self.inotify.as_raw_fd() as u64 == event.data() {
+            // Dont self.inotify.read_events(), because if recover fails, event can be retrieved to recover again.
+            return self.recover();
+        }
+
+        // When the program runs normally, listen_fd will not be closed,
+        // but connect_fd will be closed during listening.
+        if self.listen_fd as u64 == event.data() && self.epoll.is_err(event) {
+            return self.recover();
+        }
+
         if self.online_fd as u64 == event.data() {
             match self.online_fd {
-                x if x == self.listen_fd => return self.listen_proc(event),
+                x if x == self.listen_fd => return self.listen_proc(),
                 x if x == self.connect_fd => return self.connect_proc(event),
                 _ => {}
             }
         }
-        Ok(CommType::Succeed)
+        CommType::Succeed
     }
 
     pub fn finish(&mut self) {
         _ = self.set_online_fd(self.listen_fd);
-    }
-
-    pub fn clear(&mut self) {
-        self.epoll.safe_close(self.listen_fd);
-        self.listen_fd = INVALID_FD;
-
-        self.epoll.safe_close(self.connect_fd);
-        self.connect_fd = INVALID_FD;
-
-        self.timer.clear();
+        self.timer.reset();
     }
 
     fn connect(&mut self) -> Result<(), Errno> {
@@ -223,21 +203,18 @@ impl Comm {
         Ok(())
     }
 
-    fn listen_proc(&mut self, event: EpollEvent) -> Result<CommType, Errno> {
-        if self.epoll.is_err(event) {
-            return Err(Errno::EINVAL);
-        }
+    fn listen_proc(&mut self) -> CommType {
         if self.connect().is_err() {
-            return Ok(CommType::PipOFF);
+            return CommType::PipOFF;
         }
         self.timer.reset();
-        Ok(CommType::PipON)
+        CommType::PipON
     }
 
-    fn connect_proc(&mut self, event: EpollEvent) -> Result<CommType, Errno> {
+    fn connect_proc(&mut self, event: EpollEvent) -> CommType {
         if self.epoll.is_err(event) {
             _ = self.set_online_fd(self.listen_fd);
-            return Ok(CommType::PipOFF);
+            return CommType::PipOFF;
         }
         match self.recv_msg() {
             Ok(buf) => {
@@ -252,6 +229,78 @@ impl Comm {
                 unistd::sleep(1);
             }
         }
-        Ok(CommType::Succeed)
+        CommType::Succeed
     }
+
+    fn recover(&mut self) -> CommType {
+        match create_listen_fd(&self.epoll) {
+            Ok((listen_fd, inotify, wd)) => {
+                self.epoll.safe_close(self.listen_fd);
+                self.epoll.safe_close(self.inotify.as_raw_fd());
+                self.listen_fd = listen_fd;
+                self.inotify = inotify;
+                self.wd = wd;
+                eprintln!("comm recover");
+                if self.online_fd == self.connect_fd {
+                    // The socket file(INIT_SOCKET) cannot be used when connecting,
+                    // so recreate the socket file(INIT_SOCKET) and return success.
+                    return CommType::Succeed;
+                } else {
+                    // If init is in the listening state,
+                    // the sysmaster cannot be connected through the old socket file(INIT_SOCKET) at this time,
+                    // we must recreate the socket file and then reexec the sysmaster.
+                    return CommType::PipTMOUT;
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to create_listen_fd:{:?}", e);
+            }
+        }
+        CommType::Succeed
+    }
+}
+
+impl Drop for Comm {
+    fn drop(&mut self) {
+        self.epoll.safe_close(self.listen_fd);
+        self.listen_fd = INVALID_FD;
+
+        self.epoll.safe_close(self.connect_fd);
+        self.connect_fd = INVALID_FD;
+
+        let _ = self.inotify.rm_watch(self.wd);
+        self.epoll.safe_close(self.inotify.as_raw_fd());
+    }
+}
+
+fn create_listen_fd(epoll: &Rc<Epoll>) -> Result<(i32, Inotify, WatchDescriptor), Errno> {
+    let listen_fd = socket::socket(
+        AddressFamily::Unix,
+        SockType::Stream,
+        SockFlag::SOCK_CLOEXEC,
+        None,
+    )?;
+
+    let sock_path = PathBuf::from(INIT_SOCKET);
+    let parent_path = sock_path.as_path().parent();
+    match parent_path {
+        Some(path) => fs::create_dir_all(path)
+            .map_err(|e| Errno::from_i32(e.raw_os_error().unwrap_or(Errno::EINVAL as i32)))?,
+        None => return Err(Errno::EINVAL),
+    }
+
+    if let Err(e) = unistd::unlink(&sock_path) {
+        eprintln!("Failed to unlink path:{:?}, error:{}", sock_path, e);
+    }
+
+    let addr = UnixAddr::new(&sock_path)?;
+    socket::bind(listen_fd, &addr)?;
+    socket::listen(listen_fd, LISTEN_BACKLOG)?;
+
+    let inotify = Inotify::init(InitFlags::all())?;
+
+    let wd = inotify.add_watch(INIT_SOCKET, AddWatchFlags::IN_ALL_EVENTS)?;
+
+    epoll.register(inotify.as_raw_fd())?;
+    Ok((listen_fd, inotify, wd))
 }

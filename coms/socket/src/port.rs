@@ -33,8 +33,7 @@ use nix::{
 use std::{cell::RefCell, fmt, os::unix::prelude::RawFd, rc::Rc};
 use sysmaster::error::*;
 
-pub(super) const SOCKET_INVALID_FD: RawFd = -1;
-
+use constants::INVALID_FD;
 pub(crate) struct SocketPort {
     // associated objects
     comm: Rc<SocketUnitComm>,
@@ -56,7 +55,7 @@ impl SocketPort {
             config: Rc::clone(configr),
             p_conf: Rc::clone(p_confr),
 
-            fd: RefCell::new(SOCKET_INVALID_FD),
+            fd: RefCell::new(INVALID_FD),
         }
     }
 
@@ -139,7 +138,7 @@ impl SocketPort {
         }
 
         fd_util::close(fd);
-        self.set_fd(SOCKET_INVALID_FD);
+        self.set_fd(INVALID_FD);
     }
 
     pub(super) fn unlink(&self) {
@@ -332,11 +331,12 @@ impl fmt::Display for SocketPort {
 
 #[cfg(test)]
 mod tests {
+    use super::SocketPort;
     use super::*;
-    use super::{SocketPort, SOCKET_INVALID_FD};
     use crate::base::NetlinkProtocol;
     use crate::comm::SocketUnitComm;
     use crate::config::{SocketAddress, SocketConfig, SocketPortConf};
+    use constants::INVALID_FD;
     use libtests::get_project_root;
     use nix::sys::socket::{
         AddressFamily, NetlinkAddr, SockProtocol, SockType, SockaddrIn, UnixAddr,
@@ -362,12 +362,12 @@ mod tests {
         let p = SocketPort::new(&comm, &config, &p_conf);
         let port = Rc::new(p);
 
-        assert_eq!(port.fd(), SOCKET_INVALID_FD);
+        assert_eq!(port.fd(), INVALID_FD);
 
         let ret = port.open_port(false);
         assert!(ret.is_ok());
 
-        assert_ne!(port.fd(), SOCKET_INVALID_FD);
+        assert_ne!(port.fd(), INVALID_FD);
         assert_eq!(port.family(), AddressFamily::Inet);
 
         assert!(port.flush_accept().is_ok());
@@ -393,12 +393,12 @@ mod tests {
         let p = SocketPort::new(&comm, &config, &p_conf);
         let port = Rc::new(p);
 
-        assert_eq!(port.fd(), SOCKET_INVALID_FD);
+        assert_eq!(port.fd(), INVALID_FD);
 
         let ret = port.open_port(false);
         assert!(ret.is_ok());
 
-        assert_ne!(port.fd(), SOCKET_INVALID_FD);
+        assert_ne!(port.fd(), INVALID_FD);
         assert_eq!(port.family(), AddressFamily::Unix);
 
         assert!(port.flush_accept().is_ok());
@@ -430,12 +430,12 @@ mod tests {
 
         let p = SocketPort::new(&comm, &config, &p_conf);
         let port = Rc::new(p);
-        assert_eq!(port.fd(), SOCKET_INVALID_FD);
+        assert_eq!(port.fd(), INVALID_FD);
 
         let ret = port.open_port(false);
         assert!(ret.is_ok());
 
-        assert_ne!(port.fd(), SOCKET_INVALID_FD);
+        assert_ne!(port.fd(), INVALID_FD);
         assert_eq!(port.family(), AddressFamily::Netlink);
 
         assert!(port.flush_accept().is_ok());
@@ -470,7 +470,7 @@ mod tests {
 
         let ret = port.open_port(false);
         assert!(ret.is_ok());
-        assert_ne!(port.fd(), SOCKET_INVALID_FD);
+        assert_ne!(port.fd(), INVALID_FD);
         assert_eq!(port.family(), AddressFamily::Inet);
 
         port.apply_sock_opt(port.fd());

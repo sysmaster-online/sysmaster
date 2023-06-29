@@ -32,3 +32,6 @@ pub const LOG_FILE_PATH: &str = "/var/log/sysmaster/sysmaster.log";
 
 /// A file that stores the init parameters
 pub const INIT_PARA_PATH: &str = "/run/sysmaster/init_para";
+
+/// invalid fd
+pub const INVALID_FD: i32 = -1;

@@ -24,25 +24,18 @@ pub struct Timer {
     epoll: Rc<Epoll>,
     timer: TimerFd,
     current_cnt: i64,
+    time_wait: i64,
     time_cnt: i64,
 }
 
 impl Timer {
     pub fn new(epoll: &Rc<Epoll>, time_wait: i64, time_cnt: i64) -> Result<Timer, Errno> {
-        let timer = TimerFd::new(
-            ClockId::CLOCK_REALTIME,
-            TimerFlags::TFD_NONBLOCK | TimerFlags::TFD_CLOEXEC,
-        )?;
-        timer.set(
-            Expiration::Interval(TimeSpec::seconds(time_wait)),
-            TimerSetTimeFlags::empty(),
-        )?;
-
-        epoll.register(timer.as_raw_fd())?;
+        let timer = create_timer(epoll, time_wait)?;
         Ok(Timer {
             epoll: epoll.clone(),
             timer,
             current_cnt: 0,
+            time_wait,
             time_cnt,
         })
     }
@@ -56,18 +49,18 @@ impl Timer {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    pub fn is_time_out(&mut self, event: EpollEvent) -> Result<bool, Errno> {
+    pub fn is_time_out(&mut self, event: EpollEvent) -> bool {
         if self.epoll.is_err(event) {
-            return Err(Errno::EIO);
+            return self.recover();
         }
         self.flush();
         self.current_cnt += 1;
         if self.time_cnt <= self.current_cnt {
             eprintln!("time out!");
             self.reset();
-            return Ok(true);
+            return true;
         }
-        Ok(false)
+        false
     }
 
     // reset timer.
@@ -79,7 +72,40 @@ impl Timer {
         self.timer.as_raw_fd()
     }
 
-    pub fn clear(&mut self) {
-        self.epoll.safe_close(self.timer.as_raw_fd());
+    fn recover(&mut self) -> bool {
+        match create_timer(&self.epoll, self.time_wait) {
+            Ok(timer) => {
+                // After successfully creating a new timer, recycle the old timer so that
+                // if create_timer fails, event can be retrieved to create_timer again.
+                // timer have drop, no need to manually close timer.
+                self.timer = timer;
+                eprintln!("timer recover");
+            }
+            Err(e) => {
+                eprintln!("Failed to create_timer:{:?}", e);
+            }
+        }
+        // Here we believe that the system has encountered an exception, set it to timeout
+        true
     }
+}
+
+impl Drop for Timer {
+    fn drop(&mut self) {
+        // self.timer does not need to drop, because TimerFd have drop.
+    }
+}
+
+fn create_timer(epoll: &Rc<Epoll>, time_wait: i64) -> Result<TimerFd, Errno> {
+    let timer = TimerFd::new(
+        ClockId::CLOCK_REALTIME,
+        TimerFlags::TFD_NONBLOCK | TimerFlags::TFD_CLOEXEC,
+    )?;
+    timer.set(
+        Expiration::Interval(TimeSpec::seconds(time_wait)),
+        TimerSetTimeFlags::empty(),
+    )?;
+
+    epoll.register(timer.as_raw_fd())?;
+    Ok(timer)
 }

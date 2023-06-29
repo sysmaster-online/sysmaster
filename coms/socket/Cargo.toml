@@ -10,6 +10,7 @@ crate-type = ["dylib"]
 name = "socket"
 
 [dependencies]
+constants = { version = "0.1.0", path = "../../libs/constants" }
 basic = { path = "../../libs/basic" }
 event = { path = "../../libs/event" }
 macros = { path = "../../libs/macros" }

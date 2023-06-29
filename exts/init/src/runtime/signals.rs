@@ -13,7 +13,8 @@
 use super::epoll::Epoll;
 use nix::errno::Errno;
 use nix::sys::epoll::EpollEvent;
-use nix::sys::signal::{SigmaskHow, Signal};
+use nix::sys::signal::{self, SigSet, SigmaskHow, Signal};
+use nix::sys::signalfd::{self, SfdFlags};
 use nix::sys::wait::{self, Id, WaitPidFlag, WaitStatus};
 use nix::unistd;
 use std::mem;
@@ -21,42 +22,12 @@ use std::ops::Neg;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
 
+use constants::INVALID_FD;
 use constants::{SIG_RESTART_MANAGER_OFFSET, SIG_RUN_UNRECOVER_OFFSET, SIG_SWITCH_ROOT_OFFSET};
-const INVALID_FD: i32 = -1;
-
-pub(crate) struct SigSet {
-    sigset: libc::sigset_t,
-}
-
-impl SigSet {
-    /// Initialize to include nothing.
-    pub fn empty() -> SigSet {
-        let mut sigset = mem::MaybeUninit::zeroed();
-        let _ = unsafe { libc::sigemptyset(sigset.as_mut_ptr()) };
-
-        unsafe {
-            SigSet {
-                sigset: sigset.assume_init(),
-            }
-        }
-    }
-
-    /// Add the specified signal to the set.
-    pub fn add(&mut self, signal: libc::c_int) {
-        unsafe {
-            libc::sigaddset(
-                &mut self.sigset as *mut libc::sigset_t,
-                signal as libc::c_int,
-            )
-        };
-    }
-}
 
 pub struct Signals {
     epoll: Rc<Epoll>,
-    signal_fd: RawFd,
-    set: SigSet,
-    oldset: SigSet,
+    pub signal_fd: RawFd,
     signals: Vec<i32>,
     zombie_signal: i32,
     restart_signal: i32,
@@ -71,8 +42,6 @@ impl Signals {
         Signals {
             epoll: epoll.clone(),
             signal_fd: INVALID_FD,
-            set: SigSet::empty(),
-            oldset: SigSet::empty(),
             signals,
             zombie_signal: libc::SIGCHLD,
             unrecover_signal: libc::SIGRTMIN() + SIG_RUN_UNRECOVER_OFFSET,
@@ -101,29 +70,25 @@ impl Signals {
     }
 
     pub fn create_signals_epoll(&mut self) -> Result<(), Errno> {
-        self.reset_sigset();
+        self.signal_fd = self.reset_sigset()?;
         self.epoll.register(self.signal_fd)?;
         Ok(())
     }
 
-    pub fn reset_sigset(&mut self) {
+    pub fn reset_sigset(&mut self) -> Result<RawFd, Errno> {
+        let mut sigset = SigSet::empty();
         for sig in self.signals.clone() {
-            self.set.add(sig);
+            let signum: Signal = unsafe { std::mem::transmute(sig) };
+            sigset.add(signum);
         }
-
-        unsafe {
-            libc::pthread_sigmask(libc::SIG_BLOCK, &self.set.sigset, &mut self.oldset.sigset);
-            self.signal_fd = libc::signalfd(
-                -1,
-                &mut self.set.sigset as *const libc::sigset_t,
-                libc::SFD_NONBLOCK,
-            );
-        }
+        let mut oldset = SigSet::empty();
+        signal::pthread_sigmask(SigmaskHow::SIG_BLOCK, Some(&sigset), Some(&mut oldset))?;
+        signalfd::signalfd(-1, &sigset, SfdFlags::SFD_CLOEXEC | SfdFlags::SFD_NONBLOCK)
     }
 
-    pub fn read(&mut self, event: EpollEvent) -> Result<Option<libc::signalfd_siginfo>, Errno> {
+    pub fn read(&mut self, event: EpollEvent) -> Option<libc::signalfd_siginfo> {
         if self.epoll.is_err(event) {
-            return Err(Errno::EIO);
+            return self.recover();
         }
         let mut buffer = mem::MaybeUninit::<libc::signalfd_siginfo>::zeroed();
 
@@ -139,14 +104,14 @@ impl Signals {
         match res {
             x if x == size as isize => {
                 let info = unsafe { buffer.assume_init() };
-                Ok(Some(info))
+                Some(info)
             }
-            x if x >= 0 => Ok(None),
+            x if x >= 0 => None,
             x => {
                 let err = Errno::from_i32(x.neg() as i32);
                 eprintln!("read_signals failed err:{:?}", err);
                 unistd::sleep(1);
-                Ok(None)
+                None
             }
         }
     }
@@ -191,13 +156,31 @@ impl Signals {
     }
 
     pub fn is_fd(&self, fd: RawFd) -> bool {
-        if fd == self.signal_fd {
-            return true;
-        }
-        false
+        fd == self.signal_fd
     }
 
-    pub fn clear(&mut self) {
+    fn recover(&mut self) -> Option<libc::signalfd_siginfo> {
+        match self.reset_sigset() {
+            Ok(signal_fd) => match self.epoll.register(signal_fd) {
+                Ok(_) => {
+                    self.epoll.safe_close(self.signal_fd);
+                    self.signal_fd = signal_fd;
+                    eprintln!("signals recover");
+                }
+                Err(e) => {
+                    eprintln!("Failed to register signal_fd:{:?}", e);
+                }
+            },
+            Err(e) => {
+                eprintln!("Failed to create_signals_epoll:{:?}", e);
+            }
+        }
+        None
+    }
+}
+
+impl Drop for Signals {
+    fn drop(&mut self) {
         self.epoll.safe_close(self.signal_fd);
         self.signal_fd = INVALID_FD;
         if let Err(e) = nix::sys::signal::pthread_sigmask(

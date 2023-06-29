@@ -79,7 +79,7 @@ impl RunTime {
         self.state
     }
 
-    pub fn reexec(&mut self) -> Result<(), Errno> {
+    pub fn reexec(&mut self) {
         if self.need_reexec {
             self.reexec_manager();
         }
@@ -87,39 +87,30 @@ impl RunTime {
         let event = self.epoll.wait_one();
         let fd = event.data() as RawFd;
         match fd {
-            _x if self.comm.is_fd(fd) => self.reexec_comm_dispatch(event)?,
-            _x if self.signals.is_fd(fd) => self.reexec_signal_dispatch(event)?,
+            _x if self.comm.is_fd(fd) => self.reexec_comm_dispatch(event),
+            _x if self.signals.is_fd(fd) => self.reexec_signal_dispatch(event),
             _ => self.epoll.safe_close(fd),
         }
-        Ok(())
     }
 
-    pub fn run(&mut self) -> Result<(), Errno> {
+    pub fn run(&mut self) {
         let event = self.epoll.wait_one();
         let fd = event.data() as RawFd;
         match fd {
-            _x if self.comm.is_fd(fd) => self.run_comm_dispatch(event)?,
-            _x if self.signals.is_fd(fd) => self.run_signal_dispatch(event)?,
+            _x if self.comm.is_fd(fd) => self.run_comm_dispatch(event),
+            _x if self.signals.is_fd(fd) => self.run_signal_dispatch(event),
             _ => self.epoll.safe_close(fd),
         }
-        Ok(())
     }
 
-    pub fn unrecover(&mut self) -> Result<(), Errno> {
+    pub fn unrecover(&mut self) {
         let event = self.epoll.wait_one();
         let fd = event.data() as RawFd;
         match fd {
             _x if self.comm.is_fd(fd) => self.unrecover_comm_dispatch(event),
-            _x if self.signals.is_fd(fd) => self.unrecover_signal_dispatch(event)?,
+            _x if self.signals.is_fd(fd) => self.unrecover_signal_dispatch(event),
             _ => self.epoll.safe_close(fd),
         }
-        Ok(())
-    }
-
-    pub fn clear(&mut self) {
-        self.comm.clear();
-        self.signals.clear();
-        self.epoll.clear();
     }
 
     fn reexec_custom_init(&mut self) -> bool {
@@ -161,7 +152,6 @@ impl RunTime {
     }
 
     fn switch_root_run(&mut self) {
-        self.clear();
         if !self.reexec_custom_init() {
             self.reexec_self_init();
         }
@@ -188,17 +178,16 @@ impl RunTime {
         unsafe { libc::kill(self.sysmaster_pid.into(), libc::SIGABRT) };
     }
 
-    fn reexec_comm_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
-        match self.comm.proc(event)? {
+    fn reexec_comm_dispatch(&mut self, event: EpollEvent) {
+        match self.comm.proc(event) {
             CommType::PipON => self.state = InitState::Run,
             CommType::PipTMOUT => self.need_reexec = true,
             _ => {}
         }
-        Ok(())
     }
 
-    fn run_comm_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
-        match self.comm.proc(event)? {
+    fn run_comm_dispatch(&mut self, event: EpollEvent) {
+        match self.comm.proc(event) {
             CommType::PipOFF => self.state = InitState::Reexec,
             CommType::PipTMOUT => {
                 self.state = InitState::Reexec;
@@ -206,15 +195,14 @@ impl RunTime {
             }
             _ => {}
         }
-        Ok(())
     }
 
     fn unrecover_comm_dispatch(&mut self, event: EpollEvent) {
         _ = self.comm.proc(event);
     }
 
-    fn reexec_signal_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
-        if let Some(siginfo) = self.signals.read(event)? {
+    fn reexec_signal_dispatch(&mut self, event: EpollEvent) {
+        if let Some(siginfo) = self.signals.read(event) {
             match siginfo {
                 _x if self.signals.is_zombie(siginfo) => self.do_recycle(),
                 _x if self.signals.is_restart(siginfo) => self.do_reexec(),
@@ -222,11 +210,10 @@ impl RunTime {
                 _ => {}
             }
         }
-        Ok(())
     }
 
-    fn run_signal_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
-        if let Some(siginfo) = self.signals.read(event)? {
+    fn run_signal_dispatch(&mut self, event: EpollEvent) {
+        if let Some(siginfo) = self.signals.read(event) {
             match siginfo {
                 _x if self.signals.is_zombie(siginfo) => self.do_recycle(),
                 _x if self.signals.is_restart(siginfo) => self.do_reexec(),
@@ -238,11 +225,10 @@ impl RunTime {
                 _ => {}
             }
         }
-        Ok(())
     }
 
-    fn unrecover_signal_dispatch(&mut self, event: EpollEvent) -> Result<(), Errno> {
-        if let Some(siginfo) = self.signals.read(event)? {
+    fn unrecover_signal_dispatch(&mut self, event: EpollEvent) {
+        if let Some(siginfo) = self.signals.read(event) {
             match siginfo {
                 _x if self.signals.is_zombie(siginfo) => {
                     self.signals.recycle_zombie();
@@ -251,7 +237,6 @@ impl RunTime {
                 _ => {}
             }
         }
-        Ok(())
     }
 
     fn change_to_unrecover(&mut self) {
