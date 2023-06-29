@@ -666,7 +666,10 @@ impl ExecuteManager {
             self.current_unit.as_ref().unwrap().device.clone(),
             self.current_unit.as_ref().unwrap().device_db_clone.clone(),
         )
-        .log_dev_lock_error(self.current_unit.as_ref().unwrap().device.clone())?;
+        .log_dev_lock_error(
+            self.current_unit.as_ref().unwrap().device.clone(),
+            "failed to initialize device timestamp",
+        )?;
 
         // write database file
 

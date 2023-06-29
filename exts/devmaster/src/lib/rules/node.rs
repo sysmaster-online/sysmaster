@@ -64,7 +64,7 @@ pub(crate) fn node_apply_permissions(
         .unwrap()
         .get_devname()
         .context(DeviceSnafu)
-        .log_error()?;
+        .log_error("failed to apply node permissions")?;
 
     let file = match dev.lock().unwrap().open(OFlag::O_PATH | OFlag::O_CLOEXEC) {
         Ok(r) => r,
@@ -73,7 +73,7 @@ pub(crate) fn node_apply_permissions(
                 return Ok(());
             }
 
-            log::error!("{}", e);
+            log::error!("failed to open device: {}", e);
             return Err(Error::Device { source: e });
         }
     };
@@ -146,7 +146,7 @@ pub(crate) fn apply_permission_impl(
 ) -> Result<()> {
     let stat = fstat(file.as_raw_fd())
         .context(NixSnafu)
-        .log_dev_lock_option_error(dev.clone())?;
+        .log_dev_lock_option_error(dev.clone(), "fstat failed")?;
 
     /* if group is set, but mode is not set, "upgrade" group mode */
     let mode = if mode.is_none() && gid.is_some() && gid.as_ref().unwrap().as_raw() > 0 {
@@ -179,7 +179,7 @@ pub(crate) fn apply_permission_impl(
 
             fchmod_and_chown(file.as_raw_fd(), devnode, mode, uid, gid)
                 .context(BasicSnafu)
-                .log_dev_lock_option_error(dev.clone())?;
+                .log_dev_lock_option_error(dev.clone(), "chmod and chown failed")?;
         }
     } else {
         log_dev_lock_option!(debug, dev, "preserve devnode permission");
@@ -210,7 +210,10 @@ pub(crate) fn update_node(dev_new: Arc<Mutex<Device>>, dev_old: Arc<Mutex<Device
             format!("removing old devlink '{}'", devlink)
         );
 
-        let _ = update_symlink(dev_new.clone(), devlink, false).log_dev_lock_error(dev_new.clone());
+        let _ = update_symlink(dev_new.clone(), devlink, false).log_dev_lock_error(
+            dev_new.clone(),
+            &format!("failed to remove old symlink '{}'", devlink),
+        );
     }
 
     let new_links = dev_new.as_ref().lock().unwrap().devlinks.clone();
@@ -222,12 +225,15 @@ pub(crate) fn update_node(dev_new: Arc<Mutex<Device>>, dev_old: Arc<Mutex<Device
             format!("updating new devlink '{}'", devlink)
         );
 
-        let _ = update_symlink(dev_new.clone(), devlink, true).log_dev_lock_error(dev_new.clone());
+        let _ = update_symlink(dev_new.clone(), devlink, true).log_dev_lock_error(
+            dev_new.clone(),
+            &format!("failed to add new symlink '{}'", devlink),
+        );
     }
 
     /* create '/dev/{block, char}/$major:$minor' symlink */
-    let target =
-        device_get_symlink_by_devnum(dev_new.clone()).log_dev_lock_error(dev_new.clone())?;
+    let target = device_get_symlink_by_devnum(dev_new.clone())
+        .log_dev_lock_error(dev_new.clone(), "failed to get devnum symlink")?;
 
     if let Err(e) = node_symlink(dev_new.clone(), "", &target) {
         log_dev_lock!(debug, dev_new, e);
@@ -303,7 +309,7 @@ pub(crate) fn open_prior_dir(symlink: &str) -> Result<(Dir, File)> {
         .context(IoSnafu {
             filename: dirname.clone(),
         })
-        .log_error()?;
+        .log_error(&format!("failed to create directory all '{}'", dirname))?;
 
     let dir = nix::dir::Dir::from_fd(
         nix::fcntl::open(
@@ -312,7 +318,7 @@ pub(crate) fn open_prior_dir(symlink: &str) -> Result<(Dir, File)> {
             Mode::from_bits(0o755).unwrap(),
         )
         .context(NixSnafu)
-        .log_error()?,
+        .log_error(&format!("failed to open directory '{}'", dirname))?,
     )
     .context(NixSnafu)?;
 
@@ -364,7 +370,7 @@ pub(crate) fn update_prior_dir(dev: Arc<Mutex<Device>>, dirfd: RawFd, add: bool)
         .unwrap()
         .get_device_id()
         .context(DeviceSnafu)
-        .log_error()?;
+        .log_error("failed to get device id")?;
 
     if add {
         let devname = dev
@@ -373,14 +379,14 @@ pub(crate) fn update_prior_dir(dev: Arc<Mutex<Device>>, dirfd: RawFd, add: bool)
             .unwrap()
             .get_devname()
             .context(DeviceSnafu)
-            .log_error()?;
+            .log_error("failed to get devname")?;
         let priority = dev
             .as_ref()
             .lock()
             .unwrap()
             .get_devlink_priority()
             .context(DeviceSnafu)
-            .log_error()?;
+            .log_error("failed to get devlink priority")?;
         let dangle_link = format!("{}:{}", priority, devname);
         if let Ok(pointee) = readlinkat(dirfd, id.as_str()) {
             if pointee.to_str().unwrap_or_default() == dangle_link {
@@ -393,7 +399,7 @@ pub(crate) fn update_prior_dir(dev: Arc<Mutex<Device>>, dirfd: RawFd, add: bool)
         }
         symlinkat(dangle_link.as_str(), Some(dirfd), id.as_str())
             .context(NixSnafu)
-            .log_error()?;
+            .log_error("symlinkat failed")?;
     } else if let Err(e) =
         unlinkat(Some(dirfd), id.as_str(), UnlinkatFlags::NoRemoveDir).context(NixSnafu)
     {
@@ -411,7 +417,9 @@ pub(crate) fn update_prior_dir(dev: Arc<Mutex<Device>>, dirfd: RawFd, add: bool)
 /// read a symlink under the link priority directory and get the devnode and pirority
 /// return a tuple: (priority, devnode)
 fn prior_dir_read_one(dirfd: RawFd, name: &str) -> Result<(i32, String)> {
-    let pointee = readlinkat(dirfd, name).context(NixSnafu).log_error()?;
+    let pointee = readlinkat(dirfd, name)
+        .context(NixSnafu)
+        .log_error("readlinkat failed")?;
 
     let pointee_str = pointee.to_str().ok_or(Error::Other {
         msg: "invalid dangling symlink".to_string(),
@@ -470,7 +478,7 @@ pub(crate) fn node_symlink(dev: Arc<Mutex<Device>>, devnode: &str, target: &str)
             .unwrap()
             .get_devname()
             .context(DeviceSnafu)
-            .log_error()?
+            .log_error("failed to get devname")?
     } else {
         devnode.to_string()
     };
@@ -505,12 +513,15 @@ pub(crate) fn node_symlink(dev: Arc<Mutex<Device>>, devnode: &str, target: &str)
             .context(IoSnafu {
                 filename: target.to_string(),
             })
-            .log_dev_lock_error(dev.clone())?;
+            .log_dev_lock_error(dev.clone(), "failed to create directory all")?;
     }
 
     symlink(&devnode, target, true)
         .context(BasicSnafu)
-        .log_dev_lock_error(dev.clone())?;
+        .log_dev_lock_error(
+            dev.clone(),
+            &format!("failed to create symlink '{}'->'{}'", devnode, target),
+        )?;
 
     log_dev_lock!(
         debug,
@@ -526,7 +537,7 @@ pub(crate) fn find_prioritized_devnode(
 ) -> Result<Option<String>> {
     let mut dir = opendirat(dirfd, OFlag::O_NOFOLLOW)
         .context(BasicSnafu)
-        .log_error()?;
+        .log_error(&format!("failed to opendirat '{}'", dirfd))?;
 
     let mut devnode: Option<String> = None;
     let mut priority = i32::MIN;

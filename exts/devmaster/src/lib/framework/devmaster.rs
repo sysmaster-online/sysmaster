@@ -73,7 +73,7 @@ impl Devmaster {
             .read()
             .unwrap()
             .apply_static_dev_permission()
-            .log_error();
+            .log_error("failed to apply permissions on static devnode");
 
         let ret = Rc::new(RefCell::new(Devmaster {
             events: events.clone(),
