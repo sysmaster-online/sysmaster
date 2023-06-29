@@ -19,6 +19,7 @@ use std::{
     sync::Mutex,
 };
 
+use constants::LOG_FILE_PATH;
 use log::{LevelFilter, Log};
 use log4rs::{
     append::{
@@ -378,8 +379,6 @@ impl CombinedLogger {
 ///
 /// target: log target
 ///
-/// file_path: file path (valid when target == "file")
-///
 /// file_size: the maximum size of an active log file (valid when target == "file")
 ///
 /// file_number: the maximum number of rotated log files (valid when target == "file")
@@ -387,14 +386,13 @@ pub fn init_log_for_subum(
     app_name: &str,
     level: LevelFilter,
     target: &str,
-    file_path: &str,
     file_size: u32,
     file_number: u32,
 ) {
     /* We should avoid calling init_log here, or we will get many "attempted
      * to set a logger after the logging system was already initialized" error
      * message. */
-    init_log(app_name, level, target, file_path, file_size, file_number);
+    init_log(app_name, level, target, file_size, file_number);
 }
 
 /// Init and set the log target to console
@@ -403,7 +401,7 @@ pub fn init_log_for_subum(
 ///
 /// level: maximum log level
 pub fn init_log_to_console(app_name: &str, level: LevelFilter) {
-    init_log(app_name, level, "console-syslog", "", 0, 0);
+    init_log(app_name, level, "console-syslog", 0, 0);
 }
 
 /// Init and set the log target to file
@@ -412,19 +410,11 @@ pub fn init_log_to_console(app_name: &str, level: LevelFilter) {
 ///
 /// level: maximum log level
 ///
-/// file_path: file path
-///
 /// file_size: the maximum size of an active log file
 ///
 /// file_number: the maximum number of rotated log files
-pub fn init_log_to_file(
-    app_name: &str,
-    level: LevelFilter,
-    file_path: &str,
-    file_size: u32,
-    file_number: u32,
-) {
-    init_log(app_name, level, "file", file_path, file_size, file_number);
+pub fn init_log_to_file(app_name: &str, level: LevelFilter, file_size: u32, file_number: u32) {
+    init_log(app_name, level, "file", file_size, file_number);
 }
 
 /// Init and set the logger
@@ -435,8 +425,6 @@ pub fn init_log_to_file(
 ///
 /// target: log target
 ///
-/// file_path: file path (valid when target == "file")
-///
 /// file_size: the maximum size of an active log file (valid when target == "file")
 ///
 /// file_number: the maximum number of rotated log files (valid when target == "file")
@@ -444,16 +432,14 @@ pub fn init_log(
     _app_name: &str,
     level: LevelFilter,
     target: &str,
-    file_path: &str,
     file_size: u32,
     file_number: u32,
 ) {
     let mut target = target;
-    if target == "file" && (file_path.is_empty() || file_size == 0 || file_number == 0) {
+    if target == "file" && (file_size == 0 || file_number == 0) {
         println!(
             "LogTarget is configured to `file`, but configuration is invalid, changing the \
-             LogTarget to `console`, file: {file_path}, file_size: {file_size}, file_number: \
-             {file_number}"
+             LogTarget to `syslog`, file_size: {file_size}, file_number: {file_number}"
         );
         target = "syslog";
     }
@@ -474,7 +460,7 @@ pub fn init_log(
     if target == "file" {
         let _ = log::set_boxed_logger(Box::new(FileLogger::new(
             log::Level::Debug,
-            PathBuf::from(&file_path),
+            PathBuf::from(LOG_FILE_PATH),
             0o600,
             file_size,
             file_number,

@@ -317,7 +317,6 @@ impl Plugin {
             um: Rc<dyn UmIf>,
             level: LevelFilter,
             target: &str,
-            file_path: &str,
             file_size: u32,
             file_number: u32,
         ) -> *mut dyn UnitManagerObj;
@@ -479,7 +478,6 @@ impl Plugin {
         &self,
         unit_type: UnitType,
         target: &str,
-        file: &str,
         file_size: u32,
         file_number: u32,
     ) -> Result<Box<dyn UnitManagerObj>> {
@@ -495,7 +493,6 @@ impl Plugin {
         type FnType = fn(
             level: LevelFilter,
             target: &str,
-            file: &str,
             file_size: u32,
             file_number: u32,
         ) -> *mut dyn UnitManagerObj;
@@ -516,7 +513,7 @@ impl Plugin {
             Ok(v) => v,
         };
 
-        let boxed_raw = fun(log::max_level(), target, file, file_size, file_number);
+        let boxed_raw = fun(log::max_level(), target, file_size, file_number);
         Ok(unsafe { Box::from_raw(boxed_raw) })
     }
 

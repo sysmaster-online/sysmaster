@@ -1030,10 +1030,6 @@ impl UnitManager {
 
     fn remove_job_result(&self, _source: &str) {}
 
-    fn get_log_file(&self) -> &str {
-        &self.manager_config.LogFile
-    }
-
     fn get_log_target(&self) -> &str {
         &self.manager_config.LogTarget
     }
@@ -1314,7 +1310,6 @@ mod unit_submanager {
             let sub = match Plugin::get_instance().create_um_obj(
                 unit_type,
                 um.get_log_target(),
-                um.get_log_file(),
                 um.get_log_file_size(),
                 um.get_log_file_number(),
             ) {

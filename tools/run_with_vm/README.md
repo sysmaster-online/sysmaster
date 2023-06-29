@@ -96,7 +96,8 @@ menuentry 'openEuler (5.10.0-60.18.0.50.oe2203.aarch64) 22.03 LTS without system
 cat /etc/sysmaster/system.toml
 LogLevel="debug"
 LogTarget="file"
-LogFile="/sysmaster.log"
+LogFileSize=10240
+LogFileNumber=10
 ```
 
 至此，大系统准备完毕。

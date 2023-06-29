@@ -86,7 +86,6 @@ fn main() -> Result<()> {
         "sysmaster",
         manager_config.LogLevel,
         &manager_config.LogTarget,
-        &manager_config.LogFile,
         manager_config.LogFileSize,
         manager_config.LogFileNumber,
     );
