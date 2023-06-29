@@ -36,7 +36,7 @@ use log4rs::{
     encode::pattern::PatternEncoder,
 };
 use nix::libc;
-use time::UtcOffset;
+use time::macros::offset;
 
 use crate::Error;
 
@@ -69,7 +69,11 @@ impl log::Log for LogPlugin {
 }
 
 fn write_msg_common(writer: &mut impl Write, module: &str, msg: String) {
-    let now = time::OffsetDateTime::now_utc().to_offset(UtcOffset::UTC);
+    let now = match time::OffsetDateTime::now_local() {
+        Ok(v) => v,
+        Err(_) => time::OffsetDateTime::now_utc().to_offset(offset!(+8)),
+    };
+
     let format = time::macros::format_description!("[year]-[month]-[day] [hour]:[minute]:[second]");
     let now = match now.format(&format) {
         Err(_) => "[unknown time]".to_string(),
