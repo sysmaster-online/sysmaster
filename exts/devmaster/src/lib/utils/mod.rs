@@ -16,6 +16,7 @@
 use std::{
     io::Read,
     process::{Command, Stdio},
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -480,6 +481,33 @@ pub(crate) fn get_property_from_string(s: &str) -> Result<(String, String)> {
     } else {
         Ok((key.to_string(), value[0..].to_string()))
     }
+}
+
+pub(crate) fn initialize_device_usec(
+    dev_new: Arc<Mutex<Device>>,
+    dev_old: Arc<Mutex<Device>>,
+) -> Result<()> {
+    let timestamp = dev_old
+        .lock()
+        .unwrap()
+        .get_usec_initialized()
+        .unwrap_or_else(|_| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |v| v.as_secs())
+        });
+
+    dev_new
+        .lock()
+        .unwrap()
+        .set_usec_initialized(timestamp)
+        .map_err(|e| {
+            log::error!("failed to set initialization timestamp: {}", e);
+            e
+        })
+        .context(DeviceSnafu)?;
+
+    Ok(())
 }
 
 #[cfg(test)]

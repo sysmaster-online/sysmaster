@@ -20,7 +20,7 @@ use libc::{dev_t, gid_t, mode_t, uid_t, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IF
 use nix::errno::{self, Errno};
 use nix::fcntl::{open, OFlag};
 use nix::sys::stat::{self, lstat, major, makedev, minor, stat};
-use nix::unistd::{Gid, Uid};
+use nix::unistd::{unlink, Gid, Uid};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::fs::{self, OpenOptions};
@@ -933,7 +933,21 @@ impl Device {
 
     /// get initialized usec
     pub fn get_usec_initialized(&mut self) -> Result<u64, Error> {
-        todo!("require get_is_initialized");
+        if !self.get_is_initialized()? {
+            return Err(Error::Nix {
+                msg: "device is not initialized".to_string(),
+                source: nix::Error::EBUSY,
+            });
+        }
+
+        if self.usec_initialized == 0 {
+            return Err(Error::Nix {
+                msg: "device usec is not set".to_string(),
+                source: nix::Error::ENODATA,
+            });
+        }
+
+        Ok(self.usec_initialized)
     }
 
     /// get usec since initialization
@@ -1446,6 +1460,33 @@ impl Device {
     /// check whether the device object contains a devlink
     pub fn has_devlink(&self, devlink: &str) -> bool {
         self.devlinks.contains(devlink)
+    }
+
+    /// set the initialized timestamp
+    pub fn set_usec_initialized(&mut self, time: u64) -> Result<(), Error> {
+        self.add_property_internal("USEC_INITIALIZED".to_string(), time.to_string())?;
+        self.usec_initialized = time;
+        Ok(())
+    }
+
+    /// update device database
+    pub fn update_db(&mut self) -> Result<(), Error> {
+        let has_info = self.has_info();
+
+        let id = self.get_device_id()?;
+
+        let db_path = format!("/run/devmaster/data/{}", id);
+
+        if !has_info && self.devnum == 0 && self.ifindex == 0 {
+            unlink(db_path.as_str()).map_err(|e| Error::Nix {
+                msg: format!("failed to unlink db '{}'", db_path),
+                source: e,
+            })?;
+
+            return Ok(());
+        }
+
+        Ok(())
     }
 }
 
@@ -1993,21 +2034,6 @@ impl Device {
         Ok(())
     }
 
-    /// set the initialized timestamp
-    pub(crate) fn set_usec_initialized(&mut self, value: String) -> Result<(), Error> {
-        let time = value.parse::<u64>().map_err(|e| Error::Nix {
-            msg: format!(
-                "set_usec_initialized failed: failed to parse initialized time {} ({})",
-                value, e
-            ),
-            source: Errno::EINVAL,
-        })?;
-
-        self.add_property_internal("USEC_INITIALIZED".to_string(), time.to_string())?;
-        self.usec_initialized = time;
-        Ok(())
-    }
-
     /// cache sysattr value
     pub(crate) fn cache_sysattr_value(
         &mut self,
@@ -2283,14 +2309,21 @@ impl Device {
                     })?;
             }
             "I" => {
-                self.set_usec_initialized(value.to_string())
-                    .map_err(|e| Error::Nix {
-                        msg: format!(
-                            "handle_db_line failed: failed to set_usec_initialized ({})",
-                            e
-                        ),
-                        source: Errno::EINVAL,
-                    })?;
+                let time = value.parse::<u64>().map_err(|e| Error::Nix {
+                    msg: format!(
+                        "handle_db_line failed: failed to parse initialized time {} ({})",
+                        value, e
+                    ),
+                    source: Errno::EINVAL,
+                })?;
+
+                self.set_usec_initialized(time).map_err(|e| Error::Nix {
+                    msg: format!(
+                        "handle_db_line failed: failed to set_usec_initialized ({})",
+                        e
+                    ),
+                    source: Errno::EINVAL,
+                })?;
             }
             "L" => {
                 let priority = value.parse::<i32>().map_err(|e| Error::Nix {
@@ -2394,7 +2427,15 @@ impl Device {
             "SEQNUM" => self.set_seqnum_from_string(value.to_string())?,
             "DRIVER" => self.set_driver(value.to_string())?,
             "IFINDEX" => self.set_ifindex(value.to_string())?,
-            "USEC_INITIALIZED" => self.set_usec_initialized(value.to_string())?,
+            "USEC_INITIALIZED" => {
+                self.set_usec_initialized(value.parse::<u64>().map_err(|e| Error::Nix {
+                    msg: format!(
+                        "amend_key_value failed: failed to parse initialized time {} ({})",
+                        value, e
+                    ),
+                    source: Errno::EINVAL,
+                })?)?
+            }
             "DEVMODE" => self.set_devmode(value.to_string())?,
             "DEVUID" => self.set_devuid(value.to_string())?,
             "DEVGID" => self.set_devgid(value.to_string())?,
@@ -2405,6 +2446,14 @@ impl Device {
         }
 
         Ok(())
+    }
+
+    #[inline]
+    fn has_info(&self) -> bool {
+        !self.devlinks.is_empty()
+            || !self.properties_db.is_empty()
+            || !self.all_tags.is_empty()
+            || !self.current_tags.is_empty()
     }
 }
 

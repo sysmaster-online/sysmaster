@@ -25,8 +25,8 @@ use crate::{
     log_dev_lock, log_rule_line, log_rule_token,
     rules::FORMAT_SUBST_TABLE,
     utils::{
-        get_property_from_string, replace_chars, replace_ifname, resolve_subsystem_kernel, spawn,
-        sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
+        get_property_from_string, initialize_device_usec, replace_chars, replace_ifname,
+        resolve_subsystem_kernel, spawn, sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
     },
 };
 use basic::{
@@ -658,12 +658,17 @@ impl ExecuteManager {
 
         // rename netif: todo
 
-        // update devnode: todo
+        // update devnode
         self.current_unit.as_mut().unwrap().update_devnode()?;
 
-        // preserve old, or get new initialization timestamp: todo
+        // preserve old, or get new initialization timestamp
+        initialize_device_usec(
+            self.current_unit.as_ref().unwrap().device.clone(),
+            self.current_unit.as_ref().unwrap().device_db_clone.clone(),
+        )
+        .log_dev_lock_error(self.current_unit.as_ref().unwrap().device.clone())?;
 
-        // write database file: todo
+        // write database file
 
         Ok(())
     }
