@@ -105,7 +105,7 @@ impl UnitFileData {
         if fs::metadata(path).is_err() {
             return None;
         }
-        /* {/etc/sysmaster, /usr/lib/sysmaster}/foo.service.d */
+        /* {/etc/sysmaster/system, /usr/lib/sysmaster/system}/foo.service.d */
         let pathd_str = format!("{path}/{name}.d");
         let dir = Path::new(&pathd_str);
         if dir.is_dir() {
@@ -121,7 +121,7 @@ impl UnitFileData {
                 res.push(fragment);
             }
         }
-        /* {/etc/sysmater, /usr/lib/sysmaster}/foo.service */
+        /* {/etc/sysmater/system, /usr/lib/sysmaster/system}/foo.service */
         let config_path = Path::new(path).join(name);
         if !config_path.exists() {
             return None;

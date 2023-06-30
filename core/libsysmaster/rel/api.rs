@@ -21,6 +21,7 @@ use super::{
 use crate::{error::*, rel::base};
 use basic::do_entry_or_return_io_error;
 use heed::Database;
+use nix::sys::stat::{self, Mode};
 use std::{
     fs::{self, File},
     path::Path,
@@ -396,17 +397,31 @@ fn reli_prepare() -> Result<String> {
     base::reli_dir_prepare()?; // again
     let dir_string = base::reli_dir_get().unwrap();
 
-    // enable
-    enable::prepare(&dir_string)?;
-
-    // last
-    last::prepare(&dir_string)?;
-
-    // history
-    history::prepare(&dir_string)?;
-
-    // pending
-    pending::prepare(&dir_string)?;
+    // prepare
+    /* create '/run/sysmaster/reliability/sub_dir' or 'xxx/reliability/sub_dir' with mode 700 */
+    let old_mask = stat::umask(Mode::from_bits_truncate(!0o700));
+    let ret = reli_do_prepare(&dir_string);
+    let _ = stat::umask(old_mask);
+    if let Err(e) = ret {
+        log::error!("reliability prepare failed: dir{:?}, {}", dir_string, e);
+        return Err(e);
+    }
 
     Ok(dir_string)
+}
+
+fn reli_do_prepare(dir_string: &str) -> Result<()> {
+    // enable
+    enable::prepare(dir_string)?;
+
+    // last
+    last::prepare(dir_string)?;
+
+    // history
+    history::prepare(dir_string)?;
+
+    // pending
+    pending::prepare(dir_string)?;
+
+    Ok(())
 }

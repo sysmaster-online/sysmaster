@@ -13,11 +13,11 @@
 //! the management of the unit file lookup path
 
 /// unit lookup path in /etc
-pub const ETC_SYSTEM_PATH: &str = "/etc/sysmaster";
+pub const ETC_SYSTEM_PATH: &str = "/etc/sysmaster/system";
 /// unit lookup path in /run
-pub const RUN_SYSTEM_PATH: &str = "/run/sysmaster";
+pub const RUN_SYSTEM_PATH: &str = "/run/sysmaster/system";
 /// unit lookup path in /usr/lib
-pub const LIB_SYSTEM_PATH: &str = "/usr/lib/sysmaster";
+pub const LIB_SYSTEM_PATH: &str = "/usr/lib/sysmaster/system";
 
 /// struct LookupPaths
 #[derive(Debug, Clone)]
@@ -85,15 +85,19 @@ mod tests {
         lp.init_lookup_paths();
         assert_eq!(
             lp.search_path,
-            vec!["/usr/lib/sysmaster", "/run/sysmaster", "/etc/sysmaster"]
+            vec![
+                "/usr/lib/sysmaster/system",
+                "/run/sysmaster/system",
+                "/etc/sysmaster/system"
+            ]
         );
         assert_eq!(
             lp.preset_path,
             vec![
-                "/etc/sysmaster/system-preset",
-                "/usr/lib/sysmaster/system-preset"
+                "/etc/sysmaster/system/system-preset",
+                "/usr/lib/sysmaster/system/system-preset"
             ]
         );
-        assert_eq!(lp.persistent_path, "/etc/sysmaster")
+        assert_eq!(lp.persistent_path, "/etc/sysmaster/system")
     }
 }

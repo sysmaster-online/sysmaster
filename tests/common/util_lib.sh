@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 export EXPECT_FAIL=0
-export SYSMST_LIB_PATH='/usr/lib/sysmaster'
-export SYSMST_ETC_PATH='/etc/sysmaster'
-export SYSMST_RUN_PATH='/run/sysmaster'
+export SYSMST_LIB_PATH='/usr/lib/sysmaster/system'
+export SYSMST_ETC_PATH='/etc/sysmaster/system'
+export SYSMST_RUN_PATH='/run/sysmaster/system'
 export SYSMST_LOG='/opt/sysmaster.log'
 export RELIAB_SWITCH_PATH='/run/sysmaster/reliability'
 export RELIAB_SWITCH='switch.debug'

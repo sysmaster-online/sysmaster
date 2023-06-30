@@ -14,6 +14,7 @@ use super::base::{ReDbRoTxn, ReDbRwTxn, ReDbTable};
 use crate::error::*;
 use basic::{do_entry_log, do_entry_or_return_io_error};
 use heed::{CompactionOption, Env, EnvOpenOptions};
+use nix::sys::stat::{self, Mode};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -120,6 +121,14 @@ impl ReliHistory {
     }
 
     pub(super) fn compact(&self) -> Result<()> {
+        // action with mode 700, excluding group and other users
+        let old_mask = stat::umask(Mode::from_bits_truncate(!0o700));
+        let ret = self.compact_body();
+        let _ = stat::umask(old_mask);
+        ret
+    }
+
+    fn compact_body(&self) -> Result<()> {
         // a -> b or b -> a
         // prepare next
         let history = history_path_get(&self.hdir);
@@ -189,7 +198,7 @@ pub fn prepare(dir_str: &str) -> Result<()> {
 
     let b = history.join(RELI_HISTORY_B_DIR);
     if !b.exists() {
-        do_entry_or_return_io_error!(fs::create_dir_all, a, "create");
+        do_entry_or_return_io_error!(fs::create_dir_all, b, "create");
     }
 
     Ok(())

@@ -21,6 +21,7 @@ use nix::errno::Errno;
 use nix::sys::socket::{
     self, sockopt, AddressFamily, MsgFlags, RecvMsg, SockFlag, SockType, UnixAddr, UnixCredentials,
 };
+use nix::sys::stat::{self, Mode};
 use nix::unistd::Pid;
 use std::{
     cell::RefCell, collections::HashMap, fs, io::IoSliceMut, os::unix::prelude::RawFd,
@@ -171,7 +172,14 @@ impl Notify {
             log::warn!("unlink path failed: {:?}, error: {}", sock_path, e);
         }
 
-        socket::bind(fd, &unix_addr)?;
+        // create '/run/sysmaster/notify' with mode 666
+        let old_mask = stat::umask(Mode::from_bits_truncate(!0o666));
+        let ret = socket::bind(fd, &unix_addr);
+        let _ = stat::umask(old_mask);
+        if let Err(e) = ret {
+            log::error!("Failed to bind socket {:?}: {}", sock_path, e);
+            return Err(e);
+        }
         socket::setsockopt(fd, sockopt::PassCred, &true)?;
 
         log::debug!("set event fd is: {}", fd);

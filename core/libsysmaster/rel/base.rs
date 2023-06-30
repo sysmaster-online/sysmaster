@@ -15,6 +15,7 @@ use crate::error::*;
 use heed::types::SerdeBincode;
 use heed::Database;
 use heed::{Env, RoTxn, RwTxn};
+use nix::sys::stat::{self, Mode};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::cell::RefCell;
@@ -305,6 +306,14 @@ pub fn reli_dir_get() -> Result<String> {
 /// 2. OUT_DIR/../reliability/: make CI happy, which is target/debug/reliability/ or target/release/reliability/ usually.
 /// 3. PROCESS_RELI_PATH: the path customized.
 pub fn reli_dir_prepare() -> Result<()> {
+    // create '/run/sysmaster/reliability' or 'xxx/reliability' with mode 700
+    let old_mask = stat::umask(Mode::from_bits_truncate(!0o700));
+    let ret = reli_dir_prepare_body();
+    let _ = stat::umask(old_mask);
+    ret
+}
+
+fn reli_dir_prepare_body() -> Result<()> {
     // // /run/sysmaster/reliability/
     let ret_run = reli_dir_prepare_run();
     if ret_run.is_ok() {

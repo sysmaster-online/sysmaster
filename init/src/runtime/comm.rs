@@ -16,6 +16,7 @@ use nix::errno::Errno;
 use nix::sys::epoll::EpollEvent;
 use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};
 use nix::sys::socket::{self, AddressFamily, SockFlag, SockType, UnixAddr};
+use nix::sys::stat::{self, Mode};
 use nix::unistd;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
@@ -281,12 +282,16 @@ fn create_listen_fd(epoll: &Rc<Epoll>) -> Result<(i32, Inotify, WatchDescriptor)
         None,
     )?;
 
+    // create '/run/sysmaster' with mode 755
     let sock_path = PathBuf::from(INIT_SOCKET);
     let path = match sock_path.as_path().parent() {
         None => return Err(Errno::EINVAL),
         Some(v) => v,
     };
-    if let Err(e) = fs::create_dir_all(path) {
+    let old_mask = stat::umask(Mode::from_bits_truncate(!0o755));
+    let ret = fs::create_dir_all(path);
+    let _ = stat::umask(old_mask);
+    if let Err(e) = ret {
         eprintln!("Failed to create directory {path:?}: {e}");
         return Err(Errno::from_i32(
             e.raw_os_error().unwrap_or(Errno::EINVAL as i32),
@@ -297,8 +302,15 @@ fn create_listen_fd(epoll: &Rc<Epoll>) -> Result<(i32, Inotify, WatchDescriptor)
         eprintln!("Failed to unlink path:{:?}, error:{}", sock_path, e);
     }
 
+    // create '/run/sysmaster/init' with mode 600
     let addr = UnixAddr::new(&sock_path)?;
-    socket::bind(listen_fd, &addr)?;
+    let old_mask = stat::umask(Mode::from_bits_truncate(!0o600));
+    let ret = socket::bind(listen_fd, &addr);
+    let _ = stat::umask(old_mask);
+    if let Err(e) = ret {
+        eprintln!("Failed to bind socket {sock_path:?}: {e}");
+        return Err(e);
+    }
     socket::listen(listen_fd, LISTEN_BACKLOG)?;
 
     let inotify = Inotify::init(InitFlags::all())?;

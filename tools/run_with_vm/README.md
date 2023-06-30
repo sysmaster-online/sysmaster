@@ -82,7 +82,7 @@ menuentry 'openEuler (5.10.0-60.18.0.50.oe2203.aarch64) 22.03 LTS without system
 
 **1.** 将sysmaster编译二进制拷贝到对应目录，可以通过install_sysmaster.sh进行安装。使用方法是在sysmaster编译目录下，执行`sh install_sysmaster.sh debug`。注意这里将init二进制拷贝到为`/init`。与上面修改的linux启动项相对应。
 
-**2.** 将`run_with_vm`目录下service和target文件拷贝到`/usr/lib/sysmaster`目录下。
+**2.** 将`run_with_vm`目录下service和target文件拷贝到`/usr/lib/sysmaster/system`目录下。
 
 **3.** 通过`sctl enable fstab.service sshd.service udevd.service getty-tty1.service serial-getty-ttyAMA0.service lvm-activate-openeuler.service set-hostname.service NetworkManager.service udev-trigger.service hostname-setup.service`上述服务实现开机启动。
 

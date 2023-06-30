@@ -18,15 +18,15 @@ ADD ./debug/conf/plugin.conf /usr/lib/sysmaster/plugin
 RUN rm -f /sbin/init
 ADD ./debug/init /sbin/
 
-ADD ./debug/basic.target /usr/lib/sysmaster
-ADD ./debug/Multi-user.target /usr/lib/sysmaster
-ADD ./debug/shutdown.target /usr/lib/sysmaster
-ADD ./debug/sysinit.target /usr/lib/sysmaster
-ADD sshd.service /usr/lib/sysmaster
-ADD sshd-keygen.target /usr/lib/sysmaster
-ADD sshd-keygen@rsa.service /usr/lib/sysmaster
-ADD sshd-keygen@ecdsa.service /usr/lib/sysmaster
-ADD sshd-keygen@ed25519.service /usr/lib/sysmaster
+ADD ./debug/basic.target /usr/lib/sysmaster/system
+ADD ./debug/Multi-user.target /usr/lib/sysmaster/system
+ADD ./debug/shutdown.target /usr/lib/sysmaster/system
+ADD ./debug/sysinit.target /usr/lib/sysmaster/system
+ADD sshd.service /usr/lib/sysmaster/system
+ADD sshd-keygen.target /usr/lib/sysmaster/system
+ADD sshd-keygen@rsa.service /usr/lib/sysmaster/system
+ADD sshd-keygen@ecdsa.service /usr/lib/sysmaster/system
+ADD sshd-keygen@ed25519.service /usr/lib/sysmaster/system
 
 ENV TMOUT=0
 CMD [/sbin/init]

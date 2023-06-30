@@ -303,10 +303,12 @@ failures:
 ++ source /opt/sysmaster/tests/common/util_lib.sh
 +++ export EXPECT_FAIL=0
 +++ EXPECT_FAIL=0
-+++ export SYSMST_LIB_PATH=/usr/lib/sysmaster
-+++ SYSMST_LIB_PATH=/usr/lib/sysmaster
-+++ export SYSMST_ETC_PATH=/etc/sysmaster
-+++ SYSMST_ETC_PATH=/etc/sysmaster
++++ export SYSMST_LIB_PATH=/usr/lib/sysmaster/system
++++ SYSMST_LIB_PATH=/usr/lib/sysmaster/system
++++ export SYSMST_RUN_PATH=/run/sysmaster/system
++++ SYSMST_RUN_PATH=/run/sysmaster/system
++++ export SYSMST_ETC_PATH=/etc/sysmaster/system
++++ SYSMST_ETC_PATH=/etc/sysmaster/system
 +++ export SYSMST_LOG=/opt/sysmaster.log
 +++ SYSMST_LOG=/opt/sysmaster.log
 +++ export RELIAB_SWITCH_PATH=/run/sysmaster/reliability

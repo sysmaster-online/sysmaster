@@ -91,7 +91,7 @@ sysmaster支持配置单元之间的顺序及依赖关系，可以配置的值�
 
 `Conflicts`：`foo.service`与`bar.service`的状态相反。启动`foo.service`将关闭`bar.service`，启动`bar.service`会关闭`foo.service`。
 
-`Wants`和`Requires`除了支持通过`.service/.target/.socket`等单元配置文件配置，也允许在`/etc/sysmaster/`或`/usr/lib/sysmaster`目录下创建`单元名.wants/单元名.requires`目录，并在里面添加指向依赖单元的软链接。例如为了给`foo.service`配置`Wants="bar.service"`，可以创建`/etc/sysmaster/foo.service.wants`目录，并在该目录内创建`bar.service -> /etc/sysmaster/bar.service`的软链接。
+`Wants`和`Requires`除了支持通过`.service/.target/.socket`等单元配置文件配置，也允许在`/etc/sysmaster/system/`或`/usr/lib/sysmaster/system/`目录下创建`单元名.wants/单元名.requires`目录，并在里面添加指向依赖单元的软链接。例如为了给`foo.service`配置`Wants="bar.service"`，可以创建`/etc/sysmaster/system/foo.service.wants`目录，并在该目录内创建`bar.service -> /etc/sysmaster/system/bar.service`的软链接。
 
 ### OnFailure/OnSuccess
 

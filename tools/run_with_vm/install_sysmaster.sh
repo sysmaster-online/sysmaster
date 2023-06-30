@@ -14,10 +14,10 @@ install -Dm0755 -t ${install_dir} ${target_dir}/random_seed || exit 1
 install -Dm0755 -t ${install_dir} ${target_dir}/rc-local-generator || exit 1
 install -Dm0755 -t ${install_dir} ${target_dir}/hostname_setup || exit 1
 
-install -Dm0755 -t ${install_dir} ${target_dir}/basic.target || exit 1
-install -Dm0755 -t ${install_dir} ${target_dir}/multi-user.target || exit 1
-install -Dm0755 -t ${install_dir} ${target_dir}/shutdown.target || exit 1
-install -Dm0755 -t ${install_dir} ${target_dir}/sysinit.target || exit 1
+install -Dm0755 -t ${install_dir}/system ${target_dir}/basic.target || exit 1
+install -Dm0755 -t ${install_dir}/system ${target_dir}/multi-user.target || exit 1
+install -Dm0755 -t ${install_dir}/system ${target_dir}/shutdown.target || exit 1
+install -Dm0755 -t ${install_dir}/system ${target_dir}/sysinit.target || exit 1
 
 strip ${target_dir}/lib*.so
 
