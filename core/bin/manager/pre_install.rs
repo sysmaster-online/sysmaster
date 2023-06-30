@@ -796,7 +796,12 @@ mod test {
     #[test]
     fn test_read_presets() {
         let mut l_path = LookupPaths::new();
-        l_path.init_lookup_paths();
+        let test_preset_dir = libtests::get_project_root()
+            .unwrap()
+            .join("tests/presets")
+            .to_string_lossy()
+            .to_string();
+        l_path.preset_path.push(test_preset_dir);
         let lookup_path = Rc::new(l_path);
 
         let install = Install::new(PresetMode::Enable, lookup_path);
@@ -815,7 +820,12 @@ mod test {
     #[test]
     fn test_preset_all() {
         let mut l_path = LookupPaths::new();
-        l_path.init_lookup_paths();
+        let test_preset_dir = libtests::get_project_root()
+            .unwrap()
+            .join("tests/presets")
+            .to_string_lossy()
+            .to_string();
+        l_path.preset_path.push(test_preset_dir);
         let lookup_path = Rc::new(l_path);
         let install = Install::new(PresetMode::Enable, lookup_path);
         assert!(install.preset_all().is_ok());

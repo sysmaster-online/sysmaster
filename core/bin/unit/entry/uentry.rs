@@ -783,7 +783,12 @@ mod tests {
         let rentry = Rc::new(UnitRe::new(&reli));
 
         let mut l_path = LookupPaths::new();
-        l_path.init_lookup_paths();
+        let test_units_dir = libtests::get_project_root()
+            .unwrap()
+            .join("tests/test_units/")
+            .to_string_lossy()
+            .to_string();
+        l_path.search_path.push(test_units_dir);
         let lookup_path = Rc::new(l_path);
         let unit_file = UnitFile::new(&lookup_path);
 

@@ -1403,7 +1403,12 @@ mod tests {
     fn init_dm_for_test() -> (Rc<DataManager>, Rc<Events>, Rc<UnitManager>) {
         logger::init_log_to_console("manager test", log::LevelFilter::Trace);
         let mut l_path = LookupPaths::new();
-        l_path.init_lookup_paths();
+        let test_units_dir = libtests::get_project_root()
+            .unwrap()
+            .join("tests/test_units/")
+            .to_string_lossy()
+            .to_string();
+        l_path.search_path.push(test_units_dir);
         let lookup_path = Rc::new(l_path);
 
         let event = Rc::new(Events::new().unwrap());
