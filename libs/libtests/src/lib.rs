@@ -45,7 +45,7 @@ mod tests {
     use crate::{get_crate_root, get_project_root};
 
     #[test]
-    fn test_get_projecgt_root() {
+    fn test_get_project_root() {
         let mut file_path = get_project_root().unwrap();
         file_path.push("tests/test_units/config.service.toml");
 
