@@ -4,3 +4,4 @@ Cargo.lock
 tests/**/*.log
 /site
 libs/blkid_rs/src/libblkid.rs
+tests/test_units/*.toml
