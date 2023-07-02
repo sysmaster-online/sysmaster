@@ -14,16 +14,17 @@
 //!
 use crate::err_wrapper;
 use crate::utils::readlink_value;
-use crate::{error::Error, DeviceAction};
+use crate::{error::*, DeviceAction};
+use basic::fs_util::{open_temporary, touch_file};
 use basic::parse_util::{device_path_parse_devnum, parse_devnum, parse_ifindex};
 use libc::{dev_t, gid_t, mode_t, uid_t, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT, S_IRUSR};
 use nix::errno::{self, Errno};
 use nix::fcntl::{open, OFlag};
-use nix::sys::stat::{self, lstat, major, makedev, minor, stat};
+use nix::sys::stat::{self, fchmod, lstat, major, makedev, minor, stat, Mode};
 use nix::unistd::{unlink, Gid, Uid};
 use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::fs::{self, OpenOptions};
+use std::fs::{self, rename, OpenOptions};
+use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::FromRawFd;
@@ -32,7 +33,9 @@ use std::result::Result;
 use std::sync::{Arc, Mutex};
 
 /// database directory path
-pub const DB_DIRECTORY_PATH: &str = "/run/udev/data/";
+pub const DB_BASE_DIR: &str = "/run/devmaster/data/";
+/// tags directory path
+pub const TAGS_BASE_DIR: &str = "/run/devmaster/tags/";
 
 /// Device
 #[derive(Debug, Clone)]
@@ -1421,7 +1424,24 @@ impl Device {
 
     /// add devlink records to the device object
     pub fn add_devlink(&mut self, devlink: String) -> Result<(), Error> {
-        self.devlinks.insert(devlink);
+        if let Some(stripped) = devlink.strip_prefix("/dev") {
+            if stripped.is_empty() {
+                return Err(Error::Nix {
+                    msg: "add_devlink failed: invalid devlink".to_string(),
+                    source: nix::Error::EINVAL,
+                });
+            }
+            self.devlinks.insert(devlink);
+        } else {
+            if devlink.starts_with('/') {
+                return Err(Error::Nix {
+                    msg: "add_devlink failed: invalid devlink".to_string(),
+                    source: nix::Error::EINVAL,
+                });
+            }
+            self.devlinks.insert(format!("/dev/{}", devlink));
+        }
+
         self.property_devlinks_outdated = true;
 
         Ok(())
@@ -1471,11 +1491,17 @@ impl Device {
 
     /// update device database
     pub fn update_db(&mut self) -> Result<(), Error> {
+        #[inline]
+        fn cleanup(db: &str, tmp_file: &str) {
+            let _ = unlink(db);
+            let _ = unlink(tmp_file);
+        }
+
         let has_info = self.has_info();
 
         let id = self.get_device_id()?;
 
-        let db_path = format!("/run/devmaster/data/{}", id);
+        let db_path = format!("{}{}", DB_BASE_DIR, id);
 
         if !has_info && self.devnum == 0 && self.ifindex == 0 {
             unlink(db_path.as_str()).map_err(|e| Error::Nix {
@@ -1486,7 +1512,185 @@ impl Device {
             return Ok(());
         }
 
+        create_dir_all(DB_BASE_DIR).map_err(|e| Error::Nix {
+            msg: "update_db failed: failed to create db directory".to_string(),
+            source: e
+                .raw_os_error()
+                .map_or_else(|| nix::Error::EIO, nix::Error::from_i32),
+        })?;
+
+        let (mut file, tmp_file) = open_temporary(&db_path).map_err(|e| {
+            let errno = match e {
+                basic::error::Error::Nix { source } => source,
+                _ => nix::Error::EINVAL,
+            };
+            Error::Nix {
+                msg: "update_db failed: failed to open temporary file".to_string(),
+                source: errno,
+            }
+        })?;
+
+        fchmod(
+            file.as_raw_fd(),
+            if self.db_persist {
+                Mode::from_bits(0o1644).unwrap()
+            } else {
+                Mode::from_bits(0o644).unwrap()
+            },
+        )
+        .map_err(|e| {
+            cleanup(&db_path, &tmp_file);
+            Error::Nix {
+                msg: "update_db failed: failed to change the mode of temporary file".to_string(),
+                source: e,
+            }
+        })?;
+
+        if has_info {
+            if self.devnum > 0 {
+                for link in self.devlinks.iter() {
+                    file.write(format!("S:{}\n", link.strip_prefix("/dev/").unwrap()).as_bytes())
+                        .map_err(|e| {
+                            cleanup(&db_path, &tmp_file);
+                            Error::Nix {
+                                msg: "update_db failed: failed to write devlink".to_string(),
+                                source: e
+                                    .raw_os_error()
+                                    .map(nix::Error::from_i32)
+                                    .unwrap_or(nix::Error::EIO),
+                            }
+                        })?;
+                }
+
+                if self.devlink_priority != 0 {
+                    file.write(format!("L:{}\n", self.devlink_priority).as_bytes())
+                        .map_err(|e| {
+                            cleanup(&db_path, &tmp_file);
+                            Error::Nix {
+                                msg: "update_db failed: failed to write devlink priority"
+                                    .to_string(),
+                                source: e
+                                    .raw_os_error()
+                                    .map(nix::Error::from_i32)
+                                    .unwrap_or(nix::Error::EIO),
+                            }
+                        })?;
+                }
+            }
+
+            if self.usec_initialized > 0 {
+                file.write(format!("I:{}\n", self.usec_initialized).as_bytes())
+                    .map_err(|e| {
+                        cleanup(&db_path, &tmp_file);
+                        Error::Nix {
+                            msg: "update_db failed: failed to write initial usec".to_string(),
+                            source: e
+                                .raw_os_error()
+                                .map(nix::Error::from_i32)
+                                .unwrap_or(nix::Error::EIO),
+                        }
+                    })?;
+            }
+
+            for (k, v) in self.properties_db.iter() {
+                file.write(format!("E:{}={}\n", k, v).as_bytes())
+                    .map_err(|e| {
+                        cleanup(&db_path, &tmp_file);
+                        Error::Nix {
+                            msg: "update_db failed: failed to write property".to_string(),
+                            source: e
+                                .raw_os_error()
+                                .map(nix::Error::from_i32)
+                                .unwrap_or(nix::Error::EIO),
+                        }
+                    })?;
+            }
+
+            for tag in self.all_tags.iter() {
+                file.write(format!("G:{}\n", tag).as_bytes()).map_err(|e| {
+                    cleanup(&db_path, &tmp_file);
+                    Error::Nix {
+                        msg: "update_db failed: failed to write tag".to_string(),
+                        source: e
+                            .raw_os_error()
+                            .map(nix::Error::from_i32)
+                            .unwrap_or(nix::Error::EIO),
+                    }
+                })?;
+            }
+
+            for tag in self.current_tags.iter() {
+                file.write(format!("Q:{}\n", tag).as_bytes()).map_err(|e| {
+                    cleanup(&db_path, &tmp_file);
+                    Error::Nix {
+                        msg: "update_db failed: failed to write current tag".to_string(),
+                        source: e
+                            .raw_os_error()
+                            .map(nix::Error::from_i32)
+                            .unwrap_or(nix::Error::EIO),
+                    }
+                })?;
+            }
+        }
+
+        file.flush().map_err(|e| {
+            cleanup(&db_path, &tmp_file);
+            Error::Nix {
+                msg: "update_db failed: failed to flush db".to_string(),
+                source: e
+                    .raw_os_error()
+                    .map(nix::Error::from_i32)
+                    .unwrap_or(nix::Error::EIO),
+            }
+        })?;
+
+        rename(&tmp_file, &db_path).map_err(|e| {
+            cleanup(&db_path, &tmp_file);
+            Error::Nix {
+                msg: "update_db failed: failed to rename temporary file".to_string(),
+                source: e
+                    .raw_os_error()
+                    .map(nix::Error::from_i32)
+                    .unwrap_or(nix::Error::EIO),
+            }
+        })?;
+
         Ok(())
+    }
+
+    /// update persist device tag
+    pub fn update_tag(&mut self, tag: &str, add: bool) -> Result<(), Error> {
+        let id = self.get_device_id()?;
+
+        let tag_path = format!("{}{}/{}", TAGS_BASE_DIR, tag, id);
+
+        if add {
+            touch_file(&tag_path, true, Some(0o444), None, None).map_err(|e| Error::Nix {
+                msg: format!("tag_persist failed: failed to touch file: {}", e),
+                source: nix::Error::EINVAL,
+            })?;
+
+            return Ok(());
+        }
+
+        match unlink(tag_path.as_str()) {
+            Ok(_) => {}
+            Err(e) => {
+                if e != nix::Error::ENOENT {
+                    return Err(Error::Nix {
+                        msg: "failed to unlink db".to_string(),
+                        source: e,
+                    });
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// set the device object to initialized
+    pub fn set_is_initialized(&mut self) {
+        self.is_initialized = true;
     }
 }
 
@@ -2210,7 +2414,7 @@ impl Device {
             source: e.get_errno(),
         })?;
 
-        let path = DB_DIRECTORY_PATH.to_string() + &id;
+        let path = format!("{}{}", DB_BASE_DIR, id);
 
         self.read_db_internal_filename(path)
             .map_err(|e| Error::Nix {
@@ -2246,7 +2450,13 @@ impl Device {
         };
 
         let mut buf = String::new();
-        file.read_to_string(&mut buf).unwrap();
+        file.read_to_string(&mut buf).map_err(|e| Error::Nix {
+            msg: "read_db_internal_filename failed: failed to read from db".to_string(),
+            source: e
+                .raw_os_error()
+                .map(nix::Error::from_i32)
+                .unwrap_or(nix::Error::EIO),
+        })?;
 
         self.is_initialized = true;
         self.db_loaded = true;
@@ -2521,6 +2731,7 @@ mod tests {
     use crate::{
         device::*,
         device_enumerator::{DeviceEnumerationType, DeviceEnumerator},
+        utils::LoopDev,
     };
     use libc::S_IFBLK;
     use nix::sys::stat::makedev;
@@ -2820,6 +3031,66 @@ mod tests {
 
         for (k, v) in dev_clone.property_iter_mut().unwrap() {
             println!("Prepared: {}={}", k, v);
+        }
+    }
+
+    #[test]
+    fn test_update_db() {
+        match LoopDev::new("/tmp/test_update_node", 1024 * 1024 * 10) {
+            Ok(lodev) => {
+                let dev_path = lodev
+                    .get_device_path()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+
+                let mut dev = Device::from_path(dev_path).unwrap();
+
+                dev.add_devlinks("test1 test2".to_string()).unwrap();
+                dev.add_tags("tag1:tag2".to_string(), true).unwrap();
+                dev.add_property("key".to_string(), "value".to_string())
+                    .unwrap();
+                dev.set_devlink_priority(10);
+                dev.set_usec_initialized(1000).unwrap();
+
+                dev.update_db().unwrap();
+
+                let db_path = format!("{}{}", DB_BASE_DIR, dev.get_device_id().unwrap());
+
+                unlink(db_path.as_str()).unwrap();
+            }
+            Err(e) => {
+                assert_eq!(e.get_errno(), nix::Error::EACCES);
+            }
+        }
+    }
+
+    #[test]
+    fn test_update_tag() {
+        match LoopDev::new("/tmp/test_update_node", 1024 * 1024 * 10) {
+            Ok(lodev) => {
+                let dev_path = lodev
+                    .get_device_path()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+
+                let mut dev = Device::from_path(dev_path).unwrap();
+                dev.update_tag("test_update_tag", true).unwrap();
+                let tag_path = format!(
+                    "/run/devmaster/tags/test_update_tag/{}",
+                    dev.get_device_id().unwrap()
+                );
+                assert!(Path::new(tag_path.as_str()).exists());
+
+                dev.update_tag("test_update_tag", false).unwrap();
+                assert!(!Path::new(tag_path.as_str()).exists());
+            }
+            Err(e) => {
+                assert_eq!(e.get_errno(), nix::Error::EACCES);
+            }
         }
     }
 }

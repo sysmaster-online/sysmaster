@@ -10,9 +10,12 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+//! utilities for device operation
 use nix::errno::Errno;
 
-use crate::{error::*, *};
+use crate::{error::*, Device};
+use loopdev::*;
+use std::path::PathBuf;
 use std::{cmp::Ordering, fmt::Debug, fs::DirEntry, path::Path};
 
 /// compare sound device
@@ -100,4 +103,77 @@ pub(crate) fn readlink_value<P: AsRef<Path> + Debug>(path: P) -> Result<String, 
     };
 
     Ok(abs_path.file_name().unwrap().to_str().unwrap().to_string())
+}
+
+/// loop device
+pub struct LoopDev {
+    tmpfile: String,
+    lodev: LoopDevice,
+}
+
+impl LoopDev {
+    /// create a temporate file with specific size
+    #[allow(dead_code)]
+    pub fn new(tmpfile: &str, size: u64) -> Result<Self, Error> {
+        let file = std::fs::File::create(tmpfile).map_err(|e| Error::Nix {
+            msg: format!("failed to create '{}'", tmpfile),
+            source: e
+                .raw_os_error()
+                .map(nix::Error::from_i32)
+                .unwrap_or(nix::Error::EIO),
+        })?;
+        file.set_len(size).map_err(|e| Error::Nix {
+            msg: "failed to set length".to_string(),
+            source: e
+                .raw_os_error()
+                .map(nix::Error::from_i32)
+                .unwrap_or(nix::Error::EIO),
+        })?;
+
+        let lc = loopdev::LoopControl::open().map_err(|e| Error::Nix {
+            msg: "failed to open lo-control".to_string(),
+            source: e
+                .raw_os_error()
+                .map(nix::Error::from_i32)
+                .unwrap_or(nix::Error::EIO),
+        })?;
+        let ld = lc.next_free().map_err(|e| Error::Nix {
+            msg: "failed to find lo-device".to_string(),
+            source: e
+                .raw_os_error()
+                .map(nix::Error::from_i32)
+                .unwrap_or(nix::Error::EIO),
+        })?;
+
+        ld.with()
+            .part_scan(true)
+            .offset(0)
+            .size_limit(size)
+            .attach(tmpfile)
+            .map_err(|e| Error::Nix {
+                msg: "failed to attach lo-device".to_string(),
+                source: e
+                    .raw_os_error()
+                    .map(nix::Error::from_i32)
+                    .unwrap_or(nix::Error::EIO),
+            })?;
+
+        Ok(LoopDev {
+            tmpfile: tmpfile.to_string(),
+            lodev: ld,
+        })
+    }
+
+    /// get the loop device path
+    #[allow(dead_code)]
+    pub fn get_device_path(&self) -> Option<PathBuf> {
+        self.lodev.path()
+    }
+}
+
+impl Drop for LoopDev {
+    fn drop(&mut self) {
+        let _ = self.lodev.detach();
+        let _ = std::fs::remove_file(self.tmpfile.as_str());
+    }
 }

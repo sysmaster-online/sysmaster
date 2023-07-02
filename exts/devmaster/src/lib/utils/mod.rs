@@ -30,7 +30,6 @@ use shell_words::split;
 use snafu::ResultExt;
 use wait_timeout::ChildExt;
 
-pub(crate) mod loop_device;
 pub(crate) mod macros;
 
 pub(crate) const DEVMASTER_LEGAL_CHARS: &str = "/ $%?,";
@@ -483,6 +482,7 @@ pub(crate) fn get_property_from_string(s: &str) -> Result<(String, String)> {
     }
 }
 
+/// inherit initial timestamp from old device object
 pub(crate) fn initialize_device_usec(
     dev_new: Arc<Mutex<Device>>,
     dev_old: Arc<Mutex<Device>>,
@@ -506,6 +506,38 @@ pub(crate) fn initialize_device_usec(
             e
         })
         .context(DeviceSnafu)?;
+
+    Ok(())
+}
+
+/// add new tags and remove deleted tags
+pub(crate) fn device_update_tag(
+    dev_new: Arc<Mutex<Device>>,
+    dev_old: Arc<Mutex<Device>>,
+) -> Result<()> {
+    for tag in dev_old.lock().unwrap().tag_iter_mut() {
+        if let Ok(true) = dev_new.lock().unwrap().has_tag(tag) {
+            continue;
+        }
+
+        let _ = dev_new
+            .lock()
+            .unwrap()
+            .update_tag(tag, false)
+            .context(DeviceSnafu)
+            .log_error(&format!("failed to remove old tag '{}'", tag));
+    }
+
+    let tags_clone = dev_new.lock().unwrap().all_tags.clone();
+
+    for tag in tags_clone.iter() {
+        let _ = dev_new
+            .lock()
+            .unwrap()
+            .update_tag(tag, true)
+            .context(DeviceSnafu)
+            .log_error(&format!("failed to add new tag '{}'", tag));
+    }
 
     Ok(())
 }

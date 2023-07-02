@@ -15,7 +15,7 @@
 use crate::{error::*, format_proc_fd_path};
 use libc::{fchownat, mode_t, timespec, AT_EMPTY_PATH, S_IFLNK, S_IFMT};
 use nix::{
-    fcntl::{readlink, renameat, OFlag},
+    fcntl::{open, readlink, renameat, OFlag},
     sys::stat::{fstat, Mode},
     unistd::{unlinkat, Gid, Uid, UnlinkatFlags},
 };
@@ -23,7 +23,7 @@ use pathdiff::diff_paths;
 use rand::Rng;
 use std::{
     ffi::CString,
-    fs::{remove_dir, File},
+    fs::{create_dir_all, remove_dir, File},
     io::ErrorKind,
     os::unix::prelude::{AsRawFd, FromRawFd, PermissionsExt, RawFd},
     path::Path,
@@ -245,13 +245,70 @@ pub fn remove_dir_until(path: &str, stop: &str) -> Result<()> {
     Ok(())
 }
 
+/// create and open a temporary file
+pub fn open_temporary(path: &str) -> Result<(File, String)> {
+    let tmp_file = format!("{}.{}", path, rand::thread_rng().gen::<u32>());
+
+    let f = open(
+        tmp_file.as_str(),
+        OFlag::O_CLOEXEC | OFlag::O_NOCTTY | OFlag::O_RDWR | OFlag::O_CREAT | OFlag::O_EXCL,
+        Mode::from_bits(0o644).unwrap(),
+    )
+    .context(NixSnafu)?;
+
+    let file = unsafe { File::from_raw_fd(f) };
+
+    Ok((file, tmp_file))
+}
+
+/// Create a new file based on absolute path.
+pub fn touch_file(
+    path: &str,
+    parents: bool,
+    mode: Option<mode_t>,
+    uid: Option<Uid>,
+    gid: Option<Gid>,
+) -> Result<bool> {
+    let p = Path::new(path);
+
+    if parents && p.parent().is_some() {
+        let _ = create_dir_all(p.parent().unwrap());
+    }
+
+    let fd = match open(
+        p,
+        OFlag::O_PATH | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW,
+        Mode::empty(),
+    ) {
+        Ok(n) => n,
+        Err(e) => {
+            if e != nix::Error::ENOENT {
+                return Err(Error::Nix { source: e });
+            }
+
+            open(
+                p,
+                OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL | OFlag::O_CLOEXEC,
+                mode.map(|v| Mode::from_bits(v).unwrap_or(Mode::empty()))
+                    .unwrap_or(Mode::empty()),
+            )
+            .context(NixSnafu)?
+        }
+    };
+
+    /* The returned value should be explicitly declared, otherwise the file will be closed at once */
+    let _f = unsafe { File::from_raw_fd(fd) };
+
+    fchmod_and_chown(fd, path, mode, uid, gid)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::fs_util::symlink;
-    use nix::unistd::{self};
+    use nix::unistd::{self, unlink};
     use std::{
-        fs::{create_dir_all, File},
+        fs::{create_dir_all, remove_file, File},
         os::unix::prelude::MetadataExt,
         time::SystemTime,
     };
@@ -368,5 +425,28 @@ mod tests {
         assert!(remove_dir_until("/tmp/test_remove_dir_until_2/test2", "/tmp").is_err());
         assert!(!Path::new("/tmp/test_remove_dir_until_2/test2").exists());
         assert!(Path::new("/tmp/test_remove_dir_until_2/test_file").exists());
+    }
+
+    #[test]
+    fn test_open_temporary() {
+        let (file, name) = open_temporary("test_open_temporary").unwrap();
+        let p = Path::new(&name);
+        println!("{:?}", p.canonicalize().unwrap());
+        drop(file);
+        remove_file(name).unwrap();
+    }
+
+    #[test]
+    fn test_touch_file() {
+        let _ = unlink("/tmp/test_touch_file/f1");
+        touch_file("/tmp/test_touch_file/f1", true, Some(0o444), None, None).unwrap();
+        let p = Path::new("/tmp/test_touch_file/f1");
+        assert!(p.exists());
+        let md = p.metadata().unwrap();
+        assert_eq!(md.mode() & 0o777, 0o444);
+        touch_file("/tmp/test_touch_file/f1", true, Some(0o666), None, None).unwrap();
+        let md = p.metadata().unwrap();
+        assert_eq!(md.mode() & 0o777, 0o666);
+        let _ = unlink("/tmp/test_touch_file/f1");
     }
 }

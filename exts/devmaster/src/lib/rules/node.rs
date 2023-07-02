@@ -570,58 +570,60 @@ pub(crate) fn find_prioritized_devnode(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::utils::loop_device::LoopDev;
+    use device::utils::LoopDev;
     use nix::unistd::unlink;
     use std::fs::{self, remove_dir, remove_dir_all};
 
     #[test]
-    #[ignore]
     fn test_update_node() {
-        basic::logger::init_log_to_console("test", log::LevelFilter::Debug);
+        match LoopDev::new("/tmp/test_update_node", 1024 * 1024 * 10) {
+            Ok(lodev) => {
+                let dev_path = lodev
+                    .get_device_path()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string();
 
-        let lodev = LoopDev::new("/tmp/test_update_node", 1024 * 1024 * 10).unwrap();
-        let dev_path = lodev
-            .get_device_path()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
+                let mut dev_new = Device::from_path(dev_path.clone()).unwrap();
+                let dev_old = Device::from_path(dev_path).unwrap();
 
-        let mut dev_new = Device::from_path(dev_path.clone()).unwrap();
-        let dev_old = Device::from_path(dev_path).unwrap();
+                dev_new.add_devlink("/dev/test/sss".to_string()).unwrap();
 
-        dev_new.add_devlink("/dev/test/sss".to_string()).unwrap();
+                let devnum = dev_new.get_devnum().unwrap();
+                let sysname = dev_new.get_sysname().unwrap().to_string();
+                let symlink = format!("/dev/block/{}:{}", major(devnum), minor(devnum));
 
-        let devnum = dev_new.get_devnum().unwrap();
-        let sysname = dev_new.get_sysname().unwrap().to_string();
-        let symlink = format!("/dev/block/{}:{}", major(devnum), minor(devnum));
+                let link_path = Path::new(&symlink);
 
-        let link_path = Path::new(&symlink);
+                if link_path.is_symlink() {
+                    unlink(link_path).unwrap();
+                }
 
-        if link_path.is_symlink() {
-            unlink(link_path).unwrap();
+                let dev_new_arc = Arc::new(Mutex::new(dev_new));
+                let dev_old_arc = Arc::new(Mutex::new(dev_old));
+
+                update_node(dev_new_arc.clone(), dev_old_arc.clone()).unwrap();
+
+                assert!(link_path.is_symlink());
+                assert_eq!(
+                    fs::read_link(link_path).unwrap().as_path(),
+                    Path::new(&format!("../{}", sysname))
+                );
+
+                assert!(Path::new("/dev/test/sss").is_symlink());
+
+                update_node(dev_old_arc, dev_new_arc).unwrap();
+
+                assert!(!Path::new("/dev/test/sss").exists());
+                /* If /dev/test/ is not empty, the directory will not be removed. */
+                let _ = remove_dir("/dev/test");
+                unlink(symlink.as_str()).unwrap();
+            }
+            Err(e) => {
+                assert_eq!(e.get_errno(), nix::Error::EACCES);
+            }
         }
-
-        let dev_new_arc = Arc::new(Mutex::new(dev_new));
-        let dev_old_arc = Arc::new(Mutex::new(dev_old));
-
-        update_node(dev_new_arc.clone(), dev_old_arc.clone()).unwrap();
-
-        assert!(link_path.is_symlink());
-        assert_eq!(
-            fs::read_link(link_path).unwrap().as_path(),
-            Path::new(&format!("../{}", sysname))
-        );
-
-        assert!(Path::new("/dev/test/sss").is_symlink());
-
-        update_node(dev_old_arc, dev_new_arc).unwrap();
-
-        // unlink("/dev/test/sss").unwrap();
-        assert!(!Path::new("/dev/test/sss").exists());
-        /* If /dev/test/ is not empty, the directory will not be removed. */
-        let _ = remove_dir("/dev/test");
-        unlink(symlink.as_str()).unwrap();
     }
 
     #[test]

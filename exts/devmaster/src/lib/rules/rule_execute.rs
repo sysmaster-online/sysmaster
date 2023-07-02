@@ -25,8 +25,9 @@ use crate::{
     log_dev_lock, log_rule_line, log_rule_token,
     rules::FORMAT_SUBST_TABLE,
     utils::{
-        get_property_from_string, initialize_device_usec, replace_chars, replace_ifname,
-        resolve_subsystem_kernel, spawn, sysattr_subdir_subst, DEVMASTER_LEGAL_CHARS,
+        device_update_tag, get_property_from_string, initialize_device_usec, replace_chars,
+        replace_ifname, resolve_subsystem_kernel, spawn, sysattr_subdir_subst,
+        DEVMASTER_LEGAL_CHARS,
     },
 };
 use basic::{
@@ -629,7 +630,7 @@ impl ExecuteManager {
                     })?,
             ));
 
-            // copy all tags to device with db
+            // copy all tags to cloned device
             for tag in unit.device.as_ref().lock().unwrap().all_tags.iter() {
                 unit.device_db_clone
                     .as_ref()
@@ -642,7 +643,7 @@ impl ExecuteManager {
                     })?;
             }
 
-            // add property to device with db: todo
+            // add property to cloned device
             unit.device_db_clone
                 .as_ref()
                 .lock()
@@ -671,7 +672,29 @@ impl ExecuteManager {
             "failed to initialize device timestamp",
         )?;
 
-        // write database file
+        // update tags and database
+        let _ = device_update_tag(
+            self.current_unit.as_ref().unwrap().device.clone(),
+            self.current_unit.as_ref().unwrap().device_db_clone.clone(),
+        );
+
+        self.current_unit
+            .as_ref()
+            .unwrap()
+            .device
+            .lock()
+            .unwrap()
+            .update_db()
+            .context(DeviceSnafu)
+            .log_error("failed to update db")?;
+
+        self.current_unit
+            .as_ref()
+            .unwrap()
+            .device
+            .lock()
+            .unwrap()
+            .set_is_initialized();
 
         Ok(())
     }

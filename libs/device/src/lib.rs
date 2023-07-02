@@ -17,8 +17,7 @@ pub mod device_action;
 pub mod device_enumerator;
 pub mod device_monitor;
 pub mod error;
+pub mod utils;
 
 pub use crate::device::*;
 pub use crate::device_action::*;
-
-pub(crate) mod utils;
