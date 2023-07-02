@@ -10,6 +10,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+#[cfg(debug)]
+use super::debug::{self, ReliDebug};
 use super::{
     enable::{self, ReliEnable},
     history::{self, ReliHistory},
@@ -19,24 +21,9 @@ use super::{
     ReDbTable, ReStation, ReStationKind,
 };
 use crate::{error::*, rel::base};
-use basic::do_entry_or_return_io_error;
 use heed::Database;
 use nix::sys::stat::{self, Mode};
-use std::{
-    fs::{self, File},
-    path::Path,
-    rc::Rc,
-    thread,
-    time::Duration,
-};
-
-const RELI_DEBUG_SWITCH_FILE: &str = "switch.debug";
-const RELI_DEBUG_CLEAR_FILE: &str = "clear.debug";
-const RELI_DEBUG_CFIRST_FILE: &str = "clear_first.debug";
-const RELI_DEBUG_ENABLE_FILE: &str = "enable.debug";
-const RELI_DEBUG_PANIC_FILE: &str = "panic.debug";
-const RELI_DEBUG_PFIRST_FILE: &str = "panic_first.debug";
-const RELI_DEBUG_SLEEP_FILE: &str = "sleep.debug";
+use std::rc::Rc;
 
 /// the configuration of reliability instance
 pub struct ReliConf {
@@ -76,8 +63,11 @@ impl Default for ReliConf {
 /// reliability instance
 #[derive(Debug)]
 pub struct Reliability {
+    // debug
+    #[cfg(debug)]
+    debug: ReliDebug,
+
     // control data
-    dir_string: String,
     enable: ReliEnable,
 
     // output data
@@ -102,7 +92,8 @@ impl Reliability {
     pub fn new(conf: &ReliConf) -> Reliability {
         let dir_s = reli_prepare().expect("reliability prepare");
         let reli = Reliability {
-            dir_string: dir_s.clone(),
+            #[cfg(debug)]
+            debug: ReliDebug::new(&dir_s),
             enable: ReliEnable::new(&dir_s),
             last: ReliLast::new(&dir_s),
             history: ReliHistory::new(&dir_s, conf.map_size, conf.max_dbs),
@@ -250,8 +241,8 @@ impl Reliability {
 
     /// do the debug action: enable the recover process
     pub fn debug_enable(&self) {
-        let enable = Path::new(&self.dir_string).join(RELI_DEBUG_ENABLE_FILE);
-        if enable.exists() {
+        #[cfg(debug)]
+        if self.debug.enable() {
             log::info!("reliability debug: enable data...");
             self.set_enable(true);
         }
@@ -259,53 +250,25 @@ impl Reliability {
 
     /// do the debug action: clear data excluding enable
     pub fn debug_clear(&self) {
-        let clear = Path::new(&self.dir_string).join(RELI_DEBUG_CLEAR_FILE);
-        if clear.exists() {
-            log::info!("reliability debug: clear data...");
-            let cfirst = Path::new(&self.dir_string).join(RELI_DEBUG_CFIRST_FILE);
-            if cfirst.exists() {
-                // do nothing
-                log::info!("reliability debug_clear: non-first time, do nothing.");
-            } else {
-                log::info!("reliability debug_clear: first time, try clear.");
-                File::create(&cfirst).unwrap();
-                log::debug!("Successfully created {cfirst:?}");
-                log::info!("reliability debug_clear: first time, clear ...");
-
-                // clear data excluding enable
-                let enable = self.enable();
-                self.data_clear();
-                self.set_enable(enable);
-            }
+        #[cfg(debug)]
+        if self.debug.clear() {
+            // clear data excluding enable
+            let enable = self.enable();
+            self.data_clear();
+            self.set_enable(enable);
         }
     }
 
     /// do the debug action: panic
     pub fn debug_panic(&self) {
-        let panic = Path::new(&self.dir_string).join(RELI_DEBUG_PANIC_FILE);
-        if panic.exists() {
-            log::info!("reliability debug: panic...");
-            let pfirst = Path::new(&self.dir_string).join(RELI_DEBUG_PFIRST_FILE);
-            if pfirst.exists() {
-                // do nothing
-                log::info!("reliability debug_panic: non-first time, do nothing.");
-            } else {
-                log::info!("reliability debug_panic: first time, try panic.");
-                File::create(&pfirst).unwrap();
-                log::debug!("Successfully created {pfirst:?}");
-                log::info!("reliability debug_panic: first time, panic ...");
-                panic!("first debug_panic.");
-            }
-        }
+        #[cfg(debug)]
+        self.debug.panic();
     }
 
     /// do the debug action: sleep
     pub fn debug_sleep(&self) {
-        let sleep = Path::new(&self.dir_string).join(RELI_DEBUG_SLEEP_FILE);
-        if sleep.exists() {
-            log::info!("reliability debug: sleep...");
-            thread::sleep(Duration::from_secs(3600));
-        }
+        #[cfg(debug)]
+        self.debug.sleep();
     }
 
     fn input_rebuild(&self) {
@@ -365,31 +328,12 @@ impl Reliability {
     }
 }
 
-/// do the debug action: enable or disable switch flag. effective after restart.
-#[allow(dead_code)]
-pub fn reli_debug_enable_switch(enable: bool) -> Result<()> {
-    log::info!("reliability debug: enable[{}] switch.", enable);
-
-    let dir_string = base::reli_dir_get().unwrap();
-    let switch = Path::new(&dir_string).join(RELI_DEBUG_SWITCH_FILE);
-    // touch switch.debug if enable
-    if enable && !switch.exists() {
-        do_entry_or_return_io_error!(File::create, switch, "create");
-    }
-    // remove switch.debug if disable
-    if !enable && switch.exists() {
-        do_entry_or_return_io_error!(fs::remove_file, switch, "remove");
-    }
-
-    Ok(())
-}
-
 /// get the debug flag of switch
 pub fn reli_debug_get_switch() -> bool {
-    let dir_string = base::reli_dir_get().expect("guaranteed by caller.");
-    let switch = Path::new(&dir_string).join(RELI_DEBUG_SWITCH_FILE);
-    log::info!("reliability debug: get switch file: {:?}.", switch);
-    switch.exists()
+    #[cfg(debug)]
+    return debug::switch();
+    #[cfg(not(debug))]
+    return true;
 }
 
 fn reli_prepare() -> Result<String> {

@@ -11,15 +11,17 @@
 // See the Mulan PSL v2 for more details.
 
 //! reliability module
-pub use api::{reli_debug_enable_switch, reli_debug_get_switch, ReliConf, Reliability};
+pub use api::{reli_debug_get_switch, ReliConf, Reliability};
 pub use base::{reli_dir_prepare, ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable};
 use serde::{Deserialize, Serialize};
 pub use station::{ReStation, ReStationKind};
 use std::convert::TryFrom;
 
-// dependency: base -> {enable | last | history | pending | station} -> api
+// dependency: base -> {enable | last | history | pending | station} -> debug -> api
 mod api;
 mod base;
+#[cfg(debug)]
+mod debug;
 mod enable;
 mod history;
 mod last;

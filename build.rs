@@ -14,6 +14,8 @@
 // if use env out_dir need add build.rs
 use std::{env, process::Command};
 
+const RELEASE: &str = "release";
+
 macro_rules! warn {
     ($message:expr) => {
         println!("cargo:warning={}", $message);
@@ -45,4 +47,10 @@ fn main() {
     println!("cargo:rerun-if-changed=build.sh");
     println!("cargo:rerun-if-changed=build.rs");
     // println!("cargo:rerun-if-changed=config.service");
+
+    // turn on "debug" for non-release build
+    let profile = env::var("PROFILE").unwrap();
+    if profile != RELEASE {
+        println!("cargo:rustc-cfg=debug");
+    }
 }

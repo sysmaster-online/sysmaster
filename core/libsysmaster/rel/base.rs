@@ -20,10 +20,12 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+#[cfg(debug)]
+use std::env;
 use std::fmt::Debug;
+use std::fs;
 use std::hash::Hash;
 use std::path::Path;
-use std::{env, fs};
 
 /// the reliability database
 /// K & V that can be deserialized without borrowing any data from the deserializer.
@@ -275,7 +277,21 @@ pub trait ReDbTable {
 
 const RELI_PATH_DIR: &str = "/run/sysmaster/reliability";
 
+/// get the directory for reliability.
 pub fn reli_dir_get() -> Result<String> {
+    #[cfg(debug)]
+    return reli_dir_get_debug();
+    #[cfg(not(debug))]
+    return reli_dir_get_release();
+}
+
+#[cfg(not(debug))]
+fn reli_dir_get_release() -> Result<String> {
+    return reli_dir_get_run();
+}
+
+#[cfg(debug)]
+fn reli_dir_get_debug() -> Result<String> {
     // /run/sysmaster/reliability/
     let ret_run = reli_dir_get_run();
     if ret_run.is_ok() {
@@ -303,17 +319,26 @@ pub fn reli_dir_get() -> Result<String> {
 /// prepare the directory for reliability.
 /// the reliability path is prepared and searched according to the following priority, from high to low:
 /// 1. /run/sysmaster/reliability/: the real running directory.
-/// 2. OUT_DIR/../reliability/: make CI happy, which is target/debug/reliability/ or target/release/reliability/ usually.
-/// 3. PROCESS_RELI_PATH: the path customized.
+/// 2. [debug-only]OUT_DIR/../reliability/: make CI happy, which is target/debug/reliability/ or target/release/reliability/ usually.
+/// 3. [debug-only]ROCESS_RELI_PATH: the path customized.
 pub fn reli_dir_prepare() -> Result<()> {
     // create '/run/sysmaster/reliability' or 'xxx/reliability' with mode 700
     let old_mask = stat::umask(Mode::from_bits_truncate(!0o700));
-    let ret = reli_dir_prepare_body();
+    #[cfg(debug)]
+    let ret = reli_dir_prepare_debug();
+    #[cfg(not(debug))]
+    let ret = reli_dir_prepare_release();
     let _ = stat::umask(old_mask);
     ret
 }
 
-fn reli_dir_prepare_body() -> Result<()> {
+#[cfg(not(debug))]
+fn reli_dir_prepare_release() -> Result<()> {
+    return reli_dir_prepare_run();
+}
+
+#[cfg(debug)]
+fn reli_dir_prepare_debug() -> Result<()> {
     // // /run/sysmaster/reliability/
     let ret_run = reli_dir_prepare_run();
     if ret_run.is_ok() {
@@ -373,6 +398,7 @@ fn reli_dir_get_run() -> Result<String> {
     }
 }
 
+#[cfg(debug)]
 fn reli_dir_prepare_out() -> Result<()> {
     let dir_string = out_dir_string_get();
     if let Some(d_str) = dir_string {
@@ -390,6 +416,7 @@ fn reli_dir_prepare_out() -> Result<()> {
     })
 }
 
+#[cfg(debug)]
 fn reli_dir_get_out() -> Result<String> {
     let dir_string = out_dir_string_get();
     if let Some(d_str) = dir_string {
@@ -405,6 +432,7 @@ fn reli_dir_get_out() -> Result<String> {
     })
 }
 
+#[cfg(debug)]
 fn reli_dir_prepare_customize() -> Result<()> {
     let dir_string = env::var("PROCESS_LIB_LOAD_PATH").ok();
     if let Some(d_str) = dir_string {
@@ -425,6 +453,7 @@ fn reli_dir_prepare_customize() -> Result<()> {
     })
 }
 
+#[cfg(debug)]
 fn reli_dir_get_customize() -> Result<String> {
     let dir_string = env::var("PROCESS_LIB_LOAD_PATH").ok();
     if let Some(d_str) = dir_string {
@@ -443,6 +472,7 @@ fn reli_dir_get_customize() -> Result<String> {
     })
 }
 
+#[cfg(debug)]
 fn out_dir_string_get() -> Option<String> {
     let run = env::var("OUT_DIR").ok();
     let compile: Option<String> = option_env!("OUT_DIR").map(String::from);
