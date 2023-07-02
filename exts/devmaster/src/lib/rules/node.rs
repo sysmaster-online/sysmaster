@@ -242,6 +242,36 @@ pub(crate) fn update_node(dev_new: Arc<Mutex<Device>>, dev_old: Arc<Mutex<Device
     Ok(())
 }
 
+pub(crate) fn cleanup_node(dev: Arc<Mutex<Device>>) -> Result<()> {
+    let _ = dev.lock().unwrap().read_db();
+    let links = dev.lock().unwrap().devlinks.clone();
+    for link in links {
+        if let Err(e) = update_symlink(dev.clone(), link.as_str(), false) {
+            log_dev_lock!(
+                error,
+                dev.clone(),
+                format!("failed to remove symlink '{}': {}", link, e)
+            );
+        }
+    }
+
+    let filename = device_get_symlink_by_devnum(dev.clone())
+        .log_dev_lock_error(dev.clone(), "failed to get devnum symlink")?;
+
+    match unlink(filename.as_str()) {
+        Ok(_) => log_dev_lock!(debug, dev, format!("unlinked '{}'", filename)),
+        Err(e) => {
+            log_dev_lock!(
+                error,
+                dev,
+                format!("failed to unlink '{}': {}", filename, e)
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// if 'add' is true, add or update the target device symlink under '/run/devmaster/links/<escaped symlink>',
 /// otherwise delete the old symlink.
 pub(crate) fn update_symlink(dev: Arc<Mutex<Device>>, symlink: &str, add: bool) -> Result<()> {
@@ -282,13 +312,12 @@ pub(crate) fn update_symlink(dev: Arc<Mutex<Device>>, symlink: &str, add: bool) 
 
     log_dev_lock!(debug, dev, format!("removing symlink '{}'", symlink));
 
-    if let Err(e) = unlink(symlink).context(NixSnafu) {
-        if e.get_errno() != nix::Error::ENOENT {
-            log_dev_lock!(
-                debug,
-                dev,
-                format!("failed to remove symlink '{}': {}", symlink, e)
-            );
+    match unlink(symlink).context(NixSnafu) {
+        Ok(_) => log_dev_lock!(debug, dev, format!("unlinked symlink '{}'", symlink)),
+        Err(e) => {
+            if e.get_errno() != nix::Error::ENOENT {
+                log_dev_lock!(error, dev, format!("failed to unlink '{}': {}", symlink, e));
+            }
         }
     }
 
@@ -394,21 +423,25 @@ pub(crate) fn update_prior_dir(dev: Arc<Mutex<Device>>, dirfd: RawFd, add: bool)
                 return Ok(false);
             }
         }
-        if let Err(e) = unlinkat(Some(dirfd), id.as_str(), UnlinkatFlags::NoRemoveDir) {
-            log::debug!("failed to unlink '{}': {}", id, e);
+        match unlinkat(Some(dirfd), id.as_str(), UnlinkatFlags::NoRemoveDir) {
+            Ok(_) => log_dev_lock!(debug, dev, format!("unlinked '{}'", id)),
+            Err(e) => log_dev_lock!(error, dev, format!("failed to unlink '{}': {}", id, e)),
         }
         symlinkat(dangle_link.as_str(), Some(dirfd), id.as_str())
             .context(NixSnafu)
             .log_error("symlinkat failed")?;
-    } else if let Err(e) =
-        unlinkat(Some(dirfd), id.as_str(), UnlinkatFlags::NoRemoveDir).context(NixSnafu)
-    {
-        if e.get_errno() == nix::Error::ENOENT {
-            /* unchange */
-            return Ok(false);
+    } else {
+        match unlinkat(Some(dirfd), id.as_str(), UnlinkatFlags::NoRemoveDir).context(NixSnafu) {
+            Ok(_) => log_dev_lock!(debug, dev, format!("unlinked '{}'", id)),
+            Err(e) => {
+                if e.get_errno() == nix::Error::ENOENT {
+                    /* unchange */
+                    return Ok(false);
+                }
+                log_dev_lock!(error, dev, format!("failed to unlink '{}': {}", id, e));
+                return Err(e);
+            }
         }
-        log::error!("{}", e);
-        return Err(e);
     }
 
     Ok(true)

@@ -14,7 +14,7 @@
 //!
 
 use super::{
-    node::{static_node_apply_permissions, update_node},
+    node::{cleanup_node, static_node_apply_permissions, update_node},
     EscapeType, FormatSubstitutionType, OperatorType, RuleFile, RuleLine, RuleLineType, RuleToken,
     Rules, SubstituteType,
     TokenType::*,
@@ -25,8 +25,8 @@ use crate::{
     log_dev_lock, log_rule_line, log_rule_token,
     rules::FORMAT_SUBST_TABLE,
     utils::{
-        device_update_tag, get_property_from_string, initialize_device_usec, replace_chars,
-        replace_ifname, resolve_subsystem_kernel, spawn, sysattr_subdir_subst,
+        cleanup_db, device_update_tag, get_property_from_string, initialize_device_usec,
+        replace_chars, replace_ifname, resolve_subsystem_kernel, spawn, sysattr_subdir_subst,
         DEVMASTER_LEGAL_CHARS,
     },
 };
@@ -675,7 +675,8 @@ impl ExecuteManager {
         // update tags and database
         let _ = device_update_tag(
             self.current_unit.as_ref().unwrap().device.clone(),
-            self.current_unit.as_ref().unwrap().device_db_clone.clone(),
+            Some(self.current_unit.as_ref().unwrap().device_db_clone.clone()),
+            true,
         );
 
         self.current_unit
@@ -701,7 +702,48 @@ impl ExecuteManager {
 
     /// execute rules on remove uevent
     pub(crate) fn execute_rules_on_remove(&mut self) -> Result<()> {
-        todo!();
+        self.current_unit
+            .as_ref()
+            .unwrap()
+            .device
+            .as_ref()
+            .lock()
+            .unwrap()
+            .read_db_internal(true)
+            .context(DeviceSnafu)
+            .log_error("remove event failed")?;
+
+        device_update_tag(
+            self.current_unit.as_ref().unwrap().device.clone(),
+            None,
+            false,
+        )
+        .log_error("remove event failed")?;
+
+        cleanup_db(self.current_unit.as_ref().unwrap().device.clone())
+            .log_error("cleanup db failed")?;
+
+        // todo: watch end
+
+        let ret = self.apply_rules();
+
+        if self
+            .current_unit
+            .as_ref()
+            .unwrap()
+            .device
+            .as_ref()
+            .lock()
+            .unwrap()
+            .get_devnum()
+            .is_err()
+        {
+            return ret;
+        }
+
+        let _ = cleanup_node(self.current_unit.as_ref().unwrap().device.clone());
+
+        ret
     }
 
     /// apply rules on device
@@ -1424,9 +1466,8 @@ impl ExecuteManager {
                 };
 
                 let mut parent_lock = parent.as_ref().lock().unwrap();
-                let iter = execute_err!(token, parent_lock.property_iter_mut())?;
 
-                for (k, v) in iter {
+                for (k, v) in parent_lock.property_iter_mut() {
                     // check whether the key of property matches the
                     if !{
                         let mut matched = false;

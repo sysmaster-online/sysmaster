@@ -1692,6 +1692,37 @@ impl Device {
     pub fn set_is_initialized(&mut self) {
         self.is_initialized = true;
     }
+
+    /// read database
+    pub fn read_db(&mut self) -> Result<(), Error> {
+        self.read_db_internal(false).map_err(|e| Error::Nix {
+            msg: format!("read_db failed: failed to read_db_internal ({})", e),
+            source: e.get_errno(),
+        })
+    }
+
+    /// read database internally
+    pub fn read_db_internal(&mut self, force: bool) -> Result<(), Error> {
+        if self.db_loaded || (!force && self.sealed) {
+            return Ok(());
+        }
+
+        let id = self.get_device_id().map_err(|e| Error::Nix {
+            msg: format!("read_db_internal failed: failed to get_device_id ({})", e),
+            source: e.get_errno(),
+        })?;
+
+        let path = format!("{}{}", DB_BASE_DIR, id);
+
+        self.read_db_internal_filename(path)
+            .map_err(|e| Error::Nix {
+                msg: format!(
+                    "read_db_internal failed: failed to read_db_internal_filename ({})",
+                    e
+                ),
+                source: e.get_errno(),
+            })
+    }
 }
 
 /// internal methods
@@ -2395,37 +2426,6 @@ impl Device {
         Ok(())
     }
 
-    /// read database
-    pub(crate) fn read_db(&mut self) -> Result<(), Error> {
-        self.read_db_internal(false).map_err(|e| Error::Nix {
-            msg: format!("read_db failed: failed to read_db_internal ({})", e),
-            source: e.get_errno(),
-        })
-    }
-
-    /// read database internally
-    pub(crate) fn read_db_internal(&mut self, force: bool) -> Result<(), Error> {
-        if self.db_loaded || (!force && self.sealed) {
-            return Ok(());
-        }
-
-        let id = self.get_device_id().map_err(|e| Error::Nix {
-            msg: format!("read_db_internal failed: failed to get_device_id ({})", e),
-            source: e.get_errno(),
-        })?;
-
-        let path = format!("{}{}", DB_BASE_DIR, id);
-
-        self.read_db_internal_filename(path)
-            .map_err(|e| Error::Nix {
-                msg: format!(
-                    "read_db_internal failed: failed to read_db_internal_filename ({})",
-                    e
-                ),
-                source: e.get_errno(),
-            })
-    }
-
     /// read database internally from specific file
     pub(crate) fn read_db_internal_filename(&mut self, filename: String) -> Result<(), Error> {
         let mut file = match fs::OpenOptions::new().read(true).open(filename.clone()) {
@@ -2706,12 +2706,19 @@ pub struct DevicePropertyIter<'a> {
 
 impl Device {
     /// return the tag iterator
-    pub fn property_iter_mut(&mut self) -> Result<DevicePropertyIter<'_>, Error> {
-        self.properties_prepare()?;
+    pub fn property_iter_mut(&mut self) -> DevicePropertyIter<'_> {
+        if let Err(e) = self.properties_prepare() {
+            log::error!(
+                "failed to prepare properties of '{}': ({})",
+                self.get_device_id()
+                    .unwrap_or_else(|_| self.devpath.clone()),
+                e
+            )
+        }
 
-        Ok(DevicePropertyIter {
+        DevicePropertyIter {
             device_property_iter: self.properties.iter(),
-        })
+        }
     }
 }
 
@@ -2721,6 +2728,38 @@ impl<'a> Iterator for DevicePropertyIter<'a> {
     /// get the next tag
     fn next(&mut self) -> Option<Self::Item> {
         self.device_property_iter.next()
+    }
+}
+
+/// iterator over all tags of device object
+pub struct DeviceDevlinkIter<'a> {
+    device_devlink_iter: std::collections::hash_set::Iter<'a, String>,
+}
+
+impl Device {
+    /// return the tag iterator
+    pub fn devlink_iter_mut(&mut self) -> DeviceDevlinkIter<'_> {
+        if let Err(e) = self.read_db() {
+            log::error!(
+                "failed to read db of '{}': ({})",
+                self.get_device_id()
+                    .unwrap_or_else(|_| self.devpath.clone()),
+                e
+            )
+        }
+
+        DeviceDevlinkIter {
+            device_devlink_iter: self.devlinks.iter(),
+        }
+    }
+}
+
+impl<'a> Iterator for DeviceDevlinkIter<'a> {
+    type Item = &'a String;
+
+    /// get the next tag
+    fn next(&mut self) -> Option<Self::Item> {
+        self.device_devlink_iter.next()
     }
 }
 
@@ -3029,7 +3068,7 @@ mod tests {
             println!("Shallow: {}={}", k, v);
         }
 
-        for (k, v) in dev_clone.property_iter_mut().unwrap() {
+        for (k, v) in dev_clone.property_iter_mut() {
             println!("Prepared: {}={}", k, v);
         }
     }

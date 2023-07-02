@@ -20,11 +20,11 @@ use std::{
     time::Duration,
 };
 
-use crate::{error::*, rules::FormatSubstitutionType};
+use crate::{error::*, log_dev_lock, rules::FormatSubstitutionType};
 use basic::errno_util::errno_is_privilege;
-use device::Device;
+use device::{Device, DB_BASE_DIR};
 use lazy_static::lazy_static;
-use nix::errno::Errno;
+use nix::{errno::Errno, unistd::unlink};
 use regex::Regex;
 use shell_words::split;
 use snafu::ResultExt;
@@ -513,19 +513,22 @@ pub(crate) fn initialize_device_usec(
 /// add new tags and remove deleted tags
 pub(crate) fn device_update_tag(
     dev_new: Arc<Mutex<Device>>,
-    dev_old: Arc<Mutex<Device>>,
+    dev_old: Option<Arc<Mutex<Device>>>,
+    add: bool,
 ) -> Result<()> {
-    for tag in dev_old.lock().unwrap().tag_iter_mut() {
-        if let Ok(true) = dev_new.lock().unwrap().has_tag(tag) {
-            continue;
-        }
+    if let Some(dev_old) = dev_old {
+        for tag in dev_old.lock().unwrap().tag_iter_mut() {
+            if let Ok(true) = dev_new.lock().unwrap().has_tag(tag) {
+                continue;
+            }
 
-        let _ = dev_new
-            .lock()
-            .unwrap()
-            .update_tag(tag, false)
-            .context(DeviceSnafu)
-            .log_error(&format!("failed to remove old tag '{}'", tag));
+            let _ = dev_new
+                .lock()
+                .unwrap()
+                .update_tag(tag, false)
+                .context(DeviceSnafu)
+                .log_error(&format!("failed to remove old tag '{}'", tag));
+        }
     }
 
     let tags_clone = dev_new.lock().unwrap().all_tags.clone();
@@ -534,9 +537,28 @@ pub(crate) fn device_update_tag(
         let _ = dev_new
             .lock()
             .unwrap()
-            .update_tag(tag, true)
+            .update_tag(tag, add)
             .context(DeviceSnafu)
             .log_error(&format!("failed to add new tag '{}'", tag));
+    }
+
+    Ok(())
+}
+
+/// cleanup device database
+pub(crate) fn cleanup_db(dev: Arc<Mutex<Device>>) -> Result<()> {
+    let id = dev.lock().unwrap().get_device_id().context(DeviceSnafu)?;
+
+    let db_path = format!("{}{}", DB_BASE_DIR, id);
+
+    match unlink(db_path.as_str()) {
+        Ok(_) => log_dev_lock!(debug, dev, format!("unlinked '{}'", db_path)),
+        Err(e) => {
+            if e != nix::Error::ENOENT {
+                log_dev_lock!(error, dev, format!("failed to unlink '{}': {}", db_path, e));
+                return Err(Error::Nix { source: e });
+            }
+        }
     }
 
     Ok(())
