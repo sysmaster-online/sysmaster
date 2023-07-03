@@ -15,7 +15,7 @@ use crate::unit::{unit_name_to_type, UeConfigInstall, UnitType};
 use basic::fs_util;
 use basic::path_lookup::LookupPaths;
 use bitflags::bitflags;
-use confique::Config;
+use confique::{Config, FileFormat, Partial};
 use nix::unistd::UnlinkatFlags;
 use std::{
     cell::RefCell,
@@ -553,14 +553,14 @@ impl Install {
         }
 
         let canon_path = path.canonicalize()?;
-        let tmp = format!("{}.toml", canon_path.as_path().display());
-        if let Err(e) = std::fs::copy(canon_path, &tmp).context(IoSnafu) {
-            log::warn!("copy file content to toml file error: {}", e);
-            return Err(e);
-        }
-
-        let mut builder = UeConfigData::builder().env();
-        builder = builder.file(&tmp);
+        type ConfigPartial = <UeConfigData as Config>::Partial;
+        let mut partial: ConfigPartial = Partial::from_env().context(ConfiqueSnafu)?;
+        /* The first config wins, so add default values at last. */
+        partial = partial.with_fallback(
+            confique::File::with_format(canon_path, FileFormat::Toml)
+                .load()
+                .context(ConfiqueSnafu)?,
+        );
 
         let dropin_dir_name = format!("{}.d", unit_install.name());
 
@@ -570,7 +570,7 @@ impl Install {
             let dropin_dir = base_dir.join(&dropin_dir_name);
 
             if !dropin_dir.exists() {
-                log::debug!("dropin path is not exist, ignore it: {:?}", &dropin_dir);
+                log::debug!("Dropin path {dropin_dir:?} does not exist, ignoring");
                 continue;
             }
 
@@ -578,24 +578,26 @@ impl Install {
             for entry in dirs {
                 let dir_entry = entry?;
                 let fragment = dir_entry.path();
-                if fragment.is_file() {
-                    let file_name = String::from(fragment.file_name().unwrap().to_str().unwrap());
-                    if file_name.starts_with('.') || !file_name.ends_with(".toml") {
+                if !fragment.is_file() {
+                    log::debug!("Fragment file {fragment:?} is not a file, ignoring");
+                    continue;
+                }
+                partial = match confique::File::with_format(&fragment, FileFormat::Toml).load() {
+                    Err(e) => {
+                        log::error!("Failed to load {fragment:?}: {e}, skipping.");
                         continue;
                     }
-
-                    builder = builder.file(fragment);
-                }
+                    Ok(v) => partial.with_fallback(v),
+                };
             }
         }
-
-        let configer = builder.load().context(ConfiqueSnafu)?;
+        partial = partial.with_fallback(ConfigPartial::default_values());
+        let configer = UeConfigData::from_partial(partial).context(ConfiqueSnafu)?;
         unit_install.fill_struct(&configer);
 
         for also in &configer.Install.Also {
             self.unit_install_discover(also, ctx.clone())?;
         }
-        // fs::remove_file(&tmp);
 
         Ok(())
     }

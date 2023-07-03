@@ -118,12 +118,7 @@ impl UnitFileData {
                 if file_name.starts_with('.') || file_name.ends_with(".toml") {
                     continue;
                 }
-                let path = format!("{}.toml", fragment.to_string_lossy());
-
-                if let Err(e) = std::fs::copy(fragment, &path) {
-                    log::warn!("copy file content to toml file error: {}", e);
-                }
-                res.push(Path::new(&path).to_path_buf());
+                res.push(fragment);
             }
         }
         /* {/etc/sysmater, /usr/lib/sysmaster}/foo.service */
@@ -135,14 +130,8 @@ impl UnitFileData {
         if config_path.is_symlink() {
             return None;
         }
-        /* Add .toml to the original path name */
-        let path_toml = format!("{}.toml", config_path.to_string_lossy());
-        let to = Path::new(&path_toml);
-        if let Err(e) = std::fs::copy(config_path, to) {
-            log::warn!("copy file content to toml file error: {}", e);
-            return None;
-        }
-        res.push(to.to_path_buf());
+
+        res.push(config_path);
         Some(res)
     }
 

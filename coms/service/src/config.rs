@@ -13,7 +13,7 @@
 #![allow(non_snake_case)]
 use super::comm::ServiceUnitComm;
 use super::rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
-use confique::Config;
+use confique::{Config, FileFormat, Partial};
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
@@ -64,15 +64,21 @@ impl ServiceConfig {
     }
 
     pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<()> {
-        let mut builder = ServiceConfigData::builder().env();
-
-        log::debug!("service load path: {:?}", paths);
-        // fragment
-        for v in paths {
-            builder = builder.file(v);
+        type ConfigPartial = <ServiceConfigData as Config>::Partial;
+        let mut partial: ConfigPartial = Partial::from_env().context(ConfiqueSnafu)?;
+        /* The first config wins, so add default values at last. */
+        log::debug!("Loading service config from: {:?}", paths);
+        for path in paths {
+            partial = match confique::File::with_format(&path, FileFormat::Toml).load() {
+                Err(e) => {
+                    log::error!("Failed to load {path:?}: {e}, skipping");
+                    continue;
+                }
+                Ok(v) => partial.with_fallback(v),
+            }
         }
-
-        *self.data.borrow_mut() = match builder.load() {
+        partial = partial.with_fallback(ConfigPartial::default_values());
+        *self.data.borrow_mut() = match ServiceConfigData::from_partial(partial) {
             Err(e) => {
                 /* The error message is pretty readable, just print it out. */
                 log::error!("{e}");

@@ -14,7 +14,7 @@
 use super::base::UeBase;
 use crate::unit::rentry::{UeConfigInstall, UeConfigUnit};
 use crate::unit::util::UnitFile;
-use confique::Config;
+use confique::{Config, FileFormat, Partial};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -132,21 +132,28 @@ impl UeConfig {
     }
 
     pub(super) fn load_fragment_and_dropin(&self, files: &UnitFile, name: &String) -> Result<()> {
-        let mut builder = UeConfigData::builder().env();
-
+        type ConfigPartial = <UeConfigData as Config>::Partial;
+        let mut partial: ConfigPartial = Partial::from_env().context(ConfiqueSnafu)?;
+        /* The first config wins, so add default values at last. */
         let unit_conf_frag = files.get_unit_id_fragment_pathbuf(name);
         if unit_conf_frag.is_empty() {
             return Err(format!("{name} doesn't have corresponding config file").into());
         }
         // fragment
-        for v in unit_conf_frag {
-            if !v.exists() {
-                return Err(format!("Config file {:?} of {name} doesn't exist", v).into());
+        for path in unit_conf_frag {
+            if !path.exists() {
+                return Err(format!("Config file {:?} of {name} doesn't exist", path).into());
             }
-            builder = builder.file(&v);
+            partial = match confique::File::with_format(&path, FileFormat::Toml).load() {
+                Err(e) => {
+                    log::error!("Failed to load {path:?}: {e}, skipping");
+                    continue;
+                }
+                Ok(v) => partial.with_fallback(v),
+            };
         }
-
-        let mut configer = builder.load().context(ConfiqueSnafu)?;
+        partial = partial.with_fallback(ConfigPartial::default_values());
+        let mut configer = UeConfigData::from_partial(partial).context(ConfiqueSnafu)?;
 
         // dropin
         for v in files.get_unit_wants_symlink_units(name) {

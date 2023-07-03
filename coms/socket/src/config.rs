@@ -17,7 +17,7 @@ use super::comm::SocketUnitComm;
 use super::rentry::{PortType, SectionSocket, SocketCommand};
 use crate::base::NetlinkProtocol;
 use basic::{fd_util, socket_util};
-use confique::Config;
+use confique::{Config, FileFormat, Partial};
 use nix::errno::Errno;
 use nix::fcntl::{open, OFlag};
 use nix::sys::signal::Signal;
@@ -133,12 +133,20 @@ impl SocketConfig {
     }
 
     pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<()> {
-        // get original configuration
-        let mut builder = SocketConfigData::builder().env();
-        for v in paths {
-            builder = builder.file(v);
+        type ConfigPartial = <SocketConfigData as Config>::Partial;
+        let mut partial: ConfigPartial = Partial::from_env().context(ConfiqueSnafu)?;
+        /* The first config wins, so add default values at last. */
+        for path in paths {
+            partial = match confique::File::with_format(&path, FileFormat::Toml).load() {
+                Err(e) => {
+                    log::error!("Failed to load {path:?}: {e}, skipping");
+                    continue;
+                }
+                Ok(v) => partial.with_fallback(v),
+            }
         }
-        let data = builder.load().context(ConfiqueSnafu)?;
+        partial = partial.with_fallback(ConfigPartial::default_values());
+        let data = SocketConfigData::from_partial(partial).context(ConfiqueSnafu)?;
 
         // record original configuration
         *self.data.borrow_mut() = data;
