@@ -90,10 +90,10 @@ menuentry 'openEuler (5.10.0-60.18.0.50.oe2203.aarch64) 22.03 LTS without system
 
 - 上述配置中`serial-getty-ttyAMA0.service`服务是实现aarch64架构平台串口登陆所需的服务；如果是x86_64，那么需要将服务改为`serial-getty-ttyS0.service`，此服务主要针对有console串口的情况，例如`virsh console`进入串口，私人笔记本创建的虚拟机，默认应该都是只有tty1。
 
-**4.** 由于sysmaster日志默认输出到串口，会影响串口登陆，同时sysmaster日志也无法详细查看。建议配置`/etc/sysmaster/system.toml`，将日志输出到本地文件中。
+**4.** 由于sysmaster日志默认输出到串口，会影响串口登陆，同时sysmaster日志也无法详细查看。建议配置`/etc/sysmaster/system.conf`，将日志输出到本地文件中。
 
 ```
-cat /etc/sysmaster/system.toml
+# cat /etc/sysmaster/system.conf
 LogLevel="debug"
 LogTarget="file"
 LogFileSize=10240

@@ -12,9 +12,9 @@
 //
 #![allow(non_snake_case)]
 
-use confique::Config;
+use confique::{Config, FileFormat, Partial};
 
-pub const SYSTEM_CONFIG: &str = "/etc/sysmaster/system.toml";
+pub const SYSTEM_CONFIG: &str = "/etc/sysmaster/system.conf";
 const RELI_HISTORY_MAPSIZE_DEFAULT: usize = 1048576; // 1M
 
 #[derive(Config, Debug)]
@@ -40,9 +40,19 @@ pub struct ManagerConfig {
 impl ManagerConfig {
     #[allow(dead_code)]
     pub fn new(file: Option<&str>) -> ManagerConfig {
-        let builder = ManagerConfig::builder().env();
-        let manager_config = builder.file(file.unwrap_or(SYSTEM_CONFIG));
-        match manager_config.load() {
+        type ConfigPartial = <ManagerConfig as Config>::Partial;
+        let mut partial: ConfigPartial = match Partial::from_env() {
+            Err(_) => return ManagerConfig::default(),
+            Ok(v) => v,
+        };
+        partial = match confique::File::with_format(file.unwrap_or(SYSTEM_CONFIG), FileFormat::Toml)
+            .load()
+        {
+            Err(_) => return ManagerConfig::default(),
+            Ok(v) => partial.with_fallback(v),
+        };
+        partial = partial.with_fallback(ConfigPartial::default_values());
+        match ManagerConfig::from_partial(partial) {
             Ok(v) => v,
             Err(_) => ManagerConfig::default(),
         }
@@ -72,7 +82,7 @@ mod test {
     #[test]
     fn load() {
         let mut file: PathBuf = get_crate_root().unwrap();
-        file.push("config/system.toml");
+        file.push("config/system.conf");
         let config = ManagerConfig::new(file.to_str());
         println!("{config:?}");
         assert_eq!(config.DefaultRestartSec, 100);

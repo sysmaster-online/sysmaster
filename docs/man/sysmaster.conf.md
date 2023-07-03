@@ -1,6 +1,6 @@
 # sysmaster 系统配置
 
-sysmaster支持从`/etc/sysmaster/system.toml`中读取系统配置，用于配置`sysmaster`的日志。
+sysmaster支持从`/etc/sysmaster/system.conf`中读取系统配置，用于配置`sysmaster`的日志。
 
 ## 日志配置
 
