@@ -675,7 +675,7 @@ mod tests {
     #[test]
     fn test_socket_parse() {
         let mut file_path = get_project_root().unwrap();
-        file_path.push("tests/test_units/test.socket.toml");
+        file_path.push("tests/test_units/uttest.socket");
         let paths = vec![file_path];
 
         let comm = Rc::new(SocketUnitComm::new());
