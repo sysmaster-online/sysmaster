@@ -352,20 +352,6 @@ impl RuleLine {
                 op,
                 value
             );
-            log::debug!(
-                "Capture token ({}):
-line :  {}
-key  :  {}
-attr :  {}
-op   :  {}
-value:  {}",
-                token_str,
-                line,
-                key,
-                attr.clone().unwrap_or_default(),
-                op,
-                value,
-            );
 
             // if the token is 'GOTO' or 'LABEL', parse_token will return a IgnoreError
             // the following tokens in this line, if any, will be skipped

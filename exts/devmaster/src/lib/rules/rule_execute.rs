@@ -784,14 +784,12 @@ impl ExecuteManager {
             .lines
             .clone();
 
-        loop {
+        while self.current_rule_line.is_some() {
             let next_line = self.apply_rule_line()?;
 
             self.current_rule_line = next_line;
-            if self.current_rule_line.is_none() {
-                break;
-            }
         }
+
         Ok(())
     }
 
