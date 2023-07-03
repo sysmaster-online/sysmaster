@@ -47,7 +47,7 @@ mod tests {
     #[test]
     fn test_get_project_root() {
         let mut file_path = get_project_root().unwrap();
-        file_path.push("tests/test_units/config.service.toml");
+        file_path.push("tests/test_units/config.service");
 
         println!("{file_path:?}");
         assert!(file_path.is_file())

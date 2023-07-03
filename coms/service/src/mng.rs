@@ -2542,7 +2542,7 @@ mod tests {
 
     fn create_mng() -> (Rc<ServiceMng>, Rc<RunningData>, Rc<ServiceConfig>) {
         let mut file_path = get_project_root().unwrap();
-        file_path.push("tests/test_units/config.service.toml");
+        file_path.push("tests/test_units/config.service");
         let paths = vec![file_path];
 
         let comm = Rc::new(ServiceUnitComm::new());

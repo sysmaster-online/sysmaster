@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn test_service_parse() {
         let mut file_path = get_project_root().unwrap();
-        file_path.push("tests/test_units/config.service.toml");
+        file_path.push("tests/test_units/config.service");
 
         let paths = vec![file_path];
 
