@@ -7,12 +7,16 @@ build = "build.rs"
 
 [lib]
 name = "sysmaster"
-path = "core/lib/lib.rs"
+path = "core/libsysmaster/lib.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
 name = "sysmaster"
-path = "core/bin/main.rs"
+path = "core/sysmaster/main.rs"
+
+[[bin]]
+name = "sctl"
+path = "core/sctl/main.rs"
 
 [dev-dependencies.libtests]
 path = "libs/libtests"
@@ -124,10 +128,10 @@ overflow-checks = false
 
 [workspace]
 members = [
+  # sysmaster-init
+  "init",
   # external binaries
   "exts/fstab",
-  "exts/init",
-  "exts/sctl",
   "exts/random_seed",
   "exts/rc-local-generator",
   "exts/sysmonitor",
