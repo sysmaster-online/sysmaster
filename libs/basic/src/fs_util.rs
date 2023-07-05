@@ -38,7 +38,9 @@ pub fn open_parent(path: &Path, flags: OFlag, mode: Mode) -> Result<File> {
     Ok(unsafe { File::from_raw_fd(nix::fcntl::open(parent, flags, mode).context(NixSnafu)?) })
 }
 
-/// create symlink link_name -> target
+/// create symlink link -> target
+/* Please don't use "from/to", use "symlink/target" to name path.
+ * Take "A -> B" for example, A is "link", B is "target". */
 pub fn symlink(target: &str, link: &str, relative: bool) -> Result<()> {
     let link_path = Path::new(&link);
     let target_path = Path::new(&target);
@@ -48,28 +50,34 @@ pub fn symlink(target: &str, link: &str, relative: bool) -> Result<()> {
             what: format!("{}'s parent", link_path.to_string_lossy()),
         })?;
 
-        let rel_path = diff_paths(target_path, link_path_parent).unwrap();
+        let relative_path = diff_paths(target_path, link_path_parent).unwrap();
         let fd = nix::fcntl::open(
             link_path_parent,
             OFlag::O_DIRECTORY | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW,
             Mode::from_bits(0).unwrap(),
         )
         .context(NixSnafu)?;
-        (rel_path, Some(unsafe { File::from_raw_fd(fd) }))
+        (relative_path, Some(unsafe { File::from_raw_fd(fd) }))
     } else {
         (target_path.to_path_buf(), None)
     };
 
     let mut rng = rand::thread_rng();
-    let tmp_to = format!("{}.{}", link, rng.gen::<u32>());
+    let tmp_link = format!("{}.{}", link, rng.gen::<u32>());
     let raw_fd = dir.map(|f| f.as_raw_fd());
 
-    nix::unistd::symlinkat(target_path.as_path(), raw_fd, tmp_to.as_str()).context(NixSnafu)?;
-
-    if let Err(e) = renameat(raw_fd, tmp_to.as_str(), raw_fd, link_path) {
-        let _ = unlinkat(raw_fd, tmp_to.as_str(), UnlinkatFlags::NoRemoveDir);
+    if let Err(e) = nix::unistd::symlinkat(target_path.as_path(), raw_fd, tmp_link.as_str()) {
+        log::error!("Failed to create symlink {link} -> {target}: {e}");
         return Err(Error::Nix { source: e });
     }
+
+    if let Err(e) = renameat(raw_fd, tmp_link.as_str(), raw_fd, link_path) {
+        log::error!("Failed to rename the temporary path of {link_path:?}: {e}");
+        let _ = unlinkat(raw_fd, tmp_link.as_str(), UnlinkatFlags::NoRemoveDir);
+        return Err(Error::Nix { source: e });
+    }
+
+    log::debug!("Successfully created symlink: {link} -> {target}");
 
     Ok(())
 }
