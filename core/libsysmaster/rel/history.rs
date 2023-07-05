@@ -12,6 +12,7 @@
 
 use super::base::{ReDbRoTxn, ReDbRwTxn, ReDbTable};
 use crate::error::*;
+use basic::{do_entry_log, do_entry_or_return_io_error};
 use heed::{CompactionOption, Env, EnvOpenOptions};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -126,8 +127,8 @@ impl ReliHistory {
         let next_file = next_path.join(RELI_HISTORY_DATA_FILE);
 
         // clear next: delete and re-create the whole directory
-        fs::remove_dir_all(next_path.clone()).context(IoSnafu)?;
-        fs::create_dir_all(next_path).context(IoSnafu)?;
+        do_entry_or_return_io_error!(fs::remove_dir_all, next_path, "remove");
+        do_entry_or_return_io_error!(fs::create_dir_all, next_path, "create");
 
         // copy to next
         self.env
@@ -138,21 +139,17 @@ impl ReliHistory {
         // remark the next flag at last: the another one
         let bflag = bflag_path_get(history.clone());
         if self.b_exist {
-            fs::remove_file(bflag).context(IoSnafu)?;
+            do_entry_or_return_io_error!(fs::remove_file, bflag, "remove");
         } else {
-            File::create(bflag).context(IoSnafu)?;
+            do_entry_or_return_io_error!(File::create, bflag, "create");
         }
 
         // try to clear previous: it would be done in the next re-exec, but we try to delete it as soon as possible.
         let cur_path = history.join(subdir_cur_get(self.b_exist));
         let cur_data = cur_path.join(RELI_HISTORY_DATA_FILE);
         let cur_lock = cur_path.join(RELI_HISTORY_LOCK_FILE);
-        if let Err(e) = fs::remove_file(cur_data.clone()) {
-            log::error!("remove data file {:?} failed, err = {:?}", cur_data, e);
-        }
-        if let Err(e) = fs::remove_file(cur_lock.clone()) {
-            log::error!("remove lock file {:?} failed, err = {:?}", cur_lock, e);
-        }
+        do_entry_log!(fs::remove_file, cur_data, "remove");
+        do_entry_log!(fs::remove_file, cur_lock, "remove");
 
         Ok(())
     }
@@ -181,18 +178,18 @@ pub fn prepare(dir_str: &str) -> Result<()> {
     // directory
     let history = history_path_get(dir_str);
     if !history.exists() {
-        fs::create_dir_all(&history).context(IoSnafu)?;
+        do_entry_or_return_io_error!(fs::create_dir_all, history, "create");
     }
 
     // sub-directory
     let a = history.join(RELI_HISTORY_A_DIR);
     if !a.exists() {
-        fs::create_dir_all(&a).context(IoSnafu)?;
+        do_entry_or_return_io_error!(fs::create_dir_all, a, "create");
     }
 
     let b = history.join(RELI_HISTORY_B_DIR);
     if !b.exists() {
-        fs::create_dir_all(&b).context(IoSnafu)?;
+        do_entry_or_return_io_error!(fs::create_dir_all, a, "create");
     }
 
     Ok(())

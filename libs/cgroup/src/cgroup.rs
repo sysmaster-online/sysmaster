@@ -13,6 +13,7 @@
 use super::CgFlags;
 use crate::error::*;
 use crate::CgType;
+use basic::do_entry_or_return_io_error;
 use basic::special::CGROUP_SYSMASTER;
 use basic::special::INIT_SCOPE;
 use basic::special::SYSMASTER_SLICE;
@@ -146,7 +147,7 @@ pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<()> {
 pub fn cg_create(cg_path: &PathBuf) -> Result<()> {
     log::debug!("cgroup create path {:?}", cg_path);
     let abs_cg_path: PathBuf = cg_abs_path(cg_path, &PathBuf::from(""))?;
-    fs::create_dir_all(abs_cg_path).context(IoSnafu)?;
+    do_entry_or_return_io_error!(fs::create_dir_all, abs_cg_path, "create");
 
     Ok(())
 }
@@ -232,7 +233,10 @@ fn remove_dir(cg_path: &PathBuf) -> Result<()> {
     let mut try_times = 0;
     loop {
         let e = match fs::remove_dir(cg_path) {
-            Ok(()) => return Ok(()),
+            Ok(()) => {
+                log::debug!("Successfully removed {cg_path:?}");
+                return Ok(());
+            }
             Err(e) => e,
         };
         let os_errno = match e.raw_os_error() {
@@ -244,6 +248,7 @@ fn remove_dir(cg_path: &PathBuf) -> Result<()> {
             try_times += 1;
             continue;
         }
+        log::error!("Failed to remove {cg_path:?}: {e}");
         return Err(Error::Io { source: e });
     }
 }

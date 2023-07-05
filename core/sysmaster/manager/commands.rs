@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use basic::socket_util;
+use basic::{do_entry_log, socket_util};
 use cmdproto::proto::execute::ExecuterAction;
 use cmdproto::proto::ProstServerStream;
 use event::{EventType, Events, Source};
@@ -37,7 +37,7 @@ impl<T> Commands<T> {
         let sctl_socket_path = Path::new(SCTL_SOCKET);
         /* remove the old socket if it exists */
         if sctl_socket_path.exists() && !sctl_socket_path.is_symlink() {
-            let _ = std::fs::remove_file(sctl_socket_path);
+            do_entry_log!(std::fs::remove_file, sctl_socket_path, "remove");
         }
         let sctl_socket_addr = socket::UnixAddr::new(Path::new(SCTL_SOCKET)).unwrap();
         let socket_fd = socket::socket(
@@ -51,7 +51,10 @@ impl<T> Commands<T> {
         socket_util::set_pass_cred(socket_fd, true).unwrap();
         /* create the socket with mode 666 */
         let old_mask = stat::umask(stat::Mode::from_bits_truncate(!0o666));
-        let _ = socket::bind(socket_fd, &sctl_socket_addr);
+        match socket::bind(socket_fd, &sctl_socket_addr) {
+            Err(e) => log::error!("Failed to bind {sctl_socket_addr:?}: {e}"),
+            Ok(_) => log::debug!("Successfully bind {sctl_socket_addr:?}"),
+        }
         /* restore our umask */
         let _ = stat::umask(old_mask);
         /* Allow at most 4096 incoming connections can queue */

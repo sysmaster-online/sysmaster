@@ -20,7 +20,7 @@ use super::rentry::{
 };
 use super::spawn::ServiceSpawn;
 use crate::rentry::{ExitStatus, PreserveMode};
-use basic::{fd_util, IN_SET};
+use basic::{do_entry_log, fd_util, IN_SET};
 use basic::{file_util, process_util};
 use event::{EventState, EventType, Events, Source};
 use log::Level;
@@ -623,12 +623,7 @@ impl ServiceMng {
         }
 
         if let Some(p) = self.config.pid_file() {
-            if let Err(e) = nix::unistd::unlink(&p) {
-                log::warn!(
-                    "{}",
-                    format!("failed to unlink pid file: {:?}, error: {}", p, e)
-                );
-            }
+            do_entry_log!(nix::unistd::unlink, p, "unlink");
         }
     }
 

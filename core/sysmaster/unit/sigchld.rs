@@ -198,7 +198,10 @@ impl SigchldData {
 
         // check
         let (pid, code, signal) = si.unwrap();
-        log::debug!("Process {} exited witch code: {code}, signal: {signal:?}", pid.as_raw());
+        log::debug!(
+            "Process {} exited witch code: {code}, signal: {signal:?}",
+            pid.as_raw()
+        );
 
         if pid.as_raw() <= 0 {
             log::debug!("invalid pid in signal: {:?}", pid);

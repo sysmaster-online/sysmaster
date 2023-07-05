@@ -19,6 +19,7 @@ use super::{
     ReDbTable, ReStation, ReStationKind,
 };
 use crate::{error::*, rel::base};
+use basic::do_entry_or_return_io_error;
 use heed::Database;
 use std::{
     fs::{self, File},
@@ -267,6 +268,7 @@ impl Reliability {
             } else {
                 log::info!("reliability debug_clear: first time, try clear.");
                 File::create(&cfirst).unwrap();
+                log::debug!("Successfully created {cfirst:?}");
                 log::info!("reliability debug_clear: first time, clear ...");
 
                 // clear data excluding enable
@@ -289,6 +291,7 @@ impl Reliability {
             } else {
                 log::info!("reliability debug_panic: first time, try panic.");
                 File::create(&pfirst).unwrap();
+                log::debug!("Successfully created {pfirst:?}");
                 log::info!("reliability debug_panic: first time, panic ...");
                 panic!("first debug_panic.");
             }
@@ -366,15 +369,15 @@ impl Reliability {
 pub fn reli_debug_enable_switch(enable: bool) -> Result<()> {
     log::info!("reliability debug: enable[{}] switch.", enable);
 
-    // [enable]touch switch.debug or [disable]rm -rf switch.debug
     let dir_string = base::reli_dir_get().unwrap();
     let switch = Path::new(&dir_string).join(RELI_DEBUG_SWITCH_FILE);
-    if enable {
-        if !switch.exists() {
-            File::create(&switch).context(IoSnafu)?;
-        }
-    } else if switch.exists() {
-        fs::remove_file(&switch).context(IoSnafu)?;
+    // touch switch.debug if enable
+    if enable && !switch.exists() {
+        do_entry_or_return_io_error!(File::create, switch, "create");
+    }
+    // remove switch.debug if disable
+    if !enable && switch.exists() {
+        do_entry_or_return_io_error!(fs::remove_file, switch, "remove");
     }
 
     Ok(())

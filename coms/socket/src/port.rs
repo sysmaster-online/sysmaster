@@ -111,6 +111,7 @@ impl SocketPort {
             },
             PortType::Invalid => todo!(),
         };
+        log::debug!("Successfully opened socket {}", self.p_conf.listen());
 
         if update {
             if let Err(e) = self.comm.reli().fd_cloexec(fd, false) {
@@ -138,6 +139,7 @@ impl SocketPort {
         }
 
         fd_util::close(fd);
+        log::debug!("Successfully closed socket {}", self.p_conf.listen());
         self.set_fd(INVALID_FD);
     }
 

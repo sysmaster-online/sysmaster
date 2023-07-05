@@ -282,11 +282,15 @@ fn create_listen_fd(epoll: &Rc<Epoll>) -> Result<(i32, Inotify, WatchDescriptor)
     )?;
 
     let sock_path = PathBuf::from(INIT_SOCKET);
-    let parent_path = sock_path.as_path().parent();
-    match parent_path {
-        Some(path) => fs::create_dir_all(path)
-            .map_err(|e| Errno::from_i32(e.raw_os_error().unwrap_or(Errno::EINVAL as i32)))?,
+    let path = match sock_path.as_path().parent() {
         None => return Err(Errno::EINVAL),
+        Some(v) => v,
+    };
+    if let Err(e) = fs::create_dir_all(path) {
+        eprintln!("Failed to create directory {path:?}: {e}");
+        return Err(Errno::from_i32(
+            e.raw_os_error().unwrap_or(Errno::EINVAL as i32),
+        ));
     }
 
     if let Err(e) = unistd::unlink(&sock_path) {

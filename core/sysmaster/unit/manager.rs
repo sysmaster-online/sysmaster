@@ -39,14 +39,14 @@ use crate::utils::table::{TableOp, TableSubscribe};
 use basic::path_lookup::LookupPaths;
 use basic::proc_cmdline::get_process_cmdline;
 use basic::show_table::{CellColor, ShowTable};
-use basic::{initrd_util, process_util, rlimit_util, signal_util};
+use basic::{do_entry_log, initrd_util, process_util, rlimit_util, signal_util};
 use constants::SIG_SWITCH_ROOT_OFFSET;
 use event::Events;
 use libc::getppid;
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::convert::TryFrom;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
 use sysmaster::error::*;
@@ -252,13 +252,8 @@ impl UnitManagerX {
             for para in init {
                 str_paras.push_str(&format!("{}\n", para));
             }
-            std::fs::remove_file(constants::INIT_PARA_PATH).unwrap_or_else(|err| {
-                log::debug!(
-                    "Failed to remove file of {}: {}.",
-                    constants::INIT_PARA_PATH,
-                    err
-                );
-            });
+            let path = Path::new(constants::INIT_PARA_PATH);
+            do_entry_log!(std::fs::remove_file, path, "remove");
             if !str_paras.is_empty() {
                 std::fs::write(constants::INIT_PARA_PATH, str_paras).unwrap_or_else(|err| {
                     log::error!(
