@@ -310,6 +310,31 @@ pub fn touch_file(
     fchmod_and_chown(fd, path, mode, uid, gid)
 }
 
+/// do some operations and log message out, returns Io error when fail
+#[macro_export]
+macro_rules! do_entry_or_return_io_error {
+    ($function:expr, $entry:ident, $action:literal) => {
+        match $function(&$entry) {
+            Err(e) => {
+                log::error!("Failed to {} {:?}: {e}", $action, $entry);
+                return Err(e).context(IoSnafu);
+            }
+            Ok(_) => log::debug!("{} {:?} succeeded", $action, $entry),
+        }
+    };
+}
+
+/// do some operations and log message out, skip the error
+#[macro_export]
+macro_rules! do_entry_log {
+    ($function:expr, $entry:ident, $action:literal) => {
+        match $function(&$entry) {
+            Err(e) => log::error!("Failed to {} {:?}: {e}", $action, $entry),
+            Ok(_) => log::debug!("{} {:?} succeeded", $action, $entry),
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
