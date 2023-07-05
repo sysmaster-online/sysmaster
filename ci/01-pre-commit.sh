@@ -56,8 +56,7 @@ set +e
 for url in ${sources[*]}
 do
     git config --global url."${url}".insteadOf "https://github.com/"
-    git ls-remote --exit-code https://github.com/pre-commit/pre-commit-hooks &> /dev/null && \
-    git ls-remote --exit-code https://github.com/codespell-project/codespell  &> /dev/null
+    git ls-remote --exit-code https://github.com/pre-commit/pre-commit-hooks &> /dev/null
     if [[ $? -ne 0 ]]; then
         git config --unset --global url."${url}".insteadOf "https://github.com/"
     else
