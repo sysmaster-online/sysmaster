@@ -197,7 +197,9 @@ impl SigchldData {
         }
 
         // check
-        let (pid, _code, _signal) = si.unwrap();
+        let (pid, code, signal) = si.unwrap();
+        log::debug!("Process {} exited witch code: {code}, signal: {signal:?}", pid.as_raw());
+
         if pid.as_raw() <= 0 {
             log::debug!("invalid pid in signal: {:?}", pid);
             return false; // turn_off
@@ -214,8 +216,9 @@ impl SigchldData {
         }
 
         // pop: reap the zombie
-        if let Err(e) = wait::waitid(Id::Pid(pid), WaitPidFlag::WEXITED) {
-            log::error!("Error when reap the zombie, ignoring: {}", e);
+        match wait::waitid(Id::Pid(pid), WaitPidFlag::WEXITED) {
+            Err(e) => log::error!("Failed to reap process {}: {e}", pid.as_raw()),
+            Ok(_) => log::debug!("Reaped process {}", pid.as_raw()),
         }
 
         true // stay turn_on
