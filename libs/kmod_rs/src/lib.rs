@@ -110,6 +110,7 @@ impl LibKmod {
     /// Get kmod_list from lookup
     pub fn module_new_from_lookup<S: AsRef<OsStr>>(&mut self, lookup: S) -> Result<()> {
         if let Ok(lookup) = CString::new(lookup.as_ref().as_bytes()) {
+            self.kmod_list_head = ptr::null::<kmod_sys::kmod_list>() as *mut kmod_sys::kmod_list;
             if (unsafe {
                 kmod_sys::kmod_module_new_from_lookup(
                     self.ctx,
@@ -140,10 +141,8 @@ impl LibKmod {
             return Err(errno::Errno::EINVAL);
         }
 
-        match unsafe { kmod_sys::kmod_module_get_initstate(self.module) } {
-            e if e < 0 => Err(errno::from_i32(e)),
-            state => Ok(state as kmod_sys::kmod_module_initstate),
-        }
+        Ok(unsafe { kmod_sys::kmod_module_get_initstate(self.module) }
+            as kmod_sys::kmod_module_initstate)
     }
 
     /// Get module's name
@@ -188,7 +187,7 @@ impl LibKmod {
         }
 
         self.module = unsafe { kmod_sys::kmod_module_get_module(kmodlst.cur) };
-        if !self.module.is_null() {
+        if self.module.is_null() {
             return Err(errno::from_i32(errno::errno()));
         }
         Ok(())

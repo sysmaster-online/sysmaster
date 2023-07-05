@@ -81,7 +81,7 @@ pub fn proc_cmdline_get_bool(key: &str) -> Result<bool, Error> {
     Ok(r)
 }
 
-/// parse cmdline item
+/// parse cmdline item, insert module_blacklist's value to data
 pub fn parse_proc_cmdline_item(key: String, value: String, data: &mut HashSet<String>) {
     if key.eq("module_blacklist") {
         if value.is_empty() {
@@ -96,12 +96,12 @@ pub fn parse_proc_cmdline_item(key: String, value: String, data: &mut HashSet<St
     }
 }
 
-/// parse cmdline
+/// parse /proc/cmdline, Distinguish between key and value based on '='
 pub fn proc_cmdline_parse<F, T>(parse_item: F, data: &mut T)
 where
     F: Fn(String, String, &mut T),
 {
-    let line = get_process_cmdline(&Pid::from_raw(1));
+    let line = read_file(Path::new("/proc/cmdline"));
     if line.is_empty() {
         log::info!("/proc/1/cmdline is empty!");
         return;
@@ -109,18 +109,26 @@ where
 
     let v: Vec<&str> = line.split(' ').collect();
     for i in &v {
+        let key = match i.to_string().split('=').next() {
+            None => continue,
+            Some(k) => k.to_string(),
+        };
         let value = match i.to_string().split('=').nth(1) {
-            None => break,
+            None => continue,
             Some(v) => v.to_string(),
         };
-        parse_item(i.to_string(), value, data);
+        parse_item(key, value, data);
     }
 }
 
 /// read /proc/PID/cmdline and return
 pub fn get_process_cmdline(pid: &Pid) -> String {
     let pid_str = pid.to_string();
-    let cmdline_path = Path::new("/proc").join(pid_str).join("cmdline");
+    read_file(&Path::new("/proc").join(pid_str).join("cmdline"))
+}
+
+fn read_file(path: &Path) -> String {
+    let cmdline_path = path;
     let file = match File::open(cmdline_path) {
         Ok(file) => file,
         Err(_) => {
