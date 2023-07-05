@@ -30,8 +30,8 @@ pip3 install pre-commit ruamel.yaml -i https://pypi.mirrors.ustc.edu.cn/simple |
 # add doc for src code
 for rustlist in `git diff origin/master --name-only | grep \.rs$ | tr '\n' ' '`
 do
-    # Allow libblkid/mod.rs to use, because it is auto generated.
-    if [[ $rustlist =~ "libblkid/mod.rs" ]]; then
+    # Allow libblkid/mod.rs and input_event_codes_rs to use, because they are auto generated.
+    if [[ $rustlist =~ "libblkid/mod.rs" ]] || [[ $rustlist =~ "input_event_codes_rs" ]]; then
         continue
     fi
     # do not use global #!allow, exclude non_snake_case
