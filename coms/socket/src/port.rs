@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! socket_port implement the management of configured ports, create , open and close the socket。
+//! socket_port implement the management of configured ports, create , open and close the socket
 //!
 
 use crate::{

@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! socket_load mod parse the field of section Socket and add the extra dependency。
+//! socket_load mod parse the field of section Socket and add the extra dependency
 //!
 use crate::comm::SocketUnitComm;
 use crate::config::SocketConfig;

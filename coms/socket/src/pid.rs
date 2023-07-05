@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! socket_pid implement the management of pid。
+//! socket_pid implement the management of pid
 //!
 
 use super::comm::SocketUnitComm;
