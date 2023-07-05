@@ -16,7 +16,10 @@ use crate::runtime::{param::Param, InitState, RunTime};
 use nix::unistd;
 
 fn main() {
-    let cmd = get_command();
+    let cmd = match get_command() {
+        Some(c) => c,
+        None => return,
+    };
 
     // The main role of init is to manage sysmaster and recycle zombie processes.
     // Reexec: Reexecute or connect the sysmaster.
@@ -41,12 +44,17 @@ fn main() {
     freeze();
 }
 
-fn get_command() -> Param {
-    let mut param = Param::new();
-    let agrs: Vec<String> = std::env::args().collect();
-    param.get_opt(agrs);
-
-    param
+fn get_command() -> Option<Param> {
+    let args: Vec<String> = std::env::args().collect();
+    if args.contains(&String::from("--version")) || args.contains(&String::from("-V")) {
+        let version = env!("CARGO_PKG_VERSION");
+        println!("sysMaster init version: {}", version);
+        None
+    } else {
+        let mut param = Param::new();
+        param.get_opt(args);
+        Some(param)
+    }
 }
 
 fn freeze() {

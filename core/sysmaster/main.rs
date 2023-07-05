@@ -60,6 +60,7 @@ struct Args {
 }
 
 fn main() -> Result<()> {
+    let args = Args::parse();
     //------------------------Code placed at the top-----------------------------
 
     /* systemd use reset_all_signal_handlers, we can't because sysmaster is not PID1.
@@ -74,8 +75,6 @@ fn main() -> Result<()> {
     // Connect init.
     KeepAlive::init();
     //---------------------------------------------------------------------------
-
-    let args = Args::parse();
 
     let manager_config = Rc::new(ManagerConfig::new(None));
     logger::init_log(
