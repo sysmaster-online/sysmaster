@@ -21,7 +21,7 @@ use snafu::prelude::Snafu;
 #[non_exhaustive]
 pub enum Error {
     /// other error
-    #[snafu(context, display("Error(device): {}", msg,))]
+    #[snafu(context, display("Device error: {}", msg))]
     Nix {
         /// message
         msg: String,
@@ -42,12 +42,12 @@ impl Error {
     }
 }
 
-/// append current function and persist the errno
+/// append current function and inherit the errno
 #[macro_export]
 macro_rules! err_wrapper {
     ($e:expr, $s:expr) => {
         $e.map_err(|e| Error::Nix {
-            msg: format!("$s failed: ({})", e),
+            msg: format!("$s failed: {}", e),
             source: e.get_errno(),
         })
     };

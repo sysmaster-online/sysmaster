@@ -3,8 +3,13 @@ name = "input_event_codes_rs"
 version = "0.2.4"
 edition = "2021"
 
+[build-dependencies.bindgen]
+default_features = false
+features = ["runtime"]
+version = "0.63.0"
+
 [build-dependencies]
-bindgen = "0.65.1"
+basic = { path = "../basic" }
 
 [dependencies]
 libc = "0.2.*"

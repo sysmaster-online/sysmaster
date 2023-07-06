@@ -16,13 +16,8 @@ use device::{device_action::DeviceAction, device_enumerator::DeviceEnumerator};
 fn main() {
     let mut enumerator = DeviceEnumerator::new();
 
-    for device in enumerator.iter_mut() {
-        println!("{}", device.as_ref().lock().unwrap().get_devpath().unwrap());
-        device
-            .as_ref()
-            .lock()
-            .unwrap()
-            .trigger(DeviceAction::Change)
-            .unwrap();
+    for device in enumerator.iter() {
+        println!("{}", device.borrow_mut().get_devpath().unwrap());
+        device.borrow_mut().trigger(DeviceAction::Change).unwrap();
     }
 }

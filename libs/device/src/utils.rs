@@ -52,20 +52,20 @@ pub(crate) fn device_compare(device_a: &Device, device_b: &Device) -> Ordering {
     let devpath_a = device_a.get_devpath().unwrap();
     let devpath_b = device_b.get_devpath().unwrap();
 
-    match sound_device_compare(devpath_a, devpath_b) {
+    match sound_device_compare(&devpath_a, &devpath_b) {
         Ordering::Greater => return Ordering::Greater,
         Ordering::Less => return Ordering::Less,
         Ordering::Equal => {}
     }
 
     // md and dm devices are enumerated after all other devices
-    match devpath_is_late_block(devpath_a).cmp(&devpath_is_late_block(devpath_b)) {
+    match devpath_is_late_block(&devpath_a).cmp(&devpath_is_late_block(&devpath_b)) {
         Ordering::Greater => return Ordering::Greater,
         Ordering::Less => return Ordering::Less,
         Ordering::Equal => {}
     }
 
-    devpath_a.cmp(devpath_b)
+    devpath_a.cmp(&devpath_b)
 }
 
 /// check whether directory entry is subdirectory under sysfs
@@ -168,6 +168,27 @@ impl LoopDev {
     #[allow(dead_code)]
     pub fn get_device_path(&self) -> Option<PathBuf> {
         self.lodev.path()
+    }
+
+    /// create a loop device based on the temporary file and call the function to
+    /// deal with the loop device
+    pub fn inner_process<F>(tmpfile: &str, size: u64, f: F) -> Result<(), Error>
+    where
+        F: FnOnce(&mut Device) -> Result<(), Error>,
+    {
+        let lo = Self::new(tmpfile, size)?;
+
+        let devpath = lo.get_device_path().ok_or(Error::Nix {
+            msg: "invalid loop device path".to_string(),
+            source: nix::Error::EINVAL,
+        })?;
+
+        let mut dev = Device::from_path(devpath.to_str().ok_or(Error::Nix {
+            msg: "can't change path buffer to string".to_string(),
+            source: nix::Error::EINVAL,
+        })?)?;
+
+        f(&mut dev)
     }
 }
 

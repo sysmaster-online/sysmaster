@@ -12,11 +12,19 @@
 
 //! worker manager
 //!
+use crate::error::DeviceSnafu;
+use crate::error::Log;
+use crate::{error::Error, rules::Rules};
+use crate::{
+    framework::job_queue::{DeviceJob, JobQueue, JobState},
+    rules,
+};
 use device::{
     device::Device,
     device_monitor::{DeviceMonitor, MonitorNetlinkGroup},
 };
 use event::{EventState, EventType, Events, Source};
+use snafu::ResultExt;
 use std::fmt::{self, Display};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -31,12 +39,6 @@ use std::{
 };
 use std::{collections::HashMap, sync::RwLock};
 
-use crate::{error::Error, rules::Rules};
-use crate::{
-    framework::job_queue::{DeviceJob, JobQueue, JobState},
-    rules,
-};
-
 use super::devmaster::Devmaster;
 
 /// worker manager listen address
@@ -46,7 +48,7 @@ const WORKER_MAX_IDLE_INTERVAL: u64 = 1;
 
 /// messages sended by manager to workers
 pub(crate) enum WorkerMessage {
-    Job(Arc<Mutex<Device>>),
+    Job(Vec<u8>),
     Cmd(String),
 }
 
@@ -136,9 +138,10 @@ impl Worker {
             let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
 
             match msg {
-                WorkerMessage::Job(device) => {
+                WorkerMessage::Job(dev_nulstr) => {
                     // double cloned, may be optimized in future
-                    let device = device.as_ref().lock().unwrap().clone();
+                    // let device = device.as_ref().lock().unwrap().clone();
+                    let device = Device::from_nulstr(&dev_nulstr).unwrap();
 
                     log::info!("Worker {id}: received device {}", device.devpath);
 
@@ -343,9 +346,14 @@ impl WorkerManager {
             if state == WorkerState::Idle {
                 log::debug!("Worker Manager: find idle worker {}", worker.id);
                 self.set_worker_state(*id, WorkerState::Running);
-                worker.worker_send_message(WorkerMessage::Job(Arc::new(Mutex::new(
-                    device_job.device.clone(),
-                ))));
+
+                let (dev_nulstr, len) = device_job
+                    .device
+                    .get_properties_nulstr()
+                    .context(DeviceSnafu)
+                    .log_error("failed to get properties nulstr")?;
+
+                worker.worker_send_message(WorkerMessage::Job(dev_nulstr.clone()));
                 return Ok(worker.clone());
             }
         }
@@ -355,9 +363,15 @@ impl WorkerManager {
                 let workers = self.workers.borrow();
                 let worker = workers.get(&id).unwrap();
                 self.set_worker_state(id, WorkerState::Running);
-                worker.worker_send_message(WorkerMessage::Job(Arc::new(Mutex::new(
-                    device_job.device.clone(),
-                ))));
+
+                let (dev_nulstr, len) = device_job
+                    .device
+                    .get_properties_nulstr()
+                    .context(DeviceSnafu)
+                    .log_error("failed to get properties nulstr")?;
+
+                worker.worker_send_message(WorkerMessage::Job(dev_nulstr.clone()));
+
                 return Ok(worker.clone());
             }
         }

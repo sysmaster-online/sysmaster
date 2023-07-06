@@ -112,7 +112,7 @@ impl DeviceMonitor {
     /// send device
     pub fn send_device(
         &self,
-        device: &mut Device,
+        device: &Device,
         destination: Option<NetlinkAddr>,
     ) -> Result<(), Error> {
         let dest = match destination {
@@ -136,7 +136,7 @@ impl DeviceMonitor {
             // todo: supply tag bloom high and low bytes
             IoSlice::new(&[0, 0, 0, 0]),
             IoSlice::new(&[0, 0, 0, 0]),
-            IoSlice::new(nulstr),
+            IoSlice::new(&nulstr),
         ];
 
         sendmsg(self.fd(), &iov, &[], MsgFlags::empty(), Some(&dest)).unwrap();
@@ -215,10 +215,8 @@ mod tests {
         e.set_enabled(s.clone(), EventState::On).unwrap();
 
         spawn(|| {
-            let mut device = Device::from_devname("/dev/sda".to_string()).unwrap();
-            device
-                .set_sysattr_value("uevent".to_string(), Some("change".to_string()))
-                .unwrap();
+            let device = Device::from_devname("/dev/sda").unwrap();
+            device.set_sysattr_value("uevent", Some("change")).unwrap();
         })
         .join()
         .unwrap();
@@ -240,9 +238,9 @@ mod tests {
         e.set_enabled(s.clone(), EventState::On).unwrap();
 
         spawn(|| {
-            let mut device = Device::from_devname("/dev/sda".to_string()).unwrap();
+            let device = Device::from_devname("/dev/sda").unwrap();
             let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
-            broadcaster.send_device(&mut device, None).unwrap();
+            broadcaster.send_device(&device, None).unwrap();
         })
         .join()
         .unwrap();

@@ -17,9 +17,8 @@ use device::Device;
 
 fn main() {
     {
-        let mut dev_1 =
-            Device::from_subsystem_sysname("drivers".to_string(), "i2c:dummy".to_string()).unwrap();
-        let mut dev_2 = Device::from_device_id("+drivers:i2c:dummy".to_string()).unwrap();
+        let dev_1 = Device::from_subsystem_sysname("drivers", "i2c:dummy").unwrap();
+        let dev_2 = Device::from_device_id("+drivers:i2c:dummy").unwrap();
         assert_eq!(dev_1.get_sysname().unwrap(), dev_2.get_sysname().unwrap());
         assert_eq!(
             dev_1.get_subsystem().unwrap(),
@@ -28,8 +27,7 @@ fn main() {
     }
 
     {
-        let mut dev =
-            Device::from_subsystem_sysname("drivers".to_string(), "usb:hub".to_string()).unwrap();
+        let dev = Device::from_subsystem_sysname("drivers", "usb:hub").unwrap();
         println!("{}", dev.get_sysname().unwrap());
         println!("{}", dev.get_subsystem().unwrap());
         println!("{:?}", dev);
