@@ -31,7 +31,10 @@ pub(super) struct Commands<T> {
     socket_fd: i32,
 }
 
-impl<T> Commands<T> {
+impl<T> Commands<T>
+where
+    T: ExecuterAction,
+{
     pub(super) fn new(relir: &Rc<Reliability>, comm_action: T) -> Self {
         /* The socket is used to communicate with sctl, panic if any of the following steps fail. */
         let sctl_socket_path = Path::new(SCTL_SOCKET);
@@ -65,22 +68,8 @@ impl<T> Commands<T> {
             socket_fd,
         }
     }
-}
 
-impl<T> Source for Commands<T>
-where
-    T: ExecuterAction,
-{
-    fn event_type(&self) -> EventType {
-        EventType::Io
-    }
-
-    fn epoll_event(&self) -> u32 {
-        (libc::EPOLLIN) as u32
-    }
-
-    fn dispatch(&self, _e: &Events) -> i32 {
-        self.reli.set_last_frame1(ReliLastFrame::CmdOp as u32);
+    pub fn dispatch_commands(&self) -> i32 {
         let client = match socket::accept(self.socket_fd) {
             Err(e) => {
                 log::error!("Failed to accept connection: {}, ignoring.", e);
@@ -104,9 +93,30 @@ where
             Err(e) => log::error!("Commands failed: {:?}", e),
         }
         basic::fd_util::close(client);
-        self.reli.clear_last_frame();
-
         0
+    }
+}
+
+impl<T> Source for Commands<T>
+where
+    T: ExecuterAction,
+{
+    fn event_type(&self) -> EventType {
+        EventType::Io
+    }
+
+    fn epoll_event(&self) -> u32 {
+        (libc::EPOLLIN) as u32
+    }
+
+    fn dispatch(&self, _e: &Events) -> i32 {
+        self.reli.set_last_frame1(ReliLastFrame::CmdOp as u32);
+        /* NOTE: we must call clear_last_frame before return. If we don't do this, the allocated
+         * vector "frame" in reli.set_frame will be leaked, and become larger and larger until
+         * triggers a panic. */
+        let ret = self.dispatch_commands();
+        self.reli.clear_last_frame();
+        ret
     }
 
     fn token(&self) -> u64 {
