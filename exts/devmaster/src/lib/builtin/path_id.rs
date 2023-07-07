@@ -20,7 +20,7 @@ use device::Device;
 use std::cell::RefCell;
 use std::ffi::CString;
 use std::fs::read_dir;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 /// path_id builtin command
 pub struct PathId;
@@ -29,7 +29,7 @@ impl Builtin for PathId {
     /// builtin command
     fn cmd(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         _ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         _argv: Vec<String>,
@@ -70,7 +70,7 @@ impl Builtin for PathId {
          * devices do not expose their buses and do not provide a unique
          * and predictable name that way.
          */
-        if let Ok(subsystem) = device.lock().unwrap().get_subsystem() {
+        if let Ok(subsystem) = device.borrow().get_subsystem() {
             if subsystem == "block" && !supported_transport {
                 return Err(Error::BuiltinCommandError {
                     msg: "block error".to_string(),
@@ -149,7 +149,7 @@ impl PathId {
     #[allow(clippy::ptr_arg)]
     fn compose_path(
         &self,
-        dev: Arc<Mutex<Device>>,
+        dev: Rc<RefCell<Device>>,
         path: &mut String,
         compat_path: &mut String,
         supported_transport: &mut bool,
@@ -160,19 +160,15 @@ impl PathId {
             let subsys = parent
                 .as_ref()
                 .unwrap()
-                .lock()
-                .unwrap()
+                .borrow()
                 .get_subsystem()
-                .unwrap_or_else(|_| "".to_string());
-            let mut sysname = String::from(
-                parent
-                    .as_ref()
-                    .unwrap()
-                    .lock()
-                    .unwrap()
-                    .get_sysname()
-                    .unwrap_or(""),
-            );
+                .unwrap_or_default();
+            let mut sysname = parent
+                .as_ref()
+                .unwrap()
+                .borrow()
+                .get_sysname()
+                .unwrap_or_default();
             if !subsys.is_empty() && !sysname.is_empty() {
                 if subsys == "scsi_tape" {
                     self.hanlde_scsi_tape(parent.as_ref().unwrap().clone(), path);
@@ -253,7 +249,7 @@ impl PathId {
                 break;
             }
 
-            let temp = match parent.as_ref().unwrap().lock().unwrap().get_parent() {
+            let temp = match parent.as_ref().unwrap().borrow().get_parent() {
                 Ok(res) => Some(res),
                 Err(_) => {
                     break;
@@ -266,9 +262,9 @@ impl PathId {
         Ok(true)
     }
 
-    fn hanlde_scsi_tape(&self, dev: Arc<Mutex<Device>>, path: &mut String) {
-        let name = match dev.lock().unwrap().get_sysname() {
-            Ok(name) => String::from(name),
+    fn hanlde_scsi_tape(&self, dev: Rc<RefCell<Device>>, path: &mut String) {
+        let name = match dev.borrow().get_sysname() {
+            Ok(name) => name,
             Err(_) => return,
         };
 
@@ -283,12 +279,12 @@ impl PathId {
 
     fn hanlde_scsi(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
         compat_path: &mut str,
         supported_parent: &mut bool,
-    ) -> Option<Arc<Mutex<Device>>> {
-        let devtype = match parent.lock().unwrap().get_devtype() {
+    ) -> Option<Rc<RefCell<Device>>> {
+        let devtype = match parent.borrow().get_devtype() {
             Ok(devtype) => devtype,
             Err(_) => return Some(parent.clone()),
         };
@@ -297,15 +293,15 @@ impl PathId {
             return Some(parent);
         }
 
-        let id = parent.lock().unwrap().get_sysattr_value("ieee1394_id");
+        let id = parent.borrow().get_sysattr_value("ieee1394_id");
         if id.is_ok() {
             self.path_prepend(path, format!("ieee1394-0x{}", id.unwrap()));
             *supported_parent = true;
             return self.skip_subsystem(parent, "scsi");
         }
 
-        let name = match parent.lock().unwrap().get_syspath() {
-            Ok(name) => String::from(name),
+        let name = match parent.borrow().get_syspath() {
+            Ok(name) => name,
             Err(_) => return None,
         };
 
@@ -338,22 +334,21 @@ impl PathId {
 
     fn hanlde_scsi_fibre_channel(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
-    ) -> Option<Arc<Mutex<Device>>> {
+    ) -> Option<Rc<RefCell<Device>>> {
         let targetdev = match parent
-            .lock()
-            .unwrap()
+            .borrow()
             .get_parent_with_subsystem_devtype("scsi", Some("scsi_target"))
         {
             Ok(dev) => dev,
             Err(_) => return None,
         };
-        let sysname = match targetdev.lock().unwrap().get_sysname() {
-            Ok(sysname) => String::from(sysname),
+        let sysname = match targetdev.borrow().get_sysname() {
+            Ok(sysname) => sysname,
             Err(_) => return None,
         };
-        let mut fcdev = match Device::from_subsystem_sysname("fc_transport".to_string(), sysname) {
+        let fcdev = match Device::from_subsystem_sysname("fc_transport", &sysname) {
             Ok(dev) => dev,
             Err(_) => return None,
         };
@@ -371,26 +366,25 @@ impl PathId {
 
     fn hanlde_scsi_sas(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
-    ) -> Option<Arc<Mutex<Device>>> {
+    ) -> Option<Rc<RefCell<Device>>> {
         let targetdev = match parent
-            .lock()
-            .unwrap()
+            .borrow()
             .get_parent_with_subsystem_devtype("scsi", Some("scsi_target"))
         {
             Ok(dev) => dev,
             Err(_) => return None,
         };
-        let target_parent = match targetdev.lock().unwrap().get_parent() {
+        let target_parent = match targetdev.borrow().get_parent() {
             Ok(dev) => dev,
             Err(_) => return None,
         };
-        let sysname = match target_parent.lock().unwrap().get_sysname() {
-            Ok(sysname) => String::from(sysname),
+        let sysname = match target_parent.borrow().get_sysname() {
+            Ok(sysname) => sysname,
             Err(_) => return None,
         };
-        let mut asadev = match Device::from_subsystem_sysname("sas_device".to_string(), sysname) {
+        let asadev = match Device::from_subsystem_sysname("sas_device", &sysname) {
             Ok(dev) => dev,
             Err(_) => return None,
         };
@@ -409,19 +403,19 @@ impl PathId {
 
     fn hanlde_scsi_iscsi(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
-    ) -> Option<Arc<Mutex<Device>>> {
+    ) -> Option<Rc<RefCell<Device>>> {
         let transportdev = parent.clone();
         let mut sysname;
         /* find iscsi session */
         loop {
-            let transportdev = match transportdev.lock().unwrap().get_parent() {
+            let transportdev = match transportdev.borrow().get_parent() {
                 Ok(dev) => dev,
                 Err(_) => return None,
             };
-            sysname = match transportdev.lock().unwrap().get_sysname() {
-                Ok(name) => String::from(name),
+            sysname = match transportdev.borrow().get_sysname() {
+                Ok(name) => name,
                 Err(_) => return None,
             };
             if sysname.starts_with("session") {
@@ -430,28 +424,26 @@ impl PathId {
         }
 
         /* find iscsi session device */
-        let mut sessiondev =
-            match Device::from_subsystem_sysname("iscsi_session".to_string(), sysname) {
-                Ok(dev) => dev,
-                Err(_) => return None,
-            };
+        let sessiondev = match Device::from_subsystem_sysname("iscsi_session", &sysname) {
+            Ok(dev) => dev,
+            Err(_) => return None,
+        };
 
         let target = match sessiondev.get_sysattr_value("asa_address") {
             Ok(port) => port,
             Err(_) => return None,
         };
 
-        let sysnum = match transportdev.lock().unwrap().get_sysnum() {
+        let sysnum = match transportdev.borrow().get_sysnum() {
             Ok(num) => num,
             Err(_) => return None,
         };
 
         let connname = format!("connection{}:0", sysnum);
-        let mut conndev =
-            match Device::from_subsystem_sysname("iscsi_connection".to_string(), connname) {
-                Ok(dev) => dev,
-                Err(_) => return None,
-            };
+        let conndev = match Device::from_subsystem_sysname("iscsi_connection", &connname) {
+            Ok(dev) => dev,
+            Err(_) => return None,
+        };
         let addr = match conndev.get_sysattr_value("persistent_address") {
             Ok(addr) => addr,
             Err(_) => return None,
@@ -472,12 +464,12 @@ impl PathId {
 
     fn hanlde_scsi_ata(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
         compat_path: &mut str,
-    ) -> Option<Arc<Mutex<Device>>> {
-        let sysname = match parent.lock().unwrap().get_sysname() {
-            Ok(name) => String::from(name),
+    ) -> Option<Rc<RefCell<Device>>> {
+        let sysname = match parent.borrow().get_sysname() {
+            Ok(name) => name,
             Err(_) => return None,
         };
         let mut host: u32 = 0;
@@ -501,25 +493,24 @@ impl PathId {
         }
 
         let targetdev = match parent
-            .lock()
-            .unwrap()
+            .borrow()
             .get_parent_with_subsystem_devtype("scsi", Some("scsi_host"))
         {
             Ok(dev) => dev,
             Err(_) => return None,
         };
 
-        let target_parent = match targetdev.lock().unwrap().get_parent() {
+        let target_parent = match targetdev.borrow().get_parent() {
             Ok(dev) => dev,
             Err(_e) => return None,
         };
 
-        let sysname = match target_parent.lock().unwrap().get_sysname() {
-            Ok(name) => String::from(name),
+        let sysname = match target_parent.borrow().get_sysname() {
+            Ok(name) => name,
             Err(_) => return None,
         };
 
-        let mut atadev = match Device::from_subsystem_sysname("ata_port".to_string(), sysname) {
+        let atadev = match Device::from_subsystem_sysname("ata_port", &sysname) {
             Ok(dev) => dev,
             Err(_) => return None,
         };
@@ -547,25 +538,24 @@ impl PathId {
 
     fn hanlde_scsi_hyperv(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
         giud_str_len: usize,
-    ) -> Option<Arc<Mutex<Device>>> {
+    ) -> Option<Rc<RefCell<Device>>> {
         let hostdev = match parent
-            .lock()
-            .unwrap()
+            .borrow()
             .get_parent_with_subsystem_devtype("scsi", Some("scsi_host"))
         {
             Ok(dev) => dev,
             Err(_) => return None,
         };
 
-        let vmbusdev = match hostdev.lock().unwrap().get_parent() {
+        let vmbusdev = match hostdev.borrow().get_parent() {
             Ok(dev) => dev,
             Err(_e) => return None,
         };
 
-        let guid_str = match vmbusdev.lock().unwrap().get_sysattr_value("device_id") {
+        let guid_str = match vmbusdev.borrow().get_sysattr_value("device_id") {
             Ok(str) => str,
             Err(_e) => return None,
         };
@@ -589,20 +579,19 @@ impl PathId {
 
     fn handle_scsi_default(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
-    ) -> Option<Arc<Mutex<Device>>> {
+    ) -> Option<Rc<RefCell<Device>>> {
         let mut basenum = -1;
         let hostdev = match parent
-            .lock()
-            .unwrap()
+            .borrow()
             .get_parent_with_subsystem_devtype("scsi", Some("scsi_host"))
         {
             Ok(dev) => dev,
             Err(_) => return None,
         };
-        let name = match parent.lock().unwrap().get_sysname() {
-            Ok(name) => String::from(name),
+        let name = match parent.borrow().get_sysname() {
+            Ok(name) => name,
             Err(_) => return None,
         };
 
@@ -643,8 +632,8 @@ impl PathId {
          * this. Manual driver unbind/bind, parallel hotplug/unplug will
          * get into the way of this "I hope it works" logic.
          */
-        let base = match hostdev.lock().unwrap().get_syspath() {
-            Ok(base) => String::from(base),
+        let base = match hostdev.borrow().get_syspath() {
+            Ok(base) => base,
             Err(_) => return None,
         };
         let pos = match base.rfind('/') {
@@ -709,8 +698,8 @@ impl PathId {
         Some(hostdev)
     }
 
-    fn format_lun_number(&self, dev: Arc<Mutex<Device>>) -> String {
-        let sysnum = match dev.lock().unwrap().get_sysnum() {
+    fn format_lun_number(&self, dev: Rc<RefCell<Device>>) -> String {
+        let sysnum = match dev.borrow().get_sysnum() {
             Ok(sysnum) => sysnum,
             Err(_) => return String::new(),
         };
@@ -737,11 +726,11 @@ impl PathId {
 
     fn hanlde_cciss(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
-    ) -> Option<Arc<Mutex<Device>>> {
-        let name = match parent.lock().unwrap().get_sysname() {
-            Ok(s) => String::from(s),
+    ) -> Option<Rc<RefCell<Device>>> {
+        let name = match parent.borrow().get_sysname() {
+            Ok(s) => s,
             Err(_) => return None,
         };
         let mut controller: u32 = 0;
@@ -766,10 +755,10 @@ impl PathId {
 
     fn hanlde_usb(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
-    ) -> Option<Arc<Mutex<Device>>> {
-        let devtype = match parent.lock().unwrap().get_devtype() {
+    ) -> Option<Rc<RefCell<Device>>> {
+        let devtype = match parent.borrow().get_devtype() {
             Ok(devtype) => devtype,
             Err(_) => return Some(parent.clone()),
         };
@@ -778,8 +767,8 @@ impl PathId {
             return Some(parent);
         }
 
-        let sysname = match parent.lock().unwrap().get_sysname() {
-            Ok(sysname) => String::from(sysname),
+        let sysname = match parent.borrow().get_sysname() {
+            Ok(sysname) => sysname,
             Err(_) => return Some(parent.clone()),
         };
 
@@ -795,11 +784,11 @@ impl PathId {
 
     fn handle_bcma(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
-    ) -> Option<Arc<Mutex<Device>>> {
-        let sysname = match parent.lock().unwrap().get_sysname() {
-            Ok(sysname) => String::from(sysname),
+    ) -> Option<Rc<RefCell<Device>>> {
+        let sysname = match parent.borrow().get_sysname() {
+            Ok(sysname) => sysname,
             Err(_) => return None,
         };
 
@@ -818,10 +807,10 @@ impl PathId {
 
     fn handle_serio(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
-    ) -> Option<Arc<Mutex<Device>>> {
-        let sysnum = match parent.lock().unwrap().get_sysnum() {
+    ) -> Option<Rc<RefCell<Device>>> {
+        let sysnum = match parent.borrow().get_sysnum() {
             Ok(sysnum) => sysnum,
             Err(_) => return Some(parent.clone()),
         };
@@ -836,12 +825,12 @@ impl PathId {
 
     fn handle_subsys(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         subsys: String,
         path: &mut String,
         sysname: &mut String,
         compat_path: &mut String,
-    ) -> Option<Arc<Mutex<Device>>> {
+    ) -> Option<Rc<RefCell<Device>>> {
         self.path_prepend(path, format!("{}-{}", subsys, sysname));
         if !compat_path.is_empty() {
             self.path_prepend(compat_path, format!("{}-{}", subsys, sysname));
@@ -851,14 +840,14 @@ impl PathId {
 
     fn handle_ap(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
-    ) -> Option<Arc<Mutex<Device>>> {
-        let systype = parent.lock().unwrap().get_sysattr_value("type");
-        let func = parent.lock().unwrap().get_sysattr_value("ap_functions");
+    ) -> Option<Rc<RefCell<Device>>> {
+        let systype = parent.borrow().get_sysattr_value("type");
+        let func = parent.borrow().get_sysattr_value("ap_functions");
         if systype.is_ok() && func.is_ok() {
             self.path_prepend(path, format!("ap-{}-{}", systype.unwrap(), func.unwrap()));
-        } else if let Ok(sysname) = parent.lock().unwrap().get_sysname() {
+        } else if let Ok(sysname) = parent.borrow().get_sysname() {
             self.path_prepend(path, format!("ap-{}", sysname));
         }
 
@@ -867,14 +856,14 @@ impl PathId {
 
     fn handle_nvme(
         &self,
-        dev: Arc<Mutex<Device>>,
-        parent: Arc<Mutex<Device>>,
+        dev: Rc<RefCell<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
         compat_path: &mut String,
         supported_parent: &mut bool,
         supported_transport: &mut bool,
-    ) -> Option<Arc<Mutex<Device>>> {
-        if let Ok(nsid) = dev.lock().unwrap().get_sysattr_value("nsid") {
+    ) -> Option<Rc<RefCell<Device>>> {
+        if let Ok(nsid) = dev.borrow().get_sysattr_value("nsid") {
             self.path_prepend(path, format!("nvme-{}", nsid));
             if !compat_path.is_empty() {
                 self.path_prepend(compat_path, format!("nvme-{}", nsid));
@@ -889,14 +878,14 @@ impl PathId {
 
     fn handle_nvme_subsystem(
         &self,
-        dev: Arc<Mutex<Device>>,
-        parent: Arc<Mutex<Device>>,
+        dev: Rc<RefCell<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
         compat_path: &mut String,
         supported_parent: &mut bool,
         supported_transport: &mut bool,
-    ) -> Result<Option<Arc<Mutex<Device>>>> {
-        if let Ok(nsid) = dev.lock().unwrap().get_sysattr_value("nsid") {
+    ) -> Result<Option<Rc<RefCell<Device>>>> {
+        if let Ok(nsid) = dev.borrow().get_sysattr_value("nsid") {
             self.path_prepend(path, format!("nvme-{}", nsid));
             if !compat_path.is_empty() {
                 self.path_prepend(compat_path, format!("nvme-{}", nsid));
@@ -914,10 +903,10 @@ impl PathId {
 
     fn handle_nvme_spi(
         &self,
-        parent: Arc<Mutex<Device>>,
+        parent: Rc<RefCell<Device>>,
         path: &mut String,
-    ) -> Option<Arc<Mutex<Device>>> {
-        let sysnum = match parent.lock().unwrap().get_sysnum() {
+    ) -> Option<Rc<RefCell<Device>>> {
+        let sysnum = match parent.borrow().get_sysnum() {
             Ok(sysnum) => sysnum,
             Err(_) => return Some(parent.clone()),
         };
@@ -928,7 +917,7 @@ impl PathId {
         Some(parent)
     }
 
-    fn find_real_nvme_parent(&self, dev: Arc<Mutex<Device>>) -> Result<Arc<Mutex<Device>>> {
+    fn find_real_nvme_parent(&self, dev: Rc<RefCell<Device>>) -> Result<Rc<RefCell<Device>>> {
         /* If the device belongs to "nvme-subsystem" (not to be confused with "nvme"), which happens when
          * NVMe multipathing is enabled in the kernel (/sys/module/nvme_core/parameters/multipath is Y),
          * then the syspath is something like the following:
@@ -936,8 +925,8 @@ impl PathId {
          * Hence, we need to find the 'real parent' in "nvme" subsystem, e.g,
          *   /sys/devices/pci0000:00/0000:00:1c.4/0000:3c:00.0/nvme/nvme0 */
 
-        let sysname = match dev.lock().unwrap().get_sysname() {
-            Ok(name) => String::from(name),
+        let sysname = match dev.borrow().get_sysname() {
+            Ok(name) => name,
             Err(_) => {
                 return Err(Error::BuiltinCommandError {
                     msg: "Failed to get_sysname".to_string(),
@@ -960,8 +949,8 @@ impl PathId {
             .trim_start_matches(char::is_numeric);
         let sysname = &sysname[..sysname.len() - end.len()];
 
-        match Device::from_subsystem_sysname("nvme".to_string(), sysname.to_string()) {
-            Ok(dev) => Ok(Arc::new(Mutex::new(dev))),
+        match Device::from_subsystem_sysname("nvme", sysname) {
+            Ok(dev) => Ok(Rc::new(RefCell::new(dev))),
             Err(e) => Err(Error::BuiltinCommandError {
                 msg: format!("Failed to get_sysname :{:?}", e),
             }),
@@ -978,14 +967,14 @@ impl PathId {
 
     fn skip_subsystem(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         subsys: &str,
-    ) -> Option<Arc<Mutex<Device>>> {
+    ) -> Option<Rc<RefCell<Device>>> {
         let mut dev = device.clone();
         let mut parent = device;
         #[allow(clippy::while_let_loop)]
         loop {
-            let subsystem = match parent.lock().unwrap().get_subsystem() {
+            let subsystem = match parent.borrow().get_subsystem() {
                 Ok(str) => str,
                 Err(_e) => break,
             };
@@ -996,7 +985,7 @@ impl PathId {
 
             dev = parent.clone();
 
-            let temp = match parent.lock().unwrap().get_parent() {
+            let temp = match parent.borrow().get_parent() {
                 Ok(res) => res,
                 Err(_e) => break,
             };
@@ -1019,11 +1008,10 @@ mod tests {
     fn test_builtin_example() {
         let mut enumerator = DeviceEnumerator::new();
 
-        for device in enumerator.iter_mut() {
+        for device in enumerator.iter() {
             let mut rtnl = RefCell::<Option<Netlink>>::from(None);
 
             let builtin = PathId {};
-            println!("devpath:{:?}", device.lock().unwrap().get_devpath());
             if let Err(e) = builtin.cmd(device.clone(), &mut rtnl, 0, vec![], true) {
                 println!("Builtin command path_id: fails:{:?}", e);
             }

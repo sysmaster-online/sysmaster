@@ -19,8 +19,8 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     fmt::{self, Display},
+    rc::Rc,
     str::FromStr,
-    sync::{Arc, Mutex},
 };
 
 pub mod blkid;
@@ -44,7 +44,7 @@ pub trait Builtin {
     /// builtin command
     fn cmd(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         ret_rtnl: &mut RefCell<Option<Netlink>>,
         argc: i32,
         argv: Vec<String>,
@@ -71,15 +71,14 @@ pub trait Builtin {
     /// add property into device
     fn add_property(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         test: bool,
         key: &str,
         value: &str,
     ) -> Result<(), Error> {
         device
-            .lock()
-            .unwrap()
-            .add_property(key.to_string(), value.to_string())
+            .borrow()
+            .add_property(key, value)
             .map_err(|e| Error::BuiltinCommandError {
                 msg: format!("Failed to add property '{}'='{}': ({})", key, value, e),
             })?;
@@ -250,7 +249,7 @@ impl BuiltinManager {
     #[allow(dead_code)]
     pub fn run(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         ret_rtnl: &mut RefCell<Option<Netlink>>,
         cmd: BuiltinCommand,
         argc: i32,
@@ -280,7 +279,7 @@ mod tests {
 
         mgr.init();
 
-        for device in enumerator.iter_mut() {
+        for device in enumerator.iter() {
             let mut rtnl = RefCell::<Option<Netlink>>::from(None);
 
             for (cmd, v) in mgr.builtins.iter() {

@@ -18,7 +18,7 @@ use crate::builtin::Netlink;
 use crate::error::Result;
 use device::Device;
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 /// uaccess builtin command
 pub struct Uaccess;
@@ -27,7 +27,7 @@ impl Builtin for Uaccess {
     /// builtin command
     fn cmd(
         &self,
-        _device: Arc<Mutex<Device>>,
+        _device: Rc<RefCell<Device>>,
         _ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         _argv: Vec<String>,

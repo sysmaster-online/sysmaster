@@ -19,10 +19,8 @@ use crate::error::Result;
 use device::Device;
 use kmod_rs;
 use kmod_rs::KmodResources;
-use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 
 /// kmod builtin command
 pub struct Kmod {
@@ -49,15 +47,13 @@ impl Builtin for Kmod {
     /// builtin command
     fn cmd(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         _ret_rtnl: &mut RefCell<Option<Netlink>>,
         argc: i32,
         argv: Vec<String>,
         _test: bool,
     ) -> Result<bool> {
-        let mut kmod = (*self.kernel_module).borrow_mut();
-
-        if kmod.borrow().is_ctx_null() {
+        if self.kernel_module.borrow().is_ctx_null() {
             return Ok(true);
         }
 
@@ -69,19 +65,26 @@ impl Builtin for Kmod {
 
         if argc == 2 {
             let modalias = device
-                .lock()
-                .unwrap()
+                .borrow()
                 .get_property_value("MODALIAS")
                 .map_or(String::new(), |e| e);
 
             if !modalias.is_empty() {
-                if let Err(e) = kmod.module_load_and_warn(&modalias) {
+                if let Err(e) = self
+                    .kernel_module
+                    .borrow_mut()
+                    .module_load_and_warn(&modalias)
+                {
                     log::error!("Load module {} failed: {}", modalias, e);
                 }
             }
         } else {
             for i in 2..argc {
-                if let Err(e) = kmod.module_load_and_warn(&argv[i as usize]) {
+                if let Err(e) = self
+                    .kernel_module
+                    .borrow_mut()
+                    .module_load_and_warn(&argv[i as usize])
+                {
                     log::error!("Load module {} failed, {}", argv[i as usize], e);
                 }
             }
@@ -91,7 +94,7 @@ impl Builtin for Kmod {
 
     /// builtin init function
     fn init(&self) {
-        if let Err(e) = self.kernel_module.as_ref().borrow_mut().load_resources() {
+        if let Err(e) = self.kernel_module.borrow_mut().load_resources() {
             log::error!("Load resources failed! {}", e);
         }
     }
@@ -102,7 +105,6 @@ impl Builtin for Kmod {
     /// check whether builtin command should reload
     fn should_reload(&self) -> bool {
         self.kernel_module
-            .as_ref()
             .borrow_mut()
             .validate_resources()
             .map_or(false, |e| {

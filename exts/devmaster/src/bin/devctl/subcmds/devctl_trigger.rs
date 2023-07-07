@@ -48,22 +48,19 @@ pub fn subcommand_trigger(
 
         let mut enumerator = DeviceEnumerator::new();
         enumerator.set_enumerator_type(etype);
-        for device in enumerator.iter_mut() {
+        for device in enumerator.iter() {
             if !dry_run {
-                device.lock().unwrap().trigger(action).unwrap();
+                device.borrow().trigger(action).unwrap();
             }
             if verbose {
-                println!(
-                    "{}",
-                    device.lock().unwrap().get_syspath().unwrap_or_default()
-                );
+                println!("{}", device.borrow().get_syspath().unwrap_or_default());
             }
         }
         return;
     }
 
     for d in devices {
-        let mut device = Device::from_path(d).unwrap();
+        let device = Device::from_path(&d).unwrap();
         if !dry_run {
             device.trigger(action).unwrap();
         }

@@ -23,7 +23,7 @@ use std::cell::RefCell;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 #[repr(C, packed)]
 #[allow(non_snake_case)]
@@ -118,20 +118,18 @@ impl UsbId {
     const USB_DT_INTERFACE: u8 = 0x04;
     fn dev_if_packed_info(dev: &Device, info: &mut UsbInfo) -> Result<()> {
         let syspath = dev.get_syspath().unwrap();
-        let filename = PathBuf::from(syspath).join("descriptors");
+        let filename = PathBuf::from(&syspath).join("descriptors");
         let mut file = File::open(filename).context(IoSnafu {
-            filename: syspath.to_string(),
+            filename: syspath.clone(),
         })?;
         let mut buf = [0u8; 18 + 65535];
         let mut pos = 0;
 
         let size: usize = file.read(&mut buf).context(IoSnafu {
-            filename: syspath.to_string(),
+            filename: syspath.clone(),
         })?;
         if size < 18 {
-            return Err(Error::ReadTooShort {
-                filename: syspath.to_string(),
-            });
+            return Err(Error::ReadTooShort { filename: syspath });
         }
 
         while pos + std::mem::size_of::<UsbInterfaceDescriptor>() < size {
@@ -142,7 +140,7 @@ impl UsbId {
             }
             if desc.bLength > (size - std::mem::size_of::<UsbInterfaceDescriptor>()) as u8 {
                 return Err(Error::Other {
-                    msg: syspath.to_string(),
+                    msg: syspath,
                     errno: nix::errno::Errno::EINVAL,
                 });
             }
@@ -175,30 +173,35 @@ impl UsbId {
         Ok(())
     }
 
-    fn interface_directory(&self, device: &mut Device, info: &mut UsbInfo) -> Result<bool> {
+    fn interface_directory(&self, device: &Device, info: &mut UsbInfo) -> Result<bool> {
         let dev_interface = device
             .get_parent_with_subsystem_devtype("usb", Some("usb_interface"))
             .context(DeviceSnafu)?;
-        let mut dev_interface = dev_interface.lock().unwrap();
 
-        let _interface_syspath = dev_interface.get_syspath().context(DeviceSnafu)?;
+        let _interface_syspath = dev_interface.borrow().get_syspath().context(DeviceSnafu)?;
 
         info.ifnum = dev_interface
+            .borrow()
             .get_sysattr_value("bInterfacceNumber")
-            .unwrap_or_else(|_| Default::default());
+            .unwrap_or_default();
 
         info.driver = dev_interface
+            .borrow()
             .get_sysattr_value("driver")
-            .unwrap_or_else(|_| Default::default());
+            .unwrap_or_default();
 
         info.if_class = dev_interface
+            .borrow()
             .get_sysattr_value("bInterfaceClass")
             .context(DeviceSnafu)?;
 
         info.type_str = match info.if_class.parse::<i32>().context(ParseIntSnafu)? {
             8 => {
                 let mut type_str = String::new();
-                if let Ok(if_subclass) = dev_interface.get_sysattr_value("bInterfaceSubClass") {
+                if let Ok(if_subclass) = dev_interface
+                    .borrow()
+                    .get_sysattr_value("bInterfaceSubClass")
+                {
                     type_str = UsbId::usb_mass_storage_ifsubtype(&if_subclass, &mut info.protocol)
                         .unwrap()
                         .to_string();
@@ -210,12 +213,12 @@ impl UsbId {
         Ok(true)
     }
 
-    fn mass_storage(&self, device: &mut Device, info: &mut UsbInfo) -> Result<bool> {
+    fn mass_storage(&self, device: &Device, info: &mut UsbInfo) -> Result<bool> {
         if [2, 6].contains(&info.protocol) {
             let dev_scsi = device
                 .get_parent_with_subsystem_devtype("scsi", Some("scsi_device"))
                 .context(DeviceSnafu)?;
-            let mut dev_scsi = dev_scsi.lock().unwrap().to_owned();
+            let dev_scsi = dev_scsi.borrow().to_owned();
 
             let scsi_sysname = dev_scsi.get_sysname().context(DeviceSnafu)?;
 
@@ -252,7 +255,7 @@ impl UsbId {
         Ok(true)
     }
 
-    fn set_sysattr(&self, device: &mut Device, info: &mut UsbInfo) -> Result<bool> {
+    fn set_sysattr(&self, device: &Device, info: &mut UsbInfo) -> Result<bool> {
         info.vendor_id = device.get_sysattr_value("idVendor").context(DeviceSnafu)?;
 
         info.product_id = device.get_sysattr_value("idProduct").context(DeviceSnafu)?;
@@ -318,28 +321,28 @@ impl Builtin for UsbId {
     /// builtin command
     fn cmd(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         _ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         _argv: Vec<String>,
         test: bool,
     ) -> Result<bool> {
         let mut info = UsbInfo::default();
-        let mut usb_device = Arc::new(Mutex::new(Device::default()));
+        let mut usb_device = Rc::new(RefCell::new(Device::default()));
 
-        let _syspath = device.lock().unwrap().get_syspath().context(DeviceSnafu)?;
-        let _sysname = device.lock().unwrap().get_sysname().context(DeviceSnafu)?;
-        let devtype = device.lock().unwrap().get_devtype().context(DeviceSnafu)?;
+        let _syspath = device.borrow().get_syspath().context(DeviceSnafu)?;
+        let _sysname = device.borrow().get_sysname().context(DeviceSnafu)?;
+        let devtype = device.borrow().get_devtype().context(DeviceSnafu)?;
 
         #[allow(clippy::never_loop)]
         loop {
             if devtype == "usb_device" {
-                let _ = Self::dev_if_packed_info(&device.lock().unwrap(), &mut info);
+                let _ = Self::dev_if_packed_info(&device.borrow(), &mut info);
                 usb_device = device.clone();
                 break;
             }
 
-            match self.interface_directory(&mut device.lock().unwrap(), &mut info) {
+            match self.interface_directory(&device.borrow(), &mut info) {
                 Ok(true) => (),
                 Ok(false) => break,
                 Err(e) => return Err(e),
@@ -348,14 +351,13 @@ impl Builtin for UsbId {
             log::debug!("if_class:{} protocol:{}", info.if_class, info.protocol);
 
             let dev_usb = device
-                .lock()
-                .unwrap()
+                .borrow()
                 .get_parent_with_subsystem_devtype("usb", Some("usb_interface"))
                 .context(DeviceSnafu)?;
 
-            let _ = Self::dev_if_packed_info(&dev_usb.lock().unwrap(), &mut info);
+            let _ = Self::dev_if_packed_info(&dev_usb.borrow(), &mut info);
 
-            match self.mass_storage(&mut device.lock().unwrap(), &mut info) {
+            match self.mass_storage(&device.borrow(), &mut info) {
                 Ok(_) => (),
                 Err(e) => {
                     log::error!("{:?}", e);
@@ -366,10 +368,10 @@ impl Builtin for UsbId {
             break;
         }
 
-        self.set_sysattr(&mut usb_device.lock().unwrap().to_owned(), &mut info)?;
+        self.set_sysattr(&usb_device.borrow(), &mut info)?;
 
         // Set up a temporary variable id_bus here to prevent deadlock.
-        let id_bus = device.lock().unwrap().get_property_value("ID_BUS");
+        let id_bus = device.borrow().get_property_value("ID_BUS");
         match id_bus {
             Ok(_) => log::debug!("ID_BUS property is already set, setting only properties prefixed with \"ID_USB_\"."),
             Err(_) => {
@@ -514,16 +516,16 @@ mod test {
     fn test_usb_id() {
         let mut enumerator = DeviceEnumerator::new();
 
-        for device in enumerator.iter_mut() {
+        for device in enumerator.iter() {
             let mut rtnl = RefCell::<Option<Netlink>>::from(None);
 
             let builtin = UsbId {};
-            if let Ok(str) = device.lock().unwrap().get_devpath() {
+            if let Ok(str) = device.borrow().get_devpath() {
                 if !str.contains("usb") {
                     continue;
                 }
             }
-            println!("devpath:{:?}", device.lock().unwrap().get_devpath());
+            println!("devpath:{:?}", device.borrow().get_devpath());
             if let Err(e) = builtin.cmd(device.clone(), &mut rtnl, 0, vec![], true) {
                 println!("Builtin command path_id: fails:{:?}", e);
             }

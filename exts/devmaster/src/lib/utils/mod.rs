@@ -14,13 +14,14 @@
 //!
 
 use std::{
+    cell::RefCell,
     io::Read,
     process::{Command, Stdio},
-    sync::{Arc, Mutex},
+    rc::Rc,
     time::Duration,
 };
 
-use crate::{error::*, log_dev_lock, rules::FormatSubstitutionType};
+use crate::{error::*, log_dev, rules::FormatSubstitutionType};
 use basic::errno_util::errno_is_privilege;
 use device::{Device, DB_BASE_DIR};
 use lazy_static::lazy_static;
@@ -217,8 +218,8 @@ macro_rules! device_trace {
     // Match rule that takes any number of arguments
     ($p:tt, $d:expr) => {{
         let action = $d.get_action().unwrap_or_default().to_string();
-        let sysname = $d.get_sysname().unwrap_or("no_sysname").to_string();
-        let syspath = $d.get_syspath().unwrap_or("no_syspath").to_string();
+        let sysname = $d.get_sysname().unwrap_or("no_sysname".to_string());
+        let syspath = $d.get_syspath().unwrap_or("no_syspath".to_string());
         let subsystem = $d.get_subsystem().unwrap_or("no_subsystem".to_string());
         format!("{}: {} {} {} {}", $p, action, sysname, syspath, subsystem)
     }};
@@ -227,7 +228,7 @@ macro_rules! device_trace {
 /// resolve [<SUBSYSTEM>/<KERNEL>]<attribute> string
 /// if 'read' is true, read the attribute from sysfs device tree and return the value
 /// else just return the attribute path under sysfs device tree.
-pub(crate) fn resolve_subsystem_kernel(s: &String, read: bool) -> Result<String> {
+pub(crate) fn resolve_subsystem_kernel(s: &str, read: bool) -> Result<String> {
     lazy_static! {
         static ref PATTERN: Regex = Regex::new(
             "\\[(?P<subsystem>[^/\\[\\]]+)/(?P<sysname>[^/\\[\\]]+)\\](?P<attribute>.*)"
@@ -259,8 +260,8 @@ pub(crate) fn resolve_subsystem_kernel(s: &String, read: bool) -> Result<String>
                 });
             }
 
-            let mut device = Device::from_subsystem_sysname(subsystem.clone(), sysname.clone())
-                .map_err(|e| Error::Other {
+            let device =
+                Device::from_subsystem_sysname(&subsystem, &sysname).map_err(|e| Error::Other {
                     msg: format!("failed to get device: ({})", e),
                     errno: e.get_errno(),
                 })?;
@@ -287,7 +288,7 @@ pub(crate) fn resolve_subsystem_kernel(s: &String, read: bool) -> Result<String>
                 );
                 Ok(attr_value)
             } else {
-                let syspath = device.get_syspath().context(DeviceSnafu)?.to_string();
+                let syspath = device.get_syspath().context(DeviceSnafu)?;
 
                 let attr_path = if attribute.is_empty() {
                     syspath
@@ -343,7 +344,7 @@ pub(crate) fn sysattr_subdir_subst(sysattr: &str) -> Result<String> {
 }
 
 /// if the command is not absolute path, try to find it under lib directory first.
-pub(crate) fn spawn(cmd_str: &String, timeout: Duration) -> Result<(String, i32)> {
+pub(crate) fn spawn(cmd_str: &str, timeout: Duration) -> Result<(String, i32)> {
     lazy_static! {
         static ref LIB_DIRS: Vec<String> =
             vec!["/lib/udev/".to_string(), "/lib/devmaster/".to_string()];
@@ -484,22 +485,17 @@ pub(crate) fn get_property_from_string(s: &str) -> Result<(String, String)> {
 
 /// inherit initial timestamp from old device object
 pub(crate) fn initialize_device_usec(
-    dev_new: Arc<Mutex<Device>>,
-    dev_old: Arc<Mutex<Device>>,
+    dev_new: Rc<RefCell<Device>>,
+    dev_old: Rc<RefCell<Device>>,
 ) -> Result<()> {
-    let timestamp = dev_old
-        .lock()
-        .unwrap()
-        .get_usec_initialized()
-        .unwrap_or_else(|_| {
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_or(0, |v| v.as_secs())
-        });
+    let timestamp = dev_old.borrow().get_usec_initialized().unwrap_or_else(|_| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |v| v.as_secs())
+    });
 
     dev_new
-        .lock()
-        .unwrap()
+        .borrow()
         .set_usec_initialized(timestamp)
         .map_err(|e| {
             log::error!("failed to set initialization timestamp: {}", e);
@@ -512,31 +508,27 @@ pub(crate) fn initialize_device_usec(
 
 /// add new tags and remove deleted tags
 pub(crate) fn device_update_tag(
-    dev_new: Arc<Mutex<Device>>,
-    dev_old: Option<Arc<Mutex<Device>>>,
+    dev_new: Rc<RefCell<Device>>,
+    dev_old: Option<Rc<RefCell<Device>>>,
     add: bool,
 ) -> Result<()> {
     if let Some(dev_old) = dev_old {
-        for tag in dev_old.lock().unwrap().tag_iter_mut() {
-            if let Ok(true) = dev_new.lock().unwrap().has_tag(tag) {
+        for tag in &dev_old.borrow().tag_iter() {
+            if let Ok(true) = dev_new.borrow().has_tag(tag) {
                 continue;
             }
 
             let _ = dev_new
-                .lock()
-                .unwrap()
+                .borrow()
                 .update_tag(tag, false)
                 .context(DeviceSnafu)
                 .log_error(&format!("failed to remove old tag '{}'", tag));
         }
     }
 
-    let tags_clone = dev_new.lock().unwrap().all_tags.clone();
-
-    for tag in tags_clone.iter() {
+    for tag in &dev_new.borrow().tag_iter() {
         let _ = dev_new
-            .lock()
-            .unwrap()
+            .borrow()
             .update_tag(tag, add)
             .context(DeviceSnafu)
             .log_error(&format!("failed to add new tag '{}'", tag));
@@ -546,16 +538,20 @@ pub(crate) fn device_update_tag(
 }
 
 /// cleanup device database
-pub(crate) fn cleanup_db(dev: Arc<Mutex<Device>>) -> Result<()> {
-    let id = dev.lock().unwrap().get_device_id().context(DeviceSnafu)?;
+pub(crate) fn cleanup_db(dev: Rc<RefCell<Device>>) -> Result<()> {
+    let id = dev.borrow().get_device_id().context(DeviceSnafu)?;
 
     let db_path = format!("{}{}", DB_BASE_DIR, id);
 
     match unlink(db_path.as_str()) {
-        Ok(_) => log_dev_lock!(debug, dev, format!("unlinked '{}'", db_path)),
+        Ok(_) => log_dev!(debug, dev.borrow(), format!("unlinked '{}'", db_path)),
         Err(e) => {
             if e != nix::Error::ENOENT {
-                log_dev_lock!(error, dev, format!("failed to unlink '{}': {}", db_path, e));
+                log_dev!(
+                    error,
+                    dev.borrow(),
+                    format!("failed to unlink '{}': {}", db_path, e)
+                );
                 return Err(Error::Nix { source: e });
             }
         }
@@ -618,7 +614,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_device_trace() {
-        let mut device = Device::from_path("/dev/sda".to_string()).unwrap();
+        let device = Device::from_path("/dev/sda").unwrap();
 
         device_trace!("test", device);
     }
@@ -626,45 +622,39 @@ mod tests {
     #[test]
     #[ignore]
     fn test_resolve_subsystem_kernel() {
-        assert!(resolve_subsystem_kernel(&"[net]".to_string(), false).is_err());
-        assert!(resolve_subsystem_kernel(&"[net/]".to_string(), false).is_err());
-        assert!(resolve_subsystem_kernel(&"[net/lo".to_string(), false).is_err());
-        assert!(resolve_subsystem_kernel(&"[net".to_string(), false).is_err());
-        assert!(resolve_subsystem_kernel(&"net/lo".to_string(), false).is_err());
+        assert!(resolve_subsystem_kernel("[net]", false).is_err());
+        assert!(resolve_subsystem_kernel("[net/]", false).is_err());
+        assert!(resolve_subsystem_kernel("[net/lo", false).is_err());
+        assert!(resolve_subsystem_kernel("[net", false).is_err());
+        assert!(resolve_subsystem_kernel("net/lo", false).is_err());
 
         assert_eq!(
-            resolve_subsystem_kernel(&"[net/lo]".to_string(), false).unwrap(),
+            resolve_subsystem_kernel("[net/lo]", false).unwrap(),
             "/sys/devices/virtual/net/lo"
         );
         assert_eq!(
-            resolve_subsystem_kernel(&"[net/lo]/".to_string(), false).unwrap(),
+            resolve_subsystem_kernel("[net/lo]/", false).unwrap(),
             "/sys/devices/virtual/net/lo"
         );
         assert_eq!(
-            resolve_subsystem_kernel(&"[net/lo]hoge".to_string(), false).unwrap(),
+            resolve_subsystem_kernel("[net/lo]hoge", false).unwrap(),
             "/sys/devices/virtual/net/lo/hoge"
         );
         assert_eq!(
-            resolve_subsystem_kernel(&"[net/lo]/hoge".to_string(), false).unwrap(),
+            resolve_subsystem_kernel("[net/lo]/hoge", false).unwrap(),
             "/sys/devices/virtual/net/lo/hoge"
         );
 
-        assert!(resolve_subsystem_kernel(&"[net/lo]".to_string(), true).is_err());
-        assert!(resolve_subsystem_kernel(&"[net/lo]/".to_string(), true).is_err());
+        assert!(resolve_subsystem_kernel("[net/lo]", true).is_err());
+        assert!(resolve_subsystem_kernel("[net/lo]/", true).is_err());
+        assert_eq!(resolve_subsystem_kernel("[net/lo]hoge", true).unwrap(), "");
+        assert_eq!(resolve_subsystem_kernel("[net/lo]/hoge", true).unwrap(), "");
         assert_eq!(
-            resolve_subsystem_kernel(&"[net/lo]hoge".to_string(), true).unwrap(),
-            ""
-        );
-        assert_eq!(
-            resolve_subsystem_kernel(&"[net/lo]/hoge".to_string(), true).unwrap(),
-            ""
-        );
-        assert_eq!(
-            resolve_subsystem_kernel(&"[net/lo]address".to_string(), true).unwrap(),
+            resolve_subsystem_kernel("[net/lo]address", true).unwrap(),
             "00:00:00:00:00:00"
         );
         assert_eq!(
-            resolve_subsystem_kernel(&"[net/lo]/address".to_string(), true).unwrap(),
+            resolve_subsystem_kernel("[net/lo]/address", true).unwrap(),
             "00:00:00:00:00:00"
         );
     }
@@ -685,11 +675,11 @@ mod tests {
     #[test]
     #[ignore]
     fn test_sysattr_subdir_subst() {
-        let device = Device::from_path("/dev/sda".to_string()).unwrap();
+        let device = Device::from_path("/dev/sda").unwrap();
         let syspath = device.get_syspath().unwrap();
         println!(
             "{}",
-            sysattr_subdir_subst(&(syspath.to_string() + "/sda1/*/runtime_status")).unwrap()
+            sysattr_subdir_subst(&(syspath + "/sda1/*/runtime_status")).unwrap()
         );
     }
 
@@ -700,45 +690,34 @@ mod tests {
 
         println!(
             "{}",
-            spawn(&"echo hello world".to_string(), Duration::from_secs(1),)
+            spawn("echo hello world", Duration::from_secs(1),)
                 .unwrap()
                 .0
         );
 
         println!(
             "{}",
-            spawn(&"/bin/echo hello world".to_string(), Duration::from_secs(1),)
+            spawn("/bin/echo hello world", Duration::from_secs(1),)
                 .unwrap()
                 .0
         );
 
-        println!(
-            "{}",
-            spawn(&"sleep 2".to_string(), Duration::from_secs(1),).unwrap_err()
-        );
+        println!("{}", spawn("sleep 2", Duration::from_secs(1),).unwrap_err());
+
+        println!("{}", spawn("sleep 1", Duration::from_secs(10),).unwrap().0);
 
         println!(
             "{}",
-            spawn(&"sleep 1".to_string(), Duration::from_secs(10),)
+            spawn("sh -c '/bin/echo test shell'", Duration::from_secs(1),)
                 .unwrap()
                 .0
-        );
-
-        println!(
-            "{}",
-            spawn(
-                &"sh -c '/bin/echo test shell'".to_string(),
-                Duration::from_secs(1),
-            )
-            .unwrap()
-            .0
         );
 
         // scsi_id is provided by udev and is located in /lib/udev/
         println!(
             "{}",
             spawn(
-                &"scsi_id --export --whitelisted -d /dev/sda".to_string(),
+                "scsi_id --export --whitelisted -d /dev/sda",
                 Duration::from_secs(1),
             )
             .unwrap()

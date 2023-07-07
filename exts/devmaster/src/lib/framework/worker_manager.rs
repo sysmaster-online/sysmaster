@@ -25,6 +25,7 @@ use device::{
 };
 use event::{EventState, EventType, Events, Source};
 use snafu::ResultExt;
+use std::cell::RefCell;
 use std::fmt::{self, Display};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -32,11 +33,8 @@ use std::ops::DerefMut;
 use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::rc::{Rc, Weak};
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::thread::JoinHandle;
-use std::{
-    cell::RefCell,
-    sync::{Arc, Mutex},
-};
 use std::{collections::HashMap, sync::RwLock};
 
 use super::devmaster::Devmaster;
@@ -139,22 +137,26 @@ impl Worker {
 
             match msg {
                 WorkerMessage::Job(dev_nulstr) => {
-                    // double cloned, may be optimized in future
-                    // let device = device.as_ref().lock().unwrap().clone();
+                    // deserialize the device object from job message
                     let device = Device::from_nulstr(&dev_nulstr).unwrap();
 
-                    log::info!("Worker {id}: received device {}", device.devpath);
+                    log::info!(
+                        "Worker {id}: received device '{}'",
+                        device
+                            .get_devpath()
+                            .context(DeviceSnafu)
+                            .log_error("worker received a device without devpath")
+                            .unwrap_or_default()
+                    );
 
                     let mut execute_mgr = rules::rule_execute::ExecuteManager::new(rules.clone());
 
-                    let device = Arc::new(Mutex::new(device));
+                    let device = Rc::new(RefCell::new(device));
                     let _ = execute_mgr.process_device(device.clone());
 
                     log::info!("Worker {id}: finished job");
 
-                    broadcaster
-                        .send_device(&mut device.as_ref().lock().unwrap(), None)
-                        .unwrap();
+                    broadcaster.send_device(&device.borrow(), None).unwrap();
 
                     let mut tcp_stream =
                         TcpStream::connect(tcp_address.as_str()).unwrap_or_else(|error| {
@@ -347,13 +349,13 @@ impl WorkerManager {
                 log::debug!("Worker Manager: find idle worker {}", worker.id);
                 self.set_worker_state(*id, WorkerState::Running);
 
-                let (dev_nulstr, len) = device_job
+                let (dev_nulstr, _len) = device_job
                     .device
                     .get_properties_nulstr()
                     .context(DeviceSnafu)
                     .log_error("failed to get properties nulstr")?;
 
-                worker.worker_send_message(WorkerMessage::Job(dev_nulstr.clone()));
+                worker.worker_send_message(WorkerMessage::Job(dev_nulstr));
                 return Ok(worker.clone());
             }
         }
@@ -364,13 +366,13 @@ impl WorkerManager {
                 let worker = workers.get(&id).unwrap();
                 self.set_worker_state(id, WorkerState::Running);
 
-                let (dev_nulstr, len) = device_job
+                let (dev_nulstr, _len) = device_job
                     .device
                     .get_properties_nulstr()
                     .context(DeviceSnafu)
                     .log_error("failed to get properties nulstr")?;
 
-                worker.worker_send_message(WorkerMessage::Job(dev_nulstr.clone()));
+                worker.worker_send_message(WorkerMessage::Job(dev_nulstr));
 
                 return Ok(worker.clone());
             }

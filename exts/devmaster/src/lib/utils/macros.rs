@@ -138,29 +138,13 @@ macro_rules! log_dev {
     };
 }
 
-/// lock the device arc point and log message
-#[macro_export]
-macro_rules! log_dev_lock {
-    ($level:ident, $dev:expr, $msg:expr) => {
-        log::$level!(
-            "{}: {}",
-            $dev.as_ref()
-                .lock()
-                .unwrap()
-                .get_sysname()
-                .unwrap_or_default(),
-            $msg
-        )
-    };
-}
-
 /// log message about device
 #[macro_export]
-macro_rules! log_dev_lock_option {
+macro_rules! log_dev_option {
     ($level:ident, $dev:expr, $msg:expr) => {
         match $dev {
-            Some(ref d) => {
-                $crate::log_dev_lock!($level, d, $msg);
+            Some(d) => {
+                $crate::log_dev!($level, d.borrow(), $msg);
             }
             None => {
                 log::$level!("{}", $msg);

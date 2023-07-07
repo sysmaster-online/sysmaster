@@ -12,13 +12,14 @@
 
 //! uevent_monitor
 //!
+use crate::error::*;
+use crate::framework::job_queue::JobQueue;
 use device::device_monitor::{DeviceMonitor, MonitorNetlinkGroup};
 use event::{EventType, Events, Source};
 use nix::errno::Errno;
+use snafu::ResultExt;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
-
-use crate::framework::job_queue::JobQueue;
 
 /// uevent monitor
 #[derive(Debug)]
@@ -88,7 +89,14 @@ impl Source for UeventMonitor {
             },
         };
 
-        log::debug!("Monitor: received device {}", device.devpath);
+        log::debug!(
+            "Monitor: received device {}",
+            device
+                .get_devpath()
+                .context(DeviceSnafu)
+                .log_error("uevent has no devpath")
+                .unwrap_or_default()
+        );
 
         self.job_queue.job_queue_insert(device);
         self.job_queue.job_queue_start();

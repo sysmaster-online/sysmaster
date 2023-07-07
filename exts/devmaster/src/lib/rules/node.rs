@@ -32,7 +32,7 @@
 //! we will use the device with the highest priority. When there is no linkage under the 'link priority'
 //! directory, the directory will be removed.
 
-use crate::{error::*, log_dev_lock, log_dev_lock_option};
+use crate::{error::*, log_dev, log_dev_option};
 use basic::fs_util::{fchmod_and_chown, futimens_opath, symlink};
 use basic::path_util::path_simplify;
 use basic::{fd_util::opendirat, fs_util::remove_dir_until};
@@ -45,14 +45,15 @@ use nix::sys::stat::{self, fstat, lstat, major, minor, Mode};
 use nix::unistd::unlink;
 use nix::unistd::{symlinkat, unlinkat, Gid, Uid, UnlinkatFlags};
 use snafu::ResultExt;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, File};
 use std::os::unix::prelude::{AsRawFd, FromRawFd, RawFd};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 pub(crate) fn node_apply_permissions(
-    dev: Arc<Mutex<Device>>,
+    dev: Rc<RefCell<Device>>,
     apply_mac: bool,
     mode: Option<mode_t>,
     uid: Option<Uid>,
@@ -60,13 +61,12 @@ pub(crate) fn node_apply_permissions(
     seclabel_list: &HashMap<String, String>,
 ) -> Result<()> {
     let devnode = dev
-        .lock()
-        .unwrap()
+        .borrow()
         .get_devname()
         .context(DeviceSnafu)
         .log_error("failed to apply node permissions")?;
 
-    let file = match dev.lock().unwrap().open(OFlag::O_PATH | OFlag::O_CLOEXEC) {
+    let file = match dev.borrow().open(OFlag::O_PATH | OFlag::O_CLOEXEC) {
         Ok(r) => r,
         Err(e) => {
             if e.is_absent() {
@@ -135,7 +135,7 @@ pub(crate) fn static_node_apply_permissions(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_permission_impl(
-    dev: Option<Arc<Mutex<Device>>>,
+    dev: Option<Rc<RefCell<Device>>>,
     file: File,
     devnode: &str,
     apply_mac: bool,
@@ -146,7 +146,7 @@ pub(crate) fn apply_permission_impl(
 ) -> Result<()> {
     let stat = fstat(file.as_raw_fd())
         .context(NixSnafu)
-        .log_dev_lock_option_error(dev.clone(), "fstat failed")?;
+        .log_error("fstat failed")?;
 
     /* if group is set, but mode is not set, "upgrade" group mode */
     let mode = if mode.is_none() && gid.is_some() && gid.as_ref().unwrap().as_raw() > 0 {
@@ -161,9 +161,9 @@ pub(crate) fn apply_permission_impl(
 
     if apply_mode || apply_uid || apply_gid || apply_mac {
         if apply_mode || apply_uid || apply_gid {
-            log_dev_lock_option!(
+            log_dev_option!(
                 debug,
-                dev,
+                dev.clone(),
                 format!(
                     "setting permission for '{}', uid='{}', gid='{}', mode='{:o}'",
                     devnode,
@@ -179,10 +179,10 @@ pub(crate) fn apply_permission_impl(
 
             fchmod_and_chown(file.as_raw_fd(), devnode, mode, uid, gid)
                 .context(BasicSnafu)
-                .log_dev_lock_option_error(dev.clone(), "chmod and chown failed")?;
+                .log_dev_error_option(dev.clone(), "chmod and chown failed")?;
         }
     } else {
-        log_dev_lock_option!(debug, dev, "preserve devnode permission");
+        log_dev_option!(debug, dev.clone(), "preserve devnode permission");
     }
 
     /*
@@ -190,80 +190,77 @@ pub(crate) fn apply_permission_impl(
      */
 
     if let Err(e) = futimens_opath(file.as_raw_fd(), None).context(BasicSnafu) {
-        log_dev_lock_option!(debug, dev, format!("failed to update timestamp: {}", e));
+        log_dev_option!(debug, dev, format!("failed to update timestamp: {}", e));
     }
 
     Ok(())
 }
 
-pub(crate) fn update_node(dev_new: Arc<Mutex<Device>>, dev_old: Arc<Mutex<Device>>) -> Result<()> {
-    let old_links = dev_old.as_ref().lock().unwrap().devlinks.clone();
-
-    for devlink in old_links.iter() {
-        if dev_new.as_ref().lock().unwrap().has_devlink(devlink) {
+pub(crate) fn update_node(
+    dev_new: Rc<RefCell<Device>>,
+    dev_old: Rc<RefCell<Device>>,
+) -> Result<()> {
+    for devlink in &dev_old.borrow().devlink_iter() {
+        if dev_new.borrow().has_devlink(devlink) {
             continue;
         }
 
-        log_dev_lock!(
+        log_dev!(
             debug,
-            dev_new,
+            dev_new.borrow(),
             format!("removing old devlink '{}'", devlink)
         );
 
-        let _ = update_symlink(dev_new.clone(), devlink, false).log_dev_lock_error(
-            dev_new.clone(),
+        let _ = update_symlink(dev_new.clone(), devlink, false).log_dev_error(
+            &dev_new.borrow(),
             &format!("failed to remove old symlink '{}'", devlink),
         );
     }
 
-    let new_links = dev_new.as_ref().lock().unwrap().devlinks.clone();
-
-    for devlink in new_links.iter() {
-        log_dev_lock!(
+    for devlink in &dev_new.borrow().devlink_iter() {
+        log_dev!(
             debug,
-            dev_new,
+            dev_new.borrow(),
             format!("updating new devlink '{}'", devlink)
         );
 
-        let _ = update_symlink(dev_new.clone(), devlink, true).log_dev_lock_error(
-            dev_new.clone(),
+        let _ = update_symlink(dev_new.clone(), devlink, true).log_dev_error(
+            &dev_new.borrow(),
             &format!("failed to add new symlink '{}'", devlink),
         );
     }
 
     /* create '/dev/{block, char}/$major:$minor' symlink */
     let target = device_get_symlink_by_devnum(dev_new.clone())
-        .log_dev_lock_error(dev_new.clone(), "failed to get devnum symlink")?;
+        .log_dev_error(&dev_new.borrow(), "failed to get devnum symlink")?;
 
     if let Err(e) = node_symlink(dev_new.clone(), "", &target) {
-        log_dev_lock!(debug, dev_new, e);
+        log_dev!(debug, dev_new.borrow(), e);
     }
 
     Ok(())
 }
 
-pub(crate) fn cleanup_node(dev: Arc<Mutex<Device>>) -> Result<()> {
-    let _ = dev.lock().unwrap().read_db();
-    let links = dev.lock().unwrap().devlinks.clone();
-    for link in links {
+pub(crate) fn cleanup_node(dev: Rc<RefCell<Device>>) -> Result<()> {
+    for link in &dev.borrow().devlink_iter() {
         if let Err(e) = update_symlink(dev.clone(), link.as_str(), false) {
-            log_dev_lock!(
+            log_dev!(
                 error,
-                dev.clone(),
+                dev.borrow(),
                 format!("failed to remove symlink '{}': {}", link, e)
             );
         }
     }
 
     let filename = device_get_symlink_by_devnum(dev.clone())
-        .log_dev_lock_error(dev.clone(), "failed to get devnum symlink")?;
+        .log_dev_error(&dev.borrow(), "failed to get devnum symlink")?;
 
     match unlink(filename.as_str()) {
-        Ok(_) => log_dev_lock!(debug, dev, format!("unlinked '{}'", filename)),
+        Ok(_) => log_dev!(debug, dev.borrow(), format!("unlinked '{}'", filename)),
         Err(e) => {
-            log_dev_lock!(
+            log_dev!(
                 error,
-                dev,
+                dev.borrow(),
                 format!("failed to unlink '{}': {}", filename, e)
             );
         }
@@ -274,7 +271,7 @@ pub(crate) fn cleanup_node(dev: Arc<Mutex<Device>>) -> Result<()> {
 
 /// if 'add' is true, add or update the target device symlink under '/run/devmaster/links/<escaped symlink>',
 /// otherwise delete the old symlink.
-pub(crate) fn update_symlink(dev: Arc<Mutex<Device>>, symlink: &str, add: bool) -> Result<()> {
+pub(crate) fn update_symlink(dev: Rc<RefCell<Device>>, symlink: &str, add: bool) -> Result<()> {
     /*
      * Create link priority directory if it does not exist.
      * The directory is locked until finishing updating device symlink.
@@ -282,9 +279,9 @@ pub(crate) fn update_symlink(dev: Arc<Mutex<Device>>, symlink: &str, add: bool) 
     let (dir, lock_file) = open_prior_dir(symlink)?;
 
     if let Err(e) = ExclusiveFlock::wait_lock(&lock_file) {
-        log_dev_lock!(
+        log_dev!(
             error,
-            dev,
+            dev.borrow(),
             format!("failed to lock priority directory for '{}': {}", symlink, e)
         );
     } else {
@@ -310,13 +307,25 @@ pub(crate) fn update_symlink(dev: Arc<Mutex<Device>>, symlink: &str, add: bool) 
         };
     }
 
-    log_dev_lock!(debug, dev, format!("removing symlink '{}'", symlink));
+    log_dev!(
+        debug,
+        dev.borrow(),
+        format!("removing symlink '{}'", symlink)
+    );
 
     match unlink(symlink).context(NixSnafu) {
-        Ok(_) => log_dev_lock!(debug, dev, format!("unlinked symlink '{}'", symlink)),
+        Ok(_) => log_dev!(
+            debug,
+            dev.borrow(),
+            format!("unlinked symlink '{}'", symlink)
+        ),
         Err(e) => {
             if e.get_errno() != nix::Error::ENOENT {
-                log_dev_lock!(error, dev, format!("failed to unlink '{}': {}", symlink, e));
+                log_dev!(
+                    error,
+                    dev.borrow(),
+                    format!("failed to unlink '{}': {}", symlink, e)
+                );
             }
         }
     }
@@ -392,27 +401,21 @@ pub(crate) fn escape_prior_dir(symlink: &str) -> String {
 }
 
 /// return true if the link priority directory is updated
-pub(crate) fn update_prior_dir(dev: Arc<Mutex<Device>>, dirfd: RawFd, add: bool) -> Result<bool> {
+pub(crate) fn update_prior_dir(dev: Rc<RefCell<Device>>, dirfd: RawFd, add: bool) -> Result<bool> {
     let id = dev
-        .as_ref()
-        .lock()
-        .unwrap()
+        .borrow()
         .get_device_id()
         .context(DeviceSnafu)
         .log_error("failed to get device id")?;
 
     if add {
         let devname = dev
-            .as_ref()
-            .lock()
-            .unwrap()
+            .borrow()
             .get_devname()
             .context(DeviceSnafu)
             .log_error("failed to get devname")?;
         let priority = dev
-            .as_ref()
-            .lock()
-            .unwrap()
+            .borrow()
             .get_devlink_priority()
             .context(DeviceSnafu)
             .log_error("failed to get devlink priority")?;
@@ -424,21 +427,29 @@ pub(crate) fn update_prior_dir(dev: Arc<Mutex<Device>>, dirfd: RawFd, add: bool)
             }
         }
         match unlinkat(Some(dirfd), id.as_str(), UnlinkatFlags::NoRemoveDir) {
-            Ok(_) => log_dev_lock!(debug, dev, format!("unlinked '{}'", id)),
-            Err(e) => log_dev_lock!(error, dev, format!("failed to unlink '{}': {}", id, e)),
+            Ok(_) => log_dev!(debug, dev.borrow(), format!("unlinked '{}'", id)),
+            Err(e) => log_dev!(
+                error,
+                dev.borrow(),
+                format!("failed to unlink '{}': {}", id, e)
+            ),
         }
         symlinkat(dangle_link.as_str(), Some(dirfd), id.as_str())
             .context(NixSnafu)
             .log_error("symlinkat failed")?;
     } else {
         match unlinkat(Some(dirfd), id.as_str(), UnlinkatFlags::NoRemoveDir).context(NixSnafu) {
-            Ok(_) => log_dev_lock!(debug, dev, format!("unlinked '{}'", id)),
+            Ok(_) => log_dev!(debug, dev.borrow(), format!("unlinked '{}'", id)),
             Err(e) => {
                 if e.get_errno() == nix::Error::ENOENT {
                     /* unchange */
                     return Ok(false);
                 }
-                log_dev_lock!(error, dev, format!("failed to unlink '{}': {}", id, e));
+                log_dev!(
+                    error,
+                    dev.borrow(),
+                    format!("failed to unlink '{}': {}", id, e)
+                );
                 return Err(e);
             }
         }
@@ -479,20 +490,10 @@ fn prior_dir_read_one(dirfd: RawFd, name: &str) -> Result<(i32, String)> {
     Ok((priority, tokens[1].to_string()))
 }
 
-pub(crate) fn device_get_symlink_by_devnum(dev: Arc<Mutex<Device>>) -> Result<String> {
-    let subsystem = dev
-        .as_ref()
-        .lock()
-        .unwrap()
-        .get_subsystem()
-        .context(DeviceSnafu)?;
+pub(crate) fn device_get_symlink_by_devnum(dev: Rc<RefCell<Device>>) -> Result<String> {
+    let subsystem = dev.borrow().get_subsystem().context(DeviceSnafu)?;
 
-    let devnum = dev
-        .as_ref()
-        .lock()
-        .unwrap()
-        .get_devnum()
-        .context(DeviceSnafu)?;
+    let devnum = dev.borrow().get_devnum().context(DeviceSnafu)?;
 
     Ok(match subsystem.as_str() {
         "block" => {
@@ -504,11 +505,9 @@ pub(crate) fn device_get_symlink_by_devnum(dev: Arc<Mutex<Device>>) -> Result<St
     })
 }
 
-pub(crate) fn node_symlink(dev: Arc<Mutex<Device>>, devnode: &str, target: &str) -> Result<()> {
+pub(crate) fn node_symlink(dev: Rc<RefCell<Device>>, devnode: &str, target: &str) -> Result<()> {
     let devnode = if devnode.is_empty() {
-        dev.as_ref()
-            .lock()
-            .unwrap()
+        dev.borrow()
             .get_devname()
             .context(DeviceSnafu)
             .log_error("failed to get devname")?
@@ -519,9 +518,9 @@ pub(crate) fn node_symlink(dev: Arc<Mutex<Device>>, devnode: &str, target: &str)
     match lstat(target) {
         Ok(stat) => {
             if stat.st_mode & S_IFMT != S_IFLNK {
-                log_dev_lock!(
+                log_dev!(
                     error,
-                    dev,
+                    dev.borrow(),
                     format!(
                         "conflicting inode '{}' found, symlink to '{}' will not be created",
                         target, devnode
@@ -535,7 +534,7 @@ pub(crate) fn node_symlink(dev: Arc<Mutex<Device>>, devnode: &str, target: &str)
         }
         Err(e) => {
             if e != nix::Error::ENOENT {
-                log_dev_lock!(error, dev, format!("failed to lstat '{}'", target));
+                log_dev!(error, dev.borrow(), format!("failed to lstat '{}'", target));
                 return Err(Error::Nix { source: e });
             }
         }
@@ -546,26 +545,26 @@ pub(crate) fn node_symlink(dev: Arc<Mutex<Device>>, devnode: &str, target: &str)
             .context(IoSnafu {
                 filename: target.to_string(),
             })
-            .log_dev_lock_error(dev.clone(), "failed to create directory all")?;
+            .log_dev_error(&dev.borrow(), "failed to create directory all")?;
     }
 
     symlink(&devnode, target, true)
         .context(BasicSnafu)
-        .log_dev_lock_error(
-            dev.clone(),
+        .log_dev_error(
+            &dev.borrow(),
             &format!("failed to create symlink '{}'->'{}'", devnode, target),
         )?;
 
-    log_dev_lock!(
+    log_dev!(
         debug,
-        dev,
+        dev.borrow(),
         format!("successfully created symlink '{}' to '{}'", target, devnode)
     );
     Ok(())
 }
 
 pub(crate) fn find_prioritized_devnode(
-    dev: Arc<Mutex<Device>>,
+    dev: Rc<RefCell<Device>>,
     dirfd: i32,
 ) -> Result<Option<String>> {
     let mut dir = opendirat(dirfd, OFlag::O_NOFOLLOW)
@@ -590,7 +589,7 @@ pub(crate) fn find_prioritized_devnode(
                 }
                 Err(e) => {
                     if e.get_errno() != nix::Error::ENODEV {
-                        log_dev_lock!(error, dev.clone(), format!("{}", e));
+                        log_dev!(error, dev.borrow(), format!("{}", e));
                     }
                 }
             }
@@ -618,13 +617,13 @@ mod test {
                     .unwrap()
                     .to_string();
 
-                let mut dev_new = Device::from_path(dev_path.clone()).unwrap();
-                let dev_old = Device::from_path(dev_path).unwrap();
+                let dev_new = Device::from_path(&dev_path).unwrap();
+                let dev_old = Device::from_path(&dev_path).unwrap();
 
-                dev_new.add_devlink("/dev/test/sss".to_string()).unwrap();
+                dev_new.add_devlink("/dev/test/sss").unwrap();
 
                 let devnum = dev_new.get_devnum().unwrap();
-                let sysname = dev_new.get_sysname().unwrap().to_string();
+                let sysname = dev_new.get_sysname().unwrap();
                 let symlink = format!("/dev/block/{}:{}", major(devnum), minor(devnum));
 
                 let link_path = Path::new(&symlink);
@@ -633,8 +632,8 @@ mod test {
                     unlink(link_path).unwrap();
                 }
 
-                let dev_new_arc = Arc::new(Mutex::new(dev_new));
-                let dev_old_arc = Arc::new(Mutex::new(dev_old));
+                let dev_new_arc = Rc::new(RefCell::new(dev_new));
+                let dev_old_arc = Rc::new(RefCell::new(dev_old));
 
                 update_node(dev_new_arc.clone(), dev_old_arc.clone()).unwrap();
 
@@ -671,29 +670,25 @@ mod test {
     fn test_update_prior_dir() {
         match LoopDev::new("/tmp/test_update_prior_dir", 1024 * 1024 * 10) {
             Ok(lodev) => {
-                let mut dev = Device::from_path(
-                    lodev
-                        .get_device_path()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
-                )
-                .unwrap();
+                let dev =
+                    Device::from_path(lodev.get_device_path().unwrap().to_str().unwrap()).unwrap();
 
-                dev.add_devlink("test/update_prior_dir".to_string())
-                    .unwrap();
-                let arc = Arc::new(Mutex::new(dev));
+                dev.add_devlink("test/update_prior_dir").unwrap();
+                let dev_rc = Rc::new(RefCell::new(dev));
 
                 {
                     match open_prior_dir("/dev/test/update_prior_dir") {
                         Ok((dir, _)) => {
                             /* create priority link in first time */
-                            assert!(update_prior_dir(arc.clone(), dir.as_raw_fd(), true).unwrap());
+                            assert!(
+                                update_prior_dir(dev_rc.clone(), dir.as_raw_fd(), true).unwrap()
+                            );
                             /* priority link already exists, didn't update anything */
-                            assert!(!update_prior_dir(arc.clone(), dir.as_raw_fd(), true).unwrap());
+                            assert!(
+                                !update_prior_dir(dev_rc.clone(), dir.as_raw_fd(), true).unwrap()
+                            );
                             /* remove priority link */
-                            assert!(update_prior_dir(arc, dir.as_raw_fd(), false).unwrap());
+                            assert!(update_prior_dir(dev_rc, dir.as_raw_fd(), false).unwrap());
                         }
                         Err(e) => {
                             assert!(e.get_errno() == nix::Error::EACCES);

@@ -12,8 +12,12 @@
 
 //! control manager
 //!
+use crate::error::*;
+use crate::framework::job_queue::JobQueue;
+use crate::framework::worker_manager::WorkerManager;
 use device::device::Device;
 use event::Source;
+use snafu::ResultExt;
 use std::time::SystemTime;
 use std::{
     cell::RefCell,
@@ -22,9 +26,6 @@ use std::{
     os::unix::prelude::{AsRawFd, RawFd},
     rc::Rc,
 };
-
-use crate::framework::job_queue::JobQueue;
-use crate::framework::worker_manager::WorkerManager;
 
 /// listening address for control manager
 pub const CONTROL_MANAGER_LISTEN_ADDR: &str = "0.0.0.0:1224";
@@ -74,9 +75,15 @@ impl ControlManager {
                     .as_secs()
                     % 1000;
 
-                let mut device = Device::new();
-                device.devname = devname.to_string();
-                device.seqnum = seqnum;
+                let device = Device::new();
+                let _ = device
+                    .set_devname(devname)
+                    .context(DeviceSnafu)
+                    .log_error("failed to set devname");
+                let _ = device
+                    .set_seqnum(seqnum)
+                    .context(DeviceSnafu)
+                    .log_error("failed to set devname");
 
                 self.job_queue.job_queue_insert(device);
                 self.job_queue.job_queue_start();

@@ -35,7 +35,7 @@ use std::cell::RefCell;
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::prelude::AsRawFd;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 /// blkid builtin command
 pub struct Blkid;
@@ -92,7 +92,7 @@ macro_rules! op_command_err {
 impl Blkid {
     fn print_property(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         name: &str,
         value: &str,
         test: bool,
@@ -372,25 +372,22 @@ impl Builtin for Blkid {
     /// builtin command
     fn cmd(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         _ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         argv: Vec<String>,
         test: bool,
     ) -> Result<bool> {
         let subsystem = device
-            .lock()
-            .map_err(op_command_err!("device lock error"))?
+            .borrow()
             .get_subsystem()
             .map_err(op_command_err!("device get_subsystem error"))?;
 
         if subsystem != *"block" {
             let syspath = device
-                .lock()
-                .map_err(op_command_err!("device lock error"))?
+                .borrow()
                 .get_syspath()
-                .map_err(op_command_err!("device get_syspath error"))?
-                .to_string();
+                .map_err(op_command_err!("device get_syspath error"))?;
             log::warn!("blkid can only probe block devices, ignoring {syspath}");
             return Ok(false);
         }
@@ -429,8 +426,7 @@ impl Builtin for Blkid {
         }
 
         let file = device
-            .lock()
-            .map_err(op_command_err!("device lock error"))?
+            .borrow()
             .open(OFlag::O_CLOEXEC | OFlag::O_RDONLY | OFlag::O_NONBLOCK)
             .map_err(op_command_err!("device open error"))?;
 
@@ -440,8 +436,7 @@ impl Builtin for Blkid {
         self.probe_superblocks(&mut probe)?;
 
         let root_partition = device
-            .lock()
-            .map_err(op_command_err!("device lock error"))?
+            .borrow()
             .get_property_value("ID_PART_GPT_AUTO_ROOT_UUID")
             .map_or(String::new(), |e| e);
 
@@ -522,7 +517,7 @@ mod test {
             let file_name = String::from(entry.file_name().to_str().unwrap());
             let dev_path = format!("/dev/{}", file_name);
             log::info!("{} device probe:", dev_path);
-            let device = Arc::new(Mutex::new(Device::from_devname(dev_path.clone()).unwrap()));
+            let device = Rc::new(RefCell::new(Device::from_devname(&dev_path).unwrap()));
             builtin
                 .cmd(device, &mut rtnl, 0, vec!["blkid".to_string()], true)
                 .unwrap();

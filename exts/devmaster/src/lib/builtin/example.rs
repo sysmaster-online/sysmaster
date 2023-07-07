@@ -19,7 +19,7 @@ use crate::error::*;
 use device::Device;
 use snafu::ResultExt;
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 /// example for implementing Builtin trait
 pub struct Example;
@@ -28,7 +28,7 @@ impl Builtin for Example {
     /// builtin command
     fn cmd(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         _argv: Vec<String>,
@@ -36,12 +36,7 @@ impl Builtin for Example {
     ) -> Result<bool> {
         println!("example builtin run");
 
-        let syspath = device
-            .lock()
-            .unwrap()
-            .get_syspath()
-            .context(DeviceSnafu)?
-            .to_string();
+        let syspath = device.borrow().get_syspath().context(DeviceSnafu)?;
 
         ret_rtnl.replace(Some(Netlink {}));
 
@@ -91,7 +86,7 @@ mod tests {
     fn test_builtin_example() {
         let mut enumerator = DeviceEnumerator::new();
 
-        for device in enumerator.iter_mut() {
+        for device in enumerator.iter() {
             let mut rtnl = RefCell::<Option<Netlink>>::from(None);
 
             let builtin = Example {};
@@ -100,8 +95,7 @@ mod tests {
                 .unwrap();
 
             device
-                .lock()
-                .unwrap()
+                .borrow()
                 .get_property_value("ID_EXAMPLE_SYSPATH")
                 .unwrap();
             rtnl.take().unwrap();

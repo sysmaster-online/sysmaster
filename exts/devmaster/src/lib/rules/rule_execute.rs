@@ -22,7 +22,7 @@ use super::{
 use crate::{
     builtin::{BuiltinCommand, BuiltinManager, Netlink},
     error::*,
-    log_dev_lock, log_rule_line, log_rule_token,
+    log_dev, log_rule_line, log_rule_token,
     rules::FORMAT_SUBST_TABLE,
     utils::{
         cleanup_db, device_update_tag, get_property_from_string, initialize_device_usec,
@@ -47,7 +47,9 @@ use std::{
     fs::OpenOptions,
     io::Read,
     os::unix::fs::PermissionsExt,
-    sync::{Arc, Mutex, RwLock},
+    rc::Rc,
+    sync::Arc,
+    sync::RwLock,
     time::{Duration, SystemTime},
 };
 
@@ -59,9 +61,9 @@ use nix::unistd::{Gid, Uid};
 /// the process unit on device uevent
 #[allow(missing_docs, dead_code)]
 struct ExecuteUnit {
-    device: Arc<Mutex<Device>>,
-    parent: Option<Arc<Mutex<Device>>>,
-    device_db_clone: Arc<Mutex<Device>>,
+    device: Rc<RefCell<Device>>,
+    parent: Option<Rc<RefCell<Device>>>,
+    device_db_clone: Rc<RefCell<Device>>,
     name: String,
     program_result: String,
     mode: Option<mode_t>,
@@ -91,14 +93,14 @@ struct ExecuteUnit {
 }
 
 impl ExecuteUnit {
-    pub fn new(device: Arc<Mutex<Device>>) -> ExecuteUnit {
+    pub fn new(device: Rc<RefCell<Device>>) -> ExecuteUnit {
         // let mut unit = ProcessUnit::default();
         // unit.device = device;
         // unit
         ExecuteUnit {
             device,
             parent: None,
-            device_db_clone: Arc::new(Mutex::new(Device::new())),
+            device_db_clone: Rc::new(RefCell::new(Device::new())),
             name: String::default(),
             program_result: String::default(),
             mode: None,
@@ -157,10 +159,9 @@ impl ExecuteUnit {
         subst_type: FormatSubstitutionType,
         attribute: Option<String>,
     ) -> Result<String> {
-        let mut device = self.device.lock().unwrap();
         match subst_type {
             FormatSubstitutionType::Devnode => subst_format_map_err_ignore!(
-                device.get_devname(),
+                self.device.borrow().get_devname(),
                 "devnode",
                 Errno::ENOENT,
                 String::default()
@@ -177,7 +178,7 @@ impl ExecuteUnit {
                 // try to read attribute value form path '[<SUBSYSTEM>/[SYSNAME]]<ATTRIBUTE>'
                 let value = if let Ok(v) = resolve_subsystem_kernel(&attr, true) {
                     v
-                } else if let Ok(v) = device.get_sysattr_value(&attr) {
+                } else if let Ok(v) = self.device.borrow().get_sysattr_value(&attr) {
                     v
                 } else if self.parent.is_some() {
                     // try to get sysattr upwards
@@ -187,9 +188,7 @@ impl ExecuteUnit {
                         .parent
                         .clone()
                         .unwrap()
-                        .as_ref()
-                        .lock()
-                        .unwrap()
+                        .borrow()
                         .get_sysattr_value(&attr)
                     {
                         v
@@ -213,21 +212,20 @@ impl ExecuteUnit {
                 }
 
                 subst_format_map_err_ignore!(
-                    device.get_property_value(&attribute.unwrap()),
+                    self.device.borrow().get_property_value(&attribute.unwrap()),
                     "env",
                     Errno::ENOENT,
                     String::default()
                 )
             }
-            FormatSubstitutionType::Kernel => Ok(device
-                .get_sysname()
-                .unwrap_or_else(|_| {
+            FormatSubstitutionType::Kernel => {
+                Ok(self.device.borrow().get_sysname().unwrap_or_else(|_| {
                     log::debug!("formatter 'kernel' got empty value.");
-                    ""
-                })
-                .to_string()),
+                    "".to_string()
+                }))
+            }
             FormatSubstitutionType::KernelNumber => subst_format_map_err_ignore!(
-                device.get_sysnum(),
+                self.device.borrow().get_sysnum(),
                 "number",
                 Errno::ENOENT,
                 String::default()
@@ -238,19 +236,18 @@ impl ExecuteUnit {
                 }
 
                 subst_format_map_err_ignore!(
-                    self.parent.clone().unwrap().lock().unwrap().get_driver(),
+                    self.parent.as_ref().unwrap().borrow().get_driver(),
                     "driver",
                     Errno::ENOENT,
                     String::default()
                 )
             }
-            FormatSubstitutionType::Devpath => Ok(device
-                .get_devpath()
-                .unwrap_or_else(|_| {
+            FormatSubstitutionType::Devpath => {
+                Ok(self.device.borrow().get_devpath().unwrap_or_else(|_| {
                     log::debug!("formatter 'devpath' got empty value.");
-                    ""
-                })
-                .to_string()),
+                    "".to_string()
+                }))
+            }
             FormatSubstitutionType::Id => {
                 if self.parent.is_none() {
                     return Ok(String::default());
@@ -258,20 +255,18 @@ impl ExecuteUnit {
 
                 Ok(self
                     .parent
-                    .clone()
+                    .as_ref()
                     .unwrap()
-                    .lock()
-                    .unwrap()
+                    .borrow()
                     .get_sysname()
                     .unwrap_or_else(|_| {
                         log::debug!("formatter 'id' got empty value.");
-                        ""
-                    })
-                    .to_string())
+                        "".to_string()
+                    }))
             }
             FormatSubstitutionType::Major | FormatSubstitutionType::Minor => {
                 subst_format_map_err_ignore!(
-                    device.get_devnum().map(|n| {
+                    self.device.borrow().get_devnum().map(|n| {
                         match subst_type {
                             FormatSubstitutionType::Major => nix::sys::stat::major(n).to_string(),
                             _ => nix::sys::stat::minor(n).to_string(),
@@ -279,7 +274,7 @@ impl ExecuteUnit {
                     }),
                     "major|minor",
                     Errno::ENOENT,
-                    0.to_string()
+                    "0".to_string()
                 )
             }
             FormatSubstitutionType::Result => {
@@ -335,7 +330,7 @@ impl ExecuteUnit {
                 Ok(ret)
             }
             FormatSubstitutionType::Parent => {
-                let parent = match device.get_parent() {
+                let parent = match self.device.borrow().get_parent() {
                     Ok(p) => p,
                     Err(e) => {
                         if e.get_errno() == Errno::ENOENT {
@@ -348,28 +343,25 @@ impl ExecuteUnit {
                         });
                     }
                 };
-                let devname = parent.lock().unwrap().get_devname();
+                let devname = parent.borrow().get_devname();
                 subst_format_map_err_ignore!(devname, "parent", Errno::ENOENT, String::default())
                     .map(|v| v.trim_start_matches("/dev/").to_string())
             }
             FormatSubstitutionType::Name => {
                 if !self.name.is_empty() {
                     Ok(self.name.clone())
-                } else if let Ok(devname) = device.get_devname() {
+                } else if let Ok(devname) = self.device.borrow().get_devname() {
                     Ok(devname.trim_start_matches("/dev/").to_string())
                 } else {
-                    Ok(device
-                        .get_sysname()
-                        .unwrap_or_else(|_| {
-                            log::debug!("formatter 'name' got empty value.");
-                            ""
-                        })
-                        .to_string())
+                    Ok(self.device.borrow().get_sysname().unwrap_or_else(|_| {
+                        log::debug!("formatter 'name' got empty value.");
+                        "".to_string()
+                    }))
                 }
             }
             FormatSubstitutionType::Links => {
                 let mut ret = String::new();
-                for link in device.devlinks.iter() {
+                for link in &self.device.borrow().devlink_iter() {
                     ret += link.trim_start_matches("/dev/");
                     ret += " ";
                 }
@@ -475,16 +467,16 @@ impl ExecuteUnit {
     }
 
     pub(crate) fn update_devnode(&mut self) -> Result<()> {
-        if let Err(e) = self.device.as_ref().lock().unwrap().get_devnum() {
+        if let Err(e) = self.device.borrow().get_devnum() {
             if e.is_errno(Errno::ENOENT) {
                 return Ok(());
             }
-            log_dev_lock!(error, self.device, e);
+            log_dev!(error, self.device.borrow(), e);
             return Err(Error::Device { source: e });
         }
 
         if self.uid.is_none() {
-            match self.device.as_ref().lock().unwrap().get_devnode_uid() {
+            match self.device.borrow().get_devnode_uid() {
                 Ok(uid) => self.uid = Some(uid),
                 Err(e) => {
                     if !e.is_errno(Errno::ENOENT) {
@@ -495,7 +487,7 @@ impl ExecuteUnit {
         }
 
         if self.gid.is_none() {
-            match self.device.as_ref().lock().unwrap().get_devnode_gid() {
+            match self.device.borrow().get_devnode_gid() {
                 Ok(gid) => self.gid = Some(gid),
                 Err(e) => {
                     if !e.is_errno(Errno::ENOENT) {
@@ -506,7 +498,7 @@ impl ExecuteUnit {
         }
 
         if self.mode.is_none() {
-            match self.device.as_ref().lock().unwrap().get_devnode_mode() {
+            match self.device.borrow().get_devnode_mode() {
                 Ok(mode) => self.mode = Some(mode),
                 Err(e) => {
                     if !e.is_errno(Errno::ENOENT) {
@@ -518,9 +510,7 @@ impl ExecuteUnit {
 
         let apply_mac = self
             .device
-            .as_ref()
-            .lock()
-            .unwrap()
+            .borrow()
             .get_action()
             .map(|action| action == DeviceAction::Add)
             .unwrap_or(false);
@@ -574,10 +564,10 @@ impl ExecuteManager {
     }
 
     /// process a device object
-    pub fn process_device(&mut self, device: Arc<Mutex<Device>>) -> Result<()> {
+    pub fn process_device(&mut self, device: Rc<RefCell<Device>>) -> Result<()> {
         log::debug!(
             "{}",
-            device_trace!("Start processing device", device.as_ref().lock().unwrap())
+            device_trace!("Start processing device", device.borrow())
         );
 
         self.current_unit = Some(ExecuteUnit::new(device.clone()));
@@ -595,7 +585,7 @@ impl ExecuteManager {
 
         log::debug!(
             "{}",
-            device_trace!("Finish processing device", device.as_ref().lock().unwrap())
+            device_trace!("Finish processing device", device.borrow())
         );
 
         self.current_unit = None;
@@ -609,7 +599,12 @@ impl ExecuteManager {
         {
             let unit = self.current_unit.as_mut().unwrap();
 
-            let action = unit.device.as_ref().lock().unwrap().action;
+            let action = unit
+                .device
+                .borrow()
+                .get_action()
+                .context(DeviceSnafu)
+                .log_dev_error(&unit.device.borrow(), "not from uevent")?;
 
             if action == DeviceAction::Remove {
                 return self.execute_rules_on_remove();
@@ -618,25 +613,19 @@ impl ExecuteManager {
             // inotify watch end: todo
 
             // clone device with db
-            unit.device_db_clone = Arc::new(Mutex::new(
-                unit.device
-                    .as_ref()
-                    .lock()
-                    .unwrap()
-                    .clone_with_db()
-                    .map_err(|e| Error::RulesExecuteError {
+            unit.device_db_clone =
+                Rc::new(RefCell::new(unit.device.borrow().clone_with_db().map_err(
+                    |e| Error::RulesExecuteError {
                         msg: format!("failed to clone with db ({})", e),
                         errno: e.get_errno(),
-                    })?,
-            ));
+                    },
+                )?));
 
             // copy all tags to cloned device
-            for tag in unit.device.as_ref().lock().unwrap().all_tags.iter() {
+            for tag in &unit.device.borrow().tag_iter() {
                 unit.device_db_clone
-                    .as_ref()
-                    .lock()
-                    .unwrap()
-                    .add_tag(tag.clone(), false)
+                    .borrow()
+                    .add_tag(tag, false)
                     .map_err(|e| Error::RulesExecuteError {
                         msg: format!("failed to add tag ({})", e),
                         errno: e.get_errno(),
@@ -645,10 +634,8 @@ impl ExecuteManager {
 
             // add property to cloned device
             unit.device_db_clone
-                .as_ref()
-                .lock()
-                .unwrap()
-                .add_property("ID_RENAMING".to_string(), "".to_string())
+                .borrow()
+                .add_property("ID_RENAMING", "")
                 .map_err(|e| Error::RulesExecuteError {
                     msg: format!("failed to add tag ({})", e),
                     errno: e.get_errno(),
@@ -667,8 +654,8 @@ impl ExecuteManager {
             self.current_unit.as_ref().unwrap().device.clone(),
             self.current_unit.as_ref().unwrap().device_db_clone.clone(),
         )
-        .log_dev_lock_error(
-            self.current_unit.as_ref().unwrap().device.clone(),
+        .log_dev_error(
+            &self.current_unit.as_ref().unwrap().device.borrow(),
             "failed to initialize device timestamp",
         )?;
 
@@ -683,8 +670,7 @@ impl ExecuteManager {
             .as_ref()
             .unwrap()
             .device
-            .lock()
-            .unwrap()
+            .borrow()
             .update_db()
             .context(DeviceSnafu)
             .log_error("failed to update db")?;
@@ -693,8 +679,7 @@ impl ExecuteManager {
             .as_ref()
             .unwrap()
             .device
-            .lock()
-            .unwrap()
+            .borrow()
             .set_is_initialized();
 
         Ok(())
@@ -706,9 +691,7 @@ impl ExecuteManager {
             .as_ref()
             .unwrap()
             .device
-            .as_ref()
-            .lock()
-            .unwrap()
+            .borrow()
             .read_db_internal(true)
             .context(DeviceSnafu)
             .log_error("remove event failed")?;
@@ -732,9 +715,7 @@ impl ExecuteManager {
             .as_ref()
             .unwrap()
             .device
-            .as_ref()
-            .lock()
-            .unwrap()
+            .borrow()
             .get_devnum()
             .is_err()
         {
@@ -805,19 +786,14 @@ impl ExecuteManager {
         let mut mask = RuleLineType::HAS_GOTO | RuleLineType::UPDATE_SOMETHING;
 
         let device = self.current_unit.as_ref().unwrap().device.clone();
-        let action = device
-            .as_ref()
-            .lock()
-            .unwrap()
-            .get_action()
-            .context(DeviceSnafu)?;
+        let action = device.borrow().get_action().context(DeviceSnafu)?;
 
         if action != DeviceAction::Remove {
-            if device.as_ref().lock().unwrap().get_devnum().is_ok() {
+            if device.borrow().get_devnum().is_ok() {
                 mask |= RuleLineType::HAS_DEVLINK;
             }
 
-            if device.as_ref().lock().unwrap().get_ifindex().is_ok() {
+            if device.borrow().get_ifindex().is_ok() {
                 mask |= RuleLineType::HAS_NAME;
             }
         }
@@ -932,7 +908,7 @@ impl ExecuteManager {
     }
 
     /// apply rule token on device
-    pub(crate) fn apply_rule_token(&mut self, device: Arc<Mutex<Device>>) -> Result<bool> {
+    pub(crate) fn apply_rule_token(&mut self, device: Rc<RefCell<Device>>) -> Result<bool> {
         let token_type = self
             .current_rule_token
             .clone()
@@ -954,33 +930,22 @@ impl ExecuteManager {
 
         match token_type {
             MatchAction => {
-                let action = execute_err!(
-                    token,
-                    device.as_ref().lock().unwrap().borrow_mut().get_action()
-                )?;
+                let action = execute_err!(token, device.borrow().get_action())?;
 
                 Ok(token.pattern_match(&action.to_string()))
             }
             MatchDevpath => {
-                let devpath = execute_err!(
-                    token,
-                    device.as_ref().lock().unwrap().borrow_mut().get_devpath()
-                )?
-                .to_string();
+                let devpath = execute_err!(token, device.borrow().get_devpath())?;
 
                 Ok(token.pattern_match(&devpath))
             }
             MatchKernel | MatchParentsKernel => {
-                let sysname = execute_err!(
-                    token,
-                    device.as_ref().lock().unwrap().borrow_mut().get_sysname()
-                )?
-                .to_string();
+                let sysname = execute_err!(token, device.borrow().get_sysname())?;
 
                 Ok(token.pattern_match(&sysname))
             }
             MatchDevlink => {
-                for devlink in device.as_ref().lock().unwrap().borrow_mut().devlinks.iter() {
+                for devlink in &device.borrow().devlink_iter() {
                     if token.pattern_match(devlink) ^ (token.op == OperatorType::Nomatch) {
                         return Ok(token.op == OperatorType::Match);
                     }
@@ -995,11 +960,8 @@ impl ExecuteManager {
             }
             MatchEnv => {
                 let value = match device
-                    .as_ref()
-                    .lock()
-                    .unwrap()
-                    .borrow_mut()
-                    .get_property_value(&token.attr.clone().unwrap())
+                    .borrow()
+                    .get_property_value(token.attr.as_ref().unwrap())
                 {
                     Ok(v) => v,
                     Err(e) => {
@@ -1023,14 +985,7 @@ impl ExecuteManager {
                 todo!()
             }
             MatchTag | MatchParentsTag => {
-                for tag in device
-                    .as_ref()
-                    .lock()
-                    .unwrap()
-                    .borrow_mut()
-                    .current_tags
-                    .iter()
-                {
+                for tag in &device.borrow().current_tag_iter() {
                     if token.pattern_match(tag) ^ (token.op == OperatorType::Nomatch) {
                         return Ok(token.op == OperatorType::Match);
                     }
@@ -1039,18 +994,12 @@ impl ExecuteManager {
                 Ok(token.op == OperatorType::Nomatch)
             }
             MatchSubsystem | MatchParentsSubsystem => {
-                let subsystem = execute_err_ignore_ENOENT!(
-                    token,
-                    device.as_ref().lock().unwrap().borrow_mut().get_subsystem()
-                )?;
+                let subsystem = execute_err_ignore_ENOENT!(token, device.borrow().get_subsystem())?;
 
                 Ok(token.pattern_match(&subsystem))
             }
             MatchDriver | MatchParentsDriver => {
-                let driver = execute_err_ignore_ENOENT!(
-                    token,
-                    device.as_ref().lock().unwrap().borrow_mut().get_driver()
-                )?;
+                let driver = execute_err_ignore_ENOENT!(token, device.borrow().get_driver())?;
 
                 Ok(token.pattern_match(&driver))
             }
@@ -1080,13 +1029,11 @@ impl ExecuteManager {
                         Ok(v) => v,
                         Err(_) => {
                             // only throw out error when getting the syspath of device
-                            let syspath =
-                                execute_err!(token, device.as_ref().lock().unwrap().get_syspath())
-                                    .map_err(|e| {
-                                        log_rule_token!(debug, token, "failed to apply token.");
-                                        e
-                                    })?
-                                    .to_string();
+                            let syspath = execute_err!(token, device.borrow().get_syspath())
+                                .map_err(|e| {
+                                    log_rule_token!(debug, token, "failed to apply token.");
+                                    e
+                                })?;
 
                             syspath + "/" + val.as_str()
                         }
@@ -1185,10 +1132,7 @@ impl ExecuteManager {
                 for line in content.split('\n') {
                     match get_property_from_string(line) {
                         Ok((key, value)) => {
-                            execute_err!(
-                                token,
-                                device.as_ref().lock().unwrap().add_property(key, value)
-                            )?;
+                            execute_err!(token, device.borrow().add_property(&key, &value))?;
                         }
                         Err(e) => {
                             log_rule_token!(debug, token, e);
@@ -1243,10 +1187,7 @@ impl ExecuteManager {
 
                     match get_property_from_string(line) {
                         Ok((key, value)) => {
-                            execute_err!(
-                                token,
-                                device.as_ref().lock().unwrap().add_property(key, value)
-                            )?;
+                            execute_err!(token, device.borrow().add_property(&key, &value))?;
 
                             log_rule_token!(debug, token, format!("add key-value ()"))
                         }
@@ -1341,12 +1282,7 @@ impl ExecuteManager {
             MatchImportDb => {
                 let dev_db_clone = self.current_unit.as_ref().unwrap().device_db_clone.clone();
 
-                let val = match dev_db_clone
-                    .as_ref()
-                    .lock()
-                    .unwrap()
-                    .get_property_value(&token.value)
-                {
+                let val = match dev_db_clone.borrow().get_property_value(&token.value) {
                     Ok(v) => v,
                     Err(e) => {
                         if e.get_errno() == Errno::ENOENT {
@@ -1371,14 +1307,7 @@ impl ExecuteManager {
                     format!("Importing property '{}={}' from db", token.value, val)
                 );
 
-                execute_err!(
-                    token,
-                    device
-                        .as_ref()
-                        .lock()
-                        .unwrap()
-                        .add_property(token.value.clone(), val)
-                )?;
+                execute_err!(token, device.borrow().add_property(&token.value, &val))?;
 
                 Ok(token.op == OperatorType::Match)
             }
@@ -1402,14 +1331,9 @@ impl ExecuteManager {
 
                 execute_err!(
                     token,
-                    device.as_ref().lock().unwrap().add_property(
-                        token.value.clone(),
-                        if value.is_empty() {
-                            "1".to_string()
-                        } else {
-                            value.to_string()
-                        }
-                    )
+                    device
+                        .borrow()
+                        .add_property(&token.value, if value.is_empty() { "1" } else { value })
                 )?;
 
                 Ok(token.op == OperatorType::Match)
@@ -1446,7 +1370,7 @@ impl ExecuteManager {
                     }
                 }
 
-                let parent = match device.as_ref().lock().unwrap().get_parent() {
+                let parent = match device.borrow().get_parent() {
                     Ok(p) => p,
                     Err(e) => {
                         // do not match if the device has no parent
@@ -1463,9 +1387,7 @@ impl ExecuteManager {
                     }
                 };
 
-                let mut parent_lock = parent.as_ref().lock().unwrap();
-
-                for (k, v) in parent_lock.property_iter_mut() {
+                for (k, v) in &parent.borrow().property_iter() {
                     // check whether the key of property matches the
                     if !{
                         let mut matched = false;
@@ -1486,14 +1408,7 @@ impl ExecuteManager {
                         format!("Importing '{}={}' from parent.", k, v)
                     );
 
-                    execute_err!(
-                        token,
-                        device
-                            .as_ref()
-                            .lock()
-                            .unwrap()
-                            .add_property(k.to_string(), v.to_string())
-                    )?;
+                    execute_err!(token, device.borrow().add_property(k, v))?;
                 }
 
                 Ok(token.op == OperatorType::Match)
@@ -1555,13 +1470,13 @@ impl ExecuteManager {
                 Ok(true)
             }
             AssignOptionsDbPersist => {
-                device.as_ref().lock().unwrap().set_db_persist();
+                device.borrow().set_db_persist();
                 log_rule_token!(
                     debug,
                     token,
                     format!(
                         "set db '{}' to persistence",
-                        execute_err!(token, device.as_ref().lock().unwrap().get_device_id())?
+                        execute_err!(token, device.borrow().get_device_id())?
                     )
                 );
                 Ok(true)
@@ -1593,7 +1508,7 @@ impl ExecuteManager {
             }
             AssignOptionsDevlinkPriority => {
                 let r = execute_err!(token, token.value.parse::<i32>().context(ParseIntSnafu))?;
-                device.as_ref().lock().unwrap().set_devlink_priority(r);
+                device.borrow().set_devlink_priority(r);
                 log_rule_token!(debug, token, format!("set devlink priority to '{}'", r));
                 Ok(true)
             }
@@ -1843,10 +1758,8 @@ impl ExecuteManager {
                     execute_err!(
                         token,
                         device
-                            .as_ref()
-                            .lock()
-                            .unwrap()
-                            .add_property(token.attr.clone().unwrap(), token.value.clone())
+                            .borrow()
+                            .add_property(token.attr.as_ref().unwrap(), &token.value)
                     )?;
                     return Ok(true);
                 }
@@ -1855,9 +1768,7 @@ impl ExecuteManager {
 
                 if token.op == OperatorType::Add {
                     if let Ok(old_value) = device
-                        .as_ref()
-                        .lock()
-                        .unwrap()
+                        .borrow()
                         .get_property_value(token.attr.as_ref().unwrap())
                     {
                         value.push_str(&old_value);
@@ -1882,9 +1793,8 @@ impl ExecuteManager {
                 execute_err!(
                     token,
                     device
-                        .lock()
-                        .unwrap()
-                        .add_property(token.attr.clone().unwrap(), v)
+                        .borrow()
+                        .add_property(token.attr.as_ref().unwrap(), &v)
                 )?;
 
                 Ok(true)
@@ -1908,7 +1818,7 @@ impl ExecuteManager {
                 };
 
                 if token.op == OperatorType::Assign {
-                    device.as_ref().lock().unwrap().cleanup_tags();
+                    device.borrow().cleanup_tags();
                 }
 
                 if value
@@ -1920,9 +1830,9 @@ impl ExecuteManager {
                 }
 
                 if token.op == OperatorType::Remove {
-                    device.as_ref().lock().unwrap().remove_tag(&value);
+                    device.borrow().remove_tag(&value);
                 } else {
-                    execute_err!(token, device.as_ref().lock().unwrap().add_tag(value, true))?;
+                    execute_err!(token, device.borrow().add_tag(&value, true))?;
                 }
 
                 Ok(true)
@@ -1936,7 +1846,7 @@ impl ExecuteManager {
                     self.current_unit.as_mut().unwrap().name_final = true;
                 }
 
-                if device.lock().unwrap().get_ifindex().is_err() {
+                if device.borrow().get_ifindex().is_err() {
                     log_rule_token!(
                         error,
                         token,
@@ -1990,7 +1900,7 @@ impl ExecuteManager {
                     return Ok(true);
                 }
 
-                if device.as_ref().lock().unwrap().get_devnum().is_err() {
+                if device.borrow().get_devnum().is_err() {
                     return Ok(true);
                 }
 
@@ -1999,7 +1909,7 @@ impl ExecuteManager {
                 }
 
                 if [OperatorType::Assign, OperatorType::AssignFinal].contains(&token.op) {
-                    device.as_ref().lock().unwrap().cleanup_devlinks();
+                    device.borrow().cleanup_devlinks();
                 }
 
                 let value = match self.current_unit.as_ref().unwrap().apply_format(
@@ -2037,7 +1947,7 @@ impl ExecuteManager {
 
                         log_rule_token!(debug, token, format!("add DEVLINK '{}'", devlink));
 
-                        execute_err!(token, device.as_ref().lock().unwrap().add_devlink(devlink))?;
+                        execute_err!(token, device.borrow().add_devlink(&devlink))?;
                     }
                 }
 
@@ -2049,9 +1959,7 @@ impl ExecuteManager {
                 let buf = if let Ok(v) = resolve_subsystem_kernel(&attr, false) {
                     v
                 } else {
-                    let syspath =
-                        execute_err!(token, device.as_ref().lock().unwrap().get_syspath())?
-                            .to_string();
+                    let syspath = execute_err!(token, device.borrow().get_syspath())?;
                     format!("{}/{}", syspath, attr)
                 };
 
@@ -2196,7 +2104,7 @@ impl ExecuteManager {
             }
 
             let tmp = self.current_unit.as_ref().unwrap().parent.clone().unwrap();
-            match tmp.as_ref().lock().unwrap().get_parent() {
+            match tmp.borrow().get_parent() {
                 Ok(d) => {
                     self.current_unit.as_mut().unwrap().borrow_mut().parent = Some(d);
                 }
@@ -2236,18 +2144,18 @@ impl ExecuteManager {
                 let argv = match shell_words::split(builtin_str) {
                     Ok(ret) => ret,
                     Err(e) => {
-                        log_dev_lock!(
+                        log_dev!(
                             debug,
-                            self.current_unit.as_ref().unwrap().device,
+                            self.current_unit.as_ref().unwrap().device.borrow(),
                             format!("Failed to run builtin command '{}': {}", builtin_str, e)
                         );
                         continue;
                     }
                 };
 
-                log_dev_lock!(
+                log_dev!(
                     debug,
-                    self.current_unit.as_ref().unwrap().device,
+                    self.current_unit.as_ref().unwrap().device.borrow(),
                     format!("Running builtin command '{}'", builtin_str)
                 );
 
@@ -2259,9 +2167,9 @@ impl ExecuteManager {
                     argv,
                     false,
                 ) {
-                    log_dev_lock!(
+                    log_dev!(
                         debug,
-                        self.current_unit.as_ref().unwrap().device,
+                        self.current_unit.as_ref().unwrap().device.borrow(),
                         format!("Failed to run builtin command '{}': '{}'", builtin_str, e)
                     );
                 }
@@ -2281,16 +2189,16 @@ impl ExecuteManager {
             .clone()
             .iter()
         {
-            log_dev_lock!(
+            log_dev!(
                 debug,
-                self.current_unit.as_ref().unwrap().device,
+                self.current_unit.as_ref().unwrap().device.borrow(),
                 format!("Running program '{}'", cmd_str)
             );
 
             if let Err(e) = spawn(cmd_str, Duration::from_secs(self.unit_spawn_timeout_usec)) {
-                log_dev_lock!(
+                log_dev!(
                     debug,
-                    self.current_unit.as_ref().unwrap().device,
+                    self.current_unit.as_ref().unwrap().device.borrow(),
                     format!("Failed to run program '{}': '{}'", cmd_str, e)
                 );
             }
@@ -2311,63 +2219,54 @@ impl RuleToken {
         (self.op == OperatorType::Nomatch) ^ value_match
     }
 
-    fn attr_match(&self, device: Arc<Mutex<Device>>, unit: &ExecuteUnit) -> Result<bool> {
+    fn attr_match(&self, device: Rc<RefCell<Device>>, unit: &ExecuteUnit) -> Result<bool> {
         let attr = self.attr.clone().unwrap_or_default();
 
-        let val = match self.attr_subst_type {
-            SubstituteType::Plain => {
-                if let Ok(v) = device
-                    .as_ref()
-                    .lock()
-                    .unwrap()
-                    .borrow_mut()
-                    .get_sysattr_value(&attr)
-                    .map_err(|e| Error::RulesExecuteError {
-                        msg: format!("failed to match sysattr: ({})", e),
-                        errno: e.get_errno(),
-                    })
-                {
-                    v
-                } else {
-                    return Ok(false);
-                }
-            }
-            SubstituteType::Format => {
-                let attr_name =
-                    unit.apply_format(&attr, false)
-                        .map_err(|e| Error::RulesExecuteError {
+        let val =
+            match self.attr_subst_type {
+                SubstituteType::Plain => {
+                    if let Ok(v) = device.borrow().get_sysattr_value(&attr).map_err(|e| {
+                        Error::RulesExecuteError {
                             msg: format!("failed to match sysattr: ({})", e),
                             errno: e.get_errno(),
-                        })?;
-                if let Ok(v) = device
-                    .as_ref()
-                    .lock()
-                    .unwrap()
-                    .borrow_mut()
-                    .get_sysattr_value(&attr_name)
-                    .map_err(|e| Error::RulesExecuteError {
+                        }
+                    }) {
+                        v
+                    } else {
+                        return Ok(false);
+                    }
+                }
+                SubstituteType::Format => {
+                    let attr_name =
+                        unit.apply_format(&attr, false)
+                            .map_err(|e| Error::RulesExecuteError {
+                                msg: format!("failed to match sysattr: ({})", e),
+                                errno: e.get_errno(),
+                            })?;
+                    if let Ok(v) = device.borrow().get_sysattr_value(&attr_name).map_err(|e| {
+                        Error::RulesExecuteError {
+                            msg: format!("failed to match sysattr: ({})", e),
+                            errno: e.get_errno(),
+                        }
+                    }) {
+                        v
+                    } else {
+                        return Ok(false);
+                    }
+                }
+                SubstituteType::Subsys => {
+                    resolve_subsystem_kernel(&attr, true).map_err(|e| Error::RulesExecuteError {
                         msg: format!("failed to match sysattr: ({})", e),
                         errno: e.get_errno(),
-                    })
-                {
-                    v
-                } else {
-                    return Ok(false);
+                    })?
                 }
-            }
-            SubstituteType::Subsys => {
-                resolve_subsystem_kernel(&attr, true).map_err(|e| Error::RulesExecuteError {
-                    msg: format!("failed to match sysattr: ({})", e),
-                    errno: e.get_errno(),
-                })?
-            }
-            _ => {
-                return Err(Error::RulesExecuteError {
-                    msg: "invalid substitute type.".to_string(),
-                    errno: Errno::EINVAL,
-                })
-            }
-        };
+                _ => {
+                    return Err(Error::RulesExecuteError {
+                        msg: "invalid substitute type.".to_string(),
+                        errno: Errno::EINVAL,
+                    })
+                }
+            };
 
         Ok(self.pattern_match(&val))
     }
@@ -2469,9 +2368,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_subst_format() {
-        let device = Arc::new(Mutex::new(
-            Device::from_path("/dev/sda1".to_string()).unwrap(),
-        ));
+        let device = Rc::new(RefCell::new(Device::from_path("/dev/sda1").unwrap()));
         let unit = ExecuteUnit::new(device);
         println!(
             "{:?}",
@@ -2487,8 +2384,8 @@ mod tests {
             .unwrap()
         );
 
-        let device = Arc::new(Mutex::new(
-            Device::from_subsystem_sysname("net".to_string(), "lo".to_string()).unwrap(),
+        let device = Rc::new(RefCell::new(
+            Device::from_subsystem_sysname("net", "lo").unwrap(),
         ));
         let unit = ExecuteUnit::new(device);
         println!(
@@ -2500,8 +2397,8 @@ mod tests {
 
     #[test]
     fn test_apply_format() {
-        let device = Arc::new(Mutex::new(
-            Device::from_subsystem_sysname("net".to_string(), "lo".to_string()).unwrap(),
+        let device = Rc::new(RefCell::new(
+            Device::from_subsystem_sysname("net", "lo").unwrap(),
         ));
         let unit = ExecuteUnit::new(device);
         // test long substitution formatter
@@ -2607,8 +2504,8 @@ mod tests {
     #[test]
     #[ignore]
     fn test_apply_format_2() {
-        let device = Arc::new(Mutex::new(
-            Device::from_subsystem_sysname("block".to_string(), "sda1".to_string()).unwrap(),
+        let device = Rc::new(RefCell::new(
+            Device::from_subsystem_sysname("block", "sda1").unwrap(),
         ));
         let unit = ExecuteUnit::new(device);
         assert_eq!(unit.apply_format("$number", false).unwrap(), "1");

@@ -18,7 +18,7 @@ use crate::builtin::Netlink;
 use crate::error::Result;
 use device::Device;
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 /// net_id builtin command
 pub struct NetId;
@@ -27,7 +27,7 @@ impl Builtin for NetId {
     /// builtin command
     fn cmd(
         &self,
-        _device: Arc<Mutex<Device>>,
+        _device: Rc<RefCell<Device>>,
         _ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         _argv: Vec<String>,

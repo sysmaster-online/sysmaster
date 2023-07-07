@@ -15,8 +15,9 @@
 
 use crate::builtin::Builtin;
 use crate::builtin::Netlink;
+use crate::error::Log;
 use crate::error::Result;
-use crate::log_dev_lock;
+use crate::log_dev;
 use device::Device;
 use input_event_codes;
 use ioctls::{eviocgabs, input_absinfo};
@@ -24,7 +25,7 @@ use libc::input_id;
 use nix::fcntl::OFlag;
 use std::cell::RefCell;
 use std::os::unix::prelude::AsRawFd;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 macro_rules! bits_per_long {
     () => {
@@ -97,7 +98,7 @@ impl Builtin for InputId {
     /// builtin command
     fn cmd(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         _ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         _argv: Vec<String>,
@@ -116,8 +117,7 @@ impl Builtin for InputId {
             if pdev
                 .as_ref()
                 .unwrap()
-                .lock()
-                .unwrap()
+                .borrow()
                 .get_sysattr_value("capabilities/ev")
                 .is_ok()
             {
@@ -125,10 +125,8 @@ impl Builtin for InputId {
             }
 
             let tmp_dev = match pdev
-                .as_ref()
                 .unwrap()
-                .lock()
-                .unwrap()
+                .borrow()
                 .get_parent_with_subsystem_devtype("input", None)
             {
                 Ok(dev) => Option::Some(dev),
@@ -202,10 +200,7 @@ impl Builtin for InputId {
             }
         }
 
-        let sysname = match device.lock().unwrap().get_sysname() {
-            Ok(sysname) => sysname.to_string(),
-            Err(_) => "".to_string(),
-        };
+        let sysname = device.borrow().get_sysname().unwrap_or_default();
 
         if sysname.starts_with("event") {
             self.extract_info(device, test);
@@ -234,10 +229,30 @@ impl Builtin for InputId {
     fn run_once(&self) -> bool {
         false
     }
+
+    fn add_property(
+        &self,
+        device: Rc<RefCell<Device>>,
+        test: bool,
+        key: &str,
+        value: &str,
+    ) -> Result<(), crate::error::Error> {
+        device.borrow().add_property(key, value).map_err(|e| {
+            crate::error::Error::BuiltinCommandError {
+                msg: format!("Failed to add property '{}'='{}': ({})", key, value, e),
+            }
+        })?;
+
+        if test {
+            println!("{}={}", key, value);
+        }
+
+        Ok(())
+    }
 }
 
 impl InputId {
-    fn get_input_id(&self, dev: Arc<Mutex<Device>>) -> input_id {
+    fn get_input_id(&self, dev: Rc<RefCell<Device>>) -> input_id {
         let mut id = input_id {
             bustype: u16::default(),
             vendor: u16::default(),
@@ -245,22 +260,20 @@ impl InputId {
             version: u16::default(),
         };
 
-        if let Ok(mut dev) = dev.lock() {
-            if let Ok(v) = dev.get_sysattr_value("id/bustype") {
-                id.bustype = u16::from_str_radix(&v, 16).unwrap();
-            }
+        if let Ok(v) = dev.borrow().get_sysattr_value("id/bustype") {
+            id.bustype = u16::from_str_radix(&v, 16).unwrap();
+        }
 
-            if let Ok(v) = dev.get_sysattr_value("id/vendor") {
-                id.vendor = u16::from_str_radix(&v, 16).unwrap();
-            }
+        if let Ok(v) = dev.borrow().get_sysattr_value("id/vendor") {
+            id.vendor = u16::from_str_radix(&v, 16).unwrap();
+        }
 
-            if let Ok(v) = dev.get_sysattr_value("id/product") {
-                id.product = u16::from_str_radix(&v, 16).unwrap();
-            }
+        if let Ok(v) = dev.borrow().get_sysattr_value("id/product") {
+            id.product = u16::from_str_radix(&v, 16).unwrap();
+        }
 
-            if let Ok(v) = dev.get_sysattr_value("id/version") {
-                id.version = u16::from_str_radix(&v, 16).unwrap();
-            }
+        if let Ok(v) = dev.borrow().get_sysattr_value("id/version") {
+            id.version = u16::from_str_radix(&v, 16).unwrap();
         }
 
         id
@@ -268,29 +281,26 @@ impl InputId {
 
     fn get_cap_mask(
         &self,
-        dev: Arc<Mutex<Device>>,
+        dev: Rc<RefCell<Device>>,
         attr: &str,
         bitmask_size: usize,
         bitmask: &mut [u64],
         test: bool,
     ) {
-        let text = match dev.lock().unwrap().get_sysattr_value(attr) {
-            Ok(v) => v,
-            Err(_) => String::new(),
-        };
+        let text = dev.borrow().get_sysattr_value(attr).unwrap_or_default();
 
-        log_dev_lock!(
+        log_dev!(
             debug,
-            dev,
+            dev.borrow(),
             format!("{} raw kernel attribute: {}", attr, text)
         );
 
         for (i, word) in text.as_str().split_whitespace().rev().enumerate() {
             let val = match u64::from_str_radix(word, 16) {
                 Err(_) => {
-                    log_dev_lock!(
+                    log_dev!(
                         debug,
-                        dev,
+                        dev.borrow(),
                         format!("Ignoring {} block which failed to parse", attr)
                     );
                     continue;
@@ -301,9 +311,9 @@ impl InputId {
             if i < bitmask_size / std::mem::size_of::<u64>() {
                 bitmask[i] = val;
             } else {
-                log_dev_lock!(
+                log_dev!(
                     debug,
-                    dev,
+                    dev.borrow(),
                     format!(
                         "Ignoring {} block {:X} which is larger than maximum size",
                         attr, val
@@ -313,7 +323,7 @@ impl InputId {
         }
 
         if test {
-            log_dev_lock!(debug, dev, format!("{} decoded bit map:", attr));
+            log_dev!(debug, dev.borrow(), format!("{} decoded bit map:", attr));
             let mut val = bitmask_size / std::mem::size_of::<u64>();
 
             while val > 0 && bitmask[val - 1] == 0 {
@@ -328,15 +338,15 @@ impl InputId {
                 }
 
                 if std::mem::size_of::<u64>() == 4 {
-                    log_dev_lock!(
+                    log_dev!(
                         debug,
-                        dev,
+                        dev.borrow(),
                         format!("  bit {:4}: {:08X}", j * bits_per_long!(), bit)
                     );
                 } else {
-                    log_dev_lock!(
+                    log_dev!(
                         debug,
-                        dev,
+                        dev.borrow(),
                         format!("  bit {:4}: {:016X}", j * bits_per_long!(), bit)
                     );
                 }
@@ -347,7 +357,7 @@ impl InputId {
     #[allow(clippy::too_many_arguments)]
     fn test_pointer(
         &self,
-        dev: Arc<Mutex<Device>>,
+        dev: Rc<RefCell<Device>>,
         id: &input_id,
         bitmasks: &mut Bitmasks,
         test: bool,
@@ -534,7 +544,7 @@ impl InputId {
             }
 
             if num_well_known_keys >= 4 || num_joystick_buttons + num_joystick_axes < 2 {
-                log_dev_lock!(debug, dev,
+                log_dev!(debug, dev.borrow(),
                     format!("Input device has {} joystick buttons and {} axes but also {} keyboard key sets, \
                              assuming this is a keyboard, not a joystick.",
                             num_joystick_buttons, num_joystick_axes, num_well_known_keys));
@@ -542,9 +552,9 @@ impl InputId {
             }
 
             if has_wheel && has_pad_buttons {
-                log_dev_lock!(
+                log_dev!(
                     debug,
-                    dev,
+                    dev.borrow(),
                     format!(
                         "Input device has {} joystick buttons as well as tablet pad buttons, \
                          assuming this is a tablet pad, not a joystick.",
@@ -556,32 +566,39 @@ impl InputId {
         }
 
         if is_pointing_stick {
-            self.add_property(dev.clone(), test, "ID_INPUT_POINTINGSTICK", "1")
-                .unwrap_or(());
+            let _ = self
+                .add_property(dev.clone(), test, "ID_INPUT_POINTINGSTICK", "1")
+                .log_error("input_id error");
         }
         if is_mouse || is_abs_mouse {
-            self.add_property(dev.clone(), test, "ID_INPUT_MOUSE", "1")
-                .unwrap_or(());
+            let _ = self
+                .add_property(dev.clone(), test, "ID_INPUT_MOUSE", "1")
+                .log_error("input_id error");
         }
         if is_touchpad {
-            self.add_property(dev.clone(), test, "ID_INPUT_TOUCHPAD", "1")
-                .unwrap_or(());
+            let _ = self
+                .add_property(dev.clone(), test, "ID_INPUT_TOUCHPAD", "1")
+                .log_error("input_id error");
         }
         if is_touchscreen {
-            self.add_property(dev.clone(), test, "ID_INPUT_TOUCHSCREEN", "1")
-                .unwrap_or(());
+            let _ = self
+                .add_property(dev.clone(), test, "ID_INPUT_TOUCHSCREEN", "1")
+                .log_error("input_id error");
         }
         if is_joystick {
-            self.add_property(dev.clone(), test, "ID_INPUT_JOYSTICK", "1")
-                .unwrap_or(());
+            let _ = self
+                .add_property(dev.clone(), test, "ID_INPUT_JOYSTICK", "1")
+                .log_error("input_id error");
         }
         if is_tablet {
-            self.add_property(dev.clone(), test, "ID_INPUT_TABLET", "1")
-                .unwrap_or(());
+            let _ = self
+                .add_property(dev.clone(), test, "ID_INPUT_TABLET", "1")
+                .log_error("input_id error");
         }
         if is_tablet_pad {
-            self.add_property(dev, test, "ID_INPUT_TABLET_PAD", "1")
-                .unwrap_or(());
+            let _ = self
+                .add_property(dev, test, "ID_INPUT_TABLET_PAD", "1")
+                .log_error("input_id error");
         }
 
         is_tablet
@@ -593,9 +610,13 @@ impl InputId {
             || is_pointing_stick
     }
 
-    fn test_key(&self, dev: Arc<Mutex<Device>>, bitmasks: &mut Bitmasks, test: bool) -> bool {
+    fn test_key(&self, dev: Rc<RefCell<Device>>, bitmasks: &mut Bitmasks, test: bool) -> bool {
         if test_bit!(input_event_codes::EV_KEY!(), bitmasks.bitmask_ev, false) {
-            log_dev_lock!(debug, dev, format!("test_key: no EV_KEY capability"));
+            log_dev!(
+                debug,
+                dev.borrow(),
+                format!("test_key: no EV_KEY capability")
+            );
             return false;
         }
 
@@ -605,9 +626,9 @@ impl InputId {
                 if *bit != 0 {
                     found = true;
                 }
-                log_dev_lock!(
+                log_dev!(
                     debug,
-                    dev,
+                    dev.borrow(),
                     format!(
                         "test_key: checking bit block {} for any keys; found={}",
                         i * bits_per_long!(),
@@ -636,9 +657,9 @@ impl InputId {
             }
             for i in block.start..block.end {
                 if test_bit!(i, bitmasks.bitmask_key) && !found {
-                    log_dev_lock!(
+                    log_dev!(
                         debug,
-                        dev,
+                        dev.borrow(),
                         format!("test_key: Found key {} in high block", i)
                     );
                     found = true;
@@ -647,13 +668,15 @@ impl InputId {
         }
 
         if found {
-            self.add_property(dev.clone(), test, "ID_INPUT_KEY", "1")
-                .unwrap_or(());
+            let _ = self
+                .add_property(dev.clone(), test, "ID_INPUT_KEY", "1")
+                .log_error("input_id error");
         }
 
         if flags_set!(bitmasks.bitmask_key[0], 0xFFFFFFFE) {
-            self.add_property(dev, test, "ID_INPUT_KEYBOARD", "1")
-                .unwrap_or(());
+            let _ = self
+                .add_property(dev, test, "ID_INPUT_KEYBOARD", "1")
+                .log_error("input_id error");
             return true;
         }
 
@@ -664,7 +687,7 @@ impl InputId {
         (absinfo.maximum - absinfo.minimum) / absinfo.resolution
     }
 
-    fn extract_info(&self, dev: Arc<Mutex<Device>>, test: bool) {
+    fn extract_info(&self, dev: Rc<RefCell<Device>>, test: bool) {
         let mut xabsinfo = input_absinfo {
             ..Default::default()
         };
@@ -673,8 +696,7 @@ impl InputId {
         };
 
         let fd = match dev
-            .lock()
-            .unwrap()
+            .borrow()
             .open(OFlag::O_RDONLY | OFlag::O_CLOEXEC | OFlag::O_NONBLOCK | OFlag::O_NOCTTY)
         {
             Ok(fd) => fd,
@@ -693,20 +715,22 @@ impl InputId {
             return;
         }
 
-        self.add_property(
-            dev.clone(),
-            test,
-            "ID_INPUT_WIDTH_MM",
-            InputId::abs_size_mm(&xabsinfo).to_string().as_str(),
-        )
-        .unwrap_or(());
-        self.add_property(
-            dev,
-            test,
-            "ID_INPUT_HEIGHT_MM",
-            InputId::abs_size_mm(&yabsinfo).to_string().as_str(),
-        )
-        .unwrap_or(());
+        let _ = self
+            .add_property(
+                dev.clone(),
+                test,
+                "ID_INPUT_WIDTH_MM",
+                InputId::abs_size_mm(&xabsinfo).to_string().as_str(),
+            )
+            .log_error("input_id error");
+        let _ = self
+            .add_property(
+                dev,
+                test,
+                "ID_INPUT_HEIGHT_MM",
+                InputId::abs_size_mm(&yabsinfo).to_string().as_str(),
+            )
+            .log_error("input_id error");
     }
 }
 
@@ -725,8 +749,8 @@ mod tests {
 
         let mut enumerator = DeviceEnumerator::new();
 
-        for device in enumerator.iter_mut() {
-            match device.lock().unwrap().get_devpath() {
+        for device in enumerator.iter() {
+            match device.borrow().get_devpath() {
                 Ok(path) => {
                     println!("devpath:{}", path);
                 }
@@ -740,8 +764,6 @@ mod tests {
             if let Err(e) = builtin.cmd(device.clone(), &mut rtnl, 0, vec![], true) {
                 println!("Builtin command path_id: fails:{:?}", e);
             }
-            println!();
         }
-        println!();
     }
 }

@@ -12,15 +12,10 @@
 
 //! utils of libdevmaster
 //!
-use std::{
-    str::Utf8Error,
-    sync::{Arc, Mutex},
-};
-
+use crate::log_dev;
 use device::Device;
 use snafu::prelude::*;
-
-use crate::{log_dev, log_dev_lock, log_dev_lock_option};
+use std::{cell::RefCell, rc::Rc, str::Utf8Error};
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -122,15 +117,12 @@ pub(crate) trait Log {
     fn log_error(self, msg: &str) -> Self;
     fn log_debug(self, msg: &str) -> Self;
     fn log_info(self, msg: &str) -> Self;
-    fn log_dev_error(self, dev: &mut Device, msg: &str) -> Self;
-    fn log_dev_debug(self, dev: &mut Device, msg: &str) -> Self;
-    fn log_dev_info(self, dev: &mut Device, msg: &str) -> Self;
-    fn log_dev_lock_option_error(self, dev: Option<Arc<Mutex<Device>>>, msg: &str) -> Self;
-    fn log_dev_lock_option_debug(self, dev: Option<Arc<Mutex<Device>>>, msg: &str) -> Self;
-    fn log_dev_lock_option_info(self, dev: Option<Arc<Mutex<Device>>>, msg: &str) -> Self;
-    fn log_dev_lock_error(self, dev: Arc<Mutex<Device>>, msg: &str) -> Self;
-    fn log_dev_lock_debug(self, dev: Arc<Mutex<Device>>, msg: &str) -> Self;
-    fn log_dev_lock_info(self, dev: Arc<Mutex<Device>>, msg: &str) -> Self;
+    fn log_dev_error(self, dev: &Device, msg: &str) -> Self;
+    fn log_dev_debug(self, dev: &Device, msg: &str) -> Self;
+    fn log_dev_info(self, dev: &Device, msg: &str) -> Self;
+    fn log_dev_error_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self;
+    fn log_dev_debug_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self;
+    fn log_dev_info_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self;
 }
 
 impl<T> Log for std::result::Result<T, Error> {
@@ -152,57 +144,48 @@ impl<T> Log for std::result::Result<T, Error> {
             e
         })
     }
-    fn log_dev_error(self, dev: &mut Device, msg: &str) -> Self {
+    fn log_dev_error(self, dev: &Device, msg: &str) -> Self {
         self.map_err(|e| {
             log_dev!(error, dev, format!("{}: {}", msg, e));
             e
         })
     }
-    fn log_dev_debug(self, dev: &mut Device, msg: &str) -> Self {
+    fn log_dev_debug(self, dev: &Device, msg: &str) -> Self {
         self.map_err(|e| {
             log_dev!(debug, dev, format!("{}: {}", msg, e));
             e
         })
     }
-    fn log_dev_info(self, dev: &mut Device, msg: &str) -> Self {
+    fn log_dev_info(self, dev: &Device, msg: &str) -> Self {
         self.map_err(|e| {
             log_dev!(info, dev, format!("{}: {}", msg, e));
             e
         })
     }
-    fn log_dev_lock_option_error(self, dev: Option<Arc<Mutex<Device>>>, msg: &str) -> Self {
+    fn log_dev_error_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self {
         self.map_err(|e| {
-            log_dev_lock_option!(error, dev, format!("{}: {}", msg, e));
+            match dev {
+                Some(d) => log_dev!(error, d.borrow(), format!("{}: {}", msg, e)),
+                None => log::error!("{}: {}", msg, e),
+            }
             e
         })
     }
-    fn log_dev_lock_option_debug(self, dev: Option<Arc<Mutex<Device>>>, msg: &str) -> Self {
+    fn log_dev_debug_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self {
         self.map_err(|e| {
-            log_dev_lock_option!(debug, dev, format!("{}: {}", msg, e));
+            match dev {
+                Some(d) => log_dev!(debug, d.borrow(), format!("{}: {}", msg, e)),
+                None => log::error!("{}: {}", msg, e),
+            }
             e
         })
     }
-    fn log_dev_lock_option_info(self, dev: Option<Arc<Mutex<Device>>>, msg: &str) -> Self {
+    fn log_dev_info_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self {
         self.map_err(|e| {
-            log_dev_lock_option!(info, dev, format!("{}: {}", msg, e));
-            e
-        })
-    }
-    fn log_dev_lock_error(self, dev: Arc<Mutex<Device>>, msg: &str) -> Self {
-        self.map_err(|e| {
-            log_dev_lock!(error, dev, format!("{}: {}", msg, e));
-            e
-        })
-    }
-    fn log_dev_lock_debug(self, dev: Arc<Mutex<Device>>, msg: &str) -> Self {
-        self.map_err(|e| {
-            log_dev_lock!(debug, dev, format!("{}: {}", msg, e));
-            e
-        })
-    }
-    fn log_dev_lock_info(self, dev: Arc<Mutex<Device>>, msg: &str) -> Self {
-        self.map_err(|e| {
-            log_dev_lock!(info, dev, format!("{}: {}", msg, e));
+            match dev {
+                Some(d) => log_dev!(info, d.borrow(), format!("{}: {}", msg, e)),
+                None => log::error!("{}: {}", msg, e),
+            }
             e
         })
     }

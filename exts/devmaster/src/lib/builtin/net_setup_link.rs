@@ -18,7 +18,7 @@ use crate::builtin::Netlink;
 use crate::error::Result;
 use device::Device;
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 /// net_setup_link builtin command
 pub struct NetSetupLink;
@@ -27,7 +27,7 @@ impl Builtin for NetSetupLink {
     /// builtin command
     fn cmd(
         &self,
-        _device: Arc<Mutex<Device>>,
+        _device: Rc<RefCell<Device>>,
         _ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         _argv: Vec<String>,

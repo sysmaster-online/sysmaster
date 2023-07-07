@@ -24,7 +24,7 @@ use snafu::ResultExt;
 use std::cell::RefCell;
 use std::mem;
 use std::os::unix::prelude::AsRawFd;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 /// keyboard builtin command
 pub struct Keyboard;
@@ -63,17 +63,12 @@ impl Keyboard {
         };
     }
 
-    fn force_release(device: Arc<Mutex<Device>>, release: [u32; 1024], release_count: usize) {
+    fn force_release(device: Rc<RefCell<Device>>, release: [u32; 1024], release_count: usize) {
         let atkbd = device
-            .lock()
-            .unwrap()
+            .borrow()
             .get_parent_with_subsystem_devtype("serio", None)
             .unwrap();
-        let current = atkbd
-            .lock()
-            .unwrap()
-            .get_sysattr_value("force_release")
-            .unwrap();
+        let current = atkbd.borrow().get_sysattr_value("force_release").unwrap();
         let mut codes = current;
         for i in release.iter().take(release_count) {
             if !codes.is_empty() {
@@ -82,9 +77,8 @@ impl Keyboard {
             codes += &release[*i as usize].to_string();
         }
         let _ = atkbd
-            .lock()
-            .unwrap()
-            .set_sysattr_value("force_release".to_string(), Some(codes));
+            .borrow()
+            .set_sysattr_value("force_release", Some(&codes));
     }
 
     unsafe fn eviocsabs(
@@ -100,7 +94,7 @@ impl Keyboard {
         )
     }
 
-    fn override_abs(_device: Arc<Mutex<Device>>, fd: i32, evcode: u32, value: &str) {
+    fn override_abs(fd: i32, evcode: u32, value: &str) {
         // EVDEV_ABS_<axis>=<min>:<max>:<res>:<fuzz>:<flat>
         let mut absinfo = input_absinfo {
             value: 0,
@@ -130,19 +124,15 @@ impl Keyboard {
         }
     }
 
-    fn set_trackpoint_sensitivity(device: Arc<Mutex<Device>>, value: &String) {
+    fn set_trackpoint_sensitivity(device: Rc<RefCell<Device>>, value: &String) {
         let pdev = device
-            .lock()
-            .unwrap()
+            .borrow()
             .get_parent_with_subsystem_devtype("serio", None)
             .unwrap();
         if value.parse::<i32>().unwrap() < 0 || value.parse::<i32>().unwrap() > 255 {
             return;
         }
-        let _ = pdev
-            .lock()
-            .unwrap()
-            .set_sysattr_value("sensitivity".to_string(), Some(value.to_string()));
+        let _ = pdev.borrow().set_sysattr_value("sensitivity", Some(value));
     }
 }
 
@@ -150,7 +140,7 @@ impl Builtin for Keyboard {
     /// builtin command
     fn cmd(
         &self,
-        device: Arc<Mutex<Device>>,
+        device: Rc<RefCell<Device>>,
         _ret_rtnl: &mut RefCell<Option<Netlink>>,
         _argc: i32,
         _argv: Vec<String>,
@@ -161,13 +151,12 @@ impl Builtin for Keyboard {
         let mut release_count = 0;
         let mut has_abs = -1;
         let devname = device
-            .lock()
-            .unwrap()
+            .borrow()
             .get_devname()
             .context(DeviceSnafu)
             .log_error("Failed to get devname!")?;
 
-        for (key, value) in device.lock().unwrap().properties.iter() {
+        for (key, value) in &device.borrow().property_iter() {
             // KEYBOARD_KEY_<hex scan code>=<key code identifier>
             if value.starts_with("KEYBOARD_KEY_") {
                 let mut keycode: String = value.to_string();
@@ -186,7 +175,7 @@ impl Builtin for Keyboard {
                 }
 
                 if fd < 0 {
-                    let file = Device::from_devname(devname.to_string())
+                    let file = Device::from_devname(&devname)
                         .unwrap()
                         .open(
                             OFlag::O_RDWR | OFlag::O_CLOEXEC | OFlag::O_NONBLOCK | OFlag::O_NOCTTY,
@@ -200,7 +189,7 @@ impl Builtin for Keyboard {
                 // EVDEV_ABS_<axis>=<min>:<max>:<res>:<fuzz>:<flat>
                 let evcode: u32 = u32::from_str_radix(&key[10..], 16).unwrap();
                 if fd < 0 {
-                    let file = Device::from_devname(devname.to_string())
+                    let file = Device::from_devname(&devname)
                         .unwrap()
                         .open(
                             OFlag::O_RDWR | OFlag::O_CLOEXEC | OFlag::O_NONBLOCK | OFlag::O_NOCTTY,
@@ -226,7 +215,7 @@ impl Builtin for Keyboard {
                 if has_abs != 0 {
                     continue;
                 }
-                Keyboard::override_abs(device.clone(), fd, evcode, value);
+                Keyboard::override_abs(fd, evcode, value);
             } else if key == "POINTINGSTICK_SENSITIVITY" {
                 Keyboard::set_trackpoint_sensitivity(device.clone(), value);
             }

@@ -15,10 +15,7 @@
 
 use device::Device;
 use libdevmaster::builtin::{BuiltinCommand, BuiltinManager, Netlink};
-use std::{
-    cell::RefCell,
-    sync::{Arc, Mutex},
-};
+use std::{cell::RefCell, rc::Rc};
 
 /// test builtin command on processing a device
 /// Commands:
@@ -43,15 +40,15 @@ pub fn subcommand_test_builtin(action: Option<String>, builtin_cmd: String, devi
     let mgr = BuiltinManager::new();
     mgr.init();
 
-    let d = Arc::new(Mutex::new(match Device::from_path(device.clone()) {
+    let d = Rc::new(RefCell::new(match Device::from_path(&device) {
         Ok(ret) => ret,
-        Err(_) => Device::from_path(format!("/sys{}", device)).expect("invalid device path."),
+        Err(_) => Device::from_path(&format!("/sys{}", device)).expect("invalid device path."),
     }));
 
-    if let Err(e) = d.lock().unwrap().add_property(
-        "ACTION".to_string(),
-        action.unwrap_or_else(|| "change".to_string()),
-    ) {
+    if let Err(e) = d
+        .borrow()
+        .add_property("ACTION", &action.unwrap_or_else(|| "change".to_string()))
+    {
         eprintln!("{:?}", e);
     }
 
