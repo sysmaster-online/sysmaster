@@ -56,8 +56,11 @@ impl RunTime {
     pub fn new(cmd: Param) -> Result<RunTime, Errno> {
         let ep = Epoll::new()?;
         let epoll = Rc::new(ep);
+        let mut signals = Signals::new(&epoll);
+        signals.create_signals_epoll()?;
+        // Under normal circumstances, init will not receive SIGCHLD and needs to manually call the do_recycle once.
+        signals.recycle_zombie();
         let comm = Comm::new(&epoll, cmd.init_param.time_wait, cmd.init_param.time_cnt)?;
-        let signals = Signals::new(&epoll);
 
         let mut run_time = RunTime {
             cmd,
@@ -70,7 +73,6 @@ impl RunTime {
         };
 
         run_time.create_sysmaster()?;
-        run_time.signals.create_signals_epoll()?;
 
         Ok(run_time)
     }
@@ -230,9 +232,7 @@ impl RunTime {
     fn unrecover_signal_dispatch(&mut self, event: EpollEvent) {
         if let Some(siginfo) = self.signals.read(event) {
             match siginfo {
-                _x if self.signals.is_zombie(siginfo) => {
-                    self.signals.recycle_zombie();
-                }
+                _x if self.signals.is_zombie(siginfo) => self.do_recycle(),
                 _x if self.signals.is_restart(siginfo) => self.do_recreate(),
                 _ => {}
             }
@@ -242,7 +242,6 @@ impl RunTime {
     fn change_to_unrecover(&mut self) {
         println!("change run state to unrecover");
         self.state = InitState::Unrecover;
-        self.signals.recycle_zombie();
     }
 
     fn do_reexec(&mut self) {
@@ -276,6 +275,7 @@ impl RunTime {
             self.sysmaster_pid = child;
             Ok(())
         } else {
+            signals::reset_signal_mask();
             let mut command = Command::new(SYSMASTER_PATH);
             command.args(self.cmd.manager_param.to_vec());
 

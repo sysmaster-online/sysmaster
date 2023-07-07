@@ -81,8 +81,7 @@ impl Signals {
             let signum: Signal = unsafe { std::mem::transmute(sig) };
             sigset.add(signum);
         }
-        let mut oldset = SigSet::empty();
-        signal::pthread_sigmask(SigmaskHow::SIG_BLOCK, Some(&sigset), Some(&mut oldset))?;
+        signal::pthread_sigmask(SigmaskHow::SIG_BLOCK, Some(&sigset), None)?;
         signalfd::signalfd(-1, &sigset, SfdFlags::SFD_CLOEXEC | SfdFlags::SFD_NONBLOCK)
     }
 
@@ -183,12 +182,13 @@ impl Drop for Signals {
     fn drop(&mut self) {
         self.epoll.safe_close(self.signal_fd);
         self.signal_fd = INVALID_FD;
-        if let Err(e) = nix::sys::signal::pthread_sigmask(
-            SigmaskHow::SIG_SETMASK,
-            Some(&nix::sys::signal::SigSet::empty()),
-            None,
-        ) {
-            eprintln!("reset pthread_sigmask failed: {e}");
-        }
+        reset_signal_mask();
+    }
+}
+
+pub fn reset_signal_mask() {
+    let set = SigSet::empty();
+    if let Err(e) = signal::pthread_sigmask(SigmaskHow::SIG_SETMASK, Some(&set), None) {
+        eprintln!("reset signal mask failed: {e}");
     }
 }

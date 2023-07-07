@@ -58,7 +58,7 @@ menuentry 'openEuler (5.10.0-60.18.0.50.oe2203.aarch64) 22.03 LTS without system
         echo    'Loading Linux 5.10.0-60.18.0.50.oe2203.aarch64 ...'
         linux   /vmlinuz-5.10.0-60.18.0.50.oe2203.aarch64 root=/dev/mapper/openeuler-root rw rd.lvm.lv=openeuler/root rd.lvm.lv=openeuler/swap video=VGA-1:640x480-32@60me console=tty0 crashkernel=1024M,high smmu.bypassdev=0x1000:0x17 smmu.bypassdev=0x1000:0x15 video=efifb:off init=/init
         echo    'Loading initial ramdisk ...'
-        initrd  /initramfs-5.10.0-60.18.0.50.oe2203.aarch64.img
+        initrd  /initrd_withoutsd.img
 }
 ...
 ```
