@@ -749,7 +749,7 @@ bin = /bin/ls
 #[config(default = \"/run/sysmaster/init.sock\")]
 socket = init.sock
 ";
-        let file_path = "./src/init.conf";
+        let file_path = "./init/src/init.conf";
 
         if let Ok(mut file) = File::create(file_path) {
             if let Err(err) = file.write_all(content.as_bytes()) {

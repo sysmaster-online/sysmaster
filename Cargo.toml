@@ -6,54 +6,26 @@ edition = "2021"
 build = "build.rs"
 rust-version = "1.60.0"
 
-[lib]
-name = "sysmaster"
-path = "core/libsysmaster/lib.rs"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
-name = "sysmaster"
-path = "core/sysmaster/main.rs"
-
-[[bin]]
-name = "sctl"
-path = "core/sctl/main.rs"
-
-[dev-dependencies.libtests]
-path = "libs/libtests"
-
+name = "init"
+path = "init/src/main.rs"
 
 [dependencies]
-# internal libraries
-cgroup = { path = "libs/cgroup" }
-event = { path = "libs/event" }
-basic = { path = "libs/basic" }
-cmdproto = { path = "libs/cmdproto" }
-constants = { path = "libs/constants" }
-
-# third libraries
-bitflags = "1.3.2"
-confique = { version = "0.1.3", default-features = false, features = ['toml'] }
-dynamic_reload = "0.8.0"
-heed = "0.11.0"
-lazy_static = "1.4.0"
-libc = "0.2.*"
-once_cell = { version = "1.5.2" }
-log = "0.4"
-nix = "0.24"
-regex = { version = "1.6.0", default-features = false, features = ["std"] }
-serde = "1.0.130"
-siphasher = { version = "0.3", features = ["serde"] }
+nix = { version = "0.24", default-features = false, features = [
+    "fs",
+    "net",
+    "signal",
+    "time",
+    "user",
+] }
+kernlog = "0.3.1"
 tempfile = "=3.6.0"
-walkdir = "2"
-fnmatch-regex = "0.2.0"
-snafu = "0.7"
-clap = { version = "3.1.8", features = ["derive"] }
-
-[features]
-default = ["linux"]
-hongmeng = []
-linux = []
+log = { version = "0.4", default_features = false, features = ["std"] }
+mio = { version = "0.8.8", default_features = false, features = [
+    "os-poll",
+    "os-ext",
+] }
 
 # 此为开发配置文件, 给 `cargo build` 所使用.
 [profile.dev]
@@ -89,7 +61,7 @@ overflow-checks = true
 # 传递 `-C overflow-checks=...`标志 给 compiler.
 
 [profile.release]
-opt-level = 3
+opt-level = 'z'
 strip = true
 debug = false
 rpath = false
@@ -101,17 +73,17 @@ incremental = false
 overflow-checks = false
 
 [profile.release.build-override] # +
-opt-level = 3     # +
+opt-level = 'z'     # +
 codegen-units = 1
 
 [profile.release.package."*"]
-opt-level = 3
+opt-level = 'z'
 codegen-units = 1
 
 # for rpm dist
 [profile.dist]
 inherits = "release"
-opt-level = 3
+opt-level = 'z'
 # for generating debuginfo
 strip = false
 debug = false
@@ -147,8 +119,15 @@ overflow-checks = false
 
 [workspace]
 members = [
-  # sysmaster-init
-  "init",
+  #core
+  "core/sysmaster",
+  "core/libcore",
+  "core/sctl",
+  #components crates
+  "core/coms/service",
+  "core/coms/socket",
+  "core/coms/target",
+  "core/coms/mount",
   # external binaries
   "exts/fstab",
   "exts/random_seed",
@@ -168,11 +147,6 @@ members = [
   "libs/device",
   "libs/blkid_rs",
   "libs/kmod_rs",
-  #components crates
-  "coms/service",
-  "coms/socket",
-  "coms/target",
-  "coms/mount",
 ]
 exclude = ["config", "tools"]
 
