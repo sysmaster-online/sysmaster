@@ -48,6 +48,9 @@ impl ReStation for ServiceUnit {
     // data
     fn db_map(&self, reload: bool) {
         self.config.db_map(reload);
+        if !reload {
+            self.parse().unwrap();
+        }
         self.mng.db_map(reload);
     }
 
