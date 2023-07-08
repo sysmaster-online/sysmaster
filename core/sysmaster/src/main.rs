@@ -38,6 +38,7 @@ mod utils;
 extern crate lazy_static;
 extern crate clap;
 use crate::manager::config::ManagerConfig;
+use crate::manager::signals::EVENT_SIGNALS;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
 use basic::logger::{self};
@@ -290,6 +291,11 @@ fn ignore_all_signals() {
         let mut sig_action: libc::sigaction = unsafe { std::mem::zeroed() };
         sig_action.sa_flags = libc::SA_RESTART;
         sig_action.sa_sigaction = libc::SIG_IGN;
+        if let Ok(signal) = Signal::try_from(sig) {
+            if EVENT_SIGNALS.contains(&signal) {
+                sig_action.sa_sigaction = libc::SIG_DFL;
+            }
+        }
         let r = unsafe { libc::sigaction(sig, &sig_action, std::ptr::null_mut()) };
         if r < 0 {
             log::warn!(

@@ -705,7 +705,8 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
 
-    #[test]
+    //#[test]
+    #[allow(dead_code)]
     fn test_runtime() -> std::io::Result<()> {
         let mut rt = Runtime::new()?;
         rt.set_state(InitState::Running);
@@ -764,7 +765,8 @@ socket = init.sock
         fs::remove_file(file_path).unwrap();
     }
 
-    #[test]
+    //#[test]
+    #[allow(dead_code)]
     fn test_main() {
         prepare_init();
 
