@@ -14,7 +14,7 @@ done
 if [ ! -f "/etc/centos-release" ] && [ ! -f "/etc/fedora-release" ]; then
     required_packages=("gcc" "openssl-libs" "python3-pip" "musl-gcc" "clang" "util-linux-devel" "kmod-devel")
 else
-    required_packages=("gcc" "openssl-libs" "python3-pip" "musl-gcc" "clang" "kmod-devel")
+    required_packages=("gcc" "openssl-libs" "python3-pip" "musl-gcc" "clang" "libblkid-devel" "kmod-devel")
 fi
 missing_packages=()
 
