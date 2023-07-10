@@ -251,7 +251,12 @@ impl UnitRTData {
     }
 
     pub(self) fn dispatch_load_queue(&self) {
-        log::trace!("dispatch load queue");
+        if self.load_queue.borrow().is_empty() {
+            self.dispatch_target_dep_queue();
+            return;
+        }
+
+        log::debug!("Dispatching load queue");
 
         self.reli
             .set_last_frame2(ReliLastFrame::Queue as u32, ReliLastQue::Load as u32);
@@ -260,34 +265,27 @@ impl UnitRTData {
             //unitX pop from the load queue and then no need the ref of load queue
             //the unitX load process will borrow load queue as mut again
             // pop
-            let first_unit = self.load_queue.borrow_mut().pop_front();
-            match first_unit {
+            let unit = match self.load_queue.borrow_mut().pop_front() {
                 None => break,
-                Some(unit) => {
-                    // record + action
-                    self.reli.set_last_unit(unit.id());
-                    match unit.load() {
-                        Ok(()) => {
-                            let load_state = unit.load_state();
-                            if load_state == UnitLoadState::Loaded {
-                                self.push_target_dep_queue(Rc::clone(&unit));
-                            }
-                        }
-                        Err(e) => {
-                            log::error!("load unit [{}] failed: {}", unit.id(), e.to_string());
-                        }
-                    }
-                    self.reli.clear_last_unit();
-                }
-            }
-        }
-        self.reli.clear_last_frame();
+                Some(v) => v,
+            };
 
-        log::trace!("dispatch target dep queue");
-        self.reli
-            .set_last_frame2(ReliLastFrame::Queue as u32, ReliLastQue::TargetDeps as u32);
-        self.dispatch_target_dep_queue();
+            log::debug!("Loading unit: {}", unit.id());
+            self.reli.set_last_unit(unit.id());
+            if let Err(e) = unit.load() {
+                log::error!("Failed to load unit [{}]: {e}", unit.id());
+            }
+
+            let load_state = unit.load_state();
+            if load_state == UnitLoadState::Loaded {
+                self.push_target_dep_queue(Rc::clone(&unit));
+            }
+
+            self.reli.clear_last_unit();
+        }
+
         self.reli.clear_last_frame();
+        self.dispatch_target_dep_queue();
     }
 
     pub(self) fn unit_add_dependency(
@@ -307,17 +305,25 @@ impl UnitRTData {
     }
 
     fn dispatch_target_dep_queue(&self) {
-        loop {
-            let first_unit = self.target_dep_queue.borrow_mut().pop_front();
-            match first_unit {
-                None => break,
-                Some(unit) => {
-                    self.reli.set_last_unit(unit.id());
-                    dispatch_target_dep_unit(&self.db, &unit);
-                    self.reli.clear_last_unit();
-                }
-            }
+        if self.target_dep_queue.borrow().is_empty() {
+            return;
         }
+
+        log::debug!("Dispatching target dep queue");
+        self.reli
+            .set_last_frame2(ReliLastFrame::Queue as u32, ReliLastQue::TargetDeps as u32);
+
+        loop {
+            let unit = match self.target_dep_queue.borrow_mut().pop_front() {
+                None => break,
+                Some(v) => v,
+            };
+            self.reli.set_last_unit(unit.id());
+            dispatch_target_dep_unit(&self.db, &unit);
+            self.reli.clear_last_unit();
+        }
+
+        self.reli.clear_last_frame();
     }
 
     fn push_target_dep_queue(&self, unit: Rc<UnitX>) {

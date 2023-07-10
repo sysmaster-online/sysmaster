@@ -140,9 +140,7 @@ impl UnitLoadData {
 
     pub(self) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
         self.prepare_unit(name).map(|u| {
-            log::debug!("Try to load {name} by dispatching the load queue.");
             self.rt.dispatch_load_queue();
-            log::debug!("The loading state of {name}: {:?}", u.load_state());
             u
         })
     }
