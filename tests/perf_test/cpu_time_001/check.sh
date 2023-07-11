@@ -6,7 +6,7 @@ source "${work_dir}"/util_lib.sh
 set +e
 max=1000
 
-install_pkg nginx
+yum install -y nginx
 expect_eq $? 0 || exit 1
 
 cp -arf "${work_dir}"/tmp_units/*.service ${SYSMST_LIB_PATH} || exit 1

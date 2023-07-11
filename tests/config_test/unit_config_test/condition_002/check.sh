@@ -86,7 +86,7 @@ function test04() {
     test_user_2="test2_${RANDOM}"
     user_pw_1="PW!test1_${RANDOM}"
     user_pw_2="PW!test2_${RANDOM}"
-    install_pkg shadow sudo
+    yum install -y shadow sudo
     expect_eq $? 0 || return 1
     useradd "${test_user_1}"
     useradd "${test_user_2}"

@@ -34,7 +34,7 @@ function test01() {
     expect_eq $? 0 || return 1
 
     # user/group exist
-    install_pkg shadow
+    yum install -y shadow
     expect_eq $? 0 || return 1
     useradd "${test_user}"
     groupadd "${test_grp}"

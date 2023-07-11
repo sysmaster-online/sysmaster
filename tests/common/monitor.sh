@@ -2,7 +2,7 @@
 
 while ((1)); do
     time="$(date)"
-    init_data="$(ps aux | grep -v grep | grep '/usr/bin/init')"
+    init_data="$(ps aux | grep -v grep | grep '/usr/lib/sysmaster/init')"
     sysmst_data="$(ps aux | grep -v grep | grep '/usr/lib/sysmaster/sysmaster')"
 
     pid=$(echo ${init_data} | awk '{print $2}')

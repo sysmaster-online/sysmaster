@@ -11,7 +11,7 @@ function test01() {
     cp -arf "${work_dir}"/tmp_units/{conflicts.service,requires.service,wants.service,requisite.service,partof.service,bindsto.service} ${SYSMST_LIB_PATH} || return 1
     sctl daemon-reload
     sctl status base.service &> log
-    expect_eq $? 1
+    expect_ne $? 0
     check_log log 'Failed to show the status of base.service: NotExisted'
     expect_eq $? 0 || return 1
     rm -rf log

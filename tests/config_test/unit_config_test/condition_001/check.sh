@@ -165,7 +165,7 @@ function test03() {
     expect_eq $? 0 || return 1
 
     # ro mounted path
-    which mount || install_pkg /usr/bin/mount
+    which mount || yum install -y /usr/bin/mount
     expect_eq $? 0 || return 1
     dd if=/dev/zero of=/tmp/mountfile bs=1M count=10
     mkfs.ext4 /tmp/mountfile

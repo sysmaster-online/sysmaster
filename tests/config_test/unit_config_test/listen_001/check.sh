@@ -222,7 +222,7 @@ seed="1$((${RANDOM} % 1000))"
 test01_socket="/run/test01_${seed}.socket"
 test02_socket="/run/test02_${seed}.socket"
 test03_socket="/run/test03_${seed}.socket"
-install_pkg net-tools iproute || exit 1
+yum install -y net-tools iproute || exit 1
 
 run_sysmaster || return 1
 test01 || exit 1

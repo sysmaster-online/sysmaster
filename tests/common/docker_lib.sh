@@ -43,15 +43,32 @@ function load_isula_img() {
 
 function build_base_img() {
     cp -arf ${BUILD_PATH}/target/install "${TMP_DIR}"
+    cp -arf /etc/yum.repos.d "${TMP_DIR}"
 
     pushd "${TMP_DIR}"
-    cat << EOF > Dockerfile
+    if yum list sysmaster; then
+        cat << EOF > Dockerfile
 FROM ${BASE_IMG} as ${SYSMST_BASE_IMG}
-COPY install/usr/bin/sctl /usr/bin/
-COPY install/usr/bin/init /usr/bin/
-RUN mkdir /usr/lib/sysmaster
-COPY install/usr/lib/sysmaster /usr/lib/sysmaster/
+
+RUN rm -rf /etc/yum.repos.d && mkdir /etc/yum.repos.d
+COPY yum.repos.d /etc/yum.repos.d/
+RUN yum install -y sysmaster util-linux shadow sudo passwd net-tools iproute nmap
 EOF
+    else
+        cat << EOF > Dockerfile
+FROM ${BASE_IMG} as ${SYSMST_BASE_IMG}
+
+RUN rm -rf /etc/yum.repos.d && mkdir /etc/yum.repos.d
+COPY yum.repos.d /etc/yum.repos.d/
+RUN yum install -y util-linux shadow sudo passwd net-tools iproute nmap
+
+COPY install/usr/bin/sctl /usr/bin/
+RUN mkdir /usr/lib/sysmaster /etc/sysmaster
+COPY install/usr/lib/sysmaster /usr/lib/sysmaster/
+COPY install/etc/sysmaster /etc/sysmaster/
+RUN sed -i '/LogTarget/ s/=.*/="console-syslog"/' /etc/sysmaster/system.conf
+EOF
+    fi
     cat Dockerfile
     if ! docker build -t "${SYSMST_BASE_IMG}:latest" .; then
         log_error "build ${SYSMST_BASE_IMG} image failed!"
@@ -69,13 +86,29 @@ function build_isula_img() {
 
     pushd "${TMP_DIR}"
     img_name=$(isula-build ctr-img images | grep "${BASE_IMG}" | head -n1 | awk '{print $1}')
-    cat << EOF > Dockerfile
+    if yum list sysmaster; then
+        cat << EOF > Dockerfile
 FROM ${img_name} as ${SYSMST_BASE_IMG}
-COPY install/usr/bin/sctl /usr/bin/
-COPY install/usr/bin/init /usr/bin/
-RUN mkdir /usr/lib/sysmaster
-COPY install/usr/lib/sysmaster /usr/lib/sysmaster/
+
+RUN rm -rf /etc/yum.repos.d && mkdir /etc/yum.repos.d
+COPY yum.repos.d /usr/lib/sysmaster/
+RUN yum install -y sysmaster util-linux shadow sudo passwd net-tools iproute nmap
 EOF
+    else
+        cat << EOF > Dockerfile
+FROM ${img_name} as ${SYSMST_BASE_IMG}
+
+RUN rm -rf /etc/yum.repos.d && mkdir /etc/yum.repos.d
+COPY yum.repos.d /usr/lib/sysmaster/
+RUN yum install -y util-linux shadow sudo passwd net-tools iproute nmap
+
+COPY install/usr/bin/sctl /usr/bin/
+RUN mkdir /usr/lib/sysmaster /etc/sysmaster
+COPY install/usr/lib/sysmaster /usr/lib/sysmaster/
+COPY install/etc/sysmaster /etc/sysmaster/
+RUN sed -i '/LogTarget/ s/=.*/="console-syslog"/' /etc/sysmaster/system.conf
+EOF
+    fi
     cat Dockerfile
     if ! isula-build ctr-img build -o isulad:"${SYSMST_BASE_IMG}:latest" -f Dockerfile .; then
         log_error "build ${SYSMST_BASE_IMG} image failed!"

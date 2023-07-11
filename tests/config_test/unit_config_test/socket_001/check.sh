@@ -125,7 +125,7 @@ function test03() {
 seed="1$((${RANDOM} % 1000))"
 test_socket="/run/test_${seed}.socket"
 test_symlink="/dev/test_${seed}_link"
-install_pkg net-tools nmap || exit 1
+yum install -y net-tools nmap || exit 1
 
 run_sysmaster || exit 1
 test01 || exit 1

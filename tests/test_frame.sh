@@ -12,7 +12,9 @@ TMP_DIR=''
 function test_setup() {
     setenforce 0
 
-    install_sysmaster || return 1
+    if ! yum list sysmaster; then
+        install_sysmaster || return 1
+    fi
 
     if [ "${DOCKER_TEST}" == '1' ]; then
         if which isula-build; then
@@ -57,9 +59,8 @@ function setup_isula() {
 
 function test_cleanup() {
     [ -n "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"
-    rm -rf /usr/bin/sctl "${SYSMST_LIB_PATH}"
 
-    if [ "${DOCKER_TEST}" == '1' ]; then
+    if [ "${DOCKER_TEST}" == '1' ] && [ -n "${DOCKER_CMD}" ]; then
         cleanup_docker || return 1
     fi
 
