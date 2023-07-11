@@ -2518,7 +2518,7 @@ impl Source for ServiceMonitorData {
     }
 
     fn priority(&self) -> i8 {
-        0i8
+        100i8
     }
 }
 

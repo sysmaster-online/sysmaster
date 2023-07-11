@@ -351,7 +351,7 @@ impl Source for Notify {
     }
 
     fn priority(&self) -> i8 {
-        0i8
+        -8i8
     }
 
     fn dispatch(&self, _e: &Events) -> i32 {

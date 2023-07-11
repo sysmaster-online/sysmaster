@@ -227,7 +227,7 @@ impl Source for MountMonitorIo {
     }
 
     fn priority(&self) -> i8 {
-        0i8
+        -10i8
     }
 }
 
