@@ -14,7 +14,7 @@ use super::datastore::UnitDb;
 use super::entry::UnitX;
 use super::rentry::UnitRe;
 use crate::job::JobManager;
-use basic::fd_util;
+use basic::{fd_util, socket_util};
 use event::{EventState, EventType, Events, Source};
 use nix::cmsg_space;
 use nix::errno::Errno;
@@ -181,6 +181,9 @@ impl Notify {
             return Err(e);
         }
         socket::setsockopt(fd, sockopt::PassCred, &true)?;
+        if let Err(e) = socket_util::set_receive_buffer(fd, 1024 * 1014 * 8) {
+            log::error!("Failed to set the notify socket receive buffer: {e}");
+        }
 
         log::debug!("set event fd is: {}", fd);
         self.reli.fd_cloexec(fd, false)?;
