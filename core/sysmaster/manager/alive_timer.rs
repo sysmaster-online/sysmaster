@@ -10,11 +10,10 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use constants::ALIVE;
 use event::{EventState, EventType, Events, Source};
-use nix::errno::Errno;
-use nix::sys::socket::{self, MsgFlags};
+use nix::unistd::sleep;
 use std::cell::RefCell;
+use std::os::unix::net::UnixStream;
 use std::os::unix::prelude::RawFd;
 use std::rc::{Rc, Weak};
 
@@ -23,9 +22,9 @@ pub(super) struct AliveTimer {
 }
 
 impl AliveTimer {
-    pub(super) fn new(eventr: &Rc<Events>, fd: RawFd) -> AliveTimer {
+    pub(super) fn new(eventr: &Rc<Events>) -> AliveTimer {
         AliveTimer {
-            sub: AliveTimerSub::new(eventr, fd),
+            sub: AliveTimerSub::new(eventr),
         }
     }
 
@@ -43,10 +42,10 @@ struct AliveTimerSub {
 }
 
 impl AliveTimerSub {
-    pub(super) fn new(eventr: &Rc<Events>, fd: RawFd) -> Rc<AliveTimerSub> {
+    pub(super) fn new(eventr: &Rc<Events>) -> Rc<AliveTimerSub> {
         let sub = Rc::new(AliveTimerSub {
             event: Rc::clone(eventr),
-            data: Rc::new(AliveTimerData::new(fd)),
+            data: Rc::new(AliveTimerData::new()),
         });
         sub.data.set_sub(&sub);
         sub.register();
@@ -72,13 +71,11 @@ impl AliveTimerSub {
 struct AliveTimerData {
     // associated objects
     sub: RefCell<Weak<AliveTimerSub>>,
-    alive_fd: RawFd,
 }
 
 impl AliveTimerData {
-    pub(self) fn new(fd: RawFd) -> AliveTimerData {
+    pub(self) fn new() -> AliveTimerData {
         AliveTimerData {
-            alive_fd: fd,
             sub: RefCell::new(Weak::new()),
         }
     }
@@ -89,25 +86,6 @@ impl AliveTimerData {
 
     pub(self) fn sub(&self) -> Rc<AliveTimerSub> {
         self.sub.clone().into_inner().upgrade().unwrap()
-    }
-
-    fn keep_alive(&self) {
-        let mut count = 0;
-        loop {
-            if let Err(err) = socket::send(self.alive_fd, ALIVE.as_bytes(), MsgFlags::MSG_DONTWAIT)
-            {
-                if Errno::EINTR == err {
-                    continue;
-                }
-                if (Errno::EAGAIN == err || Errno::EWOULDBLOCK == err) && count < 3 {
-                    count += 1;
-                    continue;
-                }
-                log::error!("Failed to write ALIVE:{:?}", err);
-                return;
-            }
-            return;
-        }
     }
 }
 
@@ -129,11 +107,21 @@ impl Source for AliveTimerData {
     }
 
     fn time_relative(&self) -> u64 {
-        5000000
+        60000000
     }
 
     fn dispatch(&self, _: &Events) -> i32 {
-        self.keep_alive();
+        let socket_path = "/run/sysmaster/init.sock";
+        for _ in 0..3 {
+            match UnixStream::connect(socket_path) {
+                Ok(_) => break,
+                Err(e) => {
+                    log::error!("Couldn't connect {socket_path:?}: {e:?}, retry...");
+                    sleep(1);
+                    continue;
+                }
+            };
+        }
         self.sub().enable(true)
     }
 

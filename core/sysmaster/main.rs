@@ -12,7 +12,6 @@
 
 //! sysmaster-core bin
 mod job;
-mod keep_alive;
 mod manager;
 ///
 
@@ -32,7 +31,6 @@ mod utils;
 #[macro_use]
 extern crate lazy_static;
 extern crate clap;
-use crate::keep_alive::KeepAlive;
 use crate::manager::config::ManagerConfig;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
@@ -72,8 +70,6 @@ fn main() -> Result<()> {
     // The registration signal is at the beginning and has the highest priority!
     register_reexec_signal(true);
 
-    // Connect init.
-    KeepAlive::init();
     //---------------------------------------------------------------------------
 
     let manager_config = Rc::new(ManagerConfig::new(None));

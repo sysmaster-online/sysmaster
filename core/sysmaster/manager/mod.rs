@@ -20,7 +20,6 @@ pub(crate) mod config;
 pub(crate) mod pre_install;
 pub(crate) mod rentry;
 pub(crate) mod signals;
-use crate::keep_alive::KeepAlive;
 use crate::unit::UnitManagerX;
 use basic::path_lookup::LookupPaths;
 use basic::process_util::{self};
@@ -238,8 +237,7 @@ impl Manager {
             manager_config.clone(),
         ));
 
-        let kp = KeepAlive::get_instance();
-        let alive_timer = Rc::new(AliveTimer::new(&event, kp.get_fd()));
+        let alive_timer = Rc::new(AliveTimer::new(&event));
 
         Manager {
             event,
