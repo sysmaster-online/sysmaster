@@ -44,7 +44,9 @@ do
 done
 
 #fix cargo clippy fail in pre-commit when build.rs is changed
-RUSTC_WRAPPER="" cargo clippy --all-targets --features "default" --all -- -Dwarnings || exit 1
+# RUSTC_WRAPPER="" cargo clippy --all-targets --features "default" --all -- -Dwarnings || exit 1
+cargo check --all || cargo check --all || cargo check --all || exit 1
+git add . -A
 
 # run base check
 

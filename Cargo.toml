@@ -4,6 +4,7 @@ version = "0.2.4"
 authors = ["sysmaster"]
 edition = "2021"
 build = "build.rs"
+rust-version = "1.60.0"
 
 [lib]
 name = "sysmaster"
@@ -159,6 +160,6 @@ exclude = ["config", "tools"]
 
 
 # fix https://github.com/mdaffin/loopdev/issues/65
-#[patch.crates-io.loopdev]
-#git = 'https://github.com/mulkieran/loopdev'
-#branch = 'bump-bindgen-reduce-version'
+[patch.crates-io.loopdev]
+git = 'https://github.com/mulkieran/loopdev'
+branch = 'bump-bindgen-reduce-version'

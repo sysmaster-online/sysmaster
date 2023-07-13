@@ -45,14 +45,14 @@ repos:
 
   - repo: local
     hooks:
-      # - id: cargo-clippy
-      #   name: cargo clippy
-      #   description: Lint rust sources
-      #   entry: bash -c 'RUSTC_WRAPPER="" cargo clippy --all-targets --all-features --tests --benches --examples -- -v'
-      #   language: rust
-      #   pass_filenames: false
-      #   files: \.rs$
-      #   verbose: true
+      - id: cargo-clippy
+        name: cargo clippy
+        description: Lint rust sources
+        entry: bash -c 'RUSTC_WRAPPER="" cargo clippy -vvv --all-targets --features "default" --all -- -Dwarnings'
+        language: rust
+        pass_filenames: false
+        files: \.rs$
+        verbose: true
       - id: commit-msg
         name: commit-msg
         description: use commit-msg for commit.

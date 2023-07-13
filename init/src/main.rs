@@ -35,7 +35,7 @@ fn main() {
             }
         },
         Err(err) => eprintln!(
-            "Failed to new init, it may be necessary to run it as root :{:?}",
+            "Failed to start init, it may be necessary to run it as root :{:?}",
             err
         ),
     }

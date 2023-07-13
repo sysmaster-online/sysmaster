@@ -23,5 +23,5 @@ fn main() {
         .compile_protos(&["abi.proto"], &["./src/proto"])
         .unwrap();
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=abi.proto");
+    println!("cargo:rerun-if-changed=./src/proto/abi.proto");
 }

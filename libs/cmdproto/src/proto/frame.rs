@@ -251,7 +251,7 @@ mod tests {
         let socket_name = "./test-sctl.sock";
         let socket_path = Path::new(socket_name);
         if socket_path.exists() {
-            std::fs::remove_file(&socket_path).unwrap();
+            std::fs::remove_file(socket_path).unwrap();
         }
         thread::spawn(move || {
             thread::sleep(Duration::from_secs(1));
@@ -287,6 +287,6 @@ mod tests {
                 Err(_) => panic!("Unexpected error when accepting connection."),
             }
         }
-        std::fs::remove_file(&socket_path).unwrap();
+        std::fs::remove_file(socket_path).unwrap();
     }
 }

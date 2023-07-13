@@ -40,7 +40,7 @@ pub(crate) fn add_symlink(from_service: &str, to_where: &str) -> io::Result<()> 
 
     let _ = mkdir_parents_lable(&to);
 
-    let e = std::os::unix::fs::symlink(&from, &to);
+    let e = std::os::unix::fs::symlink(from, &to);
     match e {
         Err(a) => {
             if a.kind() == io::ErrorKind::AlreadyExists {

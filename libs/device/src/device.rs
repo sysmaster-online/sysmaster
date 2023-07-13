@@ -3001,7 +3001,7 @@ mod tests {
         let mut enumerator = DeviceEnumerator::new();
         enumerator.set_enumerator_type(DeviceEnumerationType::All);
         for device in enumerator.iter() {
-            test_device_one(&mut *device.as_ref().borrow_mut());
+            test_device_one(&mut device.as_ref().borrow_mut());
         }
     }
 
