@@ -1,7 +1,7 @@
 # Description: test devnode updating
 # Trigger: devctl trigger /dev/sda
 # Expect: create symlink /dev/test-devmaster/<IP_PATH>
-KERNEL=="sda", IMPORT{builtin}="path_id", SYMLINK="test-devmaster/$env{ID_PATH}"
+KERNEL=="sda", IMPORT{builtin}=="path_id", SYMLINK="test-devmaster/$env{ID_PATH}"
 
 # Description: test devnode updating
 # Trigger: devctl trigger /dev/sdb

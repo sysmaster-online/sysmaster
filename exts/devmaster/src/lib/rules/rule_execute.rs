@@ -53,6 +53,9 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use futures::stream::TryStreamExt;
+use rtnetlink::{new_connection, Handle};
+
 use crate::device_trace;
 use crate::{execute_err, execute_err_ignore_ENOENT, subst_format_map_err_ignore};
 use nix::errno::Errno;
@@ -526,6 +529,70 @@ impl ExecuteUnit {
 
         update_node(self.device.clone(), self.device_db_clone.clone())
     }
+
+    fn rename_netif(&self) -> Result<bool> {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+
+        if let Err(e) = rt.block_on(async {
+            let (connection, handle, _) = new_connection().unwrap();
+            tokio::spawn(connection);
+
+            set_link_name(
+                handle,
+                self.device.borrow().get_sysname().context(DeviceSnafu)?,
+                self.name.clone(),
+            )
+            .await
+            .context(RtnetlinkSnafu)
+        }) {
+            if e.get_errno() == nix::Error::EBUSY {
+                log_dev!(
+                    info,
+                    &self.device.borrow(),
+                    format!(
+                        "Network interface '{}' is busy, cannot rename to '{}'",
+                        self.device.borrow().get_sysname().context(DeviceSnafu)?,
+                        self.name.clone(),
+                    )
+                );
+                return Ok(false);
+            }
+
+            return Err(e);
+        }
+
+        log_dev!(
+            info,
+            &self.device.borrow(),
+            format!(
+                "Network interface '{}' is renamed from '{}' to '{}'",
+                self.device.borrow().get_ifindex().context(DeviceSnafu)?,
+                self.device.borrow().get_sysname().context(DeviceSnafu)?,
+                self.name.clone(),
+            )
+        );
+
+        Ok(true)
+    }
+}
+
+async fn set_link_name(
+    handle: Handle,
+    netif: String,
+    name: String,
+) -> Result<(), rtnetlink::Error> {
+    let mut links = handle.link().get().match_name(netif).execute();
+    if let Some(link) = links.try_next().await? {
+        handle
+            .link()
+            .set(link.header.index)
+            .name(name)
+            .execute()
+            .await?
+    } else {
+        log::error!("no link link {name} found");
+    }
+    Ok(())
 }
 
 /// manage processing units
@@ -579,7 +646,7 @@ impl ExecuteManager {
 
         self.execute_run();
 
-        // update rtnl: todo
+        // update rtnl
 
         // begin inotify watch: todo
 
@@ -595,16 +662,24 @@ impl ExecuteManager {
 
     /// execute rules
     pub(crate) fn execute_rules(&mut self) -> Result<()> {
+        assert!(self.current_unit.is_some());
+
+        let action = self
+            .current_unit
+            .as_ref()
+            .unwrap()
+            .device
+            .borrow()
+            .get_action()
+            .context(DeviceSnafu)
+            .log_dev_error(
+                &self.current_unit.as_ref().unwrap().device.borrow(),
+                "not from uevent",
+            )?;
+
         // restrict the scpoe of execute unit
         {
             let unit = self.current_unit.as_mut().unwrap();
-
-            let action = unit
-                .device
-                .borrow()
-                .get_action()
-                .context(DeviceSnafu)
-                .log_dev_error(&unit.device.borrow(), "not from uevent")?;
 
             if action == DeviceAction::Remove {
                 return self.execute_rules_on_remove();
@@ -644,7 +719,17 @@ impl ExecuteManager {
 
         self.apply_rules()?;
 
-        // rename netif: todo
+        // rename netif
+        if action == DeviceAction::Add {
+            self.current_unit
+                .as_ref()
+                .unwrap()
+                .rename_netif()
+                .log_dev_error(
+                    &self.current_unit.as_ref().unwrap().device.clone().borrow(),
+                    "rename ifname failed",
+                )?;
+        }
 
         // update devnode
         self.current_unit.as_mut().unwrap().update_devnode()?;

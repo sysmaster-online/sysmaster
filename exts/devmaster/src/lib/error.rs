@@ -95,6 +95,9 @@ pub enum Error {
 
     #[snafu(display("Invalid utf8 string: {}", source))]
     Utf8Error { source: Utf8Error },
+
+    #[snafu(display("Rtnetlink error: {}", source))]
+    Rtnetlink { source: rtnetlink::Error },
 }
 
 impl Error {
@@ -107,7 +110,13 @@ impl Error {
             } => nix::errno::from_i32(source.raw_os_error().unwrap_or_default()),
             Self::Device { source } => source.get_errno(),
             Self::Nix { source } => *source,
-            Self::Other { msg: _, errno: n } => *n,
+            Self::Other { msg: _, errno } => *errno,
+            Self::Rtnetlink { source } => match source {
+                rtnetlink::Error::NetlinkError(msg) => {
+                    nix::errno::Errno::from_i32(i32::abs(msg.code))
+                }
+                _ => nix::errno::Errno::EINVAL,
+            },
             _ => nix::errno::Errno::EINVAL,
         }
     }

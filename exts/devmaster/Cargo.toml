@@ -49,6 +49,7 @@ cluFlock = "1.2.7"
 input-event-codes = "5.16.8"
 ioctls = "0.6.1"
 ioctl-sys = "0.7.1"
+rtnetlink = "0.11.0"
 
 [build-dependencies]
 basic = { path = "../../libs/basic" }

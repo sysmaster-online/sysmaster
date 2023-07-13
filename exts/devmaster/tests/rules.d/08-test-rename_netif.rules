@@ -1,0 +1,7 @@
+ACTION!="add", GOTO="end"
+
+KERNEL=="docker0", SUBSYSTEM=="net", NAME="cjy"
+
+KERNEL=="lo", SUBSYSTEM=="net", NAME==cjy"
+
+LABEL="end"
