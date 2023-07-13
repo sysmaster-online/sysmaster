@@ -132,3 +132,174 @@ where
         0i8
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+    use std::{os::unix::net::UnixStream, rc::Rc};
+
+    use cmdproto::error::Result;
+    use cmdproto::proto::{execute::ExecuterAction, unit_comm};
+    use cmdproto::proto::{CommandRequest, ProstClientStream};
+    use constants::SCTL_SOCKET;
+    use event::{EventState, Events};
+    use sysmaster::rel::{ReliConf, Reliability};
+
+    use crate::manager::RELI_HISTORY_MAX_DBS;
+
+    use super::Commands;
+
+    struct TestExecAction {}
+
+    impl ExecuterAction for TestExecAction {
+        type Error = nix::Error;
+        type Status = nix::Error;
+
+        fn start(&self, _unit_name: &str) -> Result<(), Self::Error> {
+            Err(nix::Error::ENOENT)
+        }
+
+        fn stop(&self, _unit_name: &str) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn restart(&self, _unit_name: &str) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn reload(&self, _unit_name: &str) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn isolate(&self, _unit_name: &str) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn reset_failed(&self, _unit_name: &str) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn status(&self, _unit_name: &str) -> Result<Self::Status, Self::Error> {
+            Ok(nix::Error::EINVAL)
+        }
+
+        fn list_units(&self) -> Result<String, Self::Error> {
+            Ok(String::new())
+        }
+
+        fn suspend(&self) -> Result<i32, Self::Error> {
+            Ok(0)
+        }
+
+        fn poweroff(&self) -> Result<i32, Self::Error> {
+            Ok(0)
+        }
+
+        fn reboot(&self) -> Result<i32, Self::Error> {
+            Ok(0)
+        }
+
+        fn halt(&self) -> Result<i32, Self::Error> {
+            Ok(0)
+        }
+
+        fn disable(&self, _unit_name: &str) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn enable(&self, _unit_name: &str) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn mask(&self, _unit_name: &str) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn unmask(&self, _unit_name: &str) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn daemon_reload(&self) {}
+
+        fn daemon_reexec(&self) {}
+
+        fn switch_root(&self, _init: &[String]) -> Result<(), Self::Error> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_sctl_socket() {
+        if !nix::unistd::getuid().is_root() {
+            println!(
+                "We will create a socket under '/run', so we must be root to run this testcase."
+            );
+            return;
+        }
+
+        let mutex_main = Arc::new(Mutex::new(0));
+        let mutex_child = Arc::clone(&mutex_main);
+        let temp = mutex_main.lock().unwrap();
+
+        std::thread::spawn(move || {
+            /* Wait until the main thread are ready to process our request. */
+            let mut test_ok = mutex_child.lock().unwrap();
+            /* 1. Start a service as root. */
+            let stream = UnixStream::connect(SCTL_SOCKET).unwrap();
+            let mut client = ProstClientStream::new(stream);
+
+            let req = CommandRequest::new_unitcomm(
+                unit_comm::Action::Start,
+                vec!["foo.service".to_string()],
+            );
+            let data = client.execute(req).unwrap();
+            if !data
+                .message
+                .eq("Failed to start foo.service: ENOENT: No such file or directory")
+            {
+                return;
+            }
+            /* 2. Start a service as an unprivileged user. */
+            if nix::unistd::setuid(nix::unistd::Uid::from_raw(1000)).is_err() {
+                println!("Failed to set ourself to unprivileged user");
+                return;
+            }
+            let stream = UnixStream::connect(SCTL_SOCKET).unwrap();
+            let mut client = ProstClientStream::new(stream);
+
+            let req = CommandRequest::new_unitcomm(
+                unit_comm::Action::Start,
+                vec!["foo.service".to_string()],
+            );
+            let data = client.execute(req).unwrap();
+            if !data
+                .message
+                .eq("Failed to execute your command: Operation not permitted.")
+            {
+                return;
+            }
+            *test_ok = 1;
+        });
+
+        let exec_action = TestExecAction {};
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
+        /* This will remove the /run/sysmaster/sctl on the compiling environment. */
+        let command = Rc::new(Commands::new(&reli, exec_action));
+        let e = Events::new().unwrap();
+        e.add_source(command.clone()).unwrap();
+        e.set_enabled(command.clone(), EventState::On).unwrap();
+        /* Drop temp, let the child thread go. */
+        drop(temp);
+        /* We have 2 events to dispatch, but are not sure if we can get these events after waiting
+         * 300ms, 400ms. So we wait one more time to make sure all events are dispatched. */
+        e.run(300).unwrap();
+        e.run(400).unwrap();
+        e.run(300).unwrap();
+        let test_ok = mutex_main.lock().unwrap();
+        /* The value should be set to 1 in the child process, if everything works well. */
+        assert_eq!(*test_ok, 1);
+        e.del_source(command).unwrap();
+    }
+}
