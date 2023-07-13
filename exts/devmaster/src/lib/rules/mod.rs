@@ -24,9 +24,10 @@ use std::{
     sync::{Arc, RwLock, Weak},
 };
 
+pub mod exec_mgr;
+pub mod exec_unit;
 pub(crate) mod node;
-pub mod rule_execute;
-pub mod rule_load;
+pub mod rules_load;
 
 /// encapsulate all rule files
 #[derive(Debug, Clone)]
@@ -593,7 +594,7 @@ impl Default for FormatSubstitutionType {
 }
 
 /// escape type of execute unit
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub(crate) enum EscapeType {
     Unset,
     None,

@@ -14,16 +14,14 @@
 //!
 
 use super::{
-    node::{cleanup_node, static_node_apply_permissions, update_node},
-    EscapeType, FormatSubstitutionType, OperatorType, RuleFile, RuleLine, RuleLineType, RuleToken,
-    Rules, SubstituteType,
+    node::{cleanup_node, static_node_apply_permissions},
+    EscapeType, OperatorType, RuleFile, RuleLine, RuleLineType, RuleToken, Rules, SubstituteType,
     TokenType::*,
 };
 use crate::{
-    builtin::{BuiltinCommand, BuiltinManager, Netlink},
+    builtin::{BuiltinCommand, BuiltinManager},
     error::*,
     log_dev, log_rule_line, log_rule_token,
-    rules::FORMAT_SUBST_TABLE,
     utils::{
         cleanup_db, device_update_tag, get_property_from_string, initialize_device_usec,
         replace_chars, replace_ifname, resolve_subsystem_kernel, spawn, sysattr_subdir_subst,
@@ -41,559 +39,15 @@ use device::{Device, DeviceAction};
 use libc::{gid_t, mode_t, uid_t};
 use snafu::ResultExt;
 use std::{
-    borrow::BorrowMut,
-    cell::RefCell,
-    collections::HashMap,
-    fs::OpenOptions,
-    io::Read,
-    os::unix::fs::PermissionsExt,
-    rc::Rc,
-    sync::Arc,
-    sync::RwLock,
-    time::{Duration, SystemTime},
+    cell::RefCell, collections::HashMap, fs::OpenOptions, io::Read, os::unix::fs::PermissionsExt,
+    rc::Rc, sync::Arc, sync::RwLock, time::Duration,
 };
 
-use futures::stream::TryStreamExt;
-use rtnetlink::{new_connection, Handle};
-
 use crate::device_trace;
-use crate::{execute_err, execute_err_ignore_ENOENT, subst_format_map_err_ignore};
+use crate::rules::exec_unit::*;
+use crate::{execute_err, execute_err_ignore_ENOENT};
 use nix::errno::Errno;
 use nix::unistd::{Gid, Uid};
-
-/// the process unit on device uevent
-#[allow(missing_docs, dead_code)]
-struct ExecuteUnit {
-    device: Rc<RefCell<Device>>,
-    parent: Option<Rc<RefCell<Device>>>,
-    device_db_clone: Rc<RefCell<Device>>,
-    name: String,
-    program_result: String,
-    mode: Option<mode_t>,
-    uid: Option<Uid>,
-    gid: Option<Gid>,
-    seclabel_list: HashMap<String, String>,
-    /// builtin or program in run_list will execute in the end of rule execution
-    builtin_run_list: Vec<String>,
-    program_run_list: Vec<String>,
-
-    // exec_delay_usec: useconds_t,
-    birth_sec: SystemTime,
-    rtnl: RefCell<Option<Netlink>>,
-    builtin_run: u32,
-    /// set mask bit to 1 if the builtin failed or returned false
-    builtin_ret: u32,
-    escape_type: EscapeType,
-    watch: bool,
-    watch_final: bool,
-    group_final: bool,
-    owner_final: bool,
-    mode_final: bool,
-    name_final: bool,
-    devlink_final: bool,
-
-    run_final: bool,
-}
-
-impl ExecuteUnit {
-    pub fn new(device: Rc<RefCell<Device>>) -> ExecuteUnit {
-        // let mut unit = ProcessUnit::default();
-        // unit.device = device;
-        // unit
-        ExecuteUnit {
-            device,
-            parent: None,
-            device_db_clone: Rc::new(RefCell::new(Device::new())),
-            name: String::default(),
-            program_result: String::default(),
-            mode: None,
-            uid: None,
-            gid: None,
-            seclabel_list: HashMap::new(),
-            builtin_run_list: vec![],
-            program_run_list: vec![],
-
-            // exec_delay_usec: (),
-            birth_sec: SystemTime::now(),
-            rtnl: RefCell::new(None),
-            builtin_run: 0,
-            builtin_ret: 0,
-            escape_type: EscapeType::Unset,
-            watch: false,
-            watch_final: false,
-            group_final: false,
-            owner_final: false,
-            mode_final: false,
-            name_final: false,
-            devlink_final: false,
-            run_final: false,
-        }
-    }
-
-    /// apply runtime substitution on all formatters in the string
-    pub fn apply_format(&self, src: &str, replace_whitespace: bool) -> Result<String> {
-        let mut idx: usize = 0;
-        let mut ret = String::new();
-        while idx < src.len() {
-            match Self::get_subst_type(src, &mut idx, false)? {
-                Some((subst, attr)) => {
-                    let v = self.subst_format(subst, attr).map_err(|e| {
-                        log::debug!("failed to apply format: ({})", e);
-                        e
-                    })?;
-                    if replace_whitespace {
-                        ret += v.replace(' ', "_").as_str();
-                    } else {
-                        ret += v.as_str();
-                    }
-                }
-                None => {
-                    ret.push(src.chars().nth(idx).unwrap());
-                    idx += 1;
-                }
-            }
-        }
-
-        Ok(ret)
-    }
-
-    fn subst_format(
-        &self,
-        subst_type: FormatSubstitutionType,
-        attribute: Option<String>,
-    ) -> Result<String> {
-        match subst_type {
-            FormatSubstitutionType::Devnode => subst_format_map_err_ignore!(
-                self.device.borrow().get_devname(),
-                "devnode",
-                Errno::ENOENT,
-                String::default()
-            ),
-            FormatSubstitutionType::Attr => {
-                if attribute.is_none() {
-                    return Err(Error::RulesExecuteError {
-                        msg: "Attribute can not be empty for 'attr' formatter.".to_string(),
-                        errno: Errno::EINVAL,
-                    });
-                }
-                let attr = attribute.unwrap();
-
-                // try to read attribute value form path '[<SUBSYSTEM>/[SYSNAME]]<ATTRIBUTE>'
-                let value = if let Ok(v) = resolve_subsystem_kernel(&attr, true) {
-                    v
-                } else if let Ok(v) = self.device.borrow().get_sysattr_value(&attr) {
-                    v
-                } else if self.parent.is_some() {
-                    // try to get sysattr upwards
-                    // we did not check whether self.parent is equal to self.device
-                    // this perhaps will result in problems
-                    if let Ok(v) = self
-                        .parent
-                        .clone()
-                        .unwrap()
-                        .borrow()
-                        .get_sysattr_value(&attr)
-                    {
-                        v
-                    } else {
-                        return Ok(String::default());
-                    }
-                } else {
-                    return Ok(String::default());
-                };
-
-                let value = replace_chars(value.trim_end(), DEVMASTER_LEGAL_CHARS);
-
-                Ok(value)
-            }
-            FormatSubstitutionType::Env => {
-                if attribute.is_none() {
-                    return Err(Error::RulesExecuteError {
-                        msg: "Attribute can not be empty for 'env' formatter.".to_string(),
-                        errno: Errno::EINVAL,
-                    });
-                }
-
-                subst_format_map_err_ignore!(
-                    self.device.borrow().get_property_value(&attribute.unwrap()),
-                    "env",
-                    Errno::ENOENT,
-                    String::default()
-                )
-            }
-            FormatSubstitutionType::Kernel => {
-                Ok(self.device.borrow().get_sysname().unwrap_or_else(|_| {
-                    log::debug!("formatter 'kernel' got empty value.");
-                    "".to_string()
-                }))
-            }
-            FormatSubstitutionType::KernelNumber => subst_format_map_err_ignore!(
-                self.device.borrow().get_sysnum(),
-                "number",
-                Errno::ENOENT,
-                String::default()
-            ),
-            FormatSubstitutionType::Driver => {
-                if self.parent.is_none() {
-                    return Ok(String::default());
-                }
-
-                subst_format_map_err_ignore!(
-                    self.parent.as_ref().unwrap().borrow().get_driver(),
-                    "driver",
-                    Errno::ENOENT,
-                    String::default()
-                )
-            }
-            FormatSubstitutionType::Devpath => {
-                Ok(self.device.borrow().get_devpath().unwrap_or_else(|_| {
-                    log::debug!("formatter 'devpath' got empty value.");
-                    "".to_string()
-                }))
-            }
-            FormatSubstitutionType::Id => {
-                if self.parent.is_none() {
-                    return Ok(String::default());
-                }
-
-                Ok(self
-                    .parent
-                    .as_ref()
-                    .unwrap()
-                    .borrow()
-                    .get_sysname()
-                    .unwrap_or_else(|_| {
-                        log::debug!("formatter 'id' got empty value.");
-                        "".to_string()
-                    }))
-            }
-            FormatSubstitutionType::Major | FormatSubstitutionType::Minor => {
-                subst_format_map_err_ignore!(
-                    self.device.borrow().get_devnum().map(|n| {
-                        match subst_type {
-                            FormatSubstitutionType::Major => nix::sys::stat::major(n).to_string(),
-                            _ => nix::sys::stat::minor(n).to_string(),
-                        }
-                    }),
-                    "major|minor",
-                    Errno::ENOENT,
-                    "0".to_string()
-                )
-            }
-            FormatSubstitutionType::Result => {
-                if self.program_result.is_empty() {
-                    return Ok(String::default());
-                }
-
-                let (index, plus) = match attribute {
-                    Some(a) => {
-                        if a.ends_with('+') {
-                            let idx = match a[0..a.len() - 1].parse::<usize>() {
-                                Ok(i) => i,
-                                Err(_) => {
-                                    return Err(Error::RulesExecuteError {
-                                        msg: format!("invalid index {}", a),
-                                        errno: Errno::EINVAL,
-                                    })
-                                }
-                            };
-                            (idx, true)
-                        } else {
-                            let idx = match a[0..a.len()].parse::<usize>() {
-                                Ok(i) => i,
-                                Err(_) => {
-                                    return Err(Error::RulesExecuteError {
-                                        msg: format!("invalid index {}", a),
-                                        errno: Errno::EINVAL,
-                                    })
-                                }
-                            };
-                            (idx, false)
-                        }
-                    }
-                    None => (0, true),
-                };
-
-                let result = self.program_result.trim();
-                let mut ret = String::new();
-                for (i, p) in result.split_whitespace().enumerate() {
-                    if !plus {
-                        if i == index {
-                            return Ok(p.to_string());
-                        }
-                    } else if i >= index {
-                        ret += p;
-                        ret += " ";
-                    }
-                }
-                let ret = ret.trim_end().to_string();
-                if ret.is_empty() {
-                    log::debug!("the {}th part of result string is not found.", index)
-                }
-                Ok(ret)
-            }
-            FormatSubstitutionType::Parent => {
-                let parent = match self.device.borrow().get_parent() {
-                    Ok(p) => p,
-                    Err(e) => {
-                        if e.get_errno() == Errno::ENOENT {
-                            return Ok(String::default());
-                        }
-
-                        return Err(Error::RulesExecuteError {
-                            msg: format!("failed to substitute formatter 'parent': ({})", e),
-                            errno: e.get_errno(),
-                        });
-                    }
-                };
-                let devname = parent.borrow().get_devname();
-                subst_format_map_err_ignore!(devname, "parent", Errno::ENOENT, String::default())
-                    .map(|v| v.trim_start_matches("/dev/").to_string())
-            }
-            FormatSubstitutionType::Name => {
-                if !self.name.is_empty() {
-                    Ok(self.name.clone())
-                } else if let Ok(devname) = self.device.borrow().get_devname() {
-                    Ok(devname.trim_start_matches("/dev/").to_string())
-                } else {
-                    Ok(self.device.borrow().get_sysname().unwrap_or_else(|_| {
-                        log::debug!("formatter 'name' got empty value.");
-                        "".to_string()
-                    }))
-                }
-            }
-            FormatSubstitutionType::Links => {
-                let mut ret = String::new();
-                for link in &self.device.borrow().devlink_iter() {
-                    ret += link.trim_start_matches("/dev/");
-                    ret += " ";
-                }
-                Ok(ret.trim_end().to_string())
-            }
-            FormatSubstitutionType::Root => Ok("/dev".to_string()),
-            FormatSubstitutionType::Sys => Ok("/sys".to_string()),
-            FormatSubstitutionType::Invalid => Err(Error::RulesExecuteError {
-                msg: "invalid substitution formatter type.".to_string(),
-                errno: Errno::EINVAL,
-            }),
-        }
-    }
-
-    fn get_subst_type(
-        s: &str,
-        idx: &mut usize,
-        strict: bool,
-    ) -> Result<Option<(FormatSubstitutionType, Option<String>)>> {
-        if *idx >= s.len() {
-            return Err(Error::RulesExecuteError {
-                msg: "the idx is greater than the string length".to_string(),
-                errno: Errno::EINVAL,
-            });
-        }
-
-        let mut subst = FormatSubstitutionType::Invalid;
-        let mut attr: Option<String> = None;
-        let mut idx_b = *idx;
-
-        if s.chars().nth(idx_b) == Some('$') {
-            idx_b += 1;
-            if s.chars().nth(idx_b) == Some('$') {
-                *idx = idx_b;
-                return Ok(None);
-            }
-
-            if let Some(sub) = s.get(idx_b..) {
-                for ent in FORMAT_SUBST_TABLE.iter() {
-                    if sub.starts_with(ent.0) {
-                        subst = ent.2;
-                        idx_b += ent.0.len();
-                        break;
-                    }
-                }
-            }
-        } else if s.chars().nth(idx_b) == Some('%') {
-            idx_b += 1;
-            if s.chars().nth(idx_b) == Some('%') {
-                *idx = idx_b;
-                return Ok(None);
-            }
-
-            if let Some(sub) = s.get(idx_b..) {
-                for ent in FORMAT_SUBST_TABLE.iter() {
-                    if sub.starts_with(ent.1) {
-                        subst = ent.2;
-                        idx_b += 1;
-                        break;
-                    }
-                }
-            }
-        } else {
-            return Ok(None);
-        }
-
-        if subst == FormatSubstitutionType::Invalid {
-            if strict {
-                return Err(Error::RulesExecuteError {
-                    msg: "single $ or % symbol is invalid.".to_string(),
-                    errno: Errno::EINVAL,
-                });
-            } else {
-                return Ok(None);
-            }
-        }
-
-        if s.chars().nth(idx_b) == Some('{') {
-            let left = idx_b + 1;
-            let right = if let Some(sub) = s.get(left..) {
-                match sub.find('}') {
-                    Some(i) => left + i,
-                    None => {
-                        return Err(Error::RulesExecuteError {
-                            msg: "unclosed brackets.".to_string(),
-                            errno: Errno::EINVAL,
-                        })
-                    }
-                }
-            } else {
-                return Err(Error::RulesExecuteError {
-                    msg: "unclosed brackets.".to_string(),
-                    errno: Errno::EINVAL,
-                });
-            };
-
-            attr = Some(s.get(left..right).unwrap().to_string());
-            idx_b = right + 1;
-        }
-
-        *idx = idx_b;
-        Ok(Some((subst, attr)))
-    }
-
-    pub(crate) fn update_devnode(&mut self) -> Result<()> {
-        if let Err(e) = self.device.borrow().get_devnum() {
-            if e.is_errno(Errno::ENOENT) {
-                return Ok(());
-            }
-            log_dev!(error, self.device.borrow(), e);
-            return Err(Error::Device { source: e });
-        }
-
-        if self.uid.is_none() {
-            match self.device.borrow().get_devnode_uid() {
-                Ok(uid) => self.uid = Some(uid),
-                Err(e) => {
-                    if !e.is_errno(Errno::ENOENT) {
-                        return Err(Error::Device { source: e });
-                    }
-                }
-            }
-        }
-
-        if self.gid.is_none() {
-            match self.device.borrow().get_devnode_gid() {
-                Ok(gid) => self.gid = Some(gid),
-                Err(e) => {
-                    if !e.is_errno(Errno::ENOENT) {
-                        return Err(Error::Device { source: e });
-                    }
-                }
-            }
-        }
-
-        if self.mode.is_none() {
-            match self.device.borrow().get_devnode_mode() {
-                Ok(mode) => self.mode = Some(mode),
-                Err(e) => {
-                    if !e.is_errno(Errno::ENOENT) {
-                        return Err(Error::Device { source: e });
-                    }
-                }
-            }
-        }
-
-        let apply_mac = self
-            .device
-            .borrow()
-            .get_action()
-            .map(|action| action == DeviceAction::Add)
-            .unwrap_or(false);
-
-        super::node::node_apply_permissions(
-            self.device.clone(),
-            apply_mac,
-            self.mode,
-            self.uid,
-            self.gid,
-            &self.seclabel_list,
-        )?;
-
-        update_node(self.device.clone(), self.device_db_clone.clone())
-    }
-
-    fn rename_netif(&self) -> Result<bool> {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-
-        if let Err(e) = rt.block_on(async {
-            let (connection, handle, _) = new_connection().unwrap();
-            tokio::spawn(connection);
-
-            set_link_name(
-                handle,
-                self.device.borrow().get_sysname().context(DeviceSnafu)?,
-                self.name.clone(),
-            )
-            .await
-            .context(RtnetlinkSnafu)
-        }) {
-            if e.get_errno() == nix::Error::EBUSY {
-                log_dev!(
-                    info,
-                    &self.device.borrow(),
-                    format!(
-                        "Network interface '{}' is busy, cannot rename to '{}'",
-                        self.device.borrow().get_sysname().context(DeviceSnafu)?,
-                        self.name.clone(),
-                    )
-                );
-                return Ok(false);
-            }
-
-            return Err(e);
-        }
-
-        log_dev!(
-            info,
-            &self.device.borrow(),
-            format!(
-                "Network interface '{}' is renamed from '{}' to '{}'",
-                self.device.borrow().get_ifindex().context(DeviceSnafu)?,
-                self.device.borrow().get_sysname().context(DeviceSnafu)?,
-                self.name.clone(),
-            )
-        );
-
-        Ok(true)
-    }
-}
-
-async fn set_link_name(
-    handle: Handle,
-    netif: String,
-    name: String,
-) -> Result<(), rtnetlink::Error> {
-    let mut links = handle.link().get().match_name(netif).execute();
-    if let Some(link) = links.try_next().await? {
-        handle
-            .link()
-            .set(link.header.index)
-            .name(name)
-            .execute()
-            .await?
-    } else {
-        log::error!("no link link {name} found");
-    }
-    Ok(())
-}
 
 /// manage processing units
 pub struct ExecuteManager {
@@ -664,58 +118,48 @@ impl ExecuteManager {
     pub(crate) fn execute_rules(&mut self) -> Result<()> {
         assert!(self.current_unit.is_some());
 
-        let action = self
-            .current_unit
-            .as_ref()
-            .unwrap()
-            .device
+        let device = self.current_unit.as_ref().unwrap().get_device();
+
+        let action = device
             .borrow()
             .get_action()
             .context(DeviceSnafu)
-            .log_dev_error(
-                &self.current_unit.as_ref().unwrap().device.borrow(),
-                "not from uevent",
-            )?;
+            .log_dev_error(&device.borrow(), "not from uevent")?;
 
-        // restrict the scpoe of execute unit
-        {
-            let unit = self.current_unit.as_mut().unwrap();
+        if action == DeviceAction::Remove {
+            return self.execute_rules_on_remove();
+        }
 
-            if action == DeviceAction::Remove {
-                return self.execute_rules_on_remove();
-            }
+        // inotify watch end: todo
 
-            // inotify watch end: todo
+        // clone device with db
+        let _ = self
+            .current_unit
+            .as_ref()
+            .unwrap()
+            .clone_device_db()
+            .log_dev_debug(&device.borrow(), "failed to clone with db");
+        let device_db_clone = self.current_unit.as_ref().unwrap().get_device_db_clone();
 
-            // clone device with db
-            unit.device_db_clone =
-                Rc::new(RefCell::new(unit.device.borrow().clone_with_db().map_err(
-                    |e| Error::RulesExecuteError {
-                        msg: format!("failed to clone with db ({})", e),
-                        errno: e.get_errno(),
-                    },
-                )?));
-
-            // copy all tags to cloned device
-            for tag in &unit.device.borrow().tag_iter() {
-                unit.device_db_clone
-                    .borrow()
-                    .add_tag(tag, false)
-                    .map_err(|e| Error::RulesExecuteError {
-                        msg: format!("failed to add tag ({})", e),
-                        errno: e.get_errno(),
-                    })?;
-            }
-
-            // add property to cloned device
-            unit.device_db_clone
+        // copy all tags to cloned device
+        for tag in &device.borrow().tag_iter() {
+            device_db_clone
                 .borrow()
-                .add_property("ID_RENAMING", "")
+                .add_tag(tag, false)
                 .map_err(|e| Error::RulesExecuteError {
                     msg: format!("failed to add tag ({})", e),
                     errno: e.get_errno(),
                 })?;
         }
+
+        // add property to cloned device
+        device_db_clone
+            .borrow()
+            .add_property("ID_RENAMING", "")
+            .map_err(|e| Error::RulesExecuteError {
+                msg: format!("failed to add tag ({})", e),
+                errno: e.get_errno(),
+            })?;
 
         self.apply_rules()?;
 
@@ -725,89 +169,55 @@ impl ExecuteManager {
                 .as_ref()
                 .unwrap()
                 .rename_netif()
-                .log_dev_error(
-                    &self.current_unit.as_ref().unwrap().device.clone().borrow(),
-                    "rename ifname failed",
-                )?;
+                .log_dev_error(&device.borrow(), "rename ifname failed")?;
         }
 
         // update devnode
-        self.current_unit.as_mut().unwrap().update_devnode()?;
+        self.current_unit.as_ref().unwrap().update_devnode()?;
 
         // preserve old, or get new initialization timestamp
-        initialize_device_usec(
-            self.current_unit.as_ref().unwrap().device.clone(),
-            self.current_unit.as_ref().unwrap().device_db_clone.clone(),
-        )
-        .log_dev_error(
-            &self.current_unit.as_ref().unwrap().device.borrow(),
-            "failed to initialize device timestamp",
-        )?;
+        initialize_device_usec(device.clone(), device_db_clone.clone())
+            .log_dev_error(&device.borrow(), "failed to initialize device timestamp")?;
 
         // update tags and database
-        let _ = device_update_tag(
-            self.current_unit.as_ref().unwrap().device.clone(),
-            Some(self.current_unit.as_ref().unwrap().device_db_clone.clone()),
-            true,
-        );
+        let _ = device_update_tag(device.clone(), Some(device_db_clone.clone()), true);
 
-        self.current_unit
-            .as_ref()
-            .unwrap()
-            .device
+        device
             .borrow()
             .update_db()
             .context(DeviceSnafu)
             .log_error("failed to update db")?;
 
-        self.current_unit
-            .as_ref()
-            .unwrap()
-            .device
-            .borrow()
-            .set_is_initialized();
+        device.borrow().set_is_initialized();
 
         Ok(())
     }
 
     /// execute rules on remove uevent
     pub(crate) fn execute_rules_on_remove(&mut self) -> Result<()> {
-        self.current_unit
-            .as_ref()
-            .unwrap()
-            .device
+        assert!(self.current_unit.is_some());
+
+        let device = self.current_unit.as_ref().unwrap().get_device();
+
+        device
             .borrow()
             .read_db_internal(true)
             .context(DeviceSnafu)
             .log_error("remove event failed")?;
 
-        device_update_tag(
-            self.current_unit.as_ref().unwrap().device.clone(),
-            None,
-            false,
-        )
-        .log_error("remove event failed")?;
+        device_update_tag(device.clone(), None, false).log_error("remove event failed")?;
 
-        cleanup_db(self.current_unit.as_ref().unwrap().device.clone())
-            .log_error("cleanup db failed")?;
+        cleanup_db(device.clone()).log_error("cleanup db failed")?;
 
         // todo: watch end
 
         let ret = self.apply_rules();
 
-        if self
-            .current_unit
-            .as_ref()
-            .unwrap()
-            .device
-            .borrow()
-            .get_devnum()
-            .is_err()
-        {
+        if device.borrow().get_devnum().is_err() {
             return ret;
         }
 
-        let _ = cleanup_node(self.current_unit.as_ref().unwrap().device.clone());
+        let _ = cleanup_node(device.clone());
 
         ret
     }
@@ -842,9 +252,8 @@ impl ExecuteManager {
     pub(crate) fn apply_rule_file(&mut self) -> Result<()> {
         self.current_rule_line = self
             .current_rule_file
-            .clone()
-            .unwrap()
             .as_ref()
+            .unwrap()
             .read()
             .unwrap()
             .lines
@@ -863,6 +272,9 @@ impl ExecuteManager {
     /// normally return the next rule line after current line
     /// if current line has goto label, use the line with the target label as the next line
     pub(crate) fn apply_rule_line(&mut self) -> Result<Option<Arc<RwLock<RuleLine>>>> {
+        assert!(self.current_unit.is_some());
+        assert!(self.current_rule_line.is_some());
+
         // only apply rule token on parent device once
         // that means if some a parent device matches the token, do not match any parent tokens in the following
         let mut parents_done = false;
@@ -870,8 +282,10 @@ impl ExecuteManager {
         // if the current line does not intersect with the mask, skip applying current line.
         let mut mask = RuleLineType::HAS_GOTO | RuleLineType::UPDATE_SOMETHING;
 
-        let device = self.current_unit.as_ref().unwrap().device.clone();
+        let current_unit = self.current_unit.as_ref().unwrap();
+        let device = current_unit.get_device();
         let action = device.borrow().get_action().context(DeviceSnafu)?;
+        let current_line = self.current_rule_line.clone().unwrap();
 
         if action != DeviceAction::Remove {
             if device.borrow().get_devnum().is_ok() {
@@ -884,52 +298,23 @@ impl ExecuteManager {
         }
 
         // if the current line does not match the mask, skip to next line.
-        if (self
-            .current_rule_line
-            .as_ref()
-            .unwrap()
-            .read()
-            .unwrap()
-            .r#type
-            & mask)
-            .bits()
-            == 0
-        {
+        if (current_line.read().unwrap().r#type & mask).bits() == 0 {
             log_rule_line!(
                 debug,
-                self.current_rule_line.as_ref().unwrap().read().unwrap(),
+                current_line.read().unwrap(),
                 "mask does not match, ignoring this line"
             );
-            return Ok(self
-                .current_rule_line
-                .clone()
-                .unwrap()
-                .as_ref()
-                .read()
-                .unwrap()
-                .next
-                .clone());
+            return Ok(current_line.read().unwrap().next.clone());
         }
 
-        self.current_rule_token = match self.current_rule_line.clone() {
-            Some(line) => line.as_ref().read().unwrap().tokens.clone(),
-            None => return Ok(None),
-        };
+        self.current_rule_token = current_line.read().unwrap().tokens.clone();
 
-        self.current_unit.as_mut().unwrap().escape_type = EscapeType::Unset;
+        current_unit.set_escape_type(EscapeType::Unset);
 
         for token in RuleToken::iter(self.current_rule_token.clone()) {
             self.current_rule_token = Some(token.clone());
 
-            if self
-                .current_rule_token
-                .clone()
-                .unwrap()
-                .as_ref()
-                .read()
-                .unwrap()
-                .is_for_parents()
-            {
+            if token.read().unwrap().is_for_parents() {
                 if parents_done {
                     continue;
                 }
@@ -937,79 +322,36 @@ impl ExecuteManager {
                     // if current rule token does not match, abort applying the rest tokens in this line
                     log_rule_token!(debug, token.as_ref().read().unwrap(), "fails to match.");
 
-                    return Ok(self
-                        .current_rule_line
-                        .clone()
-                        .unwrap()
-                        .as_ref()
-                        .read()
-                        .unwrap()
-                        .next
-                        .clone());
+                    return Ok(current_line.read().unwrap().next.clone());
                 }
 
                 parents_done = true;
                 continue;
             }
 
-            if !self.apply_rule_token(self.current_unit.as_ref().unwrap().device.clone())? {
+            if !self.apply_rule_token(device.clone())? {
                 // if current rule token does not match, abort applying the rest tokens in this line
                 log_rule_token!(debug, token.as_ref().read().unwrap(), "fails to match.");
 
-                return Ok(self
-                    .current_rule_line
-                    .clone()
-                    .unwrap()
-                    .as_ref()
-                    .read()
-                    .unwrap()
-                    .next
-                    .clone());
+                return Ok(current_line.read().unwrap().next.clone());
             }
         }
 
-        let goto_line = self
-            .current_rule_line
-            .clone()
-            .unwrap()
-            .as_ref()
-            .read()
-            .unwrap()
-            .goto_line
-            .clone();
+        let goto_line = current_line.read().unwrap().goto_line.clone();
 
         match goto_line {
             Some(line) => Ok(Some(line)),
-            None => Ok(self
-                .current_rule_line
-                .clone()
-                .unwrap()
-                .as_ref()
-                .read()
-                .unwrap()
-                .next
-                .clone()),
+            None => Ok(current_line.read().unwrap().next.clone()),
         }
     }
 
     /// apply rule token on device
     pub(crate) fn apply_rule_token(&mut self, device: Rc<RefCell<Device>>) -> Result<bool> {
-        let token_type = self
-            .current_rule_token
-            .clone()
-            .unwrap()
-            .as_ref()
-            .read()
-            .unwrap()
-            .r#type;
+        assert!(self.current_unit.is_some());
 
-        let token = self
-            .current_rule_token
-            .as_ref()
-            .unwrap()
-            .as_ref()
-            .read()
-            .unwrap();
+        let token = self.current_rule_token.as_ref().unwrap().read().unwrap();
+        let token_type = token.r#type;
+        let current_unit = self.current_unit.as_ref().unwrap();
 
         log_rule_token!(debug, token, "applying token");
 
@@ -1038,11 +380,7 @@ impl ExecuteManager {
 
                 Ok(token.op == OperatorType::Nomatch)
             }
-            MatchName => {
-                let name = self.current_unit.as_ref().unwrap().name.clone();
-
-                Ok(token.pattern_match(&name))
-            }
+            MatchName => Ok(token.pattern_match(&current_unit.get_name())),
             MatchEnv => {
                 let value = match device
                     .borrow()
@@ -1088,19 +426,12 @@ impl ExecuteManager {
 
                 Ok(token.pattern_match(&driver))
             }
-            MatchAttr | MatchParentsAttr => token
-                .attr_match(device, self.current_unit.as_ref().unwrap())
-                .map_err(|e| {
-                    log_rule_token!(debug, token, e);
-                    e
-                }),
+            MatchAttr | MatchParentsAttr => token.attr_match(device, current_unit).map_err(|e| {
+                log_rule_token!(debug, token, e);
+                e
+            }),
             MatchTest => {
-                let mut val = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let mut val = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log::debug!("failed to apply formatter: ({})", e);
@@ -1166,12 +497,7 @@ impl ExecuteManager {
                 }
             }
             MatchImportFile => {
-                let file_name = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let file_name = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log::debug!("failed to apply formatter: ({})", e);
@@ -1228,12 +554,7 @@ impl ExecuteManager {
                 Ok(token.op == OperatorType::Match)
             }
             MatchImportProgram => {
-                let cmd = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let cmd = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log::debug!("failed to apply formatter: ({})", e);
@@ -1294,8 +615,8 @@ impl ExecuteManager {
                 };
 
                 let mask = 0b1 << builtin as u32;
-                let already_run = self.current_unit.as_ref().unwrap().builtin_run;
-                let run_result = self.current_unit.as_ref().unwrap().builtin_ret;
+                let already_run = current_unit.get_builtin_run();
+                let run_result = current_unit.get_builtin_ret();
 
                 if self.builtin_mgr.run_once(builtin) {
                     if already_run & mask != 0 {
@@ -1310,15 +631,10 @@ impl ExecuteManager {
                         return Ok((token.op == OperatorType::Match) ^ (run_result & mask > 0));
                     }
 
-                    self.current_unit.as_mut().unwrap().builtin_run = already_run | mask;
+                    current_unit.set_builtin_run(already_run | mask);
                 }
 
-                let cmd = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let cmd = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log_rule_token!(
@@ -1344,18 +660,14 @@ impl ExecuteManager {
                     format!("Importing properties from builtin cmd '{}'", cmd)
                 );
 
-                match self.builtin_mgr.run(
-                    self.current_unit.as_ref().unwrap().device.clone(),
-                    &mut self.current_unit.as_mut().unwrap().rtnl,
-                    builtin,
-                    argv.len() as i32,
-                    argv,
-                    false,
-                ) {
+                match self
+                    .builtin_mgr
+                    .run(&current_unit, builtin, argv.len() as i32, argv, false)
+                {
                     Ok(ret) => {
                         // if builtin command returned false, set the mask bit to 1
-                        self.current_unit.as_mut().unwrap().builtin_ret =
-                            run_result | ((!ret as u32) << builtin as u32);
+                        current_unit
+                            .set_builtin_ret(run_result | ((!ret as u32) << builtin as u32));
                         Ok((token.op == OperatorType::Nomatch) ^ ret)
                     }
                     Err(e) => {
@@ -1365,7 +677,7 @@ impl ExecuteManager {
                 }
             }
             MatchImportDb => {
-                let dev_db_clone = self.current_unit.as_ref().unwrap().device_db_clone.clone();
+                let dev_db_clone = current_unit.get_device_db_clone();
 
                 let val = match dev_db_clone.borrow().get_property_value(&token.value) {
                     Ok(v) => v,
@@ -1424,12 +736,7 @@ impl ExecuteManager {
                 Ok(token.op == OperatorType::Match)
             }
             MatchImportParent => {
-                let value = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let value = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log::debug!("failed to apply formatter: ({})", e);
@@ -1498,16 +805,9 @@ impl ExecuteManager {
 
                 Ok(token.op == OperatorType::Match)
             }
-            MatchResult => {
-                Ok(token.pattern_match(&self.current_unit.as_ref().unwrap().program_result))
-            }
+            MatchResult => Ok(token.pattern_match(&current_unit.get_program_result())),
             MatchProgram => {
-                let cmd = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let cmd = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log_rule_token!(
@@ -1540,17 +840,17 @@ impl ExecuteManager {
                     &result
                 );
 
-                self.current_unit.as_mut().unwrap().program_result = result;
+                current_unit.set_program_result(result);
 
                 Ok(token.op == OperatorType::Match)
             }
             AssignOptionsStringEscapeNone => {
-                self.current_unit.as_mut().unwrap().escape_type = EscapeType::None;
+                current_unit.set_escape_type(EscapeType::None);
                 log_rule_token!(debug, token, "set string escape to 'none'");
                 Ok(true)
             }
             AssignOptionsStringEscapeReplace => {
-                self.current_unit.as_mut().unwrap().escape_type = EscapeType::Replace;
+                current_unit.set_escape_type(EscapeType::Replace);
                 log_rule_token!(debug, token, "set string escape to 'replace'");
                 Ok(true)
             }
@@ -1567,25 +867,24 @@ impl ExecuteManager {
                 Ok(true)
             }
             AssignOptionsWatch => {
-                if self.current_unit.as_ref().unwrap().watch_final {
+                if current_unit.get_watch_final() {
                     log_rule_token!(
                         debug,
                         token,
-                        format!(
-                            "watch is fixed to '{}'",
-                            self.current_unit.as_mut().unwrap().watch
-                        )
+                        format!("watch is fixed to '{}'", current_unit.is_watch())
                     );
                     return Ok(true);
                 }
 
                 if token.op == OperatorType::AssignFinal {
-                    self.current_unit.as_mut().unwrap().watch_final = true;
+                    current_unit.set_watch_final(true);
                 }
 
                 // token.value is either "true" or "false"
-                self.current_unit.as_mut().unwrap().watch =
-                    execute_err!(token, token.value.parse::<bool>().context(ParseBoolSnafu))?;
+                current_unit.set_watch(execute_err!(
+                    token,
+                    token.value.parse::<bool>().context(ParseBoolSnafu)
+                )?);
 
                 log_rule_token!(debug, token, format!("set watch to '{}'", token.value));
 
@@ -1601,7 +900,7 @@ impl ExecuteManager {
                 todo!()
             }
             AssignOwner => {
-                if self.current_unit.as_ref().unwrap().owner_final {
+                if current_unit.is_owner_final() {
                     log_rule_token!(
                         debug,
                         token,
@@ -1611,15 +910,10 @@ impl ExecuteManager {
                 }
 
                 if token.op == OperatorType::AssignFinal {
-                    self.current_unit.as_mut().unwrap().owner_final = true;
+                    current_unit.set_owner_final(true);
                 }
 
-                let owner = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let owner = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log_rule_token!(
@@ -1639,7 +933,7 @@ impl ExecuteManager {
                             format!("assign uid '{}' from owner '{}'", u.uid, owner)
                         );
 
-                        self.current_unit.as_mut().unwrap().uid = Some(u.uid);
+                        current_unit.set_uid(Some(u.uid));
                     }
                     Err(_) => {
                         log_rule_token!(error, token, format!("unknown user '{}'", owner));
@@ -1652,7 +946,7 @@ impl ExecuteManager {
                 /*
                  *  owner id is already resolved during rules loading, token.value is the uid string
                  */
-                if self.current_unit.as_ref().unwrap().owner_final {
+                if current_unit.is_owner_final() {
                     log_rule_token!(
                         debug,
                         token,
@@ -1662,19 +956,19 @@ impl ExecuteManager {
                 }
 
                 if token.op == OperatorType::AssignFinal {
-                    self.current_unit.as_mut().unwrap().owner_final = true;
+                    current_unit.set_owner_final(true);
                 }
 
                 log_rule_token!(debug, token, format!("assign uid '{}'", token.value));
 
                 let uid = execute_err!(token, token.value.parse::<uid_t>().context(ParseIntSnafu))?;
 
-                self.current_unit.as_mut().unwrap().uid = Some(Uid::from_raw(uid));
+                current_unit.set_uid(Some(Uid::from_raw(uid)));
 
                 Ok(true)
             }
             AssignGroup => {
-                if self.current_unit.as_ref().unwrap().group_final {
+                if current_unit.is_group_final() {
                     log_rule_token!(
                         debug,
                         token,
@@ -1684,15 +978,10 @@ impl ExecuteManager {
                 }
 
                 if token.op == OperatorType::AssignFinal {
-                    self.current_unit.as_mut().unwrap().group_final = true;
+                    current_unit.set_group_final(true);
                 }
 
-                let group = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let group = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log_rule_token!(
@@ -1712,7 +1001,7 @@ impl ExecuteManager {
                             format!("assign gid '{}' from group '{}'", g.gid, group)
                         );
 
-                        self.current_unit.as_mut().unwrap().gid = Some(g.gid);
+                        current_unit.set_gid(Some(g.gid));
                     }
                     Err(_) => {
                         log_rule_token!(error, token, format!("unknown group '{}'", group));
@@ -1725,7 +1014,7 @@ impl ExecuteManager {
                 /*
                  *  group id is already resolved during rules loading, token.value is the gid string
                  */
-                if self.current_unit.as_ref().unwrap().group_final {
+                if current_unit.is_group_final() {
                     log_rule_token!(
                         debug,
                         token,
@@ -1735,19 +1024,19 @@ impl ExecuteManager {
                 }
 
                 if token.op == OperatorType::AssignFinal {
-                    self.current_unit.as_mut().unwrap().group_final = true;
+                    current_unit.set_group_final(true);
                 }
 
                 log_rule_token!(debug, token, format!("assign gid '{}'", token.value));
 
                 let gid = execute_err!(token, token.value.parse::<gid_t>().context(ParseIntSnafu))?;
 
-                self.current_unit.as_mut().unwrap().gid = Some(Gid::from_raw(gid));
+                current_unit.set_gid(Some(Gid::from_raw(gid)));
 
                 Ok(true)
             }
             AssignMode => {
-                if self.current_unit.as_ref().unwrap().mode_final {
+                if current_unit.is_mode_final() {
                     log_rule_token!(
                         debug,
                         token,
@@ -1757,15 +1046,10 @@ impl ExecuteManager {
                 }
 
                 if token.op == OperatorType::AssignFinal {
-                    self.current_unit.as_mut().unwrap().mode_final = true;
+                    current_unit.set_mode_final(true);
                 }
 
-                let mode = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let mode = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log_rule_token!(
@@ -1780,7 +1064,7 @@ impl ExecuteManager {
                 match parse_mode(&mode) {
                     Ok(v) => {
                         log_rule_token!(debug, token, format!("assign mode '{}'", v));
-                        self.current_unit.as_mut().unwrap().mode = Some(v);
+                        current_unit.set_mode(Some(v));
                     }
                     Err(_) => {
                         log_rule_token!(error, token, format!("unknown mode string '{}'", mode));
@@ -1798,7 +1082,7 @@ impl ExecuteManager {
                  * the rules token carry the raw data and automatically transform to
                  * specific object during executing for acceleration.
                  */
-                if self.current_unit.as_ref().unwrap().mode_final {
+                if current_unit.is_mode_final() {
                     log_rule_token!(
                         debug,
                         token,
@@ -1808,13 +1092,13 @@ impl ExecuteManager {
                 }
 
                 if token.op == OperatorType::AssignFinal {
-                    self.current_unit.as_mut().unwrap().mode_final = true;
+                    current_unit.set_mode_final(true);
                 }
 
                 match parse_mode(&token.value) {
                     Ok(v) => {
                         log_rule_token!(debug, token, format!("assign mode '{}'", v));
-                        self.current_unit.as_mut().unwrap().mode = Some(v);
+                        current_unit.set_mode(Some(v));
                     }
                     Err(_) => {
                         log_rule_token!(
@@ -1863,13 +1147,10 @@ impl ExecuteManager {
 
                 value.push_str(&execute_err!(
                     token,
-                    self.current_unit
-                        .as_ref()
-                        .unwrap()
-                        .apply_format(&token.value, false)
+                    current_unit.apply_format(&token.value, false)
                 )?);
 
-                let v = if self.current_unit.as_ref().unwrap().escape_type == EscapeType::Replace {
+                let v = if current_unit.get_escape_type() == EscapeType::Replace {
                     replace_chars(&value, "")
                 } else {
                     value
@@ -1885,12 +1166,7 @@ impl ExecuteManager {
                 Ok(true)
             }
             AssignTag => {
-                let value = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let value = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log_rule_token!(
@@ -1923,12 +1199,12 @@ impl ExecuteManager {
                 Ok(true)
             }
             AssignName => {
-                if self.current_unit.as_ref().unwrap().name_final {
+                if current_unit.is_name_final() {
                     return Ok(true);
                 }
 
                 if token.op == OperatorType::AssignFinal {
-                    self.current_unit.as_mut().unwrap().name_final = true;
+                    current_unit.set_name_final(true);
                 }
 
                 if device.borrow().get_ifindex().is_err() {
@@ -1941,12 +1217,7 @@ impl ExecuteManager {
                     return Ok(true);
                 }
 
-                let value = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let value = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log_rule_token!(
@@ -1959,7 +1230,7 @@ impl ExecuteManager {
                 };
 
                 let name = if [EscapeType::Unset, EscapeType::Replace]
-                    .contains(&self.current_unit.as_ref().unwrap().escape_type)
+                    .contains(&current_unit.get_escape_type())
                 {
                     if naming_scheme_has(NamingSchemeFlags::REPLACE_STRICTLY) {
                         replace_ifname(&value)
@@ -1976,12 +1247,12 @@ impl ExecuteManager {
                     format!("renaming network interface to '{}'", name)
                 );
 
-                self.current_unit.as_mut().unwrap().name = name;
+                current_unit.set_name(name);
 
                 Ok(true)
             }
             AssignDevlink => {
-                if self.current_unit.as_ref().unwrap().devlink_final {
+                if current_unit.is_devlink_final() {
                     return Ok(true);
                 }
 
@@ -1990,16 +1261,16 @@ impl ExecuteManager {
                 }
 
                 if token.op == OperatorType::AssignFinal {
-                    self.current_unit.as_mut().unwrap().devlink_final = true;
+                    current_unit.set_devlink_final(true);
                 }
 
                 if [OperatorType::Assign, OperatorType::AssignFinal].contains(&token.op) {
                     device.borrow().cleanup_devlinks();
                 }
 
-                let value = match self.current_unit.as_ref().unwrap().apply_format(
+                let value = match current_unit.apply_format(
                     &token.value,
-                    self.current_unit.as_ref().unwrap().escape_type != EscapeType::None,
+                    current_unit.get_escape_type() != EscapeType::None,
                 ) {
                     Ok(v) => v,
                     Err(e) => {
@@ -2020,7 +1291,7 @@ impl ExecuteManager {
                  * to none, the token value will be split by whitespaces and
                  * creat multiple symlinks.
                  */
-                let value_escaped = match self.current_unit.as_ref().unwrap().escape_type {
+                let value_escaped = match current_unit.get_escape_type() {
                     EscapeType::Unset => replace_chars(&value, "/ "),
                     EscapeType::Replace => replace_chars(&value, "/"),
                     _ => value,
@@ -2060,12 +1331,7 @@ impl ExecuteManager {
                     }
                 };
 
-                let value = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let value = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log_rule_token!(
@@ -2091,25 +1357,20 @@ impl ExecuteManager {
                 Ok(true)
             }
             AssignRunBuiltin | AssignRunProgram => {
-                if self.current_unit.as_ref().unwrap().run_final {
+                if current_unit.is_run_final() {
                     return Ok(true);
                 }
 
                 if token.op == OperatorType::AssignFinal {
-                    self.current_unit.as_mut().unwrap().run_final = true;
+                    current_unit.set_run_final(true);
                 }
 
                 if [OperatorType::Assign, OperatorType::AssignFinal].contains(&token.op) {
-                    self.current_unit.as_mut().unwrap().builtin_run_list.clear();
-                    self.current_unit.as_mut().unwrap().program_run_list.clear();
+                    current_unit.builtin_run_list_clear();
+                    current_unit.program_run_list_clear();
                 }
 
-                let cmd = match self
-                    .current_unit
-                    .as_ref()
-                    .unwrap()
-                    .apply_format(&token.value, false)
-                {
+                let cmd = match current_unit.apply_format(&token.value, false) {
                     Ok(v) => v,
                     Err(e) => {
                         log_rule_token!(
@@ -2122,18 +1383,10 @@ impl ExecuteManager {
                 };
 
                 if token.attr.is_some() {
-                    self.current_unit
-                        .as_mut()
-                        .unwrap()
-                        .builtin_run_list
-                        .push(cmd.clone());
+                    current_unit.builtin_run_list_push(cmd.clone());
                     log_rule_token!(debug, token, format!("insert Run builtin '{}'", cmd));
                 } else {
-                    self.current_unit
-                        .as_mut()
-                        .unwrap()
-                        .program_run_list
-                        .push(cmd.clone());
+                    current_unit.program_run_list_push(cmd.clone());
                     log_rule_token!(debug, token, format!("insert Run program '{}'", cmd));
                 }
 
@@ -2155,14 +1408,12 @@ impl ExecuteManager {
 
     /// apply rule token on the parent device
     pub(crate) fn apply_rule_token_on_parent(&mut self) -> Result<bool> {
-        self.current_unit.as_mut().unwrap().borrow_mut().parent = Some(
-            self.current_unit
-                .as_ref()
-                .unwrap()
-                .borrow_mut()
-                .device
-                .clone(),
-        );
+        assert!(self.current_unit.is_some());
+
+        self.current_unit
+            .as_ref()
+            .unwrap()
+            .set_parent(Some(self.current_unit.as_ref().unwrap().get_device()));
 
         let head = self.current_rule_token.clone();
         let mut match_rst = true;
@@ -2177,7 +1428,7 @@ impl ExecuteManager {
 
                 self.current_rule_token = Some(token);
                 if !self
-                    .apply_rule_token(self.current_unit.as_ref().unwrap().parent.clone().unwrap())?
+                    .apply_rule_token(self.current_unit.as_ref().unwrap().get_parent().unwrap())?
                 {
                     match_rst = false;
                     break;
@@ -2188,10 +1439,10 @@ impl ExecuteManager {
                 return Ok(true);
             }
 
-            let tmp = self.current_unit.as_ref().unwrap().parent.clone().unwrap();
+            let tmp = self.current_unit.as_ref().unwrap().get_parent().unwrap();
             match tmp.borrow().get_parent() {
                 Ok(d) => {
-                    self.current_unit.as_mut().unwrap().borrow_mut().parent = Some(d);
+                    self.current_unit.as_ref().unwrap().set_parent(Some(d));
                 }
                 Err(e) => {
                     if e.get_errno() != Errno::ENOENT {
@@ -2214,24 +1465,22 @@ impl ExecuteManager {
     }
 
     pub(crate) fn execute_run_builtin(&mut self) {
+        assert!(self.current_unit.is_some());
+
+        let current_unit = self.current_unit.as_ref().unwrap();
+        let device = current_unit.get_device();
+
         /*
          * todo: redundant string vector clone
          */
-        for builtin_str in self
-            .current_unit
-            .as_ref()
-            .unwrap()
-            .builtin_run_list
-            .clone()
-            .iter()
-        {
+        for builtin_str in &current_unit.builtin_run_list_iter() {
             if let Ok(builtin) = builtin_str.parse::<BuiltinCommand>() {
                 let argv = match shell_words::split(builtin_str) {
                     Ok(ret) => ret,
                     Err(e) => {
                         log_dev!(
                             debug,
-                            self.current_unit.as_ref().unwrap().device.borrow(),
+                            device.borrow(),
                             format!("Failed to run builtin command '{}': {}", builtin_str, e)
                         );
                         continue;
@@ -2240,21 +1489,17 @@ impl ExecuteManager {
 
                 log_dev!(
                     debug,
-                    self.current_unit.as_ref().unwrap().device.borrow(),
+                    device.borrow(),
                     format!("Running builtin command '{}'", builtin_str)
                 );
 
-                if let Err(e) = self.builtin_mgr.run(
-                    self.current_unit.as_ref().unwrap().device.clone(),
-                    &mut self.current_unit.as_mut().unwrap().rtnl,
-                    builtin,
-                    argv.len() as i32,
-                    argv,
-                    false,
-                ) {
+                if let Err(e) =
+                    self.builtin_mgr
+                        .run(current_unit, builtin, argv.len() as i32, argv, false)
+                {
                     log_dev!(
                         debug,
-                        self.current_unit.as_ref().unwrap().device.borrow(),
+                        &device.borrow(),
                         format!("Failed to run builtin command '{}': '{}'", builtin_str, e)
                     );
                 }
@@ -2263,27 +1508,23 @@ impl ExecuteManager {
     }
 
     pub(crate) fn execute_run_program(&mut self) {
+        let current_unit = self.current_unit.as_ref().unwrap();
+        let device = current_unit.get_device();
+
         /*
          * todo: redundant string vector clone
          */
-        for cmd_str in self
-            .current_unit
-            .as_ref()
-            .unwrap()
-            .program_run_list
-            .clone()
-            .iter()
-        {
+        for cmd_str in &current_unit.program_run_list_iter() {
             log_dev!(
                 debug,
-                self.current_unit.as_ref().unwrap().device.borrow(),
+                device.borrow(),
                 format!("Running program '{}'", cmd_str)
             );
 
             if let Err(e) = spawn(cmd_str, Duration::from_secs(self.unit_spawn_timeout_usec)) {
                 log_dev!(
                     debug,
-                    self.current_unit.as_ref().unwrap().device.borrow(),
+                    device.borrow(),
                     format!("Failed to run program '{}': '{}'", cmd_str, e)
                 );
             }
@@ -2449,6 +1690,7 @@ impl RuleLine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rules::FormatSubstitutionType;
 
     #[test]
     #[ignore]

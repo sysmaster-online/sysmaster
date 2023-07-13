@@ -14,11 +14,8 @@
 //!
 
 use crate::builtin::Builtin;
-use crate::builtin::Netlink;
 use crate::error::Result;
-use device::Device;
-use std::cell::RefCell;
-use std::rc::Rc;
+use crate::rules::exec_unit::ExecuteUnit;
 
 /// net_setup_link builtin command
 pub struct NetSetupLink;
@@ -27,8 +24,7 @@ impl Builtin for NetSetupLink {
     /// builtin command
     fn cmd(
         &self,
-        _device: Rc<RefCell<Device>>,
-        _ret_rtnl: &mut RefCell<Option<Netlink>>,
+        _exec_unit: &ExecuteUnit,
         _argc: i32,
         _argv: Vec<String>,
         _test: bool,

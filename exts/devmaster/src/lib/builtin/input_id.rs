@@ -14,10 +14,10 @@
 //!
 
 use crate::builtin::Builtin;
-use crate::builtin::Netlink;
 use crate::error::Log;
 use crate::error::Result;
 use crate::log_dev;
+use crate::rules::exec_unit::ExecuteUnit;
 use device::Device;
 use input_event_codes;
 use ioctls::{eviocgabs, input_absinfo};
@@ -98,12 +98,13 @@ impl Builtin for InputId {
     /// builtin command
     fn cmd(
         &self,
-        device: Rc<RefCell<Device>>,
-        _ret_rtnl: &mut RefCell<Option<Netlink>>,
+        exec_unit: &ExecuteUnit,
         _argc: i32,
         _argv: Vec<String>,
         test: bool,
     ) -> Result<bool> {
+        let device = exec_unit.get_device();
+
         let mut bitmasks = Bitmasks {
             bitmask_ev: [0; nbits!(libc::EV_MAX)],
             bitmask_abs: [0; nbits!(libc::ABS_MAX)],
@@ -738,10 +739,9 @@ impl InputId {
 #[cfg(debug_assertions)]
 mod tests {
     use super::InputId;
-    use crate::builtin::{Builtin, Netlink};
+    use crate::{builtin::Builtin, rules::exec_unit::ExecuteUnit};
     use basic::logger;
     use device::device_enumerator::DeviceEnumerator;
-    use std::cell::RefCell;
 
     #[test]
     fn test_builtin_example() {
@@ -758,12 +758,9 @@ mod tests {
                     continue;
                 }
             }
-
+            let exec_unit = ExecuteUnit::new(device);
             let builtin = InputId {};
-            let mut rtnl = RefCell::<Option<Netlink>>::from(None);
-            if let Err(e) = builtin.cmd(device.clone(), &mut rtnl, 0, vec![], true) {
-                println!("Builtin command path_id: fails:{:?}", e);
-            }
+            let _ = builtin.cmd(&exec_unit, 0, vec![], true);
         }
     }
 }

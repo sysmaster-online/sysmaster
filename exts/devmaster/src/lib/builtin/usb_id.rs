@@ -14,8 +14,8 @@
 //!
 
 use crate::builtin::Builtin;
-use crate::builtin::Netlink;
 use crate::error::*;
+use crate::rules::exec_unit::ExecuteUnit;
 use device::Device;
 use snafu::ResultExt;
 use sscanf::sscanf;
@@ -321,12 +321,13 @@ impl Builtin for UsbId {
     /// builtin command
     fn cmd(
         &self,
-        device: Rc<RefCell<Device>>,
-        _ret_rtnl: &mut RefCell<Option<Netlink>>,
+        exec_unit: &ExecuteUnit,
         _argc: i32,
         _argv: Vec<String>,
         test: bool,
     ) -> Result<bool> {
+        let device = exec_unit.get_device();
+
         let mut info = UsbInfo::default();
         let mut usb_device = Rc::new(RefCell::new(Device::default()));
 
@@ -460,11 +461,11 @@ impl Builtin for UsbId {
 }
 #[cfg(test)]
 mod test {
-    use std::cell::RefCell;
-
+    use crate::{
+        builtin::{usb_id::UsbId, Builtin},
+        rules::exec_unit::ExecuteUnit,
+    };
     use device::device_enumerator::DeviceEnumerator;
-
-    use crate::builtin::{usb_id::UsbId, Builtin, Netlink};
 
     #[test]
     fn test_usb_mass_storage_ifsubtype() {
@@ -517,18 +518,14 @@ mod test {
         let mut enumerator = DeviceEnumerator::new();
 
         for device in enumerator.iter() {
-            let mut rtnl = RefCell::<Option<Netlink>>::from(None);
-
             let builtin = UsbId {};
             if let Ok(str) = device.borrow().get_devpath() {
                 if !str.contains("usb") {
                     continue;
                 }
             }
-            println!("devpath:{:?}", device.borrow().get_devpath());
-            if let Err(e) = builtin.cmd(device.clone(), &mut rtnl, 0, vec![], true) {
-                println!("Builtin command path_id: fails:{:?}", e);
-            }
+            let exec_unit = ExecuteUnit::new(device);
+            let _ = builtin.cmd(&exec_unit, 0, vec![], true);
         }
     }
 }

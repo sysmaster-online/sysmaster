@@ -14,12 +14,9 @@
 //!
 
 use crate::builtin::Builtin;
-use crate::builtin::Netlink;
 use crate::error::*;
-use device::Device;
+use crate::rules::exec_unit::ExecuteUnit;
 use snafu::ResultExt;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// example for implementing Builtin trait
 pub struct Example;
@@ -28,17 +25,15 @@ impl Builtin for Example {
     /// builtin command
     fn cmd(
         &self,
-        device: Rc<RefCell<Device>>,
-        ret_rtnl: &mut RefCell<Option<Netlink>>,
+        exec_unit: &ExecuteUnit,
         _argc: i32,
         _argv: Vec<String>,
         test: bool,
     ) -> Result<bool> {
         println!("example builtin run");
+        let device = exec_unit.get_device();
 
         let syspath = device.borrow().get_syspath().context(DeviceSnafu)?;
-
-        ret_rtnl.replace(Some(Netlink {}));
 
         self.add_property(device, test, "ID_EXAMPLE_SYSPATH", &syspath)
             .map_err(|_| Error::BuiltinCommandError {
@@ -77,9 +72,8 @@ impl Builtin for Example {
 #[cfg(test)]
 mod tests {
     use super::Example;
-    use crate::builtin::{Builtin, Netlink};
+    use crate::{builtin::Builtin, rules::exec_unit::ExecuteUnit};
     use device::device_enumerator::DeviceEnumerator;
-    use std::cell::RefCell;
 
     #[test]
     #[ignore]
@@ -87,18 +81,15 @@ mod tests {
         let mut enumerator = DeviceEnumerator::new();
 
         for device in enumerator.iter() {
-            let mut rtnl = RefCell::<Option<Netlink>>::from(None);
+            let exec_unit = ExecuteUnit::new(device.clone());
 
             let builtin = Example {};
-            builtin
-                .cmd(device.clone(), &mut rtnl, 0, vec![], true)
-                .unwrap();
+            builtin.cmd(&exec_unit, 0, vec![], true).unwrap();
 
             device
                 .borrow()
                 .get_property_value("ID_EXAMPLE_SYSPATH")
                 .unwrap();
-            rtnl.take().unwrap();
         }
     }
 }

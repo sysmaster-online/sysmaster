@@ -14,7 +14,8 @@
 //!
 
 use device::Device;
-use libdevmaster::builtin::{BuiltinCommand, BuiltinManager, Netlink};
+use libdevmaster::builtin::{BuiltinCommand, BuiltinManager};
+use libdevmaster::rules::exec_unit::ExecuteUnit;
 use std::{cell::RefCell, rc::Rc};
 
 /// test builtin command on processing a device
@@ -52,16 +53,14 @@ pub fn subcommand_test_builtin(action: Option<String>, builtin_cmd: String, devi
         eprintln!("{:?}", e);
     }
 
-    let mut rtnl = RefCell::<Option<Netlink>>::from(None);
-
     let argv = builtin_cmd
         .split_ascii_whitespace()
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
 
+    let exec_unit = ExecuteUnit::new(d);
     if let Err(e) = mgr.run(
-        d,
-        &mut rtnl,
+        &exec_unit,
         builtin_cmd
             .parse::<BuiltinCommand>()
             .expect("invalid builtin command."),

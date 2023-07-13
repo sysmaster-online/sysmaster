@@ -14,23 +14,22 @@
 //!
 
 use crate::builtin::Builtin;
-use crate::builtin::Netlink;
 use crate::error::Result;
-use device::Device;
+use crate::rules::exec_unit::ExecuteUnit;
 use kmod_rs;
 use kmod_rs::KmodResources;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 /// kmod builtin command
-pub struct Kmod {
+pub(crate) struct Kmod {
     /// kmod struct
     kernel_module: Rc<RefCell<kmod_rs::LibKmod>>,
 }
 
 impl Kmod {
     /// create Kmod
-    pub fn new() -> Kmod {
+    pub(crate) fn new() -> Kmod {
         Kmod {
             kernel_module: Rc::new(RefCell::new(kmod_rs::LibKmod::new())),
         }
@@ -47,12 +46,13 @@ impl Builtin for Kmod {
     /// builtin command
     fn cmd(
         &self,
-        device: Rc<RefCell<Device>>,
-        _ret_rtnl: &mut RefCell<Option<Netlink>>,
+        exec_unit: &ExecuteUnit,
         argc: i32,
         argv: Vec<String>,
         _test: bool,
     ) -> Result<bool> {
+        let device = exec_unit.get_device();
+
         if self.kernel_module.borrow().is_ctx_null() {
             return Ok(true);
         }

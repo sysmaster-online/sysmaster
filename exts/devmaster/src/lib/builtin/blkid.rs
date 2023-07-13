@@ -14,8 +14,8 @@
 //!
 
 use crate::builtin::Builtin;
-use crate::builtin::Netlink;
 use crate::error::{Error, Result};
+use crate::rules::exec_unit::ExecuteUnit;
 use basic::gpt::GptAttribute;
 use basic::gpt::GPT_ESP;
 use basic::gpt::GPT_ROOT_NATIVE;
@@ -372,12 +372,12 @@ impl Builtin for Blkid {
     /// builtin command
     fn cmd(
         &self,
-        device: Rc<RefCell<Device>>,
-        _ret_rtnl: &mut RefCell<Option<Netlink>>,
+        exec_unit: &ExecuteUnit,
         _argc: i32,
         argv: Vec<String>,
         test: bool,
     ) -> Result<bool> {
+        let device = exec_unit.get_device();
         let subsystem = device
             .borrow()
             .get_subsystem()
@@ -510,7 +510,6 @@ mod test {
         if !path.exists() {
             return;
         }
-        let mut rtnl = RefCell::<Option<Netlink>>::from(None);
         let builtin = Blkid {};
 
         for entry in path.read_dir().unwrap().flatten() {
@@ -518,8 +517,10 @@ mod test {
             let dev_path = format!("/dev/{}", file_name);
             log::info!("{} device probe:", dev_path);
             let device = Rc::new(RefCell::new(Device::from_devname(&dev_path).unwrap()));
+            let exec_unit = ExecuteUnit::new(device);
+
             builtin
-                .cmd(device, &mut rtnl, 0, vec!["blkid".to_string()], true)
+                .cmd(&exec_unit, 0, vec!["blkid".to_string()], true)
                 .unwrap();
         }
     }

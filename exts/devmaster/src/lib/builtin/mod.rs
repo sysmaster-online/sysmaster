@@ -13,7 +13,10 @@
 //! builtin commands
 //!
 
-use crate::error::{Error, Result};
+use crate::{
+    error::{Error, Result},
+    rules::exec_unit::ExecuteUnit,
+};
 use device::Device;
 use std::{
     cell::RefCell,
@@ -44,8 +47,7 @@ pub trait Builtin {
     /// builtin command
     fn cmd(
         &self,
-        device: Rc<RefCell<Device>>,
-        ret_rtnl: &mut RefCell<Option<Netlink>>,
+        exec_unit: &ExecuteUnit,
         argc: i32,
         argv: Vec<String>,
         test: bool,
@@ -249,8 +251,7 @@ impl BuiltinManager {
     #[allow(dead_code)]
     pub fn run(
         &self,
-        device: Rc<RefCell<Device>>,
-        ret_rtnl: &mut RefCell<Option<Netlink>>,
+        exec_unit: &ExecuteUnit,
         cmd: BuiltinCommand,
         argc: i32,
         argv: Vec<String>,
@@ -259,16 +260,16 @@ impl BuiltinManager {
         self.builtins
             .get(&cmd)
             .unwrap()
-            .cmd(device, ret_rtnl, argc, argv, test)
+            .cmd(exec_unit, argc, argv, test)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::rules::exec_unit::ExecuteUnit;
+
     use super::BuiltinManager;
-    use super::Netlink;
     use device::device_enumerator::DeviceEnumerator;
-    use std::cell::RefCell;
 
     #[test]
     fn test_builtin_manager() {
@@ -280,10 +281,10 @@ mod tests {
         mgr.init();
 
         for device in enumerator.iter() {
-            let mut rtnl = RefCell::<Option<Netlink>>::from(None);
+            let exec_unit = ExecuteUnit::new(device.clone());
 
             for (cmd, v) in mgr.builtins.iter() {
-                if let Err(e) = v.cmd(device.clone(), &mut rtnl, 0, vec![], true) {
+                if let Err(e) = v.cmd(&exec_unit, 0, vec![], true) {
                     println!("Builtin command {:?} fails:{:?}", cmd, e);
                 }
             }

@@ -14,8 +14,8 @@
 //!
 
 use crate::builtin::Builtin;
-use crate::builtin::Netlink;
 use crate::error::{Error, Result};
+use crate::rules::exec_unit::ExecuteUnit;
 use device::Device;
 use std::cell::RefCell;
 use std::ffi::CString;
@@ -29,12 +29,13 @@ impl Builtin for PathId {
     /// builtin command
     fn cmd(
         &self,
-        device: Rc<RefCell<Device>>,
-        _ret_rtnl: &mut RefCell<Option<Netlink>>,
+        exec_unit: &ExecuteUnit,
         _argc: i32,
         _argv: Vec<String>,
         test: bool,
     ) -> Result<bool> {
+        let device = exec_unit.get_device();
+
         let mut supported_transport = false;
         let mut supported_parent = false;
         let mut path = String::new();
@@ -1000,21 +1001,17 @@ impl PathId {
 #[cfg(test)]
 mod tests {
     use super::PathId;
-    use crate::builtin::{Builtin, Netlink};
+    use crate::{builtin::Builtin, rules::exec_unit::ExecuteUnit};
     use device::device_enumerator::DeviceEnumerator;
-    use std::cell::RefCell;
 
     #[test]
-    fn test_builtin_example() {
+    fn test_builtin_path_id() {
         let mut enumerator = DeviceEnumerator::new();
 
         for device in enumerator.iter() {
-            let mut rtnl = RefCell::<Option<Netlink>>::from(None);
-
             let builtin = PathId {};
-            if let Err(e) = builtin.cmd(device.clone(), &mut rtnl, 0, vec![], true) {
-                println!("Builtin command path_id: fails:{:?}", e);
-            }
+            let exec_unit = ExecuteUnit::new(device);
+            let _ = builtin.cmd(&exec_unit, 0, vec![], true);
         }
     }
 }

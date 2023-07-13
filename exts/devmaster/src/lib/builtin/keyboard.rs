@@ -14,8 +14,8 @@
 //!
 
 use crate::builtin::Builtin;
-use crate::builtin::Netlink;
 use crate::error::{DeviceSnafu, Log, Result};
+use crate::rules::exec_unit::ExecuteUnit;
 use device::Device;
 use input_event_codes_rs::{get_input_event_key, input_event_codes};
 use ioctls::{eviocgabs, eviocgbit, eviocskeycode, input_absinfo};
@@ -140,8 +140,7 @@ impl Builtin for Keyboard {
     /// builtin command
     fn cmd(
         &self,
-        device: Rc<RefCell<Device>>,
-        _ret_rtnl: &mut RefCell<Option<Netlink>>,
+        exec_unit: &ExecuteUnit,
         _argc: i32,
         _argv: Vec<String>,
         _test: bool,
@@ -150,6 +149,7 @@ impl Builtin for Keyboard {
         let mut release = [0; 1024];
         let mut release_count = 0;
         let mut has_abs = -1;
+        let device = exec_unit.get_device();
         let devname = device
             .borrow()
             .get_devname()
