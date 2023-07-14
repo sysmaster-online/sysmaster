@@ -3125,15 +3125,17 @@ mod tests {
                     "DEVTYPE" => {
                         assert_eq!(v, &devtype);
                     }
-                    _ => {
-                        return Err(Error::Nix {
-                            msg: "unwanted property".to_string(),
-                            source: nix::Error::EINVAL,
-                        })
-                    }
+                    _ => {}
                 }
             }
 
+            /* Method 'property_iter' would prepare the properties of the device object
+             * by reading the uevent file in kernel device tree.
+             * According to different kernel versions, the content in uevent file may be
+             * different, which may introduce new properties than the following ones.
+             * Thus when iterating the properties colleted by method 'property_iter',
+             * tolerate new properties.
+             */
             for (k, v) in &dev_clone.property_iter() {
                 match k.as_str() {
                     "SUBSYSTEM" => {
@@ -3154,12 +3156,7 @@ mod tests {
                     "DEVTYPE" => {
                         assert_eq!(v, &devtype);
                     }
-                    _ => {
-                        return Err(Error::Nix {
-                            msg: "unwanted property".to_string(),
-                            source: nix::Error::EINVAL,
-                        })
-                    }
+                    _ => {}
                 }
             }
 
