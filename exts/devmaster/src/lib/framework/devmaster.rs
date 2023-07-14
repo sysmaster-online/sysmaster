@@ -13,26 +13,19 @@
 //! encapsulate all sub-managers of framework
 //!
 
+use crate::{
+    config::*,
+    error::*,
+    framework::{control_manager::*, job_queue::*, uevent_monitor::*, worker_manager::*},
+    rules::*,
+};
+use basic::logger::init_log_to_console;
+use event::{EventState, Events};
 use std::{
     cell::RefCell,
     rc::Rc,
     sync::{Arc, RwLock},
 };
-
-use super::{
-    control_manager::{ControlManager, CONTROL_MANAGER_LISTEN_ADDR},
-    job_queue::JobQueue,
-    uevent_monitor::UeventMonitor,
-    worker_manager::{WorkerManager, WORKER_MANAGER_LISTEN_ADDR},
-};
-use crate::rules::{ResolveNameTime, Rules};
-use crate::{
-    config::{Conf, DEFAULT_CONFIG, DEFAULT_RULES_DIRS},
-    error::Log,
-};
-use basic::logger::init_log_to_console;
-use confique::Config;
-use event::{EventState, Events};
 
 /// encapsulate all submanagers
 #[derive(Debug)]
@@ -47,28 +40,52 @@ pub struct Devmaster {
     /// reference to monitor
     monitor: Option<Rc<UeventMonitor>>,
 
-    /// rules
-    rules: Arc<RwLock<Rules>>,
+    /// Shared by workers
+    /// .0 rules
+    /// .1 netif configurations
+    cache: Arc<RwLock<Cache>>,
+}
+
+/// Shared by workers
+#[derive(Debug)]
+pub struct Cache {
+    /// shared rules
+    pub(crate) rules: Arc<RwLock<Rules>>,
+    /// shared network interface configuration context
+    pub(crate) netif_cfg_ctx: NetifConfigCtx,
+}
+
+impl Cache {
+    /// generate the shared cache
+    pub fn new(rules_d: Vec<String>, netif_cfg_d: Vec<String>) -> Cache {
+        let rules = Rules::load_rules(rules_d, ResolveNameTime::Early);
+
+        let mut netif_cfg_ctx = NetifConfigCtx::new();
+        netif_cfg_ctx.load(netif_cfg_d);
+
+        Cache {
+            rules,
+            netif_cfg_ctx,
+        }
+    }
 }
 
 impl Devmaster {
     /// generate a devmaster object
     pub fn new(events: Rc<Events>) -> Rc<RefCell<Devmaster>> {
-        let config = Conf::builder().file(DEFAULT_CONFIG).load().unwrap();
+        let config = DevmasterConfig::new();
 
-        init_log_to_console("devmaster", config.log_level);
+        config.load(DEFAULT_CONFIG);
+
+        init_log_to_console("devmaster", config.get_log_level());
         log::info!("daemon start");
 
-        let rules = Rules::load_rules(
-            config
-                .rules_d
-                .unwrap_or_else(|| DEFAULT_RULES_DIRS.to_vec()),
-            ResolveNameTime::Early,
-        );
+        let cache = Cache::new(config.get_rules_d(), config.get_netif_cfg_d());
 
         log::info!("rules loaded");
 
-        let _ = rules
+        let _ = cache
+            .rules
             .as_ref()
             .read()
             .unwrap()
@@ -80,12 +97,12 @@ impl Devmaster {
             worker_manager: None,
             control_manager: None,
             monitor: None,
-            rules,
+            cache: Arc::new(RwLock::new(cache)),
         }));
 
         // initialize submanagers
         let worker_manager = Rc::new(WorkerManager::new(
-            config.children_max,
+            config.get_max_workers(),
             String::from(WORKER_MANAGER_LISTEN_ADDR),
             events.clone(),
             Rc::downgrade(&ret),
@@ -143,8 +160,8 @@ impl Devmaster {
             .unwrap();
     }
 
-    /// get a clone of rules
-    pub(crate) fn get_rules(&self) -> Arc<RwLock<Rules>> {
-        self.rules.clone()
+    /// get shared cache
+    pub(crate) fn get_cache(&self) -> Arc<RwLock<Cache>> {
+        self.cache.clone()
     }
 }

@@ -15,7 +15,10 @@
 
 use device::Device;
 use libdevmaster::builtin::{BuiltinCommand, BuiltinManager};
+use libdevmaster::config::devmaster_conf::{DevmasterConfig, DEFAULT_CONFIG};
+use libdevmaster::framework::devmaster::Cache;
 use libdevmaster::rules::exec_unit::ExecuteUnit;
+use std::sync::{Arc, RwLock};
 use std::{cell::RefCell, rc::Rc};
 
 /// test builtin command on processing a device
@@ -38,7 +41,15 @@ pub fn subcommand_test_builtin(action: Option<String>, builtin_cmd: String, devi
         action.clone().unwrap_or_else(|| "change".to_string())
     );
 
-    let mgr = BuiltinManager::new();
+    let config = DevmasterConfig::new();
+    config.load(DEFAULT_CONFIG);
+
+    let cache = Arc::new(RwLock::new(Cache::new(
+        config.get_rules_d(),
+        config.get_netif_cfg_d(),
+    )));
+
+    let mgr = BuiltinManager::new(cache);
     mgr.init();
 
     let d = Rc::new(RefCell::new(match Device::from_path(&device) {

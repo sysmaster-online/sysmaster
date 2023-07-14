@@ -12,16 +12,14 @@
 
 //! worker manager
 //!
-use crate::error::DeviceSnafu;
-use crate::error::Log;
-use crate::{error::Error, rules::Rules};
 use crate::{
-    framework::job_queue::{DeviceJob, JobQueue, JobState},
+    error::*,
+    framework::{devmaster::*, job_queue::*},
     rules,
 };
 use device::{
-    device::Device,
     device_monitor::{DeviceMonitor, MonitorNetlinkGroup},
+    Device,
 };
 use event::{EventState, EventType, Events, Source};
 use snafu::ResultExt;
@@ -122,7 +120,7 @@ impl Worker {
         id: u32,
         state: WorkerState,
         tcp_address: String,
-        rules: Arc<RwLock<Rules>>,
+        cache: Arc<RwLock<Cache>>,
     ) -> Worker {
         let (tx, rx) = mpsc::channel::<WorkerMessage>();
 
@@ -149,7 +147,7 @@ impl Worker {
                             .unwrap_or_default()
                     );
 
-                    let mut execute_mgr = rules::exec_mgr::ExecuteManager::new(rules.clone());
+                    let mut execute_mgr = rules::exec_mgr::ExecuteManager::new(cache.clone());
 
                     let device = Rc::new(RefCell::new(device));
                     let _ = execute_mgr.process_device(device.clone());
@@ -317,7 +315,7 @@ impl WorkerManager {
                             .unwrap()
                             .as_ref()
                             .borrow()
-                            .get_rules(),
+                            .get_cache(),
                     )),
                 );
                 log::debug!("Worker Manager: created new worker {id}");

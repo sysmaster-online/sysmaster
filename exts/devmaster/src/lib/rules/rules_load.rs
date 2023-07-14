@@ -1369,7 +1369,7 @@ impl RuleToken {
                      *  If a legal uid is provided, directly pass the uid to rules executer
                      */
                     if parse_uid(&value).is_ok() {
-                        return Ok(RuleToken::new(
+                        return RuleToken::new(
                             TokenType::AssignOwnerId,
                             op,
                             attr,
@@ -1377,7 +1377,7 @@ impl RuleToken {
                             line_number,
                             rule_file,
                             content,
-                        )?);
+                        );
                     }
 
                     let time = rules.as_ref().read().unwrap().resolve_name_time;
@@ -1399,7 +1399,7 @@ impl RuleToken {
                             user.uid
                         );
 
-                        return Ok(RuleToken::new(
+                        return RuleToken::new(
                             TokenType::AssignOwnerId,
                             op,
                             attr,
@@ -1407,7 +1407,7 @@ impl RuleToken {
                             line_number,
                             rule_file,
                             content,
-                        )?);
+                        );
                     } else if time != ResolveNameTime::Never {
                         /*
                          *  If the resolve_name_time is not set to 'Never', try to format the value during rules executing.
@@ -1417,7 +1417,7 @@ impl RuleToken {
                             log::warn!("{}", e);
                         }
 
-                        return Ok(RuleToken::new(
+                        return RuleToken::new(
                             TokenType::AssignOwner,
                             op,
                             attr,
@@ -1425,7 +1425,7 @@ impl RuleToken {
                             line_number,
                             rule_file,
                             content,
-                        )?);
+                        );
                     }
                 }
 
@@ -1456,7 +1456,7 @@ impl RuleToken {
                      *  If a legal gid is provided, directly pass the gid to rules executer
                      */
                     if parse_gid(&value).is_ok() {
-                        return Ok(RuleToken::new(
+                        return RuleToken::new(
                             TokenType::AssignGroupId,
                             op,
                             attr,
@@ -1464,7 +1464,7 @@ impl RuleToken {
                             line_number,
                             rule_file,
                             content,
-                        )?);
+                        );
                     }
 
                     let time = rules.as_ref().read().unwrap().resolve_name_time;
@@ -1486,7 +1486,7 @@ impl RuleToken {
                             group.gid
                         );
 
-                        return Ok(RuleToken::new(
+                        return RuleToken::new(
                             TokenType::AssignGroupId,
                             op,
                             attr,
@@ -1494,7 +1494,7 @@ impl RuleToken {
                             line_number,
                             rule_file,
                             content,
-                        )?);
+                        );
                     } else if time != ResolveNameTime::Never {
                         /*
                          * If resolve_name_time is not set to 'Never', try to format the value during rules executing.
@@ -1504,7 +1504,7 @@ impl RuleToken {
                             log::warn!("{}", e);
                         }
 
-                        return Ok(RuleToken::new(
+                        return RuleToken::new(
                             TokenType::AssignGroup,
                             op,
                             attr,
@@ -1512,7 +1512,7 @@ impl RuleToken {
                             line_number,
                             rule_file,
                             content,
-                        )?);
+                        );
                     }
                 }
 

@@ -13,45 +13,30 @@
 //! the process unit to apply rules on device uevent in worker thread
 //!
 
-use super::{
-    node::{cleanup_node, static_node_apply_permissions},
-    EscapeType, OperatorType, RuleFile, RuleLine, RuleLineType, RuleToken, Rules, SubstituteType,
-    TokenType::*,
-};
 use crate::{
-    builtin::{BuiltinCommand, BuiltinManager},
-    error::*,
-    log_dev, log_rule_line, log_rule_token,
-    utils::{
-        cleanup_db, device_update_tag, get_property_from_string, initialize_device_usec,
-        replace_chars, replace_ifname, resolve_subsystem_kernel, spawn, sysattr_subdir_subst,
-        DEVMASTER_LEGAL_CHARS,
-    },
+    builtin::*, device_trace, error::*, execute_err, execute_err_ignore_ENOENT,
+    framework::devmaster::*, log_dev, log_rule_line, log_rule_token, rules::exec_unit::*,
+    rules::node::*, rules::TokenType::*, rules::*, utils::*,
 };
 use basic::{
-    file_util::write_string_file,
-    naming_scheme::{naming_scheme_has, NamingSchemeFlags},
-    parse_util::parse_mode,
-    proc_cmdline::cmdline_get_item,
-    user_group_util::{get_group_creds, get_user_creds},
+    file_util::write_string_file, naming_scheme::*, parse_util::parse_mode,
+    proc_cmdline::cmdline_get_item, user_group_util::*,
 };
 use device::{Device, DeviceAction};
 use libc::{gid_t, mode_t, uid_t};
+use nix::{
+    errno::Errno,
+    unistd::{Gid, Uid},
+};
 use snafu::ResultExt;
 use std::{
     cell::RefCell, collections::HashMap, fs::OpenOptions, io::Read, os::unix::fs::PermissionsExt,
     rc::Rc, sync::Arc, sync::RwLock, time::Duration,
 };
 
-use crate::device_trace;
-use crate::rules::exec_unit::*;
-use crate::{execute_err, execute_err_ignore_ENOENT};
-use nix::errno::Errno;
-use nix::unistd::{Gid, Uid};
-
 /// manage processing units
-pub struct ExecuteManager {
-    rules: Arc<RwLock<Rules>>,
+pub(crate) struct ExecuteManager {
+    cache: Arc<RwLock<Cache>>,
     builtin_mgr: BuiltinManager,
 
     current_rule_file: Option<Arc<RwLock<RuleFile>>>,
@@ -67,13 +52,13 @@ pub struct ExecuteManager {
 
 impl ExecuteManager {
     /// create a execute manager object
-    pub fn new(rules: Arc<RwLock<Rules>>) -> ExecuteManager {
-        let builtin_mgr = BuiltinManager::new();
+    pub(crate) fn new(cache: Arc<RwLock<Cache>>) -> ExecuteManager {
+        let builtin_mgr = BuiltinManager::new(cache.clone());
 
         builtin_mgr.init();
 
         ExecuteManager {
-            rules,
+            cache,
             builtin_mgr,
             current_rule_file: None,
             current_rule_line: None,
@@ -85,7 +70,7 @@ impl ExecuteManager {
     }
 
     /// process a device object
-    pub fn process_device(&mut self, device: Rc<RefCell<Device>>) -> Result<()> {
+    pub(crate) fn process_device(&mut self, device: Rc<RefCell<Device>>) -> Result<()> {
         log::debug!(
             "{}",
             device_trace!("Start processing device", device.borrow())
@@ -116,7 +101,7 @@ impl ExecuteManager {
 
     /// execute rules
     pub(crate) fn execute_rules(&mut self) -> Result<()> {
-        assert!(self.current_unit.is_some());
+        debug_assert!(self.current_unit.is_some());
 
         let device = self.current_unit.as_ref().unwrap().get_device();
 
@@ -180,7 +165,7 @@ impl ExecuteManager {
             .log_dev_error(&device.borrow(), "failed to initialize device timestamp")?;
 
         // update tags and database
-        let _ = device_update_tag(device.clone(), Some(device_db_clone.clone()), true);
+        let _ = device_update_tag(device.clone(), Some(device_db_clone), true);
 
         device
             .borrow()
@@ -195,7 +180,7 @@ impl ExecuteManager {
 
     /// execute rules on remove uevent
     pub(crate) fn execute_rules_on_remove(&mut self) -> Result<()> {
-        assert!(self.current_unit.is_some());
+        debug_assert!(self.current_unit.is_some());
 
         let device = self.current_unit.as_ref().unwrap().get_device();
 
@@ -217,14 +202,22 @@ impl ExecuteManager {
             return ret;
         }
 
-        let _ = cleanup_node(device.clone());
+        let _ = cleanup_node(device);
 
         ret
     }
 
     /// apply rules on device
     pub(crate) fn apply_rules(&mut self) -> Result<()> {
-        self.current_rule_file = self.rules.as_ref().read().unwrap().files.clone();
+        self.current_rule_file = self
+            .cache
+            .read()
+            .unwrap()
+            .rules
+            .read()
+            .unwrap()
+            .files
+            .clone();
 
         loop {
             let next_file = self
@@ -272,8 +265,8 @@ impl ExecuteManager {
     /// normally return the next rule line after current line
     /// if current line has goto label, use the line with the target label as the next line
     pub(crate) fn apply_rule_line(&mut self) -> Result<Option<Arc<RwLock<RuleLine>>>> {
-        assert!(self.current_unit.is_some());
-        assert!(self.current_rule_line.is_some());
+        debug_assert!(self.current_unit.is_some());
+        debug_assert!(self.current_rule_line.is_some());
 
         // only apply rule token on parent device once
         // that means if some a parent device matches the token, do not match any parent tokens in the following
@@ -347,7 +340,7 @@ impl ExecuteManager {
 
     /// apply rule token on device
     pub(crate) fn apply_rule_token(&mut self, device: Rc<RefCell<Device>>) -> Result<bool> {
-        assert!(self.current_unit.is_some());
+        debug_assert!(self.current_unit.is_some());
 
         let token = self.current_rule_token.as_ref().unwrap().read().unwrap();
         let token_type = token.r#type;
@@ -662,7 +655,7 @@ impl ExecuteManager {
 
                 match self
                     .builtin_mgr
-                    .run(&current_unit, builtin, argv.len() as i32, argv, false)
+                    .run(current_unit, builtin, argv.len() as i32, argv, false)
                 {
                     Ok(ret) => {
                         // if builtin command returned false, set the mask bit to 1
@@ -1408,7 +1401,7 @@ impl ExecuteManager {
 
     /// apply rule token on the parent device
     pub(crate) fn apply_rule_token_on_parent(&mut self) -> Result<bool> {
-        assert!(self.current_unit.is_some());
+        debug_assert!(self.current_unit.is_some());
 
         self.current_unit
             .as_ref()
@@ -1465,7 +1458,7 @@ impl ExecuteManager {
     }
 
     pub(crate) fn execute_run_builtin(&mut self) {
-        assert!(self.current_unit.is_some());
+        debug_assert!(self.current_unit.is_some());
 
         let current_unit = self.current_unit.as_ref().unwrap();
         let device = current_unit.get_device();

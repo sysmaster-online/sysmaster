@@ -13,12 +13,11 @@
 //! the process unit to apply rules on device uevent in worker thread
 //!
 
-use super::{node::update_node, EscapeType, FormatSubstitutionType};
 use crate::{
     builtin::Netlink,
     error::*,
     log_dev,
-    rules::FORMAT_SUBST_TABLE,
+    rules::{node::*, *},
     utils::{replace_chars, resolve_subsystem_kernel, DEVMASTER_LEGAL_CHARS},
 };
 use device::{Device, DeviceAction};
@@ -76,7 +75,7 @@ struct ExecuteUnitData {
 impl ExecuteUnitData {
     fn new(device: Rc<RefCell<Device>>) -> Self {
         ExecuteUnitData {
-            device: device,
+            device,
             parent: None,
             device_db_clone: None,
             name: String::default(),
@@ -106,7 +105,7 @@ impl ExecuteUnitData {
     }
 
     fn get_device_db_clone(&self) -> Rc<RefCell<Device>> {
-        assert!(self.device_db_clone.is_some());
+        debug_assert!(self.device_db_clone.is_some());
 
         self.device_db_clone.clone().unwrap()
     }
@@ -617,6 +616,7 @@ impl ExecuteUnitData {
 }
 
 impl ExecuteUnit {
+    /// create a execute unit based on device object
     pub fn new(device: Rc<RefCell<Device>>) -> Self {
         ExecuteUnit {
             seclabel_list: RefCell::new(HashMap::new()),

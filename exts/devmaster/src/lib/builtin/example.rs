@@ -30,7 +30,6 @@ impl Builtin for Example {
         _argv: Vec<String>,
         test: bool,
     ) -> Result<bool> {
-        println!("example builtin run");
         let device = exec_unit.get_device();
 
         let syspath = device.borrow().get_syspath().context(DeviceSnafu)?;

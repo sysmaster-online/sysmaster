@@ -98,6 +98,9 @@ pub enum Error {
 
     #[snafu(display("Rtnetlink error: {}", source))]
     Rtnetlink { source: rtnetlink::Error },
+
+    #[snafu(display("Failed to deserialize .toml: {}", source))]
+    Toml { source: toml::de::Error },
 }
 
 impl Error {
@@ -111,12 +114,9 @@ impl Error {
             Self::Device { source } => source.get_errno(),
             Self::Nix { source } => *source,
             Self::Other { msg: _, errno } => *errno,
-            Self::Rtnetlink { source } => match source {
-                rtnetlink::Error::NetlinkError(msg) => {
-                    nix::errno::Errno::from_i32(i32::abs(msg.code))
-                }
-                _ => nix::errno::Errno::EINVAL,
-            },
+            Self::Rtnetlink {
+                source: rtnetlink::Error::NetlinkError(msg),
+            } => nix::errno::Errno::from_i32(i32::abs(msg.code)),
             _ => nix::errno::Errno::EINVAL,
         }
     }

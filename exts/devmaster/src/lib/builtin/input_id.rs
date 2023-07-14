@@ -331,7 +331,7 @@ impl InputId {
                 val -= 1;
             }
 
-            assert!(std::mem::size_of::<u64>() == 4 || std::mem::size_of::<u64>() == 8);
+            debug_assert!(std::mem::size_of::<u64>() == 4 || std::mem::size_of::<u64>() == 8);
 
             for (j, bit) in bitmask.iter().enumerate() {
                 if j >= val {
@@ -749,15 +749,10 @@ mod tests {
 
         let mut enumerator = DeviceEnumerator::new();
 
-        for device in enumerator.iter() {
-            match device.borrow().get_devpath() {
-                Ok(path) => {
-                    println!("devpath:{}", path);
-                }
-                Err(_) => {
-                    continue;
-                }
-            }
+        for device in enumerator
+            .iter()
+            .filter(|d| d.borrow().get_devpath().is_ok())
+        {
             let exec_unit = ExecuteUnit::new(device);
             let builtin = InputId {};
             let _ = builtin.cmd(&exec_unit, 0, vec![], true);

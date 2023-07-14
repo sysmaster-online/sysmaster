@@ -15,6 +15,7 @@
 
 use crate::{
     error::{Error, Result},
+    framework::devmaster::Cache,
     rules::exec_unit::ExecuteUnit,
 };
 use device::Device;
@@ -24,6 +25,7 @@ use std::{
     fmt::{self, Display},
     rc::Rc,
     str::FromStr,
+    sync::{Arc, RwLock},
 };
 
 pub mod blkid;
@@ -169,16 +171,9 @@ pub struct BuiltinManager {
     builtins: HashMap<BuiltinCommand, Box<dyn Builtin>>,
 }
 
-impl Default for BuiltinManager {
-    fn default() -> BuiltinManager {
-        Self::new()
-    }
-}
-
 impl BuiltinManager {
     /// create builtin manager
-    #[allow(dead_code)]
-    pub fn new() -> Self {
+    pub fn new(cache: Arc<RwLock<Cache>>) -> Self {
         let mut builtins = HashMap::<BuiltinCommand, Box<dyn Builtin>>::with_capacity(
             BuiltinCommand::Max as usize,
         );
@@ -192,7 +187,7 @@ impl BuiltinManager {
         builtins.insert(BuiltinCommand::NetId, Box::new(net_id::NetId {}));
         builtins.insert(
             BuiltinCommand::NetSetupLink,
-            Box::new(net_setup_link::NetSetupLink {}),
+            Box::new(net_setup_link::NetSetupLink { cache }),
         );
         builtins.insert(BuiltinCommand::PathId, Box::new(path_id::PathId {}));
         builtins.insert(BuiltinCommand::Uaccess, Box::new(uaccess::Uaccess {}));
@@ -266,14 +261,15 @@ impl BuiltinManager {
 
 #[cfg(test)]
 mod tests {
-    use crate::rules::exec_unit::ExecuteUnit;
-
     use super::BuiltinManager;
+    use crate::{framework::devmaster::Cache, rules::exec_unit::ExecuteUnit};
     use device::device_enumerator::DeviceEnumerator;
+    use std::sync::{Arc, RwLock};
 
     #[test]
     fn test_builtin_manager() {
-        let mgr = BuiltinManager::new();
+        let cache = Arc::new(RwLock::new(Cache::new(vec![], vec![])));
+        let mgr = BuiltinManager::new(cache);
         let mut enumerator = DeviceEnumerator::new();
 
         mgr.list();
@@ -283,10 +279,8 @@ mod tests {
         for device in enumerator.iter() {
             let exec_unit = ExecuteUnit::new(device.clone());
 
-            for (cmd, v) in mgr.builtins.iter() {
-                if let Err(e) = v.cmd(&exec_unit, 0, vec![], true) {
-                    println!("Builtin command {:?} fails:{:?}", cmd, e);
-                }
+            for (_, v) in mgr.builtins.iter() {
+                let _ = v.cmd(&exec_unit, 0, vec![], true);
             }
         }
 
