@@ -136,6 +136,17 @@ pub fn naming_scheme() -> NamingScheme {
     NamingScheme::LATEST
 }
 
+/// check whether the naming scheme is enabled
+pub fn naming_scheme_enabled() -> bool {
+    if let Ok(Some(v)) = proc_cmdline::cmdline_get_value("net.ifnames") {
+        if ["0", "false"].contains(&v.as_str()) {
+            return false;
+        }
+    }
+
+    true
+}
+
 /// check whether a naming scheme contains the flag
 pub fn naming_scheme_has(flag: NamingSchemeFlags) -> bool {
     let scheme = naming_scheme();
