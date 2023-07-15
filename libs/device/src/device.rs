@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights r&eserved.
 //
 // sysMaster is licensed under Mulan PSL v2.
 // You can use this software according to the terms and conditions of the Mulan
@@ -24,8 +24,8 @@ use nix::sys::stat::{self, fchmod, lstat, major, makedev, minor, stat, Mode};
 use nix::unistd::{unlink, Gid, Uid};
 use std::cell::{Ref, RefCell};
 use std::collections::hash_set::Iter;
-use std::collections::{HashMap, HashSet};
-use std::fs::{self, rename, OpenOptions};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fs::{self, rename, OpenOptions, ReadDir};
 use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
@@ -110,6 +110,11 @@ pub struct Device {
     /// database version
     pub database_version: RefCell<u32>,
 
+    /// children
+    pub children: RefCell<HashMap<String, Rc<RefCell<Device>>>>,
+    /// children enumerated
+    pub children_enumerated: RefCell<bool>,
+
     /// properties are outdated
     pub properties_buf_outdated: RefCell<bool>,
     /// devlinks in properties are outdated
@@ -189,6 +194,8 @@ impl Device {
             database_version: RefCell::new(0),
             devlink_priority: RefCell::new(0),
             db_persist: RefCell::new(false),
+            children: RefCell::new(HashMap::new()),
+            children_enumerated: RefCell::new(false),
         }
     }
 
@@ -2375,6 +2382,28 @@ impl Device {
         }
     }
 
+    /// Get the child device if it exists.
+    ///
+    /// The parent will try to find the child in its cache firstly. If
+    /// it already exists in the cache, directly return is. Otherwise
+    /// the child device will be created and be cached.
+    pub fn get_child(&self, child: &str) -> Result<Rc<RefCell<Device>>, Error> {
+        if let Some(d) = self.children.borrow().get(child) {
+            return Ok(d.clone());
+        }
+
+        let dev = Rc::new(RefCell::new(Self::from_syspath(
+            &format!("{}/{}", self.get_syspath()?, child),
+            true,
+        )?));
+
+        self.children
+            .borrow_mut()
+            .insert(child.to_string(), dev.clone());
+
+        Ok(dev)
+    }
+
     /// prepare properties:
     /// 1. read from uevent file
     /// 2. read database
@@ -2683,6 +2712,112 @@ impl Device {
             || !self.all_tags.borrow().is_empty()
             || !self.current_tags.borrow().is_empty()
     }
+
+    pub(crate) fn enumerate_children(&self) -> Result<bool, Error> {
+        if *self.children_enumerated.borrow() {
+            return Ok(false);
+        }
+
+        let stk = RefCell::new(VecDeque::<String>::new());
+
+        self.enumerate_children_internal("", &stk)?;
+
+        #[allow(clippy::while_let_loop)]
+        loop {
+            let subdir = match stk.borrow_mut().pop_front() {
+                Some(s) => s,
+                None => break,
+            };
+
+            self.enumerate_children_internal(&subdir, &stk)?;
+        }
+
+        let _ = self.children_enumerated.replace(true);
+
+        Ok(true)
+    }
+
+    pub(crate) fn enumerate_children_internal(
+        &self,
+        subdir: &str,
+        stk: &RefCell<VecDeque<String>>,
+    ) -> Result<(), Error> {
+        for entry in self.opendir(subdir)? {
+            let de = match entry {
+                Ok(e) => e,
+                Err(_) => {
+                    continue;
+                }
+            };
+
+            let de_name = match de.file_name().to_str() {
+                Some(name) => {
+                    if [".", ".."].contains(&name) {
+                        continue;
+                    }
+
+                    name.to_string()
+                }
+                None => {
+                    continue;
+                }
+            };
+
+            match de.file_type() {
+                Ok(t) => {
+                    if !t.is_dir() && !t.is_symlink() {
+                        continue;
+                    }
+                }
+                Err(_) => {
+                    continue;
+                }
+            }
+
+            let path = if subdir.is_empty() {
+                de_name
+            } else {
+                format!("{}/{}", subdir, de_name)
+            };
+
+            if let Err(e) = self.get_child(&path) {
+                if e.is_errno(nix::Error::ENODEV) {
+                    debug_assert!(de.file_type().is_ok());
+
+                    /* Avoid infinite loop */
+                    if de.file_type().unwrap().is_symlink() {
+                        continue;
+                    }
+
+                    /*
+                     * If the current sub-directory is not a device,
+                     * push it to the statck and enumerate deeper until
+                     * a child device is found.
+                     */
+                    stk.borrow_mut().push_back(path);
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn opendir(&self, subdir: &str) -> Result<ReadDir, Error> {
+        let syspath = self.get_syspath()?;
+
+        let dir = if syspath.is_empty() {
+            syspath
+        } else {
+            format!("{}/{}", syspath, subdir)
+        };
+
+        std::fs::read_dir(&dir).map_err(|e| Error::Nix {
+            msg: format!("Failed to read directory '{}'", &dir),
+            source: nix::Error::from_i32(e.raw_os_error().unwrap_or_default()),
+        })
+    }
 }
 
 /// iterator wrapper of hash set in refcell
@@ -2775,6 +2910,22 @@ impl Device {
 
         HashMapRefWrapper {
             r: self.properties.borrow(),
+        }
+    }
+
+    /// return the child iterator
+    pub fn child_iterator(&self) -> HashMapRefWrapper<String, Rc<RefCell<Device>>> {
+        if let Err(e) = self.enumerate_children() {
+            log::error!(
+                "failed to enumerate children of '{}': {}",
+                self.get_device_id()
+                    .unwrap_or_else(|_| self.devpath.borrow().clone()),
+                e
+            )
+        }
+
+        HashMapRefWrapper {
+            r: self.children.borrow(),
         }
     }
 }
@@ -2994,6 +3145,8 @@ mod tests {
                     .contains(&e.get_errno()));
             }
         }
+
+        device.enumerate_children().unwrap();
     }
 
     #[test]
