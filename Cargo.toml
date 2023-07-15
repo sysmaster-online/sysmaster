@@ -161,5 +161,5 @@ exclude = ["config", "tools"]
 
 # fix https://github.com/mdaffin/loopdev/issues/65
 [patch.crates-io.loopdev]
-git = 'https://github.com/mulkieran/loopdev'
+git = 'https://gitee.com/overweight/loopdev'
 branch = 'bump-bindgen-reduce-version'
