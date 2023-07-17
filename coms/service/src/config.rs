@@ -14,6 +14,7 @@
 use super::comm::ServiceUnitComm;
 use super::rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
 use confique::{Config, FileFormat, Partial};
+use constants::{USEC_INFINITY, USEC_PER_SEC};
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
@@ -86,6 +87,7 @@ impl ServiceConfig {
             }
             Ok(v) => v,
         };
+        self.data.borrow_mut().verify();
 
         if update {
             self.db_update();
@@ -177,6 +179,19 @@ impl ServiceConfigData {
 
     pub(self) fn set_timeout_stop(&mut self, time_out: u64) {
         self.Service.set_timeout_stop(time_out);
+    }
+
+    pub(self) fn verify(&mut self) {
+        if self.Service.WatchdogSec >= USEC_INFINITY / USEC_PER_SEC {
+            self.Service.WatchdogSec = 0;
+        } else {
+            self.Service.WatchdogSec *= USEC_PER_SEC;
+        }
+        if self.Service.RestartSec >= USEC_INFINITY / USEC_PER_SEC {
+            self.Service.RestartSec = USEC_PER_SEC;
+        } else {
+            self.Service.RestartSec *= USEC_PER_SEC;
+        }
     }
 }
 

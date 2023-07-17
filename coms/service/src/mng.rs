@@ -1228,9 +1228,9 @@ impl ServiceMng {
     }
 
     fn restart_watchdog(&self) {
-        self.monitor.borrow_mut().set_original_watchdog(
-            self.config.config_data().borrow().Service.WatchdogSec * 1000000,
-        );
+        self.monitor
+            .borrow_mut()
+            .set_original_watchdog(self.config.config_data().borrow().Service.WatchdogSec);
         let watchdog_usec = self.monitor.borrow().watchdog_usec();
         if watchdog_usec == 0 || watchdog_usec == u64::MAX {
             self.stop_watchdog();
@@ -2570,7 +2570,7 @@ mod tests {
         assert!(rt.armd_watchdog());
         assert_eq!(
             rt.watchdog().time(),
-            config.config_data().borrow().Service.WatchdogSec * 1000000
+            config.config_data().borrow().Service.WatchdogSec
         );
     }
 
@@ -2589,7 +2589,7 @@ mod tests {
         assert!(rt.armd_watchdog());
         assert_eq!(
             rt.watchdog().time(),
-            config.config_data().borrow().Service.WatchdogSec * 1000000
+            config.config_data().borrow().Service.WatchdogSec
         );
 
         messages.remove("WATCHDOG");

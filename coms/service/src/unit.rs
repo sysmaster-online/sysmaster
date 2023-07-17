@@ -405,11 +405,5 @@ impl ServiceUnit {
     }
 }
 
-/*impl Default for ServiceUnit {
-    fn default() -> Self {
-        ServiceUnit::new()
-    }
-}*/
-
 use sysmaster::declare_unitobj_plugin_with_param;
 declare_unitobj_plugin_with_param!(ServiceUnit, ServiceUnit::new);

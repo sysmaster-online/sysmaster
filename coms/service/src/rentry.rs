@@ -32,7 +32,7 @@ use sysmaster::serialize::DeserializeWith;
 use sysmaster::unit::KillMode;
 
 use basic::special::EXEC_RUNTIME_PREFIX;
-use basic::time_util::USEC_PER_SEC;
+use constants::USEC_PER_SEC;
 
 struct ServiceReDb<K, V>(ReDb<K, V>);
 
@@ -290,7 +290,7 @@ pub(super) struct SectionService {
     #[config(deserialize_with = ExitStatusSet::deserialize_with)]
     #[config(default = "")]
     pub RestartPreventExitStatus: ExitStatusSet,
-    #[config(default = 100000)]
+    #[config(default = 1)]
     pub RestartSec: u64,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     #[config(default = "")]

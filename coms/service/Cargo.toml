@@ -10,6 +10,7 @@ crate-type = ["dylib"]
 name = "service"
 
 [dependencies]
+constants = { path = "../../libs/constants" }
 basic = { path = "../../libs/basic" }
 macros = { path = "../../libs/macros" }
 cgroup = { path = "../../libs/cgroup" }

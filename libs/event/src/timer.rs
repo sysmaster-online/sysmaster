@@ -19,11 +19,7 @@ use std::{
 };
 
 use crate::{EventType, Source};
-
-use std::u64::MAX as USEC_INFINITY;
-const USEC_PER_SEC: u64 = 1000000;
-const NSEC_PER_USEC: u64 = 1000;
-const NSEC_PER_SEC: u64 = 1000000000;
+use constants::{NSEC_PER_SEC, NSEC_PER_USEC, USEC_INFINITY, USEC_PER_SEC};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Timestamp {
@@ -137,16 +133,11 @@ impl Timer {
     pub fn push(&mut self, source: Rc<dyn Source>) {
         // calc the time
         let mut next = source.time_relative();
-        if next != u64::MAX {
-            next += self.timerid(&source.event_type());
-        } else {
+        let now = self.timerid(&source.event_type());
+        if next > USEC_INFINITY - now {
             next = source.time();
-        }
-
-        if next == u64::MAX {
-            panic!(
-                "You need to implement time() or time_relative(), and cannot be set to u64::MAX"
-            );
+        } else {
+            next += now;
         }
 
         let cd = ClockData::new(source.clone(), next);
@@ -165,7 +156,6 @@ impl Timer {
 
     pub fn pop(&mut self, et: &EventType) -> Option<Rc<dyn Source>> {
         let next = self.timerid(et);
-        // self.now();
         match self.timer_set.get_mut(et) {
             Some(timer) => {
                 if timer.data.is_empty() {

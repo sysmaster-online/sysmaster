@@ -35,3 +35,12 @@ pub const INIT_PARA_PATH: &str = "/run/sysmaster/init_para";
 
 /// invalid fd
 pub const INVALID_FD: i32 = -1;
+
+/// USec per Sec
+pub const USEC_PER_SEC: u64 = 1000000;
+/// NSec per USec
+pub const NSEC_PER_USEC: u64 = 1000;
+/// NSec per Sec
+pub const NSEC_PER_SEC: u64 = 1000000000;
+/// USec infinity
+pub const USEC_INFINITY: u64 = u64::MAX;

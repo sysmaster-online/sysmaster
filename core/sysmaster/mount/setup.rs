@@ -32,7 +32,6 @@ use std::{
 use sysmaster::error::*;
 
 const EARLY_MOUNT_NUM: u8 = 3;
-// const CGROUP_ROOT: &str = "/sys/fs/cgroup/";
 
 type Callback = fn() -> bool;
 
