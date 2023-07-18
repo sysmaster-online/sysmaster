@@ -17,6 +17,7 @@ rustup override set 1.60.0 > /dev/null 2>&1
 
 echo "Starting to build..."
 export RUSTFLAGS="-Cinstrument-coverage"
+export LLVM_PROFILE_FILE="grcov-sysmaster-%p-%m.profraw"
 cargo build --all
 if [ $? -ne 0 ]; then
     echo "cargo build failed, exit."
@@ -33,7 +34,6 @@ for i in `find . -name "*.service"`; do cp $i /usr/lib/sysmaster/; done
 for i in `find . -name "*.target"`; do cp $i /usr/lib/sysmaster/; done
 
 echo "Starting to test..."
-export LLVM_PROFILE_FILE="grcov-sysmaster-%p-%m.profraw"
 cargo test --all-targets --all -v -- --nocapture --test-threads=1
 result=$?
 rm -rf /usr/lib/sysmaster
