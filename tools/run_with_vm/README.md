@@ -80,30 +80,18 @@ menuentry 'openEuler (5.10.0-60.18.0.50.oe2203.aarch64) 22.03 LTS without system
 
 ## 大系统准备
 
-**1.** 将sysmaster编译二进制拷贝到对应目录，可以通过install_sysmaster.sh进行安装。使用方法是在sysmaster编译目录下，执行`sh install_sysmaster.sh debug`。注意这里将init二进制拷贝到为`/init`。与上面修改的linux启动项相对应。
+**1.** 将sysmaster编译二进制拷贝到对应目录，可以通过install_sysmaster.sh进行安装。使用方法是在sysmaster编译目录下(target目录)，执行`sh install_sysmaster.sh debug/release`，这里取决于你以debug还是release模式编译。注意这里将init二进制拷贝到为`/init`。与上面修改的linux启动项相对应。
 
-**2.** 将`run_with_vm`目录下service和target文件拷贝到`/usr/lib/sysmaster/system`目录下。
+**2.** 将`run_with_vm`目录下的service和target，以及`sysmaster/units`目录下的target拷贝到`/usr/lib/sysmaster/system`目录下：
 
-**3.** 通过`sctl enable fstab.service sshd.service udevd.service getty-tty1.service serial-getty-ttyAMA0.service lvm-activate-openeuler.service set-hostname.service NetworkManager.service udev-trigger.service hostname-setup.service`上述服务实现开机启动。
+**3.** 在虚拟机通过执行/init &启动sysmaster，然后通过`sctl enable fstab.service sshd.service udevd.service getty-tty1.service lvm-activate-openeuler.service NetworkManager.service udev-trigger.service hostname-setup.service`上述服务实现开机启动。
 
 **注意：**
 
-- 上述配置中`serial-getty-ttyAMA0.service`服务是实现aarch64架构平台串口登陆所需的服务；如果是x86_64，那么需要将服务改为`serial-getty-ttyS0.service`，此服务主要针对有console串口的情况，例如`virsh console`进入串口，私人笔记本创建的虚拟机，默认应该都是只有tty1。
-
-**4.** 由于sysmaster日志默认输出到串口，会影响串口登陆，同时sysmaster日志也无法详细查看。建议配置`/etc/sysmaster/system.conf`，将日志输出到本地文件中。
-
-```
-# cat /etc/sysmaster/system.conf
-LogLevel="debug"
-LogTarget="file"
-LogFileSize=10240
-LogFileNumber=10
-```
+- 上面提到`serial-getty-ttyAMA0.service`服务是实现aarch64架构平台串口登陆所需的服务；如果是x86_64，那么需要将服务改为`serial-getty-ttyS0.service`，此服务主要针对有console串口的情况，例如`virsh console`进入串口，私人笔记本创建的虚拟机，默认应该都是只有tty1。可以开机启动后手动通过sctl start启动，或者添加到multi-user.target里面的requires字段中实现开机自启。
 
 至此，大系统准备完毕。
 
-
-
 ## 启动
 
-虚拟机重启，在grub引导启动界面选择对于的启动项。启动后，可以通过tty1或者对于的console串口登陆。或者通过setip.services设置的ip进行ssh登陆。注意，通过tty1或者串口登陆，由于当前对于的getty服务自动重启有bug，所以只能输入一次账户和密码，输入错误则无法再次出现登陆界面。
+虚拟机重启，在grub引导启动界面选择对于的启动项。启动后，可以通过tty1或者ssh登陆。
