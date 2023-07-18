@@ -5,11 +5,14 @@
 #   $ sh ./tools/generate_cov.sh
 
 # Install tools
+echo "Installing tools..."
 rustup override set 1.70.0 > /dev/null 2>&1
 cargo install grcov > /dev/null 2>&1
 rustup component add llvm-tools-preview > /dev/null 2>&1
 
 # Ensure build and test succeed
+find . -name "*.profraw" | xargs rm -f
+cargo clean
 rustup override set 1.60.0 > /dev/null 2>&1
 
 echo "Starting to build..."
@@ -51,6 +54,10 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 genhtml -o coverage cov.info
+if [ $? -ne 0 ]; then
+    echo "genhtml failed, exit."
+    exit 1
+fi
 
 find . -name "*.profraw" | xargs rm -f
 cargo clean
