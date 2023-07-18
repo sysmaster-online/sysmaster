@@ -2385,7 +2385,7 @@ impl Device {
     /// Get the child device if it exists.
     ///
     /// The parent will try to find the child in its cache firstly. If
-    /// it already exists in the cache, directly return is. Otherwise
+    /// it already exists in the cache, directly return it. Otherwise
     /// the child device will be created and be cached.
     pub fn get_child(&self, child: &str) -> Result<Rc<RefCell<Device>>, Error> {
         if let Some(d) = self.children.borrow().get(child) {
@@ -2914,7 +2914,7 @@ impl Device {
     }
 
     /// return the child iterator
-    pub fn child_iterator(&self) -> HashMapRefWrapper<String, Rc<RefCell<Device>>> {
+    pub fn child_iter(&self) -> HashMapRefWrapper<String, Rc<RefCell<Device>>> {
         if let Err(e) = self.enumerate_children() {
             log::error!(
                 "failed to enumerate children of '{}': {}",
@@ -3146,7 +3146,15 @@ mod tests {
             }
         }
 
-        device.enumerate_children().unwrap();
+        /* Test enumerating child devices */
+        for (subdir, child) in &device.child_iter() {
+            let canoicalized_path =
+                std::fs::canonicalize(&format!("{}/{}", &syspath, subdir)).unwrap();
+            assert_eq!(
+                canoicalized_path.to_str().unwrap(),
+                &child.borrow().get_syspath().unwrap()
+            );
+        }
     }
 
     #[test]
