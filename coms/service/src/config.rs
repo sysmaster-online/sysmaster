@@ -218,4 +218,17 @@ mod tests {
 
         assert!(result.is_ok());
     }
+    #[test]
+    fn test_get_service_type() {
+        let mut file_path = get_project_root().unwrap();
+        file_path.push("tests/test_units/config.service");
+
+        let paths = vec![file_path];
+
+        let comm = Rc::new(ServiceUnitComm::new());
+        let config = ServiceConfig::new(&comm);
+
+        let result = config.load(paths, false);
+        assert_eq!(config.service_type(), b"Simple")
+    }
 }

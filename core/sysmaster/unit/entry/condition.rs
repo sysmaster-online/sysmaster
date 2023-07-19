@@ -160,3 +160,56 @@ impl UeCondition {
         Self::condition_vec_test(assert_conditions)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use basic::condition::ConditionType;
+
+    use crate::unit::entry::condition::condition_keys::CONDITION_NEEDS_UPDATE;
+
+    use super::{
+        assert_keys::ASSERT_PATH_EXISTS, condition_keys::CONDITION_PATH_EXISTS, UeCondition,
+    };
+
+    #[test]
+    fn test_new_condition_trigger() {
+        let uc = UeCondition::new();
+        let c = uc.new_condition(ConditionType::FileNotEmpty, String::from("|!test"));
+        assert_eq!(c.trigger(), 1, "condition trigger is {}", c.trigger());
+    }
+    #[test]
+    fn test_new_condition_is_not_trigger() {
+        let uc = UeCondition::new();
+        let c = uc.new_condition(ConditionType::FileNotEmpty, String::from("!test"));
+        assert_eq!(c.trigger(), 0, "condition trigger is {}", c.trigger());
+    }
+
+    #[test]
+    fn test_new_condition_is_revert() {
+        let uc = UeCondition::new();
+        let c = uc.new_condition(ConditionType::FileNotEmpty, String::from("!test"));
+        assert_eq!(c.revert(), 1, "condition revert is {}", c.revert());
+    }
+    #[test]
+    fn test_new_condition_is_not_revert() {
+        let uc = UeCondition::new();
+        let c = uc.new_condition(ConditionType::FileNotEmpty, String::from("test"));
+        assert_eq!(c.revert(), 0, "condition revert is {}", c.revert());
+    }
+
+    #[test]
+    fn test_add_condition() {
+        let uc = UeCondition::new();
+        uc.add_condition(CONDITION_PATH_EXISTS, String::from("test"));
+        assert_eq!(uc.conditions.borrow().0.len(), 1);
+        uc.add_condition(CONDITION_NEEDS_UPDATE, String::from("True"));
+        assert_eq!(uc.conditions.borrow().0.len(), 2);
+    }
+
+    #[test]
+    fn test_add_assert() {
+        let uc = UeCondition::new();
+        uc.add_assert(ASSERT_PATH_EXISTS, String::from("assert"));
+        assert_eq!(uc.asserts.borrow().0.len(), 1);
+    }
+}
