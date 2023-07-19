@@ -48,7 +48,7 @@ rustup override set 1.70.0 > /dev/null 2>&1
 
 echo "Starting to generate coverage..."
 # To be compatible with the sysmaster of src-openeuler
-grcov . --ignore "/**/*" --ignore "tests/**/*" --ignore "target/**/*" --ignore "vendor/**/*" --ignore "ci/**/*" --ignore "tools/**/*" --ignore "docs/**/*" -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./cov.info
+grcov . --ignore "/**/*" --ignore "tests/**/*" --ignore "target/**/*" --ignore "vendor/**/*" --ignore "ci/**/*" --ignore "tools/**/*" --ignore "docs/**/*" --ignore "**/examples/**/*" -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./cov.info
 if [ $? -ne 0 ]; then
     echo "grcov failed, exit."
     exit 1
