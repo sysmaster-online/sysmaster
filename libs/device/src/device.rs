@@ -17,11 +17,15 @@ use crate::utils::readlink_value;
 use crate::{error::*, DeviceAction};
 use basic::fs_util::{open_temporary, touch_file};
 use basic::parse_util::{device_path_parse_devnum, parse_devnum, parse_ifindex};
-use libc::{dev_t, gid_t, mode_t, uid_t, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT, S_IRUSR};
+use libc::{
+    dev_t, gid_t, mode_t, opendir, uid_t, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT, S_IRUSR,
+};
+use nix::dir::Dir;
 use nix::errno::{self, Errno};
 use nix::fcntl::{open, OFlag};
 use nix::sys::stat::{self, fchmod, lstat, major, makedev, minor, stat, Mode};
 use nix::unistd::{unlink, Gid, Uid};
+use snafu::ResultExt;
 use std::cell::{Ref, RefCell};
 use std::collections::hash_set::Iter;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -2742,7 +2746,7 @@ impl Device {
         subdir: &str,
         stk: &RefCell<VecDeque<String>>,
     ) -> Result<(), Error> {
-        for entry in self.opendir(subdir)? {
+        for entry in self.read_dir(subdir)? {
             let de = match entry {
                 Ok(e) => e,
                 Err(_) => {
@@ -2804,7 +2808,8 @@ impl Device {
         Ok(())
     }
 
-    pub(crate) fn opendir(&self, subdir: &str) -> Result<ReadDir, Error> {
+    /// Read a directory and return 'ReadDir'
+    pub fn read_dir(&self, subdir: &str) -> Result<ReadDir, Error> {
         let syspath = self.get_syspath()?;
 
         let dir = if syspath.is_empty() {
@@ -2816,6 +2821,26 @@ impl Device {
         std::fs::read_dir(&dir).map_err(|e| Error::Nix {
             msg: format!("Failed to read directory '{}'", &dir),
             source: nix::Error::from_i32(e.raw_os_error().unwrap_or_default()),
+        })
+    }
+
+    /// Open a subdirectory and return 'Dir'
+    pub fn open_dir(&self, subdir: &str) -> Result<Dir, Error> {
+        let syspath = self.get_syspath()?;
+
+        let dir = if syspath.is_empty() {
+            syspath
+        } else {
+            format!("{}/{}", syspath, subdir)
+        };
+
+        Dir::open(
+            dir.as_str(),
+            OFlag::O_DIRECTORY,
+            Mode::from_bits_truncate(0o000),
+        )
+        .context(Nix {
+            msg: format!("Failed to open directory '{}'", &dir),
         })
     }
 }
