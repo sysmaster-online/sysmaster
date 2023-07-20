@@ -26,6 +26,7 @@ constants = { path = "../constants"}
 
 [dev-dependencies]
 libtests = { path = "../libtests" }
+tempfile = "3.6.0"
 
 [features]
 selinux = []

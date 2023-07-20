@@ -268,11 +268,17 @@ mod tests {
     }
     #[test]
     fn test_unit_name_is_not_valid() {
-        let s_name = "@.service";
-        let s_temp_name = "bar.service";
-        let s_ins_name = "@bar123.service";
-        assert!(!unit_name_is_valid(s_name, UnitNameFlags::PLAIN));
-        assert!(!unit_name_is_valid(s_temp_name, UnitNameFlags::TEMPLATE),);
-        assert!(!unit_name_is_valid(s_ins_name, UnitNameFlags::INSTANCE),);
+        let s_invalid_name = "@.service";
+        let s_invalid_tmp_name = "@bar.service";
+        let s_invalid_ins_name = "@bar123.service";
+        assert!(!unit_name_is_valid(s_invalid_name, UnitNameFlags::PLAIN));
+        assert!(!unit_name_is_valid(
+            s_invalid_tmp_name,
+            UnitNameFlags::TEMPLATE
+        ),);
+        assert!(!unit_name_is_valid(
+            s_invalid_ins_name,
+            UnitNameFlags::INSTANCE
+        ),);
     }
 }

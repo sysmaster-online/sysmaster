@@ -144,16 +144,16 @@ mod tests {
 
     #[test]
     fn test_target_stop_action() {
-        let _comm = Rc::new(TargetUnitComm::new());
-        let tm = TargetMng::new(&_comm);
+        let comm = Rc::new(TargetUnitComm::new());
+        let tm = TargetMng::new(&comm);
         tm.stop_action(false);
         assert_eq!(tm.state(), TargetState::Dead)
     }
 
     #[test]
     fn test_target_start_action() {
-        let _comm = Rc::new(TargetUnitComm::new());
-        let tm = TargetMng::new(&_comm);
+        let comm = Rc::new(TargetUnitComm::new());
+        let tm = TargetMng::new(&comm);
         tm.start_action(false);
         assert_eq!(tm.state(), TargetState::Active)
     }

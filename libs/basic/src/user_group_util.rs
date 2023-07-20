@@ -169,3 +169,25 @@ pub fn get_group_creds(group: &String) -> Result<Group> {
         what: "invalid group name".to_string(),
     })
 }
+
+#[cfg(test)]
+mod test {
+    use super::parse_uid;
+
+    #[test]
+    fn test_parse_uid() {
+        let s_uid = String::from("0");
+        let u = parse_uid(&s_uid);
+        println!("{:?}", u);
+        assert_eq!(u.unwrap().name, "root");
+        let s_uid = String::from("1");
+        let u = parse_uid(&s_uid);
+        assert_eq!(u.unwrap().name, "bin");
+        let s_invalid_uid = String::from("abc_i");
+        let u = parse_uid(&s_invalid_uid);
+        let e = u.expect_err("invalid uid");
+        assert!(e
+            .to_string()
+            .contains("UID must only contains 0-9 and shouldn't starts with 0"));
+    }
+}

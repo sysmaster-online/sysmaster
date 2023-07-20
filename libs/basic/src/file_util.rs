@@ -22,11 +22,9 @@ use std::path::Path;
 /// read first line from a file
 pub fn read_first_line(path: &Path) -> Result<String> {
     let file = std::fs::File::open(path).context(IoSnafu)?;
-
     let mut buffer = BufReader::new(file);
     let mut first_line = String::with_capacity(1024);
     let _ = buffer.read_line(&mut first_line);
-
     Ok(first_line)
 }
 
@@ -37,4 +35,39 @@ pub fn write_string_file<P: AsRef<Path>>(path: P, value: String) -> std::io::Res
     let _ = file.write(value.as_bytes())?;
 
     Ok(())
+}
+#[cfg(test)]
+mod test {
+    use super::read_first_line;
+    use std::{
+        io::{BufWriter, Write},
+        path::Path,
+    };
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_read_first_line() {
+        let file = NamedTempFile::new().unwrap();
+        let mut buffer = BufWriter::new(&file);
+        buffer.write_all(b"Hello, world!\n").unwrap();
+        buffer.flush().unwrap();
+        let path = file.path();
+        let first_line: Result<String, crate::Error> = read_first_line(path);
+        assert_eq!(first_line.unwrap(), "Hello, world!\n");
+    }
+
+    #[test]
+    fn test_read_first_line_empty_file() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path();
+        let result = read_first_line(path);
+        assert_eq!(result.unwrap(), "");
+    }
+
+    #[test]
+    fn test_read_first_line_nonexistent_file() {
+        let path = Path::new("nonexistent_file.txt");
+        let result: Result<String, crate::Error> = read_first_line(path);
+        assert!(result.is_err());
+    }
 }
