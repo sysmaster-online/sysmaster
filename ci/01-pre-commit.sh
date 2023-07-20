@@ -27,8 +27,11 @@ pip3 install pre-commit ruamel.yaml -i https://pypi.mirrors.ustc.edu.cn/simple |
 # newnum=`git rev-list HEAD --no-merges --count`
 # changenum=$[newnum - oldnum]
 
+cargo check --all || cargo check --all || cargo check --all || exit 1
+git add . -A
+
 # add doc for src code
-for rustlist in `git diff origin/master --name-only | grep \.rs$ | tr '\n' ' '`
+for rustlist in `git diff origin/master --name-only | grep \.rs$  | grep -v "/examples/" | tr '\n' ' '`
 do
     # Allow libblkid/mod.rs and input_event_codes_rs to use, because they are auto generated.
     if [[ $rustlist =~ "libblkid/mod.rs" ]] || [[ $rustlist =~ "input_event_codes_rs" ]]; then
@@ -45,7 +48,6 @@ done
 
 #fix cargo clippy fail in pre-commit when build.rs is changed
 # RUSTC_WRAPPER="" cargo clippy --all-targets --features "default" --all -- -Dwarnings || exit 1
-cargo check --all || cargo check --all || cargo check --all || exit 1
 
 # run base check
 

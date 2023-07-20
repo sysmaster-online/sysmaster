@@ -113,19 +113,17 @@
 pub mod error;
 pub mod events;
 pub mod poll;
-mod signal;
 pub mod source;
 mod timer;
 
 pub use crate::events::Events;
 pub(crate) use crate::poll::Poll;
-pub(crate) use crate::signal::Signals;
 pub use crate::source::Source;
 pub use error::*;
 
 /// Supports event types added to the frame
 /// An event scheduling framework based on epoll
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone)]
 pub enum EventType {
     /// Io type
     Io,
@@ -159,7 +157,7 @@ pub enum EventType {
 
 /// The scheduling status of the event
 /// The dispatch status of the event
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum EventState {
     /// Start scheduling
     On,
@@ -167,4 +165,258 @@ pub enum EventState {
     Off,
     /// Stop after dispatching once
     OneShot,
+}
+
+#[cfg(test)]
+mod tests {
+    use libtests::get_target_test_dir;
+    use nix::sys::inotify::AddWatchFlags;
+
+    use super::*;
+    use std::{
+        fs::File,
+        net::{TcpListener, TcpStream},
+        os::unix::prelude::{AsRawFd, RawFd},
+        rc::Rc,
+        thread,
+        time::Duration,
+    };
+
+    #[test]
+    fn test_event_type_hash() {
+        let mut hash_set = std::collections::HashSet::new();
+        hash_set.insert(EventType::Io);
+        hash_set.insert(EventType::TimerRealtime);
+        hash_set.insert(EventType::TimerBoottime);
+        hash_set.insert(EventType::TimerMonotonic);
+        hash_set.insert(EventType::TimerRealtimeAlarm);
+        hash_set.insert(EventType::TimerBoottimeAlarm);
+        hash_set.insert(EventType::Signal);
+        hash_set.insert(EventType::Child);
+        hash_set.insert(EventType::Pidfd);
+        hash_set.insert(EventType::Watchdog);
+        hash_set.insert(EventType::Inotify);
+        hash_set.insert(EventType::Defer);
+        hash_set.insert(EventType::Post);
+        hash_set.insert(EventType::Exit);
+        assert_eq!(hash_set.len(), 14);
+    }
+
+    #[test]
+    fn test_event_state_clone() {
+        let state = EventState::On;
+        let cloned = state.clone();
+        assert_eq!(state, cloned);
+    }
+
+    // io test
+    struct Io {
+        t: TcpStream,
+    }
+
+    impl Io {
+        fn new(s: &'static str) -> Io {
+            Io {
+                t: TcpStream::connect(s).unwrap(),
+            }
+        }
+    }
+
+    impl Source for Io {
+        fn fd(&self) -> RawFd {
+            self.t.as_raw_fd()
+        }
+
+        fn event_type(&self) -> EventType {
+            EventType::Io
+        }
+
+        fn epoll_event(&self) -> u32 {
+            (libc::EPOLLIN) as u32
+        }
+
+        fn priority(&self) -> i8 {
+            0i8
+        }
+
+        fn dispatch(&self, _: &Events) -> i32 {
+            self.priority();
+            0
+        }
+
+        fn token(&self) -> u64 {
+            let data: u64 = unsafe { std::mem::transmute(self) };
+            data
+        }
+    }
+
+    #[test]
+    fn test_io() {
+        thread::spawn(move || {
+            let listener = TcpListener::bind("0.0.0.0:9097").unwrap();
+            loop {
+                let (_stream, addr) = listener.accept().unwrap();
+                println!("Accepted a new connection: {addr}");
+            }
+        });
+
+        thread::sleep(Duration::from_millis(100));
+        let e = Events::new().unwrap();
+        let s: Rc<dyn Source> = Rc::new(Io::new("0.0.0.0:9097"));
+        let s2: Rc<dyn Source> = Rc::new(Io::new("127.0.0.1:9097"));
+        e.add_source(s.clone()).unwrap();
+        e.add_source(s2.clone()).unwrap();
+
+        e.set_enabled(s.clone(), EventState::On).unwrap();
+        e.set_enabled(s2.clone(), EventState::On).unwrap();
+
+        e.run(100).unwrap();
+        e.run(100).unwrap();
+        e.run(100).unwrap();
+
+        e.del_source(s.clone()).unwrap();
+        e.del_source(s2.clone()).unwrap();
+    }
+
+    #[test]
+    fn test_io_onshot() {
+        thread::spawn(move || {
+            let listener = TcpListener::bind("0.0.0.0:9098").unwrap();
+            loop {
+                let (_stream, addr) = listener.accept().unwrap();
+                println!("Accepted a new connection: {addr}");
+            }
+        });
+
+        thread::sleep(Duration::from_millis(100));
+        let e = Events::new().unwrap();
+        let s: Rc<dyn Source> = Rc::new(Io::new("0.0.0.0:9098"));
+        e.add_source(s.clone()).unwrap();
+
+        e.set_enabled(s.clone(), EventState::OneShot).unwrap();
+
+        e.run(100).unwrap();
+        e.run(100).unwrap();
+        e.run(100).unwrap();
+
+        e.del_source(s.clone()).unwrap();
+    }
+
+    // timer test
+    struct Timer();
+
+    impl Timer {
+        fn new() -> Timer {
+            Self {}
+        }
+    }
+
+    impl Source for Timer {
+        fn fd(&self) -> RawFd {
+            0
+        }
+
+        fn event_type(&self) -> EventType {
+            EventType::TimerRealtime
+        }
+
+        fn epoll_event(&self) -> u32 {
+            (libc::EPOLLIN) as u32
+        }
+
+        fn priority(&self) -> i8 {
+            0i8
+        }
+
+        fn time_relative(&self) -> u64 {
+            100000
+        }
+
+        fn dispatch(&self, e: &Events) -> i32 {
+            self.fd();
+            self.priority();
+            e.set_exit();
+            0
+        }
+
+        fn token(&self) -> u64 {
+            let data: u64 = unsafe { std::mem::transmute(self) };
+            data
+        }
+    }
+
+    #[test]
+    fn test_timer() {
+        let e = Events::new().unwrap();
+        let s: Rc<dyn Source> = Rc::new(Timer::new());
+        e.add_source(s.clone()).unwrap();
+
+        e.set_enabled(s.clone(), EventState::On).unwrap();
+
+        e.rloop().unwrap();
+
+        e.del_source(s.clone()).unwrap();
+    }
+
+    // test inotify
+    #[derive(Debug)]
+    struct Inotify();
+
+    impl Inotify {
+        fn new() -> Inotify {
+            Self {}
+        }
+    }
+
+    impl Source for Inotify {
+        fn fd(&self) -> RawFd {
+            0
+        }
+
+        fn event_type(&self) -> EventType {
+            EventType::Inotify
+        }
+
+        fn epoll_event(&self) -> u32 {
+            (libc::EPOLLIN) as u32
+        }
+
+        fn priority(&self) -> i8 {
+            0i8
+        }
+
+        fn dispatch(&self, e: &Events) -> i32 {
+            e.set_exit();
+            println!("test_dir:");
+            0
+        }
+
+        fn token(&self) -> u64 {
+            let data: u64 = unsafe { std::mem::transmute(self) };
+            data
+        }
+    }
+
+    #[test]
+    fn test_inotify() {
+        thread::spawn(move || loop {
+            let mut test_dir = get_target_test_dir().unwrap();
+            test_dir.push("libevent-test-xxxxxxfoo.txt");
+            let _ = File::create(test_dir.as_os_str()).unwrap();
+            let _ = std::fs::remove_file(test_dir);
+        });
+
+        let e = Events::new().unwrap();
+        let s: Rc<dyn Source> = Rc::new(Inotify::new());
+        e.add_source(s.clone()).unwrap();
+        e.set_enabled(s.clone(), EventState::On).unwrap();
+
+        let test_dir = get_target_test_dir().unwrap();
+        let wd = e.add_watch(&test_dir, AddWatchFlags::IN_ALL_EVENTS);
+
+        e.rloop().unwrap();
+
+        e.rm_watch(wd);
+        e.del_source(s.clone()).unwrap();
+    }
 }

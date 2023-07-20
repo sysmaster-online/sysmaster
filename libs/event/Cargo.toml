@@ -11,3 +11,6 @@ constants = { path = "../constants" }
 libc = { version = "0.2" }
 nix = { version = "0.24" }
 snafu = { version = "0.7" }
+
+[dev-dependencies.libtests]
+path = "../libtests"

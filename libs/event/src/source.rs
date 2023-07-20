@@ -13,6 +13,7 @@
 //! # Events must implement the Source trait
 use crate::EventType;
 use crate::Events;
+use nix::sys::signal::Signal;
 use std::fmt::Debug;
 use std::os::unix::io::RawFd;
 
@@ -24,7 +25,7 @@ pub trait Source {
     }
 
     /// The signal type needs to specify the signal to listen to
-    fn signals(&self) -> Vec<libc::c_int> {
+    fn signals(&self) -> Vec<Signal> {
         vec![]
     }
 
@@ -107,5 +108,55 @@ impl PartialOrd for dyn Source {
 impl Debug for dyn Source {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Source { ... }")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct TestSource {
+        token: u64,
+        priority: i8,
+    }
+
+    impl TestSource {
+        fn new(token: u64, priority: i8) -> Self {
+            TestSource { token, priority }
+        }
+    }
+
+    impl Source for TestSource {
+        fn token(&self) -> u64 {
+            self.token
+        }
+
+        fn priority(&self) -> i8 {
+            self.priority
+        }
+
+        fn dispatch(&self, _: &Events) -> i32 {
+            // implementation of dispatch function
+            0
+        }
+    }
+
+    #[test]
+    fn test_source_token() {
+        let source = TestSource::new(123, 0);
+        assert_eq!(source.token(), 123);
+    }
+
+    #[test]
+    fn test_source_priority() {
+        let source = TestSource::new(123, 0);
+        assert_eq!(source.priority(), 0);
+    }
+
+    #[test]
+    fn test_source_dispatch() {
+        let source = TestSource::new(123, 0);
+        let events = Events::new().unwrap();
+        assert_eq!(source.dispatch(&events), 0);
     }
 }

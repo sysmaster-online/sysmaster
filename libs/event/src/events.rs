@@ -11,13 +11,17 @@
 // See the Mulan PSL v2 for more details.
 
 //! An event scheduling framework based on epoll
+use crate::error::*;
 use crate::timer::Timer;
-use crate::Error;
-use crate::Result;
-use crate::{EventState, EventType, Poll, Signals, Source};
+use crate::{EventState, EventType, Poll, Source};
 use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, InotifyEvent, WatchDescriptor};
+use nix::sys::signalfd::siginfo;
+use nix::sys::signalfd::SfdFlags;
+use nix::sys::signalfd::SigSet;
+use nix::sys::signalfd::SignalFd;
 use nix::unistd;
 use nix::NixPath;
+use snafu::ResultExt;
 use std::cell::RefCell;
 use std::collections::{BinaryHeap, HashMap};
 use std::convert::TryInto;
@@ -42,7 +46,7 @@ impl Events {
     /// create event
     pub fn new() -> Result<Events> {
         Ok(Events {
-            data: RefCell::new(EventsData::new()),
+            data: RefCell::new(EventsData::new()?),
         })
     }
 
@@ -136,11 +140,11 @@ impl Events {
     }
 
     /// for signal: read the signal content when signal source emit
-    pub fn read_signals(&self) -> std::io::Result<Option<libc::signalfd_siginfo>> {
+    pub fn read_signals(&self) -> Option<siginfo> {
         self.data.borrow_mut().read_signals()
     }
 
-    ///The "events" represents the "event_event" returned by epoll_wait.
+    /// The "events" represents the "event_event" returned by epoll_wait.
     pub fn epoll_event(&self, token: u64) -> u32 {
         self.data.borrow().epoll_event(token)
     }
@@ -161,7 +165,7 @@ impl Events {
     }
 
     /// for test: clear all events to release resource
-    // repeating protection
+    /// repeating protection
     pub fn clear(&self) {
         self.data.borrow_mut().clear();
     }
@@ -197,16 +201,16 @@ pub(crate) struct EventsData {
     children: HashMap<i64, i64>,
     pidfd: RawFd,
     timerfd: HashMap<EventType, RawFd>,
-    signal: Signals,
+    signalfd: SignalFd,
     timer: Timer,
-    inotify: Inotify,
+    inotifyfd: Inotify,
 }
 
 // the declaration "pub(self)" is for identification only.
 impl EventsData {
-    pub(self) fn new() -> EventsData {
-        Self {
-            poller: Poll::new().unwrap(),
+    pub(self) fn new() -> Result<EventsData> {
+        Ok(Self {
+            poller: Poll::new()?,
             exit: false,
             sources: HashMap::new(),
             defer_sources: HashMap::new(),
@@ -217,10 +221,12 @@ impl EventsData {
             children: HashMap::new(),
             pidfd: 0,
             timerfd: HashMap::new(),
-            signal: Signals::new(),
+            signalfd: SignalFd::with_flags(&SigSet::empty(), SfdFlags::SFD_NONBLOCK)
+                .context(NixSnafu)?,
             timer: Timer::new(),
-            inotify: Inotify::init(InitFlags::IN_CLOEXEC | InitFlags::IN_NONBLOCK).unwrap(),
-        }
+            inotifyfd: Inotify::init(InitFlags::IN_CLOEXEC | InitFlags::IN_NONBLOCK)
+                .context(NixSnafu)?,
+        })
     }
 
     pub(self) fn add_source(&mut self, source: Rc<dyn Source>) -> Result<i32> {
@@ -353,8 +359,14 @@ impl EventsData {
                 self.poller.register(source.fd(), &mut event)?;
             }
             EventType::Signal => {
-                self.signal.reset_sigset(source.signals());
-                self.poller.register(self.signal.fd(), &mut event)?;
+                let mut mask = SigSet::empty();
+                for sig in source.signals() {
+                    mask.add(sig);
+                }
+                mask.thread_set_mask().context(NixSnafu)?;
+                self.signalfd.set_mask(&mask).context(NixSnafu)?;
+                self.poller
+                    .register(self.signalfd.as_raw_fd(), &mut event)?;
             }
             EventType::Child => {
                 self.add_child(&mut event, source.pid());
@@ -381,7 +393,8 @@ impl EventsData {
                 self.pending_push(source.clone(), 0);
             }
             EventType::Inotify => {
-                self.poller.register(self.inotify.as_raw_fd(), &mut event)?;
+                self.poller
+                    .register(self.inotifyfd.as_raw_fd(), &mut event)?;
             }
             EventType::Post => todo!(),
             EventType::Exit => todo!(),
@@ -408,7 +421,7 @@ impl EventsData {
                 self.poller.unregister(source.fd())?;
             }
             EventType::Signal => {
-                self.poller.unregister(self.signal.fd())?;
+                self.poller.unregister(self.signalfd.as_raw_fd())?;
             }
             EventType::Child => {
                 self.poller.unregister(self.pidfd)?;
@@ -421,7 +434,7 @@ impl EventsData {
                 self.timer.remove(&et, source.clone());
             }
             EventType::Inotify => {
-                self.poller.unregister(self.inotify.as_raw_fd())?;
+                self.poller.unregister(self.inotifyfd.as_raw_fd())?;
             }
             EventType::Defer => (),
             EventType::Post => todo!(),
@@ -440,8 +453,8 @@ impl EventsData {
     }
 
     /// read the signal content when signal source emit
-    pub(self) fn read_signals(&mut self) -> std::io::Result<Option<libc::signalfd_siginfo>> {
-        self.signal.read_signals()
+    pub(self) fn read_signals(&mut self) -> Option<siginfo> {
+        self.signalfd.read_signal().unwrap_or(None)
     }
 
     pub(crate) fn epoll_event(&self, token: u64) -> u32 {
@@ -457,15 +470,15 @@ impl EventsData {
         path: &P,
         mask: AddWatchFlags,
     ) -> WatchDescriptor {
-        self.inotify.add_watch(path, mask).unwrap()
+        self.inotifyfd.add_watch(path, mask).unwrap()
     }
 
     pub(self) fn rm_watch(&self, wd: WatchDescriptor) {
-        self.inotify.rm_watch(wd).unwrap();
+        self.inotifyfd.rm_watch(wd).unwrap();
     }
 
     pub(self) fn read_events(&self) -> Vec<InotifyEvent> {
-        self.inotify.read_events().unwrap()
+        self.inotifyfd.read_events().unwrap()
     }
 
     /// Wait for the event event through poller
@@ -606,7 +619,7 @@ impl EventsData {
         self.state.clear();
         self.children.clear();
         self.timerfd.clear();
-        if nix::unistd::close(self.inotify.as_raw_fd()).is_err() {
+        if nix::unistd::close(self.inotifyfd.as_raw_fd()).is_err() {
             println!("Failed to close inotify fd.");
         }
     }

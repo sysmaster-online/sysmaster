@@ -32,7 +32,7 @@ macro_rules! syscall {
 
 const LOWEST_FD: libc::c_int = 3;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct Epoll {
     epoll_fd: RawFd,
     n_sources: AtomicUsize,
@@ -96,7 +96,7 @@ impl Epoll {
 
 impl Drop for Epoll {
     fn drop(&mut self) {
-        let _ = syscall!(close(self.epoll_fd));
+        _ = syscall!(close(self.epoll_fd));
     }
 }
 

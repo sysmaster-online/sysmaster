@@ -10,17 +10,19 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use nix::sys::signalfd::siginfo;
 #[cfg(test)]
 pub(crate) use rentry::RELI_HISTORY_MAX_DBS;
 use sysmaster::unit::UnitStatus;
-
 pub(crate) mod alive_timer;
 pub(crate) mod commands;
 pub(crate) mod config;
 pub(crate) mod pre_install;
 pub(crate) mod rentry;
 pub(crate) mod signals;
+use self::config::ManagerConfig;
 use crate::unit::UnitManagerX;
+use alive_timer::AliveTimer;
 use basic::path_lookup::LookupPaths;
 use basic::process_util::{self};
 use basic::special::{CGROUP_SYSMASTER, MULTI_USER_TARGET};
@@ -40,11 +42,6 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::rel::{ReliConf, ReliLastFrame, Reliability};
-
-use alive_timer::AliveTimer;
-
-use self::config::ManagerConfig;
-use self::signals::EVENT_SIGNALS;
 
 /// maximal size of process's arguments
 pub const MANAGER_ARGS_SIZE_MAX: usize = 5; // 6 - 1
@@ -69,11 +66,8 @@ impl SignalMgr {
 }
 
 impl SignalDispatcher for SignalMgr {
-    fn dispatch_signal(&self, signal: &libc::signalfd_siginfo) -> Result<i32> {
+    fn dispatch_signal(&self, signal: &siginfo) -> Result<i32> {
         /* Received signal should be in the set defined in EVENT_SIGNALS */
-        if !EVENT_SIGNALS.contains(&(signal.ssi_signo as libc::c_int)) {
-            return Ok(1);
-        }
         match signal.ssi_signo as libc::c_int {
             libc::SIGHUP => self.reload(),
             libc::SIGTERM => self.reexec(),
@@ -84,7 +78,7 @@ impl SignalDispatcher for SignalMgr {
                 .um
                 .start_unit("ctrl-alt-del.target", false, "replace")
                 .map(|_| 1),
-            _ => todo!(),
+            _ => Ok(0),
         }
     }
 }

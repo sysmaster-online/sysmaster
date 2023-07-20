@@ -11,12 +11,18 @@
 // See the Mulan PSL v2 for more details.
 
 use event::{EventType, Events, Source};
+use nix::sys::signal::Signal;
+use nix::sys::signalfd::siginfo;
 use std::rc::Rc;
 use sysmaster::error::*;
 use sysmaster::rel::{ReliLastFrame, Reliability};
 
-pub(crate) const EVENT_SIGNALS: [i32; 4] =
-    [libc::SIGCHLD, libc::SIGTERM, libc::SIGINT, libc::SIGHUP];
+pub(crate) const EVENT_SIGNALS: [Signal; 4] = [
+    Signal::SIGCHLD,
+    Signal::SIGTERM,
+    Signal::SIGINT,
+    Signal::SIGHUP,
+];
 
 pub(super) struct Signals<T> {
     // associated objects
@@ -25,7 +31,7 @@ pub(super) struct Signals<T> {
 }
 
 pub(super) trait SignalDispatcher {
-    fn dispatch_signal(&self, signal: &libc::signalfd_siginfo) -> Result<i32>;
+    fn dispatch_signal(&self, signal: &siginfo) -> Result<i32>;
 }
 
 impl<T> Signals<T> {
@@ -42,7 +48,7 @@ impl<T: SignalDispatcher> Source for Signals<T> {
         EventType::Signal
     }
 
-    fn signals(&self) -> Vec<libc::c_int> {
+    fn signals(&self) -> Vec<Signal> {
         Vec::from(EVENT_SIGNALS)
     }
 
@@ -54,15 +60,11 @@ impl<T: SignalDispatcher> Source for Signals<T> {
         log::debug!("Dispatching signals!");
 
         self.reli.set_last_frame1(ReliLastFrame::ManagerOp as u32);
-        match e.read_signals() {
-            Ok(Some(info)) => {
-                log::debug!("read signal from event: {:?}", info);
-                if let Err(e) = self.signal_handler.dispatch_signal(&info) {
-                    log::error!("dispatch signal failed : {}", e);
-                }
+        if let Some(info) = e.read_signals() {
+            log::debug!("read signal from event: {:?}", info);
+            if let Err(e) = self.signal_handler.dispatch_signal(&info) {
+                log::error!("dispatch signal failed : {}", e);
             }
-            Ok(None) => log::debug!("read signals none"),
-            Err(e) => log::debug!("read signals error, {:?}", e),
         }
         self.reli.clear_last_frame();
 
