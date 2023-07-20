@@ -70,3 +70,32 @@ pub fn rlimit_nofile_safe() {
         log::warn!("Failed to set RLIMIT_NOFILE: {}", e);
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_rlimit() {
+        let soft = 1100;
+        let hard = 2048;
+        setrlimit(libc::RLIMIT_NOFILE as u8, soft, hard).unwrap();
+        rlimit_nofile_safe();
+        let limit = getrlimit(libc::RLIMIT_NOFILE as u8).unwrap();
+        assert_eq!(limit.0, nix::sys::select::FD_SETSIZE as u64);
+        assert_eq!(limit.1, hard);
+
+        let soft = 1022;
+        setrlimit(libc::RLIMIT_NOFILE as u8, soft, hard).unwrap();
+        rlimit_nofile_safe();
+        let limit = getrlimit(libc::RLIMIT_NOFILE as u8).unwrap();
+        assert_eq!(limit.0, soft);
+        assert_eq!(limit.1, hard);
+
+        let soft = 1024;
+        setrlimit(libc::RLIMIT_NOFILE as u8, soft, hard).unwrap();
+        rlimit_nofile_safe();
+        let limit = getrlimit(libc::RLIMIT_NOFILE as u8).unwrap();
+        assert_eq!(limit.0, soft);
+        assert_eq!(limit.1, hard);
+    }
+}

@@ -15,7 +15,7 @@
 use std::fmt::Display;
 
 /// uuid
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct Uuid(pub(super) [u8; 16]);
 
 fn unhexchar(c: u8) -> Result<u8, ()> {
@@ -113,6 +113,10 @@ impl Uuid {
             return None;
         }
 
+        if i != str.len() {
+            return None;
+        }
+
         Some(id128)
     }
 
@@ -145,5 +149,24 @@ mod tests {
             "e57446f8-7c3f-4f97-8a7e-ca30ff7197d3".to_string(),
             uuid2.to_string()
         );
+
+        assert_eq!(
+            Uuid::from_string("01020304-0506-0708-090a-0b0c0d0e0f101"),
+            None
+        );
+        assert_eq!(
+            Uuid::from_string("01020304-0506-0708-090a-0b0c0d0e0f10-"),
+            None
+        );
+        assert_eq!(
+            Uuid::from_string("01020304-0506-0708-090a0b0c0d0e0f10"),
+            None
+        );
+        assert_eq!(
+            Uuid::from_string("010203040506-0708-090a-0b0c0d0e0f10"),
+            None
+        );
+
+        assert!(Uuid::default().is_null());
     }
 }
