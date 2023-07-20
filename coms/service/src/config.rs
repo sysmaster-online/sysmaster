@@ -199,6 +199,7 @@ impl ServiceConfigData {
 mod tests {
     use crate::comm::ServiceUnitComm;
     use crate::config::ServiceConfig;
+    use crate::rentry::ServiceType;
     use libtests::get_project_root;
     use std::rc::Rc;
 
@@ -228,7 +229,7 @@ mod tests {
         let comm = Rc::new(ServiceUnitComm::new());
         let config = ServiceConfig::new(&comm);
 
-        let result = config.load(paths, false);
-        assert_eq!(config.service_type(), b"Simple")
+        assert!(config.load(paths, false).is_ok());
+        assert_eq!(config.service_type(), ServiceType::Simple)
     }
 }
