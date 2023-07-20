@@ -18,11 +18,12 @@ use crate::{error::*, DeviceAction};
 use basic::fs_util::{open_temporary, touch_file};
 use basic::parse_util::{device_path_parse_devnum, parse_devnum, parse_ifindex};
 use libc::{
-    dev_t, gid_t, mode_t, opendir, uid_t, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT, S_IRUSR,
+    c_char, dev_t, faccessat, gid_t, mode_t, uid_t, F_OK, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK,
+    S_IFMT, S_IRUSR, S_IWUSR,
 };
 use nix::dir::Dir;
 use nix::errno::{self, Errno};
-use nix::fcntl::{open, OFlag};
+use nix::fcntl::{open, AtFlags, OFlag};
 use nix::sys::stat::{self, fchmod, lstat, major, makedev, minor, stat, Mode};
 use nix::unistd::{unlink, Gid, Uid};
 use snafu::ResultExt;
@@ -135,6 +136,8 @@ pub struct Device {
     pub driver_set: RefCell<bool>,
     /// whether the database is loaded
     pub db_loaded: RefCell<bool>,
+    /// whether the attributes are cached
+    pub sysattrs_cached: RefCell<bool>,
 
     /// whether the device object is initialized
     pub is_initialized: RefCell<bool>,
@@ -200,6 +203,7 @@ impl Device {
             db_persist: RefCell::new(false),
             children: RefCell::new(HashMap::new()),
             children_enumerated: RefCell::new(false),
+            sysattrs_cached: RefCell::new(false),
         }
     }
 
@@ -1056,11 +1060,11 @@ impl Device {
                     // read full virtual file
                     let mut file = std::fs::OpenOptions::new()
                         .read(true)
-                        .open(sysattr_path.clone())
+                        .open(&sysattr_path)
                         .map_err(|e| Error::Nix {
                             msg: format!(
                                 "get_sysattr_value failed: can't open sysattr '{}': {}",
-                                sysattr_path, e
+                                sysattr, e
                             ),
                             source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
                         })?;
@@ -1068,7 +1072,7 @@ impl Device {
                     file.read_to_string(&mut value).map_err(|e| Error::Nix {
                         msg: format!(
                             "get_sysattr_value failed: can't read sysattr '{}': {}",
-                            sysattr_path, e
+                            sysattr, e
                         ),
                         source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
                     })?;
@@ -2843,6 +2847,140 @@ impl Device {
             msg: format!("Failed to open directory '{}'", &dir),
         })
     }
+
+    fn read_all_sysattrs(&self) -> Result<(), Error> {
+        if *self.sysattrs_cached.borrow() {
+            return Ok(());
+        }
+
+        let stk = RefCell::new(VecDeque::<String>::new());
+        self.read_all_sysattrs_internal("", &stk)?;
+
+        #[allow(clippy::while_let_loop)]
+        loop {
+            let subdir = match stk.borrow_mut().pop_front() {
+                Some(v) => v,
+                None => break,
+            };
+
+            self.read_all_sysattrs_internal(&subdir, &stk)?;
+        }
+
+        self.sysattrs_cached.replace(true);
+
+        Ok(())
+    }
+
+    fn read_all_sysattrs_internal(
+        &self,
+        subdir: &str,
+        stk: &RefCell<VecDeque<String>>,
+    ) -> Result<(), Error> {
+        let dir = match self.open_dir(subdir) {
+            Ok(d) => d,
+            Err(e) => {
+                if e.is_errno(nix::Error::ENOENT) && !subdir.is_empty() {
+                    return Ok(());
+                }
+
+                return Err(Error::Nix {
+                    msg: format!("failed to read subdirectory '{}'", subdir),
+                    source: e.get_errno(),
+                });
+            }
+        };
+
+        if !subdir.is_empty() {
+            if unsafe { faccessat(dir.as_raw_fd(), "uevent".as_ptr() as *const c_char, F_OK, 0) }
+                >= 0
+            {
+                /* skip child device */
+                return Ok(());
+            }
+            let error = nix::Error::from_i32(nix::errno::errno());
+            if error != nix::Error::ENOENT {
+                log::debug!(
+                    "{}: failed to access {}/uevent, ignoring subdirectory {}: {}",
+                    self.sysname.borrow(),
+                    subdir,
+                    subdir,
+                    error
+                );
+
+                return Ok(());
+            }
+        }
+
+        for de in self.read_dir(subdir)? {
+            let de = match de {
+                Ok(i) => i,
+                Err(_) => continue,
+            };
+
+            match de.file_name().to_str() {
+                Some(s) => {
+                    if [".", ".."].contains(&s) {
+                        continue;
+                    }
+                }
+                None => {
+                    continue;
+                }
+            }
+
+            /* only handle symlinks, regular files, and directories */
+            match de.file_type() {
+                Ok(t) => {
+                    if !t.is_dir() && !t.is_file() & !t.is_symlink() {
+                        continue;
+                    }
+                }
+                Err(_) => {
+                    continue;
+                }
+            }
+
+            let p = if !subdir.is_empty() {
+                format!("{}/{}", subdir, de.file_name().to_str().unwrap())
+            } else {
+                de.file_name().to_str().unwrap().to_string()
+            };
+
+            if de.file_type().unwrap().is_dir() {
+                stk.borrow_mut().push_back(p.clone());
+                continue;
+            }
+
+            let stat = match nix::sys::stat::fstatat(
+                dir.as_raw_fd(),
+                de.file_name().to_str().unwrap(),
+                AtFlags::AT_SYMLINK_NOFOLLOW,
+            ) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+
+            if (stat.st_mode & (S_IRUSR | S_IWUSR)) == 0 {
+                continue;
+            }
+
+            /*
+             * Some attributes are a symlink to other device, ignoring them.
+             *
+             * Only regard 'subsystem', 'driver' and 'module' as legal if
+             * the attribute is a symlink.
+             */
+            if de.file_type().unwrap().is_symlink()
+                && !["driver", "subsystem", "module"].contains(&p.as_str())
+            {
+                continue;
+            }
+
+            let _ = self.sysattrs.borrow_mut().insert(p);
+        }
+
+        Ok(())
+    }
 }
 
 /// iterator wrapper of hash set in refcell
@@ -2951,6 +3089,24 @@ impl Device {
 
         HashMapRefWrapper {
             r: self.children.borrow(),
+        }
+    }
+
+    /// return the sysattr iterator
+    pub fn sysattr_iter(&self) -> HashSetRefWrapper<String> {
+        if !*self.sysattrs_cached.borrow() {
+            if let Err(e) = self.read_all_sysattrs() {
+                log::error!(
+                    "{}: failed to read all sysattrs: {}",
+                    self.get_sysname()
+                        .unwrap_or_else(|_| self.devpath.borrow().clone()),
+                    e
+                );
+            }
+        }
+
+        HashSetRefWrapper {
+            r: self.sysattrs.borrow(),
         }
     }
 }
@@ -3179,6 +3335,13 @@ mod tests {
                 canoicalized_path.to_str().unwrap(),
                 &child.borrow().get_syspath().unwrap()
             );
+        }
+
+        /* Test iterate all attributes */
+        for sysattr in &device.sysattr_iter() {
+            let p = format!("{}/{}", syspath, sysattr);
+            let path = Path::new(&p);
+            assert!(path.exists());
         }
     }
 
