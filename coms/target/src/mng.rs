@@ -97,25 +97,25 @@ impl TargetMng {
     }
 
     fn state_notify(&self, new_state: TargetState, old_state: TargetState) {
-        let unit = self.comm.owner().unwrap();
-        if new_state != old_state {
-            log::debug!(
-                "{} original state[{:?}] ->new state[{:?}]",
-                unit.id(),
-                old_state,
-                new_state,
+        if let Some(unit) = self.comm.owner() {
+            if new_state != old_state {
+                log::debug!(
+                    "{} original state[{:?}] ->new state[{:?}]",
+                    unit.id(),
+                    old_state,
+                    new_state,
+                );
+            }
+            let old_unit_state = old_state.to_unit_state();
+            let new_unit_state = new_state.to_unit_state();
+            unit.notify(
+                old_unit_state,
+                new_unit_state,
+                UnitNotifyFlags::RELOAD_FAILURE,
             );
+
+            self.db_update();
         }
-
-        let old_unit_state = old_state.to_unit_state();
-        let new_unit_state = new_state.to_unit_state();
-        unit.notify(
-            old_unit_state,
-            new_unit_state,
-            UnitNotifyFlags::RELOAD_FAILURE,
-        );
-
-        self.db_update();
     }
 
     fn state(&self) -> TargetState {
@@ -148,5 +148,13 @@ mod tests {
         let tm = TargetMng::new(&_comm);
         tm.stop_action(false);
         assert_eq!(tm.state(), TargetState::Dead)
+    }
+
+    #[test]
+    fn test_target_start_action() {
+        let _comm = Rc::new(TargetUnitComm::new());
+        let tm = TargetMng::new(&_comm);
+        tm.start_action(false);
+        assert_eq!(tm.state(), TargetState::Active)
     }
 }

@@ -253,3 +253,26 @@ pub fn unit_name_is_valid(name: &str, flag: UnitNameFlags) -> bool {
 pub fn unit_type_from_string(type_string: &str) -> Result<UnitType, ParseIntError> {
     UnitType::from_str(type_string)
 }
+#[cfg(test)]
+mod tests {
+    use super::{unit_name_is_valid, UnitNameFlags};
+
+    #[test]
+    fn test_unit_name_is_valid() {
+        let s_name = "foo.service";
+        let s_temp_name = "bar@.service";
+        let s_ins_name = "bar@123.service";
+        assert!(unit_name_is_valid(s_name, UnitNameFlags::PLAIN));
+        assert!(unit_name_is_valid(s_temp_name, UnitNameFlags::TEMPLATE));
+        assert!(unit_name_is_valid(s_ins_name, UnitNameFlags::INSTANCE));
+    }
+    #[test]
+    fn test_unit_name_is_not_valid() {
+        let s_name = "@.service";
+        let s_temp_name = "bar.service";
+        let s_ins_name = "@bar123.service";
+        assert!(!unit_name_is_valid(s_name, UnitNameFlags::PLAIN));
+        assert!(!unit_name_is_valid(s_temp_name, UnitNameFlags::TEMPLATE),);
+        assert!(!unit_name_is_valid(s_ins_name, UnitNameFlags::INSTANCE),);
+    }
+}
