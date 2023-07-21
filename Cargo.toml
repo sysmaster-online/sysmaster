@@ -44,6 +44,7 @@ nix = "0.24"
 regex = { version = "1.6.0", default-features = false, features = ["std"] }
 serde = "1.0.130"
 siphasher = { version = "0.3", features = ["serde"] }
+tempfile = "=3.6.0"
 walkdir = "2"
 fnmatch-regex = "0.2.0"
 snafu = "0.7"
