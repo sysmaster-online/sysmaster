@@ -13,7 +13,6 @@
 //! This crate provides common, functions for unit tests
 use std::{
     env,
-    fs::read_dir,
     io::{self, ErrorKind},
     path::PathBuf,
 };
@@ -21,17 +20,25 @@ use std::{
 /// get the source project root path
 pub fn get_project_root() -> io::Result<PathBuf> {
     let path = env::current_dir()?;
+    let mut current_path = Some(path.as_path());
 
-    for p in path.as_path().ancestors() {
-        let has_cargo = read_dir(p)?.any(|p| p.unwrap().file_name().eq("Cargo.lock"));
+    while let Some(p) = current_path {
+        let has_cargo = p.read_dir()?.any(|p| {
+            if let Ok(entry) = p {
+                entry.file_name().eq("Cargo.lock")
+            } else {
+                false
+            }
+        });
+
         if has_cargo {
-            return Ok(PathBuf::from(p));
+            return Ok(p.into());
         }
+
+        current_path = p.parent();
     }
-    Err(io::Error::new(
-        ErrorKind::NotFound,
-        "Ran out of places to find Cargo.toml",
-    ))
+
+    Err(io::Error::new(ErrorKind::NotFound, "NotFound"))
 }
 
 /// get the crate root path
@@ -40,17 +47,27 @@ pub fn get_crate_root() -> io::Result<PathBuf> {
     Ok(PathBuf::from(manifest_dir))
 }
 
+/// get the target test dir
+pub fn get_target_test_dir() -> io::Result<PathBuf> {
+    let test_dir = get_project_root()?.join("target").join("tests");
+
+    if !test_dir.exists() {
+        std::fs::create_dir_all(&test_dir)?;
+    }
+
+    Ok(test_dir)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{get_crate_root, get_project_root};
+    use crate::{get_crate_root, get_project_root, get_target_test_dir};
 
     #[test]
     fn test_get_project_root() {
         let mut file_path = get_project_root().unwrap();
-        file_path.push("tests/test_units/config.service");
+        file_path.push("target");
 
-        println!("{file_path:?}");
-        assert!(file_path.is_file())
+        assert!(file_path.exists());
     }
 
     #[test]
@@ -58,7 +75,15 @@ mod tests {
         let mut file_path = get_crate_root().unwrap();
         file_path.push("Cargo.toml");
 
-        println!("{file_path:?}");
-        assert!(file_path.is_file())
+        println!("{:?}", file_path);
+
+        assert!(file_path.is_file());
+        assert!(file_path.exists());
+    }
+
+    #[test]
+    fn test_get_target_test_dir() {
+        let test_dir = get_target_test_dir().unwrap();
+        assert!(test_dir.exists());
     }
 }

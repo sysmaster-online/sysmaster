@@ -224,6 +224,12 @@ impl Notify {
         let msgs = socket::recvmsg::<()>(self.rawfd(), &mut iov, Some(&mut space), flags)
             .context(NixSnafu)?;
 
+        if msgs.flags.contains(MsgFlags::MSG_CTRUNC) {
+            return Err(Error::Nix {
+                source: nix::Error::EXFULL,
+            });
+        }
+
         // check: peek == pop
         let (received_cred, received_fds) = notify_trans_recvmsg(&msgs);
         if get_pid_from_cred(&received_cred) != pid {
@@ -278,6 +284,12 @@ fn notify_peek_pid(fd: RawFd, flags: MsgFlags) -> Result<libc::pid_t> {
     let peek_flags = flags | MsgFlags::MSG_PEEK;
     let msgs =
         socket::recvmsg::<()>(fd, &mut iov, Some(&mut space), peek_flags).context(NixSnafu)?;
+
+    if msgs.flags.contains(MsgFlags::MSG_CTRUNC) {
+        return Err(Error::Nix {
+            source: nix::Error::EXFULL,
+        });
+    }
 
     // get message information
     let (received_cred, received_fds) = notify_trans_recvmsg(&msgs);

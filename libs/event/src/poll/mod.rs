@@ -15,13 +15,13 @@
 use crate::Result;
 use libc::epoll_event;
 use std::os::unix::{io::AsRawFd, io::RawFd};
-
 pub(crate) mod epoll;
+
 #[cfg(unix)]
 use epoll::Epoll as Poller;
 
 /// Encapsulation of the epoll interface
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Poll {
     poller: Poller,
 }
@@ -87,6 +87,7 @@ mod test {
             events: EPOLLIN as u32,
             u64: 0,
         };
+        assert!(poll.try_clone().unwrap().as_raw_fd() > 0);
         let _ = poll.register(listener.as_raw_fd(), &mut events);
         let _ = poll.poll(0).unwrap();
         let _ = poll.reregister(listener.as_raw_fd(), &mut events);

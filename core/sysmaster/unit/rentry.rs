@@ -30,6 +30,9 @@ use sysmaster::unit::{UnitRelations, UnitType};
 
 pub(crate) fn unit_name_to_type(unit_name: &str) -> UnitType {
     let words: Vec<&str> = unit_name.split('.').collect();
+    if words.is_empty() {
+        return UnitType::UnitTypeInvalid;
+    }
     UnitType::from_str(words[words.len() - 1]).unwrap_or(UnitType::UnitTypeInvalid)
 }
 

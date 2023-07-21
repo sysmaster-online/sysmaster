@@ -16,10 +16,12 @@ use event::EventState;
 use event::EventType;
 use event::Events;
 use event::Source;
-use nix::unistd::fork;
-use nix::unistd::ForkResult;
+use nix::sys::signal::kill;
+use nix::sys::signal::Signal;
+use nix::unistd::Pid;
 use std::rc::Rc;
 
+#[allow(missing_docs)]
 #[derive(Debug)]
 struct Signals {}
 
@@ -34,8 +36,8 @@ impl Source for Signals {
         EventType::Signal
     }
 
-    fn signals(&self) -> Vec<libc::c_int> {
-        vec![libc::SIGCHLD, libc::SIGTERM]
+    fn signals(&self) -> Vec<Signal> {
+        vec![Signal::SIGINT, Signal::SIGTERM, Signal::SIGUSR1]
     }
 
     fn epoll_event(&self) -> u32 {
@@ -47,14 +49,8 @@ impl Source for Signals {
     }
 
     fn dispatch(&self, e: &Events) -> i32 {
-        match e.read_signals() {
-            Ok(Some(info)) => {
-                println!("read signo: {:?}", info.ssi_signo);
-            }
-            Ok(None) => (),
-            Err(e) => {
-                println!("{e:?}");
-            }
+        if let Some(info) = e.read_signals() {
+            assert_eq!(2, info.ssi_signo);
         }
         0
     }
@@ -65,19 +61,14 @@ impl Source for Signals {
     }
 }
 
+#[allow(missing_docs)]
 fn main() {
     let e = Events::new().unwrap();
     let s: Rc<dyn Source> = Rc::new(Signals::new());
     e.add_source(s.clone()).unwrap();
     e.set_enabled(s.clone(), EventState::OneShot).unwrap();
 
-    let pid = unsafe { fork() };
-    match pid {
-        Ok(ForkResult::Parent { child, .. }) => {
-            println!("Continuing execution in parent process, new child has pid: {child}");
-            e.run(-1).unwrap();
-        }
-        Ok(ForkResult::Child) => println!("I'm a new child process"),
-        Err(_) => println!("Fork failed"),
-    }
+    kill(Pid::this(), Signal::SIGINT).expect("Failed to send SIGINT signal");
+
+    e.run(-1).unwrap();
 }

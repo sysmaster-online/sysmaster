@@ -38,7 +38,6 @@ use basic::logger::{self};
 use clap::Parser;
 use libc::{c_int, getpid, getppid, prctl, PR_SET_CHILD_SUBREAPER};
 use log::{self};
-use manager::signals::EVENT_SIGNALS;
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use std::convert::TryFrom;
 use std::env::{self};
@@ -269,10 +268,7 @@ fn ignore_all_signals() {
         if [libc::SIGKILL, libc::SIGSTOP].contains(&sig) {
             continue;
         }
-        /* These signals will be dispatched by event. */
-        if EVENT_SIGNALS.contains(&sig) {
-            continue;
-        }
+
         let mut sig_action: libc::sigaction = unsafe { std::mem::zeroed() };
         sig_action.sa_flags = libc::SA_RESTART;
         sig_action.sa_sigaction = libc::SIG_IGN;

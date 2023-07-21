@@ -229,7 +229,7 @@ mod tests {
         let comm = Rc::new(ServiceUnitComm::new());
         let config = ServiceConfig::new(&comm);
 
-        let _result = config.load(paths, false);
-        assert_eq!(config.service_type(), ServiceType::Simple);
+        assert!(config.load(paths, false).is_ok());
+        assert_eq!(config.service_type(), ServiceType::Simple)
     }
 }
