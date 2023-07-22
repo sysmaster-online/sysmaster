@@ -157,6 +157,7 @@ pub fn naming_scheme_has(flag: NamingSchemeFlags) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::proc_cmdline;
     use std::env;
 
     #[test]
@@ -168,5 +169,102 @@ mod tests {
         assert_eq!(naming_scheme(), NamingScheme::V000);
         env::set_var("NET_NAMING_SCHEME", "0");
         assert_eq!(naming_scheme(), NamingScheme::V000);
+
+        let cmdline_value = proc_cmdline::cmdline_get_value("net.naming-scheme")
+            .unwrap_or(None)
+            .unwrap_or_default();
+
+        let scheme = cmdline_value
+            .parse::<NamingScheme>()
+            .unwrap_or(NamingScheme::V023);
+        env::set_var("NET_NAMING_SCHEME", ":v023");
+        assert_eq!(naming_scheme(), scheme);
+
+        let scheme = cmdline_value
+            .parse::<NamingScheme>()
+            .unwrap_or(NamingScheme::V000);
+        env::set_var("NET_NAMING_SCHEME", ":v000");
+        assert_eq!(naming_scheme(), scheme);
+    }
+
+    #[test]
+    fn test_naming_scheme_enabled() {
+        let ret = naming_scheme_enabled();
+        if let Ok(Some(v)) = proc_cmdline::cmdline_get_value("net.ifnames") {
+            if ["0", "false"].contains(&v.as_str()) {
+                assert!(!ret);
+            } else {
+                assert!(ret);
+            }
+        } else {
+            assert!(ret);
+        }
+    }
+
+    #[test]
+    fn test_naming_scheme_has() {
+        env::set_var("NET_NAMING_SCHEME", "latest");
+        assert!(naming_scheme_has(NamingSchemeFlags::SR_IOV_V));
+        assert!(naming_scheme_has(NamingSchemeFlags::NPAR_ARI));
+        assert!(naming_scheme_has(NamingSchemeFlags::INFINIBAND));
+        assert!(naming_scheme_has(NamingSchemeFlags::ZERO_ACPI_INDEX));
+        assert!(naming_scheme_has(NamingSchemeFlags::ALLOW_RERENAMES));
+        assert!(naming_scheme_has(NamingSchemeFlags::STABLE_VIRTUAL_MACS));
+        assert!(naming_scheme_has(NamingSchemeFlags::NETDEVSIM));
+        assert!(naming_scheme_has(NamingSchemeFlags::LABEL_NOPREFIX));
+        assert!(naming_scheme_has(NamingSchemeFlags::NSPAWN_LONG_HASH));
+        assert!(naming_scheme_has(NamingSchemeFlags::BRIDGE_NO_SLOT));
+        assert!(naming_scheme_has(NamingSchemeFlags::SLOT_FUNCTION_ID));
+        assert!(naming_scheme_has(NamingSchemeFlags::ONBOARD_16BIT_INDEX));
+        assert!(naming_scheme_has(NamingSchemeFlags::REPLACE_STRICTLY));
+        assert!(naming_scheme_has(NamingSchemeFlags::XEN_VIF));
+        assert!(naming_scheme_has(
+            NamingSchemeFlags::BRIDGE_MULTIFUNCTION_SLOT
+        ));
+        assert!(naming_scheme_has(NamingSchemeFlags::DEVICETREE_ALIASES));
+        assert!(naming_scheme_has(NamingSchemeFlags::USB_HOST));
+
+        env::set_var("NET_NAMING_SCHEME", "v023");
+        assert!(naming_scheme_has(NamingSchemeFlags::SR_IOV_V));
+        assert!(naming_scheme_has(NamingSchemeFlags::NPAR_ARI));
+        assert!(naming_scheme_has(NamingSchemeFlags::INFINIBAND));
+        assert!(naming_scheme_has(NamingSchemeFlags::ZERO_ACPI_INDEX));
+        assert!(naming_scheme_has(NamingSchemeFlags::ALLOW_RERENAMES));
+        assert!(naming_scheme_has(NamingSchemeFlags::STABLE_VIRTUAL_MACS));
+        assert!(naming_scheme_has(NamingSchemeFlags::NETDEVSIM));
+        assert!(naming_scheme_has(NamingSchemeFlags::LABEL_NOPREFIX));
+        assert!(naming_scheme_has(NamingSchemeFlags::NSPAWN_LONG_HASH));
+        assert!(naming_scheme_has(NamingSchemeFlags::BRIDGE_NO_SLOT));
+        assert!(naming_scheme_has(NamingSchemeFlags::SLOT_FUNCTION_ID));
+        assert!(naming_scheme_has(NamingSchemeFlags::ONBOARD_16BIT_INDEX));
+        assert!(naming_scheme_has(NamingSchemeFlags::REPLACE_STRICTLY));
+
+        assert!(!naming_scheme_has(NamingSchemeFlags::XEN_VIF));
+        assert!(!naming_scheme_has(
+            NamingSchemeFlags::BRIDGE_MULTIFUNCTION_SLOT
+        ));
+        assert!(!naming_scheme_has(NamingSchemeFlags::DEVICETREE_ALIASES));
+        assert!(!naming_scheme_has(NamingSchemeFlags::USB_HOST));
+
+        env::set_var("NET_NAMING_SCHEME", "v000");
+        assert!(!naming_scheme_has(NamingSchemeFlags::SR_IOV_V));
+        assert!(!naming_scheme_has(NamingSchemeFlags::NPAR_ARI));
+        assert!(!naming_scheme_has(NamingSchemeFlags::INFINIBAND));
+        assert!(!naming_scheme_has(NamingSchemeFlags::ZERO_ACPI_INDEX));
+        assert!(!naming_scheme_has(NamingSchemeFlags::ALLOW_RERENAMES));
+        assert!(!naming_scheme_has(NamingSchemeFlags::STABLE_VIRTUAL_MACS));
+        assert!(!naming_scheme_has(NamingSchemeFlags::NETDEVSIM));
+        assert!(!naming_scheme_has(NamingSchemeFlags::LABEL_NOPREFIX));
+        assert!(!naming_scheme_has(NamingSchemeFlags::NSPAWN_LONG_HASH));
+        assert!(!naming_scheme_has(NamingSchemeFlags::BRIDGE_NO_SLOT));
+        assert!(!naming_scheme_has(NamingSchemeFlags::SLOT_FUNCTION_ID));
+        assert!(!naming_scheme_has(NamingSchemeFlags::ONBOARD_16BIT_INDEX));
+        assert!(!naming_scheme_has(NamingSchemeFlags::REPLACE_STRICTLY));
+        assert!(!naming_scheme_has(NamingSchemeFlags::XEN_VIF));
+        assert!(!naming_scheme_has(
+            NamingSchemeFlags::BRIDGE_MULTIFUNCTION_SLOT
+        ));
+        assert!(!naming_scheme_has(NamingSchemeFlags::DEVICETREE_ALIASES));
+        assert!(!naming_scheme_has(NamingSchemeFlags::USB_HOST));
     }
 }

@@ -33,3 +33,25 @@ pub fn errno_is_not_supported(source: Errno) -> bool {
 pub fn errno_is_privilege(source: Errno) -> bool {
     matches!(source, Errno::EACCES | Errno::EPERM)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_errno_is_not_supported() {
+        assert!(errno_is_not_supported(nix::Error::EOPNOTSUPP));
+        assert!(errno_is_not_supported(nix::Error::ENOTTY));
+        assert!(errno_is_not_supported(nix::Error::ENOSYS));
+        assert!(errno_is_not_supported(nix::Error::EAFNOSUPPORT));
+        assert!(errno_is_not_supported(nix::Error::EPFNOSUPPORT));
+        assert!(errno_is_not_supported(nix::Error::EPROTONOSUPPORT));
+        assert!(errno_is_not_supported(nix::Error::ESOCKTNOSUPPORT));
+    }
+
+    #[test]
+    fn test_errno_is_privilege() {
+        assert!(errno_is_privilege(nix::Error::EACCES));
+        assert!(errno_is_privilege(nix::Error::EPERM));
+    }
+}

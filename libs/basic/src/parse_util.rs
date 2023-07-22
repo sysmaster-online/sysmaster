@@ -88,3 +88,37 @@ pub fn parse_mode(mode: &str) -> Result<mode_t> {
         }),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_device_path_parse_devnum() {
+        assert_eq!(
+            (S_IFBLK, makedev(8, 100)),
+            device_path_parse_devnum("/dev/block/8:100").unwrap()
+        );
+        assert_eq!(
+            (S_IFCHR, makedev(9, 100)),
+            device_path_parse_devnum("/dev/char/9:100").unwrap()
+        );
+        assert!(device_path_parse_devnum("invalid").is_err());
+        assert!(device_path_parse_devnum("/dev/block/invalid").is_err());
+        assert!(device_path_parse_devnum("/dev/char/invalid").is_err());
+    }
+
+    #[test]
+    fn test_parse_ifindex() {
+        assert_eq!(1, parse_ifindex("1").unwrap());
+        assert!(parse_ifindex("a").is_err());
+    }
+
+    #[test]
+    fn test_parse_mode() {
+        assert_eq!(0o777, parse_mode("777").unwrap());
+        assert_eq!(0o7777, parse_mode("7777").unwrap());
+        assert!(parse_mode("7778").is_err());
+        assert!(parse_mode("invalid").is_err());
+    }
+}

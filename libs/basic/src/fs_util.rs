@@ -192,8 +192,11 @@ pub fn futimens_opath(fd: RawFd, ts: Option<[timespec; 2]>) -> Result<()> {
              * the opened real file. It is weird because the fd path really exists but utimesat
              * can not find it. To avoid the failure, we try to follow the fd path symlink to the
              * real file and update the timestamp directly on it.
+             *
+             * By the way, this code region is not covered in unit test cases. This region is expected
+             * to run in devmaster threads.
              */
-            let target = readlink(fd_path.as_str()).unwrap();
+            let target = readlink(fd_path.as_str()).context(NixSnafu)?;
             let c_string = target
                 .to_str()
                 .ok_or(Error::Nix { source: errno })
@@ -341,7 +344,7 @@ mod tests {
     use crate::fs_util::symlink;
     use nix::unistd::{self, unlink};
     use std::{
-        fs::{create_dir_all, remove_file, File},
+        fs::{create_dir_all, remove_dir_all, remove_file, File},
         os::unix::prelude::MetadataExt,
         time::SystemTime,
     };
@@ -372,6 +375,10 @@ mod tests {
             unistd::UnlinkatFlags::NoRemoveDir,
         )
         .unwrap();
+
+        let _ = unlink("/tmp/test_not_exist");
+        assert!(symlink("/dev/not_exist", "/tmp/test_not_exist", false).is_ok());
+        let _ = unlink("/tmp/test_not_exist");
     }
 
     /// test changing the mode of a file by file descriptor with O_PATH
@@ -411,6 +418,53 @@ mod tests {
         let stat = fstat(fd).unwrap();
         assert_eq!(stat.st_mode & 0o777, 0o664);
 
+        match fchmod_and_chown(
+            fd,
+            "",
+            Some(0o664),
+            Some(Uid::from_raw(10)),
+            Some(Gid::from_raw(10)),
+        ) {
+            Ok(_) => {
+                let stat = fstat(fd).unwrap();
+                assert_eq!(stat.st_uid, 10);
+                assert_eq!(stat.st_gid, 10);
+            }
+            Err(e) => match e {
+                Error::Nix { source } => {
+                    assert_eq!(source, nix::Error::EPERM);
+                }
+                _ => {
+                    panic!("{}", e);
+                }
+            },
+        }
+
+        match fchmod_and_chown(
+            fd,
+            "",
+            Some(0o555),
+            Some(Uid::from_raw(20)),
+            Some(Gid::from_raw(20)),
+        ) {
+            Ok(_) => {
+                let stat = fstat(fd).unwrap();
+                assert_eq!(stat.st_mode & 0o777, 0o555);
+                assert_eq!(stat.st_uid, 20);
+                assert_eq!(stat.st_gid, 20);
+            }
+            Err(e) => match e {
+                Error::Nix { source } => {
+                    assert_eq!(source, nix::Error::EPERM);
+                }
+                _ => {
+                    panic!("{}", e);
+                }
+            },
+        }
+
+        fchmod_and_chown(fd, "", Some(0o7555), None, None).unwrap();
+
         std::fs::remove_file("/tmp/test_fchmod_and_chown").unwrap();
     }
 
@@ -441,6 +495,25 @@ mod tests {
         assert!(point.duration_since(modify).unwrap().as_nanos() < 10000000);
 
         std::fs::remove_file("/tmp/test_futimens_opath").unwrap();
+
+        /* Test invalid raw fd. */
+        assert!(futimens_opath(1000, None).is_err());
+    }
+
+    #[test]
+    fn test_futimens_opath_in_thread() {
+        let _ = File::create("/tmp/test_futimens_opath_in_thread").unwrap();
+        let fd = nix::fcntl::open(
+            "/tmp/test_futimens_opath_in_thread",
+            OFlag::O_PATH | OFlag::O_CLOEXEC,
+            Mode::empty(),
+        )
+        .unwrap();
+        let handle = std::thread::spawn(move || {
+            futimens_opath(fd, None).unwrap();
+        });
+        handle.join().unwrap();
+        std::fs::remove_file("/tmp/test_futimens_opath_in_thread").unwrap();
     }
 
     #[test]
@@ -481,5 +554,52 @@ mod tests {
         let md = p.metadata().unwrap();
         assert_eq!(md.mode() & 0o777, 0o666);
         let _ = unlink("/tmp/test_touch_file/f1");
+    }
+
+    #[test]
+    fn test_open_parent() {
+        let _ = unlink("/tmp/test_open_parent/dir");
+        touch_file("/tmp/test_open_parent/dir", true, Some(0o444), None, None).unwrap();
+        {
+            let f = open_parent(
+                Path::new("/tmp/test_open_parent/dir"),
+                OFlag::O_RDONLY,
+                Mode::empty(),
+            )
+            .unwrap();
+            let _md = f.metadata().unwrap();
+
+            /* permission denied */
+            assert!(open_parent(
+                Path::new("/tmp/test_open_parent/dir"),
+                OFlag::O_RDWR,
+                Mode::from_bits_truncate(0o777),
+            )
+            .is_err());
+        }
+        remove_dir_all("/tmp/test_open_parent").unwrap();
+
+        assert!(open_parent(
+            Path::new("/tmp/test_open_parent/not_exist"),
+            OFlag::O_RDONLY,
+            Mode::empty(),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn test_macro() {
+        fn inner_function() -> Result<()> {
+            let p = Path::new("/tmp/test_macro/all");
+            do_entry_or_return_io_error!(std::fs::create_dir_all, p, "create");
+            Ok(())
+        }
+
+        let _ = remove_dir_all("/tmp/test_macro");
+        assert!(inner_function().is_ok());
+
+        let p = Path::new("/tmp/test_macro/all_2");
+        do_entry_log!(std::fs::create_dir_all, p, "create");
+        assert!(remove_dir_all("/tmp/test_macro").is_ok());
     }
 }

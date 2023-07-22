@@ -43,3 +43,13 @@ pub fn build_libblkid() {
         println!("cargo:rustc-cfg={}=\"libblkid_2_37\"", BLKID);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_libblkid() {
+        build_libblkid();
+    }
+}
