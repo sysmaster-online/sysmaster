@@ -36,7 +36,6 @@ use log4rs::{
     encode::pattern::PatternEncoder,
 };
 use nix::libc;
-use time::macros::offset;
 
 use crate::Error;
 
@@ -69,19 +68,19 @@ impl log::Log for LogPlugin {
 }
 
 fn write_msg_common(writer: &mut impl Write, module: &str, msg: String) {
-    let now = match time::OffsetDateTime::now_local() {
-        Ok(v) => v,
-        Err(_) => time::OffsetDateTime::now_utc().to_offset(offset!(+8)),
-    };
-
-    let format = time::macros::format_description!("[year]-[month]-[day] [hour]:[minute]:[second]");
-    let now = match now.format(&format) {
-        Err(_) => "[unknown time]".to_string(),
-        Ok(v) => v,
-    };
+    let now = time::now();
+    let now_str = format!(
+        "{:0>4}-{:0>2}-{:0>2} {:0>2}:{:0>2}:{:0>2} ",
+        now.tm_year + 1900, /* tm_year is years since 1900 */
+        now.tm_mon + 1,     /* tm_mon is months since Jan: [0, 11] */
+        now.tm_mday,
+        now.tm_hour,
+        now.tm_min,
+        now.tm_sec
+    );
 
     /* 1. Write time */
-    if let Err(e) = writer.write(format!("{now} ").as_bytes()) {
+    if let Err(e) = writer.write(now_str.as_bytes()) {
         println!("Failed to log time message: {e}");
         return;
     }
