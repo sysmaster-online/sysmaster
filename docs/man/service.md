@@ -21,7 +21,17 @@ service服务的类型，当前支持`simple`、`forking`、`oneshot`、`notify`
 
 ## ExecCondition、ExecStartPre、ExecStart、ExecStop、ExecStartPost
 
-服务在不同的启动阶段执行的命令，`ExecStart`是Service唯一必须配置的选项，用于配置Service需要执行的命令。
+* 类型：字符串
+
+服务在不同的启动阶段执行的命令，多条命令使用`;`分隔。`ExecStart`是Service唯一必须配置的选项，用于配置Service需要执行的命令。
+
+**注意：** 为了避免`;`解析为命令参数，`;`作为分隔符使用时需要在前后添加空格。例如：
+
+|配置的命令|解析结果|
+|-|-|
+|ExecStart="/bin/echo foo; /bin/echo bar"|命令路径：/bin/echo，命令参数："foo;", "/bin/echo", "bar"，执行结果：打印"foo; /bin/echo bar"|
+|ExecStart="/bin/echo foo;/bin/echo bar"|命令路径：/bin/echo，命令参数："foo;/bin/echo", "bar"，执行结果：打印"foo;/bin/echo bar"|
+|ExecStart="/bin/echo foo ; /bin/echo bar"|解析为两条命令。</br> 命令1路径：/bin/echo，命令1参数："foo"，命令1执行结果：打印"foo"。</br> 命令2路径：/bin/echo，命令2参数："bar"，命令2执行结果：打印"bar"|
 
 ### ExecStart配置的限制
 

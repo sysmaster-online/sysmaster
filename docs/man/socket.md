@@ -2,7 +2,11 @@
 
 ## ExecStartPre、ExecStartPost、ExecStopPre、ExecStopPost
 
-服务在不同的启动阶段执行的命令。配置多条命令时以；号隔开。
+* 类型：字符串
+
+服务在不同的启动阶段执行的命令。配置多条命令时以`;`隔开。
+
+**注意：** 为了避免`;`解析为命令参数，`;`作为分隔符使用时需要在前后添加空格。详情参考：[service说明文档中对应说明](./service.md)
 
 ## ListenStream、ListenDatagram、ListenSequentialPacket
 
