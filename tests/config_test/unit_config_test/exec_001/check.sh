@@ -44,7 +44,7 @@ function test02() {
     log_info "===== test02 ====="
 
     # multiple commands in single ExecStart
-    sed -i "s#ExecStart=.*#ExecStart=\"/bin/sleep 2; /bin/sleep 222\"#" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s#ExecStart=.*#ExecStart=\"/bin/sleep 2 ; /bin/sleep 222\"#" ${SYSMST_LIB_PATH}/base.service
     echo > ${SYSMST_LOG}
     sctl daemon-reload
     sctl restart base
@@ -288,7 +288,7 @@ function test04() {
 function test05() {
     log_info "===== test05 ====="
     cp -arf "${work_dir}"/tmp_units/exec.service ${SYSMST_LIB_PATH} || return 1
-    sed -i '/Service/ a ExecCondition="/usr/bin/echo echo_condition_1_echo; /usr/bin/echo echo_condition_2_echo"' ${SYSMST_LIB_PATH}/exec.service
+    sed -i '/Service/ a ExecCondition="/usr/bin/echo echo_condition_1_echo ; /usr/bin/echo echo_condition_2_echo"' ${SYSMST_LIB_PATH}/exec.service
     sctl daemon-reload
     echo > ${SYSMST_LOG}
     # multiple success ExecCondition
@@ -302,7 +302,7 @@ function test05() {
         || cat ${SYSMST_LOG}
 
     # ExecCondition return 1
-    sed -i 's#ExecCondition=.*#ExecCondition="/usr/bin/echo echo_condition_1_echo; /usr/bin/false; /usr/bin/echo echo_condition_2_echo"#' ${SYSMST_LIB_PATH}/exec.service
+    sed -i 's#ExecCondition=.*#ExecCondition="/usr/bin/echo echo_condition_1_echo ; /usr/bin/false ; /usr/bin/echo echo_condition_2_echo"#' ${SYSMST_LIB_PATH}/exec.service
     sctl daemon-reload
     echo > ${SYSMST_LOG}
     sctl start exec
@@ -315,7 +315,7 @@ function test05() {
         || cat ${SYSMST_LOG}
 
     # ExecCondition return 254
-    sed -i 's#ExecCondition=.*#ExecCondition="/usr/bin/echo echo_condition_1_echo; /usr/bin/test.sh; /usr/bin/echo echo_condition_2_echo"#' ${SYSMST_LIB_PATH}/exec.service
+    sed -i 's#ExecCondition=.*#ExecCondition="/usr/bin/echo echo_condition_1_echo ; /usr/bin/test.sh ; /usr/bin/echo echo_condition_2_echo"#' ${SYSMST_LIB_PATH}/exec.service
     echo "exit 254" > /usr/bin/test.sh
     chmod +x /usr/bin/test.sh
     sctl daemon-reload
@@ -358,7 +358,7 @@ function test05() {
         || cat ${SYSMST_LOG}
 
     # ExecCondition killed
-    sed -i 's#ExecCondition=.*#ExecCondition="/usr/bin/echo echo_condition_1_echo; /usr/bin/sleep 12321; /usr/bin/echo echo_condition_2_echo"#' ${SYSMST_LIB_PATH}/exec.service
+    sed -i 's#ExecCondition=.*#ExecCondition="/usr/bin/echo echo_condition_1_echo ; /usr/bin/sleep 12321 ; /usr/bin/echo echo_condition_2_echo"#' ${SYSMST_LIB_PATH}/exec.service
     sctl daemon-reload
     echo > ${SYSMST_LOG}
     sctl start exec &

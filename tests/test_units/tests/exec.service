@@ -2,8 +2,8 @@
 Description="exec service"
 
 [Service]
-ExecStartPre="/usr/bin/echo echo_start_pre_1_echo; /usr/bin/echo echo_start_pre_2_echo; /usr/bin/echo echo_start_pre_3_echo"
+ExecStartPre="/usr/bin/echo echo_start_pre_1_echo ; /usr/bin/echo echo_start_pre_2_echo ; /usr/bin/echo echo_start_pre_3_echo"
 ExecStart="/usr/bin/echo echo_start_1_echo"
-ExecStartPost="/usr/bin/echo echo_start_post_1_echo; /usr/bin/echo echo_start_post_2_echo; /usr/bin/echo echo_start_post_3_echo"
+ExecStartPost="/usr/bin/echo echo_start_post_1_echo ; /usr/bin/echo echo_start_post_2_echo ; /usr/bin/echo echo_start_post_3_echo"
 ExecStop="/usr/bin/echo echo_stop_1_echo"
-ExecStopPost="/usr/bin/echo echo_stop_post_1_echo; /usr/bin/echo echo_stop_post_2_echo; /usr/bin/echo echo_stop_post_3_echo"
+ExecStopPost="/usr/bin/echo echo_stop_post_1_echo ; /usr/bin/echo echo_stop_post_2_echo ; /usr/bin/echo echo_stop_post_3_echo"

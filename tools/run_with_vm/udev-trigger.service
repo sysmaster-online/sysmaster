@@ -17,7 +17,7 @@ ConditionPathIsReadWrite="/sys"
 [Service]
 Type="oneshot"
 RemainAfterExit=true
-ExecStart="-/usr/sbin/udevadm trigger --type=subsystems --action=add;/usr/sbin/udevadm trigger --type=devices --action=add"
+ExecStart="-/usr/sbin/udevadm trigger --type=subsystems --action=add ; /usr/sbin/udevadm trigger --type=devices --action=add"
 
 [Install]
 WantedBy="sysinit.target"
