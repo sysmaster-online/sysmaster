@@ -11,13 +11,16 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::serialize::DeserializeWith;
+use basic::{
+    path_util::{path_length_is_valid, path_name_is_safe},
+    Error, Result,
+};
 use bitflags::bitflags;
-use regex::Regex;
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer, Serialize,
 };
-use std::{collections::VecDeque, path::Path};
+use std::collections::VecDeque;
 
 bitflags! {
     /// ExecCommand Flags
@@ -83,69 +86,341 @@ impl ExecCommand {
     }
 }
 
+fn parse_exec(s: &str) -> Result<VecDeque<ExecCommand>> {
+    if s.is_empty() {
+        return Err(Error::Invalid {
+            what: "empty string".to_string(),
+        });
+    }
+
+    let mut res = VecDeque::new();
+    let mut next_start = 0_usize;
+    loop {
+        let mut flags = ExecFlag::EXEC_COMMAND_EMPTY;
+        /* TODO: separate_argv0 is currently not used. */
+        let mut separate_argv0 = false;
+        let content = s.split_at(next_start).1;
+        if content.is_empty() {
+            break;
+        }
+        /* Take "-/bin/echo good" for example, content is "-bin/echo good" */
+        let mut path_start = next_start;
+        for f in content.as_bytes() {
+            if *f == b' ' {
+                path_start += 1;
+                continue;
+            }
+            if *f == b'-' && !flags.intersects(ExecFlag::EXEC_COMMAND_IGNORE_FAILURE) {
+                flags |= ExecFlag::EXEC_COMMAND_IGNORE_FAILURE;
+            } else if *f == b'@' && !separate_argv0 {
+                separate_argv0 = true;
+            } else if *f == b':' && !flags.intersects(ExecFlag::EXEC_COMMAND_NO_ENV_EXPAND) {
+                flags |= ExecFlag::EXEC_COMMAND_NO_ENV_EXPAND;
+            } else if *f == b'+'
+                && !flags.intersects(
+                    ExecFlag::EXEC_COMMAND_FULLY_PRIVILEGED
+                        | ExecFlag::EXEC_COMMAND_NO_SETUID
+                        | ExecFlag::EXEC_COMMAND_AMBIENT_MAGIC,
+                )
+            {
+                flags |= ExecFlag::EXEC_COMMAND_FULLY_PRIVILEGED;
+            } else if *f == b'!'
+                && !flags.intersects(
+                    ExecFlag::EXEC_COMMAND_FULLY_PRIVILEGED
+                        | ExecFlag::EXEC_COMMAND_NO_SETUID
+                        | ExecFlag::EXEC_COMMAND_AMBIENT_MAGIC,
+                )
+            {
+                flags |= ExecFlag::EXEC_COMMAND_NO_SETUID;
+            } else if *f == b'!'
+                && !flags.intersects(
+                    ExecFlag::EXEC_COMMAND_FULLY_PRIVILEGED | ExecFlag::EXEC_COMMAND_AMBIENT_MAGIC,
+                )
+            {
+                flags &= !ExecFlag::EXEC_COMMAND_NO_SETUID;
+                flags |= ExecFlag::EXEC_COMMAND_AMBIENT_MAGIC;
+            } else {
+                break;
+            }
+            path_start += 1;
+        }
+
+        /* content is "/bin/echo good" */
+        let content = s.split_at(path_start).1;
+        if content.is_empty() {
+            return Err(Error::Invalid {
+                what: "empty exec command".to_string(),
+            });
+        }
+        /* path is "/bin/echo" */
+        let path = match content.split_once(' ') {
+            None => content,
+            Some((v0, _v1)) => v0,
+        };
+
+        if path.is_empty() {
+            return Err(Error::Invalid {
+                what: "empty exec path".to_string(),
+            });
+        }
+        if !path.starts_with('/') {
+            return Err(Error::Invalid {
+                what: "path is not abosolute".to_string(),
+            });
+        }
+        if !path_name_is_safe(path) {
+            return Err(Error::Invalid {
+                what: "path contains unsafe character".to_string(),
+            });
+        }
+        if path.ends_with('/') {
+            return Err(Error::Invalid {
+                what: "path is not a file".to_string(),
+            });
+        }
+        if !path_length_is_valid(path) {
+            return Err(Error::Invalid {
+                what: "path is empty or too long".to_string(),
+            });
+        }
+
+        /* content is "good" */
+        let mut argv_start = path_start + path.len();
+        let content = s.split_at(argv_start).1;
+        if content.is_empty() {
+            res.push_back(ExecCommand {
+                path: path.to_string(),
+                argv: vec![],
+                flags,
+            });
+            break;
+        }
+
+        /* Get the command arg values */
+        let mut argv: Vec<String> = Vec::new();
+        let mut cur = String::new();
+        let mut found_semicolon_wait_space = false;
+        for c in content.chars() {
+            argv_start += 1;
+            if c == ' ' {
+                /* now we find " ; ", break the loop */
+                if found_semicolon_wait_space {
+                    cur = String::new();
+                    break;
+                }
+                if !cur.is_empty() {
+                    argv.push(cur);
+                    cur = "".to_string();
+                }
+                continue;
+            }
+            if c == ';' {
+                /* \; is ; */
+                if cur == "\\" {
+                    found_semicolon_wait_space = false;
+                    cur = ";".to_string();
+                } else if !cur.is_empty() {
+                    found_semicolon_wait_space = false;
+                    cur += ";";
+                } else {
+                    /* " ;", wait for another space */
+                    found_semicolon_wait_space = true;
+                    cur += ";";
+                }
+                continue;
+            }
+            found_semicolon_wait_space = false;
+            cur += &c.to_string();
+        }
+        /* No more characters after " ;", drop current argv  */
+        if found_semicolon_wait_space {
+            cur = String::new();
+        }
+
+        if !cur.is_empty() {
+            argv.push(cur);
+        }
+
+        res.push_back(ExecCommand {
+            path: path.to_string(),
+            argv,
+            flags,
+        });
+
+        /* argv_start is at the first character after " ; " */
+        next_start = argv_start;
+    }
+
+    if res.is_empty() {
+        return Err(Error::Invalid {
+            what: "no valid exec command".to_string(),
+        });
+    }
+
+    Ok(res)
+}
+
 impl DeserializeWith for ExecCommand {
     type Item = VecDeque<Self>;
     fn deserialize_with<'de, D>(de: D) -> Result<Self::Item, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let mut s = String::deserialize(de)?;
-
-        let first = match s.as_bytes().first() {
-            None => {
-                return Err(de::Error::invalid_value(
-                    Unexpected::Str(&s),
-                    &"The configured value is empty.",
-                ));
+        let s = String::deserialize(de)?;
+        match parse_exec(&s) {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                log::error!("Failed to parse ExecCommand: {e}");
+                return Err(de::Error::invalid_value(Unexpected::Str(&s), &""));
             }
-            Some(v) => *v,
-        };
-
-        let exec_flag = match first as char {
-            '-' => {
-                s = s.trim_start_matches('-').to_string();
-                ExecFlag::EXEC_COMMAND_IGNORE_FAILURE
-            }
-            _ => ExecFlag::EXEC_COMMAND_EMPTY,
-        };
-
-        let mut commands = VecDeque::new();
-
-        for cmd in s.trim().split_terminator(';') {
-            if cmd.is_empty() {
-                continue;
-            }
-
-            let mut command: Vec<String> = Vec::new();
-            let re = Regex::new(r"'([^']*)'|\S+").unwrap();
-            for cap in re.captures_iter(cmd) {
-                if let Some(s) = cap.get(1) {
-                    command.push(s.as_str().to_string());
-                    continue;
-                }
-
-                if let Some(s) = cap.get(0) {
-                    command.push(s.as_str().to_string());
-                }
-            }
-
-            // get the command and leave the command args
-            let exec_cmd = command.remove(0);
-            let path = Path::new(&exec_cmd);
-
-            if !path.is_absolute() {
-                return Err(de::Error::invalid_value(
-                    Unexpected::Str(&exec_cmd),
-                    &"only accept absolute path",
-                ));
-            }
-
-            let cmd = path.to_str().unwrap().to_string();
-            let mut new_command = ExecCommand::new(cmd, command);
-            new_command.add_exec_flag(exec_flag);
-            commands.push_back(new_command);
         }
+    }
+}
 
-        Ok(commands)
+mod tests {
+    #[test]
+    fn test_exec() {
+        use crate::exec::{cmd::parse_exec, ExecCommand, ExecFlag};
+        use std::collections::VecDeque;
+        /* One command */
+        assert_eq!(
+            parse_exec("/bin/echo").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec![],
+                flags: ExecFlag::EXEC_COMMAND_EMPTY
+            }])
+        );
+
+        assert_eq!(
+            parse_exec("!!/bin/echo").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec![],
+                flags: ExecFlag::EXEC_COMMAND_AMBIENT_MAGIC
+            }])
+        );
+
+        assert_eq!(
+            parse_exec("-!/bin/echo").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec![],
+                flags: ExecFlag::EXEC_COMMAND_IGNORE_FAILURE | ExecFlag::EXEC_COMMAND_NO_SETUID
+            }])
+        );
+
+        assert_eq!(
+            parse_exec("/bin/echo good1 good2").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec!["good1".to_string(), "good2".to_string()],
+                flags: ExecFlag::EXEC_COMMAND_EMPTY
+            }])
+        );
+
+        assert_eq!(
+            parse_exec("/bin/echo good1;good2").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec!["good1;good2".to_string()],
+                flags: ExecFlag::EXEC_COMMAND_EMPTY
+            }])
+        );
+
+        assert_eq!(
+            parse_exec("/bin/echo ;/bin/echo good").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec![";/bin/echo".to_string(), "good".to_string()],
+                flags: ExecFlag::EXEC_COMMAND_EMPTY
+            }])
+        );
+
+        assert_eq!(
+            parse_exec("/bin/echo good1\\;good2").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec!["good1\\;good2".to_string()],
+                flags: ExecFlag::EXEC_COMMAND_EMPTY
+            }])
+        );
+
+        assert_eq!(
+            parse_exec("/bin/echo \\;").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec![";".to_string()],
+                flags: ExecFlag::EXEC_COMMAND_EMPTY
+            }])
+        );
+
+        assert_eq!(
+            parse_exec("/bin/echo good \\; /bin/echo good1 good2").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec![
+                    "good".to_string(),
+                    ";".to_string(),
+                    "/bin/echo".to_string(),
+                    "good1".to_string(),
+                    "good2".to_string()
+                ],
+                flags: ExecFlag::EXEC_COMMAND_EMPTY
+            }])
+        );
+
+        assert_eq!(
+            parse_exec("/bin/echo good ;").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec!["good".to_string()],
+                flags: ExecFlag::EXEC_COMMAND_EMPTY
+            }])
+        );
+
+        /* Many commands */
+        assert_eq!(
+            parse_exec("/bin/echo good ; /bin/echo good1 good2 ; /bin/echo").unwrap(),
+            VecDeque::from([
+                ExecCommand {
+                    path: "/bin/echo".to_string(),
+                    argv: vec!["good".to_string()],
+                    flags: ExecFlag::EXEC_COMMAND_EMPTY
+                },
+                ExecCommand {
+                    path: "/bin/echo".to_string(),
+                    argv: vec!["good1".to_string(), "good2".to_string()],
+                    flags: ExecFlag::EXEC_COMMAND_EMPTY
+                },
+                ExecCommand {
+                    path: "/bin/echo".to_string(),
+                    argv: vec![],
+                    flags: ExecFlag::EXEC_COMMAND_EMPTY
+                }
+            ])
+        );
+
+        /* Error command */
+        assert!(parse_exec("echo good \\; /bin/echo good1 good2").is_err());
+        assert!(parse_exec("; /bin/echo good1 good2").is_err());
+        assert!(parse_exec("--/bin/echo good").is_err());
+        assert!(parse_exec("-+!@  /bin/echo good1 good2").is_err());
+        assert!(parse_exec("/bin/echo\x7f good1 good2").is_err());
+
+        let path = "/a/".to_string() + &String::from_iter(vec!['1'; 255]);
+        assert!(parse_exec(&path).is_ok());
+
+        let path = "/a/".to_string() + &String::from_iter(vec!['1'; 256]);
+        assert!(parse_exec(&path).is_err());
+
+        let mut path = "".to_string();
+        for _ in 0..41 {
+            path += "/";
+            path += &String::from_iter(vec!['1'; 100]);
+        }
+        assert!(parse_exec(&path).is_err());
+
+        assert!(parse_exec("/bin/echo good ; ; ; ;").is_err());
     }
 }
