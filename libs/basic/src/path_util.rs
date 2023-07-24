@@ -14,11 +14,69 @@
 //!
 use std::path::Path;
 
+/// The maximum length of a linux path
+pub const PATH_LENGTH_MAX: usize = 4096;
+
+/// The maximum length of a linux file name
+pub const FILE_LENGTH_MAX: usize = 255;
+
 /// return true if the path of a and b equaled.
 pub fn path_equal(a: &str, b: &str) -> bool {
     let p_a = Path::new(a);
     let p_b = Path::new(b);
     p_a == p_b
+}
+
+/// check if the path name contains unsafe character
+///
+/// return true if it doesn't contain unsafe character
+pub fn path_name_is_safe(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    for c in s.chars() {
+        if c > 0 as char && c < ' ' {
+            return false;
+        }
+        if (c as char).is_ascii_control() {
+            return false;
+        }
+    }
+    true
+}
+
+/// check if the path length is valid
+pub fn path_length_is_valid(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    if s.len() > PATH_LENGTH_MAX {
+        return false;
+    }
+    let mut de_len = 0;
+    let mut last_c = '/';
+    for c in s.chars() {
+        match c {
+            '/' => {
+                de_len = 0;
+            }
+            '.' => {
+                if last_c == '/' {
+                    de_len = 1;
+                } else {
+                    de_len += 1;
+                }
+            }
+            _ => {
+                de_len += 1;
+            }
+        }
+        if de_len > FILE_LENGTH_MAX {
+            return false;
+        }
+        last_c = c;
+    }
+    true
 }
 
 /// Remove redundant inner and trailing slashes and unnecessary dots to simplify path.
@@ -76,5 +134,45 @@ mod tests {
         assert_eq!(path_simplify("//foo//.//bar/"), "/foo/bar");
         assert_eq!(path_simplify(".//foo//.//bar/"), "foo/bar");
         assert_eq!(path_simplify("foo//.//bar/"), "foo/bar");
+    }
+
+    #[test]
+    fn test_path_name_is_safe() {
+        assert!(!path_name_is_safe(""));
+        assert!(path_name_is_safe("/abc"));
+        assert!(!path_name_is_safe("/abc\x7f/a"));
+        assert!(!path_name_is_safe("/abc\x1f/a"));
+        assert!(!path_name_is_safe("/\x0a/a"));
+    }
+
+    #[test]
+    fn test_path_length_is_valid() {
+        assert!(!path_length_is_valid(""));
+
+        let path = "/a/".to_string() + &String::from_iter(vec!['1'; 255]);
+        assert!(path_length_is_valid(&path));
+
+        let path = "/a/".to_string() + &String::from_iter(vec!['1'; 256]);
+        assert!(!path_length_is_valid(&path));
+
+        let path = "/a/".to_string() + &String::from_iter(vec!['/'; 256]);
+        assert!(path_length_is_valid(&path));
+
+        let path = "/a/".to_string() + &String::from_iter(vec!['.'; 255]);
+        assert!(path_length_is_valid(&path));
+
+        let mut path = "".to_string();
+        for _ in 0..40 {
+            path += "/";
+            path += &String::from_iter(vec!['1'; 100]);
+        }
+        assert!(path_length_is_valid(&path));
+
+        let mut path = "".to_string();
+        for _ in 0..41 {
+            path += "/";
+            path += &String::from_iter(vec!['1'; 100]);
+        }
+        assert!(!path_length_is_valid(&path));
     }
 }
