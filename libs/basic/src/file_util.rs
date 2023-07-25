@@ -38,7 +38,7 @@ pub fn write_string_file<P: AsRef<Path>>(path: P, value: String) -> std::io::Res
 }
 #[cfg(test)]
 mod test {
-    use super::read_first_line;
+    use super::{read_first_line, write_string_file};
     use std::{
         io::{BufWriter, Write},
         path::Path,
@@ -69,5 +69,22 @@ mod test {
         let path = Path::new("nonexistent_file.txt");
         let result: Result<String, crate::Error> = read_first_line(path);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_write_string_file() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path();
+        let result = write_string_file(path, String::from("Hello, world!\n"));
+        let first_line = read_first_line(path);
+        assert!(result.is_ok());
+        assert_eq!(first_line.unwrap(), "Hello, world!\n");
+    }
+
+    #[test]
+    fn test_write_string_noneexistent_file() {
+        let path = Path::new("nonexistent_file.txt");
+        let result = write_string_file(path, String::from("Hello, world!\n"));
+        assert!(result.is_err())
     }
 }
