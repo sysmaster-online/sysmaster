@@ -370,7 +370,14 @@ pub(crate) fn open_prior_dir(symlink: &str) -> Result<(Dir, File)> {
 
 /// get link priority path based on symlink name
 pub(crate) fn get_prior_dir(symlink: &str) -> Result<String> {
-    let cano_link = path_simplify(symlink);
+    let cano_link = match path_simplify(symlink) {
+        None => {
+            return Err(Error::Nix {
+                source: nix::errno::Errno::EINVAL,
+            })
+        }
+        Some(v) => v,
+    };
 
     let name = match cano_link.strip_prefix("/dev") {
         Some(s) => s,

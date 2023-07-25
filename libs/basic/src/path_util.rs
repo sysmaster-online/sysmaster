@@ -81,37 +81,49 @@ pub fn path_length_is_valid(s: &str) -> bool {
 
 /// Remove redundant inner and trailing slashes and unnecessary dots to simplify path.
 /// e.g., //foo//.//bar/ becomes /foo/bar
-/// .//foo//.//bar/ becomes foo/bar
-pub fn path_simplify(s: &str) -> String {
-    let mut ret = String::new();
-
-    let mut pre = "";
-
-    for com in s.split('/') {
-        match com {
-            "" => {
-                if ret.is_empty() && pre.is_empty() {
-                    ret.push('/');
+/// /foo/foo1/../bar becomes /foo/bar
+pub fn path_simplify(p: &str) -> Option<String> {
+    let mut res = String::new();
+    let mut stack: Vec<&str> = Vec::new();
+    for f in p.split('/') {
+        if f.is_empty() || f == "." {
+            continue;
+        }
+        if f == ".." {
+            if let Some(v) = stack.last() {
+                if *v != ".." {
+                    stack.pop();
+                    continue;
                 }
             }
-            "." => {
-                if pre.is_empty() {
-                    pre = ".";
-                }
+            if !p.starts_with('/') {
+                stack.push(f);
+                continue;
             }
-            _ => {
-                ret.push_str(com);
-                ret.push('/');
-                pre = com;
-            }
+            return None;
+        }
+        stack.push(f);
+    }
+
+    if stack.is_empty() {
+        if p.starts_with('/') {
+            return Some("/".to_string());
+        } else {
+            return Some(".".to_string());
         }
     }
-    /* drop the trailing slash */
-    if ret.ends_with('/') {
-        let _ = ret.pop();
+
+    if p.starts_with('/') {
+        res += "/";
+    }
+    res += stack.remove(0);
+
+    for f in stack {
+        res += "/";
+        res += f;
     }
 
-    ret
+    return Some(res);
 }
 
 #[cfg(test)]
@@ -127,13 +139,6 @@ mod tests {
         assert!(path_equal("/x/./y", "/x/y"));
         assert!(path_equal("/x/././y", "/x/y/./."));
         assert!(!path_equal("/etc", "/var"));
-    }
-
-    #[test]
-    fn test_path_simplify() {
-        assert_eq!(path_simplify("//foo//.//bar/"), "/foo/bar");
-        assert_eq!(path_simplify(".//foo//.//bar/"), "foo/bar");
-        assert_eq!(path_simplify("foo//.//bar/"), "foo/bar");
     }
 
     #[test]
@@ -174,5 +179,30 @@ mod tests {
             path += &String::from_iter(vec!['1'; 100]);
         }
         assert!(!path_length_is_valid(&path));
+    }
+
+    #[test]
+    fn test_path_simplify() {
+        assert_eq!(path_simplify("//foo//.//bar/").unwrap(), "/foo/bar");
+        assert_eq!(path_simplify(".//foo//.//bar/").unwrap(), "foo/bar");
+        assert_eq!(path_simplify("foo//.//bar/").unwrap(), "foo/bar");
+        assert_eq!(path_simplify("/a///b/////././././c").unwrap(), "/a/b/c");
+        assert_eq!(path_simplify(".//././///././././a").unwrap(), "a");
+        assert_eq!(path_simplify("/////////////////").unwrap(), "/");
+        assert_eq!(path_simplify(".//////////////////").unwrap(), ".");
+        assert_eq!(
+            path_simplify("a/b/c../..d/e/f//g").unwrap(),
+            "a/b/c../..d/e/f/g"
+        );
+        assert_eq!(
+            path_simplify("aaa/bbbb/.//.//.....").unwrap(),
+            "aaa/bbbb/....."
+        );
+
+        assert_eq!(path_simplify("a/b/c/../../d").unwrap(), "a/d");
+        assert_eq!(path_simplify("a/b/c/../../..").unwrap(), ".");
+        assert_eq!(path_simplify("a/b/../../../c/d").unwrap(), "../c/d");
+        assert_eq!(path_simplify("../../../a/../").unwrap(), "../../..");
+        assert!(path_simplify("/../../../a/../").is_none());
     }
 }
