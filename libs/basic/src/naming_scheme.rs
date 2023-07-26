@@ -13,7 +13,7 @@
 //! network interface naming scheme
 use crate::{error::Error, proc_cmdline};
 use bitflags::bitflags;
-use std::{env, str::FromStr};
+use std::{env, fmt::Display, str::FromStr};
 
 bitflags! {
     /// network interface naming scheme flags
@@ -99,6 +99,18 @@ impl FromStr for NamingScheme {
                 what: s.to_string(),
             }),
         }
+    }
+}
+
+impl Display for NamingScheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match *self {
+            Self::V000 => "v000",
+            Self::V023 => "v023",
+            Self::LATEST => "latest",
+            _ => "invalid",
+        };
+        write!(f, "{}", s)
     }
 }
 
