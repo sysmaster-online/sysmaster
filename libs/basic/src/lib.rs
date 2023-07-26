@@ -46,4 +46,5 @@ pub mod user_group_util;
 pub mod uuid;
 pub mod virtualize;
 pub use error::*;
+pub mod ether_addr_util;
 pub mod os_release;
