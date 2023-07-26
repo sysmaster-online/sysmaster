@@ -1,7 +1,0 @@
-SUBSYSTEM!="net", GOTO="end"
-
-ENV{ID_NET_NAME_ONBOARD}="test_onboard"
-
-IMPORT{builtin}=="net_setup_link"
-
-LABEL="end"

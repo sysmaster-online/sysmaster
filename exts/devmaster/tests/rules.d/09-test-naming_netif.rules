@@ -1,0 +1,16 @@
+# After network interface gets online, the netif database should contain the following properties:
+#   E:ID_NET_NAMING_SCHEME=latest
+#   E:ID_NET_NAME_SLOT=ens33
+#   E:ID_NET_NAME=ens33
+#   E:ID_NET_NAME_MAC=enx000c298d21a3
+#   E:ID_NET_NAME_PATH=enp2s1
+
+SUBSYSTEM!="net", GOTO="end"
+
+IMPORT{builtin}=="net_id"
+
+IMPORT{builtin}=="net_setup_link"
+
+ENV{ID_NET_NAME}!="", NAME="$env{ID_NET_NAME}"
+
+LABEL="end"
