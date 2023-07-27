@@ -24,7 +24,7 @@ use std::path::PathBuf;
 use std::process;
 use std::rc::Rc;
 use sysmaster::error::*;
-use sysmaster::exec::{ExecCommand, ExecContext, ExecDirectoryType, ExecFlags, ExecParameters};
+use sysmaster::exec::{ExecCommand, ExecContext, ExecFlags, ExecParameters, WorkingDirectory};
 use walkdir::DirEntry;
 use walkdir::WalkDir;
 
@@ -104,19 +104,23 @@ fn apply_root_directory(root_directory: Option<PathBuf>) -> Result<()> {
     chroot(&root_directory).context(NixSnafu)
 }
 
-fn apply_working_directory(working_directory: Option<PathBuf>) -> Result<()> {
-    let working_directory = match working_directory {
+fn apply_working_directory(working_directory: WorkingDirectory) -> Result<()> {
+    let directory = match working_directory.directory() {
         None => return Ok(()),
         Some(v) => v,
     };
-    std::env::set_current_dir(working_directory).context(IoSnafu)
+    if let Err(e) = std::env::set_current_dir(directory) {
+        if !working_directory.miss_ok() {
+            return Err(Error::Io { source: e });
+        }
+    }
+    return Ok(());
 }
 
 fn setup_exec_directory(
-    exec_directory: &[Option<Vec<PathBuf>>],
+    exec_ctx: Rc<ExecContext>,
     user: Option<User>,
     group: Option<Group>,
-    kind: ExecDirectoryType,
 ) -> Result<()> {
     /* Always change the directory's owner, because sysmaster only
      * runs under system mode. */
@@ -128,26 +132,29 @@ fn setup_exec_directory(
         Some(v) => v.gid,
         None => Gid::from_raw(0),
     };
-    if let Some(directories) = &exec_directory[kind as usize] {
-        for d in directories {
-            /* d should be prefixed already, create it if it doesn't exist */
-            if !d.exists() {
-                if let Err(e) = std::fs::create_dir_all(d) {
-                    log::error!("Failed to setup directory {:?}: {e}", d);
-                    return Err(Error::Io { source: e });
-                }
-            }
 
-            if let Err(e) = nix::unistd::chown(d, Some(uid), Some(gid)) {
-                log::error!("Failed to set the owner of {:?}: {e}", d);
-                return Err(Error::Nix { source: e });
-            }
+    let mut directories = Vec::new();
+    directories.append(&mut exec_ctx.runtime_directory().directory());
+    directories.append(&mut exec_ctx.state_directory().directory());
 
-            /* Hard-coding 755, change this when we implementing XXXDirectoryMode. */
-            if let Err(e) = std::fs::set_permissions(d, Permissions::from_mode(0o755)) {
-                log::error!("Failed to set the permissions of {:?}: {e}", d);
+    for d in &directories {
+        /* d should be prefixed already, create it if it doesn't exist */
+        if !d.exists() {
+            if let Err(e) = std::fs::create_dir_all(d) {
+                log::error!("Failed to setup directory {:?}: {e}", d);
                 return Err(Error::Io { source: e });
             }
+        }
+
+        if let Err(e) = nix::unistd::chown(d, Some(uid), Some(gid)) {
+            log::error!("Failed to set the owner of {:?}: {e}", d);
+            return Err(Error::Nix { source: e });
+        }
+
+        /* Hard-coding 755, change this when we implementing XXXDirectoryMode. */
+        if let Err(e) = std::fs::set_permissions(d, Permissions::from_mode(0o755)) {
+            log::error!("Failed to set the permissions of {:?}: {e}", d);
+            return Err(Error::Io { source: e });
         }
     }
     Ok(())
@@ -167,27 +174,19 @@ fn apply_umask(umask: Option<Mode>) -> Result<()> {
 fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: Rc<ExecContext>) {
     log::debug!("exec context params: {:?}", ctx.envs());
 
-    if let Err(e) = apply_root_directory(params.get_root_directory()) {
+    if let Err(e) = apply_root_directory(ctx.root_directory()) {
         log::error!("Failed to apply root directory: {e}");
         return;
     }
 
-    let exec_directory = params.get_exec_directory();
-    for kind in [ExecDirectoryType::Runtime, ExecDirectoryType::State] {
-        if let Err(e) =
-            setup_exec_directory(exec_directory, params.get_user(), params.get_group(), kind)
-        {
-            log::error!("Failed to apply {:?} directory: {e}", kind);
-            continue;
-        }
-    }
+    let _ = setup_exec_directory(ctx.clone(), params.get_user(), params.get_group());
 
     if let Err(e) = apply_user_and_group(params.get_user(), params.get_group(), params) {
         log::error!("Failed to apply user or group: {e}");
         return;
     }
 
-    if let Err(e) = apply_working_directory(params.get_working_directory()) {
+    if let Err(e) = apply_working_directory(ctx.working_directory()) {
         log::error!("Failed to apply working directory: {e}");
         return;
     }

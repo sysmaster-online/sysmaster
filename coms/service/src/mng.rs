@@ -617,9 +617,8 @@ impl ServiceMng {
         if preserve_mode == PreserveMode::No
             || preserve_mode == PreserveMode::Restart && !self.rd.will_restart()
         {
-            if let Some(runtime_directory) = self.spawn.get_runtime_directory() {
-                let _ = self.comm.um().unit_destroy_runtime_data(runtime_directory);
-            }
+            let runtime_directory = self.spawn.runtime_directory();
+            let _ = self.comm.um().unit_destroy_runtime_data(runtime_directory);
         }
 
         if let Some(p) = self.config.pid_file() {

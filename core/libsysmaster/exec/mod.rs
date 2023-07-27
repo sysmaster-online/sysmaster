@@ -13,6 +13,9 @@
 //! execute module
 mod base;
 mod cmd;
-pub use base::{ExecContext, ExecDirectoryType, ExecFlags, ExecParameters, Rlimit};
+pub use base::{
+    ExecContext, ExecDirectoryType, ExecFlags, ExecParameters, Rlimit, RuntimeDirectory,
+    StateDirectory, WorkingDirectory,
+};
 pub use cmd::ExecCommand;
 pub use cmd::ExecFlag;

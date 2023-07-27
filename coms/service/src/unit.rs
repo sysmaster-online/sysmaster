@@ -223,34 +223,39 @@ impl ServiceUnit {
         // if TimeoutSec is set, flush it's value to TimeoutStartSec and TimeoutStopSec
         self.config.flush_timeout();
 
+        let cfg_data = self.config.config_data();
+
         if let Some(envs) = self.config.environments() {
             for (key, value) in envs {
                 self.exec_ctx.insert_env(key, value);
             }
         }
 
-        self.exec_ctx.insert_envs_files(
-            self.config
-                .config_data()
-                .borrow()
-                .Service
-                .EnvironmentFile
-                .clone(),
-        );
+        self.exec_ctx
+            .insert_envs_files(cfg_data.borrow().Service.EnvironmentFile.clone());
 
-        if let Some(rlimit) = self.config.config_data().borrow().Service.LimitCORE {
+        if let Some(rlimit) = cfg_data.borrow().Service.LimitCORE {
             self.exec_ctx.insert_rlimit(libc::RLIMIT_CORE as u8, rlimit);
         }
 
-        if let Some(rlimit) = self.config.config_data().borrow().Service.LimitNOFILE {
+        if let Some(rlimit) = cfg_data.borrow().Service.LimitNOFILE {
             self.exec_ctx
                 .insert_rlimit(libc::RLIMIT_NOFILE as u8, rlimit);
         }
 
-        if let Some(rlimit) = self.config.config_data().borrow().Service.LimitNPROC {
+        if let Some(rlimit) = cfg_data.borrow().Service.LimitNPROC {
             self.exec_ctx
                 .insert_rlimit(libc::RLIMIT_NPROC as u8, rlimit);
         }
+
+        self.exec_ctx
+            .set_root_directory(cfg_data.borrow().Service.RootDirectory.clone());
+        self.exec_ctx
+            .set_working_directory(cfg_data.borrow().Service.WorkingDirectory.clone());
+        self.exec_ctx
+            .set_runtime_directory(cfg_data.borrow().Service.RuntimeDirectory.clone());
+        self.exec_ctx
+            .set_state_directory(cfg_data.borrow().Service.StateDirectory.clone());
 
         if let Some(owner) = self.comm.owner() {
             if let Some(sockets) = self.config.sockets() {

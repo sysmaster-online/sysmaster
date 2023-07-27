@@ -114,30 +114,6 @@ impl ServiceSpawn {
             return Err(e);
         }
 
-        if let Err(e) = params.add_root_directory(service_config.RootDirectory.clone()) {
-            log::error!("Failed to add root directory: {e}");
-            return Err(e);
-        }
-
-        if let Some(runtime_directories) = &service_config.RuntimeDirectory {
-            if let Err(e) = params.add_runtime_directory(runtime_directories) {
-                log::error!("Failed to add runtime directories: {e}");
-                return Err(e);
-            }
-        }
-
-        if let Some(state_directories) = &service_config.StateDirectory {
-            if let Err(e) = params.add_state_directory(state_directories) {
-                log::error!("Failed to add state directories: {e}");
-                return Err(e);
-            }
-        }
-
-        if let Err(e) = params.add_working_directory(service_config.WorkingDirectory.clone()) {
-            log::error!("Failed to add working directory: {e}");
-            return Err(e);
-        }
-
         params.set_watchdog_usec(self.watchdog_timer());
 
         log::debug!("begin to exec spawn");
@@ -155,11 +131,8 @@ impl ServiceSpawn {
         Ok(pid)
     }
 
-    pub fn get_runtime_directory(&self) -> Option<Vec<PathBuf>> {
-        match self.exec_params.borrow().as_ref() {
-            None => None,
-            Some(v) => v.get_runtime_directory(),
-        }
+    pub fn runtime_directory(&self) -> Vec<PathBuf> {
+        self.exec_ctx.runtime_directory().directory()
     }
 
     fn collect_socket_fds(&self) -> Vec<i32> {

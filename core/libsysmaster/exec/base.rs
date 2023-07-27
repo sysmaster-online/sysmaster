@@ -23,7 +23,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::str::FromStr;
 use std::{cell::RefCell, collections::HashMap};
-use std::{ffi::CString, path::Path, path::PathBuf, rc::Rc};
+use std::{ffi::CString, path::PathBuf, rc::Rc};
 
 /// the Rlimit soft and hard value
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -121,12 +121,91 @@ impl DeserializeWith for Rlimit {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WorkingDirectory {
+    directory: Option<PathBuf>,
+    miss_ok: bool,
+}
+
+impl Default for WorkingDirectory {
+    fn default() -> Self {
+        Self {
+            directory: None,
+            miss_ok: false,
+        }
+    }
+}
+
+impl WorkingDirectory {
+    pub fn new(directory: Option<PathBuf>, miss_ok: bool) -> Self {
+        Self { directory, miss_ok }
+    }
+
+    pub fn directory(&self) -> Option<PathBuf> {
+        self.directory.clone()
+    }
+
+    pub fn miss_ok(&self) -> bool {
+        self.miss_ok
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RuntimeDirectory {
+    directory: Vec<PathBuf>,
+}
+
+impl Default for RuntimeDirectory {
+    fn default() -> Self {
+        Self {
+            directory: Vec::new(),
+        }
+    }
+}
+
+impl RuntimeDirectory {
+    pub fn add_directory(&mut self, directory: PathBuf) {
+        self.directory.push(directory);
+    }
+
+    pub fn directory(&self) -> Vec<PathBuf> {
+        self.directory.clone()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StateDirectory {
+    directory: Vec<PathBuf>,
+}
+
+impl Default for StateDirectory {
+    fn default() -> Self {
+        Self {
+            directory: Vec::new(),
+        }
+    }
+}
+
+impl StateDirectory {
+    pub fn add_directory(&mut self, directory: PathBuf) {
+        self.directory.push(directory);
+    }
+
+    pub fn directory(&self) -> Vec<PathBuf> {
+        self.directory.clone()
+    }
+}
+
 /// the exec context that was parse from the unit file.
 /// like parsed from Environment field.
 pub struct ExecContext {
     envs: RefCell<HashMap<String, String>>,
     env_files: RefCell<Vec<PathBuf>>,
     rlimits: RefCell<HashMap<u8, Rlimit>>,
+    root_directory: RefCell<Option<PathBuf>>,
+    working_directory: RefCell<WorkingDirectory>,
+    runtime_directory: RefCell<RuntimeDirectory>,
+    state_directory: RefCell<StateDirectory>,
 }
 
 impl Default for ExecContext {
@@ -142,6 +221,10 @@ impl ExecContext {
             envs: RefCell::new(HashMap::new()),
             env_files: RefCell::new(vec![]),
             rlimits: RefCell::new(HashMap::new()),
+            working_directory: RefCell::new(WorkingDirectory::default()),
+            root_directory: RefCell::new(None),
+            runtime_directory: RefCell::new(RuntimeDirectory::default()),
+            state_directory: RefCell::new(StateDirectory::default()),
         }
     }
 
@@ -213,9 +296,41 @@ impl ExecContext {
 
         Ok(())
     }
+
+    pub fn set_root_directory(&self, root_diretory: Option<PathBuf>) {
+        *self.root_directory.borrow_mut() = root_diretory;
+    }
+
+    pub fn root_directory(&self) -> Option<PathBuf> {
+        self.root_directory.borrow().clone()
+    }
+
+    pub fn set_working_directory(&self, working_directory: WorkingDirectory) {
+        *self.working_directory.borrow_mut() = working_directory;
+    }
+
+    pub fn working_directory(&self) -> WorkingDirectory {
+        self.working_directory.borrow().clone()
+    }
+
+    pub fn set_runtime_directory(&self, runtime_directory: RuntimeDirectory) {
+        *self.runtime_directory.borrow_mut() = runtime_directory;
+    }
+
+    pub fn runtime_directory(&self) -> RuntimeDirectory {
+        self.runtime_directory.borrow().clone()
+    }
+
+    pub fn set_state_directory(&self, state_directory: StateDirectory) {
+        *self.state_directory.borrow_mut() = state_directory;
+    }
+
+    pub fn state_directory(&self) -> StateDirectory {
+        self.state_directory.borrow().clone()
+    }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Serialize, Deserialize)]
 ///
 pub enum ExecDirectoryType {
     ///
@@ -235,9 +350,6 @@ pub struct ExecParameters {
     environment: Rc<EnvData>,
     fds: Vec<i32>,
     notify_sock: Option<PathBuf>,
-    root_directory: Option<PathBuf>,
-    working_directory: Option<PathBuf>,
-    exec_directory: Vec<Option<Vec<PathBuf>>>,
     user: Option<User>,
     group: Option<Group>,
     umask: Option<Mode>,
@@ -285,14 +397,10 @@ impl Default for ExecParameters {
 impl ExecParameters {
     /// create  a new instance of ExecParameters
     pub fn new() -> ExecParameters {
-        let exec_directory: Vec<Option<Vec<PathBuf>>> = vec![None, None, None, None, None];
         ExecParameters {
             environment: Rc::new(EnvData::new()),
             fds: Vec::new(),
             notify_sock: None,
-            root_directory: None,
-            working_directory: None,
-            exec_directory,
             user: None,
             group: None,
             umask: None,
@@ -340,111 +448,6 @@ impl ExecParameters {
     /// set the NOTIFY_SOCKET value
     pub fn set_notify_sock(&mut self, notify_sock: PathBuf) {
         self.notify_sock = Some(notify_sock)
-    }
-
-    // Just check if the given directory exists
-    fn add_directory_common(directory_str: String) -> Result<Option<PathBuf>> {
-        if directory_str.is_empty() {
-            return Ok(None);
-        }
-        let directory = PathBuf::from(&directory_str);
-        if !directory.is_dir() {
-            return Err(Error::InvalidData);
-        }
-        Ok(Some(directory))
-    }
-
-    /// add RootDirectory
-    pub fn add_root_directory(&mut self, root_directory_str: String) -> Result<()> {
-        self.root_directory = Self::add_directory_common(root_directory_str)?;
-        Ok(())
-    }
-
-    /// add RuntimeDirectory
-    pub fn add_runtime_directory(&mut self, runtime_directories: &Vec<String>) -> Result<()> {
-        if runtime_directories.is_empty() {
-            return Ok(());
-        }
-        let mut directories: Vec<PathBuf> = Vec::new();
-        for d in runtime_directories {
-            /* Different from RootDirectory or WorkingDirectory, we don't
-             * check if the specified directory exists. We will create it
-             * later if it doesn't exist. */
-            directories.push(Path::new("/run").join(d));
-        }
-        self.exec_directory[ExecDirectoryType::Runtime as usize] = Some(directories);
-        Ok(())
-    }
-
-    /// add StateDirectory
-    pub fn add_state_directory(&mut self, state_directories: &Vec<String>) -> Result<()> {
-        /* Similar with RuntimeDirectory */
-        if state_directories.is_empty() {
-            return Ok(());
-        }
-        let mut directories: Vec<PathBuf> = Vec::new();
-        for d in state_directories {
-            directories.push(Path::new("/var/lib").join(d));
-        }
-        self.exec_directory[ExecDirectoryType::State as usize] = Some(directories);
-        Ok(())
-    }
-
-    /// get RootDirectory
-    pub fn get_root_directory(&self) -> Option<PathBuf> {
-        self.root_directory.clone()
-    }
-
-    /// get ExecDirectory
-    pub fn get_exec_directory(&self) -> &Vec<Option<Vec<PathBuf>>> {
-        &self.exec_directory
-    }
-
-    /// get RuntimeDirectory
-    pub fn get_runtime_directory(&self) -> Option<Vec<PathBuf>> {
-        self.exec_directory[ExecDirectoryType::Runtime as usize].as_ref()?;
-        let res: Vec<PathBuf> = self.exec_directory[ExecDirectoryType::Runtime as usize]
-            .as_ref()
-            .unwrap()
-            .iter()
-            .map(PathBuf::from)
-            .collect();
-        Some(res)
-    }
-
-    /// add WorkingDirectory
-    pub fn add_working_directory(&mut self, working_directory_str: String) -> Result<()> {
-        if working_directory_str.is_empty() {
-            return Ok(());
-        }
-
-        let mut miss_ok = false;
-        if working_directory_str.starts_with('-') {
-            miss_ok = true;
-        }
-
-        let mut working_directory_str = working_directory_str.trim_start_matches('-').to_string();
-
-        if working_directory_str == *"~".to_string() {
-            working_directory_str = std::env::var("HOME").context(VarSnafu)?
-        }
-
-        let working_directory = PathBuf::from(&working_directory_str);
-        if !working_directory.is_dir() {
-            if miss_ok {
-                return Ok(());
-            } else {
-                return Err(Error::InvalidData);
-            }
-        }
-
-        self.working_directory = Some(working_directory);
-        Ok(())
-    }
-
-    /// get WorkingDirectory
-    pub fn get_working_directory(&self) -> Option<PathBuf> {
-        self.working_directory.clone()
     }
 
     /// add User
@@ -573,45 +576,6 @@ mod tests {
     use crate::exec::base::Rlimit;
 
     use super::ExecParameters;
-
-    #[test]
-    fn test_add_working_directory() {
-        let mut params = ExecParameters::new();
-        assert!(params.add_working_directory("/root".to_string()).is_ok());
-        assert_eq!(
-            params.get_working_directory().unwrap().to_str(),
-            Some("/root")
-        );
-        let mut params = ExecParameters::new();
-        assert!(params
-            .add_working_directory("-/root/foooooooobarrrrrr".to_string())
-            .is_ok());
-        assert_eq!(params.get_working_directory(), None);
-        let mut params = ExecParameters::new();
-        assert!(params
-            .add_working_directory("/root/fooooooooobarrrrrrrrrrrr".to_string())
-            .is_err());
-        assert_eq!(params.get_working_directory(), None);
-        let mut params = ExecParameters::new();
-        assert!(params
-            .add_working_directory("--------------/usr/lib".to_string())
-            .is_ok());
-        assert_eq!(
-            params.get_working_directory().unwrap().to_str(),
-            Some("/usr/lib")
-        );
-        let mut params = ExecParameters::new();
-        assert!(params.add_working_directory("~".to_string()).is_ok());
-        assert_eq!(
-            params
-                .get_working_directory()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string(),
-            std::env::var("HOME").unwrap()
-        );
-    }
 
     #[test]
     fn test_add_user() {

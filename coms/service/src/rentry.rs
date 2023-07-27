@@ -13,11 +13,15 @@
 #![allow(non_snake_case)]
 use crate::monitor::ServiceMonitor;
 
+use basic::path_util::{
+    parse_path_common, path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify,
+};
 use confique::Config;
 use macros::EnumDisplay;
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
+use serde::de::{self, Unexpected};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::path::Path;
@@ -26,7 +30,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use sysmaster::error::*;
-use sysmaster::exec::{ExecCommand, Rlimit};
+use sysmaster::exec::{ExecCommand, Rlimit, RuntimeDirectory, StateDirectory, WorkingDirectory};
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
 use sysmaster::serialize::DeserializeWith;
 use sysmaster::unit::KillMode;
@@ -196,20 +200,175 @@ where
     };
     Ok(res)
 }
-    }
-}
 
 fn deserialize_pidfile<'de, D>(de: D) -> Result<PathBuf, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let file = String::deserialize(de)?;
-    let pid_file_path = Path::new(&file);
-    if pid_file_path.is_absolute() {
-        return Ok(PathBuf::from(pid_file_path));
+    let s = String::deserialize(de)?;
+    if !path_name_is_safe(&s) {
+        return Err(de::Error::invalid_value(
+            Unexpected::Str(&s),
+            &"safe character",
+        ));
     }
 
-    Ok(Path::new(EXEC_RUNTIME_PREFIX).join(pid_file_path))
+    if !path_length_is_valid(&s) {
+        return Err(de::Error::invalid_value(
+            Unexpected::Str(&s),
+            &"valid length",
+        ));
+    }
+
+    let s = match path_simplify(&s) {
+        None => {
+            return Err(de::Error::invalid_value(Unexpected::Str(&s), &""));
+        }
+        Some(v) => v,
+    };
+
+    if path_is_abosolute(&s) {
+        return Ok(PathBuf::from(s));
+    } else {
+        return Ok(Path::new(EXEC_RUNTIME_PREFIX).join(s));
+    }
+}
+
+fn deserialize_pathbuf<'de, D>(de: D) -> Result<PathBuf, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(de)?;
+    let path =
+        parse_path_common(&s).map_err(|_| de::Error::invalid_value(Unexpected::Str(&s), &""))?;
+    Ok(PathBuf::from(path))
+}
+
+fn parse_working_directory(s: &str) -> Result<WorkingDirectory, basic::Error> {
+    if s.is_empty() {
+        return Ok(WorkingDirectory::new(None, true));
+    }
+
+    let mut miss_ok = false;
+    if s.starts_with('-') {
+        miss_ok = true;
+    }
+
+    let mut s: String = s.trim_start_matches('-').to_string();
+
+    if s == *"~".to_string() {
+        s = std::env::var("HOME").map_err(|_| basic::Error::Invalid {
+            what: "can't get HOME environment".to_string(),
+        })?;
+    }
+
+    Ok(WorkingDirectory::new(Some(PathBuf::from(&s)), miss_ok))
+}
+
+fn deserialize_working_directory<'de, D>(de: D) -> Result<WorkingDirectory, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(de)?;
+
+    match parse_working_directory(&s) {
+        Ok(v) => Ok(v),
+        Err(_) => Err(de::Error::invalid_value(Unexpected::Str(&s), &"")),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::PathBuf;
+
+    use crate::rentry::parse_working_directory;
+
+    #[test]
+    fn test_parse_working_directory() {
+        assert_eq!(
+            parse_working_directory("/root").unwrap().directory(),
+            Some(PathBuf::from("/root"))
+        );
+        assert_eq!(
+            parse_working_directory("-/root/foooooooobarrrrrr")
+                .unwrap()
+                .directory(),
+            Some(PathBuf::from("/root/foooooooobarrrrrr"))
+        );
+        assert_eq!(
+            parse_working_directory("--------------/usr/lib")
+                .unwrap()
+                .directory(),
+            Some(PathBuf::from("/usr/lib"))
+        );
+        assert_eq!(
+            parse_working_directory("~").unwrap().directory(),
+            Some(PathBuf::from(std::env::var("HOME").unwrap()))
+        );
+        assert_eq!(parse_working_directory("").unwrap().directory(), None);
+    }
+}
+
+fn is_valid_exec_directory(s: &str) -> bool {
+    if !path_name_is_safe(&s) {
+        return false;
+    }
+    if !path_length_is_valid(&s) {
+        return false;
+    }
+    if path_is_abosolute(&s) {
+        return false;
+    }
+    true
+}
+
+fn deserialize_runtime_directory<'de, D>(de: D) -> Result<RuntimeDirectory, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(de)?;
+    let mut res = RuntimeDirectory::default();
+    for d in s.split_terminator(';') {
+        if !is_valid_exec_directory(&d) {
+            return Err(de::Error::invalid_value(Unexpected::Str(&s), &""));
+        }
+
+        let path = match path_simplify(&d) {
+            None => {
+                return Err(de::Error::invalid_value(Unexpected::Str(&d), &""));
+            }
+            Some(v) => v,
+        };
+
+        res.add_directory(Path::new("/run").join(path));
+    }
+
+    Ok(res)
+}
+
+fn deserialize_state_directory<'de, D>(de: D) -> Result<StateDirectory, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    /* Similar with RuntimeDirectory */
+    let s = String::deserialize(de)?;
+    let mut res = StateDirectory::default();
+    for d in s.split_terminator(';') {
+        if !is_valid_exec_directory(&d) {
+            return Err(de::Error::invalid_value(Unexpected::Str(&s), &""));
+        }
+
+        let path = match path_simplify(&d) {
+            None => {
+                return Err(de::Error::invalid_value(Unexpected::Str(&d), &""));
+            }
+            Some(v) => v,
+        };
+
+        res.add_directory(Path::new("/var/lib").join(path));
+    }
+
+    Ok(res)
 }
 
 fn deserialize_timeout<'de, D>(de: D) -> Result<u64, D::Error>
@@ -260,14 +419,17 @@ pub(super) struct SectionService {
     #[config(deserialize_with = KillMode::deserialize_with)]
     #[config(default = "none")]
     pub KillMode: KillMode,
+    #[config(deserialize_with = deserialize_pathbuf)]
+    pub RootDirectory: Option<PathBuf>,
     #[config(default = "")]
-    pub RootDirectory: String,
+    #[config(deserialize_with = deserialize_working_directory)]
+    pub WorkingDirectory: WorkingDirectory,
     #[config(default = "")]
-    pub WorkingDirectory: String,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub StateDirectory: Option<Vec<String>>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub RuntimeDirectory: Option<Vec<String>>,
+    #[config(deserialize_with = deserialize_state_directory)]
+    pub StateDirectory: StateDirectory,
+    #[config(deserialize_with = deserialize_runtime_directory)]
+    #[config(default = "")]
+    pub RuntimeDirectory: RuntimeDirectory,
     #[config(deserialize_with = deserialize_preserve_mode)]
     #[config(default = "no")]
     pub RuntimeDirectoryPreserve: PreserveMode,
