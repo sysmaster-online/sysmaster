@@ -61,21 +61,18 @@ impl Default for ServiceType {
     }
 }
 
-impl DeserializeWith for ServiceType {
-    type Item = Self;
-    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(de)?;
+fn deserialize_service_type<'de, D>(de: D) -> Result<ServiceType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(de)?;
 
-        match s.as_ref() {
-            "simple" => Ok(ServiceType::Simple),
-            "forking" => Ok(ServiceType::Forking),
-            "oneshot" => Ok(ServiceType::Oneshot),
-            "notify" => Ok(ServiceType::Notify),
-            &_ => Ok(ServiceType::Simple),
-        }
+    match s.as_ref() {
+        "simple" => Ok(ServiceType::Simple),
+        "forking" => Ok(ServiceType::Forking),
+        "oneshot" => Ok(ServiceType::Oneshot),
+        "notify" => Ok(ServiceType::Notify),
+        &_ => Ok(ServiceType::Simple),
     }
 }
 
@@ -142,35 +139,32 @@ fn exit_status_from_string(status: &str) -> Result<u8> {
     Ok(s)
 }
 
-impl DeserializeWith for ExitStatusSet {
-    type Item = Self;
-    fn deserialize_with<'de, D>(de: D) -> Result<Self::Item, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(de)?;
+fn deserialize_exit_status_set<'de, D>(de: D) -> Result<ExitStatusSet, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(de)?;
 
-        let mut status_set = ExitStatusSet::default();
+    let mut status_set = ExitStatusSet::default();
 
-        for cmd in s.split_whitespace() {
-            if cmd.is_empty() {
-                continue;
-            }
-
-            if let Ok(v) = exit_status_from_string(cmd) {
-                status_set.add_status(v);
-                continue;
-            }
-
-            if let Ok(_sig) = Signal::from_str(cmd) {
-                status_set.add_signal(cmd.to_string());
-                continue;
-            }
-            log::warn!("RestartPreventExitStatus: invalid config value {}", cmd);
+    for cmd in s.split_whitespace() {
+        if cmd.is_empty() {
+            continue;
         }
 
-        Ok(status_set)
+        if let Ok(v) = exit_status_from_string(cmd) {
+            status_set.add_status(v);
+            continue;
+        }
+
+        if let Ok(_sig) = Signal::from_str(cmd) {
+            status_set.add_signal(cmd.to_string());
+            continue;
+        }
+        log::warn!("RestartPreventExitStatus: invalid config value {}", cmd);
     }
+
+    Ok(status_set)
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -186,24 +180,22 @@ impl Default for PreserveMode {
     }
 }
 
-impl DeserializeWith for PreserveMode {
-    type Item = Self;
-
-    fn deserialize_with<'de, D>(de: D) -> std::result::Result<Self::Item, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(de)?;
-        let res = match s.as_str() {
-            "no" => PreserveMode::No,
-            "yes" => PreserveMode::Yes,
-            "restart" => PreserveMode::Restart,
-            _ => {
-                log::error!("Failed to parse RuntimeDirectoryPreserve: {s}, assuming no");
-                PreserveMode::No
-            }
-        };
-        Ok(res)
+fn deserialize_preserve_mode<'de, D>(de: D) -> std::result::Result<PreserveMode, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(de)?;
+    let res = match s.as_str() {
+        "no" => PreserveMode::No,
+        "yes" => PreserveMode::Yes,
+        "restart" => PreserveMode::Restart,
+        _ => {
+            log::error!("Failed to parse RuntimeDirectoryPreserve: {s}, assuming no");
+            PreserveMode::No
+        }
+    };
+    Ok(res)
+}
     }
 }
 
@@ -236,7 +228,7 @@ where
 
 #[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
 pub(super) struct SectionService {
-    #[config(deserialize_with = ServiceType::deserialize_with)]
+    #[config(deserialize_with = deserialize_service_type)]
     #[config(default = "simple")]
     pub Type: ServiceType,
     #[config(deserialize_with = ExecCommand::deserialize_with)]
@@ -276,7 +268,7 @@ pub(super) struct SectionService {
     pub StateDirectory: Option<Vec<String>>,
     #[config(deserialize_with = Vec::<String>::deserialize_with)]
     pub RuntimeDirectory: Option<Vec<String>>,
-    #[config(deserialize_with = PreserveMode::deserialize_with)]
+    #[config(deserialize_with = deserialize_preserve_mode)]
     #[config(default = "no")]
     pub RuntimeDirectoryPreserve: PreserveMode,
     #[config(default = "")]
@@ -287,7 +279,7 @@ pub(super) struct SectionService {
     pub UMask: String,
     #[config(default = "no")]
     pub Restart: ServiceRestart,
-    #[config(deserialize_with = ExitStatusSet::deserialize_with)]
+    #[config(deserialize_with = deserialize_exit_status_set)]
     #[config(default = "")]
     pub RestartPreventExitStatus: ExitStatusSet,
     #[config(default = 1)]
