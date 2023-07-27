@@ -57,27 +57,36 @@ linux = []
 
 # 此为开发配置文件, 给 `cargo build` 所使用.
 [profile.dev]
-opt-level = 'z'           # 控制编译器构建的`--opt-level`。
-                          # 0-1适合调试。 2是良好优化的。最大为 3。
-                          # 's' 企图优化大小, 'z' 则 进一步优化大小.
-debug = true              # (u32 or bool) 包括调试信息（调试符号）.
-                          # 相当于 `-C debuginfo=2` 编译器 标志.
-rpath = false             # 控制 编译器 是否应该设置加载器路径.
-                          # 若为 true, 传递 `-C rpath` 标志 给 编译器.
-lto = false               # 链接时间优化通常会减少二进制文件和静态库的大小
-                          # 但会增加编译时间.
-                          # 若是 true, 传递 `-C lto` 标志 给 编译器, 和 若是一个
-                          # 字符串值 像 'thin' ，那会传递 `-C lto=thin`
-                          # 给 编译器
-debug-assertions = true   # 控制是否启用调试断言
-                          # (e.g. debug_assert!() 和 算术溢出检查)
-codegen-units = 16        # if > 1 并行代码生成，以改善
-                          # 编译时间, 但阻止了些优化.
-                          # 传递 `-C codegen-units`.
-panic = 'abort'           # 恐慌策略 (`-C panic=...`), 也可以是 'abort'
-incremental = true        # 是否启用增量编译
-overflow-checks = true    # 使用溢出检查进行整数运算。
-                          # 传递 `-C overflow-checks=...`标志 给 compiler.
+opt-level = 'z'
+# 控制编译器构建的`--opt-level`。
+# 0-1适合调试。 2是良好优化的。最大为 3。
+# 's' 企图优化大小, 'z' 则 进一步优化大小.
+debug = true
+# (u32 or bool) 包括调试信息（调试符号）.
+# 相当于 `-C debuginfo=2` 编译器 标志.
+rpath = false
+# 控制 编译器 是否应该设置加载器路径.
+# 若为 true, 传递 `-C rpath` 标志 给 编译器.
+lto = false
+# 链接时间优化通常会减少二进制文件和静态库的大小
+# 但会增加编译时间.
+# 若是 true, 传递 `-C lto` 标志 给 编译器, 和 若是一个
+# 字符串值 像 'thin' ，那会传递 `-C lto=thin`
+# 给 编译器
+debug-assertions = true
+# 控制是否启用调试断言
+# (e.g. debug_assert!() 和 算术溢出检查)
+codegen-units = 128
+# if > 1 并行代码生成，以改善
+# 编译时间, 但阻止了些优化.
+# 传递 `-C codegen-units`.
+panic = 'unwind'
+# 恐慌策略 (`-C panic=...`), 也可以是 'abort'
+incremental = true
+# 是否启用增量编译
+overflow-checks = true
+# 使用溢出检查进行整数运算。
+# 传递 `-C overflow-checks=...`标志 给 compiler.
 
 [profile.release]
 opt-level = 3
@@ -90,6 +99,14 @@ codegen-units = 1
 panic = 'abort'
 incremental = false
 overflow-checks = false
+
+[profile.release.build-override] # +
+opt-level = 3     # +
+codegen-units = 1
+
+[profile.release.package."*"]
+opt-level = 3
+codegen-units = 1
 
 # for rpm dist
 [profile.dist]
@@ -158,7 +175,6 @@ members = [
   "coms/mount",
 ]
 exclude = ["config", "tools"]
-
 
 # fix https://github.com/mdaffin/loopdev/issues/65
 [patch.crates-io.loopdev]

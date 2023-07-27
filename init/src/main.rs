@@ -11,105 +11,146 @@
 // See the Mulan PSL v2 for more details.
 
 //! The init daemon
-use clap::Parser;
-use log::{Level, LevelFilter, Log};
-use nix::sys::{
-    signal::Signal,
-    wait::{waitid, Id, WaitPidFlag, WaitStatus},
-};
-use once_cell::sync::OnceCell;
-use psutil::process::Process;
-use std::{
-    fs::{self, File, OpenOptions},
-    io::Write,
-    path::{Path, PathBuf},
-    process,
-    sync::Arc,
-    time::Duration,
-};
-use tokio::{
-    net::UnixListener,
-    process::Command,
-    signal::unix::{signal, SignalKind},
-    sync::RwLock,
-    time::sleep,
-};
+use mio::unix::SourceFd;
+use mio::Events;
+use mio::Interest;
+use mio::Poll;
+use mio::Token;
+use nix::sys::signal;
+use nix::sys::signal::kill;
+use nix::sys::signal::SaFlags;
+use nix::sys::signal::SigAction;
+use nix::sys::signal::SigHandler;
+use nix::sys::signal::Signal;
+use nix::sys::signalfd::SigSet;
+use nix::sys::signalfd::SignalFd;
+use nix::sys::socket::getsockopt;
+use nix::sys::socket::sockopt::PeerCredentials;
+use nix::sys::stat::umask;
+use nix::sys::stat::Mode;
+use nix::sys::time::TimeSpec;
+use nix::sys::time::TimeValLike;
+use nix::sys::timerfd::ClockId;
+use nix::sys::timerfd::Expiration;
+use nix::sys::timerfd::TimerFd;
+use nix::sys::timerfd::TimerFlags;
+use nix::sys::timerfd::TimerSetTimeFlags;
+use nix::sys::wait::waitid;
+use nix::sys::wait::Id;
+use nix::sys::wait::WaitPidFlag;
+use nix::sys::wait::WaitStatus;
+use nix::unistd;
+use nix::unistd::execv;
+use nix::unistd::Pid;
+#[allow(unused_imports)]
+use nix::unistd::Uid;
+use std::ffi::CString;
+use std::fs;
+use std::fs::File;
+use std::io;
+use std::io::Read;
+use std::os::unix::io::AsRawFd;
+use std::os::unix::net::UnixListener;
+use std::path::Path;
+use std::path::PathBuf;
+use std::process::Command;
+use std::time::Duration;
 
-struct InitLog {
-    kmsg: std::sync::Mutex<File>,
-    maxlevel: LevelFilter,
+const ALLFD_TOKEN: Token = Token(0);
+const TIMERFD_TOKEN: Token = Token(1);
+const SIGNALFD_TOKEN: Token = Token(2);
+const SOCKETFD_TOKEN: Token = Token(3);
+#[cfg(not(test))]
+const INIT_SOCK: &str = "/run/sysmaster/init.sock";
+#[cfg(test)]
+const INIT_SOCK: &str = "init.sock";
+const INIT_CONFIG: &str = "/etc/sysmaster/init.conf";
+
+#[derive(Debug)]
+struct InitConfig {
+    pub timecnt: usize,
+    pub timewait: u64,
+    pub bin: String,
 }
 
-impl InitLog {
-    pub fn new(filter: LevelFilter) -> InitLog {
-        InitLog {
-            kmsg: std::sync::Mutex::new(OpenOptions::new().write(true).open("/dev/kmsg").unwrap()),
-            maxlevel: filter,
-        }
+impl InitConfig {
+    fn parse_config_line(line: &str) -> Option<(String, String)> {
+        let mut iter = line.splitn(2, '=');
+        let key = iter.next()?.trim();
+        let value = iter.next()?.trim();
+
+        Some((key.to_string(), value.to_string()))
     }
 
-    pub fn init(filter: LevelFilter) {
-        let klog = InitLog::new(filter);
-        _ = log::set_boxed_logger(Box::new(klog));
-        log::set_max_level(filter);
+    pub fn load(path: Option<String>) -> std::io::Result<Self> {
+        let mut config = Self::default();
+        let default_config_file = INIT_CONFIG.to_string();
+        let path = path.unwrap_or(default_config_file);
+        let file = Path::new(&path);
+        if file.exists() {
+            let mut content = String::new();
+            let file = File::open(&file);
+            match file.map(|mut f| f.read_to_string(&mut content)) {
+                Ok(_) => (),
+                Err(_) => return Ok(config),
+            };
+
+            for (_, line) in content.lines().enumerate() {
+                let trimmed_line = line.trim();
+                if trimmed_line.is_empty() || trimmed_line.starts_with('#') {
+                    continue;
+                }
+                if let Some((key, value)) = InitConfig::parse_config_line(trimmed_line) {
+                    match key.as_str() {
+                        "timecnt" => match value.as_str().parse::<usize>() {
+                            Ok(v) => config.timecnt = v,
+                            Err(e) => {
+                                log::warn!(
+                                    "parse timecnt failed: {:?}, use default({:?})!",
+                                    e,
+                                    config.timecnt
+                                );
+                            }
+                        },
+                        "timewait" => match value.as_str().parse::<u64>() {
+                            Ok(v) => config.timewait = v,
+                            Err(e) => {
+                                log::warn!(
+                                    "parse timewait failed: {:?}, use default({:?})!",
+                                    e,
+                                    config.timewait
+                                );
+                            }
+                        },
+                        "bin" => match value.as_str().parse::<String>() {
+                            Ok(v) => config.bin = v,
+                            Err(e) => {
+                                log::warn!(
+                                    "parse bin failed: {:?}, use default({:?})!",
+                                    e,
+                                    config.bin
+                                );
+                            }
+                        },
+                        _ => log::warn!("parse config error, use default!"),
+                    }
+                }
+            }
+            log::debug!("{:?}", config);
+        }
+
+        Ok(config)
     }
 }
 
-impl Log for InitLog {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= self.maxlevel
-    }
-
-    fn log(&self, record: &log::Record) {
-        if record.level() > self.maxlevel {
-            return;
-        }
-
-        let level: u8 = match record.level() {
-            Level::Error => 3,
-            Level::Warn => 4,
-            Level::Info => 5,
-            Level::Debug => 6,
-            Level::Trace => 7,
-        };
-
-        let mut buf = Vec::new();
-        writeln!(
-            buf,
-            "<{}>{}[{}]: {}",
-            level,
-            record.target(),
-            process::id(),
-            record.args()
-        )
-        .unwrap();
-
-        if let Ok(mut kmsg) = self.kmsg.lock() {
-            let _ = kmsg.write(&buf);
-            let _ = kmsg.flush();
+impl Default for InitConfig {
+    fn default() -> Self {
+        Self {
+            timecnt: 10,
+            timewait: 90,
+            bin: "/usr/lib/sysmaster/sysmaster".to_string(),
         }
     }
-
-    fn flush(&self) {}
-}
-
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-struct InitOptions {
-    /// Number of monitored and reset instances.
-    #[clap(long, value_parser, default_value = "10")]
-    timecnt: usize,
-    /// Waiting time for monitoring and keeping alive.
-    #[clap(long, value_parser, default_value = "90")]
-    timewait: u64,
-    /// Subcommands for init
-    #[clap(long, value_parser, default_value = "/usr/lib/sysmaster/sysmaster")]
-    bin: String,
-    /// socket path
-    #[clap(long, value_parser, default_value = "/run/sysmaster/init.sock")]
-    socket: String,
-    /// Other options
-    args: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,414 +161,620 @@ enum InitState {
 }
 
 struct Runtime {
-    options: InitOptions,
+    poll: Poll,
+    timerfd: TimerFd,
+    signalfd: SignalFd,
+    socketfd: UnixListener,
+    config: InitConfig,
     state: InitState,
     // sysmaster pid
-    pid: i32,
-    debug: bool,
+    pid: u32,
     // sysmaster status
     online: bool,
-}
-
-fn runtime() -> &'static RwLock<Runtime> {
-    static INSTANCE: OnceCell<RwLock<Runtime>> = OnceCell::new();
-    INSTANCE.get_or_init(|| {
-        #[cfg(not(test))]
-        let ret = RwLock::new(Runtime::new().unwrap());
-        #[cfg(test)]
-        let ret = RwLock::new(Runtime {
-            options: InitOptions {
-                timecnt: 1,
-                timewait: 0,
-                bin: "/usr/bin/ls".to_string(),
-                socket: "/tmp/sysmaster/init.socket".to_string(),
-                args: None,
-            },
-            state: InitState::Running,
-            pid: 0,
-            debug: false,
-            online: false,
-        });
-        ret
-    })
-}
-
-macro_rules! runtime_read {
-    () => {
-        crate::runtime().read().await
-    };
-}
-
-macro_rules! runtime_write {
-    () => {
-        crate::runtime().write().await
-    };
+    deserialize: bool,
 }
 
 impl Runtime {
-    // This is an issue with the clippy tool. The new function is used under the not(test) configuration.
-    #[allow(dead_code)]
     pub fn new() -> std::io::Result<Self> {
+        // parse arguments, --pid, Invisible to user
+        let mut pid = 0u32;
+        let mut args = std::env::args().skip(1);
+        while let Some(arg) = args.next() {
+            match arg.as_str() {
+                "--pid" => {
+                    if let Some(value) = args.next() {
+                        if value.starts_with('-') {
+                            panic!("Missing or invalid value for option.");
+                        }
+                        pid = match value.parse::<u32>() {
+                            Ok(v) => v,
+                            Err(e) => panic!("Invalid value: {e:?}"),
+                        };
+                    } else {
+                        panic!("Missing value for option --deserialize.");
+                    }
+                }
+                _ => {
+                    log::debug!("unknown items: {}, ignored!", arg);
+                }
+            }
+        }
+
+        // check socket
+        let sock_path = PathBuf::from(INIT_SOCK);
+        let sock_parent = sock_path.parent().unwrap();
+        if !sock_parent.exists() {
+            fs::create_dir_all(sock_parent)?;
+        }
+        if fs::metadata(INIT_SOCK).is_ok() {
+            let _ = fs::remove_file(INIT_SOCK);
+        }
+        let socketfd = UnixListener::bind(INIT_SOCK)?;
+
+        // add signal
+        let mut mask = SigSet::empty();
+        for sig in [
+            Signal::SIGINT,
+            Signal::SIGTERM,
+            Signal::SIGCHLD,
+            Signal::SIGHUP,
+        ] {
+            mask.add(sig);
+        }
+        mask.thread_set_mask()?;
+        let signalfd = SignalFd::new(&mask)?;
+
+        // set timer
+        let timerfd = TimerFd::new(ClockId::CLOCK_MONOTONIC, TimerFlags::TFD_NONBLOCK)?;
+        timerfd.set(
+            Expiration::OneShot(TimeSpec::from_duration(Duration::from_nanos(1))),
+            TimerSetTimeFlags::empty(),
+        )?;
+
+        // parse config
+        let config = InitConfig::load(None)?;
+
         Ok(Self {
-            options: InitOptions::parse(),
+            poll: Poll::new()?,
+            timerfd,
+            signalfd,
+            socketfd,
+            config,
             state: InitState::Init,
-            pid: 0,
-            debug: false,
+            pid,
             online: false,
+            deserialize: pid != 0,
         })
+    }
+
+    pub fn register(&mut self, token: Token) -> std::io::Result<()> {
+        let binding = self.signalfd.as_raw_fd();
+        let mut signal_source = SourceFd(&binding);
+        let binding = self.timerfd.as_raw_fd();
+        let mut time_source = SourceFd(&binding);
+        let binding = self.socketfd.as_raw_fd();
+        let mut unix_source = SourceFd(&binding);
+
+        match token {
+            SIGNALFD_TOKEN => self.poll.registry().register(
+                &mut signal_source,
+                SIGNALFD_TOKEN,
+                Interest::READABLE,
+            )?,
+            TIMERFD_TOKEN => self.poll.registry().register(
+                &mut time_source,
+                TIMERFD_TOKEN,
+                Interest::READABLE,
+            )?,
+            SOCKETFD_TOKEN => self.poll.registry().register(
+                &mut unix_source,
+                SOCKETFD_TOKEN,
+                Interest::READABLE,
+            )?,
+            _ => {
+                self.poll.registry().register(
+                    &mut signal_source,
+                    SIGNALFD_TOKEN,
+                    Interest::READABLE,
+                )?;
+                self.poll.registry().register(
+                    &mut time_source,
+                    TIMERFD_TOKEN,
+                    Interest::READABLE,
+                )?;
+                self.poll.registry().register(
+                    &mut unix_source,
+                    SOCKETFD_TOKEN,
+                    Interest::READABLE,
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn deregister(&mut self, token: Token) -> std::io::Result<()> {
+        let binding = self.signalfd.as_raw_fd();
+        let mut signal_source = SourceFd(&binding);
+        let binding = self.timerfd.as_raw_fd();
+        let mut time_source = SourceFd(&binding);
+        let binding = self.socketfd.as_raw_fd();
+        let mut unix_source = SourceFd(&binding);
+
+        match token {
+            SIGNALFD_TOKEN => self.poll.registry().deregister(&mut signal_source)?,
+            TIMERFD_TOKEN => self.poll.registry().deregister(&mut time_source)?,
+            SOCKETFD_TOKEN => self.poll.registry().deregister(&mut unix_source)?,
+            _ => {
+                self.poll.registry().deregister(&mut signal_source)?;
+                self.poll.registry().deregister(&mut time_source)?;
+                self.poll.registry().deregister(&mut unix_source)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn load_config(&mut self) -> std::io::Result<()> {
+        self.config = match InitConfig::load(None) {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("failed to load config, error: {:?}, ignored!", e);
+                return Ok(());
+            }
+        };
+        Ok(())
+    }
+
+    fn reap_zombie(&self) {
+        // peek signal
+        let flags = WaitPidFlag::WEXITED | WaitPidFlag::WNOHANG | WaitPidFlag::WNOWAIT;
+        loop {
+            let wait_status = match waitid(Id::All, flags) {
+                Ok(status) => status,
+                Err(_) => return,
+            };
+
+            let si = match wait_status {
+                WaitStatus::Exited(pid, code) => Some((pid, code, Signal::SIGCHLD)),
+                WaitStatus::Signaled(pid, signal, _dc) => Some((pid, -1, signal)),
+                _ => None, // ignore
+            };
+
+            // check
+            let (pid, _, _) = match si {
+                Some((pid, code, sig)) => (pid, code, sig),
+                None => {
+                    log::debug!("ignored child signal: {:?}!", wait_status);
+                    return;
+                }
+            };
+
+            if pid.as_raw() <= 0 {
+                log::debug!("pid:{:?} is invalid! ignored.", pid);
+                return;
+            }
+
+            // pop: recycle the zombie
+            if let Err(e) = waitid(Id::Pid(pid), WaitPidFlag::WEXITED) {
+                log::error!("error when reap the zombie({:?}), ignored: {:?}!", pid, e);
+            } else {
+                log::debug!("reap the zombie: {:?}.", pid);
+            }
+        }
+    }
+
+    pub fn handle_signal(&mut self) -> std::io::Result<()> {
+        let sig = match self.signalfd.read_signal()? {
+            Some(s) => s,
+            None => return Ok(()),
+        };
+        match Signal::try_from(sig.ssi_signo as i32)? {
+            Signal::SIGHUP => self.reload()?,
+            Signal::SIGINT => {
+                log::debug!("received SIGINT for pid({:?})", sig.ssi_pid);
+                self.exit(1);
+            }
+            Signal::SIGKILL => {
+                self.kill_sysmaster();
+            }
+            Signal::SIGTERM => self.state = InitState::Reexec,
+            Signal::SIGCHLD => self.reap_zombie(),
+            _ => {
+                log::debug!(
+                    "received signo {:?} for pid({:?}), ignored!",
+                    sig.ssi_signo,
+                    sig.ssi_pid
+                );
+            }
+        };
+        Ok(())
+    }
+
+    pub fn handle_timer(&mut self) -> std::io::Result<()> {
+        if self.config.timecnt == 0 {
+            log::error!(
+                "keepalive: we tried multiple times, and no longer start {:?}.",
+                self.config.bin
+            );
+            self.deregister(TIMERFD_TOKEN)?;
+            self.deregister(SOCKETFD_TOKEN)?;
+            return Ok(());
+        }
+
+        if self.online {
+            self.online = false;
+        } else {
+            self.start_bin();
+            self.config.timecnt -= 1;
+        }
+        self.timerfd.set(
+            Expiration::OneShot(TimeSpec::seconds(self.config.timewait as i64)),
+            TimerSetTimeFlags::empty(),
+        )?;
+        Ok(())
+    }
+
+    pub fn handle_socket(&mut self) -> std::io::Result<()> {
+        let (stream, _) = match self.socketfd.accept() {
+            Ok((connection, address)) => (connection, address),
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                // If we get a `WouldBlock` error we know our
+                // listener has no more incoming connections queued,
+                // so we can return to polling and wait for some
+                // more.
+                return Ok(());
+            }
+            Err(e) => {
+                // If it was any other kind of error, something went
+                // wrong and we terminate with an error.
+                log::error!("error accepting connection: {}!", e);
+                return Err(e);
+            }
+        };
+
+        let credentials = getsockopt(stream.as_raw_fd(), PeerCredentials)?;
+        let pid = credentials.pid() as u32;
+        if self.pid_is_running(pid) {
+            // If the incoming PID is not the monitored sysmaster,
+            // do not refresh the status.
+            self.online = true;
+            self.pid = pid;
+            log::debug!("keepalive: receive a heartbeat from pid({})!", pid);
+        }
+        Ok(())
+    }
+
+    fn pid_is_running(&self, pid: u32) -> bool {
+        let path = format!("/proc/{}/comm", pid);
+        let file = Path::new(&path);
+        if file.exists() {
+            let mut content = String::new();
+            let file = File::open(&file);
+            match file.map(|mut f| f.read_to_string(&mut content)) {
+                Ok(_) => (),
+                Err(_) => return false,
+            };
+            if content.starts_with("sysmaster") {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn start_bin(&mut self) {
+        // check sysmaster status, if it is running then sigterm it
+        if self.pid != 0 && (self.deserialize || self.kill_sysmaster()) {
+            return;
+        }
+
+        // else start the binary
+        let mut parts = self.config.bin.split_whitespace();
+        let command = match parts.next() {
+            Some(c) => c,
+            None => {
+                log::error!("wrong command: {:?}!", self.config.bin);
+                return;
+            }
+        };
+        let args: Vec<&str> = parts.collect();
+        if !Path::new(command).exists() {
+            log::error!("{:?} does not exest!", command);
+        }
+
+        let child_process = match Command::new(command).args(&args).spawn() {
+            Ok(child) => child,
+            Err(_) => {
+                log::error!("failed to spawn process: {:?}.", command);
+                return;
+            }
+        };
+
+        self.pid = child_process.id();
+        log::info!("success to start {}({}))!", self.config.bin, self.pid);
+    }
+
+    pub fn runloop(&mut self) -> std::io::Result<()> {
+        self.register(ALLFD_TOKEN)?;
+        let mut events = Events::with_capacity(16);
+
+        // event loop.
+        loop {
+            if !self.is_running() {
+                self.deregister(ALLFD_TOKEN)?;
+                break;
+            }
+
+            self.poll.poll(&mut events, None)?;
+
+            // Process each event.
+            for event in events.iter() {
+                match event.token() {
+                    SIGNALFD_TOKEN => self.handle_signal()?,
+                    TIMERFD_TOKEN => self.handle_timer()?,
+                    SOCKETFD_TOKEN => self.handle_socket()?,
+                    _ => unreachable!(),
+                }
+            }
+
+            #[cfg(test)]
+            self.set_state(InitState::Init);
+        }
+
+        Ok(())
     }
 
     pub fn is_running(&self) -> bool {
         self.state == InitState::Running
     }
 
-    pub fn socket(&self) -> String {
-        self.options.socket.clone()
-    }
-
-    pub fn bin(&self) -> String {
-        self.options.bin.clone()
-    }
-
-    pub fn pid(&self) -> i32 {
-        self.pid
-    }
-
-    pub fn set_pid(&mut self, pid: i32) {
-        self.pid = pid;
-    }
-
-    pub fn _state(&self) -> InitState {
-        self.state.clone()
-    }
-
     pub fn set_state(&mut self, state: InitState) {
         self.state = state;
     }
 
-    pub fn debug(&self) -> bool {
-        true
+    fn reload(&mut self) -> std::io::Result<()> {
+        log::info!("reloading init configuration!");
+        self.load_config()?;
+        Ok(())
     }
 
-    pub fn set_debug(&mut self, debug: bool) {
-        self.debug = debug;
+    pub fn is_reexec(&self) -> bool {
+        self.state == InitState::Reexec
     }
 
-    pub fn online(&self) -> bool {
-        self.online
-    }
-
-    pub fn set_online(&mut self, online: bool) {
-        self.online = online;
-    }
-
-    pub fn timecnt(&self) -> usize {
-        self.options.timecnt
-    }
-
-    pub fn timewait(&self) -> u64 {
-        self.options.timewait
-    }
-}
-
-async fn bootup() {
-    log::info!("bootup started.");
-    log::info!("bootup completed.");
-}
-
-fn rape_zombie() {
-    // peek signal
-    let flags = WaitPidFlag::WEXITED | WaitPidFlag::WNOHANG | WaitPidFlag::WNOWAIT;
-    loop {
-        let wait_status = match waitid(Id::All, flags) {
-            Ok(status) => status,
-            Err(_) => return,
+    pub fn reexec(&mut self) {
+        let exe = match std::env::current_exe().unwrap().file_name() {
+            Some(v) => v.to_string_lossy().to_string(),
+            None => "".to_string(),
         };
+        let pid = self.pid.to_string();
 
-        let si = match wait_status {
-            WaitStatus::Exited(pid, code) => Some((pid, code, Signal::SIGCHLD)),
-            WaitStatus::Signaled(pid, signal, _dc) => Some((pid, -1, signal)),
-            _ => None, // ignore
-        };
-
-        // check
-        let (pid, _, _) = match si {
-            Some((pid, code, sig)) => (pid, code, sig),
-            None => {
-                log::debug!("Ignored child signal: {:?}!", wait_status);
-                return;
-            }
-        };
-
-        if pid.as_raw() <= 0 {
-            log::debug!("pid:{:?} is invalid! Ignored it.", pid);
-            return;
-        }
-
-        // pop: recycle the zombie
-        if let Err(e) = waitid(Id::Pid(pid), WaitPidFlag::WEXITED) {
-            log::error!("Error when rape the zombie({:?}), ignoring: {:?}!", pid, e);
-        } else {
-            log::debug!("rape the zombie: pid:{:?}.", pid);
+        for arg0 in [&exe, "/init", "/sbin/init"] {
+            let argv = vec![
+                <&str>::clone(&arg0).to_string(),
+                "--pid".to_string(),
+                pid.clone(),
+            ];
+            let cstr_argv = argv
+                .iter()
+                .map(|str| std::ffi::CString::new(&**str).unwrap())
+                .collect::<Vec<_>>();
+            log::info!("reexecuting init, {:?}!", argv.as_slice());
+            if let Err(e) = execv(&CString::new(<&str>::clone(&arg0)).unwrap(), &cstr_argv) {
+                log::error!("execv {arg0:?} {argv:?} failed: {e}!");
+            };
         }
     }
-}
 
-async fn signald() {
-    let mut sigterm = signal(SignalKind::terminate()).unwrap();
-    let mut sigint = signal(SignalKind::interrupt()).unwrap();
-    let mut sigchld = signal(SignalKind::child()).unwrap();
-    let mut sighup = signal(SignalKind::hangup()).unwrap();
-    // let mut sigfault = signal(SignalKind::from_raw(9)).unwrap();
+    fn kill_sysmaster(&mut self) -> bool {
+        if self.pid_is_running(self.pid) {
+            let target_pid = Pid::from_raw(self.pid.try_into().unwrap());
 
-    loop {
-        if !runtime_read!().is_running() {
-            break;
-        }
-
-        tokio::select! {
-            _ = sigterm.recv() => {
-                runtime_write!().set_state(InitState::Reexec);
-            }
-            signal = sigint.recv() => {
-                if signal.is_some() {
-                println!("Received signal: SIGINT!");
-                    let debug = !runtime_read!().debug();
-                    runtime_write!().set_debug(debug);
-                    std::process::exit(-1);
-                }
-            }
-            _ = sigchld.recv() => {
-                rape_zombie();
-            }
-            _ = sighup.recv() => {
-                reload();
-            }
-        };
-    }
-}
-
-async fn keepalive() {
-    let rt_socket = runtime_read!().socket();
-    let rt_bin = runtime_read!().bin();
-
-    let sock_path = PathBuf::from(rt_socket.clone());
-    let path = sock_path.parent().unwrap();
-    if !path.exists() {
-        if let Err(e) = fs::create_dir_all(path) {
-            log::error!("Failed to create directory {path:?}: {e}!");
-            return;
-        }
-    }
-    if fs::metadata(sock_path.clone()).is_ok() {
-        let _ = fs::remove_file(sock_path);
-    }
-    let listener = Arc::new(UnixListener::bind(rt_socket.clone()).unwrap());
-
-    loop {
-        if !runtime_read!().is_running() {
-            break;
-        }
-
-        match listener.accept().await {
-            Ok((stream, _)) => {
-                // get pid of connection socket
-                let cred = stream.peer_cred().unwrap();
-                let pid = cred.pid().unwrap();
-                let rt_pid = runtime_read!().pid();
-                if pid == rt_pid {
-                    // If the incoming PID is not the monitored sysmaster,
-                    // do not refresh the status.
-                    runtime_write!().set_online(true);
-                    log::debug!(
-                        "Keepalive:  receive a heartbeat from  {} ({})!",
-                        rt_bin,
-                        pid
+            match kill(target_pid, Signal::SIGTERM) {
+                Ok(_) => {
+                    log::info!(
+                        "timeout, send SIGTERM to {} ({})!",
+                        self.config.bin,
+                        self.pid
                     );
+                    return true;
                 }
+                Err(err) => log::error!(
+                    "timeout, failed to send SIGTERM to {} ({}), {}, ignore!",
+                    self.config.bin,
+                    self.pid,
+                    err
+                ),
             }
-            Err(e) => log::error!("Error accepting connection: {}!", e),
         }
+        false
     }
-    let _ = fs::remove_file(rt_socket);
+
+    fn exit(&self, i: i32) {
+        std::process::exit(i);
+    }
 }
 
-async fn watchdog() {
-    let mut rt_timecnt = runtime_read!().timecnt();
-    let rt_timewait = runtime_read!().timewait();
-    let rt_bin = runtime_read!().bin();
-
-    loop {
-        if !runtime_read!().is_running() || rt_timecnt == 0 {
-            break;
-        }
-
-        if !(runtime_read!().online()) {
-            // False for two consecutive times,
-            // indicating an abnormal state of sysmaster.
-            check_bin().await;
-            rt_timecnt -= 1;
-            #[cfg(test)]
-            runtime_write!().set_online(true);
-        } else {
-            runtime_write!().set_online(false);
-        }
-
-        sleep(Duration::from_secs(rt_timewait)).await;
+fn prepare_init() {
+    // version
+    let version = env!("CARGO_PKG_VERSION");
+    log::info!("sysMaster init version: {}", version);
+    let args: Vec<String> = std::env::args().collect();
+    if args.contains(&String::from("--version")) || args.contains(&String::from("-V")) {
+        println!("sysMaster init version: {}!", version);
+        std::process::exit(0);
     }
-    log::info!(
-        "Restarted {} {} times, {} seconds each time, will not continue.",
-        rt_bin,
-        rt_timecnt,
-        rt_timewait
+
+    // common umask
+    let mode = Mode::from_bits_truncate(0o77);
+    umask(umask(mode) | Mode::from_bits_truncate(0o22));
+
+    // euid check
+    #[cfg(not(test))]
+    if unistd::geteuid() != Uid::from_raw(0) {
+        log::error!("must be superuser.");
+        std::process::exit(1);
+    }
+
+    if unistd::getpid() != Pid::from_raw(1) {
+        log::info!("running in the test mode.");
+    }
+}
+
+fn reset_all_signal_handlers() {
+    // Create an empty signal set
+    let mut sigset = SigSet::empty();
+
+    // Add all signals to the signal set
+    for sig in signal::Signal::iterator() {
+        if sig == signal::Signal::SIGKILL || sig == signal::Signal::SIGSTOP {
+            continue; // Do not allow ignoring SIGKILL and SIGSTOP signals
+        }
+        sigset.add(sig);
+    }
+
+    // Set the signal handler to be ignored
+    let sig_action = SigAction::new(SigHandler::SigIgn, SaFlags::SA_RESTART, SigSet::empty());
+    for sig in sigset.iter() {
+        unsafe {
+            signal::sigaction(sig, &sig_action).expect("failed to set signal handler!");
+        }
+    }
+}
+
+extern "C" fn crash_handler(_signal: i32) {
+    log::error!("crash_handler");
+}
+
+fn install_crash_handler() {
+    let signals_crash_handler = [
+        signal::SIGSEGV,
+        signal::SIGILL,
+        signal::SIGFPE,
+        signal::SIGBUS,
+        signal::SIGABRT,
+    ];
+    let sig_action = SigAction::new(
+        SigHandler::Handler(crash_handler),
+        SaFlags::SA_SIGINFO | SaFlags::SA_NODEFER,
+        SigSet::empty(),
     );
-}
 
-async fn check_bin() {
-    // check sysmaster status, if it is running then sigterm it
-    let rt_pid = runtime_read!().pid();
-    let rt_bin = runtime_read!().bin();
-    if rt_pid != 0 {
-        if let Ok(process) = Process::new(rt_pid as u32) {
-            if process.is_running() {
-                _ = process.terminate();
-                log::info!("Timeout: send SIGTERM to {} ({})!", rt_bin, rt_pid);
-                return;
-            }
+    for sig in signals_crash_handler {
+        unsafe {
+            signal::sigaction(sig, &sig_action).expect("Failed to set crash signal handler!");
         }
-    }
-
-    // else start the binary
-    let mut parts = rt_bin.split_whitespace();
-    let command = match parts.next() {
-        Some(c) => c,
-        None => {
-            log::error!("Wrong command: {:?}!", rt_bin);
-            return;
-        }
-    };
-    let args: Vec<&str> = parts.collect();
-    if !Path::new(command).exists() {
-        log::error!("{:?} does not exest!", command);
-    }
-
-    let child_process = match Command::new(command).args(&args).spawn() {
-        Ok(child) => child,
-        Err(_) => {
-            log::error!("Failed to spawn process: {:?}.", command);
-            return;
-        }
-    };
-
-    if let Some(pid) = child_process.id() {
-        runtime_write!().set_pid(pid as i32);
-        log::info!("Startup: start {}({}))!", rt_bin, pid);
     }
 }
 
-fn prepare_init() {}
-fn reset_all_signal_handlers() {}
-fn install_crash_handler() {}
-fn reexec() {}
-fn reload() {}
 fn shutdown_init() {
     nix::unistd::sync();
+    log::info!("shutdowning init");
 }
 
-#[tokio::main]
-async fn main() -> std::io::Result<()> {
-    InitLog::init(LevelFilter::Info);
+fn main() -> std::io::Result<()> {
+    match kernlog::init() {
+        Ok(_) => (),
+        Err(e) => panic!("Unsupported when cannot log into /dev/kmsg : {e:?}!"),
+    };
+
     prepare_init();
+
     reset_all_signal_handlers();
     install_crash_handler();
 
-    runtime_write!().set_state(InitState::Running);
-    let bootup_handle = tokio::spawn(async move { bootup().await });
-    let signald_handle = tokio::spawn(async move { signald().await });
-    let keepalive_handle = tokio::spawn(async move { keepalive().await });
-    let watchdog_handle = tokio::spawn(async move { watchdog().await });
+    let mut rt = Runtime::new()?;
+    rt.set_state(InitState::Running);
 
-    _ = tokio::join!(
-        bootup_handle,
-        signald_handle,
-        keepalive_handle,
-        watchdog_handle
-    );
+    rt.runloop()?;
 
-    log::info!("all tasks completed!");
-
-    reexec();
-
+    if rt.is_reexec() {
+        rt.reexec();
+    }
     shutdown_init();
     Ok(())
 }
 
 #[cfg(test)]
-mod test {
-    use std::{os::unix::net::UnixStream, time::Duration};
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
 
-    use nix::{
-        sys::signal::{kill, Signal},
-        unistd::Pid,
-    };
-    use tokio::time::sleep;
-
-    use crate::{keepalive, watchdog};
-    use crate::{signald, InitState};
-
-    #[tokio::test]
-    async fn test_watchdog() {
-        runtime_write!().set_state(InitState::Running);
-        runtime_write!().set_online(false);
-        watchdog().await;
-        assert!(runtime_read!().online());
+    #[test]
+    fn test_runtime() -> std::io::Result<()> {
+        let mut rt = Runtime::new()?;
+        rt.set_state(InitState::Running);
+        rt.config.timewait = 0;
+        rt.runloop()?;
+        assert_ne!(rt.timerfd.as_raw_fd(), 0);
+        assert_ne!(rt.signalfd.as_raw_fd(), 0);
+        assert_ne!(rt.socketfd.as_raw_fd(), 0);
+        fs::remove_file("init.sock").unwrap();
+        Ok(())
     }
 
-    #[tokio::test]
-    // In tests, signal handling is controlled and cannot be easily tested.
-    async fn test_signald() {
-        runtime_write!().set_state(InitState::Running);
-        let handle1 = tokio::spawn(async move {
-            loop {
-                sleep(Duration::from_millis(100)).await;
-
-                match kill(Pid::this(), Signal::SIGTERM) {
-                    Ok(_) => log::info!("Signal sent successfully."),
-                    Err(err) => log::error!("Failed to send signal: {}", err),
-                }
-            }
-        });
-        let handle2 = tokio::spawn(async move { signald().await });
-        tokio::select! {
-            _ = handle1 => { }
-            _ = handle2 => { }
-        };
-        assert_eq!(runtime_read!().state, InitState::Reexec);
+    #[test]
+    fn test_default_config() {
+        let config = InitConfig::default();
+        assert_eq!(config.timecnt, 10);
+        assert_eq!(config.timewait, 90);
+        assert_eq!(config.bin, "/usr/lib/sysmaster/sysmaster");
     }
 
-    #[tokio::test]
-    async fn test_keepalive() {
-        runtime_write!().set_state(InitState::Running);
-        let client = tokio::task::spawn(async move {
-            #[allow(unused_assignments)]
-            let mut connected = false;
-            loop {
-                sleep(Duration::from_millis(100)).await;
-                match UnixStream::connect(runtime_read!().socket()) {
-                    Ok(_) => {
-                        connected = true;
-                        break;
-                    }
-                    Err(_) => continue,
-                };
-            }
-            assert!(connected);
-        });
+    #[test]
+    fn test_load_fail_defconfig() {
+        let config = InitConfig::load(Some("/path/to/init.conf".to_string())).unwrap();
+        assert_eq!(config.timecnt, 10);
+        assert_eq!(config.timewait, 90);
+        assert_eq!(config.bin, "/usr/lib/sysmaster/sysmaster");
+    }
 
-        let server = tokio::spawn(async move { keepalive().await });
-        tokio::select! {
-            _ = server => { }
-            _ = client => { }
+    #[test]
+    fn test_load_success_config() {
+        let content = "
+#[config(default = 10)]
+timecnt = 9
+#[config(default = 90)]
+    timewait =1
+#[config(default = \"/usr/lib/sysmaster/sysmaster\")]
+bin = /bin/ls
+#[config(default = \"/run/sysmaster/init.sock\")]
+socket = init.sock
+";
+        let file_path = "./src/init.conf";
+
+        if let Ok(mut file) = File::create(file_path) {
+            if let Err(err) = file.write_all(content.as_bytes()) {
+                eprintln!("Write file error: {}.", err);
+            } else {
+                println!("Success to write.");
+            }
+        } else {
+            eprintln!("Failed to write file.");
         }
+        let config = InitConfig::load(Some(file_path.to_string())).unwrap();
+        assert_eq!(config.timecnt, 9);
+        assert_eq!(config.timewait, 1);
+        assert_eq!(config.bin, "/bin/ls");
+        fs::remove_file(file_path).unwrap();
+    }
+
+    #[test]
+    fn test_main() {
+        prepare_init();
+
+        reset_all_signal_handlers();
+        install_crash_handler();
+        let mut rt = Runtime::new().unwrap();
+        rt.set_state(InitState::Running);
+
+        rt.runloop().unwrap();
+
+        if rt.is_reexec() {
+            rt.reexec();
+        }
+        shutdown_init();
     }
 }
