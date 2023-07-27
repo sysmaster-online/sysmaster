@@ -144,8 +144,8 @@ impl Condition {
 
     fn test_capability(&self) -> i8 {
         let values = match caps::Capability::from_str(&self.params) {
-            Err(_) => {
-                log::info!("Failed to parse ConditionCapability values: {}, assuming ConditionCapability check failed", self.params);
+            Err(e) => {
+                log::error!("Failed to parse ConditionCapability values: {}, assuming ConditionCapability check failed:{}", self.params,e);
                 return 0;
             }
             Ok(v) => v,
@@ -153,7 +153,7 @@ impl Condition {
 
         let file = match File::open("/proc/self/status") {
             Err(_) => {
-                log::info!(
+                log::error!(
                     "Failed to open /proc/self/status, assuming ConditionCapability check failed."
                 );
                 return 0;
@@ -166,7 +166,7 @@ impl Condition {
         for line in reader.lines() {
             let line = match line {
                 Err(_) => {
-                    log::info!("Failed to read /proc/self/status, assuming ConditionCapability check failed.");
+                    log::error!("Failed to read /proc/self/status, assuming ConditionCapability check failed.");
                     return 0;
                 }
                 Ok(v) => v,
@@ -176,7 +176,9 @@ impl Condition {
             }
             match u64::from_str_radix(line.trim_start_matches(p).trim_start(), 16) {
                 Err(_) => {
-                    log::info!("Failed to parse CapBnd, assuming ConditionCapability check failed");
+                    log::error!(
+                        "Failed to parse CapBnd, assuming ConditionCapability check failed"
+                    );
                     return 0;
                 }
                 Ok(v) => {
@@ -186,6 +188,7 @@ impl Condition {
             };
         }
 
+        log::debug!("capability {}{}", cap_bitmask, values);
         let res = cap_bitmask & values.bitmask();
         (res != 0) as i8
     }
@@ -324,6 +327,12 @@ impl Condition {
              * check if the path is a mount point, and chase the
              * symlink unconditionally*/
             statx(fd, path_name.as_ptr(), 0, 0, &mut statxbuf);
+            log::debug!(
+                "{} attributes_mask {},stx_attributes{}",
+                self.params,
+                statxbuf.stx_attributes_mask & (STATX_ATTR_MOUNT_ROOT as u64),
+                statxbuf.stx_attributes & (STATX_ATTR_MOUNT_ROOT as u64)
+            );
             /* The mask is supported and is set */
             i8::from(
                 statxbuf.stx_attributes_mask & (STATX_ATTR_MOUNT_ROOT as u64) != 0
@@ -429,54 +438,376 @@ impl Condition {
 #[cfg(test)]
 mod test {
     use super::{Condition, ConditionType};
-    use crate::{logger, proc_cmdline};
-    use libtests::get_project_root;
-    use std::path::Path;
+    use crate::{
+        file_util::write_string_file,
+        logger, proc_cmdline,
+        security::{self},
+    };
+    use core::panic;
+    use std::{env, fs, path::Path};
+    use tempfile::NamedTempFile;
+
+    fn setup(_type: ConditionType, trigger: i8, revert: i8, params: String) -> Condition {
+        logger::init_log_to_console("test_condition", log::LevelFilter::Debug);
+        Condition::new(_type, trigger, revert, params)
+    }
+
+    fn teardown() {}
+
+    fn run_test<T>(test: T, c_type: ConditionType, trigger: i8, revert: i8, params: String)
+    where
+        T: FnOnce(Condition) -> () + panic::UnwindSafe,
+    {
+        let c = setup(c_type, trigger, revert, params);
+        let result = std::panic::catch_unwind(|| {
+            test(c);
+        });
+        teardown();
+        assert!(result.is_ok());
+    }
 
     #[test]
-    fn test_condition_test() {
-        logger::init_log_to_console("test_condition", log::LevelFilter::Debug);
-        let project_root = get_project_root().unwrap();
-        let cond_path_not_exists = Condition::new(
+    fn test_ac_power_false() {
+        run_test(
+            |x| {
+                let result = x.test();
+                assert!(!result, "cond_ac power test false");
+            },
+            ConditionType::ACPower,
+            0,
+            0,
+            String::from("false"),
+        );
+    }
+
+    #[test]
+    fn test_ac_power_true() {
+        run_test(
+            |c| {
+                let result = c.test();
+                assert!(result, "cond ac power test true");
+            },
+            ConditionType::ACPower,
+            0,
+            0,
+            String::from("true"),
+        );
+    }
+
+    #[test]
+    fn test_capability() {
+        run_test(
+            |c: Condition| {
+                let result = c.test();
+                assert!(result, "test capability {} true", c.params);
+            },
+            ConditionType::Capability,
+            0,
+            0,
+            String::from("CAP_CHOWN"),
+        );
+    }
+
+    #[test]
+    fn test_directory_not_empty() {
+        run_test(
+            |c: Condition| {
+                let result = c.test();
+                assert!(
+                    result,
+                    "test test_directory_not_empty,directoy is:{}",
+                    c.params
+                );
+            },
+            ConditionType::DirectoryNotEmpty,
+            0,
+            0,
+            String::from(env::temp_dir().to_str().unwrap()),
+        )
+    }
+
+    #[test]
+    fn test_directory_notempty_empty() {
+        let tmp = env::temp_dir();
+        let mut path: String = String::from(tmp.to_str().unwrap());
+        path.push_str("/empty_test");
+        let p: &Path = Path::new(path.as_str());
+        fs::create_dir(p).unwrap();
+        run_test(
+            |c: Condition| {
+                let result = c.test();
+                fs::remove_dir(p).unwrap();
+                assert!(
+                    !result,
+                    "test test_directory_notempty_empty,directoy is: {}",
+                    c.params
+                );
+            },
+            ConditionType::DirectoryNotEmpty,
+            0,
+            0,
+            String::from(path.as_str()),
+        )
+    }
+
+    #[test]
+    fn test_directory_noempty_is_not_dir() {
+        let tmp_file: NamedTempFile = NamedTempFile::new().unwrap();
+        run_test(
+            |c: Condition| {
+                assert!(
+                    !c.test(),
+                    "test test_directory_noempty_is_not_dir,directoy is: {}",
+                    c.params
+                );
+            },
+            ConditionType::DirectoryNotEmpty,
+            0,
+            0,
+            String::from(tmp_file.path().to_str().unwrap()),
+        )
+    }
+
+    #[test]
+    fn test_condition_path_no_exists() {
+        run_test(
+            |c| {
+                assert!(!c.test(), "test_condition_path_no_exists {}", c.params);
+            },
             ConditionType::PathExists,
             0,
             0,
             "/home/a_usually_not_existent_file".to_string(),
         );
-        let f_result = cond_path_not_exists.test();
-        assert!(!f_result);
-        log::debug!("project root {:?}", project_root);
-        let cond_path_exists = Condition::new(
+    }
+
+    #[test]
+    fn test_condition_path_exists() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path();
+        run_test(
+            |c: Condition| {
+                let t_result = c.test();
+                assert!(t_result, "condition_path is exists {}", c.params);
+            },
             ConditionType::PathExists,
             0,
             0,
-            project_root.to_str().unwrap().to_string(),
+            String::from(path.to_str().unwrap()),
         );
-        let t_result = cond_path_exists.test();
-        assert!(t_result, "condition_path exists is not true");
-        let cond_path_exists_revert = Condition::new(
+    }
+
+    #[test]
+    fn test_condition_path_exists_revert() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path();
+        run_test(
+            |c: Condition| {
+                assert!(
+                    !c.test(),
+                    "condition test path exist revert error {}",
+                    c.params
+                );
+            },
             ConditionType::PathExists,
             0,
             1,
-            project_root.to_str().unwrap().to_string(),
+            String::from(path.to_str().unwrap()),
         );
-        let f_result = cond_path_exists_revert.test();
-        assert!(!f_result, "condition test path exist revert error");
-        let cond_file_not_empty = Condition::new(
-            ConditionType::FileNotEmpty,
-            0,
-            0,
-            project_root.to_str().unwrap().to_string() + "/Cargo.lock",
-        );
-        assert!(cond_file_not_empty.test(), "cond test file not empty");
+    }
 
-        let cond_file_empty = Condition::new(
+    #[test]
+    fn test_condition_test_file_not_empty() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path();
+        let _ = write_string_file(path, String::from("Hello world"));
+        run_test(
+            |c: Condition| {
+                assert!(c.test(), "cond test file not empty");
+            },
             ConditionType::FileNotEmpty,
             0,
             0,
-            project_root.to_str().unwrap().to_string(),
+            String::from(path.to_str().unwrap()),
         );
-        assert!(!cond_file_empty.test(), "cond test file empty");
+    }
+
+    #[test]
+    fn test_condition_test_file_empty() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path();
+        run_test(
+            |c| {
+                assert!(!c.test(), "cond test file empty");
+            },
+            ConditionType::FileNotEmpty,
+            0,
+            0,
+            String::from(path.to_str().unwrap()),
+        );
+    }
+
+    #[test]
+    fn test_file_is_not_executable() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path();
+        run_test(
+            |c| {
+                assert!(!c.test(), "test_file_is_executable {}", c.params);
+            },
+            ConditionType::FileIsExecutable,
+            0,
+            0,
+            String::from(path.to_str().unwrap()),
+        )
+    }
+    #[test]
+    fn test_security_selinux() {
+        run_test(
+            |c: Condition| {
+                assert_eq!(
+                    c.test(),
+                    security::selinux_enabled(),
+                    "test for security {}",
+                    c.params
+                );
+            },
+            ConditionType::Security,
+            0,
+            0,
+            String::from("selinux"),
+        );
+    }
+
+    #[test]
+    fn test_secuirty_appamgr() {
+        let policy = String::from("apparmor");
+        run_test(
+            |c: Condition| {
+                assert_eq!(
+                    c.test(),
+                    security::apparmor_enabled(),
+                    "test for security {}",
+                    c.params
+                );
+            },
+            ConditionType::Security,
+            0,
+            0,
+            policy,
+        );
+    }
+
+    #[test]
+    fn test_secuirty_tomoyo() {
+        let policy = String::from("tomoyo");
+        run_test(
+            |c: Condition| {
+                assert_eq!(
+                    c.test(),
+                    security::tomoyo_enabled(),
+                    "test for security {}",
+                    c.params
+                );
+            },
+            ConditionType::Security,
+            0,
+            0,
+            policy,
+        );
+    }
+    #[test]
+    fn test_secuirty_ima() {
+        let policy = String::from("ima");
+        run_test(
+            |c: Condition| {
+                assert_eq!(
+                    c.test(),
+                    security::ima_enabled(),
+                    "test for security {}",
+                    c.params
+                );
+            },
+            ConditionType::Security,
+            0,
+            0,
+            policy,
+        );
+    }
+
+    #[test]
+    fn test_secuirty_smack() {
+        let policy = String::from("smack");
+        run_test(
+            |c: Condition| {
+                assert_eq!(
+                    c.test(),
+                    security::smack_enabled(),
+                    "test for security {}",
+                    c.params
+                );
+            },
+            ConditionType::Security,
+            0,
+            0,
+            policy,
+        );
+    }
+
+    #[test]
+    fn test_secuirty_audit() {
+        let policy = String::from("audit");
+        run_test(
+            |c: Condition| {
+                assert_eq!(
+                    c.test(),
+                    security::audit_enabled(),
+                    "test for security {}",
+                    c.params
+                );
+            },
+            ConditionType::Security,
+            0,
+            0,
+            policy,
+        );
+    }
+
+    #[test]
+    fn test_secuirty_uefi_secureboot() {
+        let policy = String::from("uefi-secureboot");
+        run_test(
+            |c: Condition| {
+                assert_eq!(
+                    c.test(),
+                    security::uefi_secureboot_enabled(),
+                    "test for security {}",
+                    c.params
+                );
+            },
+            ConditionType::Security,
+            0,
+            0,
+            policy,
+        );
+    }
+    #[test]
+    fn test_secuirty_tpm2() {
+        let policy = String::from("tpm2");
+        run_test(
+            |c: Condition| {
+                assert_eq!(
+                    c.test(),
+                    security::tpm2_enabled(),
+                    "test for security {}",
+                    c.params
+                );
+            },
+            ConditionType::Security,
+            0,
+            0,
+            policy,
+        );
     }
 
     #[test]
@@ -485,56 +816,166 @@ mod test {
             return;
         }
 
-        let root_user = "root";
-        let cond_user_root_username =
-            Condition::new(ConditionType::User, 0, 0, root_user.to_string());
-        assert!(cond_user_root_username.test(), "cond root username");
+        run_test(
+            |c| {
+                assert!(c.test(), "cond root username");
+            },
+            ConditionType::User,
+            0,
+            0,
+            "root".to_string(),
+        );
 
-        let root_user_num = "0";
-        let cond_user_root_username_num =
-            Condition::new(ConditionType::User, 0, 0, root_user_num.to_string());
-        assert!(cond_user_root_username_num.test(), "cond root username");
+        run_test(
+            |c| {
+                assert!(c.test(), "cond root userid");
+            },
+            ConditionType::User,
+            0,
+            0,
+            "0".to_string(),
+        );
 
         let fake_user = "fake";
-        let cond_user_fake_username =
-            Condition::new(ConditionType::User, 0, 0, fake_user.to_string());
-        assert!(!cond_user_fake_username.test(), "cond fake username");
 
-        let fake_user_num = "1234";
-        let cond_user_fake_username_num =
-            Condition::new(ConditionType::User, 0, 0, fake_user_num.to_string());
-        assert!(!cond_user_fake_username_num.test(), "cond fake username");
+        run_test(
+            |c| {
+                assert!(!c.test(), "cond fake username");
+            },
+            ConditionType::User,
+            0,
+            0,
+            fake_user.to_string(),
+        );
 
-        let system_str = "@system";
-        let cond_user_system_str =
-            Condition::new(ConditionType::User, 0, 0, system_str.to_string());
-        assert!(cond_user_system_str.test(), "cond system username");
+        run_test(
+            |c| {
+                assert!(!c.test(), "cond fake userid");
+            },
+            ConditionType::User,
+            0,
+            0,
+            "1234".to_string(),
+        );
+
+        run_test(
+            |c| {
+                assert!(c.test(), "cond system username");
+            },
+            ConditionType::User,
+            0,
+            0,
+            "@system".to_string(),
+        );
+    }
+
+    #[test]
+    fn test_kernel_command_line() {
+        run_test(
+            |c| {
+                assert!(c.test(), "test kernel_command_line {}", c.params);
+            },
+            ConditionType::KernelCommandLine,
+            0,
+            0,
+            String::from("root=/dev/mapper/openeuler-root"),
+        );
+    }
+
+    #[test]
+    fn test_path_is_directory() {
+        run_test(
+            |c| {
+                assert!(c.test(), "test path is directory {}", c.params);
+            },
+            ConditionType::PathIsDirectory,
+            0,
+            0,
+            String::from(env::temp_dir().to_str().unwrap()),
+        );
+    }
+
+    #[test]
+    fn test_path_is_mount_point() {
+        run_test(
+            |c| {
+                //test mount point is not correct need modify
+                assert!(!c.test(), "test_path_is_mount_point {}", c.params);
+            },
+            ConditionType::PathIsMountPoint,
+            0,
+            0,
+            String::from("/dev/mapper/openeuler-root"),
+        );
+    }
+
+    #[test]
+    fn test_path_is_not_mount_point() {
+        run_test(
+            |c| {
+                assert!(!c.test(), "test_path_is_not_mount_point {}", c.params);
+            },
+            ConditionType::PathIsMountPoint,
+            0,
+            0,
+            String::from("/home/aaaa"),
+        );
     }
 
     #[test]
     fn test_condition_first_boot() {
-        if let Ok(ret) = proc_cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot") {
-            if ret {
-                println!(
-                    "this test cannot be tested because we cannot modify the kernel parameters"
-                );
-                return;
-            }
-        }
+        run_test(
+            |c| {
+                if let Ok(ret) =
+                    proc_cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot")
+                {
+                    if ret {
+                        log::info!(
+                            "this test cannot be tested because we cannot modify the kernel parameters"
+                        );
+                        assert!(true);
+                    }
+                }
 
-        let existed = Path::new("/run/sysmaster/first-boot").exists();
-        let cond_first_boot_true =
-            Condition::new(ConditionType::FirstBoot, 0, 0, String::from("true"));
-        let cond_first_boot_false =
-            Condition::new(ConditionType::FirstBoot, 0, 0, String::from("false"));
-        if existed {
-            println!("file is existed");
-            assert!(cond_first_boot_true.test(), "file should be existed");
-            assert!(!cond_first_boot_false.test(), "file should be existed");
-        } else {
-            println!("file is no existed");
-            assert!(!cond_first_boot_true.test(), "file should not be existed");
-            assert!(cond_first_boot_false.test(), "file should not be existed");
-        }
+                let existed = Path::new("/run/sysmaster/first-boot").exists();
+                if existed {
+                    assert!(c.test(), "file should be existed{}", c.params);
+                } else {
+                    assert!(!c.test(), "file should not be existed{}", c.params);
+                }
+            },
+            ConditionType::FirstBoot,
+            0,
+            0,
+            String::from("true"),
+        );
+    }
+    #[test]
+    fn test_condition_first_boot_false() {
+        run_test(
+            |c| {
+                if let Ok(ret) =
+                    proc_cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot")
+                {
+                    if ret {
+                        log::info!(
+                            "this test cannot be tested because we cannot modify the kernel parameters"
+                        );
+                        assert!(true);
+                    }
+                }
+
+                let existed = Path::new("/run/sysmaster/first-boot").exists();
+                if existed {
+                    assert!(!c.test(), "file should be existed{}", c.params);
+                } else {
+                    assert!(c.test(), "file should not be existed{}", c.params);
+                }
+            },
+            ConditionType::FirstBoot,
+            0,
+            0,
+            String::from("false"),
+        );
     }
 }
