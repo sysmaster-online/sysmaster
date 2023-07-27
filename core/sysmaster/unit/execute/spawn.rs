@@ -114,7 +114,7 @@ fn apply_working_directory(working_directory: WorkingDirectory) -> Result<()> {
             return Err(Error::Io { source: e });
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 fn setup_exec_directory(

@@ -228,9 +228,9 @@ where
     };
 
     if path_is_abosolute(&s) {
-        return Ok(PathBuf::from(s));
+        Ok(PathBuf::from(s))
     } else {
-        return Ok(Path::new(EXEC_RUNTIME_PREFIX).join(s));
+        Ok(Path::new(EXEC_RUNTIME_PREFIX).join(s))
     }
 }
 
@@ -310,13 +310,13 @@ mod test {
 }
 
 fn is_valid_exec_directory(s: &str) -> bool {
-    if !path_name_is_safe(&s) {
+    if !path_name_is_safe(s) {
         return false;
     }
-    if !path_length_is_valid(&s) {
+    if !path_length_is_valid(s) {
         return false;
     }
-    if path_is_abosolute(&s) {
+    if path_is_abosolute(s) {
         return false;
     }
     true
@@ -329,13 +329,13 @@ where
     let s = String::deserialize(de)?;
     let mut res = RuntimeDirectory::default();
     for d in s.split_terminator(';') {
-        if !is_valid_exec_directory(&d) {
-            return Err(de::Error::invalid_value(Unexpected::Str(&s), &""));
+        if !is_valid_exec_directory(d) {
+            return Err(de::Error::invalid_value(Unexpected::Str(d), &""));
         }
 
-        let path = match path_simplify(&d) {
+        let path = match path_simplify(d) {
             None => {
-                return Err(de::Error::invalid_value(Unexpected::Str(&d), &""));
+                return Err(de::Error::invalid_value(Unexpected::Str(d), &""));
             }
             Some(v) => v,
         };
@@ -354,13 +354,13 @@ where
     let s = String::deserialize(de)?;
     let mut res = StateDirectory::default();
     for d in s.split_terminator(';') {
-        if !is_valid_exec_directory(&d) {
-            return Err(de::Error::invalid_value(Unexpected::Str(&s), &""));
+        if !is_valid_exec_directory(d) {
+            return Err(de::Error::invalid_value(Unexpected::Str(d), &""));
         }
 
-        let path = match path_simplify(&d) {
+        let path = match path_simplify(d) {
             None => {
-                return Err(de::Error::invalid_value(Unexpected::Str(&d), &""));
+                return Err(de::Error::invalid_value(Unexpected::Str(d), &""));
             }
             Some(v) => v,
         };

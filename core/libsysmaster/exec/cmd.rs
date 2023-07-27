@@ -162,7 +162,7 @@ fn parse_exec(s: &str) -> Result<VecDeque<ExecCommand>> {
         let content = s.split_at(argv_start).1;
         if content.is_empty() {
             res.push_back(ExecCommand {
-                path: path,
+                path,
                 argv: vec![],
                 flags,
             });

@@ -121,76 +121,61 @@ impl DeserializeWith for Rlimit {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// WorkingDirectory of ExecContext
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct WorkingDirectory {
     directory: Option<PathBuf>,
     miss_ok: bool,
 }
 
-impl Default for WorkingDirectory {
-    fn default() -> Self {
-        Self {
-            directory: None,
-            miss_ok: false,
-        }
-    }
-}
-
 impl WorkingDirectory {
+    ///
     pub fn new(directory: Option<PathBuf>, miss_ok: bool) -> Self {
         Self { directory, miss_ok }
     }
 
+    ///
     pub fn directory(&self) -> Option<PathBuf> {
         self.directory.clone()
     }
 
+    ///
     pub fn miss_ok(&self) -> bool {
         self.miss_ok
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// RuntimeDirectory of ExecContext
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct RuntimeDirectory {
     directory: Vec<PathBuf>,
 }
 
-impl Default for RuntimeDirectory {
-    fn default() -> Self {
-        Self {
-            directory: Vec::new(),
-        }
-    }
-}
-
 impl RuntimeDirectory {
+    ///
     pub fn add_directory(&mut self, directory: PathBuf) {
         self.directory.push(directory);
     }
 
+    ///
     pub fn directory(&self) -> Vec<PathBuf> {
         self.directory.clone()
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// StateDirectory of ExecContext
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct StateDirectory {
     directory: Vec<PathBuf>,
 }
 
-impl Default for StateDirectory {
-    fn default() -> Self {
-        Self {
-            directory: Vec::new(),
-        }
-    }
-}
-
 impl StateDirectory {
+    ///
     pub fn add_directory(&mut self, directory: PathBuf) {
         self.directory.push(directory);
     }
 
+    ///
     pub fn directory(&self) -> Vec<PathBuf> {
         self.directory.clone()
     }
@@ -297,34 +282,42 @@ impl ExecContext {
         Ok(())
     }
 
+    ///
     pub fn set_root_directory(&self, root_diretory: Option<PathBuf>) {
         *self.root_directory.borrow_mut() = root_diretory;
     }
 
+    ///
     pub fn root_directory(&self) -> Option<PathBuf> {
         self.root_directory.borrow().clone()
     }
 
+    ///
     pub fn set_working_directory(&self, working_directory: WorkingDirectory) {
         *self.working_directory.borrow_mut() = working_directory;
     }
 
+    ///
     pub fn working_directory(&self) -> WorkingDirectory {
         self.working_directory.borrow().clone()
     }
 
+    ///
     pub fn set_runtime_directory(&self, runtime_directory: RuntimeDirectory) {
         *self.runtime_directory.borrow_mut() = runtime_directory;
     }
 
+    ///
     pub fn runtime_directory(&self) -> RuntimeDirectory {
         self.runtime_directory.borrow().clone()
     }
 
+    ///
     pub fn set_state_directory(&self, state_directory: StateDirectory) {
         *self.state_directory.borrow_mut() = state_directory;
     }
 
+    ///
     pub fn state_directory(&self) -> StateDirectory {
         self.state_directory.borrow().clone()
     }
