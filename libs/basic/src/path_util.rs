@@ -14,6 +14,8 @@
 //!
 use std::path::Path;
 
+use crate::Error;
+
 /// The maximum length of a linux path
 pub const PATH_LENGTH_MAX: usize = 4096;
 
@@ -126,6 +128,41 @@ pub fn path_simplify(p: &str) -> Option<String> {
     return Some(res);
 }
 
+pub fn path_is_abosolute(s: &str) -> bool {
+    s.starts_with('/')
+}
+
+pub fn parse_path_common(s: &str) -> Result<String, Error> {
+    if !path_name_is_safe(&s) {
+        return Err(Error::Invalid {
+            what: "path contains unsafe character".to_string(),
+        });
+    }
+
+    if !path_length_is_valid(&s) {
+        return Err(Error::Invalid {
+            what: "path is too long or empty".to_string(),
+        });
+    }
+
+    if !path_is_abosolute(&s) {
+        return Err(Error::Invalid {
+            what: "path is not abosolute".to_string(),
+        });
+    }
+
+    let path = match path_simplify(&s) {
+        None => {
+            return Err(Error::Invalid {
+                what: "path can't be simplified".to_string(),
+            });
+        }
+        Some(v) => v,
+    };
+
+    Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,5 +241,12 @@ mod tests {
         assert_eq!(path_simplify("a/b/../../../c/d").unwrap(), "../c/d");
         assert_eq!(path_simplify("../../../a/../").unwrap(), "../../..");
         assert!(path_simplify("/../../../a/../").is_none());
+    }
+
+    #[test]
+    fn test_path_is_abosolute() {
+        assert!(path_is_abosolute("/a"));
+        assert!(path_is_abosolute("//"));
+        assert!(!path_is_abosolute("a"));
     }
 }

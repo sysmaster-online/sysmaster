@@ -11,10 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::serialize::DeserializeWith;
-use basic::{
-    path_util::{path_length_is_valid, path_name_is_safe},
-    Error, Result,
-};
+use basic::{path_util::parse_path_common, Error, Result};
 use bitflags::bitflags;
 use serde::{
     de::{self, Unexpected},
@@ -153,43 +150,19 @@ fn parse_exec(s: &str) -> Result<VecDeque<ExecCommand>> {
             });
         }
         /* path is "/bin/echo" */
-        let path = match content.split_once(' ') {
+        let path_str = match content.split_once(' ') {
             None => content,
             Some((v0, _v1)) => v0,
         };
 
-        if path.is_empty() {
-            return Err(Error::Invalid {
-                what: "empty exec path".to_string(),
-            });
-        }
-        if !path.starts_with('/') {
-            return Err(Error::Invalid {
-                what: "path is not abosolute".to_string(),
-            });
-        }
-        if !path_name_is_safe(path) {
-            return Err(Error::Invalid {
-                what: "path contains unsafe character".to_string(),
-            });
-        }
-        if path.ends_with('/') {
-            return Err(Error::Invalid {
-                what: "path is not a file".to_string(),
-            });
-        }
-        if !path_length_is_valid(path) {
-            return Err(Error::Invalid {
-                what: "path is empty or too long".to_string(),
-            });
-        }
+        let path = parse_path_common(path_str)?;
 
         /* content is "good" */
-        let mut argv_start = path_start + path.len();
+        let mut argv_start = path_start + path_str.len();
         let content = s.split_at(argv_start).1;
         if content.is_empty() {
             res.push_back(ExecCommand {
-                path: path.to_string(),
+                path: path,
                 argv: vec![],
                 flags,
             });
