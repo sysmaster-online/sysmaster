@@ -247,9 +247,11 @@ impl ExecuteUnitData {
             let (connection, handle, _) = new_connection().unwrap();
             tokio::spawn(connection);
 
+            let netif = self.device.borrow().get_sysname().context(DeviceSnafu)?;
+
             set_link_name(
                 handle,
-                self.device.borrow().get_sysname().context(DeviceSnafu)?,
+                netif,
                 self.name.clone(),
             )
             .await
