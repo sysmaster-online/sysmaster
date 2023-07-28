@@ -10,8 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use basic::{initrd_util, IN_SET};
-use libmount::mountinfo;
+use basic::{initrd_util, mount_util::MountInfoParser, IN_SET};
 use nix::{
     dir::Type,
     errno::Errno,
@@ -134,24 +133,14 @@ fn umount_recursive(prefix: &str, mnt_flags: MntFlags) {
         return;
     }
 
-    let parser = mountinfo::Parser::new(mount_data.as_bytes());
-    for mount_result in parser {
-        match mount_result {
-            Ok(mount) => {
-                if let Some(mount_patch) = mount.mount_point.to_str() {
-                    if !mount_patch.starts_with(prefix) {
-                        continue;
-                    }
-                    if let Err(e) =
-                        nix::mount::umount2(mount_patch, mnt_flags | MntFlags::UMOUNT_NOFOLLOW)
-                    {
-                        println!("Failed to umount {mount_patch}, ignoring:{e}");
-                    }
-                }
-            }
-            Err(err) => {
-                println!("parse mountinfo error: {err}");
-            }
+    let parser = MountInfoParser::new(mount_data);
+    for mount in parser {
+        let mount_path = mount.mount_point.as_str();
+        if !mount_path.starts_with(prefix) {
+            continue;
+        }
+        if let Err(e) = nix::mount::umount2(mount_path, mnt_flags | MntFlags::UMOUNT_NOFOLLOW) {
+            println!("Failed to umount {mount_path}, ignoring:{e}");
         }
     }
 }

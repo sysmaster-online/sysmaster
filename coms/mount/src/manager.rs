@@ -14,8 +14,8 @@ use super::base::PLUGIN_NAME;
 use super::comm::MountUmComm;
 use super::rentry::{MountRe, MountReFrame};
 use basic::logger;
+use basic::mount_util::MountInfoParser;
 use event::{EventState, EventType, Events, Source};
-use libmount::mountinfo;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
@@ -96,20 +96,13 @@ impl MountManager {
             .unwrap()
             .read_to_string(&mut mount_data)
             .unwrap();
-        let parser = mountinfo::Parser::new(mount_data.as_bytes());
-        for mount_result in parser {
-            match mount_result {
-                Ok(mount) => {
-                    log::debug!(
-                        "[{}] mounted on [{}]",
-                        mount.mount_source.to_str().unwrap(),
-                        mount.mount_point.to_str().unwrap()
-                    );
-                }
-                Err(err) => {
-                    println!("parse error: {err}");
-                }
-            }
+        let parser = MountInfoParser::new(mount_data);
+        for mount in parser {
+            log::debug!(
+                "[{}] mounted on [{}]",
+                mount.mount_source,
+                mount.mount_point,
+            );
         }
         Ok(0)
     }
@@ -346,34 +339,27 @@ impl MountMonitorData {
             .unwrap()
             .read_to_string(&mut mountinfo_content)
             .unwrap();
-        let parser = mountinfo::Parser::new(mountinfo_content.as_bytes());
-        for mount_result in parser {
+        let parser = MountInfoParser::new(mountinfo_content);
+        for mount in parser {
             // pop
-            match mount_result {
-                Ok(mount) => {
-                    // We don't process autofs for now, because it is not
-                    // .mount but .automount in systemd.
-                    if mount.fstype.to_str() == Some("autofs") {
-                        continue;
-                    }
-                    let unit_name = mount_point_to_unit_name(mount.mount_point.to_str().unwrap());
-                    if dead_mount_set.contains(unit_name.as_str()) {
-                        dead_mount_set.remove(unit_name.as_str());
-                    } else if self.comm.um().load_unit_success(unit_name.as_str()) {
-                        // record + action
-                        self.comm.reli().set_last_unit(&unit_name);
-                        let start_ok = self.comm.um().unit_start_directly(&unit_name).is_ok();
-                        self.comm.reli().clear_last_unit();
+            // We don't process autofs for now, because it is not
+            // .mount but .automount in systemd.
+            if mount.fstype == "autofs" {
+                continue;
+            }
+            let unit_name = mount_point_to_unit_name(&mount.mount_point);
+            if dead_mount_set.contains(unit_name.as_str()) {
+                dead_mount_set.remove(unit_name.as_str());
+            } else if self.comm.um().load_unit_success(unit_name.as_str()) {
+                // record + action
+                self.comm.reli().set_last_unit(&unit_name);
+                let start_ok = self.comm.um().unit_start_directly(&unit_name).is_ok();
+                self.comm.reli().clear_last_unit();
 
-                        if start_ok {
-                            log::debug!("{} change to mounted.", unit_name);
-                        } else {
-                            log::error!("Failed to start {}", unit_name);
-                        }
-                    }
-                }
-                Err(err) => {
-                    log::error!("Failed to parse /proc/self/mountinfo: {}", err);
+                if start_ok {
+                    log::debug!("{} change to mounted.", unit_name);
+                } else {
+                    log::error!("Failed to start {}", unit_name);
                 }
             }
         }

@@ -24,6 +24,10 @@ use libc::{glob, glob_t, GLOB_NOSORT};
 use libc::{statx, STATX_ATTR_MOUNT_ROOT};
 
 use crate::{device::on_ac_power, fd_util, proc_cmdline, security, user_group_util};
+
+#[cfg(target_env = "musl")]
+use crate::mount_util::MountInfoParser;
+
 use std::{
     ffi::CString,
     fs::File,
@@ -331,7 +335,6 @@ impl Condition {
     #[cfg(target_env = "musl")]
     /* musl can't use statx, check /proc/self/mountinfo. */
     fn test_path_is_mount_point(&self) -> i8 {
-        use libmount::mountinfo;
         use std::io::Read;
 
         let mut mount_data = String::new();
@@ -344,18 +347,10 @@ impl Condition {
         if file.read_to_string(&mut mount_data).is_err() {
             return 0;
         }
-        let parser = mountinfo::Parser::new(mount_data.as_bytes());
-        for mount_result in parser {
-            if let Ok(mount) = mount_result {
-                let mount_point = match mount.mount_point.to_str() {
-                    None => {
-                        continue;
-                    }
-                    Some(v) => v,
-                };
-                if self.params == mount_point {
-                    return 1;
-                }
+        let parser = MountInfoParser::new(mount_data);
+        for mount in parser {
+            if self.params == mount.mount_point {
+                return 1;
             }
         }
         0
