@@ -174,6 +174,7 @@ mod tests {
 
     use super::*;
     use std::{
+        cell::RefCell,
         fs::File,
         net::{TcpListener, TcpStream},
         os::unix::prelude::{AsRawFd, RawFd},
@@ -418,5 +419,171 @@ mod tests {
 
         e.rm_watch(wd);
         e.del_source(s.clone()).unwrap();
+    }
+
+    #[test]
+    fn test_post() {
+        struct InnerPost {
+            count: RefCell<u8>,
+        }
+
+        impl InnerPost {
+            fn new() -> Self {
+                InnerPost {
+                    count: RefCell::new(0),
+                }
+            }
+        }
+
+        impl Source for InnerPost {
+            fn fd(&self) -> RawFd {
+                /* RawFd is not necessary for Post event source. */
+                0
+            }
+
+            fn event_type(&self) -> EventType {
+                EventType::Post
+            }
+
+            fn priority(&self) -> i8 {
+                10
+            }
+
+            fn dispatch(&self, _: &Events) -> i32 {
+                let v = *self.count.borrow();
+                self.count.replace(v + 1);
+
+                0
+            }
+
+            fn token(&self) -> u64 {
+                let data: u64 = unsafe { std::mem::transmute(self) };
+                data
+            }
+        }
+
+        struct InnerTimer(u64);
+
+        impl InnerTimer {
+            fn new(t: u64) -> InnerTimer {
+                Self(t)
+            }
+        }
+
+        impl Source for InnerTimer {
+            fn fd(&self) -> RawFd {
+                0
+            }
+
+            fn event_type(&self) -> EventType {
+                EventType::TimerRealtime
+            }
+
+            fn epoll_event(&self) -> u32 {
+                (libc::EPOLLIN) as u32
+            }
+
+            fn priority(&self) -> i8 {
+                0i8
+            }
+
+            fn time_relative(&self) -> u64 {
+                self.0
+            }
+
+            fn dispatch(&self, e: &Events) -> i32 {
+                e.set_exit();
+                0
+            }
+
+            fn token(&self) -> u64 {
+                let data: u64 = unsafe { std::mem::transmute(self) };
+                data
+            }
+        }
+
+        struct InnerIo {
+            t: TcpListener,
+        }
+
+        impl InnerIo {
+            fn new(s: &'static str) -> InnerIo {
+                InnerIo {
+                    t: TcpListener::bind(s).unwrap(),
+                }
+            }
+        }
+
+        impl Source for InnerIo {
+            fn fd(&self) -> RawFd {
+                self.t.as_raw_fd()
+            }
+
+            fn event_type(&self) -> EventType {
+                EventType::Io
+            }
+
+            fn epoll_event(&self) -> u32 {
+                (libc::EPOLLIN) as u32
+            }
+
+            fn priority(&self) -> i8 {
+                0i8
+            }
+
+            fn dispatch(&self, _: &Events) -> i32 {
+                let _ = self.t.accept().unwrap();
+                0
+            }
+
+            fn token(&self) -> u64 {
+                let data: u64 = unsafe { std::mem::transmute(self) };
+                data
+            }
+        }
+
+        let handle1 = thread::spawn(|| {
+            std::thread::sleep(Duration::from_millis(100));
+
+            for _ in 0..10 {
+                let _ = TcpStream::connect("127.0.0.1:49099").unwrap();
+            }
+
+            std::thread::sleep(Duration::from_millis(100));
+
+            for _ in 0..10 {
+                let _ = TcpStream::connect("127.0.0.1:49099").unwrap();
+            }
+        });
+
+        let s = Rc::new(InnerIo::new("127.0.0.1:49099"));
+
+        let e = Events::new().unwrap();
+        let timer_s = Rc::new(InnerTimer::new(500000));
+        let post_s = Rc::new(InnerPost::new());
+
+        e.add_source(s.clone()).unwrap();
+        e.add_source(timer_s.clone()).unwrap();
+        e.add_source(post_s.clone()).unwrap();
+        e.set_enabled(timer_s.clone(), EventState::On).unwrap();
+        e.set_enabled(s.clone(), EventState::On).unwrap();
+        e.set_enabled(post_s.clone(), EventState::On).unwrap();
+
+        e.rloop().unwrap();
+
+        /*
+         * The occurrence number of post events is unstable, because the TCP connection may be blocked
+         * until the post event is dispatched and new connection arrives and produces new post events.
+         *
+         * Thus the assertion condition should be slightly relaxed.
+         */
+        let count = *post_s.as_ref().count.borrow();
+        assert!((2..=4).contains(&count));
+
+        e.del_source(s).unwrap();
+        e.del_source(timer_s).unwrap();
+        e.del_source(post_s).unwrap();
+
+        handle1.join().unwrap();
     }
 }

@@ -120,6 +120,12 @@ impl Events {
             None => return Ok(0),
             Some(v) => v.state,
         };
+
+        /* If a non-post event source raised, mark all post event sources as pending. */
+        if state != EventState::Off && top.event_type() != EventType::Post {
+            self.data.borrow_mut().pending_posts();
+        }
+
         match state {
             EventState::Off => {}
             EventState::On => {
@@ -396,7 +402,7 @@ impl EventsData {
                 self.poller
                     .register(self.inotifyfd.as_raw_fd(), &mut event)?;
             }
-            EventType::Post => todo!(),
+            EventType::Post => {}
             EventType::Exit => todo!(),
             EventType::Watchdog => todo!(),
         }
@@ -437,7 +443,7 @@ impl EventsData {
                 self.poller.unregister(self.inotifyfd.as_raw_fd())?;
             }
             EventType::Defer => (),
-            EventType::Post => todo!(),
+            EventType::Post => {}
             EventType::Exit => todo!(),
             EventType::Watchdog => todo!(),
         }
@@ -579,6 +585,21 @@ impl EventsData {
             } else {
                 self.pending.push(source);
                 current.in_pending = true;
+            }
+        }
+    }
+
+    pub(self) fn pending_posts(&mut self) {
+        for (token, post_source) in self.post_sources.iter() {
+            if let Some(current) = self.state.get_mut(token) {
+                if current.state == EventState::Off {
+                    continue;
+                }
+
+                if !current.in_pending {
+                    self.pending.push(post_source.clone());
+                    current.in_pending = true;
+                }
             }
         }
     }
