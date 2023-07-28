@@ -515,7 +515,7 @@ mod test {
                 let result = c.test();
                 assert!(
                     result,
-                    "test test_directory_not_empty,directoy is:{}",
+                    "test test_directory_not_empty,directory is:{}",
                     c.params
                 );
             },
@@ -539,7 +539,7 @@ mod test {
                 fs::remove_dir(p).unwrap();
                 assert!(
                     !result,
-                    "test test_directory_notempty_empty,directoy is: {}",
+                    "test test_directory_notempty_empty,directory is: {}",
                     c.params
                 );
             },
@@ -557,7 +557,7 @@ mod test {
             |c: Condition| {
                 assert!(
                     !c.test(),
-                    "test test_directory_noempty_is_not_dir,directoy is: {}",
+                    "test test_directory_noempty_is_not_dir,directory is: {}",
                     c.params
                 );
             },
