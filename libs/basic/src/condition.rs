@@ -933,7 +933,7 @@ mod test {
                         log::info!(
                             "this test cannot be tested because we cannot modify the kernel parameters"
                         );
-                        assert!(true);
+                        return;
                     }
                 }
 
