@@ -444,7 +444,7 @@ mod test {
         security::{self},
     };
     use core::panic;
-    use std::{env, fs, path::Path};
+    use std::{env, fs, path::Path, any::Any};
     use tempfile::NamedTempFile;
 
     fn setup(_type: ConditionType, trigger: i8, revert: i8, params: String) -> Condition {
@@ -456,10 +456,10 @@ mod test {
 
     fn run_test<T>(test: T, c_type: ConditionType, trigger: i8, revert: i8, params: String)
     where
-        T: FnOnce(Condition) -> () + panic::UnwindSafe,
+        T: FnOnce(Condition) + panic::UnwindSafe,
     {
         let c = setup(c_type, trigger, revert, params);
-        let result = std::panic::catch_unwind(|| {
+        let result: Result<(), Box<dyn Any + Send>> = std::panic::catch_unwind(|| {
             test(c);
         });
         teardown();
@@ -961,7 +961,7 @@ mod test {
                         log::info!(
                             "this test cannot be tested because we cannot modify the kernel parameters"
                         );
-                        assert!(true);
+                        return;
                     }
                 }
 
