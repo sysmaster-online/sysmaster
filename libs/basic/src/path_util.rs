@@ -40,7 +40,7 @@ pub fn path_name_is_safe(s: &str) -> bool {
         if c > 0 as char && c < ' ' {
             return false;
         }
-        if (c as char).is_ascii_control() {
+        if c.is_ascii_control() {
             return false;
         }
     }
