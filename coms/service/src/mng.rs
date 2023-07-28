@@ -2244,7 +2244,7 @@ impl PathIntofy {
     }
 
     fn do_dispatch(&self) -> i32 {
-        log::debug!("dispatch initify pid file: {:?}", self.path);
+        log::debug!("dispatch inotify pid file: {:?}", self.path);
         match self.read_fd_event() {
             Ok(_) => {
                 if let Ok(_v) = self.mng().retry_pid_file() {
