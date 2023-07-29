@@ -191,6 +191,10 @@ pub struct ExecContext {
     working_directory: RefCell<WorkingDirectory>,
     runtime_directory: RefCell<RuntimeDirectory>,
     state_directory: RefCell<StateDirectory>,
+
+    user: RefCell<Option<User>>,
+    group: RefCell<Option<Group>>,
+    umask: RefCell<Option<Mode>>,
 }
 
 impl Default for ExecContext {
@@ -210,6 +214,9 @@ impl ExecContext {
             root_directory: RefCell::new(None),
             runtime_directory: RefCell::new(RuntimeDirectory::default()),
             state_directory: RefCell::new(StateDirectory::default()),
+            user: RefCell::new(None),
+            group: RefCell::new(None),
+            umask: RefCell::new(None),
         }
     }
 
@@ -321,6 +328,99 @@ impl ExecContext {
     pub fn state_directory(&self) -> StateDirectory {
         self.state_directory.borrow().clone()
     }
+
+    ///
+    pub fn set_user(&self, user_str: &str) -> Result<()> {
+        if user_str.is_empty() {
+            *self.user.borrow_mut() = User::from_uid(Uid::from_raw(0)).unwrap();
+            return Ok(());
+        }
+
+        /* try to parse as UID */
+        if let Ok(user) = basic::user_group_util::parse_uid(user_str) {
+            *self.user.borrow_mut() = Some(user);
+            return Ok(());
+        }
+
+        /* parse as user name */
+        if let Ok(Some(user)) = User::from_name(user_str) {
+            *self.user.borrow_mut() = Some(user);
+            return Ok(());
+        }
+
+        *self.user.borrow_mut() = None;
+        Err(Error::ConfigureError {
+            msg: "invalid user".to_string(),
+        })
+    }
+
+    ///
+    pub fn user(&self) -> Option<User> {
+        self.user.borrow().clone()
+    }
+
+    ///
+    pub fn set_group(&self, group_str: &str) -> Result<()> {
+        /* add_user should be called before add_group */
+        assert!(self.user().is_some());
+
+        /* group is not configured, use the primary group of user */
+        if group_str.is_empty() {
+            let gid = self.user().unwrap().gid;
+            *self.group.borrow_mut() = Group::from_gid(gid).unwrap();
+            return Ok(());
+        }
+
+        /* try to parse group_str as GID */
+        if let Ok(group) = basic::user_group_util::parse_gid(group_str) {
+            *self.group.borrow_mut() = Some(group);
+            return Ok(());
+        }
+
+        /* not a valid GID, parse it as a group name */
+        if let Ok(Some(group)) = Group::from_name(group_str) {
+            *self.group.borrow_mut() = Some(group);
+            return Ok(());
+        }
+
+        *self.group.borrow_mut() = None;
+        Err(Error::ConfigureError {
+            msg: "invalid group".to_string(),
+        })
+    }
+
+    ///
+    pub fn group(&self) -> Option<Group> {
+        self.group.borrow().clone()
+    }
+
+    ///
+    pub fn set_umask(&self, umask_str: &str) -> Result<()> {
+        let mut umask_str = umask_str;
+        if umask_str.is_empty() {
+            umask_str = "0022";
+        }
+        for c in umask_str.as_bytes() {
+            if !(b'0'..b'8').contains(c) {
+                *self.umask.borrow_mut() = None;
+                return Err(Error::InvalidData);
+            }
+        }
+        let mode = match u32::from_str_radix(umask_str, 8) {
+            Err(_) => {
+                *self.umask.borrow_mut() = None;
+                return Err(Error::InvalidData);
+            }
+            Ok(v) => v,
+        };
+        *self.umask.borrow_mut() = Mode::from_bits(mode);
+        Ok(())
+    }
+
+    ///
+    pub fn umask(&self) -> Option<Mode> {
+        *self.umask.borrow()
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Serialize, Deserialize)]
@@ -343,9 +443,6 @@ pub struct ExecParameters {
     environment: Rc<EnvData>,
     fds: Vec<i32>,
     notify_sock: Option<PathBuf>,
-    user: Option<User>,
-    group: Option<Group>,
-    umask: Option<Mode>,
     watchdog_usec: u64,
     flags: ExecFlags,
     nonblock: bool,
@@ -394,9 +491,6 @@ impl ExecParameters {
             environment: Rc::new(EnvData::new()),
             fds: Vec::new(),
             notify_sock: None,
-            user: None,
-            group: None,
-            umask: None,
             watchdog_usec: 0,
             flags: ExecFlags::CONTROL,
             nonblock: false,
@@ -443,86 +537,6 @@ impl ExecParameters {
         self.notify_sock = Some(notify_sock)
     }
 
-    /// add User
-    pub fn add_user(&mut self, user_str: String) -> Result<()> {
-        // 1. If user_str is empty, treat it as UID 0
-        if user_str.is_empty() {
-            self.user = User::from_uid(Uid::from_raw(0)).unwrap();
-            return Ok(());
-        }
-        // 2. Try to parse user_str as UID
-        if let Ok(user) = basic::user_group_util::parse_uid(&user_str) {
-            self.user = Some(user);
-            return Ok(());
-        }
-        // 3. OK, this is not a valid UID, try to parse it as user name
-        if let Ok(Some(user)) = User::from_name(&user_str) {
-            self.user = Some(user);
-            return Ok(());
-        }
-        Err(Error::InvalidData)
-    }
-
-    /// get User
-    pub fn get_user(&self) -> Option<User> {
-        self.user.clone()
-    }
-
-    /// add Group
-    pub fn add_group(&mut self, group_str: String) -> Result<()> {
-        // add_user should be called before add_group
-        assert!(self.get_user().is_some());
-        // 1. Group is not configured, use the primary group of user
-        if group_str.is_empty() {
-            let gid = self.get_user().unwrap().gid;
-            self.group = Group::from_gid(gid).unwrap();
-            return Ok(());
-        }
-        // 2. Try to parse group_str as GID
-        if let Ok(group) = basic::user_group_util::parse_gid(&group_str) {
-            self.group = Some(group);
-            return Ok(());
-        }
-        // 3. Not a valid GID, parse it as a group name
-        if let Ok(Some(group)) = Group::from_name(&group_str) {
-            self.group = Some(group);
-            return Ok(());
-        }
-        Err(Error::InvalidData)
-    }
-
-    /// get Group
-    pub fn get_group(&self) -> Option<Group> {
-        self.group.clone()
-    }
-
-    /// add UMask
-    pub fn add_umask(&mut self, umask_str: String) -> Result<()> {
-        let mut umask_str = umask_str;
-        if umask_str.is_empty() {
-            umask_str = "0022".to_string();
-        }
-        for c in umask_str.as_bytes() {
-            if !(b'0'..b'8').contains(c) {
-                return Err(Error::InvalidData);
-            }
-        }
-        let mode = match u32::from_str_radix(&umask_str, 8) {
-            Err(_) => {
-                return Err(Error::InvalidData);
-            }
-            Ok(v) => v,
-        };
-        self.umask = Mode::from_bits(mode);
-        log::debug!("Adding umask {:?}", mode);
-        Ok(())
-    }
-
-    /// get UMask
-    pub fn get_umask(&self) -> Option<Mode> {
-        self.umask
-    }
-
     /// set the software watchdog time
     pub fn set_watchdog_usec(&mut self, usec: u64) {
         self.watchdog_usec = usec;
@@ -566,58 +580,50 @@ mod tests {
         unistd::{Gid, Uid},
     };
 
-    use crate::exec::base::Rlimit;
-
-    use super::ExecParameters;
+    use crate::exec::{base::Rlimit, ExecContext};
 
     #[test]
-    fn test_add_user() {
-        let mut params = ExecParameters::new();
-        assert!(params.add_user("0".to_string()).is_ok());
-        assert_eq!(params.get_user().unwrap().name, "root");
-        let mut params = ExecParameters::new();
-        assert!(params.add_user("root".to_string()).is_ok());
-        assert_eq!(params.get_user().unwrap().uid, Uid::from_raw(0));
-        let mut params = ExecParameters::new();
-        assert!(params.add_user("010123".to_string()).is_err());
-        assert!(params.add_user("---".to_string()).is_err());
-        assert!(params.add_user("wwwwyyyyyffffff".to_string()).is_err());
+    fn test_set_user() {
+        let exec_ctx = ExecContext::new();
+        assert!(exec_ctx.set_user("0").is_ok());
+        assert_eq!(exec_ctx.user().unwrap().name, "root");
+        assert!(exec_ctx.set_user("root").is_ok());
+        assert_eq!(exec_ctx.user().unwrap().uid, Uid::from_raw(0));
+        assert!(exec_ctx.set_user("010123").is_err());
+        assert!(exec_ctx.set_user("---").is_err());
+        assert!(exec_ctx.set_user("wwwwyyyyyffffff").is_err());
     }
 
     #[test]
-    fn test_add_group() {
-        let mut params = ExecParameters::new();
-        assert!(params.add_user("0".to_string()).is_ok());
-        assert!(params.add_group("0".to_string()).is_ok());
-        assert_eq!(params.get_group().unwrap().name, "root");
+    fn test_set_group() {
+        let exec_ctx = ExecContext::new();
+        assert!(exec_ctx.set_user("0").is_ok());
+        assert!(exec_ctx.set_group("0").is_ok());
+        assert_eq!(exec_ctx.group().unwrap().name, "root");
 
-        let mut params = ExecParameters::new();
-        assert!(params.add_user("0".to_string()).is_ok());
-        assert!(params.add_group("root".to_string()).is_ok());
-        assert_eq!(params.get_group().unwrap().gid, Gid::from_raw(0));
+        assert!(exec_ctx.set_user("0").is_ok());
+        assert!(exec_ctx.set_group("root").is_ok());
+        assert_eq!(exec_ctx.group().unwrap().gid, Gid::from_raw(0));
 
-        let mut params = ExecParameters::new();
-        assert!(params.add_user("0".to_string()).is_ok());
-        assert!(params.add_group("010123".to_string()).is_err());
-        assert!(params.add_group("---".to_string()).is_err());
-        assert!(params.add_group("wwwwyyyyyffffff".to_string()).is_err());
+        assert!(exec_ctx.set_user("0").is_ok());
+        assert!(exec_ctx.set_group("010123").is_err());
+        assert!(exec_ctx.set_group("---").is_err());
+        assert!(exec_ctx.set_group("wwwwyyyyyffffff").is_err());
     }
 
     #[test]
-    fn test_add_umask() {
-        let mut params = ExecParameters::new();
-        assert!(params.add_umask("".to_string()).is_ok());
-        assert_eq!(params.get_umask().unwrap(), Mode::from_bits(18).unwrap());
-        assert!(params.add_umask("0022".to_string()).is_ok());
-        assert_eq!(params.get_umask().unwrap(), Mode::from_bits(18).unwrap());
-        params.umask = None;
-        assert!(params.add_umask("0o0022".to_string()).is_err());
-        assert_eq!(params.get_umask(), None);
-        params.umask = None;
-        assert!(params.add_umask("0088".to_string()).is_err());
-        assert_eq!(params.get_umask(), None);
-        assert!(params.add_umask("0011".to_string()).is_ok());
-        assert_eq!(params.get_umask().unwrap(), Mode::from_bits(9).unwrap());
+    fn test_set_umask() {
+        let exec_ctx = ExecContext::new();
+        assert!(exec_ctx.set_umask("").is_ok());
+        assert_eq!(exec_ctx.umask().unwrap(), Mode::from_bits(18).unwrap());
+        assert!(exec_ctx.set_umask("0022").is_ok());
+        assert_eq!(exec_ctx.umask().unwrap(), Mode::from_bits(18).unwrap());
+        assert!(exec_ctx.set_umask("0o0022").is_err());
+        assert_eq!(exec_ctx.umask(), None);
+        assert!(exec_ctx.set_umask("0088").is_err());
+        assert_eq!(exec_ctx.umask(), None);
+        assert!(exec_ctx.set_umask("0011").is_ok());
+        assert_eq!(exec_ctx.umask().unwrap(), Mode::from_bits(9).unwrap());
     }
 
     #[test]

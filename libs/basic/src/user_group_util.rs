@@ -17,7 +17,7 @@ use nix::libc::uid_t;
 use nix::unistd::{Gid, Group, Uid, User};
 
 /// Parse a string as UID
-pub fn parse_uid(uid_str: &String) -> Result<User> {
+pub fn parse_uid(uid_str: &str) -> Result<User> {
     if uid_str.is_empty() {
         return Err(Error::Invalid {
             what: "UID is empty".to_string(),
@@ -68,7 +68,7 @@ pub fn parse_uid(uid_str: &String) -> Result<User> {
 }
 
 /// Parse a string as UID
-pub fn parse_gid(gid_str: &String) -> Result<Group> {
+pub fn parse_gid(gid_str: &str) -> Result<Group> {
     // Same logic as parse_uid()
     if gid_str.is_empty() {
         return Err(Error::Invalid {
@@ -145,7 +145,7 @@ pub fn uid_is_system(uid: Uid) -> bool {
 }
 
 /// get user creds
-pub fn get_user_creds(user: &String) -> Result<User> {
+pub fn get_user_creds(user: &str) -> Result<User> {
     if let Ok(u) = parse_uid(user) {
         return Ok(u);
     }
@@ -158,7 +158,7 @@ pub fn get_user_creds(user: &String) -> Result<User> {
 }
 
 /// get group creds
-pub fn get_group_creds(group: &String) -> Result<Group> {
+pub fn get_group_creds(group: &str) -> Result<Group> {
     if let Ok(g) = parse_gid(group) {
         return Ok(g);
     }

@@ -858,7 +858,7 @@ impl SocketMng {
         self.db_update();
     }
 
-    fn socket_chown(&self, user: &String, group: &String) -> Result<()> {
+    fn socket_chown(&self, user: &str, group: &str) -> Result<()> {
         let mut uid = Uid::from_raw(u32::MAX);
         let mut gid = Gid::from_raw(u32::MAX);
         if !user.is_empty() {

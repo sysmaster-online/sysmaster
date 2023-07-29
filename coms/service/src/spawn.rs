@@ -99,21 +99,6 @@ impl ServiceSpawn {
             params.set_notify_sock(notify_sock);
         }
 
-        if let Err(e) = params.add_user(service_config.User.clone()) {
-            log::error!("Failed to add user to execute parameters: {e}");
-            return Err(e);
-        }
-
-        if let Err(e) = params.add_group(service_config.Group.clone()) {
-            log::error!("Failed to add group to execute parameters: {e}");
-            return Err(e);
-        }
-
-        if let Err(e) = params.add_umask(service_config.UMask.clone()) {
-            log::error!("Failed to add umask to execute parameters: {e}");
-            return Err(e);
-        }
-
         params.set_watchdog_usec(self.watchdog_timer());
 
         log::debug!("begin to exec spawn");

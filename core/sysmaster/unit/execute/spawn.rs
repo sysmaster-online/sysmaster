@@ -16,7 +16,7 @@ use nix::fcntl::FcntlArg;
 use nix::sys::signal::{pthread_sigmask, SigmaskHow};
 use nix::sys::signalfd::SigSet;
 use nix::sys::stat::Mode;
-use nix::unistd::{self, chroot, setresgid, setresuid, ForkResult, Gid, Group, Pid, Uid, User};
+use nix::unistd::{self, chroot, setresgid, setresuid, ForkResult, Gid, Pid, Uid};
 use regex::Regex;
 use std::fs::Permissions;
 use std::os::unix::prelude::PermissionsExt;
@@ -63,19 +63,15 @@ impl ExecSpawn {
     }
 }
 
-fn apply_user_and_group(
-    user: Option<User>,
-    group: Option<Group>,
-    params: &ExecParameters,
-) -> Result<()> {
-    let user = match user {
+fn apply_user_and_group(exec_ctx: Rc<ExecContext>, params: &ExecParameters) -> Result<()> {
+    let user = match exec_ctx.user() {
         // ExecParameters.add_user() has already assigned valid user if the configuration is correct
         None => {
             return Err(Error::InvalidData);
         }
         Some(v) => v,
     };
-    let group = match group {
+    let group = match exec_ctx.group() {
         None => {
             return Err(Error::InvalidData);
         }
@@ -117,18 +113,14 @@ fn apply_working_directory(working_directory: WorkingDirectory) -> Result<()> {
     Ok(())
 }
 
-fn setup_exec_directory(
-    exec_ctx: Rc<ExecContext>,
-    user: Option<User>,
-    group: Option<Group>,
-) -> Result<()> {
+fn setup_exec_directory(exec_ctx: Rc<ExecContext>) -> Result<()> {
     /* Always change the directory's owner, because sysmaster only
      * runs under system mode. */
-    let uid = match user {
+    let uid = match exec_ctx.user() {
         Some(v) => v.uid,
         None => Uid::from_raw(0),
     };
-    let gid = match group {
+    let gid = match exec_ctx.group() {
         Some(v) => v.gid,
         None => Gid::from_raw(0),
     };
@@ -179,9 +171,9 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
         return;
     }
 
-    let _ = setup_exec_directory(ctx.clone(), params.get_user(), params.get_group());
+    let _ = setup_exec_directory(ctx.clone());
 
-    if let Err(e) = apply_user_and_group(params.get_user(), params.get_group(), params) {
+    if let Err(e) = apply_user_and_group(ctx.clone(), params) {
         log::error!("Failed to apply user or group: {e}");
         return;
     }
@@ -191,7 +183,7 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
         return;
     }
 
-    if let Err(e) = apply_umask(params.get_umask()) {
+    if let Err(e) = apply_umask(ctx.umask()) {
         log::error!("Failed to apply umask: {}", e.to_string());
         return;
     }
