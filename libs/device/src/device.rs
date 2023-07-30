@@ -1695,7 +1695,7 @@ impl Device {
             Err(e) => {
                 if e != nix::Error::ENOENT {
                     return Err(Error::Nix {
-                        msg: "update_tag failed: can't unlink db".to_string(),
+                        msg: format!("update_tag failed: can't unlink tag '{}'", tag_path),
                         source: e,
                     });
                 }
