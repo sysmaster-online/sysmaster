@@ -11,14 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-use std::{
-    fs::{self, File, OpenOptions},
-    io::Write,
-    os::unix::prelude::{OpenOptionsExt, PermissionsExt},
-    path::{Path, PathBuf},
-    sync::Mutex,
-};
-
+use crate::Error;
 use constants::LOG_FILE_PATH;
 use log::{LevelFilter, Log};
 use log4rs::{
@@ -35,9 +28,17 @@ use log4rs::{
     config::{Appender, Config, Logger, Root},
     encode::pattern::PatternEncoder,
 };
-use nix::libc;
-
-use crate::Error;
+use std::{
+    borrow::BorrowMut,
+    fs::{self, File, OpenOptions},
+    io::Write,
+    os::unix::{
+        net::UnixDatagram,
+        prelude::{OpenOptionsExt, PermissionsExt},
+    },
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 
 /// sysmaster log parttern:
 ///
@@ -101,7 +102,39 @@ fn write_msg_file(writer: &mut File, module: &str, msg: String) {
     write_msg_common(writer, module, msg);
 }
 
-struct SysLogger;
+struct SysLogger {
+    dgram: Arc<Mutex<UnixDatagramX>>,
+}
+
+struct UnixDatagramX {
+    dgram: UnixDatagram,
+}
+
+impl Write for UnixDatagramX {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.dgram.send(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl UnixDatagramX {
+    fn log(&mut self, module: &str, msg: String) {
+        write_msg_common(self, module, msg);
+    }
+}
+
+impl SysLogger {
+    fn connect() -> Result<Self, std::io::Error> {
+        let sock = UnixDatagram::unbound()?;
+        sock.connect("/dev/log")?;
+        Ok(Self {
+            dgram: Arc::new(Mutex::new(UnixDatagramX { dgram: sock })),
+        })
+    }
+}
 
 /* This is an extremely simple implementation, and only
  * supports the very basic log function. */
@@ -112,17 +145,12 @@ impl log::Log for SysLogger {
 
     fn log(&self, record: &log::Record) {
         let msg = record.args().to_string();
-        let level = match record.level() {
-            log::Level::Error => libc::LOG_ERR,
-            log::Level::Warn => libc::LOG_WARNING,
-            log::Level::Info => libc::LOG_INFO,
-            log::Level::Debug => libc::LOG_DEBUG,
-            /* The highest libc log level is LOG_DEBUG */
-            log::Level::Trace => libc::LOG_DEBUG,
+        let module = match record.module_path() {
+            None => "unknown",
+            Some(v) => v,
         };
-        unsafe {
-            libc::syslog(level, msg.as_ptr() as *const libc::c_char);
-        }
+        let mut dgram = self.dgram.lock().unwrap();
+        dgram.borrow_mut().log(module, msg)
     }
 
     fn flush(&self) {}
@@ -448,15 +476,35 @@ pub fn init_log(
     }
 
     if target == "syslog" {
-        let _ = log::set_boxed_logger(Box::new(SysLogger));
+        match SysLogger::connect() {
+            Ok(l) => {
+                if let Err(e) = log::set_boxed_logger(Box::new(l)) {
+                    eprint!("Failed to set logger: {:?}", e);
+                }
+            }
+            Err(e) => {
+                eprint!("Failed to connect to /dev/log: {:?}", e);
+            }
+        }
         log::set_max_level(level);
         return;
     }
     if target == "console-syslog" {
         let mut logger = CombinedLogger::empty();
         logger.push(Box::new(ConsoleLogger));
-        logger.push(Box::new(SysLogger));
-        let _ = log::set_boxed_logger(Box::new(logger));
+
+        match SysLogger::connect() {
+            Ok(l) => {
+                logger.push(Box::new(l));
+            }
+            Err(e) => {
+                eprint!("Failed to connect to /dev/log: {:?}", e);
+            }
+        }
+
+        if let Err(e) = log::set_boxed_logger(Box::new(logger)) {
+            eprintln!("Failed to set logger: {:?}", e);
+        }
         log::set_max_level(level);
         return;
     }
