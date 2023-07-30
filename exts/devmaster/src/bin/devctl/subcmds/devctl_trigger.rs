@@ -12,6 +12,8 @@
 
 //! subcommand for devctl trigger
 //!
+use std::{cell::RefCell, rc::Rc};
+
 use device::{
     device_enumerator::{DeviceEnumerationType, DeviceEnumerator},
     Device, DeviceAction,
@@ -25,6 +27,8 @@ pub fn subcommand_trigger(
     action: Option<String>,
     dry_run: bool,
 ) {
+    let mut devlist = vec![];
+
     let action = match action {
         Some(a) => a.parse::<DeviceAction>().unwrap(),
         None => DeviceAction::Change,
@@ -49,23 +53,41 @@ pub fn subcommand_trigger(
         let mut enumerator = DeviceEnumerator::new();
         enumerator.set_enumerator_type(etype);
         for device in enumerator.iter() {
-            if !dry_run {
-                device.borrow().trigger(action).unwrap();
-            }
-            if verbose {
-                println!("{}", device.borrow().get_syspath().unwrap_or_default());
+            devlist.push(device);
+        }
+    } else {
+        for d in devices {
+            match Device::from_path(&d) {
+                Ok(dev) => {
+                    devlist.push(Rc::new(RefCell::new(dev)));
+                }
+                Err(e) => {
+                    eprintln!("Invalid device path '{}': {}", d, e);
+                }
             }
         }
-        return;
     }
 
-    for d in devices {
-        let device = Device::from_path(&d).unwrap();
+    for d in devlist {
         if !dry_run {
-            device.trigger(action).unwrap();
+            if let Err(e) = d.borrow().trigger(action) {
+                if ![nix::Error::ENOENT, nix::Error::ENODEV].contains(&e.get_errno()) {
+                    eprintln!(
+                        "Failed to trigger '{}': {}",
+                        d.borrow().get_syspath().unwrap_or_default(),
+                        e
+                    );
+                } else {
+                    println!(
+                        "Ignore to trigger '{}': {}",
+                        d.borrow().get_syspath().unwrap_or_default(),
+                        e
+                    );
+                }
+            }
         }
         if verbose {
-            println!("{}", device.get_syspath().unwrap_or_default());
+            println!("{}", d.borrow().get_syspath().unwrap_or_default());
         }
     }
 }
