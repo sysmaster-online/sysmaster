@@ -160,13 +160,9 @@ impl NetifConfigCtx {
     }
 
     pub(crate) fn get_config(&self, netif: Rc<RefCell<Device>>) -> Option<&NetifConfig> {
-        for config in self.configs.iter() {
-            if config.inner.match_netif(netif.clone()) {
-                return Some(config);
-            }
-        }
-
-        None
+        self.configs
+            .iter()
+            .find(|&config| config.inner.match_netif(netif.clone()))
     }
 }
 

@@ -43,14 +43,10 @@ impl Builtin for Example {
     }
 
     /// builtin init function
-    fn init(&self) {
-        println!("example builtin init");
-    }
+    fn init(&self) {}
 
     /// builtin exit function
-    fn exit(&self) {
-        println!("example builtin exit");
-    }
+    fn exit(&self) {}
 
     /// check whether builtin command should reload
     fn should_reload(&self) -> bool {

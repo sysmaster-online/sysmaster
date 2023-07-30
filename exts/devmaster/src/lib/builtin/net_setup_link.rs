@@ -169,8 +169,6 @@ impl Builtin for NetSetupLink {
             None => return Ok(false),
         };
 
-        println!("{:#?}", cfg);
-
         let mut link = NetifLink::new(cfg, device.clone());
 
         if let Err(e) = link.apply_cfg() {
@@ -196,6 +194,7 @@ impl Builtin for NetSetupLink {
             "ID_NET_LINK_FILE",
             &link.netif_cfg.abs_path,
         )?;
+
         if !link.new_name.is_empty() {
             self.add_property(device, true, "ID_NET_NAME", &link.new_name)?;
         }

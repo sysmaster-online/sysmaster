@@ -584,9 +584,7 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
                 && is_pci_bridge(hotplug_slot_dev.clone())
             {
                 if naming_scheme_has(NamingSchemeFlags::BRIDGE_MULTIFUNCTION_SLOT)
-                    && !is_pci_multifunction(names.pcidev.clone())
-                        .or::<Result<bool>>(Ok(false))
-                        .unwrap()
+                    && !is_pci_multifunction(names.pcidev.clone()).unwrap_or(false)
                 {
                     log_dev!(
                         debug,
@@ -629,11 +627,7 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
         }
 
         names.pci_slot.push_str(&format!("s{}", hotplug_slot));
-        if func > 0
-            || is_pci_multifunction(names.pcidev.clone())
-                .or::<Result<bool>>(Ok(false))
-                .unwrap()
-        {
+        if func > 0 || is_pci_multifunction(names.pcidev.clone()).unwrap_or(false) {
             names.pci_slot.push_str(&format!("f{}", func));
         }
         if !info.physical_port_name.is_empty() {

@@ -249,13 +249,9 @@ impl ExecuteUnitData {
 
             let netif = self.device.borrow().get_sysname().context(DeviceSnafu)?;
 
-            set_link_name(
-                handle,
-                netif,
-                self.name.clone(),
-            )
-            .await
-            .context(RtnetlinkSnafu)
+            set_link_name(handle, netif, self.name.clone())
+                .await
+                .context(RtnetlinkSnafu)
         }) {
             if e.get_errno() == nix::Error::EBUSY {
                 log_dev!(
