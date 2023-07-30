@@ -13,7 +13,7 @@
 //! generate input_event_codes.rs and get_input_event_key.rs
 //!
 
-use std::{env, process::Command};
+use std::{env, fs::write, process::Command};
 
 fn main() {
     let input_event_codes_gen = bindgen::Builder::default()
@@ -30,8 +30,13 @@ fn main() {
     let out_path = path.to_str().unwrap();
     let s_cmd = format!("{out_path}/src/build.sh");
 
-    let _ = Command::new(s_cmd)
+    let output = Command::new(s_cmd)
         .arg(format!("{out_path}/src"))
         .output()
-        .expect("Couldn't write get_input_event_key.rs!");
+        .expect("Couldn't generate content of get_input_event_key.rs!");
+
+    let contents =
+        String::from_utf8(output.stdout).expect("Invalid generated get_input_event_key.rs!");
+    write("src/get_input_event_key.rs", contents)
+        .expect("Couldn't write to get_input_event_key.rs!");
 }
