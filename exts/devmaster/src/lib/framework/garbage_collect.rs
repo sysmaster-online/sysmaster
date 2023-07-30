@@ -103,6 +103,19 @@ impl Source for GarbageCollect {
             self.close_killer(e);
             self.start_killer(e);
         } else {
+            /*
+             * Cleaning up idle wokers is asynchronous, thus when the
+             * idle worker killer raised, the workers is not cleaned
+             * up right away. This will lead to the post event starting
+             * another idle worker killer.
+             *
+             * That is to say, when the worker manager has cleaned up
+             * the workers, there is another redundant idle worker killer
+             * underground.
+             *
+             * To avoid the redundant idle worker killer raising, close
+             * it explicitly.
+             */
             self.close_killer(e);
         }
 

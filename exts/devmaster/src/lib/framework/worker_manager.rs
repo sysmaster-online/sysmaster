@@ -442,7 +442,7 @@ impl Source for WorkerManager {
     }
 
     /// start dispatching after the event arrives
-    fn dispatch(&self, e: &event::Events) -> i32 {
+    fn dispatch(&self, _: &event::Events) -> i32 {
         let (mut stream, _) = match self.listener.borrow_mut().accept() {
             Ok((s, sa)) => (s, sa),
             Err(e) => {
@@ -458,25 +458,6 @@ impl Source for WorkerManager {
 
         log::debug!("Worker Manager: received message \"{ack}\"");
         self.worker_response_dispose(ack);
-
-        /*
-         * Cleaning up idle wokers is asynchronous, thus when the
-         * idle worker killer raised, the workers is not cleaned
-         * up right away. This will lead to the post event starting
-         * another idle worker killer.
-         *
-         * That is to say, when the worker manager has cleaned up
-         * the workers, there is another redundant idle worker killer
-         * underground.
-         *
-         * To avoid the redundant idle worker killer raising, close
-         * it explicitly.
-         */
-        if self.workers.borrow().is_empty() {
-            let devmaster = self.devmaster.upgrade().unwrap();
-            let gc = devmaster.borrow().gc.clone().unwrap();
-            gc.close_killer(e);
-        }
 
         0
     }
