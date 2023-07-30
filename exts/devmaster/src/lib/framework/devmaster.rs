@@ -13,14 +13,9 @@
 //! encapsulate all sub-managers of framework
 //!
 
-use crate::{
-    config::*,
-    error::*,
-    framework::{control_manager::*, job_queue::*, uevent_monitor::*, worker_manager::*},
-    rules::*,
-};
+use crate::{config::*, error::*, framework::*, rules::*};
 use basic::logger::init_log_to_console;
-use event::{EventState, Events};
+use event::*;
 use std::{
     cell::RefCell,
     rc::Rc,
@@ -31,19 +26,23 @@ use std::{
 #[derive(Debug)]
 pub struct Devmaster {
     /// reference to events
-    events: Rc<Events>,
+    pub(crate) events: Rc<Events>,
 
     /// reference to worker manager
-    worker_manager: Option<Rc<WorkerManager>>,
+    pub(crate) worker_manager: Option<Rc<WorkerManager>>,
     /// reference to control manager
-    control_manager: Option<Rc<ControlManager>>,
+    pub(crate) control_manager: Option<Rc<ControlManager>>,
     /// reference to monitor
-    monitor: Option<Rc<UeventMonitor>>,
+    pub(crate) monitor: Option<Rc<UeventMonitor>>,
+    /// job queue
+    pub(crate) job_queue: Option<Rc<JobQueue>>,
+    /// post event source for garbage collection
+    pub(crate) gc: Option<Rc<GarbageCollect>>,
 
     /// Shared by workers
     /// .0 rules
     /// .1 netif configurations
-    cache: Arc<RwLock<Cache>>,
+    pub(crate) cache: Arc<RwLock<Cache>>,
 }
 
 /// Shared by workers
@@ -92,11 +91,13 @@ impl Devmaster {
             .apply_static_dev_permission()
             .log_error("failed to apply permissions on static devnode");
 
-        let ret = Rc::new(RefCell::new(Devmaster {
+        let devmaster = Rc::new(RefCell::new(Devmaster {
             events: events.clone(),
             worker_manager: None,
             control_manager: None,
             monitor: None,
+            job_queue: None,
+            gc: None,
             cache: Arc::new(RwLock::new(cache)),
         }));
 
@@ -104,28 +105,26 @@ impl Devmaster {
         let worker_manager = Rc::new(WorkerManager::new(
             config.get_max_workers(),
             String::from(WORKER_MANAGER_LISTEN_ADDR),
-            events.clone(),
-            Rc::downgrade(&ret),
+            Rc::downgrade(&devmaster),
         ));
-        let job_queue = Rc::new(JobQueue::new(worker_manager.clone()));
+        let job_queue = Rc::new(JobQueue::new(devmaster.clone()));
         let control_manager = Rc::new(ControlManager::new(
             String::from(CONTROL_MANAGER_LISTEN_ADDR),
             worker_manager.clone(),
             job_queue.clone(),
         ));
         let monitor = Rc::new(UeventMonitor::new(job_queue.clone()));
+        let post = Rc::new(GarbageCollect::new(&devmaster));
 
         // configure worker manager and monitor
         worker_manager.set_job_queue(&job_queue);
-        worker_manager.set_kill_workers_timer();
         monitor.set_receive_buffer(1024 * 1024 * 128);
 
-        events
-            .add_source(worker_manager.get_kill_workers_timer().unwrap())
-            .unwrap();
         events.add_source(worker_manager.clone()).unwrap();
         events.add_source(control_manager.clone()).unwrap();
         events.add_source(monitor.clone()).unwrap();
+
+        events.add_source(post.clone()).unwrap();
 
         events
             .set_enabled(worker_manager.clone(), EventState::On)
@@ -134,12 +133,15 @@ impl Devmaster {
             .set_enabled(control_manager.clone(), EventState::On)
             .unwrap();
         events.set_enabled(monitor.clone(), EventState::On).unwrap();
+        events.set_enabled(post.clone(), EventState::On).unwrap();
 
-        ret.as_ref().borrow_mut().worker_manager = Some(worker_manager);
-        ret.as_ref().borrow_mut().control_manager = Some(control_manager);
-        ret.as_ref().borrow_mut().monitor = Some(monitor);
+        devmaster.borrow_mut().worker_manager = Some(worker_manager);
+        devmaster.borrow_mut().control_manager = Some(control_manager);
+        devmaster.borrow_mut().monitor = Some(monitor);
+        devmaster.borrow_mut().job_queue = Some(job_queue);
+        devmaster.borrow_mut().gc = Some(post);
 
-        ret
+        devmaster
     }
 
     /// run the events loop
@@ -158,6 +160,7 @@ impl Devmaster {
         self.events
             .del_source(self.monitor.clone().unwrap())
             .unwrap();
+        self.events.del_source(self.gc.clone().unwrap()).unwrap();
     }
 
     /// get shared cache

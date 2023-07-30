@@ -18,6 +18,7 @@ use crate::framework::worker_manager::WorkerManager;
 use device::device::Device;
 use event::Source;
 use snafu::ResultExt;
+use std::rc::Weak;
 use std::time::SystemTime;
 use std::{
     cell::RefCell,
@@ -37,9 +38,9 @@ pub struct ControlManager {
     listener: RefCell<TcpListener>,
 
     /// reference to worker manager
-    worker_manager: Rc<WorkerManager>,
+    worker_manager: Weak<WorkerManager>,
     /// reference to job queue
-    job_queue: Rc<JobQueue>,
+    job_queue: Weak<JobQueue>,
     // events: Rc<Events>,
 }
 
@@ -53,8 +54,8 @@ impl ControlManager {
     ) -> ControlManager {
         ControlManager {
             listener: RefCell::new(TcpListener::bind(listen_addr).unwrap()),
-            worker_manager,
-            job_queue,
+            worker_manager: Rc::downgrade(&worker_manager),
+            job_queue: Rc::downgrade(&job_queue),
         }
     }
 }
@@ -85,11 +86,11 @@ impl ControlManager {
                     .context(DeviceSnafu)
                     .log_error("failed to set devname");
 
-                self.job_queue.job_queue_insert(device);
-                self.job_queue.job_queue_start();
+                self.job_queue.upgrade().unwrap().job_queue_insert(device);
+                self.job_queue.upgrade().unwrap().job_queue_start(None);
             }
             "kill" => {
-                self.worker_manager.clone().start_kill_workers_timer();
+                self.worker_manager.upgrade().unwrap().kill_workers();
             }
             _ => {
                 todo!();
@@ -116,7 +117,7 @@ impl Source for ControlManager {
 
     /// Set the priority, -127i8 ~ 128i8, the smaller the value, the higher the priority
     fn priority(&self) -> i8 {
-        -50
+        100
     }
 
     /// start dispatching after the event arrives

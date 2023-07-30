@@ -99,7 +99,6 @@ impl Source for UeventMonitor {
         );
 
         self.job_queue.job_queue_insert(device);
-        self.job_queue.job_queue_start();
         0
     }
 

@@ -12,14 +12,19 @@
 
 //! job queue
 //!
+use crate::{error::*, framework::*};
+use basic::fs_util::touch_file;
 use device::device::Device;
-use std::cell::RefCell;
-use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
-use std::collections::VecDeque;
-use std::fmt::{self, Display};
-use std::rc::{Rc, Weak};
-
-use crate::framework::worker_manager::{Worker, WorkerManager};
+use event::Events;
+use nix::unistd::unlink;
+use snafu::ResultExt;
+use std::{
+    cell::RefCell,
+    cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
+    collections::VecDeque,
+    fmt::{self, Display},
+    rc::{Rc, Weak},
+};
 
 /// state of device job
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -130,30 +135,39 @@ impl PartialEq for DeviceJob {
 #[derive(Debug)]
 pub struct JobQueue {
     /// internal container of jobs
-    jobs: RefCell<VecDeque<Rc<DeviceJob>>>,
+    pub(crate) jobs: RefCell<VecDeque<Rc<DeviceJob>>>,
 
     /// dispatch jobs to worker manager
-    worker_manager: Rc<WorkerManager>,
+    pub(crate) devmaster: Weak<RefCell<Devmaster>>,
 }
 
 /// public methods
 impl JobQueue {
     /// create a job queue
-    pub fn new(worker_manager: Rc<WorkerManager>) -> JobQueue {
+    pub fn new(devmaster: Rc<RefCell<Devmaster>>) -> JobQueue {
         JobQueue {
             jobs: RefCell::new(VecDeque::new()),
-            worker_manager,
+            devmaster: Rc::downgrade(&devmaster),
         }
     }
 }
 
 /// internal methods
 impl JobQueue {
-    /// dispatch job to worker manager
-    pub(crate) fn job_queue_start(&self) {
+    /// Dispatch job to worker manager.
+    /// If events is not none, close the idle worker killer.
+    pub(crate) fn job_queue_start(&self, e: Option<&Events>) {
         if self.jobs.borrow().is_empty() {
             log::debug!("Job Queue: job queue is empty");
             return;
+        }
+
+        let devmaster = self.devmaster.upgrade().unwrap();
+        let worker_manager = devmaster.borrow().worker_manager.clone().unwrap();
+
+        if let Some(e) = e {
+            let gc = devmaster.borrow().gc.clone().unwrap();
+            gc.close_killer(e);
         }
 
         // self.job_queue_show_state();
@@ -169,7 +183,7 @@ impl JobQueue {
             // check whether device is busy
             // todo!()
 
-            match self.worker_manager.job_dispatch(job.clone()) {
+            match worker_manager.job_dispatch(job.clone()) {
                 Ok(worker) => {
                     job.set_state(JobState::Running);
                     job.bind(&worker);
@@ -213,6 +227,15 @@ impl JobQueue {
             return;
         }
 
+        if self.jobs.borrow().is_empty()
+            && touch_file("/run/devmaster/queue", true, None, None, None)
+                .context(BasicSnafu)
+                .log_error("Failed to touch /run/devmaster/queue, stop inserting jobs")
+                .is_err()
+        {
+            return;
+        }
+
         // Keep the ordering
         let idx = self.jobs.borrow().partition_point(|x| x < &job);
         self.jobs.borrow_mut().insert(idx, job);
@@ -253,6 +276,19 @@ impl JobQueue {
                 log::debug!("Job Queue: failed to free job {}", job.seqnum);
             }
         }
+
+        if self.jobs.borrow().is_empty()
+            && unlink("/run/devmaster/queue")
+                .context(NixSnafu)
+                .log_error("Failed to unlink /run/devmaster/queue")
+                .is_ok()
+        {
+            log::debug!("Job queue is empty, removing /run/devmaster/queue");
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.jobs.borrow().is_empty()
     }
 
     // /// show states of each device job in the job queue

@@ -12,35 +12,29 @@
 
 //! worker manager
 //!
-use crate::{
-    error::*,
-    framework::{devmaster::*, job_queue::*},
-    rules,
-};
+use crate::{error::*, framework::*, rules::*};
 use device::{
     device_monitor::{DeviceMonitor, MonitorNetlinkGroup},
     Device,
 };
-use event::{EventState, EventType, Events, Source};
+use event::Source;
 use snafu::ResultExt;
-use std::cell::RefCell;
-use std::fmt::{self, Display};
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::ops::DerefMut;
-use std::os::unix::prelude::{AsRawFd, RawFd};
-use std::rc::{Rc, Weak};
-use std::sync::mpsc;
-use std::sync::Arc;
-use std::thread::JoinHandle;
-use std::{collections::HashMap, sync::RwLock};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fmt::{self, Display},
+    io::{Read, Write},
+    net::{TcpListener, TcpStream},
+    os::unix::prelude::{AsRawFd, RawFd},
+    rc::{Rc, Weak},
+    sync::{mpsc, Arc, RwLock},
+    thread::JoinHandle,
+};
 
 use super::devmaster::Devmaster;
 
 /// worker manager listen address
 pub const WORKER_MANAGER_LISTEN_ADDR: &str = "0.0.0.0:1223";
-/// max time interval for idle worker
-const WORKER_MAX_IDLE_INTERVAL: u64 = 1;
 
 /// messages sended by manager to workers
 pub(crate) enum WorkerMessage {
@@ -52,21 +46,18 @@ pub(crate) enum WorkerMessage {
 #[derive(Debug)]
 pub struct WorkerManager {
     /// max number of workers
-    workers_capacity: u32,
+    pub(crate) workers_capacity: u32,
     /// container of workers
-    workers: RefCell<HashMap<u32, Rc<Worker>>>,
+    pub(crate) workers: RefCell<HashMap<u32, Rc<Worker>>>,
     /// listening socket address
-    listen_addr: String,
+    pub(crate) listen_addr: String,
     /// listening socket
-    listener: RefCell<TcpListener>,
-    /// timer source for killing all workers
-    kill_idle_workers: RefCell<Option<Rc<WorkerManagerKillWorkers>>>,
+    pub(crate) listener: RefCell<TcpListener>,
     /// reference to job queue
-    job_queue: RefCell<Weak<JobQueue>>,
-    /// reference to events
-    events: Rc<Events>,
+    pub(crate) job_queue: RefCell<Weak<JobQueue>>,
+
     /// reference to devmaster manager
-    devmaster: Weak<RefCell<Devmaster>>,
+    pub(crate) devmaster: Weak<RefCell<Devmaster>>,
 }
 
 /// worker
@@ -147,7 +138,7 @@ impl Worker {
                             .unwrap_or_default()
                     );
 
-                    let mut execute_mgr = rules::exec_mgr::ExecuteManager::new(cache.clone());
+                    let mut execute_mgr = exec_mgr::ExecuteManager::new(cache.clone());
 
                     let device = Rc::new(RefCell::new(device));
                     let _ = execute_mgr.process_device(device.clone());
@@ -245,7 +236,6 @@ impl WorkerManager {
     pub fn new(
         workers_capacity: u32,
         listen_addr: String,
-        events: Rc<Events>,
         devmaster: Weak<RefCell<Devmaster>>,
     ) -> WorkerManager {
         let listener = RefCell::new(TcpListener::bind(listen_addr.as_str()).unwrap_or_else(
@@ -265,30 +255,9 @@ impl WorkerManager {
             workers: RefCell::new(HashMap::new()),
             listen_addr,
             listener,
-            kill_idle_workers: RefCell::new(None),
             job_queue: RefCell::new(Weak::new()),
-            events,
             devmaster,
         }
-    }
-
-    /// set the event source instance of kill workers timer
-    pub fn set_kill_workers_timer(self: &Rc<WorkerManager>) {
-        *self.kill_idle_workers.borrow_mut() = Some(Rc::new(WorkerManagerKillWorkers::new(
-            WORKER_MAX_IDLE_INTERVAL,
-            self.clone(),
-        )));
-    }
-
-    /// get the event source instance of kill workers timer
-    pub fn get_kill_workers_timer(
-        self: &Rc<WorkerManager>,
-    ) -> Option<Rc<WorkerManagerKillWorkers>> {
-        if let Some(source) = self.kill_idle_workers.borrow().as_ref() {
-            return Some(source.clone());
-        }
-
-        None
     }
 
     /// set the reference to a job queue instance
@@ -403,7 +372,6 @@ impl WorkerManager {
 
                 self.workers
                     .borrow_mut()
-                    .deref_mut()
                     .remove(&id)
                     .unwrap()
                     .handler
@@ -427,8 +395,6 @@ impl WorkerManager {
 
                 self.set_worker_state(id, WorkerState::Idle);
                 self.job_queue.borrow().upgrade().unwrap().job_free(job);
-
-                self.job_queue.borrow().upgrade().unwrap().job_queue_start();
             }
             _ => {
                 todo!();
@@ -446,29 +412,12 @@ impl WorkerManager {
     }
 
     /// kill all workers
-    pub(crate) fn manager_kill_workers(&self) {
+    pub(crate) fn kill_workers(&self) {
         for (id, worker) in self.workers.borrow().iter() {
             self.set_worker_state(*id, WorkerState::Killing);
             worker.worker_send_message(WorkerMessage::Cmd(String::from("kill")));
         }
     }
-
-    /// start kill workers timer
-    pub(crate) fn start_kill_workers_timer(self: &Rc<WorkerManager>) {
-        self.events
-            .set_enabled(self.get_kill_workers_timer().unwrap(), EventState::Off)
-            .unwrap();
-        self.events
-            .set_enabled(self.get_kill_workers_timer().unwrap(), EventState::OneShot)
-            .unwrap();
-    }
-
-    // /// stop kill workers timer
-    // pub(crate) fn stop_kill_workers_timer(self: &Rc<WorkerManager>) {
-    //     self.events
-    //         .set_enabled(self.get_kill_workers_timer().unwrap(), EventState::Off)
-    //         .unwrap();
-    // }
 }
 
 impl Source for WorkerManager {
@@ -489,11 +438,11 @@ impl Source for WorkerManager {
 
     /// Set the priority, -127i8 ~ 128i8, the smaller the value, the higher the priority
     fn priority(&self) -> i8 {
-        10
+        0
     }
 
     /// start dispatching after the event arrives
-    fn dispatch(&self, _: &event::Events) -> i32 {
+    fn dispatch(&self, e: &event::Events) -> i32 {
         let (mut stream, _) = match self.listener.borrow_mut().accept() {
             Ok((s, sa)) => (s, sa),
             Err(e) => {
@@ -510,74 +459,29 @@ impl Source for WorkerManager {
         log::debug!("Worker Manager: received message \"{ack}\"");
         self.worker_response_dispose(ack);
 
+        /*
+         * Cleaning up idle wokers is asynchronous, thus when the
+         * idle worker killer raised, the workers is not cleaned
+         * up right away. This will lead to the post event starting
+         * another idle worker killer.
+         *
+         * That is to say, when the worker manager has cleaned up
+         * the workers, there is another redundant idle worker killer
+         * underground.
+         *
+         * To avoid the redundant idle worker killer raising, close
+         * it explicitly.
+         */
+        if self.workers.borrow().is_empty() {
+            let devmaster = self.devmaster.upgrade().unwrap();
+            let gc = devmaster.borrow().gc.clone().unwrap();
+            gc.close_killer(e);
+        }
+
         0
     }
 
     /// Unless you can guarantee all types of token allocation, it is recommended to use the default implementation here
-    fn token(&self) -> u64 {
-        let data: u64 = unsafe { std::mem::transmute(self) };
-        data
-    }
-}
-
-/// event source to kill workers
-#[derive(Debug)]
-pub struct WorkerManagerKillWorkers {
-    /// time interval
-    time: u64,
-
-    /// reference to worker manager
-    worker_manager: Weak<WorkerManager>,
-}
-
-/// internal methods
-impl WorkerManagerKillWorkers {
-    /// create a timer instance to recycle workers
-    pub(crate) fn new(time: u64, worker_manager: Rc<WorkerManager>) -> WorkerManagerKillWorkers {
-        WorkerManagerKillWorkers {
-            time,
-            worker_manager: Rc::downgrade(&worker_manager),
-        }
-    }
-}
-
-impl Source for WorkerManagerKillWorkers {
-    /// timer fd is zero
-    fn fd(&self) -> RawFd {
-        0
-    }
-
-    /// timer type
-    fn event_type(&self) -> EventType {
-        EventType::TimerMonotonic
-    }
-
-    /// epoll type
-    fn epoll_event(&self) -> u32 {
-        (libc::EPOLLIN) as u32
-    }
-
-    /// priority of timer source
-    fn priority(&self) -> i8 {
-        -55
-    }
-
-    /// relative time
-    fn time_relative(&self) -> u64 {
-        self.time * 1000000
-    }
-
-    /// kill workers if job queue keeps empty for an interval
-    fn dispatch(&self, _: &Events) -> i32 {
-        log::info!("Worker Manager Kill Workers timeout!");
-        self.worker_manager
-            .upgrade()
-            .unwrap()
-            .manager_kill_workers();
-        0
-    }
-
-    /// token of event source
     fn token(&self) -> u64 {
         let data: u64 = unsafe { std::mem::transmute(self) };
         data
