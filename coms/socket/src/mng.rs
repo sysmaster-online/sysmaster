@@ -619,7 +619,7 @@ impl SocketMng {
             return;
         }
         for symlink in config.borrow().Socket.Symlinks.as_ref().unwrap() {
-            let _ = unlink(symlink.as_str());
+            let _ = unlink(symlink.to_str().unwrap());
         }
     }
 

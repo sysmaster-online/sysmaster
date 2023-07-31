@@ -17,6 +17,7 @@ use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::os::unix::prelude::RawFd;
+use std::path::PathBuf;
 use std::rc::Rc;
 use sysmaster::exec::ExecCommand;
 use sysmaster::rel::{ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, Reliability};
@@ -71,8 +72,8 @@ pub(super) struct SectionSocket {
     pub Broadcast: Option<bool>,
     #[config(default = false)]
     pub RemoveOnStop: bool,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub Symlinks: Option<Vec<String>>,
+    #[config(deserialize_with = Vec::<PathBuf>::deserialize_with)]
+    pub Symlinks: Option<Vec<PathBuf>>,
     pub PassSecurity: Option<bool>,
     #[config(default = 0o666)]
     pub SocketMode: u32,

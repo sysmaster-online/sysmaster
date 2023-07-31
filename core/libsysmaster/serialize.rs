@@ -11,7 +11,13 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-use serde::{Deserialize, Deserializer};
+use std::path::PathBuf;
+
+use basic::path_util::parse_absolute_path;
+use serde::{
+    de::{self, Unexpected},
+    Deserialize, Deserializer,
+};
 
 ///
 pub trait DeserializeWith: Sized {
@@ -37,5 +43,27 @@ impl DeserializeWith for Vec<String> {
         }
 
         Ok(vec)
+    }
+}
+
+impl DeserializeWith for Vec<PathBuf> {
+    type Item = Self;
+
+    fn deserialize_with<'de, D>(de: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(de)?;
+        let mut res: Vec<PathBuf> = Vec::new();
+        if s.is_empty() {
+            return Ok(res);
+        }
+        for p in s.split_terminator(';') {
+            if parse_absolute_path(p).is_err() {
+                return Err(de::Error::invalid_value(Unexpected::Str(p), &""));
+            }
+            res.push(PathBuf::from(p));
+        }
+        Ok(res)
     }
 }
