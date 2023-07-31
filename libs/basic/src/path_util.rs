@@ -133,8 +133,8 @@ pub fn path_is_abosolute(s: &str) -> bool {
     s.starts_with('/')
 }
 
-/// check if the given path is valid, return the simplified path String if it's valid
-pub fn parse_path_common(s: &str) -> Result<String, Error> {
+/// check if the absolute path is valid, return the simplified path String if it's valid.
+pub fn parse_absolute_path(s: &str) -> Result<String, Error> {
     if !path_name_is_safe(s) {
         return Err(Error::Invalid {
             what: "path contains unsafe character".to_string(),

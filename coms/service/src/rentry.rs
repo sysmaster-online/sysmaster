@@ -14,7 +14,7 @@
 use crate::monitor::ServiceMonitor;
 
 use basic::path_util::{
-    parse_path_common, path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify,
+    parse_absolute_path, path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify,
 };
 use confique::Config;
 use macros::EnumDisplay;
@@ -240,7 +240,7 @@ where
 {
     let s = String::deserialize(de)?;
     let path =
-        parse_path_common(&s).map_err(|_| de::Error::invalid_value(Unexpected::Str(&s), &""))?;
+        parse_absolute_path(&s).map_err(|_| de::Error::invalid_value(Unexpected::Str(&s), &""))?;
     Ok(PathBuf::from(path))
 }
 

@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::serialize::DeserializeWith;
-use basic::{path_util::parse_path_common, Error, Result};
+use basic::{path_util::parse_absolute_path, Error, Result};
 use bitflags::bitflags;
 use serde::{
     de::{self, Unexpected},
@@ -155,7 +155,7 @@ fn parse_exec(s: &str) -> Result<VecDeque<ExecCommand>> {
             Some((v0, _v1)) => v0,
         };
 
-        let path = parse_path_common(path_str)?;
+        let path = parse_absolute_path(path_str)?;
 
         /* content is "good" */
         let mut argv_start = path_start + path_str.len();
