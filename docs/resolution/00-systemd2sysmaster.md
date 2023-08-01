@@ -1,4 +1,4 @@
-# systemd迁移到sysmaster说明
+# systemd向sysmaster迁移
 
 ## toml配置格式
 
