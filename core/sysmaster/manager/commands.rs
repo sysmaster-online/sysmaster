@@ -135,6 +135,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::fs::File;
+    use std::io::{Read, Write};
+    use std::os::unix::prelude::FromRawFd;
+    use std::process::exit;
     use std::sync::{Arc, Mutex};
     use std::{os::unix::net::UnixStream, rc::Rc};
 
@@ -143,6 +147,7 @@ mod tests {
     use cmdproto::proto::{CommandRequest, ProstClientStream};
     use constants::SCTL_SOCKET;
     use event::{EventState, Events};
+    use nix::unistd;
     use sysmaster::rel::{ReliConf, Reliability};
 
     use crate::manager::RELI_HISTORY_MAX_DBS;
@@ -229,7 +234,103 @@ mod tests {
     }
 
     #[test]
-    fn test_sctl_socket() {
+    fn test_sctl_socket_process() {
+        if !nix::unistd::getuid().is_root() {
+            println!(
+                "We will create a socket under '/run', so we must be root to run this testcase."
+            );
+            return;
+        }
+
+        let pipe_msg = unistd::pipe().unwrap();
+        let pipe_sync = unistd::pipe().unwrap();
+
+        let ret = unsafe { unistd::fork() }.unwrap();
+        if ret.is_parent() {
+            unistd::close(pipe_msg.1).unwrap();
+            unistd::close(pipe_sync.0).unwrap();
+
+            let exec_action = TestExecAction {};
+            let reli = Rc::new(Reliability::new(
+                ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+            ));
+            /* This will remove the /run/sysmaster/sctl on the compiling environment. */
+            let command = Rc::new(Commands::new(&reli, exec_action));
+            let e = Events::new().unwrap();
+            e.add_source(command.clone()).unwrap();
+            e.set_enabled(command, EventState::On).unwrap();
+
+            /* Write something to trigger the child process continue */
+            let mut file = unsafe { File::from_raw_fd(pipe_sync.1) };
+            write!(&mut file, "go!").unwrap();
+            unistd::close(pipe_sync.1).unwrap();
+
+            /* We have 2 events to dispatch, but are not sure if we can get these events after waiting
+             * 300ms, 400ms. So we wait one more time to make sure all events are dispatched. */
+            e.run(300).unwrap();
+            e.run(400).unwrap();
+            e.run(300).unwrap();
+
+            /* Got the result from child use pipe_msg */
+            let mut file = unsafe { File::from_raw_fd(pipe_msg.0) };
+            let mut res = String::new();
+            file.read_to_string(&mut res).unwrap();
+            assert_eq!(res, "Ok");
+            unistd::close(pipe_msg.0).unwrap();
+        } else {
+            /* child only writes message */
+            unistd::close(pipe_msg.0).unwrap();
+            unistd::close(pipe_sync.1).unwrap();
+
+            /* Wait until the parent process tells "go!" */
+            let mut file = unsafe { File::from_raw_fd(pipe_sync.0) };
+            let mut buf = String::new();
+            file.read_to_string(&mut buf).unwrap();
+            assert_eq!(buf, "go!");
+            unistd::close(pipe_sync.0).unwrap();
+
+            /* 1. Start a service as root. */
+            let stream = UnixStream::connect(SCTL_SOCKET).unwrap();
+            let mut client = ProstClientStream::new(stream);
+
+            let req = CommandRequest::new_unitcomm(
+                unit_comm::Action::Start,
+                vec!["foo.service".to_string()],
+            );
+            let data = client.execute(req).unwrap();
+            if !data
+                .message
+                .eq("Failed to start foo.service: ENOENT: No such file or directory")
+            {
+                return;
+            }
+            /* 2. Start a service as an unprivileged user. */
+            let _ = nix::unistd::setuid(nix::unistd::Uid::from_raw(1000));
+            let stream = UnixStream::connect(SCTL_SOCKET).unwrap();
+            let mut client = ProstClientStream::new(stream);
+
+            let req = CommandRequest::new_unitcomm(
+                unit_comm::Action::Start,
+                vec!["foo.service".to_string()],
+            );
+            let data = client.execute(req).unwrap();
+            if !data
+                .message
+                .eq("Failed to execute your command: Operation not permitted.")
+            {
+                return;
+            }
+
+            /* Everything goes well, tell the parent "Ok" */
+            let mut file = unsafe { File::from_raw_fd(pipe_msg.1) };
+            write!(&mut file, "Ok").unwrap();
+            unistd::close(pipe_msg.1).unwrap();
+            exit(0);
+        }
+    }
+
+    #[test]
+    fn test_sctl_socket_thread() {
         if !nix::unistd::getuid().is_root() {
             println!(
                 "We will create a socket under '/run', so we must be root to run this testcase."
@@ -259,25 +360,7 @@ mod tests {
             {
                 return;
             }
-            /* 2. Start a service as an unprivileged user. */
-            if nix::unistd::setuid(nix::unistd::Uid::from_raw(1000)).is_err() {
-                println!("Failed to set ourself to unprivileged user");
-                return;
-            }
-            let stream = UnixStream::connect(SCTL_SOCKET).unwrap();
-            let mut client = ProstClientStream::new(stream);
 
-            let req = CommandRequest::new_unitcomm(
-                unit_comm::Action::Start,
-                vec!["foo.service".to_string()],
-            );
-            let data = client.execute(req).unwrap();
-            if !data
-                .message
-                .eq("Failed to execute your command: Operation not permitted.")
-            {
-                return;
-            }
             *test_ok = 1;
         });
 
