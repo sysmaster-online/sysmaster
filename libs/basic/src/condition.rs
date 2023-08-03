@@ -878,7 +878,7 @@ mod test {
             ConditionType::KernelCommandLine,
             0,
             0,
-            String::from("root=/dev/mapper/openeuler-root"),
+            String::from("ro"),
         );
     }
 
