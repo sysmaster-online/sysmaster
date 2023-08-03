@@ -26,6 +26,7 @@ use nix::sys::signalfd::SigSet;
 use nix::sys::signalfd::SignalFd;
 use nix::sys::socket::getsockopt;
 use nix::sys::socket::sockopt::PeerCredentials;
+use nix::sys::stat;
 use nix::sys::stat::umask;
 use nix::sys::stat::Mode;
 use nix::sys::time::TimeSpec;
@@ -204,7 +205,12 @@ impl Runtime {
         let sock_path = PathBuf::from(INIT_SOCK);
         let sock_parent = sock_path.parent().unwrap();
         if !sock_parent.exists() {
-            fs::create_dir_all(sock_parent)?;
+            let old_mask = stat::umask(stat::Mode::from_bits_truncate(!0o755));
+            let ret = fs::create_dir_all(sock_parent);
+            let _ = stat::umask(old_mask);
+            if let Err(e) = ret {
+                return Err(e);
+            }
         }
         if fs::metadata(INIT_SOCK).is_ok() {
             let _ = fs::remove_file(INIT_SOCK);
