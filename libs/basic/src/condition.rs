@@ -444,7 +444,7 @@ mod test {
         security::{self},
     };
     use core::panic;
-    use std::{env, fs, path::Path, any::Any};
+    use std::{any::Any, env, fs, path::Path};
     use tempfile::NamedTempFile;
 
     fn setup(_type: ConditionType, trigger: i8, revert: i8, params: String) -> Condition {
