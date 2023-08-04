@@ -67,17 +67,21 @@ pub fn symlink(target: &str, link: &str, relative: bool) -> Result<()> {
     let raw_fd = dir.map(|f| f.as_raw_fd());
 
     if let Err(e) = nix::unistd::symlinkat(target_path.as_path(), raw_fd, tmp_link.as_str()) {
-        log::error!("Failed to create symlink {link} -> {target}: {e}");
+        log::error!("Failed to create symlink {} -> {}: {}", link, target, e);
         return Err(Error::Nix { source: e });
     }
 
     if let Err(e) = renameat(raw_fd, tmp_link.as_str(), raw_fd, link_path) {
-        log::error!("Failed to rename the temporary path of {link_path:?}: {e}");
+        log::error!(
+            "Failed to rename the temporary path of {:?}: {}",
+            link_path,
+            e
+        );
         let _ = unlinkat(raw_fd, tmp_link.as_str(), UnlinkatFlags::NoRemoveDir);
         return Err(Error::Nix { source: e });
     }
 
-    log::debug!("Successfully created symlink: {link} -> {target}");
+    log::debug!("Successfully created symlink: {} -> {}", link, target);
 
     Ok(())
 }
@@ -319,7 +323,7 @@ macro_rules! do_entry_or_return_io_error {
     ($function:expr, $entry:ident, $action:literal) => {
         match $function(&$entry) {
             Err(e) => {
-                log::error!("Failed to {} {:?}: {e}", $action, $entry);
+                log::error!("Failed to {} {:?}: {}", $action, $entry, e);
                 return Err(e).context(IoSnafu);
             }
             Ok(_) => log::debug!("{} {:?} succeeded", $action, $entry),
@@ -332,7 +336,7 @@ macro_rules! do_entry_or_return_io_error {
 macro_rules! do_entry_log {
     ($function:expr, $entry:ident, $action:literal) => {
         match $function(&$entry) {
-            Err(e) => log::error!("Failed to {} {:?}: {e}", $action, $entry),
+            Err(e) => log::error!("Failed to {} {:?}: {}", $action, $entry, e),
             Ok(_) => log::debug!("{} {:?} succeeded", $action, $entry),
         }
     };

@@ -179,7 +179,7 @@ pub fn parse_hw_addr_full(s: &str, expected_len: usize) -> Result<HwAddress> {
 
     let field_bytes = if s.find('.').is_some() {
         2
-    } else if s.find([':', '-']).is_some() {
+    } else if s.find(':').is_some() || s.find('-').is_some() {
         1
     } else {
         return Err(Error::Nix {

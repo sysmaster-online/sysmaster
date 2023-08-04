@@ -66,7 +66,7 @@ impl ReliEnable {
         enable.unwrap_or(false)
     }
 
-    fn enable_len(&self) -> Result<u64> {
+    fn enable_len(&self) -> Result<usize> {
         let db = self.open_db_enable()?;
         let rtxn = self.env.read_txn().context(HeedSnafu)?;
         db.len(&rtxn).context(HeedSnafu)

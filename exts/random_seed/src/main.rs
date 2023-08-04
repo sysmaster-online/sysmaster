@@ -32,7 +32,7 @@ fn main() {
     }
 
     if let Err(str) = run(&args[1]) {
-        log::error!("{str}");
+        log::error!("{}", str);
         process::exit(1);
     }
 

@@ -93,7 +93,7 @@ enum SubCmd {
 /// subcommand for testing communication
 fn subcommand_test(devname: String) {
     let mut stream = TcpStream::connect(CONTROL_MANAGER_LISTEN_ADDR).unwrap();
-    let msg = format!("test {devname}");
+    let msg = format!("test {}", devname);
     stream.write_all(msg.as_bytes()).unwrap();
 }
 

@@ -133,19 +133,19 @@ fn setup_exec_directory(exec_ctx: Rc<ExecContext>) -> Result<()> {
         /* d should be prefixed already, create it if it doesn't exist */
         if !d.exists() {
             if let Err(e) = std::fs::create_dir_all(d) {
-                log::error!("Failed to setup directory {:?}: {e}", d);
+                log::error!("Failed to setup directory {:?}: {}", d, e);
                 return Err(Error::Io { source: e });
             }
         }
 
         if let Err(e) = nix::unistd::chown(d, Some(uid), Some(gid)) {
-            log::error!("Failed to set the owner of {:?}: {e}", d);
+            log::error!("Failed to set the owner of {:?}: {}", d, e);
             return Err(Error::Nix { source: e });
         }
 
         /* Hard-coding 755, change this when we implementing XXXDirectoryMode. */
         if let Err(e) = std::fs::set_permissions(d, Permissions::from_mode(0o755)) {
-            log::error!("Failed to set the permissions of {:?}: {e}", d);
+            log::error!("Failed to set the permissions of {:?}: {}", d, e);
             return Err(Error::Io { source: e });
         }
     }
@@ -167,19 +167,19 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
     log::debug!("exec context params: {:?}", ctx.envs());
 
     if let Err(e) = apply_root_directory(ctx.root_directory()) {
-        log::error!("Failed to apply root directory: {e}");
+        log::error!("Failed to apply root directory: {}", e);
         return;
     }
 
     let _ = setup_exec_directory(ctx.clone());
 
     if let Err(e) = apply_user_and_group(ctx.clone(), params) {
-        log::error!("Failed to apply user or group: {e}");
+        log::error!("Failed to apply user or group: {}", e);
         return;
     }
 
     if let Err(e) = apply_working_directory(ctx.working_directory()) {
-        log::error!("Failed to apply working directory: {e}");
+        log::error!("Failed to apply working directory: {}", e);
         return;
     }
 
@@ -288,7 +288,7 @@ fn build_environment(_unit: &Unit, ep: &ExecParameters) -> Vec<std::ffi::CString
     if fds > 0 {
         envs.push(std::ffi::CString::new(format!("LISTEN_PID={}", nix::unistd::getpid())).unwrap());
 
-        envs.push(std::ffi::CString::new(format!("LISTEN_FDS={fds}")).unwrap());
+        envs.push(std::ffi::CString::new(format!("LISTEN_FDS={}", fds)).unwrap());
     }
 
     if ep.exec_flags().contains(ExecFlags::SOFT_WATCHDOG) && ep.watchdog_usec() > 0 {

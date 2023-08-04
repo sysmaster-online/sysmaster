@@ -106,11 +106,11 @@ USERSPACE - broadcasted by devmaster after successful process on device
     });
 
     if let Err(errno) = set_receive_buffer(kernel_monitor.fd(), 1024 * 1024 * 128) {
-        log::error!("Failed to set receive buffer forcely ({errno:?})");
+        log::error!("Failed to set receive buffer forcely ({:?})", errno);
     }
 
     if let Err(errno) = set_receive_buffer(userspace_monitor.fd(), 1024 * 1024 * 128) {
-        log::error!("Failed to set receive buffer forcely ({errno:?})");
+        log::error!("Failed to set receive buffer forcely ({:?})", errno);
     }
 
     let events = Events::new().unwrap();

@@ -62,14 +62,14 @@ impl SocketLoad {
         let unit_name = self.comm.owner().map(|u| u.id().to_string());
         let suffix = String::from(related_type);
         if suffix.is_empty() {
-            return Err(format!("failed to load related unit {suffix}").into());
+            return Err(format!("failed to load related unit {}", suffix).into());
         }
         if unit_name.is_none() {
-            return Err(format!("failed to load related unit {suffix} unit name is none").into());
+            return Err(format!("failed to load related unit {} unit name is none", suffix).into());
         }
         let u_name = unit_name.unwrap();
         let stem_name = Path::new(&u_name).file_stem().unwrap().to_str().unwrap();
-        let relate_name = format!("{stem_name}.{suffix}");
+        let relate_name = format!("{}.{}", stem_name, suffix);
         self.config.set_unit_ref(relate_name);
         Ok(())
     }

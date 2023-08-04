@@ -209,7 +209,7 @@ impl Blkid {
                 &blkid_rs::encode_string(value).unwrap(),
             ),
             _ => {
-                log::warn!("not match key: {name}={value}");
+                log::warn!("not match key: {}={}", name, value);
                 Ok(())
             }
         }

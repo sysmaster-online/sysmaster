@@ -25,7 +25,7 @@ pub struct ManagerConfig {
     pub DefaultTimeoutSec: u64,
 
     #[config(default = "info")]
-    pub LogLevel: log::LevelFilter,
+    pub LogLevel: String,
     #[config(default = "syslog")]
     pub LogTarget: String,
     #[config(default = 10240)]
@@ -64,7 +64,7 @@ impl Default for ManagerConfig {
         Self {
             DefaultRestartSec: 100,
             DefaultTimeoutSec: 90,
-            LogLevel: log::LevelFilter::Debug,
+            LogLevel: "info".to_string(),
             LogTarget: "syslog".to_string(),
             LogFileSize: 10240,
             LogFileNumber: 10,
@@ -84,7 +84,6 @@ mod test {
         let mut file: PathBuf = get_crate_root().unwrap();
         file.push("config/system.conf");
         let config = ManagerConfig::new(file.to_str());
-        println!("{config:?}");
         assert_eq!(config.DefaultRestartSec, 100);
     }
 }

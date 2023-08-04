@@ -28,7 +28,7 @@ pip3 install pre-commit ruamel.yaml -i https://pypi.mirrors.ustc.edu.cn/simple |
 # newnum=`git rev-list HEAD --no-merges --count`
 # changenum=$[newnum - oldnum]
 rustup override set 1.57
-cargo check --all --all-targets || cargo check --all --all-targets || cargo check --all --all-targets || exit 1
+cargo check --all --all-targets || exit 1
 git add . -A
 
 # add doc for src code
@@ -39,7 +39,7 @@ do
         continue
     fi
     # do not use global #!allow, exclude non_snake_case
-    sed -i 's/#!\[allow(/\/\/#!\[allow(/g' $rustlist 2>/dev/null || true
+    # sed -i 's/#!\[allow(/\/\/#!\[allow(/g' $rustlist 2>/dev/null || true
     sed -i 's/\/\/#!\[allow(non_snake_case)\]/#!\[allow(non_snake_case)\]/g' $rustlist 2>/dev/null || true
     sed -i 's/\/\/#!\[allow(clippy::module_inception)\]/#!\[allow(clippy::module_inception)\]/g' $rustlist 2>/dev/null || true
     egrep '#!\[deny\(missing_docs\)\]' $rustlist || sed -i '1i\#![deny(missing_docs)]' $rustlist 2>/dev/null || true

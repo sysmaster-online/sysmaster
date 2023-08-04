@@ -48,7 +48,7 @@ repos:
       - id: cargo-override-set
         name: cargo-override-set
         description: unset override.
-        entry: bash -c 'rustup && rustup override set stable'
+        entry: bash -c 'rustup override set stable || true'
         language: rust
         pass_filenames: false
         files: \.(rs|toml)$
@@ -103,7 +103,7 @@ repos:
       - id: cargo-override-unset
         name: cargo-override-unset
         description: unset override.
-        entry: bash -c 'rustup && rustup override unset'
+        entry: bash -c 'rustup override unset || true'
         language: rust
         pass_filenames: false
         files: \.(rs|toml)$

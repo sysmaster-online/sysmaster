@@ -456,7 +456,8 @@ impl JobManagerData {
 
             if let Some((trigger_info, merge_trigger)) = trigger_ret {
                 // something is triggered in this round
-                (cnt, _) = cnt.overflowing_add(1); // ++
+                let (lcnt, _) = cnt.overflowing_add(1); // ++
+                cnt = lcnt;
 
                 // update statistics
                 self.stat.update_change(&(&None, &merge_trigger, &None));

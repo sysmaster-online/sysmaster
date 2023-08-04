@@ -166,7 +166,7 @@ impl ReliPending {
         contains.is_some()
     }
 
-    fn fd_len(&self) -> Result<u64> {
+    fn fd_len(&self) -> Result<usize> {
         let db = self.open_db_fd()?;
         let rtxn = self.env.read_txn().context(HeedSnafu)?;
         db.len(&rtxn).context(HeedSnafu)

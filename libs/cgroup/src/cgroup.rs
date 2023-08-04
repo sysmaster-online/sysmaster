@@ -138,7 +138,7 @@ pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<()> {
         pid
     };
 
-    fs::write(cg_procs, format!("{p}\n")).context(IoSnafu)?;
+    fs::write(cg_procs, format!("{}\n", p)).context(IoSnafu)?;
 
     Ok(())
 }
@@ -207,7 +207,7 @@ fn remove_dir(cg_path: &PathBuf) -> Result<()> {
     for entry in read_dir {
         let entry = match entry {
             Err(e) => {
-                log::error!("Failed to get directory entry: {e}");
+                log::error!("Failed to get directory entry: {}", e);
                 return Err(Error::Io { source: e });
             }
             Ok(v) => v,
@@ -215,8 +215,9 @@ fn remove_dir(cg_path: &PathBuf) -> Result<()> {
         let entry_file_type = match entry.file_type() {
             Err(e) => {
                 log::error!(
-                    "Failed to geth the file type of {:?}: {e}",
-                    entry.file_name()
+                    "Failed to geth the file type of {:?}: {}",
+                    entry.file_name(),
+                    e
                 );
                 return Err(Error::Io { source: e });
             }
@@ -234,7 +235,7 @@ fn remove_dir(cg_path: &PathBuf) -> Result<()> {
     loop {
         let e = match fs::remove_dir(cg_path) {
             Ok(()) => {
-                log::debug!("Successfully removed {cg_path:?}");
+                log::debug!("Successfully removed {:?}", cg_path);
                 return Ok(());
             }
             Err(e) => e,
@@ -248,7 +249,7 @@ fn remove_dir(cg_path: &PathBuf) -> Result<()> {
             try_times += 1;
             continue;
         }
-        log::error!("Failed to remove {cg_path:?}: {e}");
+        log::error!("Failed to remove {:?}: {}", cg_path, e);
         return Err(Error::Io { source: e });
     }
 }
@@ -592,15 +593,15 @@ impl CgController {
     }
 
     fn cg_strip_suffix<'a>(&self, str: &'a str) -> &'a str {
-        if let Some(str) = str.strip_suffix(&format!("/{INIT_SCOPE}")) {
+        if let Some(str) = str.strip_suffix(&format!("/{}", INIT_SCOPE)) {
             return str;
         }
 
-        if let Some(str) = str.strip_suffix(&format!("/{SYSMASTER_SLICE}")) {
+        if let Some(str) = str.strip_suffix(&format!("/{}", SYSMASTER_SLICE)) {
             return str;
         }
 
-        if let Some(str) = str.strip_suffix(&format!("/{CGROUP_SYSMASTER}")) {
+        if let Some(str) = str.strip_suffix(&format!("/{}", CGROUP_SYSMASTER)) {
             return str;
         }
 
@@ -620,8 +621,8 @@ impl CgController {
 
     fn get_abs_path_by_cgtype(&self, path: &str, cg_type: CgType) -> Result<String> {
         match cg_type {
-            CgType::UnifiedV2 => Ok(format!("{CG_BASE_DIR}/{path}")),
-            CgType::UnifiedV1 => Ok(format!("{CG_UNIFIED_DIR}/{path}")),
+            CgType::UnifiedV2 => Ok(format!("{}/{}", CG_BASE_DIR, path)),
+            CgType::UnifiedV1 => Ok(format!("{}/{}", CG_UNIFIED_DIR, path)),
             CgType::Legacy => Ok(format!("{}/{}/{}", CG_BASE_DIR, self.controller, path)),
             _ => Err(Error::NotSupported),
         }
@@ -637,7 +638,7 @@ impl CgController {
         Ok(())
     }
 
-    fn cg_remove_dir(path: &PathBuf, delete_root: bool) -> Result<()> {
+    fn cg_remove_dir(path: &Path, delete_root: bool) -> Result<()> {
         if !path.exists() {
             return Ok(());
         }
@@ -697,7 +698,7 @@ mod tests {
         let base_path = super::cgtype_to_path(cg_type);
         let path_buf: PathBuf = PathBuf::from(base_path);
 
-        println!("base path is: {base_path:?}");
+        println!("base path is: {:?}", base_path);
         if let Ok(p) = super::cg_abs_path(&cg_path, &PathBuf::from("")) {
             assert_eq!(p, path_buf.join(&cg_path).join(PathBuf::from("")),)
         }
@@ -706,7 +707,7 @@ mod tests {
 
         let pid = match t_thread {
             Ok(ForkResult::Parent { child }) => {
-                println!("child pid is: {child:?}");
+                println!("child pid is: {:?}", child);
                 let ret = super::cg_attach(child, &cg_path);
                 assert!(ret.is_ok());
                 child
@@ -733,7 +734,7 @@ mod tests {
             HashSet::new(),
         );
         assert!(ret.is_ok());
-        println!("kill cgroup ret is: {ret:?}");
+        println!("kill cgroup ret is: {:?}", ret);
 
         thread::sleep(Duration::from_secs(1));
 
@@ -758,7 +759,7 @@ mod tests {
         let clist = ret.unwrap();
         assert_ne!(clist.len(), 0);
 
-        println!("supported controllers: {clist:?}");
+        println!("supported controllers: {:?}", clist);
         let controllers = [
             "cpuset",
             "cpu",
@@ -806,14 +807,17 @@ mod tests {
         let path = cg0.cg_get_path(cg0.get_procfs_path()).unwrap();
         assert_ne!(path.len(), 0);
 
-        assert_eq!(cg0.cg_strip_suffix(&format!("/test/{INIT_SCOPE}")), "/test");
-        assert_eq!(cg0.cg_strip_suffix(&format!("/{INIT_SCOPE}")), "");
         assert_eq!(
-            cg0.cg_strip_suffix(&format!("/test/{SYSMASTER_SLICE}")),
+            cg0.cg_strip_suffix(&format!("/test/{}", INIT_SCOPE)),
+            "/test"
+        );
+        assert_eq!(cg0.cg_strip_suffix(&format!("/{}", INIT_SCOPE)), "");
+        assert_eq!(
+            cg0.cg_strip_suffix(&format!("/test/{}", SYSMASTER_SLICE)),
             "/test"
         );
         assert_eq!(
-            cg0.cg_strip_suffix(&format!("/test/{CGROUP_SYSMASTER}")),
+            cg0.cg_strip_suffix(&format!("/test/{}", CGROUP_SYSMASTER)),
             "/test"
         );
 

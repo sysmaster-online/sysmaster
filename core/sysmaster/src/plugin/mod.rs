@@ -111,7 +111,7 @@ impl Plugin {
             }
         };
 
-        let mut conf_file = format!("{LIB_PLUGIN_PATH}plugin.conf");
+        let mut conf_file = format!("{}plugin.conf", LIB_PLUGIN_PATH);
         let mut path = Path::new(&conf_file);
         if !path.exists() {
             let lib_path_str = devel_path();
@@ -125,7 +125,7 @@ impl Plugin {
                 let _tmp: Vec<_> = lib_path_str.split("build").collect();
                 conf_file = format!("{}/conf/plugin.conf", _tmp[0]);
             } else {
-                conf_file = format!("{lib_path_str}/conf/plugin.conf");
+                conf_file = format!("{}/conf/plugin.conf", lib_path_str);
             }
             path = Path::new(&conf_file);
         }
@@ -446,7 +446,7 @@ impl Plugin {
         let dy_lib = match self.get_lib(unit_type) {
             Err(_) => {
                 return Err(Error::PluginLoad {
-                    msg: format!("create unit, the {unit_type:?} plugin is not exist"),
+                    msg: format!("create unit, the {:?} plugin is not exist", unit_type),
                 })
             }
             Ok(v) => v,
@@ -484,7 +484,7 @@ impl Plugin {
         let dy_lib = match self.get_lib(unit_type) {
             Err(_) => {
                 return Err(Error::PluginLoad {
-                    msg: format!("create um, the {unit_type:?} plugin is not exist"),
+                    msg: format!("create um, the {:?} plugin is not exist", unit_type),
                 });
             }
             Ok(v) => v,
@@ -530,7 +530,7 @@ impl Plugin {
             let dy_lib: Result<Arc<Lib>> = match (*self.load_libs.read().unwrap()).get(&unit_type) {
                 Some(lib) => Ok(lib.clone()),
                 None => Err(Error::PluginLoad {
-                    msg: format!("the {unit_type:?} plugin is not exist"),
+                    msg: format!("the {:?} plugin is not exist", unit_type),
                 }),
             };
             if dy_lib.is_err() {
@@ -540,7 +540,7 @@ impl Plugin {
                     continue;
                 } else {
                     return Err(Error::PluginLoad {
-                        msg: format!("the {unit_type:?} plugin is not exist"),
+                        msg: format!("the {:?} plugin is not exist", unit_type),
                     });
                 }
             }

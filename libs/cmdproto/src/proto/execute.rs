@@ -174,7 +174,8 @@ impl Executer for UnitComm {
                             error_code = status.into() as u32 | ERROR_CODE_MASK_PRINT_STDOUT;
                         }
                         Err(e) => {
-                            reply = format!("{reply}Failed to show the status of {unit}: {e}");
+                            reply =
+                                format!("{}Failed to show the status of {}: {}", reply, unit, e);
                             error_code = e.into() as u32;
                         }
                     }
@@ -184,7 +185,7 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.start(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply}Failed to start {unit}: {e}");
+                        reply = format!("{}Failed to start {}: {}", reply, unit, e);
                         error_code = e.into() as u32;
                     }
                 }
@@ -193,7 +194,7 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.stop(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply}Failed to stop {unit}: {e}");
+                        reply = format!("{}Failed to stop {}: {}", reply, unit, e);
                         error_code = e.into() as u32;
                     }
                 }
@@ -202,7 +203,7 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.restart(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply}Failed to restart {unit}: {e}");
+                        reply = format!("{}Failed to restart {}: {}", reply, unit, e);
                         error_code = e.into() as u32;
                     }
                 }
@@ -211,7 +212,7 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.reload(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply}Failed to reload {unit}: {e}");
+                        reply = format!("{}Failed to reload {}: {}", reply, unit, e);
                         error_code = e.into() as u32;
                     }
                 }
@@ -220,7 +221,7 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.isolate(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply}Failed to isolate {unit}: {e}");
+                        reply = format!("{}Failed to isolate {}: {}", reply, unit, e);
                         error_code = e.into() as u32;
                     }
                 }
@@ -229,7 +230,7 @@ impl Executer for UnitComm {
                 for unit in units {
                     if let Err(e) = manager.reset_failed(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply}Failed to reset-failed {unit}: {e}");
+                        reply = format!("{}Failed to reset-failed {}: {}", reply, unit, e);
                         error_code = e.into() as u32;
                     }
                 }
@@ -284,7 +285,7 @@ impl Executer for MngrComm {
                     message: m,
                 },
                 Err(e) => {
-                    let error_message = format!("Failed to list all units:{e}");
+                    let error_message = format!("Failed to list all units:{}", e);
                     CommandResponse {
                         status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
                         error_code: e.into() as u32,
@@ -366,7 +367,7 @@ impl Executer for UnitFile {
                 for unit in units {
                     if let Err(e) = manager.enable(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply} Failed to enable {unit}: {e}");
+                        reply = format!("{} Failed to enable {}: {}", reply, unit, e);
                         error_code = e.into() as u32;
                     }
                 }
@@ -375,7 +376,7 @@ impl Executer for UnitFile {
                 for unit in units {
                     if let Err(e) = manager.disable(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply} Failed to disable {unit}: {e}");
+                        reply = format!("{} Failed to disable {}: {}", reply, unit, e);
                         error_code = e.into() as u32;
                     }
                 }
@@ -384,7 +385,7 @@ impl Executer for UnitFile {
                 for unit in units {
                     if let Err(e) = manager.mask(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply} Failed to mask {unit}: {e}");
+                        reply = format!("{} Failed to mask {}: {}", reply, unit, e);
                         error_code = e.into() as u32;
                     }
                 }
@@ -393,7 +394,7 @@ impl Executer for UnitFile {
                 for unit in units {
                     if let Err(e) = manager.unmask(&unit) {
                         new_line_break(&mut reply);
-                        reply = format!("{reply} Failed to unmask {unit}: {e}");
+                        reply = format!("{} Failed to unmask {}: {}", reply, unit, e);
                         error_code = e.into() as u32;
                     }
                 }

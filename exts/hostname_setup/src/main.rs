@@ -134,7 +134,7 @@ impl Hostname {
 
         let local_hostname = Hostname::local_hostname()?;
         if local_hostname.eq(hostname) {
-            log::info!("Hostname has already been set: {hostname}.");
+            log::info!("Hostname has already been set: {}.", hostname);
             return Ok(());
         }
         nix::unistd::sethostname(&hostname.hostname)

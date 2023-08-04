@@ -245,7 +245,10 @@ impl Device {
     pub fn from_devname(devname: &str) -> Result<Device, Error> {
         if !devname.starts_with("/dev") {
             return Err(Error::Nix {
-                msg: format!("from_devname failed: devname '{devname}' doesn't start with /dev"),
+                msg: format!(
+                    "from_devname failed: devname '{}' doesn't start with /dev",
+                    devname
+                ),
                 source: Errno::EINVAL,
             });
         }
@@ -257,7 +260,7 @@ impl Device {
                 Ok(st) => Device::from_mode_and_devnum(st.st_mode, st.st_rdev)?,
                 Err(e) => {
                     return Err(Error::Nix {
-                        msg: format!("from_devname failed: cannot stat '{devname}'"),
+                        msg: format!("from_devname failed: cannot stat '{}'", devname),
                         source: {
                             if [Errno::ENODEV, Errno::ENXIO, Errno::ENOENT].contains(&e) {
                                 // device is absent

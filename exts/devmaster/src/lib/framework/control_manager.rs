@@ -126,7 +126,7 @@ impl Source for ControlManager {
         let mut cmd = String::new();
         stream.read_to_string(&mut cmd).unwrap();
 
-        log::debug!("Control Manager: received message \"{cmd}\"");
+        log::debug!("Control Manager: received message \"{}\"", cmd);
 
         self.cmd_process(cmd);
 

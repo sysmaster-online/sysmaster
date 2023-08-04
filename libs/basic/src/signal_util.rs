@@ -26,7 +26,7 @@ pub fn reset_all_signal_handlers() {
         let sig_action = SigAction::new(sig_handler, flags, SigSet::empty());
         unsafe {
             if let Err(e) = signal::sigaction(sig, &sig_action) {
-                log::warn!("Failed to reset signal {}: {e}", sig);
+                log::warn!("Failed to reset signal {}: {}", sig, e);
             }
         }
     }

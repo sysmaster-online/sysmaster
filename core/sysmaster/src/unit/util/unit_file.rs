@@ -12,6 +12,7 @@
 
 use basic::path_lookup::LookupPaths;
 use basic::time_util;
+use core::utils::file::is_symbolic_link;
 use siphasher::sip::SipHasher24;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -106,7 +107,7 @@ impl UnitFileData {
             return None;
         }
         /* {/etc/sysmaster/system, /usr/lib/sysmaster/system}/foo.service.d */
-        let pathd_str = format!("{path}/{name}.d");
+        let pathd_str = format!("{}/{}.d", path, name);
         let dir = Path::new(&pathd_str);
         if dir.is_dir() {
             for entry in dir.read_dir().unwrap() {
@@ -127,7 +128,7 @@ impl UnitFileData {
             return None;
         }
         /* Symlink is complicated, it is related to Alias, skip it for now. */
-        if config_path.is_symlink() {
+        if is_symbolic_link(config_path.as_path()) {
             return None;
         }
 
@@ -164,14 +165,14 @@ impl UnitFileData {
     fn build_id_dropin(&mut self, name: &String, suffix: String) {
         let mut pathbuf_dropin = Vec::new();
         for v in &self.lookup_path.search_path {
-            let path = format!("{v}/{name}.{suffix}");
+            let path = format!("{}/{}.{}", v, name, suffix);
             let dir = Path::new(&path);
             if !dir.is_dir() {
                 continue;
             }
             for entry in dir.read_dir().unwrap() {
                 let symlink_unit = entry.unwrap().path();
-                if !symlink_unit.is_symlink() {
+                if !is_symbolic_link(symlink_unit.as_path()) {
                     continue;
                 }
                 let abs_path = match symlink_unit.canonicalize() {
@@ -200,14 +201,14 @@ impl UnitFileData {
         for dir in &self.lookup_path.search_path {
             let metadata = match fs::metadata(dir) {
                 Err(e) => {
-                    log::debug!("Couldn't find unit config lookup path {dir}: {e}");
+                    log::debug!("Couldn't find unit config lookup path {}: {}", dir, e);
                     continue;
                 }
                 Ok(v) => v,
             };
             let time = match metadata.modified() {
                 Err(_) => {
-                    log::error!("Failed to get mtime of {dir}");
+                    log::error!("Failed to get mtime of {}", dir);
                     continue;
                 }
                 Ok(v) => v,

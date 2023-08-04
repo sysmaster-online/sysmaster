@@ -42,7 +42,7 @@ impl ReliDebug {
                 false
             } else {
                 File::create(&cfirst).unwrap();
-                log::debug!("Successfully created {cfirst:?}");
+                log::debug!("Successfully created {:?}", cfirst);
 
                 // clear data
                 log::info!("reliability debug_clear: first time, clear ...");
@@ -62,7 +62,7 @@ impl ReliDebug {
                 log::info!("reliability debug_panic: non-first time, do nothing.");
             } else {
                 File::create(&pfirst).unwrap();
-                log::debug!("Successfully created {pfirst:?}");
+                log::debug!("Successfully created {:?}", pfirst);
 
                 // panic
                 log::info!("reliability debug_panic: first time, panic ...");

@@ -72,7 +72,7 @@ impl ServiceConfig {
         for path in paths {
             partial = match confique::File::with_format(&path, FileFormat::Toml).load() {
                 Err(e) => {
-                    log::error!("Failed to load {path:?}: {e}, skipping");
+                    log::error!("Failed to load {:?}: {}, skipping", path, e);
                     continue;
                 }
                 Ok(v) => partial.with_fallback(v),
@@ -82,7 +82,7 @@ impl ServiceConfig {
         *self.data.borrow_mut() = match ServiceConfigData::from_partial(partial) {
             Err(e) => {
                 /* The error message is pretty readable, just print it out. */
-                log::error!("{e}");
+                log::error!("{}", e);
                 return Err(Error::Confique { source: e });
             }
             Ok(v) => v,

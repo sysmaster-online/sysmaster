@@ -149,8 +149,8 @@ impl Default for HardwareWatchdog {
 
 impl Drop for HardwareWatchdog {
     fn drop(&mut self) {
-        if let Err(err) = self.close() {
-            println!("HardwareWatchdog drop close err: {err}");
+        if let Err(e) = self.close() {
+            println!("HardwareWatchdog drop close err: {}", e);
         }
     }
 }

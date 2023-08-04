@@ -90,7 +90,7 @@ impl InitConfig {
         let file = Path::new(&path);
         if file.exists() {
             let mut content = String::new();
-            let file = File::open(&file);
+            let file = File::open(file);
             match file.map(|mut f| f.read_to_string(&mut content)) {
                 Ok(_) => (),
                 Err(_) => return Ok(config),
@@ -189,7 +189,7 @@ impl Runtime {
                         }
                         pid = match value.parse::<u32>() {
                             Ok(v) => v,
-                            Err(e) => panic!("Invalid value: {e:?}"),
+                            Err(e) => panic!("Invalid value: {:?}", e),
                         };
                     } else {
                         panic!("Missing value for option --deserialize.");
@@ -206,11 +206,8 @@ impl Runtime {
         let sock_parent = sock_path.parent().unwrap();
         if !sock_parent.exists() {
             let old_mask = stat::umask(stat::Mode::from_bits_truncate(!0o755));
-            let ret = fs::create_dir_all(sock_parent);
+            fs::create_dir_all(sock_parent)?;
             let _ = stat::umask(old_mask);
-            if let Err(e) = ret {
-                return Err(e);
-            }
         }
         if fs::metadata(INIT_SOCK).is_ok() {
             let _ = fs::remove_file(INIT_SOCK);
@@ -456,7 +453,7 @@ impl Runtime {
         let file = Path::new(&path);
         if file.exists() {
             let mut content = String::new();
-            let file = File::open(&file);
+            let file = File::open(file);
             match file.map(|mut f| f.read_to_string(&mut content)) {
                 Ok(_) => (),
                 Err(_) => return false,
@@ -568,7 +565,7 @@ impl Runtime {
                 .collect::<Vec<_>>();
             log::info!("reexecuting init, {:?}!", argv.as_slice());
             if let Err(e) = execv(&CString::new(<&str>::clone(&arg0)).unwrap(), &cstr_argv) {
-                log::error!("execv {arg0:?} {argv:?} failed: {e}!");
+                log::error!("execv {:?} {:?} failed: {:?}!", arg0, argv, e);
             };
         }
     }
@@ -682,7 +679,7 @@ fn shutdown_init() {
 fn main() -> std::io::Result<()> {
     match kernlog::init() {
         Ok(_) => (),
-        Err(e) => panic!("Unsupported when cannot log into /dev/kmsg : {e:?}!"),
+        Err(e) => panic!("Unsupported when cannot log into /dev/kmsg : {:?}!", e),
     };
 
     prepare_init();

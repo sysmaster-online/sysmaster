@@ -12,6 +12,7 @@
 
 //! sysmaster-core bin
 
+#![allow(deprecated)]
 #[cfg(all(feature = "plugin", feature = "noplugin"))]
 compile_error!("feature plugin and noplugin cannot be enabled at the same time");
 
@@ -44,7 +45,7 @@ use clap::Parser;
 use core::error::*;
 use core::rel;
 use libc::{c_int, getpid, getppid, prctl, PR_SET_CHILD_SUBREAPER};
-use log::{self};
+use log::{self, LevelFilter};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use std::convert::TryFrom;
 use std::env::{self};
@@ -79,7 +80,17 @@ fn main() -> Result<()> {
     let manager_config = Rc::new(ManagerConfig::new(None));
     logger::init_log(
         "sysmaster",
-        manager_config.LogLevel,
+        match manager_config.LogLevel.as_str() {
+            "debug" => LevelFilter::Debug,
+            "info" => LevelFilter::Info,
+            "trace" => LevelFilter::Trace,
+            "warn" => LevelFilter::Warn,
+            "error" => LevelFilter::Error,
+            _ => {
+                println!("unsupported log level, set log level to off");
+                LevelFilter::Off
+            }
+        },
         &manager_config.LogTarget,
         manager_config.LogFileSize,
         manager_config.LogFileNumber,
@@ -140,8 +151,8 @@ fn initialize_runtime(self_recovery_enable: bool) -> Result<()> {
     }
 
     #[cfg(feature = "linux")]
-    setup::mount_cgroup_controllers().map_err(|_| Error::Other {
-        msg: "mount cgroup controllers failed: {e}".to_string(),
+    setup::mount_cgroup_controllers().map_err(|e| Error::Other {
+        msg: format!("mount cgroup controllers failed: {}", e),
     })?;
 
     set_child_reaper();
@@ -163,7 +174,9 @@ fn do_reexecute(args: &[String], reload: bool) {
     let path;
     let mut argv = [].to_vec();
     if args.is_empty() {
-        (path, argv) = execarg_build_default();
+        let (ppath, pargv) = execarg_build_default();
+        path = ppath;
+        argv = pargv;
     } else {
         path = args[0].clone();
         if args.len() >= 2 {

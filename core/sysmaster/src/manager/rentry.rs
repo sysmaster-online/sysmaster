@@ -41,7 +41,7 @@ impl TryFrom<u32> for ReliLastQue {
             7 => Ok(ReliLastQue::StopWhenBound),
             8 => Ok(ReliLastQue::StopWhenUnneeded),
             9 => Ok(ReliLastQue::Dbus),
-            v => Err(format!("input {v} is invalid")),
+            v => Err(format!("input {} is invalid", v)),
         }
     }
 }

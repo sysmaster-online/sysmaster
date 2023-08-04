@@ -536,10 +536,10 @@ fn out_dir_string_get() -> Option<String> {
     let compile: Option<String> = option_env!("OUT_DIR").map(String::from);
     run.or(compile).map(|dir_string| {
         if dir_string.contains("build") {
-            let _tmp: Vec<_> = dir_string.split("build").collect();
-            format!("{}reliability", _tmp[0])
+            let tmp: Vec<_> = dir_string.split("build").collect();
+            format!("{}reliability", tmp[0])
         } else {
-            format!("{dir_string}reliability")
+            format!("{}reliability", dir_string)
         }
     })
 }

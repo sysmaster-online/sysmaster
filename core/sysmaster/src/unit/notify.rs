@@ -182,7 +182,7 @@ impl Notify {
         }
         socket::setsockopt(fd, sockopt::PassCred, &true)?;
         if let Err(e) = socket_util::set_receive_buffer(fd, 1024 * 1014 * 8) {
-            log::error!("Failed to set the notify socket receive buffer: {e}");
+            log::error!("Failed to set the notify socket receive buffer: {}", e);
         }
 
         log::debug!("set event fd is: {}", fd);

@@ -199,8 +199,10 @@ impl SigchldData {
         // check
         let (pid, code, signal) = si.unwrap();
         log::debug!(
-            "Process {} exited witch code: {code}, signal: {signal:?}",
-            pid.as_raw()
+            "Process {} exited witch code: {}, signal: {:?}",
+            pid.as_raw(),
+            code,
+            signal
         );
 
         if pid.as_raw() <= 0 {
@@ -220,7 +222,7 @@ impl SigchldData {
 
         // pop: reap the zombie
         match wait::waitid(Id::Pid(pid), WaitPidFlag::WEXITED) {
-            Err(e) => log::error!("Failed to reap process {}: {e}", pid.as_raw()),
+            Err(e) => log::error!("Failed to reap process {}: {}", pid.as_raw(), e),
             Ok(_) => log::debug!("Reaped process {}", pid.as_raw()),
         }
 

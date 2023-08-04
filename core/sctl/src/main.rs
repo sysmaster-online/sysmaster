@@ -12,6 +12,7 @@
 
 //!
 
+#![allow(deprecated)]
 use clap::Parser;
 use cmdproto::proto::{
     abi::{sys_comm, unit_comm, CommandRequest},
@@ -24,6 +25,7 @@ use std::{io::Write, os::unix::net::UnixStream};
 /// parse program arguments
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
+
 struct Args {
     /// Name of unit
     #[clap(subcommand)]

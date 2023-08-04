@@ -360,7 +360,7 @@ impl Manager {
             HashSet::new(),
         )
         .map_err(|e| Error::Other {
-            msg: format!("failed to kill cgroup: {cg_init:?}, error: {e}"),
+            msg: format!("failed to kill cgroup: {:?}, error: {}", cg_init, e),
         })?;
 
         Ok(())

@@ -170,7 +170,7 @@ impl TryFrom<u32> for UnitType {
             1 => Ok(UnitType::UnitTarget),
             2 => Ok(UnitType::UnitSocket),
             3 => Ok(UnitType::UnitMount),
-            v => Err(format!("input {v} is invalid")),
+            v => Err(format!("input {} is invalid", v)),
         }
     }
 }

@@ -83,7 +83,7 @@ impl SocketPort {
                 let flag = SockFlag::SOCK_CLOEXEC | SockFlag::SOCK_NONBLOCK;
                 let fd = match self.p_conf.socket_listen(flag, 128, socket_mode) {
                     Err(e) => {
-                        log::error!("Failed to listen {}: {e}", self.p_conf.listen());
+                        log::error!("Failed to listen {}: {}", self.p_conf.listen(), e);
                         return Err(Error::Nix { source: e });
                     }
                     Ok(v) => v,
@@ -94,7 +94,7 @@ impl SocketPort {
             PortType::Fifo => {
                 let fd = match self.p_conf.open_fifo(socket_mode) {
                     Err(e) => {
-                        log::error!("Failed to open FIFO file {}: {e}", self.p_conf.listen());
+                        log::error!("Failed to open FIFO file {}: {}", self.p_conf.listen(), e);
                         return Err(Error::Nix { source: e });
                     }
                     Ok(v) => v,
@@ -104,7 +104,11 @@ impl SocketPort {
             }
             PortType::Special => match self.p_conf.open_special() {
                 Err(e) => {
-                    log::error!("Failed to open special file {}: {e}", self.p_conf.listen());
+                    log::error!(
+                        "Failed to open special file {}: {}",
+                        self.p_conf.listen(),
+                        e
+                    );
                     return Err(Error::Nix { source: e });
                 }
                 Ok(v) => v,

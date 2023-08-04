@@ -14,10 +14,13 @@ use std::{env, process::Command};
 
 pub fn run_script(suit: &str, name: &str, docker_flg: &str) {
     let m_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let testpath = format!("{m_dir}/tests/{suit}/{name}/{name}.sh");
-    let logpath = format!("{m_dir}/tests/{suit}/{name}/{name}.log");
-    let cmd = format!("BUILD_PATH={m_dir} DOCKER_TEST={docker_flg} sh -x {testpath} &> {logpath}");
-    println!("[ {name} ]: {cmd}");
+    let testpath = format!("{}/tests/{}/{}/{}.sh", m_dir, suit, name, name);
+    let logpath = format!("{}/tests/{}/{}/{}.log", m_dir, suit, name, name);
+    let cmd = format!(
+        "BUILD_PATH={} DOCKER_TEST={} sh -x {} &> {}",
+        m_dir, docker_flg, testpath, logpath
+    );
+    println!("[{}]: {}", name, cmd);
 
     let status = Command::new("/bin/bash")
         .arg("-c")
@@ -26,10 +29,10 @@ pub fn run_script(suit: &str, name: &str, docker_flg: &str) {
         .expect("failed to execute process!");
 
     if status.success() {
-        println!("[ {name} ]: {status}");
+        println!("[{}]: {}", name, status);
     } else {
-        println!("[ {name} ]: {status}   Detail Log:");
-        let cmd = format!("cat {logpath}");
+        println!("[{}]: {}   Detail Log:", name, status);
+        let cmd = format!("cat {}", logpath);
         Command::new("/bin/bash")
             .arg("-c")
             .arg(cmd)

@@ -28,10 +28,10 @@ fn main() {
         .expect("Couldn't write input_event_codes.rs!");
 
     let out_path = path.to_str().unwrap();
-    let s_cmd = format!("{out_path}/src/build.sh");
+    let s_cmd = format!("{}/src/build.sh", out_path);
 
     let output = Command::new(s_cmd)
-        .arg(format!("{out_path}/src"))
+        .arg(format!("{}/src", out_path))
         .output()
         .expect("Couldn't generate content of get_input_event_key.rs!");
 

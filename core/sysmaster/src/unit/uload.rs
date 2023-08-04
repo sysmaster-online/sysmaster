@@ -158,8 +158,9 @@ impl UnitLoadData {
         let um = self.um();
         let um_rc = Rc::clone(&um);
         log::info!(
-            "Creating SubUnit for {:?}: {name} by __subunit_create_with_params()",
-            unit_type
+            "Creating SubUnit for {:?}: {} by __subunit_create_with_params()",
+            unit_type,
+            name
         );
         let subclass = match util::create_subunit_with_um(unit_type, um_rc) {
             Ok(sub) => sub,

@@ -257,7 +257,7 @@ mod tests {
             thread::sleep(Duration::from_secs(1));
             let stream = match UnixStream::connect(socket_name) {
                 Err(e) => {
-                    println!("Failed to connect to sysmaster: {e}");
+                    println!("Failed to connect to sysmaster: {}", e);
                     return;
                 }
                 Ok(v) => v,

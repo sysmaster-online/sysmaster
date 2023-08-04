@@ -10,6 +10,13 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! libcore utils
-pub mod fd;
-pub mod file;
+//! file functions
+use std::path::Path;
+
+///
+pub fn is_symbolic_link(path: &Path) -> bool {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) => metadata.file_type().is_symlink(),
+        Err(_) => false,
+    }
+}

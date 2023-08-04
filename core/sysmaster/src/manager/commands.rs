@@ -14,6 +14,7 @@ use basic::{do_entry_log, socket_util};
 use cmdproto::proto::execute::ExecuterAction;
 use cmdproto::proto::ProstServerStream;
 use core::rel::{ReliLastFrame, Reliability};
+use core::utils::file::is_symbolic_link;
 use event::{EventType, Events, Source};
 use nix::sys::{socket, stat};
 use std::os::unix::io::RawFd;
@@ -39,7 +40,7 @@ where
         /* The socket is used to communicate with sctl, panic if any of the following steps fail. */
         let sctl_socket_path = Path::new(SCTL_SOCKET);
         /* remove the old socket if it exists */
-        if sctl_socket_path.exists() && !sctl_socket_path.is_symlink() {
+        if sctl_socket_path.exists() && !is_symbolic_link(sctl_socket_path) {
             do_entry_log!(std::fs::remove_file, sctl_socket_path, "remove");
         }
         let sctl_socket_addr = socket::UnixAddr::new(Path::new(SCTL_SOCKET)).unwrap();
@@ -55,8 +56,8 @@ where
         /* create the socket with mode 666 */
         let old_mask = stat::umask(stat::Mode::from_bits_truncate(!0o666));
         match socket::bind(socket_fd, &sctl_socket_addr) {
-            Err(e) => log::error!("Failed to bind {sctl_socket_addr:?}: {e}"),
-            Ok(_) => log::debug!("Successfully bind {sctl_socket_addr:?}"),
+            Err(e) => log::error!("Failed to bind {:?}: {}", sctl_socket_addr, e),
+            Ok(_) => log::debug!("Successfully bind {:?}", sctl_socket_addr),
         }
         /* restore our umask */
         let _ = stat::umask(old_mask);

@@ -116,7 +116,7 @@ impl Source for AliveTimerData {
             match UnixStream::connect(socket_path) {
                 Ok(_) => break,
                 Err(e) => {
-                    log::error!("Couldn't connect {socket_path:?}: {e:?}, retry...");
+                    log::error!("Couldn't connect {:?}: {:?}, retry...", socket_path, e);
                     sleep(1);
                     continue;
                 }

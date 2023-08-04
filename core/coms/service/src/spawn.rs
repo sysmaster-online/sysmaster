@@ -75,7 +75,7 @@ impl ServiceSpawn {
         );
 
         if let Some(pid) = self.pid.main() {
-            params.add_env("MAINPID", format!("{pid}"));
+            params.add_env("MAINPID", pid.to_string());
         }
         let unit = match self.comm.owner() {
             None => {

@@ -54,7 +54,7 @@ impl Display for Uuid {
             ret.push((hexchar(self.0[i] >> 4)).unwrap());
             ret.push((hexchar(self.0[i] & 0xF)).unwrap());
         }
-        write!(f, "{ret}")
+        write!(f, "{}", ret)
     }
 }
 

@@ -16,7 +16,7 @@ use basic::fs_util;
 use basic::path_lookup::LookupPaths;
 use bitflags::bitflags;
 use confique::{Config, FileFormat, Partial};
-use core::error::*;
+use core::{error::*, utils::file::is_symbolic_link};
 use nix::unistd::UnlinkatFlags;
 use std::{
     cell::RefCell,
@@ -310,7 +310,7 @@ impl InstallContext {
 
         let source = install.path();
         for symlink in symlinks {
-            let target = format!("{target_path}/{symlink}");
+            let target = format!("{}/{}", target_path, symlink);
             if let Err(e) = fs_util::symlink(&source, &target, false) {
                 log::warn!(
                     "create symlink from {} to {}, errno is: {}",
@@ -411,7 +411,7 @@ impl Install {
                     continue;
                 }
                 let u_path = entry.unwrap().path();
-                if !u_path.is_file() && !u_path.is_symlink() {
+                if !u_path.is_file() && !is_symbolic_link(u_path.as_path()) {
                     continue;
                 }
 
@@ -548,7 +548,7 @@ impl Install {
             unit_install.set_u_type(UnitFileType::Masked);
         } else if meta.is_file() {
             unit_install.set_u_type(UnitFileType::Regular);
-        } else if meta.is_symlink() {
+        } else if meta.file_type().is_symlink() {
             unit_install.set_u_type(UnitFileType::Symlink);
         }
 
@@ -570,7 +570,7 @@ impl Install {
             let dropin_dir = base_dir.join(&dropin_dir_name);
 
             if !dropin_dir.exists() {
-                log::debug!("Dropin path {dropin_dir:?} does not exist, ignoring");
+                log::debug!("Dropin path {:?} does not exist, ignoring", dropin_dir);
                 continue;
             }
 
@@ -579,12 +579,12 @@ impl Install {
                 let dir_entry = entry?;
                 let fragment = dir_entry.path();
                 if !fragment.is_file() {
-                    log::debug!("Fragment file {fragment:?} is not a file, ignoring");
+                    log::debug!("Fragment file {:?} is not a file, ignoring", fragment);
                     continue;
                 }
                 partial = match confique::File::with_format(&fragment, FileFormat::Toml).load() {
                     Err(e) => {
-                        log::error!("Failed to load {fragment:?}: {e}, skipping.");
+                        log::error!("Failed to load {:?}: {}, skipping.", fragment, e);
                         continue;
                     }
                     Ok(v) => partial.with_fallback(v),

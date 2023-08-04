@@ -67,7 +67,7 @@ pub fn switch_root(new_root: &str) -> bool {
         MsFlags::MS_REC | MsFlags::MS_PRIVATE,
         None::<&str>,
     ) {
-        log::error!("Failed to set \"/\" mount propagation to private: {e}");
+        log::error!("Failed to set \"/\" mount propagation to private: {}", e);
     }
 
     let mounts_path = ["/dev", "/proc", "/sys", "/run"];
@@ -90,7 +90,7 @@ pub fn switch_root(new_root: &str) -> bool {
     let put_old = new_root.to_string() + old_root_after;
     if !Path::new(&put_old).exists() {
         if let Err(e) = fs::create_dir_all(&put_old) {
-            log::error!("Failed to crearte {put_old} dir: {e}");
+            log::error!("Failed to crearte {} dir: {}", put_old, e);
         }
     }
 
@@ -140,7 +140,7 @@ fn umount_recursive(prefix: &str, mnt_flags: MntFlags) {
             continue;
         }
         if let Err(e) = nix::mount::umount2(mount_path, mnt_flags | MntFlags::UMOUNT_NOFOLLOW) {
-            println!("Failed to umount {mount_path}, ignoring:{e}");
+            println!("Failed to umount {}, ignoring:{}", mount_path, e);
         }
     }
 }
@@ -242,7 +242,7 @@ fn base_filesystem_create(new_root: &str, uid: unistd::Uid, gid: unistd::Gid) {
         stat::Mode::empty(),
     ) {
         Err(e) => {
-            eprintln!("Failed to open root file system: {e}");
+            eprintln!("Failed to open root file system: {}", e);
             return;
         }
         Ok(fd) => fd,
@@ -548,15 +548,15 @@ mod test {
         Command::new("umount")
             .arg(mount_move_path)
             .output()
-            .unwrap_or_else(|_| panic!("umount {mount_move_path} failed"));
+            .unwrap_or_else(|_| panic!("umount {} failed", mount_move_path));
         Command::new("umount")
             .arg(old_root)
             .output()
-            .unwrap_or_else(|_| panic!("umount {old_root} failed"));
+            .unwrap_or_else(|_| panic!("umount {} failed", old_root));
         Command::new("umount")
             .arg(old_root)
             .output()
-            .unwrap_or_else(|_| panic!("umount {old_root} failed"));
+            .unwrap_or_else(|_| panic!("umount {} failed", old_root));
     }
 
     #[test]
@@ -592,7 +592,7 @@ mod test {
         }
 
         remove_dir_all_by_dir(old_root_dir);
-        switch_root_post(old_root, &format!("{old_root}/{}", data.2.as_str()));
+        switch_root_post(old_root, &format!("{}/{}", old_root, data.2.as_str()));
     }
 
     #[test]

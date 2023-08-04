@@ -14,20 +14,6 @@
 use crate::Error;
 use constants::LOG_FILE_PATH;
 use log::{LevelFilter, Log};
-use log4rs::{
-    append::{
-        console::{ConsoleAppender, Target},
-        rolling_file::{
-            policy::compound::{
-                roll::fixed_window::FixedWindowRoller, trigger::size::SizeTrigger, CompoundPolicy,
-            },
-            RollingFileAppender,
-        },
-        Append,
-    },
-    config::{Appender, Config, Logger, Root},
-    encode::pattern::PatternEncoder,
-};
 use std::{
     borrow::BorrowMut,
     fs::{self, File, OpenOptions},
@@ -52,22 +38,6 @@ use std::{
 /// ```
 pub const LOG_PATTERN: &str = "{d(%Y-%m-%d %H:%M:%S)} {h({l}):<5} {M} {m}{n}";
 
-struct LogPlugin(log4rs::Logger);
-
-impl log::Log for LogPlugin {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
-        self.0.enabled(metadata)
-    }
-
-    fn log(&self, record: &log::Record) {
-        self.0.log(record);
-    }
-
-    fn flush(&self) {
-        Log::flush(&self.0);
-    }
-}
-
 fn write_msg_common(writer: &mut impl Write, module: &str, msg: String) {
     let now = time::now();
     let now_str = format!(
@@ -82,19 +52,19 @@ fn write_msg_common(writer: &mut impl Write, module: &str, msg: String) {
 
     /* 1. Write time */
     if let Err(e) = writer.write(now_str.as_bytes()) {
-        println!("Failed to log time message: {e}");
+        println!("Failed to log time message: {}", e);
         return;
     }
 
     /* 2. Write module */
     if let Err(e) = writer.write((module.to_string() + " ").as_bytes()) {
-        println!("Failed to log module message: {e}");
+        println!("Failed to log module message: {}", e);
         return;
     }
 
     /* 3. Write message */
     if let Err(e) = writer.write((msg + "\n").as_bytes()) {
-        println!("Failed to log message: {e}");
+        println!("Failed to log message: {}", e);
     }
 }
 
@@ -218,10 +188,10 @@ impl log::Log for FileLogger {
                 Ok(v) => v,
             };
             if let Err(e) = self.rotate() {
-                println!("Failed to rotate log file: {e}");
+                println!("Failed to rotate log file: {}", e);
             }
             if let Err(e) = file.set_len(0) {
-                println!("Failed to clear log file: {e}");
+                println!("Failed to clear log file: {}", e);
             }
         }
     }
@@ -232,7 +202,7 @@ impl log::Log for FileLogger {
             Ok(v) => v,
         };
         if let Err(e) = file.flush() {
-            println!("Failed to flush log file: {e}");
+            println!("Failed to flush log file: {}", e);
         }
     }
 }
@@ -276,13 +246,13 @@ impl FileLogger {
         let src = dir.join(src);
         if dst.is_none() {
             if let Err(e) = fs::remove_file(src) {
-                println!("Failed to remove old log file: {e}");
+                println!("Failed to remove old log file: {}", e);
             }
             return;
         }
         let dst = dir.join(dst.unwrap()); /* safe here */
         if let Err(e) = fs::rename(src, dst) {
-            println!("Failed to rotate log file: {e}");
+            println!("Failed to rotate log file: {}", e);
         }
     }
 
@@ -290,10 +260,10 @@ impl FileLogger {
         let src = dir.join(src);
         let dst = dir.join(dst);
         if let Err(e) = fs::copy(src, &dst) {
-            println!("Failed to create sysmaster.log.1: {e}");
+            println!("Failed to create sysmaster.log.1: {}", e);
         }
         if let Err(e) = fs::set_permissions(dst, fs::Permissions::from_mode(0o400)) {
-            println!("Failed to set log file mode: {e}");
+            println!("Failed to set log file mode: {}", e);
         }
     }
 
@@ -470,7 +440,8 @@ pub fn init_log(
     if target == "file" && (file_size == 0 || file_number == 0) {
         println!(
             "LogTarget is configured to `file`, but configuration is invalid, changing the \
-             LogTarget to `syslog`, file_size: {file_size}, file_number: {file_number}"
+             LogTarget to `syslog`, file_size: {}, file_number: {}",
+            file_size, file_number
         );
         target = "syslog";
     }
@@ -520,68 +491,7 @@ pub fn init_log(
     }
 }
 
-#[allow(unused)]
-fn build_log_config(
-    app_name: &str,
-    level: LevelFilter,
-    target: &str,
-    file_path: &str,
-    file_size: u32,
-    file_number: u32,
-) -> Config {
-    let mut target = target;
-    /* If the file is configured to None, use console forcely. */
-    if (file_path.is_empty() || file_size == 0 || file_number == 0) && target == "rolling_file" {
-        println!(
-            "LogTarget is configured to `file`, but configuration is invalid, changing the \
-             LogTarget to `console`, file: {file_path}, file_size: {file_size}, file_number: \
-             {file_number}"
-        );
-        target = "console";
-    }
-    let encoder = Box::new(PatternEncoder::new(LOG_PATTERN));
-    let appender: Box<dyn Append> = match target {
-        "console" => Box::new(
-            ConsoleAppender::builder()
-                .encoder(encoder)
-                .target(Target::Stdout)
-                .build(),
-        ),
-        "rolling_file" => {
-            let pattern = file_path.to_string() + ".{}";
-            let policy = Box::new(CompoundPolicy::new(
-                Box::new(SizeTrigger::new(file_size as u64 * 1024)),
-                Box::new(
-                    FixedWindowRoller::builder()
-                        .build(&pattern, file_number)
-                        .unwrap(),
-                ),
-            ));
-            Box::new(
-                RollingFileAppender::builder()
-                    .encoder(encoder)
-                    .build(file_path, policy)
-                    .unwrap(),
-            )
-        }
-        _ => Box::new(
-            ConsoleAppender::builder()
-                .encoder(encoder)
-                .target(Target::Stdout)
-                .build(),
-        ),
-    };
-    let logger = Logger::builder().build(app_name, level);
-    let root = Root::builder().appender(target).build(level);
-    Config::builder()
-        .appender(Appender::builder().build(target, appender))
-        .logger(logger)
-        .build(root)
-        .unwrap()
-}
-
 #[cfg(test)]
-
 mod tests {
     use super::*;
     use log;

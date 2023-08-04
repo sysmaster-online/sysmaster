@@ -553,9 +553,10 @@ impl ServiceMng {
         self.log(
             Level::Debug,
             &format!(
-                "Running into dead state, res: {:?}, current res: {:?}, restart: {force_restart}",
+                "Running into dead state, res: {:?}, current res: {:?}, restart: {}",
                 res,
-                self.result()
+                self.result(),
+                force_restart
             ),
         );
         let mut restart = force_restart;

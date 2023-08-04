@@ -137,16 +137,16 @@ impl UeConfig {
         /* The first config wins, so add default values at last. */
         let unit_conf_frag = files.get_unit_id_fragment_pathbuf(name);
         if unit_conf_frag.is_empty() {
-            return Err(format!("{name} doesn't have corresponding config file").into());
+            return Err(format!("{} doesn't have corresponding config file", name).into());
         }
         // fragment
         for path in unit_conf_frag {
             if !path.exists() {
-                return Err(format!("Config file {:?} of {name} doesn't exist", path).into());
+                return Err(format!("Config file {:?} of {} doesn't exist", path, name).into());
             }
             partial = match confique::File::with_format(&path, FileFormat::Toml).load() {
                 Err(e) => {
-                    log::error!("Failed to load {path:?}: {e}, skipping");
+                    log::error!("Failed to load {:?}: {}, skipping", path, e);
                     continue;
                 }
                 Ok(v) => partial.with_fallback(v),
@@ -211,6 +211,6 @@ mod tests {
 
         let result = builder.load();
 
-        println!("{result:?}");
+        println!("{:?}", result);
     }
 }

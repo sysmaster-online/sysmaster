@@ -139,7 +139,7 @@ impl SocketConfig {
         for path in paths {
             partial = match confique::File::with_format(&path, FileFormat::Toml).load() {
                 Err(e) => {
-                    log::error!("Failed to load {path:?}: {e}, skipping");
+                    log::error!("Failed to load {:?}: {}, skipping", path, e);
                     continue;
                 }
                 Ok(v) => partial.with_fallback(v),
@@ -192,7 +192,10 @@ impl SocketConfig {
     fn parse_service(&self) -> Result<()> {
         if let Some(service) = self.config_data().borrow().Socket.Service.clone() {
             if !service.ends_with(".service") {
-                log::warn!("socket service must be end with .service, ignoring:{service}");
+                log::warn!(
+                    "socket service must be end with .service, ignoring:{}",
+                    service
+                );
                 return Ok(());
             }
 
@@ -246,7 +249,7 @@ impl SocketConfig {
 
             let socket_addr = match parse_func(v, socket_type) {
                 Err(_) => {
-                    log::warn!("Invalid socket configuration: {v}");
+                    log::warn!("Invalid socket configuration: {}", v);
                     return Ok(());
                 }
                 Ok(v) => v,
@@ -417,7 +420,7 @@ impl SocketPortConf {
             Ok(v) => v,
         };
         if let Err(e) = nix::unistd::unlink(&path) {
-            log::error!("Failed to unlink FIFO {}: {e}", self.listen());
+            log::error!("Failed to unlink FIFO {}: {}", self.listen(), e);
         }
     }
 
@@ -598,7 +601,7 @@ impl fmt::Display for SocketAddress {
 fn parse_netlink_address(item: &str, socket_type: SockType) -> Result<SocketAddress> {
     let words: Vec<String> = item.split_whitespace().map(|s| s.to_string()).collect();
     if words.len() != 2 {
-        return Err(format!("Netlink configuration format is not correct: {item}").into());
+        return Err(format!("Netlink configuration format is not correct: {}", item).into());
     }
 
     let family = NetlinkProtocol::from(words[0].to_string());

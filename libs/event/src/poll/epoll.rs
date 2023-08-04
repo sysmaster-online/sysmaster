@@ -96,7 +96,7 @@ impl Epoll {
 
 impl Drop for Epoll {
     fn drop(&mut self) {
-        _ = syscall!(close(self.epoll_fd));
+        let _ = syscall!(close(self.epoll_fd));
     }
 }
 

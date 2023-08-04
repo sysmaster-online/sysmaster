@@ -257,7 +257,7 @@ mod tests {
             let listener = TcpListener::bind("0.0.0.0:9097").unwrap();
             loop {
                 let (_stream, addr) = listener.accept().unwrap();
-                println!("Accepted a new connection: {addr}");
+                println!("Accepted a new connection: {}", addr);
             }
         });
 
@@ -285,7 +285,7 @@ mod tests {
             let listener = TcpListener::bind("0.0.0.0:9098").unwrap();
             loop {
                 let (_stream, addr) = listener.accept().unwrap();
-                println!("Accepted a new connection: {addr}");
+                println!("Accepted a new connection: {}", addr);
             }
         });
 

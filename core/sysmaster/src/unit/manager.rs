@@ -436,7 +436,7 @@ impl UmIf for UnitManager {
     fn unit_destroy_runtime_data(&self, runtime_directory: Vec<PathBuf>) -> Result<()> {
         for d in runtime_directory {
             if let Err(e) = std::fs::remove_dir_all(&d) {
-                log::info!("Failed to remove {:?}: {e}, ignoring", d);
+                log::info!("Failed to remove {:?}: {}, ignoring", d, e);
             }
         }
         Ok(())
@@ -849,7 +849,7 @@ impl UnitManager {
             Ok(())
         } else {
             Err(Error::LoadError {
-                msg: format!("Failed to load {name}"),
+                msg: format!("Failed to load {}", name),
             })
         }
     }
@@ -1442,7 +1442,7 @@ mod tests {
 
         match unit {
             Some(_unit_obj) => assert_eq!(_unit_obj.id(), "config.service"),
-            None => println!("test unit load, not found unit: {unit_name}"),
+            None => println!("test unit load, not found unit: {}", unit_name),
         };
     }
 
@@ -1527,7 +1527,7 @@ mod tests {
 
             match unit {
                 Some(_unit_obj) => assert_eq!(_unit_obj.id(), u_name),
-                None => println!("test unit load, not found unit: {u_name}"),
+                None => println!("test unit load, not found unit: {}", u_name),
             };
         }
     }
@@ -1551,7 +1551,7 @@ mod tests {
                     );
                     assert_eq!(_unit_obj.id(), u_name);
                 }
-                None => println!("test unit load, not found unit: {u_name}"),
+                None => println!("test unit load, not found unit: {}", u_name),
             };
         }
     }

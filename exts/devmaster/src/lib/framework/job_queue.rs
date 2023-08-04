@@ -46,7 +46,7 @@ impl Display for JobState {
             JobState::Running => "Running",
         };
 
-        write!(f, "{state}")
+        write!(f, "{}", state)
     }
 }
 
@@ -223,7 +223,7 @@ impl JobQueue {
             .binary_search_by(|x| x.seqnum.cmp(&seqnum))
             .is_ok()
         {
-            log::debug!("Job Queue: failed to insert reduplicated job {seqnum}");
+            log::debug!("Job Queue: failed to insert reduplicated job {}", seqnum);
             return;
         }
 
@@ -240,7 +240,7 @@ impl JobQueue {
         let idx = self.jobs.borrow().partition_point(|x| x < &job);
         self.jobs.borrow_mut().insert(idx, job);
 
-        log::debug!("Job Queue: insert job {seqnum}");
+        log::debug!("Job Queue: insert job {}", seqnum);
     }
 
     // /// cleanup the job queue, if match_state is Undef, cleanup all jobs, otherwise just retain the unmatched jobs
@@ -290,11 +290,4 @@ impl JobQueue {
     pub(crate) fn is_empty(&self) -> bool {
         self.jobs.borrow().is_empty()
     }
-
-    // /// show states of each device job in the job queue
-    // pub(crate) fn job_queue_show_state(&self) {
-    //     for job in self.jobs.borrow().iter() {
-    //         log::debug!("{job:?}");
-    //     }
-    // }
 }

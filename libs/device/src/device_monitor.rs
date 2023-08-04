@@ -191,7 +191,7 @@ mod tests {
         ///
         fn dispatch(&self, e: &Events) -> i32 {
             let device = self.device_monitor.receive_device().unwrap();
-            println!("{device:?}");
+            println!("{:?}", device);
             e.set_exit();
             0
         }

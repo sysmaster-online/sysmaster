@@ -143,7 +143,7 @@ impl ReliLast {
         *self.ignore.borrow()
     }
 
-    fn unit_len(&self) -> Result<u64> {
+    fn unit_len(&self) -> Result<usize> {
         let db = self.open_db_unit()?;
         let rtxn = self.env.read_txn().context(HeedSnafu)?;
         db.len(&rtxn).context(HeedSnafu)

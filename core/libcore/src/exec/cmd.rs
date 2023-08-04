@@ -243,7 +243,7 @@ impl DeserializeWith for ExecCommand {
         match parse_exec(&s) {
             Ok(v) => Ok(v),
             Err(e) => {
-                log::error!("Failed to parse ExecCommand: {e}");
+                log::error!("Failed to parse ExecCommand: {}", e);
                 return Err(de::Error::invalid_value(Unexpected::Str(&s), &""));
             }
         }

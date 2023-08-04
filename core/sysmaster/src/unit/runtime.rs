@@ -273,7 +273,7 @@ impl UnitRTData {
             log::debug!("Loading unit: {}", unit.id());
             self.reli.set_last_unit(unit.id());
             if let Err(e) = unit.load() {
-                log::error!("Failed to load unit [{}]: {e}", unit.id());
+                log::error!("Failed to load unit [{}]: {}", unit.id(), e);
             }
 
             let load_state = unit.load_state();

@@ -266,7 +266,7 @@ impl Condition {
                 v.unwrap()
             }
         };
-        log::debug!("Found kernel command line value: {value}");
+        log::debug!("Found kernel command line value: {}", value);
         if has_equal {
             /* has an equal, "crashkernel=512M matches crashkernel=512M" */
             self.params.eq(&value) as i8
@@ -396,7 +396,16 @@ impl Condition {
     }
 
     fn test_path_is_symbolic_link(&self) -> i8 {
-        Path::new(&self.params).is_symlink() as i8
+        match std::fs::symlink_metadata(self.params.clone()) {
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink() {
+                    1
+                } else {
+                    0
+                }
+            }
+            Err(_) => -1,
+        }
     }
 
     fn test_security(&self) -> i8 {

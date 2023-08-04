@@ -73,7 +73,7 @@ impl Display for DeviceAction {
             _ => "invalid",
         };
 
-        write!(f, "{s}")
+        write!(f, "{}", s)
     }
 }
 

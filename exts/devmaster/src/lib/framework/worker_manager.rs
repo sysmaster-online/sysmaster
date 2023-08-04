@@ -100,7 +100,7 @@ impl Display for WorkerState {
             WorkerState::_Killed => "Killed",
         };
 
-        write!(f, "{state}")
+        write!(f, "{}", state)
     }
 }
 
@@ -118,7 +118,7 @@ impl Worker {
         // share rules in worker threads. worker should only read rules to avoid lock being poisoned.
         let handler = std::thread::spawn(move || loop {
             let msg = rx.recv().unwrap_or_else(|error| {
-                log::error!("Worker {id}: panic at recv \"{error}\"");
+                log::error!("Worker {}: panic at recv \"{}\"", id, error);
                 panic!();
             });
 
@@ -130,7 +130,8 @@ impl Worker {
                     let device = Device::from_nulstr(&dev_nulstr).unwrap();
 
                     log::info!(
-                        "Worker {id}: received device '{}'",
+                        "Worker {}: received device '{}'",
+                        id,
                         device
                             .get_devpath()
                             .context(DeviceSnafu)
@@ -143,13 +144,13 @@ impl Worker {
                     let device = Rc::new(RefCell::new(device));
                     let _ = execute_mgr.process_device(device.clone());
 
-                    log::info!("Worker {id}: finished job");
+                    log::info!("Worker {}: finished job", id);
 
                     broadcaster.send_device(&device.borrow(), None).unwrap();
 
                     let mut tcp_stream =
                         TcpStream::connect(tcp_address.as_str()).unwrap_or_else(|error| {
-                            log::error!("Worker {id}: failed to connect {error}");
+                            log::error!("Worker {}: failed to connect {}", id, error);
                             panic!();
                         });
 

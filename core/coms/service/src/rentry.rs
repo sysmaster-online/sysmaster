@@ -194,7 +194,10 @@ where
         "yes" => PreserveMode::Yes,
         "restart" => PreserveMode::Restart,
         _ => {
-            log::error!("Failed to parse RuntimeDirectoryPreserve: {s}, assuming no");
+            log::error!(
+                "Failed to parse RuntimeDirectoryPreserve: {}, assuming no",
+                s
+            );
             PreserveMode::No
         }
     };

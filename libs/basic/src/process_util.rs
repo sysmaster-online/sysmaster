@@ -177,7 +177,7 @@ fn get_ppid(pid: Pid) -> Result<Pid, Error> {
         return Ok(nix::unistd::getppid());
     }
 
-    let path = PathBuf::from(format!("/proc/{pid}/stat"));
+    let path = PathBuf::from(format!("/proc/{}/stat", pid));
 
     let stat = Stat::from_reader(File::open(path).context(IoSnafu)?).context(ProcSnafu)?;
 
@@ -204,7 +204,7 @@ pub fn kill_and_cont(pid: Pid, sig: Signal) -> Result<(), Errno> {
     match nix::sys::signal::kill(pid, sig) {
         Ok(_) => {
             if sig != Signal::SIGCONT && sig != Signal::SIGKILL {
-                _ = nix::sys::signal::kill(pid, Signal::SIGCONT);
+                let _ = nix::sys::signal::kill(pid, Signal::SIGCONT);
             }
             Ok(())
         }
