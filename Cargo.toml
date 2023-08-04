@@ -4,7 +4,6 @@ version = "0.2.4"
 authors = ["sysmaster"]
 edition = "2021"
 build = "build.rs"
-rust-version = "1.60.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
@@ -13,18 +12,18 @@ path = "init/src/main.rs"
 
 [dependencies]
 nix = { version = "0.24", default-features = false, features = [
-    "fs",
-    "net",
-    "signal",
-    "time",
-    "user",
+  "fs",
+  "net",
+  "signal",
+  "time",
+  "user",
 ] }
 kernlog = "0.3.1"
 tempfile = "=3.6.0"
-log = { version = "0.4", default_features = false, features = ["std"] }
+log = { version = "=0.4.14", default_features = false, features = ["std"] }
 mio = { version = "0.8.8", default_features = false, features = [
-    "os-poll",
-    "os-ext",
+  "os-poll",
+  "os-ext",
 ] }
 
 # 此为开发配置文件, 给 `cargo build` 所使用.
@@ -62,7 +61,6 @@ overflow-checks = true
 
 [profile.release]
 opt-level = 'z'
-strip = true
 debug = false
 rpath = false
 lto = true
@@ -73,27 +71,12 @@ incremental = false
 overflow-checks = false
 
 [profile.release.build-override] # +
-opt-level = 'z'     # +
+opt-level = 'z'   # +
 codegen-units = 1
 
 [profile.release.package."*"]
 opt-level = 'z'
 codegen-units = 1
-
-# for rpm dist
-[profile.dist]
-inherits = "release"
-opt-level = 'z'
-# for generating debuginfo
-strip = false
-debug = false
-rpath = false
-lto = true
-debug-assertions = false
-codegen-units = 1
-panic = 'abort'
-incremental = false
-overflow-checks = false
 
 [profile.test]
 opt-level = 0

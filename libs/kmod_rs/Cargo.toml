@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-log = "0.4"
+log = { version = "=0.4.14", default_features = false, features = ["std"] }
 kmod-sys = "0.2.0"
 nix = "0.24"
 basic = { path = "../basic" }

@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 nix = "0.24"
-log = "0.4"
+log = { version = "=0.4.14", default_features = false, features = ["std"] }
 libc = "0.2.*"
 constants = { path = "../../libs/constants" }
 basic = { path = "../../libs/basic" }

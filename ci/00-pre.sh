@@ -38,7 +38,7 @@ rm -rf rustlang.sh
 fi
 
 source "$HOME/.cargo/env"
-rustup default 1.60
+rustup default 1.57
 
 arch=`uname -m`
 # install musl-build

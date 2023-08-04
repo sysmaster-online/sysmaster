@@ -23,17 +23,17 @@ path = "src/lib/lib.rs"
 device = { path = "../../libs/device" }
 event = { path = "../../libs/event" }
 basic = { path = "../../libs/basic" }
-blkid_rs = {path = "../../libs/blkid_rs"}
-kmod_rs = {path = "../../libs/kmod_rs"}
-input_event_codes_rs = {path = "../../libs/input_event_codes_rs"}
+blkid_rs = { path = "../../libs/blkid_rs" }
+kmod_rs = { path = "../../libs/kmod_rs" }
+input_event_codes_rs = { path = "../../libs/input_event_codes_rs" }
 
 # third libraries
 libc = "0.2.*"
 bitflags = "1.3.2"
 thiserror = "1.0"
-netlink-sys = "0.8.3"
+netlink-sys = "0.6.0"
 nix = "0.24"
-log = "0.4"
+log = { version = "=0.4.14", default_features = false, features = ["std"] }
 snafu = "0.7"
 clap = { version = "3.1.8", features = ["derive"] }
 lazy_static = "1.4.0"
@@ -49,9 +49,9 @@ cluFlock = "1.2.7"
 input-event-codes = "5.16.8"
 ioctls = "0.6.1"
 ioctl-sys = "0.7.1"
-rtnetlink = "0.11.0"
+rtnetlink = "0.7.0"
 futures = "0.3"
-tokio = { version = "1.29.1", features = ["full"]}
+tokio = { version = "1.29.1", features = ["full"] }
 toml = "0.5.2"
 
 [build-dependencies]

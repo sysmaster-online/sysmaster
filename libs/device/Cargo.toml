@@ -15,7 +15,7 @@ nix = "0.24"
 libc = "0.2.140"
 snafu = "0.7"
 bitflags = "1.3.2"
-log = "0.4"
+log = { version = "=0.4.14", default_features = false, features = ["std"] }
 fnmatch-regex = "0.2.0"
 regex = "1.7.0"
 loopdev = "0.4.0"

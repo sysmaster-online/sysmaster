@@ -6,3 +6,10 @@ rustflags = ["-C", "target-feature=-crt-static", "-C", "link-arg=-fstack-protect
 
 [target.'cfg(unix)']
 rustflags = ["-C", "link-arg=-fstack-protector-all", "-C", "link-arg=-fpie", "-C", "link-arg=-DFORTIFY=2 -O2"]
+
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
+

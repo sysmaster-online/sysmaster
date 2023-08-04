@@ -45,6 +45,14 @@ repos:
 
   - repo: local
     hooks:
+      - id: cargo-override-set
+        name: cargo-override-set
+        description: unset override.
+        entry: bash -c 'rustup && rustup override set stable'
+        language: rust
+        pass_filenames: false
+        files: \.(rs|toml)$
+        verbose: true
       - id: cargo-clippy
         name: cargo clippy
         description: Lint rust sources
@@ -88,6 +96,14 @@ repos:
         name: cargo test
         description: test the package for errors.
         entry: bash -c 'RUST_BACKTRACE=full cargo test --all-targets --all -v -- --nocapture --show-output --test-threads=1'
+        language: rust
+        pass_filenames: false
+        files: \.(rs|toml)$
+        verbose: true
+      - id: cargo-override-unset
+        name: cargo-override-unset
+        description: unset override.
+        entry: bash -c 'rustup && rustup override unset'
         language: rust
         pass_filenames: false
         files: \.(rs|toml)$

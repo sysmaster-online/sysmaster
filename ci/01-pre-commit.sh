@@ -10,6 +10,7 @@ function finish() {
         sed -i '/#!\[deny(clippy::all)]/d' $rustlist 2>/dev/null || true
         sed -i '/#!\[deny(warnings)]/d' $rustlist 2>/dev/null || true
     done
+    rustup override unset
 }
 
 trap finish EXIT
@@ -26,8 +27,8 @@ pip3 install pre-commit ruamel.yaml -i https://pypi.mirrors.ustc.edu.cn/simple |
 # oldnum=`git rev-list origin/master --no-merges --count`
 # newnum=`git rev-list HEAD --no-merges --count`
 # changenum=$[newnum - oldnum]
-
-cargo check --all || cargo check --all || cargo check --all || exit 1
+rustup override set 1.57
+cargo check --all --all-targets || cargo check --all --all-targets || cargo check --all --all-targets || exit 1
 git add . -A
 
 # add doc for src code
