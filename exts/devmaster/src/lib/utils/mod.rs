@@ -486,7 +486,7 @@ pub(crate) fn get_property_from_string(s: &str) -> Result<(String, String)> {
         });
     }
 
-    if value.starts_with('"') || value.starts_with('\\') {
+    if value.starts_with('"') || value.starts_with('\'') {
         Ok((key.to_string(), value[1..value.len() - 1].to_string()))
     } else {
         Ok((key.to_string(), value[0..].to_string()))
