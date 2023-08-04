@@ -588,7 +588,7 @@ impl ExecuteManager {
                         Ok((key, value)) => {
                             execute_err!(token, device.borrow().add_property(&key, &value))?;
 
-                            log_rule_token!(debug, token, format!("add key-value ()"))
+                            log_rule_token!(debug, token, format!("add key-value ({}={})", key, value))
                         }
                         Err(e) => {
                             log_rule_token!(debug, token, e);

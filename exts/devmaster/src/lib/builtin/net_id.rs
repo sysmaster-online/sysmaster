@@ -483,6 +483,8 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
         names.pci_path.push_str(&format!("P{}", domain));
     }
     names.pci_path.push_str(&format!("p{}s{}", bus, slot));
+
+    #[allow(clippy::if_same_then_else)]
     if func > 0 {
         names.pci_path.push_str(&format!("f{}", func));
     } else if let Ok(true) = is_pci_multifunction(names.pcidev.clone()) {
@@ -1218,7 +1220,7 @@ fn names_ccw(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
      * bus_id 0.0.0600 -> 600. This is similar to e.g. how PCI domain is
      * not prepended when it is zero. Preserve the last 0 for 0.0.0000.
      */
-    let bus_id_strip = match bus_id.strip_prefix(['0', '.']) {
+    let bus_id_strip = match bus_id.strip_prefix(|c| ['0', '.'].contains(&c)) {
         Some(s) => s.to_string(),
         None => "".to_string(),
     };

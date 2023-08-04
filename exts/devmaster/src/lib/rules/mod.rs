@@ -470,7 +470,7 @@ impl FromStr for SubstituteType {
             return Ok(SubstituteType::Subsys);
         }
 
-        if s.contains(['%', '$']) {
+        if s.contains(|c| ['%', '$'].contains(&c)) {
             return Ok(SubstituteType::Format);
         }
 

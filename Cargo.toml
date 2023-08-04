@@ -116,7 +116,7 @@ members = [
   "exts/random_seed",
   "exts/rc-local-generator",
   "exts/sysmonitor",
-  # "exts/devmaster",
+  "exts/devmaster",
   "exts/switch_root",
   "exts/hostname_setup",
   #internal libraries crates

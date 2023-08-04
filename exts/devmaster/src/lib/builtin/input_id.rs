@@ -616,7 +616,7 @@ impl InputId {
             log_dev!(
                 debug,
                 dev.borrow(),
-                format!("test_key: no EV_KEY capability")
+                "test_key: no EV_KEY capability".to_string()
             );
             return false;
         }

@@ -609,9 +609,10 @@ pub(crate) fn find_prioritized_devnode(
 #[cfg(test)]
 mod test {
     use super::*;
+    use basic::fs_util::is_symlink;
     use device::utils::LoopDev;
     use nix::unistd::unlink;
-    use std::fs::{self, remove_dir, remove_dir_all};
+    use std::fs::{self, read_link, remove_dir, remove_dir_all};
 
     #[test]
     fn test_update_node() {
@@ -635,7 +636,7 @@ mod test {
 
                 let link_path = Path::new(&symlink);
 
-                if link_path.is_symlink() {
+                if is_symlink(link_path) {
                     unlink(link_path).unwrap();
                 }
 
@@ -644,17 +645,29 @@ mod test {
 
                 update_node(dev_new_arc.clone(), dev_old_arc.clone()).unwrap();
 
-                assert!(link_path.is_symlink());
+                assert!(is_symlink(link_path));
                 assert_eq!(
                     fs::read_link(link_path).unwrap().as_path(),
                     Path::new(&format!("../{}", sysname))
                 );
 
-                assert!(Path::new("/dev/test/sss").is_symlink());
+                assert!(is_symlink(Path::new("/dev/test/sss")));
 
                 update_node(dev_old_arc, dev_new_arc).unwrap();
 
-                assert!(!Path::new("/dev/test/sss").exists());
+                /*
+                 * If some other devices hold the same symlink, the symlink will not
+                 * be removed but be linked to the other devices. Thus, if the symlink
+                 * still exists, check whether it points to different devices.
+                 */
+                assert!(
+                    !Path::new("/dev/test/sss").exists() || {
+                        match read_link(Path::new("/dev/test/sss")) {
+                            Ok(target) => !target.ends_with(&sysname),
+                            Err(_) => false,
+                        }
+                    }
+                );
                 /* If /dev/test/ is not empty, the directory will not be removed. */
                 let _ = remove_dir("/dev/test");
                 unlink(symlink.as_str()).unwrap();

@@ -247,9 +247,9 @@ impl ExecuteUnitData {
             let (connection, handle, _) = new_connection().unwrap();
             tokio::spawn(connection);
 
-            let netif = self.device.borrow().get_sysname().context(DeviceSnafu)?;
+            let ifindex = self.device.borrow().get_ifindex().context(DeviceSnafu)?;
 
-            set_link_name(handle, netif, self.name.clone())
+            set_link_name(handle, ifindex, self.name.clone())
                 .await
                 .context(RtnetlinkSnafu)
         }) {
@@ -874,12 +874,8 @@ impl ExecuteUnit {
     }
 }
 
-async fn set_link_name(
-    handle: Handle,
-    netif: String,
-    name: String,
-) -> Result<(), rtnetlink::Error> {
-    let mut links = handle.link().get().match_name(netif).execute();
+async fn set_link_name(handle: Handle, ifindex: u32, name: String) -> Result<(), rtnetlink::Error> {
+    let mut links = handle.link().get().match_index(ifindex).execute();
     if let Some(link) = links.try_next().await? {
         handle
             .link()

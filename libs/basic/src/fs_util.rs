@@ -332,6 +332,16 @@ macro_rules! do_entry_or_return_io_error {
     };
 }
 
+/// Replace unstable is_symlink method in std
+pub fn is_symlink(path: &Path) -> bool {
+    let md = match path.symlink_metadata() {
+        Ok(md) => md,
+        Err(_) => return false,
+    };
+
+    md.file_type().is_symlink()
+}
+
 /// do some operations and log message out, skip the error
 #[macro_export]
 macro_rules! do_entry_log {
@@ -360,7 +370,7 @@ mod tests {
         // before running this testcase.
         let link_name_path = std::path::Path::new("/tmp/test_link_name_39285b");
         if link_name_path.exists() {
-            return;
+            let _ = unlink(link_name_path);
         }
 
         symlink("/dev/null", "/tmp/test_link_name_39285b", false).unwrap();
@@ -606,5 +616,19 @@ mod tests {
         let p = Path::new("/tmp/test_macro/all_2");
         do_entry_log!(std::fs::create_dir_all, p, "create");
         assert!(remove_dir_all("/tmp/test_macro").is_ok());
+    }
+
+    #[test]
+    fn test_is_symlink() {
+        let link_name_path = std::path::Path::new("/tmp/test_is_symlink");
+        if link_name_path.exists() {
+            let _ = unlink(link_name_path);
+        }
+
+        symlink("/dev/null", "/tmp/test_is_symlink", false).unwrap();
+
+        assert!(is_symlink(link_name_path));
+
+        let _ = unlink("/tmp/test_is_symlink");
     }
 }

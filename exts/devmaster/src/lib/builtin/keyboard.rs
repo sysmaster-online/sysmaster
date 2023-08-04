@@ -72,7 +72,7 @@ impl Keyboard {
         let mut codes = current;
         for i in release.iter().take(release_count) {
             if !codes.is_empty() {
-                codes += &String::from(",");
+                codes += ",";
             }
             codes += &release[*i as usize].to_string();
         }
@@ -124,7 +124,7 @@ impl Keyboard {
         }
     }
 
-    fn set_trackpoint_sensitivity(device: Rc<RefCell<Device>>, value: &String) {
+    fn set_trackpoint_sensitivity(device: Rc<RefCell<Device>>, value: &str) {
         let pdev = device
             .borrow()
             .get_parent_with_subsystem_devtype("serio", None)
