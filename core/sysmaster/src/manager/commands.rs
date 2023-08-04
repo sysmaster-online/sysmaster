@@ -10,11 +10,11 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use basic::fs_util::is_symlink;
 use basic::{do_entry_log, socket_util};
 use cmdproto::proto::execute::ExecuterAction;
 use cmdproto::proto::ProstServerStream;
 use core::rel::{ReliLastFrame, Reliability};
-use core::utils::file::is_symbolic_link;
 use event::{EventType, Events, Source};
 use nix::sys::{socket, stat};
 use std::os::unix::io::RawFd;
@@ -40,7 +40,7 @@ where
         /* The socket is used to communicate with sctl, panic if any of the following steps fail. */
         let sctl_socket_path = Path::new(SCTL_SOCKET);
         /* remove the old socket if it exists */
-        if sctl_socket_path.exists() && !is_symbolic_link(sctl_socket_path) {
+        if sctl_socket_path.exists() && !is_symlink(sctl_socket_path) {
             do_entry_log!(std::fs::remove_file, sctl_socket_path, "remove");
         }
         let sctl_socket_addr = socket::UnixAddr::new(Path::new(SCTL_SOCKET)).unwrap();

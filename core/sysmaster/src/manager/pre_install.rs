@@ -12,11 +12,11 @@
 //
 #![allow(non_snake_case)]
 use crate::unit::{unit_name_to_type, UeConfigInstall, UnitType};
-use basic::fs_util;
+use basic::fs_util::{self, is_symlink};
 use basic::path_lookup::LookupPaths;
 use bitflags::bitflags;
 use confique::{Config, FileFormat, Partial};
-use core::{error::*, utils::file::is_symbolic_link};
+use core::error::*;
 use nix::unistd::UnlinkatFlags;
 use std::{
     cell::RefCell,
@@ -411,7 +411,7 @@ impl Install {
                     continue;
                 }
                 let u_path = entry.unwrap().path();
-                if !u_path.is_file() && !is_symbolic_link(u_path.as_path()) {
+                if !u_path.is_file() && !is_symlink(u_path.as_path()) {
                     continue;
                 }
 

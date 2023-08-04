@@ -10,9 +10,9 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use basic::fs_util::is_symlink;
 use basic::path_lookup::LookupPaths;
 use basic::time_util;
-use core::utils::file::is_symbolic_link;
 use siphasher::sip::SipHasher24;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -128,7 +128,7 @@ impl UnitFileData {
             return None;
         }
         /* Symlink is complicated, it is related to Alias, skip it for now. */
-        if is_symbolic_link(config_path.as_path()) {
+        if is_symlink(config_path.as_path()) {
             return None;
         }
 
@@ -172,7 +172,7 @@ impl UnitFileData {
             }
             for entry in dir.read_dir().unwrap() {
                 let symlink_unit = entry.unwrap().path();
-                if !is_symbolic_link(symlink_unit.as_path()) {
+                if !is_symlink(symlink_unit.as_path()) {
                     continue;
                 }
                 let abs_path = match symlink_unit.canonicalize() {

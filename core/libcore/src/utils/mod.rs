@@ -12,4 +12,3 @@
 
 //! libcore utils
 pub mod fd;
-pub mod file;
