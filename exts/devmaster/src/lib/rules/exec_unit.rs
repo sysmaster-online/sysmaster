@@ -241,13 +241,22 @@ impl ExecuteUnitData {
     }
 
     fn rename_netif(&self) -> Result<bool> {
+        let ifindex = match self.device.borrow().get_ifindex().context(DeviceSnafu) {
+            Ok(ifindex) => ifindex,
+            Err(e) => {
+                if e.get_errno() == nix::Error::ENOENT {
+                    return Ok(false);
+                }
+
+                return Err(e);
+            }
+        };
+
         let rt = tokio::runtime::Runtime::new().unwrap();
 
         if let Err(e) = rt.block_on(async {
             let (connection, handle, _) = new_connection().unwrap();
             tokio::spawn(connection);
-
-            let ifindex = self.device.borrow().get_ifindex().context(DeviceSnafu)?;
 
             set_link_name(handle, ifindex, self.name.clone())
                 .await
