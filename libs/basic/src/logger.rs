@@ -15,7 +15,6 @@ use crate::Error;
 use constants::LOG_FILE_PATH;
 use log::{LevelFilter, Log};
 use std::{
-    borrow::BorrowMut,
     fs::{self, File, OpenOptions},
     io::Write,
     os::unix::{
@@ -25,18 +24,6 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
-
-/// sysmaster log parttern:
-///
-/// ```rust,ignore
-/// {d(%Y-%m-%d %H:%M:%S)} {h({l}):<5} {M} {m}{n}
-/// {d(%Y-%m-%d %H:%M:%S)}: log time, i.e. `2023-03-24 11:00:23`
-/// {h({l}:<5)}: log level, 5 bytes
-/// {M}: the method name where the logging request was issued
-/// {m}: log message
-/// {n}: separator character, '\n' in linux.
-/// ```
-pub const LOG_PATTERN: &str = "{d(%Y-%m-%d %H:%M:%S)} {h({l}):<5} {M} {m}{n}";
 
 fn write_msg_common(writer: &mut impl Write, module: &str, msg: String) {
     let now = time::now();
@@ -73,27 +60,7 @@ fn write_msg_file(writer: &mut File, module: &str, msg: String) {
 }
 
 struct SysLogger {
-    dgram: Arc<Mutex<UnixDatagramX>>,
-}
-
-struct UnixDatagramX {
-    dgram: UnixDatagram,
-}
-
-impl Write for UnixDatagramX {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.dgram.send(buf)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl UnixDatagramX {
-    fn log(&mut self, module: &str, msg: String) {
-        write_msg_common(self, module, msg);
-    }
+    dgram: Arc<Mutex<UnixDatagram>>,
 }
 
 impl SysLogger {
@@ -101,7 +68,7 @@ impl SysLogger {
         let sock = UnixDatagram::unbound()?;
         sock.connect("/dev/log")?;
         Ok(Self {
-            dgram: Arc::new(Mutex::new(UnixDatagramX { dgram: sock })),
+            dgram: Arc::new(Mutex::new(sock)),
         })
     }
 }
@@ -114,13 +81,19 @@ impl log::Log for SysLogger {
     }
 
     fn log(&self, record: &log::Record) {
-        let msg = record.args().to_string();
-        let module = match record.module_path() {
+        let mut msg = String::new();
+        msg += match record.module_path() {
             None => "unknown",
             Some(v) => v,
         };
-        let mut dgram = self.dgram.lock().unwrap();
-        dgram.borrow_mut().log(module, msg)
+        msg += " ";
+        msg += &record.args().to_string();
+
+        let dgram = self.dgram.lock().unwrap();
+
+        if let Err(e) = dgram.send(msg.as_bytes()) {
+            println!("Failed to log message: {}", e);
+        }
     }
 
     fn flush(&self) {}
