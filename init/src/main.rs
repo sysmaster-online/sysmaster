@@ -22,6 +22,7 @@ use nix::sys::signal::SaFlags;
 use nix::sys::signal::SigAction;
 use nix::sys::signal::SigHandler;
 use nix::sys::signal::Signal;
+use nix::sys::signalfd::SfdFlags;
 use nix::sys::signalfd::SigSet;
 use nix::sys::signalfd::SignalFd;
 use nix::sys::socket::getsockopt;
@@ -149,6 +150,9 @@ impl Default for InitConfig {
         Self {
             timecnt: 10,
             timewait: 90,
+            #[cfg(test)]
+            bin: "ls".to_string(),
+            #[cfg(not(test))]
             bin: "/usr/lib/sysmaster/sysmaster".to_string(),
         }
     }
@@ -225,10 +229,13 @@ impl Runtime {
             mask.add(sig);
         }
         mask.thread_set_mask()?;
-        let signalfd = SignalFd::new(&mask)?;
+        let signalfd = SignalFd::with_flags(&mask, SfdFlags::SFD_CLOEXEC | SfdFlags::SFD_NONBLOCK)?;
 
         // set timer
-        let timerfd = TimerFd::new(ClockId::CLOCK_MONOTONIC, TimerFlags::TFD_NONBLOCK)?;
+        let timerfd = TimerFd::new(
+            ClockId::CLOCK_MONOTONIC,
+            TimerFlags::TFD_NONBLOCK | TimerFlags::TFD_CLOEXEC,
+        )?;
         timerfd.set(
             Expiration::OneShot(TimeSpec::from_duration(Duration::from_nanos(1))),
             TimerSetTimeFlags::empty(),
@@ -307,13 +314,19 @@ impl Runtime {
         match token {
             SIGNALFD_TOKEN => self.poll.registry().deregister(&mut signal_source)?,
             TIMERFD_TOKEN => self.poll.registry().deregister(&mut time_source)?,
-            SOCKETFD_TOKEN => self.poll.registry().deregister(&mut unix_source)?,
+            SOCKETFD_TOKEN => {
+                self.poll.registry().deregister(&mut unix_source)?;
+            }
             _ => {
                 self.poll.registry().deregister(&mut signal_source)?;
                 self.poll.registry().deregister(&mut time_source)?;
                 self.poll.registry().deregister(&mut unix_source)?;
             }
         }
+
+        if [SOCKETFD_TOKEN, ALLFD_TOKEN].contains(&token) && fs::metadata(INIT_SOCK).is_ok() {
+            fs::remove_file(INIT_SOCK)?;
+        };
 
         Ok(())
     }
@@ -599,6 +612,14 @@ impl Runtime {
     }
 }
 
+impl Drop for Runtime {
+    fn drop(&mut self) {
+        if fs::metadata(INIT_SOCK).is_ok() {
+            let _ = fs::remove_file(INIT_SOCK);
+        }
+    }
+}
+
 fn prepare_init() {
     // version
     let version = env!("CARGO_PKG_VERSION");
@@ -705,8 +726,7 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
 
-    //#[test]
-    #[allow(dead_code)]
+    #[test]
     fn test_runtime() -> std::io::Result<()> {
         let mut rt = Runtime::new()?;
         rt.set_state(InitState::Running);
@@ -715,7 +735,6 @@ mod tests {
         assert_ne!(rt.timerfd.as_raw_fd(), 0);
         assert_ne!(rt.signalfd.as_raw_fd(), 0);
         assert_ne!(rt.socketfd.as_raw_fd(), 0);
-        fs::remove_file("init.sock").unwrap();
         Ok(())
     }
 
@@ -724,7 +743,7 @@ mod tests {
         let config = InitConfig::default();
         assert_eq!(config.timecnt, 10);
         assert_eq!(config.timewait, 90);
-        assert_eq!(config.bin, "/usr/lib/sysmaster/sysmaster");
+        assert_eq!(config.bin, "ls");
     }
 
     #[test]
@@ -732,7 +751,7 @@ mod tests {
         let config = InitConfig::load(Some("/path/to/init.conf".to_string())).unwrap();
         assert_eq!(config.timecnt, 10);
         assert_eq!(config.timewait, 90);
-        assert_eq!(config.bin, "/usr/lib/sysmaster/sysmaster");
+        assert_eq!(config.bin, "ls".to_string());
     }
 
     #[test]
@@ -765,8 +784,7 @@ socket = init.sock
         fs::remove_file(file_path).unwrap();
     }
 
-    //#[test]
-    #[allow(dead_code)]
+    #[test]
     fn test_main() {
         prepare_init();
 
