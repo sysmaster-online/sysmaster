@@ -61,7 +61,7 @@ overflow-checks = true
 
 [profile.release]
 opt-level = 'z'
-debug = false
+debug = true
 rpath = false
 lto = true
 debug-assertions = false

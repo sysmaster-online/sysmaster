@@ -227,8 +227,11 @@ impl EventsData {
             children: HashMap::new(),
             pidfd: 0,
             timerfd: HashMap::new(),
-            signalfd: SignalFd::with_flags(&SigSet::empty(), SfdFlags::SFD_NONBLOCK)
-                .context(NixSnafu)?,
+            signalfd: SignalFd::with_flags(
+                &SigSet::empty(),
+                SfdFlags::SFD_NONBLOCK | SfdFlags::SFD_CLOEXEC,
+            )
+            .context(NixSnafu)?,
             timer: Timer::new(),
             inotifyfd: Inotify::init(InitFlags::IN_CLOEXEC | InitFlags::IN_NONBLOCK)
                 .context(NixSnafu)?,
