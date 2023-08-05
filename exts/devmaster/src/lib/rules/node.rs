@@ -379,7 +379,7 @@ pub(crate) fn get_prior_dir(symlink: &str) -> Result<String> {
         Some(v) => v,
     };
 
-    let name = match cano_link.strip_prefix("/dev") {
+    let name = match cano_link.strip_prefix("/dev/") {
         Some(s) => s,
         None => {
             return Err(Error::Nix {
