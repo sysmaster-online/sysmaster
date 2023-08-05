@@ -57,10 +57,14 @@ mod noplugin {
     use core::error::*;
     use core::unit::UmIf;
     use core::unit::{SubUnit, UnitManagerObj, UnitType};
+    #[cfg(feature = "mount")]
     use mount::{self};
+    #[cfg(feature = "service")]
     use service::{self};
+    #[cfg(feature = "socket")]
     use socket::{self};
     use std::rc::Rc;
+    #[cfg(feature = "target")]
     use target::{self};
 
     pub(super) fn create_um_obj(
