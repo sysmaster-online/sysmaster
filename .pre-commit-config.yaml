@@ -48,7 +48,7 @@ repos:
       - id: cargo-override-set
         name: cargo-override-set
         description: unset override.
-        entry: bash -c 'rustup override set stable || true'
+        entry: bash -c 'rustup override set 1.57 || true'
         language: rust
         pass_filenames: false
         files: \.(rs|toml)$
