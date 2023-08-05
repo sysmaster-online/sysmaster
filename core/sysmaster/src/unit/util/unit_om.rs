@@ -70,14 +70,18 @@ mod noplugin {
         file_number: u32,
     ) -> Result<Box<dyn UnitManagerObj>> {
         let fun = match unit_type {
+            #[cfg(feature = "mount")]
             UnitType::UnitMount => mount::__um_obj_create,
+            #[cfg(feature = "service")]
             UnitType::UnitService => service::__um_obj_create,
+            #[cfg(feature = "socket")]
             UnitType::UnitSocket => socket::__um_obj_create,
+            #[cfg(feature = "target")]
             UnitType::UnitTarget => target::__um_obj_create,
             _ => {
                 return Err(Error::Other {
-                    msg: "Component doesn't exist".to_string(),
-                })
+                    msg: "Component unsupported!".to_string(),
+                });
             }
         };
         let boxed_raw = fun(log::max_level(), target, file_size, file_number);
@@ -89,13 +93,17 @@ mod noplugin {
         um: Rc<dyn UmIf>,
     ) -> Result<Box<dyn SubUnit>> {
         let fun = match unit_type {
+            #[cfg(feature = "mount")]
             UnitType::UnitMount => mount::__subunit_create_with_params,
+            #[cfg(feature = "service")]
             UnitType::UnitService => service::__subunit_create_with_params,
+            #[cfg(feature = "socket")]
             UnitType::UnitSocket => socket::__subunit_create_with_params,
+            #[cfg(feature = "target")]
             UnitType::UnitTarget => target::__subunit_create_with_params,
             _ => {
                 return Err(Error::Other {
-                    msg: "Component doesn't exist".to_string(),
+                    msg: "Component unsupported!".to_string(),
                 })
             }
         };
