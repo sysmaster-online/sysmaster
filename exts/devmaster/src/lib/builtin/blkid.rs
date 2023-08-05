@@ -12,7 +12,7 @@
 
 //! blkid builtin
 //!
-
+#![allow(deprecated)]
 use crate::builtin::Builtin;
 use crate::error::{Error, Result};
 use crate::rules::exec_unit::ExecuteUnit;
@@ -325,7 +325,7 @@ impl Blkid {
         ) {
             Ok(file) => file,
             Err(err) => {
-                log::error!("Failed to open LoaderDevicePartUUID: {err}");
+                log::error!("Failed to open LoaderDevicePartUUID: {}", err);
                 return None;
             }
         };
@@ -338,7 +338,7 @@ impl Blkid {
                 }
             }
             Err(err) => {
-                log::error!("Failed to read LoaderDevicePartUUID: {err}");
+                log::error!("Failed to read LoaderDevicePartUUID: {}", err);
                 return None;
             }
         }
@@ -350,7 +350,7 @@ impl Blkid {
 
         match String::from_utf16(s.as_ref()) {
             Err(err) => {
-                log::error!("Failed to from utf16: {err}");
+                log::error!("Failed to from utf16: {}", err);
                 None
             }
             Ok(s) => Uuid::from_string(&s),
@@ -388,7 +388,7 @@ impl Builtin for Blkid {
                 .borrow()
                 .get_syspath()
                 .map_err(op_command_err!("device get_syspath error"))?;
-            log::warn!("blkid can only probe block devices, ignoring {syspath}");
+            log::warn!("blkid can only probe block devices, ignoring {}", syspath);
             return Ok(false);
         }
 

@@ -155,29 +155,33 @@ impl Worker {
                         });
 
                     tcp_stream
-                        .write_all(format!("finished {id}").as_bytes())
+                        .write_all(format!("finished {}", id).as_bytes())
                         .unwrap_or_else(|error| {
-                            log::error!("Worker {id}: failed to send ack to manager \"{error}\"");
+                            log::error!(
+                                "Worker {}: failed to send ack to manager \"{}\"",
+                                id,
+                                error
+                            );
                         });
                 }
                 WorkerMessage::Cmd(cmd) => {
-                    log::info!("Worker {id} received cmd: {cmd}");
+                    log::info!("Worker {} received cmd: {}", id, cmd);
                     match cmd.as_str() {
                         "kill" => {
                             let mut tcp_stream = TcpStream::connect(tcp_address.as_str())
                                 .unwrap_or_else(|error| {
-                                    log::error!("Worker {id}: failed to connect \"{error}\"");
+                                    log::error!("Worker {}: failed to connect \"{}\"", id, error);
                                     panic!();
                                 });
                             let _ret = tcp_stream
-                                .write(format!("killed {id}").as_bytes())
+                                .write(format!("killed {}", id).as_bytes())
                                 .unwrap_or_else(|error| {
                                     log::error!(
-                                        "Worker {id}: failed to send killed message to manager \"{error}\""
+                                        "Worker {}: failed to send killed message to manager \"{}\"", id, error
                                     );
                                     0
                                 });
-                            log::debug!("Worker {id}: is killed");
+                            log::debug!("Worker {}: is killed", id);
                             break;
                         }
                         _ => {
@@ -214,8 +218,9 @@ impl Worker {
     pub(crate) fn worker_send_message(&self, msg: WorkerMessage) {
         self.tx.send(msg).unwrap_or_else(|error| {
             log::error!(
-                "Worker Manager: failed to send message to worker {}, {error}",
-                self.id
+                "Worker Manager: failed to send message to worker {}, {}",
+                self.id,
+                error
             )
         });
     }
@@ -241,7 +246,7 @@ impl WorkerManager {
     ) -> WorkerManager {
         let listener = RefCell::new(TcpListener::bind(listen_addr.as_str()).unwrap_or_else(
             |error| {
-                log::error!("Worker Manager: failed to bind listener \"{error}\"");
+                log::error!("Worker Manager: failed to bind listener \"{}\"", error);
                 panic!();
             },
         ));
@@ -288,7 +293,7 @@ impl WorkerManager {
                             .get_cache(),
                     )),
                 );
-                log::debug!("Worker Manager: created new worker {id}");
+                log::debug!("Worker Manager: created new worker {}", id);
                 self.set_worker_state(id, WorkerState::Idle);
                 return Some(id);
             }
@@ -369,7 +374,7 @@ impl WorkerManager {
         match ack_kind {
             "killed" => {
                 // cleanup the killed worker from the manager
-                log::debug!("Worker Manager: cleanup worker {id}");
+                log::debug!("Worker Manager: cleanup worker {}", id);
 
                 self.workers
                     .borrow_mut()
@@ -405,7 +410,7 @@ impl WorkerManager {
 
     /// set the state of the worker
     pub(crate) fn set_worker_state(&self, id: u32, state: WorkerState) {
-        log::debug!("Worker Manager: set worker {id} to state {}", state);
+        log::debug!("Worker Manager: set worker {} to state {}", id, state);
         let workers = self.workers.borrow();
         let worker = workers.get(&id).unwrap();
 
@@ -449,7 +454,7 @@ impl Source for WorkerManager {
             Err(e) => {
                 // WouldBlock error is expected when a large number of uevents are triggered in a shot interval
                 if e.kind() != std::io::ErrorKind::WouldBlock {
-                    log::error!("failed to listen worker ack ({})", e.kind());
+                    log::error!("failed to listen worker ack ({:?})", e.kind());
                 }
                 return 0;
             }
@@ -457,7 +462,7 @@ impl Source for WorkerManager {
         let mut ack = String::new();
         stream.read_to_string(&mut ack).unwrap();
 
-        log::debug!("Worker Manager: received message \"{ack}\"");
+        log::debug!("Worker Manager: received message \"{}\"", ack);
         self.worker_response_dispose(ack);
 
         0

@@ -13,12 +13,11 @@
 //! parse the configuration of devmaster
 //!
 
-use std::cell::RefCell;
-
 use super::DEFAULT_NETIF_CONFIG_DIRS;
 use confique::Config;
 use lazy_static::lazy_static;
 use log::LevelFilter;
+use std::cell::RefCell;
 
 /// default configuration path
 pub const DEFAULT_CONFIG: &str = "/etc/devmaster/config.toml";
@@ -44,7 +43,7 @@ pub struct DevmasterConfig {
 pub(crate) struct DevmasterConfigData {
     pub(crate) rules_d: Option<Vec<String>>,
     pub(crate) max_workers: Option<u32>,
-    pub(crate) log_level: Option<LevelFilter>,
+    pub(crate) log_level: Option<String>,
     pub(crate) netif_cfg_d: Option<Vec<String>>,
 }
 
@@ -73,7 +72,20 @@ impl DevmasterConfig {
 
     /// get the rules directories
     pub fn get_log_level(&self) -> LevelFilter {
-        self.inner.borrow().log_level.unwrap_or(LevelFilter::Info)
+        match self.inner.borrow().log_level.clone() {
+            Some(level) => match level.as_str() {
+                "debug" => LevelFilter::Debug,
+                "info" => LevelFilter::Info,
+                "trace" => LevelFilter::Trace,
+                "warn" => LevelFilter::Warn,
+                "error" => LevelFilter::Error,
+                _ => {
+                    println!("unsupported log level, set log level to off");
+                    LevelFilter::Off
+                }
+            },
+            None => LevelFilter::Info,
+        }
     }
 
     /// get the rules directories

@@ -17,7 +17,7 @@ core = { path = "../../libcore" }
 
 nix = "0.24"
 log = { version = "=0.4.14", default_features = false, features = ["std"] }
-epoll = "4.3.1"
+epoll = "=4.3.1"
 libc = "0.2.*"
 serde = "1.0.130"
 once_cell = { version = "=1.7.2" }

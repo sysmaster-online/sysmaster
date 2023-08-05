@@ -12,8 +12,8 @@
 
 //! devctrl is the client of devmaster
 //!
+#![allow(deprecated)]
 mod subcmds;
-
 use basic::logger::init_log_to_console;
 use clap::Parser;
 use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;

@@ -255,7 +255,7 @@ pub(crate) fn resolve_subsystem_kernel(s: &str, read: bool) -> Result<String> {
 
             if read && attribute.is_empty() {
                 return Err(Error::Other {
-                    msg: format!("can not read empty sysattr: '{s}'",),
+                    msg: format!("can not read empty sysattr: '{}'", s),
                     errno: nix::errno::Errno::EINVAL,
                 });
             }
@@ -284,7 +284,11 @@ pub(crate) fn resolve_subsystem_kernel(s: &str, read: bool) -> Result<String> {
                 };
 
                 log::debug!(
-                    "the sysattr value of '[{subsystem}/{sysname}]{attribute}' is '{attr_value}'"
+                    "the sysattr value of '[{}/{}]{}' is '{}'",
+                    subsystem,
+                    sysname,
+                    attribute,
+                    attr_value
                 );
                 Ok(attr_value)
             } else {
@@ -295,7 +299,13 @@ pub(crate) fn resolve_subsystem_kernel(s: &str, read: bool) -> Result<String> {
                 } else {
                     syspath + "/" + attribute.as_str()
                 };
-                log::debug!("resolve path '[{subsystem}/{sysname}]{attribute}' as '{attr_path}'");
+                log::debug!(
+                    "resolve path '[{}/{}]{}' as '{}'",
+                    subsystem,
+                    sysname,
+                    attribute,
+                    attr_path
+                );
                 Ok(attr_path)
             }
         }
@@ -476,7 +486,7 @@ pub(crate) fn get_property_from_string(s: &str) -> Result<(String, String)> {
         });
     }
 
-    if value.starts_with(['"', '\'']) {
+    if value.starts_with('"') || value.starts_with('\\') {
         Ok((key.to_string(), value[1..value.len() - 1].to_string()))
     } else {
         Ok((key.to_string(), value[0..].to_string()))

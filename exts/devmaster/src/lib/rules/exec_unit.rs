@@ -888,7 +888,7 @@ async fn set_link_name(
             .execute()
             .await?
     } else {
-        log::error!("no link link {name} found");
+        log::error!("no link link {} found", name);
     }
     Ok(())
 }
