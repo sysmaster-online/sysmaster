@@ -36,15 +36,15 @@ impl UnitFile {
         self.data.borrow_mut().build_id_map(name, has_loaded);
     }
 
-    pub fn get_unit_id_fragment_pathbuf(&self, name: &String) -> Vec<PathBuf> {
+    pub fn get_unit_id_fragment_pathbuf(&self, name: &str) -> Vec<PathBuf> {
         self.data.borrow().get_unit_id_fragment_pathbuf(name)
     }
 
-    pub fn get_unit_wants_symlink_units(&self, name: &String) -> Vec<PathBuf> {
+    pub fn get_unit_wants_symlink_units(&self, name: &str) -> Vec<PathBuf> {
         self.data.borrow().get_unit_wants_symlink_units(name)
     }
 
-    pub fn get_unit_requires_symlink_units(&self, name: &String) -> Vec<PathBuf> {
+    pub fn get_unit_requires_symlink_units(&self, name: &str) -> Vec<PathBuf> {
         self.data.borrow().get_unit_requires_symlink_units(name)
     }
 }
@@ -72,21 +72,21 @@ impl UnitFileData {
         }
     }
 
-    pub(self) fn get_unit_id_fragment_pathbuf(&self, name: &String) -> Vec<PathBuf> {
+    pub(self) fn get_unit_id_fragment_pathbuf(&self, name: &str) -> Vec<PathBuf> {
         match self.unit_id_fragment.get(name) {
             Some(v) => v.to_vec(),
             None => Vec::new(),
         }
     }
 
-    pub(self) fn get_unit_wants_symlink_units(&self, name: &String) -> Vec<PathBuf> {
+    pub(self) fn get_unit_wants_symlink_units(&self, name: &str) -> Vec<PathBuf> {
         match self.unit_wants_symlink_units.get(name) {
             Some(v) => v.to_vec(),
             None => Vec::<PathBuf>::new(),
         }
     }
 
-    pub(self) fn get_unit_requires_symlink_units(&self, name: &String) -> Vec<PathBuf> {
+    pub(self) fn get_unit_requires_symlink_units(&self, name: &str) -> Vec<PathBuf> {
         match self.unit_requires_symlink_units.get(name) {
             Some(v) => v.to_vec(),
             None => Vec::<PathBuf>::new(),
@@ -101,7 +101,7 @@ impl UnitFileData {
         }
     }
 
-    fn build_id_fragment_by_name(path: &String, name: &String) -> Option<Vec<PathBuf>> {
+    fn build_id_fragment_by_name(path: &str, name: &str) -> Option<Vec<PathBuf>> {
         let mut res: Vec<PathBuf> = Vec::new();
         if fs::metadata(path).is_err() {
             return None;
@@ -136,7 +136,7 @@ impl UnitFileData {
         Some(res)
     }
 
-    fn build_id_fragment(&mut self, name: &String) {
+    fn build_id_fragment(&mut self, name: &str) {
         let mut pathbuf_fragment = Vec::new();
         for search_path in &self.lookup_path.search_path {
             let mut v = match Self::build_id_fragment_by_name(search_path, name) {
@@ -162,7 +162,7 @@ impl UnitFileData {
             .insert(name.to_string(), pathbuf_fragment);
     }
 
-    fn build_id_dropin(&mut self, name: &String, suffix: String) {
+    fn build_id_dropin(&mut self, name: &str, suffix: String) {
         let mut pathbuf_dropin = Vec::new();
         for v in &self.lookup_path.search_path {
             let path = format!("{}/{}.{}", v, name, suffix);

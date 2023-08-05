@@ -89,7 +89,7 @@ impl ReStation for JobManager {
     fn do_compensate_last(&self, _lframe: (u32, Option<u32>, Option<u32>), lunit: Option<&String>) {
         if let Some(unit_id) = lunit {
             // re-run
-            self.trigger_unit(unit_id);
+            self.trigger_unit(&unit_id.to_string());
         }
     }
 
@@ -98,7 +98,7 @@ impl ReStation for JobManager {
         for unit_id in self.data.rentry_trigger_keys().iter() {
             if Some(unit_id) != lunit {
                 // other: all excluding the last
-                self.trigger_unit(unit_id);
+                self.trigger_unit(&unit_id.to_string());
             }
         }
     }

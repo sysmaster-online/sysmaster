@@ -751,7 +751,7 @@ mod tests {
         let config = InitConfig::load(Some("/path/to/init.conf".to_string())).unwrap();
         assert_eq!(config.timecnt, 10);
         assert_eq!(config.timewait, 90);
-        assert_eq!(config.bin, "ls".to_string());
+        assert_eq!(config.bin, "ls");
     }
 
     #[test]

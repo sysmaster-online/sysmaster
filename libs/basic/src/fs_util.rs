@@ -301,11 +301,12 @@ pub fn touch_file(
                 return Err(Error::Nix { source: e });
             }
 
+            let empty = Mode::empty();
             open(
                 p,
                 OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_EXCL | OFlag::O_CLOEXEC,
-                mode.map(|v| Mode::from_bits(v).unwrap_or(Mode::empty()))
-                    .unwrap_or(Mode::empty()),
+                mode.map(|v| Mode::from_bits(v).unwrap_or(empty))
+                    .unwrap_or(empty),
             )
             .context(NixSnafu)?
         }

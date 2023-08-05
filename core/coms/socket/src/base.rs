@@ -16,6 +16,7 @@ pub(super) const PLUGIN_NAME: &str = "SocketUnit";
 
 #[repr(i32)]
 #[derive(Debug, Eq, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub(super) enum NetlinkProtocol {
     NetlinkRoute = libc::NETLINK_ROUTE,
     NetlinkFirewall = libc::NETLINK_FIREWALL,

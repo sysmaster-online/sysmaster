@@ -131,7 +131,7 @@ impl UeCondition {
         self.asserts.borrow_mut().0.push(condition);
     }
 
-    fn condition_vec_test(conditions: &Vec<Condition>) -> bool {
+    fn condition_vec_test(conditions: &[Condition]) -> bool {
         let mut trigger_flag = 0;
         let mut ret = true;
         for cond in conditions {

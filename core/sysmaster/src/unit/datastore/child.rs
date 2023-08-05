@@ -128,7 +128,7 @@ impl UnitChildData {
             let unit = match units.get(unit_id) {
                 Some(u) => u,
                 None => {
-                    log::warn!("Failed to get unit:{:?}", unit_id);
+                    log::warn!("Failed to get unit:{:?}", &unit_id.to_string());
                     continue;
                 }
             };

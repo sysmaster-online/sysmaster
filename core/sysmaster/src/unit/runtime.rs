@@ -146,14 +146,14 @@ impl UnitRTData {
         }
     }
 
-    fn rc_last_queue_load(&self, lunit: &String) {
+    fn rc_last_queue_load(&self, lunit: &str) {
         // remove from pps, which would be compensated later(dc_last_queue_load).
         if self.rentry.pps_contains(lunit, UnitRePps::QUEUE_LOAD) {
             self.rentry.pps_clear(lunit, UnitRePps::QUEUE_LOAD);
         }
     }
 
-    fn rc_last_queue_targetdeps(&self, lunit: &String) {
+    fn rc_last_queue_targetdeps(&self, lunit: &str) {
         // remove from pps, which would be compensated later(dc_last_queue_targetdeps).
         if self
             .rentry

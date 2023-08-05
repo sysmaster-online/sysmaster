@@ -194,7 +194,7 @@ impl LibKmod {
     }
 
     /// Load module
-    pub fn module_load_and_warn(&mut self, module: &String) -> Result<()> {
+    pub fn module_load_and_warn(&mut self, module: &str) -> Result<()> {
         log::debug!("Loading module: {}", module);
 
         let mut denylisy_parsed = false;

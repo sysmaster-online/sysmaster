@@ -56,8 +56,8 @@ impl TargetRe {
         self.mng.0.insert(unit_id.to_string(), mng);
     }
 
-    pub(super) fn mng_get(&self, unit_id: &String) -> Option<TargetState> {
-        let mng = self.mng.0.get(unit_id);
+    pub(super) fn mng_get(&self, unit_id: &str) -> Option<TargetState> {
+        let mng = self.mng.0.get(&unit_id.to_string());
         mng.map(|m| m.state)
     }
 

@@ -102,7 +102,7 @@ fn cgtype_to_path(cg_type: CgType) -> &'static str {
 }
 
 #[cfg(feature = "linux")]
-fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf> {
+fn cg_abs_path(cg_path: &Path, suffix: &Path) -> Result<PathBuf> {
     let cg_type = cg_type()?;
     if cg_type == CgType::None {
         return Err(Error::NotFound {
@@ -116,13 +116,13 @@ fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf> {
 }
 
 #[cfg(feature = "hongmeng")]
-fn cg_abs_path(cg_path: &PathBuf, suffix: &PathBuf) -> Result<PathBuf> {
+fn cg_abs_path(cg_path: &Path, suffix: &Path) -> Result<PathBuf> {
     let path_buf: PathBuf = PathBuf::from(CG_BASE_DIR);
     Ok(path_buf.join(cg_path).join(suffix))
 }
 
 /// attach the pid to the controller which is depend the cg_path
-pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<()> {
+pub fn cg_attach(pid: Pid, cg_path: &Path) -> Result<()> {
     log::debug!("attach pid {} to path {:?}", pid, cg_path);
     let cg_procs = cg_abs_path(cg_path, &PathBuf::from(CGROUP_PROCS))?;
 
@@ -144,7 +144,7 @@ pub fn cg_attach(pid: Pid, cg_path: &PathBuf) -> Result<()> {
 }
 
 /// create the cg_path which is relative to cg_abs_path.
-pub fn cg_create(cg_path: &PathBuf) -> Result<()> {
+pub fn cg_create(cg_path: &Path) -> Result<()> {
     log::debug!("cgroup create path {:?}", cg_path);
     let abs_cg_path: PathBuf = cg_abs_path(cg_path, &PathBuf::from(""))?;
     do_entry_or_return_io_error!(fs::create_dir_all, abs_cg_path, "create");
@@ -157,7 +157,7 @@ pub fn cg_escape(id: &str) -> &str {
     id
 }
 
-fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>> {
+fn get_pids(cg_path: &Path, item: &str) -> Result<Vec<Pid>> {
     let path = cg_abs_path(cg_path, &PathBuf::from(item))?;
     let file = fs::OpenOptions::new()
         .read(true)
@@ -181,14 +181,14 @@ fn get_pids(cg_path: &PathBuf, item: &str) -> Result<Vec<Pid>> {
 }
 
 /// return all the pids in the cg_path, read from cgroup.procs.
-pub fn cg_get_pids(cg_path: &PathBuf) -> Vec<Pid> {
+pub fn cg_get_pids(cg_path: &Path) -> Vec<Pid> {
     match get_pids(cg_path, CGROUP_PROCS) {
         Ok(pids) => pids,
         Err(_) => Vec::new(),
     }
 }
 
-fn remove_dir(cg_path: &PathBuf) -> Result<()> {
+fn remove_dir(cg_path: &Path) -> Result<()> {
     if !cg_path.is_absolute() {
         log::error!("We only support remove absolute directory.");
         return Err(Error::NotSupported);
@@ -255,7 +255,7 @@ fn remove_dir(cg_path: &PathBuf) -> Result<()> {
 }
 
 fn cg_kill_process(
-    cg_path: &PathBuf,
+    cg_path: &Path,
     signal: Signal,
     mut flags: CgFlags,
     pids: HashSet<Pid>,
@@ -319,7 +319,7 @@ fn cg_kill_process(
     Ok(())
 }
 
-fn cg_kill(cg_path: &PathBuf, signal: Signal, flags: CgFlags, pids: HashSet<Pid>) -> Result<()> {
+fn cg_kill(cg_path: &Path, signal: Signal, flags: CgFlags, pids: HashSet<Pid>) -> Result<()> {
     cg_kill_process(cg_path, signal, flags, pids, CGROUP_PROCS)?;
 
     Ok(())
@@ -331,7 +331,7 @@ fn cg_kill(cg_path: &PathBuf, signal: Signal, flags: CgFlags, pids: HashSet<Pid>
 /// flags: the flags that will be operated on the controller.
 /// pids: not kill the process which is in the pids.
 pub fn cg_kill_recursive(
-    cg_path: &PathBuf,
+    cg_path: &Path,
     signal: Signal,
     flags: CgFlags,
     pids: HashSet<Pid>,
@@ -376,7 +376,7 @@ pub fn cg_controllers() -> Result<Vec<String>> {
 }
 
 #[allow(dead_code)]
-fn cg_read_event(cg_path: &PathBuf, event: &str) -> Result<String> {
+fn cg_read_event(cg_path: &Path, event: &str) -> Result<String> {
     let events_path = cg_abs_path(cg_path, &PathBuf::from("cgroup.events"))?;
     let file = File::open(events_path).context(IoSnafu)?;
     let reader = BufReader::new(file);
@@ -399,7 +399,7 @@ fn cg_read_event(cg_path: &PathBuf, event: &str) -> Result<String> {
     Ok("".to_string())
 }
 
-fn cg_is_empty(cg_path: &PathBuf) -> bool {
+fn cg_is_empty(cg_path: &Path) -> bool {
     let procs_path = cg_abs_path(cg_path, &PathBuf::from(CGROUP_PROCS));
     if procs_path.is_err() {
         return true;
@@ -428,8 +428,8 @@ fn is_dir(entry: &DirEntry) -> bool {
 
 /// whether the cg_path cgroup is empty, return true if empty.
 #[cfg(feature = "linux")]
-pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool> {
-    if cg_path == &PathBuf::from("") || cg_path == &PathBuf::from("/") {
+pub fn cg_is_empty_recursive(cg_path: &Path) -> Result<bool> {
+    if cg_path == Path::new("") || cg_path == Path::new("/") {
         return Ok(true);
     }
 
@@ -507,7 +507,7 @@ pub fn cg_is_empty_recursive(cg_path: &PathBuf) -> Result<bool> {
 }
 
 /// create cgroup path and attach pid to this cgroup
-pub fn cg_create_and_attach(cg_path: &PathBuf, pid: Pid) -> Result<bool> {
+pub fn cg_create_and_attach(cg_path: &Path, pid: Pid) -> Result<bool> {
     cg_create(cg_path)?;
 
     cg_attach(pid, cg_path)?;

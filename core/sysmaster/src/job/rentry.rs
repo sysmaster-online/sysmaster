@@ -140,8 +140,8 @@ impl JobRe {
         self.trigger.insert(String::from(unit_id), jt_data);
     }
 
-    pub(super) fn trigger_remove(&self, unit_id: &String) {
-        self.trigger.remove(unit_id);
+    pub(super) fn trigger_remove(&self, unit_id: &str) {
+        self.trigger.remove(&unit_id.to_string());
     }
 
     pub(super) fn trigger_get(&self, unit_id: &str) -> Option<(JobKind, JobAttr)> {

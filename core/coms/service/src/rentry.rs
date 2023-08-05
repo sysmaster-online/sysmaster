@@ -670,12 +670,12 @@ impl ServiceRe {
         self.conf.0.insert(unit_id.to_string(), conf);
     }
 
-    pub(super) fn _conf_remove(&self, unit_id: &String) {
-        self.conf.0.remove(unit_id);
+    pub(super) fn _conf_remove(&self, unit_id: &str) {
+        self.conf.0.remove(&unit_id.to_string());
     }
 
-    pub(super) fn conf_get(&self, unit_id: &String) -> Option<SectionService> {
-        let conf = self.conf.0.get(unit_id);
+    pub(super) fn conf_get(&self, unit_id: &str) -> Option<SectionService> {
+        let conf = self.conf.0.get(&unit_id.to_string());
         conf.map(|c| c.service)
     }
 
@@ -717,14 +717,14 @@ impl ServiceRe {
         self.mng.0.insert(unit_id.to_string(), mng);
     }
 
-    pub(super) fn _mng_remove(&self, unit_id: &String) {
-        self.mng.0.remove(unit_id);
+    pub(super) fn _mng_remove(&self, unit_id: &str) {
+        self.mng.0.remove(&unit_id.to_string());
     }
 
     #[allow(clippy::type_complexity)]
     pub(super) fn mng_get(
         &self,
-        unit_id: &String,
+        unit_id: &str,
     ) -> Option<(
         ServiceState,
         ServiceResult,
@@ -740,7 +740,7 @@ impl ServiceRe {
         ExitStatus,
         ServiceMonitor,
     )> {
-        let mng = self.mng.0.get(unit_id);
+        let mng = self.mng.0.get(&unit_id.to_string());
         mng.map(|m| {
             (
                 m.state,

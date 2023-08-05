@@ -56,7 +56,7 @@ impl ReStation for NotifyManager {
     fn do_compensate_last(&self, _lframe: (u32, Option<u32>, Option<u32>), lunit: Option<&String>) {
         if let Some(unit_id) = lunit {
             // re-run
-            self.jm.trigger_unit(unit_id);
+            self.jm.trigger_unit(&unit_id.to_string());
         }
     }
 

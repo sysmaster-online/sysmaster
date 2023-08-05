@@ -131,7 +131,7 @@ impl UeConfig {
         conf
     }
 
-    pub(super) fn load_fragment_and_dropin(&self, files: &UnitFile, name: &String) -> Result<()> {
+    pub(super) fn load_fragment_and_dropin(&self, files: &UnitFile, name: &str) -> Result<()> {
         type ConfigPartial = <UeConfigData as Config>::Partial;
         let mut partial: ConfigPartial = Partial::from_env().context(ConfiqueSnafu)?;
         /* The first config wins, so add default values at last. */

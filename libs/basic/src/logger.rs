@@ -208,7 +208,7 @@ impl log::Log for FileLogger {
 }
 
 impl FileLogger {
-    fn file_open(file_path: &PathBuf, file_mode: u32) -> File {
+    fn file_open(file_path: &Path, file_mode: u32) -> File {
         /* Panic if we can't open a log file. */
         let dir = file_path.parent().unwrap();
         if !dir.exists() {

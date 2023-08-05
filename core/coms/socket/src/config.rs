@@ -229,7 +229,7 @@ impl SocketConfig {
         Ok(())
     }
 
-    fn parse_sockets(&self, listens: &Vec<String>, listen_item: ListenItem) -> Result<()> {
+    fn parse_sockets(&self, listens: &[String], listen_item: ListenItem) -> Result<()> {
         let socket_type = match listen_item {
             ListenItem::Datagram => SockType::Datagram,
             ListenItem::Stream => SockType::Stream,
@@ -262,7 +262,7 @@ impl SocketConfig {
         Ok(())
     }
 
-    fn parse_fifo(&self, listens: &Vec<String>) -> Result<()> {
+    fn parse_fifo(&self, listens: &[String]) -> Result<()> {
         for v in listens {
             let port = SocketPortConf::new(PortType::Fifo, SocketAddress::empty(), v);
             self.push_port(Rc::new(port));
@@ -270,7 +270,7 @@ impl SocketConfig {
         Ok(())
     }
 
-    fn parse_special(&self, listens: &Vec<String>) -> Result<()> {
+    fn parse_special(&self, listens: &[String]) -> Result<()> {
         for v in listens {
             let port = SocketPortConf::new(PortType::Special, SocketAddress::empty(), v);
             self.push_port(Rc::new(port));

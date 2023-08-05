@@ -377,12 +377,12 @@ impl UnitRe {
     }
 
     #[allow(dead_code)]
-    pub(super) fn base_remove(&self, unit_id: &String) {
-        self.base.remove(unit_id);
+    pub(super) fn base_remove(&self, unit_id: &str) {
+        self.base.remove(&unit_id.to_string());
     }
 
-    pub(super) fn base_get(&self, unit_id: &String) -> Option<UnitType> {
-        let u_base = self.base.get(unit_id);
+    pub(super) fn base_get(&self, unit_id: &str) -> Option<UnitType> {
+        let u_base = self.base.get(&unit_id.to_string());
         u_base.map(|b| b.unit_type)
     }
 
@@ -396,12 +396,12 @@ impl UnitRe {
     }
 
     #[allow(dead_code)]
-    pub(super) fn load_remove(&self, unit_id: &String) {
-        self.load.remove(unit_id);
+    pub(super) fn load_remove(&self, unit_id: &str) {
+        self.load.remove(&unit_id.to_string());
     }
 
-    pub(super) fn load_get(&self, unit_id: &String) -> Option<UnitLoadState> {
-        let u_load = self.load.get(unit_id);
+    pub(super) fn load_get(&self, unit_id: &str) -> Option<UnitLoadState> {
+        let u_load = self.load.get(&unit_id.to_string());
         u_load.map(|l| l.load_state)
     }
 
@@ -416,12 +416,12 @@ impl UnitRe {
     }
 
     #[allow(dead_code)]
-    pub(super) fn conf_remove(&self, unit_id: &String) {
-        self.conf.remove(unit_id);
+    pub(super) fn conf_remove(&self, unit_id: &str) {
+        self.conf.remove(&unit_id.to_string());
     }
 
-    pub(super) fn conf_get(&self, unit_id: &String) -> Option<(UeConfigUnit, UeConfigInstall)> {
-        let u_conf = self.conf.get(unit_id);
+    pub(super) fn conf_get(&self, unit_id: &str) -> Option<(UeConfigUnit, UeConfigInstall)> {
+        let u_conf = self.conf.get(&unit_id.to_string());
         u_conf.map(|c| (c.unit, c.install))
     }
 
@@ -431,12 +431,12 @@ impl UnitRe {
     }
 
     #[allow(dead_code)]
-    pub(super) fn cgroup_remove(&self, unit_id: &String) {
-        self.cgroup.remove(unit_id);
+    pub(super) fn cgroup_remove(&self, unit_id: &str) {
+        self.cgroup.remove(&unit_id.to_string());
     }
 
-    pub(super) fn cgroup_get(&self, unit_id: &String) -> Option<PathBuf> {
-        let u_cgroup = self.cgroup.get(unit_id);
+    pub(super) fn cgroup_get(&self, unit_id: &str) -> Option<PathBuf> {
+        let u_cgroup = self.cgroup.get(&unit_id.to_string());
         u_cgroup.map(|c| c.cg_path)
     }
 
@@ -446,13 +446,13 @@ impl UnitRe {
     }
 
     #[allow(dead_code)]
-    pub(super) fn child_remove(&self, unit_id: &String) {
-        self.child.remove(unit_id);
+    pub(super) fn child_remove(&self, unit_id: &str) {
+        self.child.remove(&unit_id.to_string());
     }
 
-    pub(super) fn child_get(&self, unit_id: &String) -> Vec<Pid> {
+    pub(super) fn child_get(&self, unit_id: &str) -> Vec<Pid> {
         let mut pids = Vec::new();
-        if let Some(u_child) = self.child.get(unit_id) {
+        if let Some(u_child) = self.child.get(&unit_id.to_string()) {
             for pid in u_child.pids.iter() {
                 pids.push(Pid::from_raw(*pid));
             }
@@ -469,25 +469,25 @@ impl UnitRe {
         self.pps.insert(unit_id.to_owned(), pps_empty);
     }
 
-    pub(super) fn pps_set(&self, unit_id: &String, pps_mask: UnitRePps) {
-        let mut pps = self.pps_get(unit_id);
+    pub(super) fn pps_set(&self, unit_id: &str, pps_mask: UnitRePps) {
+        let mut pps = self.pps_get(&unit_id.to_string());
         pps.insert(pps_mask);
-        self.pps.insert(unit_id.clone(), pps);
+        self.pps.insert(unit_id.to_string(), pps);
     }
 
-    pub(super) fn pps_clear(&self, unit_id: &String, pps_mask: UnitRePps) {
-        let mut pps = self.pps_get(unit_id);
+    pub(super) fn pps_clear(&self, unit_id: &str, pps_mask: UnitRePps) {
+        let mut pps = self.pps_get(&unit_id.to_string());
         pps.remove(pps_mask);
-        self.pps.insert(unit_id.clone(), pps);
+        self.pps.insert(unit_id.to_string(), pps);
     }
 
     #[allow(dead_code)]
-    pub(super) fn pps_remove(&self, unit_id: &String) {
-        self.pps.remove(unit_id);
+    pub(super) fn pps_remove(&self, unit_id: &str) {
+        self.pps.remove(&unit_id.to_string());
     }
 
-    pub(super) fn pps_contains(&self, unit_id: &String, pps_mask: UnitRePps) -> bool {
-        let pps = self.pps_get(unit_id);
+    pub(super) fn pps_contains(&self, unit_id: &str, pps_mask: UnitRePps) -> bool {
+        let pps = self.pps_get(&unit_id.to_string());
         pps.contains(pps_mask)
     }
 
@@ -502,13 +502,13 @@ impl UnitRe {
     }
 
     #[allow(dead_code)]
-    pub(super) fn dep_remove(&self, unit_id: &String) {
-        self.dep.remove(unit_id);
+    pub(super) fn dep_remove(&self, unit_id: &str) {
+        self.dep.remove(&unit_id.to_string());
     }
 
-    pub(super) fn dep_get(&self, unit_id: &String) -> Vec<(UnitRelations, String)> {
+    pub(super) fn dep_get(&self, unit_id: &str) -> Vec<(UnitRelations, String)> {
         let mut deps = Vec::new();
-        if let Some(mut ud_config) = self.dep.get(unit_id) {
+        if let Some(mut ud_config) = self.dep.get(&unit_id.to_string()) {
             deps.append(&mut ud_config.deps);
         }
         deps
@@ -518,9 +518,9 @@ impl UnitRe {
         self.dep.keys()
     }
 
-    fn pps_get(&self, unit_id: &String) -> UnitRePps {
+    fn pps_get(&self, unit_id: &str) -> UnitRePps {
         let pps_empty = UnitRePps::empty();
-        self.pps.get(unit_id).unwrap_or(pps_empty)
+        self.pps.get(&unit_id.to_string()).unwrap_or(pps_empty)
     }
 
     pub(super) fn notify_insert(&self, fd: i32) {
