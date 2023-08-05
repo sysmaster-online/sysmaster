@@ -10,10 +10,11 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use super::base::PLUGIN_NAME;
+#[cfg(feature = "plugin")]
+use {basic::logger, supper::base::PLUGIN_NAME};
+
 use super::comm::SocketUmComm;
 use super::rentry::SocketReFrame;
-use basic::logger;
 use core::rel::{ReStation, Reliability};
 use core::unit::{UmIf, UnitManagerObj, UnitMngUtil};
 use std::rc::Rc;

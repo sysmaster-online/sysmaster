@@ -10,10 +10,11 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use super::base::PLUGIN_NAME;
+#[cfg(feature = "plugin")]
+use {basic::logger, supper::base::PLUGIN_NAME};
+
 use super::comm::MountUmComm;
 use super::rentry::{MountRe, MountReFrame};
-use basic::logger;
 use basic::mount_util::MountInfoParser;
 use core::error::*;
 use core::rel::{ReStation, ReliLastFrame, Reliability};

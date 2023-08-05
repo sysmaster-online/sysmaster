@@ -10,4 +10,5 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+#[cfg(feature = "plugin")]
 pub(super) const PLUGIN_NAME: &str = "TargetUnit";

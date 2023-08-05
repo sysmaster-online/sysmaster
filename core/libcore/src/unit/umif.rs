@@ -233,6 +233,7 @@ macro_rules! declare_umobj_plugin {
             file_size: u32,
             file_number: u32,
         ) -> *mut dyn $crate::unit::UnitManagerObj {
+            #[cfg(feature = "plugin")]
             logger::init_log_for_subum($name, level, target, file_size, file_number);
             let construcotr: fn() -> $unit_type = $constructor;
             let obj = construcotr();

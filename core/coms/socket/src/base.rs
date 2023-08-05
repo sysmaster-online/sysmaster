@@ -12,6 +12,7 @@
 
 use nix::{libc, sys::socket::SockProtocol};
 
+#[cfg(feature = "plugin")]
 pub(super) const PLUGIN_NAME: &str = "SocketUnit";
 
 #[repr(i32)]
