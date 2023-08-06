@@ -716,7 +716,7 @@ mod test {
                     }
                 }
 
-                remove_dir_all("/run/devmaster/links/\\x2ftest\\x2fupdate_prior_dir/").unwrap();
+                remove_dir_all("/run/devmaster/links/test\\x2fupdate_prior_dir/").unwrap();
             }
             Err(e) => {
                 assert!(e.get_errno() == nix::Error::EACCES);
