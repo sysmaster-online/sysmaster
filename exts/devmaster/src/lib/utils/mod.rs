@@ -57,11 +57,15 @@ pub(crate) fn check_attr_format(key: &str, attr: &str) -> Result<()> {
     check_format(key, attr)
 }
 
-/// check whether the format of the value is valid
+/// Check whether the format of the value is valid.
+///
+/// The formatter should have explicit trailing delimiter,
+/// that is to say the formatter must end with attribute '{xxx}'
+/// or non-unicode characters.
 pub(crate) fn check_format(key: &str, value: &str) -> Result<()> {
     lazy_static! {
         static ref VALUE_RE: Regex =
-            Regex::new("(\\$(?P<long>\\w+)|%(?P<short>\\w))(\\{(?P<attr>\\w+)\\})?").unwrap();
+            Regex::new("(\\$(?P<long>\\w+)|%(?P<short>\\w))(\\{(?P<attr>[^\\{\\}]+)\\})?").unwrap();
     }
 
     for subst in VALUE_RE.captures_iter(value) {
@@ -100,14 +104,16 @@ pub(crate) fn check_format(key: &str, value: &str) -> Result<()> {
 
         if matches!(subst_type, FormatSubstitutionType::Result) {
             if let Some(m) = attr {
-                let num = m.as_str().parse::<i32>();
+                let s = m.as_str();
+                let num = if s.ends_with('+') {
+                    s[0..s.len() - 1].parse::<i32>()
+                } else {
+                    s.parse::<i32>()
+                };
 
                 if num.is_err() {
                     return Err(Error::RulesLoadError {
-                        msg: format!(
-                            "Key '{}': formatter attribute of type \"result\" is not a valid number.",
-                            key
-                        ),
+                        msg: format!("Key '{}': formatter 'result' has invalid index.", key),
                     });
                 }
             }
@@ -580,45 +586,58 @@ mod tests {
 
     #[test]
     fn test_check_value_format() {
-        // valid value
-        check_value_format("", "aaa$devnode{ID_PATH}bbb", false).unwrap();
-        check_value_format("", "aaa$tempnode{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$sysfs{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$kernel{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$number{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$driver{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$devpath{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$id{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$major{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$minor{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$parent{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$name{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$links{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$root{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$sys{ID_PATH}ccc", false).unwrap();
+        // valid long formatter
+        check_value_format("", "aaa $devnode    ccc", false).unwrap();
+        check_value_format("", "aaa $tempnode   ccc", false).unwrap();
+        check_value_format("", "aaa $kernel     ccc", false).unwrap();
+        check_value_format("", "aaa $number     ccc", false).unwrap();
+        check_value_format("", "aaa $driver     ccc", false).unwrap();
+        check_value_format("", "aaa $devpath    ccc", false).unwrap();
+        check_value_format("", "aaa $id         ccc", false).unwrap();
+        check_value_format("", "aaa $major      ccc", false).unwrap();
+        check_value_format("", "aaa $minor      ccc", false).unwrap();
+        check_value_format("", "aaa $parent     ccc", false).unwrap();
+        check_value_format("", "aaa $name       ccc", false).unwrap();
+        check_value_format("", "aaa $links      ccc", false).unwrap();
+        check_value_format("", "aaa $root       ccc", false).unwrap();
+        check_value_format("", "aaa $sys        ccc", false).unwrap();
+        check_value_format("", "aaa $result     ccc", false).unwrap();
+        check_value_format("", "aaa $attr{[net/lo]ifindex} ccc", false).unwrap();
 
-        check_value_format(
-            "",
-            "aaa$devnode{ID_PATH}bbb$env{ID_FSTYPE}ccc$result",
-            false,
-        )
-        .unwrap();
+        check_value_format("", "aaa$attr{xxx}ccc", false).unwrap();
+        check_value_format("", "aaa$sysfs{xxx}ccc", false).unwrap();
+        check_value_format("", "aaa$result{0}ccc", false).unwrap();
+        check_value_format("", "aaa$result{0+}ccc", false).unwrap();
 
-        // formatter type """, ttr" and "env" must take attribute
-        check_value_format("", "aaa$attr{ID_PATH}ccc", false).unwrap();
-        check_value_format("", "aaa$env{ID_PATH}ccc", false).unwrap();
+        // test short formatter
+        check_value_format("", "aaa %N   ccc", false).unwrap();
+        check_value_format("", "aaa %N   ccc", false).unwrap();
+        check_value_format("", "aaa %k   ccc", false).unwrap();
+        check_value_format("", "aaa %n   ccc", false).unwrap();
+        check_value_format("", "aaa %d   ccc", false).unwrap();
+        check_value_format("", "aaa %p   ccc", false).unwrap();
+        check_value_format("", "aaa %b   ccc", false).unwrap();
+        check_value_format("", "aaa %M   ccc", false).unwrap();
+        check_value_format("", "aaa %m   ccc", false).unwrap();
+        check_value_format("", "aaa %P   ccc", false).unwrap();
+        check_value_format("", "aaa %D   ccc", false).unwrap();
+        check_value_format("", "aaa %L   ccc", false).unwrap();
+        check_value_format("", "aaa %r   ccc", false).unwrap();
+        check_value_format("", "aaa %S   ccc", false).unwrap();
+        check_value_format("", "aaa %c   ccc", false).unwrap();
+        check_value_format("", "aaa %s{[net/lo]ifindex} ccc", false).unwrap();
+
+        check_value_format("", "aaa$s{xxx}ccc", false).unwrap();
+        check_value_format("", "aaa$c{0}ccc", false).unwrap();
+        check_value_format("", "aaa$c{0+}ccc", false).unwrap();
+
+        // test multiple formatters
+        check_value_format("", "aaa$devnode{xxx}bbb$env{ID_FSTYPE}ccc$result", false).unwrap();
+
+        // 'attr', 'sysfs' and 'env' formatters must follow attribute
         check_value_format("", "aaa$attr", false).unwrap_err();
+        check_value_format("", "aaa$sysfs", false).unwrap_err();
         check_value_format("", "aaa$env", false).unwrap_err();
-
-        // invalid value
-        check_value_format("", "aaa$devnode{ID_PATH}bbb", false).unwrap();
-
-        // formatter type """, result" can ignore attribute, thus there should be a delimiter after "result"
-        // besides, if it t"", akes an attribute, the attribute must be a valid number.
-        check_value_format("", "aaa$resultbbb", false).unwrap_err();
-        check_value_format("", "aaa$result bbb", false).unwrap();
-        check_value_format("", "aaa$result", false).unwrap();
-        check_value_format("", "aaa$result{0}bbb", false).unwrap();
     }
 
     #[test]
