@@ -1660,7 +1660,7 @@ impl RuleToken {
 
                 if op != OperatorType::Assign {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'GOTO' can not take assign operator.".to_string(),
+                        msg: "Key 'GOTO' should take '=' operator.".to_string(),
                     });
                 }
 
@@ -1683,7 +1683,7 @@ impl RuleToken {
 
                 if op != OperatorType::Assign {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'LABEL' can not take assign operator.".to_string(),
+                        msg: "Key 'LABEL' should take '=' operator.".to_string(),
                     });
                 }
 
