@@ -1,9 +1,9 @@
 [package]
 name = "watchdog"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nix = "0.24"
+nix = { features = ["ioctl"], default-features = false, version = "0.24" }

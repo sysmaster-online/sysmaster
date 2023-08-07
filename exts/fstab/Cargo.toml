@@ -1,11 +1,11 @@
 [package]
 name = "fstab"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-inotify = "0.9.2"
-log = { version = "=0.4.14", default_features = false, features = ["std"] }
-nix = "0.24"
+inotify = { version = "0.9.2", default-features = false }
+log = { version = "=0.4.14", default_features = false }
+nix = { version = "0.24", default-features = false }

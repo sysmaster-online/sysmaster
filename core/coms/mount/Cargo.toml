@@ -1,6 +1,6 @@
 [package]
 name = "mount"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -10,17 +10,17 @@ crate-type = ["dylib", "lib"]
 name = "mount"
 
 [dependencies]
+basic = { path = "../../../libs/basic" }
+core = { path = "../../libcore", default-features = false }
 event = { path = "../../../libs/event" }
 macros = { path = "../../../libs/macros" }
-basic = { path = "../../../libs/basic" }
-core = { path = "../../libcore" }
 
-nix = "0.24"
-log = { version = "=0.4.14", default_features = false, features = ["std"] }
 epoll = "=4.3.1"
-libc = "0.2.*"
-serde = "1.0.130"
-once_cell = { version = "=1.7.2" }
+libc = { version = "0.2.*", default-features = false }
+log = { version = "=0.4.14", default_features = false }
+nix = { version = "0.24", default-features = false }
+once_cell = { version = "=1.7.2", default-features = false }
+serde = { version = "1.0.130", default-features = false }
 
 [features]
 default = ["noplugin"]

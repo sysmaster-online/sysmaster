@@ -3,8 +3,11 @@ name = "kmod_rs"
 version = "0.1.0"
 edition = "2021"
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [dependencies]
-log = { version = "=0.4.14", default_features = false, features = ["std"] }
-kmod-sys = "0.2.0"
-nix = "0.24"
 basic = { path = "../basic" }
+
+kmod-sys = "0.2.0"
+log = { version = "=0.4.14", default_features = false }
+nix = { default-features = false, version = "0.24" }

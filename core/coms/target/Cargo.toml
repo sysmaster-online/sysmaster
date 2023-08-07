@@ -1,10 +1,9 @@
 [package]
 name = "target"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 
 [lib]
 crate-type = ["dylib", "lib"]
@@ -12,13 +11,13 @@ name = "target"
 
 [dependencies]
 basic = { path = "../../../libs/basic" }
+core = { path = "../../libcore", default-features = false }
 macros = { path = "../../../libs/macros" }
-core = { path = "../../libcore" }
 
-nix = "0.24"
-log = { version = "=0.4.14", default_features = false, features = ["std"] }
-serde = "1.0.130"
-once_cell = { version = "=1.7.2" }
+log = { version = "=0.4.14", default_features = false }
+nix = { version = "0.24", default-features = false }
+once_cell = { version = "=1.7.2", default-features = false }
+serde = { version = "1.0.130", default-features = false }
 
 [features]
 default = ["noplugin"]

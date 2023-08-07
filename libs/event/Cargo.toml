@@ -1,6 +1,6 @@
 [package]
 name = "event"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["overweight <hexiaowen@huawei.com>"]
 edition = "2021"
 
@@ -8,9 +8,13 @@ edition = "2021"
 
 [dependencies]
 constants = { path = "../constants" }
-libc = { version = "0.2" }
-nix = { version = "0.24" }
-snafu = { version = "0.7" }
+
+libc = { version = "0.2", default-features = false }
+nix = { version = "0.24", default-features = false, features = [
+    "inotify",
+    "ucontext",
+] }
+snafu = { version = "0.7", default-features = false, features = ["std"] }
 
 [dev-dependencies.libtests]
 path = "../libtests"

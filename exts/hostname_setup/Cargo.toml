@@ -1,11 +1,17 @@
 [package]
 name = "hostname_setup"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [dependencies]
-nix = "0.24"
-log = { version = "=0.4.14", default_features = false, features = ["std"] }
-libc = "0.2.*"
-constants = { path = "../../libs/constants" }
 basic = { path = "../../libs/basic" }
+constants = { path = "../../libs/constants" }
+
+libc = { version = "0.2.*", default-features = false }
+log = { version = "=0.4.14", default_features = false }
+nix = { version = "0.24", default-features = false, features = [
+    "mount",
+    "hostname",
+] }

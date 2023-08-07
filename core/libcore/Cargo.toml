@@ -1,27 +1,26 @@
 [package]
 name = "core"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-
 [dependencies]
 # internal libraries
+basic = { path = "../../libs/basic" }
 cgroup = { path = "../../libs/cgroup" }
 event = { path = "../../libs/event" }
-basic = { path = "../../libs/basic" }
 
 # third libraries
 bitflags = "1.3.2"
-confique = { version = "0.1.3", default-features = false, features = ['toml'] }
-heed = "0.10.6"
-libc = "0.2.*"
-log = { version = "=0.4.14", default_features = false, features = ["std"] }
-nix = "0.24"
-regex = { version = "1.6.0", default-features = false, features = ["std"] }
-serde = "1.0.130"
-snafu = "0.7"
+confique = { version = "0.1.3", default-features = false }
+heed = { version = "0.10.6", features = ["lmdb"], default-features = false }
+libc = { version = "0.2.*", default-features = false }
+log = { version = "=0.4.14", default_features = false }
+nix = { version = "0.24", default-features = false }
+regex = { version = "1.6.0", default-features = false }
+serde = { version = "1.0.130", default-features = false }
+snafu = { version = "0.7", default-features = false }
 
 [features]
 default = ["noplugin"]
