@@ -20,39 +20,44 @@ path = "src/lib/lib.rs"
 
 [dependencies]
 # internal libraries
-device = { path = "../../libs/device" }
-event = { path = "../../libs/event" }
 basic = { path = "../../libs/basic" }
 blkid_rs = { path = "../../libs/blkid_rs" }
-kmod_rs = { path = "../../libs/kmod_rs" }
+device = { path = "../../libs/device" }
+event = { path = "../../libs/event" }
 input_event_codes_rs = { path = "../../libs/input_event_codes_rs" }
+kmod_rs = { path = "../../libs/kmod_rs" }
 
 # third libraries
-libc = "0.2.*"
 bitflags = "1.3.2"
-thiserror = "1.0"
-netlink-sys = "0.8.0"
-nix = "0.24"
-log = { version = "=0.4.14", default_features = false, features = ["std"] }
-snafu = "0.7"
-clap = { version = "3.1.8", features = ["derive"] }
-lazy_static = "1.4.0"
-regex = "1.7.0"
-fnmatch-regex = "0.2.0"
-wait-timeout = "0.2.0"
-shell-words = "1.1.0"
-sscanf = "0.4.0"
-serde = "1.0.130"
+clap = { version = "3.1.8", default_features = false, features = [
+    "derive",
+    "std",
+] }
+cluFlock = { version = "1.2.7", default-features = false }
 confique = { version = "0.1.3", default-features = false, features = ['toml'] }
-loopdev = "0.4.0"
-cluFlock = "1.2.7"
+fnmatch-regex = "0.2.0"
+futures = { version = "0.3.13", default-features = false }
 input-event-codes = "5.16.8"
-ioctls = "0.6.1"
 ioctl-sys = "0.7.1"
+ioctls = "0.6.1"
+lazy_static = "1.4.0"
+libc = { version = "0.2.*", default-features = false }
+log = { version = "=0.4.14", default_features = false }
+loopdev = "0.4.0"
+netlink-sys = "0.8.0"
+nix = { version = "0.24", default-features = false, features = ["uio"] }
+regex = { version = "1.7.0", default_features = false }
 rtnetlink = "0.8.1"
-futures = "0.3.13"
-tokio = { version = "1.29.1", features = ["full"] }
-toml = "0.5.2"
+serde = { version = "1.0.130", default-features = false }
+shell-words = "1.1.0"
+snafu = { version = "0.7", default-features = false }
+sscanf = "0.4.0"
+thiserror = "1.0"
+tokio = { version = "1.29.1", default_features = false, features = [
+    "rt-multi-thread",
+] }
+toml = "0.5.8"
+wait-timeout = "0.2.0"
 
 [build-dependencies]
 basic = { path = "../../libs/basic" }
