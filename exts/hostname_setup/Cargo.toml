@@ -7,9 +7,9 @@ edition = "2021"
 
 [dependencies]
 basic = { path = "../../libs/basic" }
-constants = { path = "../../libs/constants" }
+# constants = { path = "../../libs/constants" }
 
-libc = { version = "0.2.*", default-features = false }
+# libc = { version = "0.2.*", default-features = false }
 log = { version = "=0.4.14", default_features = false }
 nix = { version = "0.24", default-features = false, features = [
     "mount",

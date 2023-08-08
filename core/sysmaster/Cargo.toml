@@ -42,7 +42,7 @@ once_cell = { version = "=1.7.2", default-features = false }
 regex = { version = "1.6.0", default-features = false }
 serde = { version = "1.0.130", default-features = false }
 siphasher = { version = "0.3", default-features = false }
-snafu = { version = "0.7", default-features = false }
+# snafu = { version = "0.7", default-features = false }
 walkdir = "2"
 
 [features]

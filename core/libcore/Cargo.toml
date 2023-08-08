@@ -18,7 +18,7 @@ heed = { version = "0.10.6", features = ["lmdb"], default-features = false }
 libc = { version = "0.2.*", default-features = false }
 log = { version = "=0.4.14", default_features = false }
 nix = { version = "0.24", default-features = false }
-regex = { version = "1.6.0", default-features = false }
+# regex = { version = "1.6.0", default-features = false }
 serde = { version = "1.0.130", default-features = false }
 snafu = { version = "0.7", default-features = false }
 

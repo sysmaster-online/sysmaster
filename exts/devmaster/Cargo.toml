@@ -43,8 +43,8 @@ ioctls = "0.6.1"
 lazy_static = "1.4.0"
 libc = { version = "0.2.*", default-features = false }
 log = { version = "=0.4.14", default_features = false }
-loopdev = "0.4.0"
-netlink-sys = "0.8.0"
+# loopdev = "0.4.0"
+# netlink-sys = "0.8.0"
 nix = { version = "0.24", default-features = false, features = ["uio"] }
 regex = { version = "1.7.0", default_features = false }
 rtnetlink = "0.8.1"
@@ -52,7 +52,7 @@ serde = { version = "1.0.130", default-features = false }
 shell-words = "1.1.0"
 snafu = { version = "0.7", default-features = false }
 sscanf = "0.4.0"
-thiserror = "1.0"
+# thiserror = "1.0"
 tokio = { version = "1.29.1", default_features = false, features = [
     "rt-multi-thread",
 ] }

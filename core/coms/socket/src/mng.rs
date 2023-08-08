@@ -485,7 +485,7 @@ impl SocketMng {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(e) => {
                         #[allow(clippy::unit_arg)]
-                        self.comm.owner().map_or(
+                        let _ = self.comm.owner().map_or(
                             log::error!("Failed to run stop post cmd and service unit id is None"),
                             |u| {
                                 log::error!(

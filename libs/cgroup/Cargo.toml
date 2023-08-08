@@ -10,7 +10,7 @@ basic = { path = "../basic" }
 bitflags = "1.3.2"
 log = { version = "=0.4.14", default_features = false }
 nix = { version = "0.24", default-features = false }
-regex = { version = "1.6.0", default-features = false, features = ["std"] }
+# regex = { version = "1.6.0", default-features = false, features = ["std"] }
 snafu = { version = "0.7", default-features = false }
 walkdir = "2"
 

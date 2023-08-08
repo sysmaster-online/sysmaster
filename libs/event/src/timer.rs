@@ -14,7 +14,6 @@ use std::{
     cmp::Ordering,
     collections::{BinaryHeap, HashMap},
     mem,
-    ops::Deref,
     rc::Rc,
 };
 
@@ -214,7 +213,7 @@ impl TimerInner {
         let mut tmp = BinaryHeap::<ClockData>::new();
         for clock_data in self.data.iter() {
             if clock_data.source().cmp(&source) != Ordering::Equal {
-                tmp.push(clock_data.deref().clone());
+                tmp.push(clock_data.clone());
             }
         }
         self.data.clear();

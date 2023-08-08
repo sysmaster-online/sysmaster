@@ -16,7 +16,7 @@ snafu = { features = ["std"], default-features = false, version = "0.7" }
 prost-build = "0.9" # 编译 protobuf
 
 [dev-dependencies]
-libtests = { path = "../../libs/libtests" }
+# libtests = { path = "../../libs/libtests" }
 
 [[example]]
 name = "signals"

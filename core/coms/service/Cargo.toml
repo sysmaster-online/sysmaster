@@ -16,7 +16,7 @@ constants = { path = "../../../libs/constants" }
 core = { path = "../../libcore", default-features = false }
 event = { path = "../../../libs/event" }
 macros = { path = "../../../libs/macros" }
-watchdog = { path = "../../../libs/watchdog" }
+# watchdog = { path = "../../../libs/watchdog" }
 
 confique = { version = "0.1.3", default-features = false }
 libc = { version = "0.2.*", default-features = false }
