@@ -307,7 +307,7 @@ impl MountMonitorData {
         };
 
         let me_fd = me_file.as_raw_fd();
-        let me_epfd = epoll::create(false).unwrap();
+        let me_epfd = epoll::create(true).unwrap();
         let event = epoll::Events::EPOLLET | epoll::Events::EPOLLIN;
         let me_epevent = epoll::Event::new(event, me_fd as u64);
         let op = epoll::ControlOptions::EPOLL_CTL_ADD;

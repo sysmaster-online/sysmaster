@@ -37,7 +37,11 @@ fnmatch-regex = "0.2.0"
 lazy_static = "1.4.0"
 libc = { version = "0.2.*", default-features = false }
 log = { version = "=0.4.14", default_features = false }
-nix = { version = "0.24", default-features = false, features = ["reboot"] }
+nix = { version = "0.24", default-features = false, features = [
+    "reboot",
+    "mount",
+    "socket",
+] }
 once_cell = { version = "=1.7.2", default-features = false }
 regex = { version = "1.6.0", default-features = false }
 serde = { version = "1.0.130", default-features = false }
