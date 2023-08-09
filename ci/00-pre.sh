@@ -49,7 +49,6 @@ crate_names=("https://github.com/rust-lang/crates.io-index" \
             "https://mirrors.ustc.edu.cn/crates.io-index" \
             "https://rsproxy.cn/crates.io-index" \
             "https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git" \
-            "https://code.aliyun.com/rustcc/crates.io-index.git" \
             "https://mirrors.sjtug.sjtu.edu.cn/git/crates.io-index")
 
 # Initialize minimum latency to a large value
