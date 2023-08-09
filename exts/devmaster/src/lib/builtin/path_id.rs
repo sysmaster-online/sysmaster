@@ -172,9 +172,9 @@ impl PathId {
                 .unwrap_or_default();
             if !subsys.is_empty() && !sysname.is_empty() {
                 if subsys == "scsi_tape" {
-                    self.hanlde_scsi_tape(parent.as_ref().unwrap().clone(), path);
+                    self.handle_scsi_tape(parent.as_ref().unwrap().clone(), path);
                 } else if subsys == "scsi" {
-                    parent = self.hanlde_scsi(
+                    parent = self.handle_scsi(
                         parent.as_ref().unwrap().clone(),
                         path,
                         compat_path,
@@ -182,10 +182,10 @@ impl PathId {
                     );
                     *supported_transport = true;
                 } else if subsys == "cciss" {
-                    parent = self.hanlde_cciss(parent.as_ref().unwrap().clone(), path);
+                    parent = self.handle_cciss(parent.as_ref().unwrap().clone(), path);
                     *supported_transport = true;
                 } else if subsys == "usb" {
-                    parent = self.hanlde_usb(parent.as_ref().unwrap().clone(), path);
+                    parent = self.handle_usb(parent.as_ref().unwrap().clone(), path);
                     *supported_transport = true;
                 } else if subsys == "bcma" {
                     parent = self.handle_bcma(parent.as_ref().unwrap().clone(), path);
@@ -263,7 +263,7 @@ impl PathId {
         Ok(true)
     }
 
-    fn hanlde_scsi_tape(&self, dev: Rc<RefCell<Device>>, path: &mut String) {
+    fn handle_scsi_tape(&self, dev: Rc<RefCell<Device>>, path: &mut String) {
         let name = match dev.borrow().get_sysname() {
             Ok(name) => name,
             Err(_) => return,
@@ -278,7 +278,7 @@ impl PathId {
         }
     }
 
-    fn hanlde_scsi(
+    fn handle_scsi(
         &self,
         parent: Rc<RefCell<Device>>,
         path: &mut String,
@@ -306,34 +306,34 @@ impl PathId {
             Err(_) => return None,
         };
 
-        if name == "/rport-" {
+        if name.contains("/rport-") {
             *supported_parent = true;
-            return self.hanlde_scsi_fibre_channel(parent, path);
+            return self.handle_scsi_fibre_channel(parent, path);
         }
 
-        if name == "/end_device-" {
+        if name.contains("/end_device-") {
             *supported_parent = true;
-            return self.hanlde_scsi_sas(parent, path);
+            return self.handle_scsi_sas(parent, path);
         }
 
-        if name == "/session" {
+        if name.contains("/session") {
             *supported_parent = true;
-            return self.hanlde_scsi_iscsi(parent, path);
+            return self.handle_scsi_iscsi(parent, path);
         }
 
-        if name == "/ata" {
-            return self.hanlde_scsi_ata(parent, path, compat_path);
+        if name.contains("/ata") {
+            return self.handle_scsi_ata(parent, path, compat_path);
         }
 
-        if name == "/vmbus_" {
-            return self.hanlde_scsi_hyperv(parent, path, 37);
-        } else if name == "VMBUS" {
-            return self.hanlde_scsi_hyperv(parent, path, 38);
+        if name.contains("/vmbus_") {
+            return self.handle_scsi_hyperv(parent, path, 37);
+        } else if name.contains("/VMBUS") {
+            return self.handle_scsi_hyperv(parent, path, 38);
         }
         self.handle_scsi_default(parent, path)
     }
 
-    fn hanlde_scsi_fibre_channel(
+    fn handle_scsi_fibre_channel(
         &self,
         parent: Rc<RefCell<Device>>,
         path: &mut String,
@@ -365,7 +365,7 @@ impl PathId {
         Some(parent)
     }
 
-    fn hanlde_scsi_sas(
+    fn handle_scsi_sas(
         &self,
         parent: Rc<RefCell<Device>>,
         path: &mut String,
@@ -402,7 +402,7 @@ impl PathId {
         Some(parent)
     }
 
-    fn hanlde_scsi_iscsi(
+    fn handle_scsi_iscsi(
         &self,
         parent: Rc<RefCell<Device>>,
         path: &mut String,
@@ -463,7 +463,7 @@ impl PathId {
         Some(parent)
     }
 
-    fn hanlde_scsi_ata(
+    fn handle_scsi_ata(
         &self,
         parent: Rc<RefCell<Device>>,
         path: &mut String,
@@ -537,7 +537,7 @@ impl PathId {
         Some(parent)
     }
 
-    fn hanlde_scsi_hyperv(
+    fn handle_scsi_hyperv(
         &self,
         parent: Rc<RefCell<Device>>,
         path: &mut String,
@@ -651,11 +651,11 @@ impl PathId {
         for entry in dir {
             let de = match entry {
                 Ok(de) => de,
-                Err(_) => return None,
+                Err(_) => continue,
             };
             let d_name = match de.file_name().to_str() {
                 Some(name) => String::from(name),
-                None => return None,
+                None => continue,
             };
 
             if d_name.starts_with('.') {
@@ -663,18 +663,20 @@ impl PathId {
             }
             let d_type = match de.file_type() {
                 Ok(t) => t,
-                Err(_) => return None,
+                Err(_) => continue,
             };
-            if !d_type.is_dir() || !d_type.is_symlink() {
+            if !d_type.is_dir() && !d_type.is_symlink() {
                 continue;
             }
-            if d_name.starts_with("host") {
+
+            if !d_name.starts_with("host") {
                 continue;
             }
             let d_name = &d_name[4..];
+
             let i = match d_name.parse::<i32>() {
                 Ok(i) => i,
-                Err(_) => return None,
+                Err(_) => continue,
             };
             /*
              * find the smallest number; the host really needs to export its
@@ -689,13 +691,7 @@ impl PathId {
             return Some(hostdev);
         }
         host -= basenum;
-        self.path_prepend(
-            path,
-            format!(
-                "scsi-{}:{}:{}:{}",
-                host as u32, bus as u32, target as u32, lun as u32
-            ),
-        );
+        self.path_prepend(path, format!("scsi-{}:{}:{}:{}", host, bus, target, lun));
         Some(hostdev)
     }
 
@@ -725,7 +721,7 @@ impl PathId {
         path
     }
 
-    fn hanlde_cciss(
+    fn handle_cciss(
         &self,
         parent: Rc<RefCell<Device>>,
         path: &mut String,
@@ -754,7 +750,7 @@ impl PathId {
         self.skip_subsystem(parent, &name)
     }
 
-    fn hanlde_usb(
+    fn handle_usb(
         &self,
         parent: Rc<RefCell<Device>>,
         path: &mut String,
