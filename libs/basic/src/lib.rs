@@ -15,7 +15,6 @@
 pub mod build;
 pub mod condition;
 pub mod conf_parser;
-pub mod device;
 pub mod env_cargo;
 pub mod errno_util;
 pub mod error;
@@ -42,6 +41,8 @@ pub mod socket_util;
 pub mod special;
 pub mod stat_util;
 pub mod string;
+#[cfg(feature = "sysfs")]
+pub mod sysfs;
 pub mod time_util;
 pub mod user_group_util;
 pub mod uuid;

@@ -35,6 +35,7 @@ time = "=0.1.45"
 tempfile = "3.6.0"
 
 [features]
-default = ["build", "selinux"]
+default = ["build", "selinux", "sysfs"]
 selinux = []
 build = ["pkg-config"]
+sysfs = []

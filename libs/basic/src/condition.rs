@@ -23,7 +23,7 @@ use libc::{glob, glob_t, GLOB_NOSORT};
 #[cfg(not(target_env = "musl"))]
 use libc::{statx, STATX_ATTR_MOUNT_ROOT};
 
-use crate::{device::on_ac_power, fd_util, proc_cmdline, security, user_group_util};
+use crate::{fd_util, proc_cmdline, security, sysfs::SysFs, user_group_util};
 
 #[cfg(target_env = "musl")]
 use crate::mount_util::MountInfoParser;
@@ -139,7 +139,7 @@ impl Condition {
         /* params is generated from bool.to_string(), so it should
          * be exactly "true", not "yes"/"on" or other words. */
         let is_true = self.params.eq("true");
-        !(is_true ^ on_ac_power()) as i8
+        !(is_true ^ SysFs::on_ac_power()) as i8
     }
 
     fn test_capability(&self) -> i8 {
