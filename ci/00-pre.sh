@@ -40,10 +40,6 @@ fi
 source "$HOME/.cargo/env"
 rustup default 1.57
 
-arch=`uname -m`
-# install musl-build
-rustup target add $arch-unknown-linux-musl
-
 # Define the crate names to test
 crate_names=("https://github.com/rust-lang/crates.io-index" \
             "https://mirrors.ustc.edu.cn/crates.io-index" \
