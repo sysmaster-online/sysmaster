@@ -182,6 +182,8 @@ pub(crate) fn replace_ifname(s: &str) -> String {
 /// It uses a regular expression to match one or more whitespace characters.
 /// The input string is not modified, and a new string with the replacements is returned.
 pub(crate) fn replace_whitespace(s: &str) -> String {
+    // Remove consecutive spaces after the last non-space character
+    let s = s.trim_end_matches(' ');
     // Create a regular expression to match one or more whitespace characters.
     let re = Regex::new(r"\s+").unwrap();
     // Use the regular expression to replace all matches with underscores.
