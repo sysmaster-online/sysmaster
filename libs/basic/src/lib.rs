@@ -13,11 +13,13 @@
 //!
 #[cfg(feature = "build")]
 pub mod build;
+#[cfg(feature = "condition")]
 pub mod condition;
 pub mod conf_parser;
 pub mod env_cargo;
-pub mod errno_util;
 pub mod error;
+pub use error::*;
+pub mod ether_addr_util;
 pub mod fd_util;
 pub mod file_util;
 pub mod fs_util;
@@ -28,6 +30,7 @@ pub mod logger;
 pub mod macros;
 pub mod mount_util;
 pub mod naming_scheme;
+pub mod os_release;
 pub mod parse_util;
 pub mod path_lookup;
 pub mod path_util;
@@ -38,15 +41,41 @@ pub mod security;
 pub mod show_table;
 pub mod signal_util;
 pub mod socket_util;
-pub mod special;
 pub mod stat_util;
 pub mod string;
 #[cfg(feature = "sysfs")]
 pub mod sysfs;
-pub mod time_util;
-pub mod user_group_util;
+#[cfg(feature = "timebasic")]
+pub mod time;
+#[cfg(feature = "unistd")]
+pub mod unistd;
+#[cfg(feature = "uuid")]
 pub mod uuid;
-pub mod virtualize;
-pub use error::*;
-pub mod ether_addr_util;
-pub mod os_release;
+#[cfg(feature = "virt")]
+pub mod virt;
+
+/// default startup target
+pub const DEFAULT_TARGET: &str = "default.target";
+/// the shutdown target
+pub const SHUTDOWN_TARGET: &str = "shutdown.target";
+/// the socketc target
+pub const SOCKETS_TARGET: &str = "sockets.target";
+
+/// early boot targets
+pub const SYSINIT_TARGET: &str = "sysinit.target";
+/// the basic start target
+pub const BASIC_TARGET: &str = "basic.target";
+
+/// Special user boot targets */
+pub const MULTI_USER_TARGET: &str = "multi-user.target";
+
+/// the init scope
+pub const INIT_SCOPE: &str = "init.scope";
+/// sysmaster service slice
+pub const SYSMASTER_SLICE: &str = "system.slice";
+
+/// the unit store sysmaster itself
+pub const CGROUP_SYSMASTER: &str = "sysmaster";
+
+/// the default running time directory of sysmaster
+pub const EXEC_RUNTIME_PREFIX: &str = "/run";

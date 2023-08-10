@@ -19,11 +19,16 @@ use std::fmt::Display;
 pub struct Uuid(pub(super) [u8; 16]);
 
 fn unhexchar(c: u8) -> Result<u8, ()> {
+    // If the character is a digit, subtract the ASCII value of '0' to get the decimal value
     if c.is_ascii_digit() {
         return Ok(c - b'0');
-    } else if c.is_ascii_hexdigit() && c.is_ascii_lowercase() {
+    }
+    // If the character is a lowercase hex digit, subtract the ASCII value of 'a' and add 10 to get the decimal value
+    else if c.is_ascii_hexdigit() && c.is_ascii_lowercase() {
         return Ok(c - b'a' + 10);
-    } else if c.is_ascii_hexdigit() && c.is_ascii_uppercase() {
+    }
+    // If the character is an uppercase hex digit, subtract the ASCII value of 'A' and add 10 to get the decimal value
+    else if c.is_ascii_hexdigit() && c.is_ascii_uppercase() {
         return Ok(c - b'A' + 10);
     }
 
@@ -51,6 +56,7 @@ impl Display for Uuid {
             if vec![4, 6, 8, 10].contains(&i) {
                 ret.push('-');
             }
+            // Convert the byte to hexadecimal characters, push empty string when ti is not hex
             ret.push((hexchar(self.0[i] >> 4)).unwrap());
             ret.push((hexchar(self.0[i] & 0xF)).unwrap());
         }

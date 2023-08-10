@@ -25,7 +25,7 @@ use crate::unit::UnitManagerX;
 use alive_timer::AliveTimer;
 use basic::path_lookup::LookupPaths;
 use basic::process_util::{self};
-use basic::special::{CGROUP_SYSMASTER, MULTI_USER_TARGET};
+use basic::{CGROUP_SYSMASTER, MULTI_USER_TARGET};
 use cgroup::CgController;
 use cgroup::{cg_create_and_attach, CgFlags};
 use cmdproto::proto::execute::ExecuterAction;

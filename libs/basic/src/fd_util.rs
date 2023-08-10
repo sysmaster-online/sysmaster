@@ -146,7 +146,7 @@ pub fn fd_get_diskseq(fd: RawFd) -> Result<u64> {
         match blk_get_diskseq(fd, ptr) {
             Ok(_) => {}
             Err(e) => {
-                if !crate::errno_util::errno_is_not_supported(e) && e != Errno::EINVAL {
+                if !crate::error::errno_is_not_supported(e) && e != Errno::EINVAL {
                     return Err(Error::Nix { source: e });
                 }
 

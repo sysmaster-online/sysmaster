@@ -35,7 +35,7 @@ use core::rel::{ReDb, ReDbRwTxn, ReDbTable, Reliability};
 use core::serialize::DeserializeWith;
 use core::unit::KillMode;
 
-use basic::special::EXEC_RUNTIME_PREFIX;
+use basic::EXEC_RUNTIME_PREFIX;
 use constants::USEC_PER_SEC;
 
 struct ServiceReDb<K, V>(ReDb<K, V>);

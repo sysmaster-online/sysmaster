@@ -23,7 +23,7 @@ use libc::{glob, glob_t, GLOB_NOSORT};
 #[cfg(not(target_env = "musl"))]
 use libc::{statx, STATX_ATTR_MOUNT_ROOT};
 
-use crate::{fd_util, proc_cmdline, security, sysfs::SysFs, user_group_util};
+use crate::{fd_util, proc_cmdline, security, sysfs::SysFs, unistd};
 
 #[cfg(target_env = "musl")]
 use crate::mount_util::MountInfoParser;
@@ -425,18 +425,17 @@ impl Condition {
 
     fn test_user(&self) -> i8 {
         // may be UID
-        if let Ok(user) = user_group_util::parse_uid(&self.params) {
+        if let Ok(user) = unistd::parse_uid(&self.params) {
             return (user.uid == nix::unistd::getuid() || user.uid == nix::unistd::geteuid()) as i8;
         }
 
         if self.params.eq("@system") {
-            return (user_group_util::uid_is_system(nix::unistd::getuid())
-                || user_group_util::uid_is_system(nix::unistd::geteuid()))
-                as i8;
+            return (unistd::uid_is_system(nix::unistd::getuid())
+                || unistd::uid_is_system(nix::unistd::geteuid())) as i8;
         }
 
         // may be username
-        let result = match user_group_util::parse_name(&self.params) {
+        let result = match unistd::parse_name(&self.params) {
             Ok(user) => user.uid == nix::unistd::getuid() || user.uid == nix::unistd::geteuid(),
             _ => false,
         };

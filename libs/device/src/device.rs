@@ -3243,7 +3243,7 @@ mod tests {
                                 assert!(f.as_raw_fd() >= 0)
                             }
                             Err(e) => {
-                                assert!(basic::errno_util::errno_is_privilege(e.get_errno()));
+                                assert!(basic::error::errno_is_privilege(e.get_errno()));
                             }
                         }
                     }

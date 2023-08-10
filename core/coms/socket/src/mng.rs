@@ -21,7 +21,7 @@ use super::{
     spawn::SocketSpawn,
 };
 use basic::{
-    user_group_util::{get_group_creds, get_user_creds},
+    unistd::{get_group_creds, get_user_creds},
     IN_SET,
 };
 use core::exec::{ExecCommand, ExecContext};

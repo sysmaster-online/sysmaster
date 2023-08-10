@@ -20,7 +20,7 @@ use crate::{
 };
 use basic::{
     file_util::write_string_file, naming_scheme::*, parse_util::parse_mode,
-    proc_cmdline::cmdline_get_item, user_group_util::*,
+    proc_cmdline::cmdline_get_item, unistd::*,
 };
 use device::{Device, DeviceAction};
 use libc::{gid_t, mode_t, uid_t};

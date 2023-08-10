@@ -18,7 +18,7 @@ use crate::builtin::BuiltinCommand;
 use crate::error::{Error, Result};
 use crate::utils::*;
 use basic::parse_util::parse_mode;
-use basic::user_group_util::{parse_gid, parse_uid};
+use basic::unistd::{parse_gid, parse_uid};
 use fnmatch_regex;
 use lazy_static::lazy_static;
 use nix::unistd::{Group, User};

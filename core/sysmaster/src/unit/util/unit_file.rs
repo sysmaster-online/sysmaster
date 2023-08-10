@@ -12,7 +12,6 @@
 
 use basic::fs_util::is_symlink;
 use basic::path_lookup::LookupPaths;
-use basic::time_util;
 use siphasher::sip::SipHasher24;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -213,7 +212,7 @@ impl UnitFileData {
                 }
                 Ok(v) => v,
             };
-            siphash24.write_u128(time_util::timespec_load(time));
+            siphash24.write_u128(basic::time::timespec_load(time));
         }
 
         let updated: u64 = siphash24.finish();

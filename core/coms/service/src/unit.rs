@@ -17,7 +17,7 @@ use super::config::ServiceConfig;
 use super::mng::RunningData;
 use super::mng::ServiceMng;
 use super::rentry::{NotifyAccess, ServiceCommand, ServiceType};
-use basic::special::{BASIC_TARGET, SHUTDOWN_TARGET, SYSINIT_TARGET};
+use basic::{BASIC_TARGET, SHUTDOWN_TARGET, SYSINIT_TARGET};
 use core::error::*;
 use core::rel::{ReStation, Reliability};
 use core::unit::{

@@ -11,8 +11,8 @@
 // See the Mulan PSL v2 for more details.
 
 //! mount the cgroup systems
-use basic::virtualize::Virtualization;
-use basic::{fs_util, mount_util, path_util, proc_cmdline, virtualize};
+use basic::virt::Virtualization;
+use basic::{fs_util, mount_util, path_util, proc_cmdline, virt};
 use bitflags::bitflags;
 use cgroup::{self, CgController, CgType, CG_BASE_DIR};
 use core::error::*;
@@ -302,7 +302,7 @@ impl MountPoint {
         let fs_type = self.fs_type.as_str();
 
         if fs_type == "cgroup" {
-            let virtualization = virtualize::detect_container();
+            let virtualization = virt::detect_container();
             // for systemd only mounted on virtualization machine
             if self.mode.contains(MountMode::MNT_NOT_HOST) && virtualization == Virtualization::None
             {

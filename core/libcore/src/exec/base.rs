@@ -337,7 +337,7 @@ impl ExecContext {
         }
 
         /* try to parse as UID */
-        if let Ok(user) = basic::user_group_util::parse_uid(user_str) {
+        if let Ok(user) = basic::unistd::parse_uid(user_str) {
             *self.user.borrow_mut() = Some(user);
             return Ok(());
         }
@@ -372,7 +372,7 @@ impl ExecContext {
         }
 
         /* try to parse group_str as GID */
-        if let Ok(group) = basic::user_group_util::parse_gid(group_str) {
+        if let Ok(group) = basic::unistd::parse_gid(group_str) {
             *self.group.borrow_mut() = Some(group);
             return Ok(());
         }

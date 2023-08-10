@@ -22,7 +22,7 @@ use std::{
 };
 
 use crate::{error::*, log_dev, rules::FormatSubstitutionType};
-use basic::errno_util::errno_is_privilege;
+use basic::error::errno_is_privilege;
 use device::{Device, DB_BASE_DIR};
 use lazy_static::lazy_static;
 use nix::{errno::Errno, unistd::unlink};

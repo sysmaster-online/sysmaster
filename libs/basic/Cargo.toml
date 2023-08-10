@@ -35,7 +35,21 @@ time = "=0.1.45"
 tempfile = "3.6.0"
 
 [features]
-default = ["build", "selinux", "sysfs"]
-selinux = []
+default = [
+    "build",
+    "condition",
+    "selinux",
+    "sysfs",
+    "timebasic",
+    "unistd",
+    "uuid",
+    "virt",
+]
 build = ["pkg-config"]
+selinux = []
 sysfs = []
+uuid = []
+virt = []
+condition = []
+unistd = []
+timebasic = []

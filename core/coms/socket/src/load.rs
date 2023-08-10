@@ -15,7 +15,7 @@
 use crate::comm::SocketUnitComm;
 use crate::config::SocketConfig;
 use crate::rentry::PortType;
-use basic::special::{SHUTDOWN_TARGET, SOCKETS_TARGET, SYSINIT_TARGET};
+use basic::{SHUTDOWN_TARGET, SOCKETS_TARGET, SYSINIT_TARGET};
 use core::error::*;
 use core::unit::{UnitDependencyMask, UnitRelations, UnitType};
 use std::path::Path;
