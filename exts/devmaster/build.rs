@@ -12,8 +12,7 @@
 //
 
 //!
-use basic::build_util;
 
 fn main() {
-    build_util::build_libblkid();
+    basic::build::build_libblkid();
 }

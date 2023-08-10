@@ -11,7 +11,8 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-pub mod build_util;
+#[cfg(feature = "build")]
+pub mod build;
 pub mod condition;
 pub mod conf_parser;
 pub mod device;

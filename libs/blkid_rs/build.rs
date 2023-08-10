@@ -13,7 +13,6 @@
 //! generate libblkid.rs
 //!
 
-use basic::build_util;
 use bindgen::Builder;
 use std::{env, path::PathBuf};
 
@@ -31,5 +30,5 @@ fn main() {
         .write_to_file(out_path)
         .expect("Couldn't write libblkid.rs");
 
-    build_util::build_libblkid();
+    basic::build::build_libblkid();
 }
