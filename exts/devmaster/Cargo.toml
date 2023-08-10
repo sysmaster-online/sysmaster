@@ -14,6 +14,10 @@ path = "src/bin/devmaster/main.rs"
 name = "devctl"
 path = "src/bin/devctl/main.rs"
 
+[[bin]]
+name = "ata_id"
+path = "src/bin/tools/ata_id/main.rs"
+
 [lib]
 name = "libdevmaster"
 path = "src/lib/lib.rs"
@@ -31,6 +35,7 @@ device = { path = "../../libs/device" }
 event = { path = "../../libs/event" }
 input_event_codes_rs = { path = "../../libs/input_event_codes_rs" }
 kmod_rs = { path = "../../libs/kmod_rs" }
+scsi_generic_rs = { path = "../../libs/scsi_generic_rs" }
 
 # third libraries
 bitflags = "1.3.2"

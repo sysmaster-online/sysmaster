@@ -137,7 +137,7 @@ pub(crate) fn valid_ifname_chars(c: char) -> bool {
 
 /// replace invalid chars with '_', except for white list, plain ascii, hex-escaping and valid utf8
 /// as Rust strings are always encoded as utf8, we don't need to check whether chars are valid utf8
-pub(crate) fn replace_chars(s: &str, white_list: &str) -> String {
+pub fn replace_chars(s: &str, white_list: &str) -> String {
     let mut ret: String = String::new();
     let l = s.len();
     let mut i = 0;
@@ -181,7 +181,7 @@ pub(crate) fn replace_ifname(s: &str) -> String {
 /// This function replaces excess whitespace in a string with underscores.
 /// It uses a regular expression to match one or more whitespace characters.
 /// The input string is not modified, and a new string with the replacements is returned.
-pub(crate) fn replace_whitespace(s: &str) -> String {
+pub fn replace_whitespace(s: &str) -> String {
     // Remove consecutive spaces after the last non-space character
     let s = s.trim_end_matches(' ');
     // Create a regular expression to match one or more whitespace characters.
@@ -194,7 +194,7 @@ pub(crate) fn replace_whitespace(s: &str) -> String {
 /// This function encodes a device node name string into a byte array.
 /// The encoded string is stored in the output string buffer.
 /// If the input string or output buffer is empty, an error is returned.
-pub(crate) fn encode_devnode_name(str: &str, str_enc: &mut String) {
+pub fn encode_devnode_name(str: &str, str_enc: &mut String) {
     let mut i = 0;
 
     if str.is_empty() {

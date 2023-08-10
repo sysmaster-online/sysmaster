@@ -1,0 +1,13 @@
+[package]
+name = "scsi_generic_rs"
+version = "0.5.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies.bindgen]
+default_features = false
+features = ["runtime"]
+version = "0.63.0"
+
+[dependencies]
