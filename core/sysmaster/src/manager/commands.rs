@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use basic::fs_util::is_symlink;
+use basic::fs_util::{self, is_symlink};
 use basic::{do_entry_log, socket_util};
 use cmdproto::proto::execute::ExecuterAction;
 use cmdproto::proto::ProstServerStream;
@@ -39,6 +39,10 @@ where
     pub(super) fn new(relir: &Rc<Reliability>, comm_action: T) -> Self {
         /* The socket is used to communicate with sctl, panic if any of the following steps fail. */
         let sctl_socket_path = Path::new(SCTL_SOCKET);
+        let run_sysmaster = sctl_socket_path.parent().unwrap();
+        if run_sysmaster.exists() {
+            let _ = fs_util::chmod("/run/sysmaster", 0o755);
+        }
         /* remove the old socket if it exists */
         if sctl_socket_path.exists() && !is_symlink(sctl_socket_path) {
             do_entry_log!(std::fs::remove_file, sctl_socket_path, "remove");
