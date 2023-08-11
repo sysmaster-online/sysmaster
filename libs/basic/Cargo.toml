@@ -37,7 +37,7 @@ default = [
     "sysfs",
     "unistd",
     "uuid",
-    "virt",
+    "machine",
     "config",
     "cargo",
     "parse",
@@ -48,7 +48,7 @@ cargo = ["pkg-config"]
 selinux = []
 sysfs = []
 uuid = []
-virt = []
+machine = []
 condition = []
 unistd = []
 config = []

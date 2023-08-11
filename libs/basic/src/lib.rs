@@ -24,9 +24,10 @@ pub use error::*;
 pub mod fd_util;
 pub mod file_util;
 pub mod fs_util;
-pub mod initrd_util;
 pub mod io_util;
 pub mod logger;
+#[cfg(feature = "machine")]
+pub mod machine;
 pub mod macros;
 pub mod mount_util;
 pub mod naming_scheme;
@@ -52,8 +53,6 @@ pub mod sysfs;
 pub mod unistd;
 #[cfg(feature = "uuid")]
 pub mod uuid;
-#[cfg(feature = "virt")]
-pub mod virt;
 
 /// default startup target
 pub const DEFAULT_TARGET: &str = "default.target";

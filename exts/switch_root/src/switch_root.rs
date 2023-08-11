@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use basic::{initrd_util, mount_util::MountInfoParser, IN_SET};
+use basic::{machine, mount_util::MountInfoParser, IN_SET};
 use nix::{
     dir::Type,
     errno::Errno,
@@ -117,7 +117,7 @@ pub fn switch_root(new_root: &str) -> bool {
         return false;
     }
 
-    if initrd_util::in_initrd(None) {
+    if machine::Machine::in_initrd(None) {
         remove_dir_all_by_dir(old_root_dir);
     }
     true

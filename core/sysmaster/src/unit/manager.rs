@@ -37,7 +37,7 @@ use crate::utils::table::{TableOp, TableSubscribe};
 use basic::path_lookup::LookupPaths;
 use basic::proc_cmdline::get_process_cmdline;
 use basic::show_table::{CellColor, ShowTable};
-use basic::{initrd_util, process_util, rlimit_util, signal_util};
+use basic::{machine, process_util, rlimit_util, signal_util};
 use constants::SIG_SWITCH_ROOT_OFFSET;
 use core::error::*;
 use core::exec::ExecParameters;
@@ -249,7 +249,7 @@ impl UnitManagerX {
     }
 
     pub(crate) fn switch_root(&self, init: &[String]) -> Result<()> {
-        if initrd_util::in_initrd(None) {
+        if machine::Machine::in_initrd(None) {
             let mut str_paras = String::new();
             for para in init {
                 str_paras.push_str(&format!("{}\n", para));
