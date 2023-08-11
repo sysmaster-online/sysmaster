@@ -30,5 +30,5 @@ fn main() {
         .write_to_file(out_path)
         .expect("Couldn't write libblkid.rs");
 
-    basic::build::build_libblkid();
+    basic::cargo::build_libblkid();
 }

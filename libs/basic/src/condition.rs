@@ -143,7 +143,7 @@ impl Condition {
     }
 
     fn test_capability(&self) -> i8 {
-        let values = match caps::Capability::from_str(&self.params) {
+        let values = match crate::capability::Capability::from_str(&self.params) {
             Err(e) => {
                 log::error!("Failed to parse ConditionCapability values: {}, assuming ConditionCapability check failed:{}", self.params,e);
                 return 0;

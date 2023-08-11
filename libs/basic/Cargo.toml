@@ -9,7 +9,7 @@ edition = "2021"
 constants = { path = "../constants" }
 
 bitflags = "1.3.2"
-caps = "0.5.5"
+# caps = "0.5.5"
 # lazy_static = "1.4.0"
 pkg-config = { version = "0.3", optional = true }
 libc = { version = "0.2.140", default-features = false }
@@ -35,11 +35,25 @@ time = "=0.1.45"
 tempfile = "3.6.0"
 
 [features]
-default = ["build", "condition", "selinux", "sysfs", "unistd", "uuid", "virt"]
-build = ["pkg-config"]
+default = [
+    "condition",
+    "selinux",
+    "sysfs",
+    "unistd",
+    "uuid",
+    "virt",
+    "config",
+    "cargo",
+    "parse",
+    "capability",
+]
+cargo = ["pkg-config"]
 selinux = []
 sysfs = []
 uuid = []
 virt = []
 condition = []
 unistd = []
+config = []
+parse = []
+capability = []

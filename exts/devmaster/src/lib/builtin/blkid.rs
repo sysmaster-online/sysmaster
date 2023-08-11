@@ -16,11 +16,11 @@
 use crate::builtin::Builtin;
 use crate::error::{Error, Result};
 use crate::rules::exec_unit::ExecuteUnit;
-use basic::gpt::GptAttribute;
-use basic::gpt::GPT_ESP;
-use basic::gpt::GPT_ROOT_NATIVE;
-use basic::gpt::GPT_XBOOTLDR;
+use basic::uuid::GptAttribute;
 use basic::uuid::Uuid;
+use basic::uuid::GPT_ESP;
+use basic::uuid::GPT_ROOT_NATIVE;
+use basic::uuid::GPT_XBOOTLDR;
 use blkid_rs::BlkidFltr;
 use blkid_rs::BlkidPartition;
 #[cfg(blkid = "libblkid_2_37")]

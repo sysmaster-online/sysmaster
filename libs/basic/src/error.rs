@@ -36,6 +36,9 @@ pub enum Error {
     #[snafu(display("Io: {}", source))]
     Io { source: std::io::Error },
 
+    #[snafu(display("Caps: {}", what))]
+    Caps { what: String },
+
     #[snafu(display("Errno: {}", source))]
     Nix { source: nix::Error },
 

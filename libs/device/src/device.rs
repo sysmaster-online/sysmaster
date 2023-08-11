@@ -16,7 +16,7 @@ use crate::err_wrapper;
 use crate::utils::readlink_value;
 use crate::{error::*, DeviceAction};
 use basic::fs_util::{open_temporary, touch_file};
-use basic::parse_util::{device_path_parse_devnum, parse_devnum, parse_ifindex};
+use basic::parse::{device_path_parse_devnum, parse_devnum, parse_ifindex};
 use libc::{
     c_char, dev_t, faccessat, gid_t, mode_t, uid_t, F_OK, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK,
     S_IFMT, S_IRUSR, S_IWUSR,

@@ -132,7 +132,7 @@ mod test {
 
     #[test]
     fn test_parse_size() {
-        use crate::conf_parser::{parse_size, Base};
+        use crate::config::{parse_size, Base};
         let ret1 = parse_size("", Base::Binary);
         assert!(ret1.is_err());
 
@@ -160,7 +160,7 @@ mod test {
 
     #[test]
     fn test_parse_boolean() {
-        use crate::conf_parser::parse_boolean;
+        use crate::config::parse_boolean;
 
         assert!(parse_boolean("1").unwrap());
         assert!(parse_boolean("y").unwrap());

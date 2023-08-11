@@ -11,19 +11,20 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-#[cfg(feature = "build")]
-pub mod build;
+#[cfg(feature = "capability")]
+pub mod capability;
+#[cfg(feature = "cargo")]
+pub mod cargo;
 #[cfg(feature = "condition")]
 pub mod condition;
-pub mod conf_parser;
-pub mod env_cargo;
+#[cfg(feature = "config")]
+pub mod config;
 pub mod error;
 pub use error::*;
 pub mod ether_addr_util;
 pub mod fd_util;
 pub mod file_util;
 pub mod fs_util;
-pub mod gpt;
 pub mod initrd_util;
 pub mod io_util;
 pub mod logger;
@@ -31,7 +32,8 @@ pub mod macros;
 pub mod mount_util;
 pub mod naming_scheme;
 pub mod os_release;
-pub mod parse_util;
+#[cfg(feature = "parse")]
+pub mod parse;
 pub mod path_lookup;
 pub mod path_util;
 pub mod proc_cmdline;

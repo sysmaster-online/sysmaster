@@ -14,5 +14,5 @@
 //!
 
 fn main() {
-    basic::build::build_libblkid();
+    basic::cargo::build_libblkid();
 }

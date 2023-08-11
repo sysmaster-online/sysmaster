@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-use crate::conf_parser;
+use crate::config;
 use crate::error::*;
 use nix::unistd::Pid;
 use std::collections::HashSet;
@@ -76,7 +76,7 @@ pub fn proc_cmdline_get_bool(key: &str) -> Result<bool, Error> {
         return Ok(false);
     }
 
-    let r = conf_parser::parse_boolean(&val.unwrap())?;
+    let r = config::parse_boolean(&val.unwrap())?;
 
     Ok(r)
 }
