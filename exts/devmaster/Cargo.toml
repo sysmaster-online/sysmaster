@@ -1,6 +1,6 @@
 [package]
 name = "devmaster"
-version = "0.2.5"
+version = "0.5.0"
 edition = "2021"
 default-run = "devmaster"
 

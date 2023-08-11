@@ -55,7 +55,7 @@ dependencies = [
 
 [[package]]
 name = "basic"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "bitflags",
  "caps",
@@ -111,7 +111,7 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "blkid_rs"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "bindgen",
@@ -167,7 +167,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cgroup"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "bitflags",
@@ -236,7 +236,7 @@ dependencies = [
 
 [[package]]
 name = "cmdproto"
-version = "0.2.0"
+version = "0.5.0"
 dependencies = [
  "http",
  "nix 0.24.3",
@@ -290,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "constants"
-version = "0.2.5"
+version = "0.5.0"
 
 [[package]]
 name = "convert_case"
@@ -303,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "core"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "bitflags",
@@ -349,7 +349,7 @@ dependencies = [
 
 [[package]]
 name = "device"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "bitflags",
@@ -365,7 +365,7 @@ dependencies = [
 
 [[package]]
 name = "devmaster"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "bitflags",
@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "event"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "constants",
  "libc",
@@ -537,7 +537,7 @@ dependencies = [
 
 [[package]]
 name = "fstab"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "inotify",
  "log",
@@ -728,7 +728,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hostname_setup"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "log",
@@ -794,7 +794,7 @@ checksum = "6b6b0f8557f596a2db592f172015c40d0c149e16a956c7848e733d663f2c6636"
 
 [[package]]
 name = "input_event_codes_rs"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "bindgen",
 ]
@@ -871,7 +871,7 @@ dependencies = [
 
 [[package]]
 name = "kmod_rs"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "basic",
  "kmod-sys",
@@ -929,7 +929,7 @@ dependencies = [
 
 [[package]]
 name = "libtests"
-version = "0.2.5"
+version = "0.5.0"
 
 [[package]]
 name = "linux-raw-sys"
@@ -969,7 +969,7 @@ dependencies = [
 
 [[package]]
 name = "macros"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1020,7 +1020,7 @@ dependencies = [
 
 [[package]]
 name = "mount"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "core",
@@ -1413,7 +1413,7 @@ dependencies = [
 
 [[package]]
 name = "random_seed"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "libc",
@@ -1424,7 +1424,7 @@ dependencies = [
 
 [[package]]
 name = "rc-local-generator"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "libc",
  "log",
@@ -1523,7 +1523,7 @@ dependencies = [
 
 [[package]]
 name = "sctl"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "clap",
  "cmdproto",
@@ -1564,7 +1564,7 @@ dependencies = [
 
 [[package]]
 name = "service"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "cgroup",
@@ -1632,7 +1632,7 @@ dependencies = [
 
 [[package]]
 name = "socket"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "confique",
@@ -1692,7 +1692,7 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "switch_root"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "log",
@@ -1744,7 +1744,7 @@ dependencies = [
 
 [[package]]
 name = "sysMaster"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "kernlog",
  "log",
@@ -1754,7 +1754,7 @@ dependencies = [
 
 [[package]]
 name = "sysmaster"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "bitflags",
@@ -1785,7 +1785,7 @@ dependencies = [
 
 [[package]]
 name = "sysmonitor"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "nix 0.24.3",
@@ -1797,7 +1797,7 @@ dependencies = [
 
 [[package]]
 name = "target"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "basic",
  "core",
@@ -2003,7 +2003,7 @@ checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
 name = "watchdog"
-version = "0.2.5"
+version = "0.5.0"
 dependencies = [
  "nix 0.24.3",
 ]
