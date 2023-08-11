@@ -45,8 +45,6 @@ pub mod stat_util;
 pub mod string;
 #[cfg(feature = "sysfs")]
 pub mod sysfs;
-#[cfg(feature = "timebasic")]
-pub mod time;
 #[cfg(feature = "unistd")]
 pub mod unistd;
 #[cfg(feature = "uuid")]

@@ -15,6 +15,17 @@
 use crate::error::*;
 use nix::libc::uid_t;
 use nix::unistd::{Gid, Group, Uid, User};
+use std::time::SystemTime;
+
+const USEC_INFINITY: u128 = u128::MAX;
+
+///
+pub fn timespec_load(systime: SystemTime) -> u128 {
+    match systime.duration_since(SystemTime::UNIX_EPOCH) {
+        Ok(d) => d.as_micros(),
+        Err(_) => USEC_INFINITY,
+    }
+}
 
 /// Parse a string as UID
 pub fn parse_uid(uid_str: &str) -> Result<User> {
