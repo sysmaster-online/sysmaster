@@ -21,7 +21,6 @@ pub mod condition;
 pub mod config;
 pub mod error;
 pub use error::*;
-pub mod ether_addr_util;
 pub mod fd_util;
 pub mod file_util;
 pub mod fs_util;
@@ -31,6 +30,8 @@ pub mod logger;
 pub mod macros;
 pub mod mount_util;
 pub mod naming_scheme;
+#[cfg(feature = "network")]
+pub mod network;
 pub mod os_release;
 #[cfg(feature = "parse")]
 pub mod parse;

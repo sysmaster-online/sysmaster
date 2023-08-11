@@ -16,8 +16,8 @@
 use crate::builtin::Builtin;
 use crate::rules::exec_unit::ExecuteUnit;
 use crate::{error::*, log_dev};
-use basic::ether_addr_util::*;
 use basic::naming_scheme::*;
+use basic::network::*;
 use device::Device;
 use libc::{c_char, faccessat, ARPHRD_INFINIBAND, F_OK};
 use nix::errno::errno;
