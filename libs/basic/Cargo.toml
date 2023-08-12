@@ -51,9 +51,25 @@ default = [
     "host",
     "process",
     "fs",
+    "cmdline",
+    "security",
+    "string",
+    "stat",
+    "fd",
+    "logger",
+    "mount",
+    "naming_scheme",
+    "signal",
+    "socket",
+    "os_release",
+    "show_table",
+    "io",
+
 ]
+
 capability = []
 cargo = ["pkg-config"]
+cmdline = []
 condition = []
 config = []
 cpu = []
@@ -62,14 +78,25 @@ fd = []
 file = []
 fs = []
 host = []
+io = []
+logger = []
 machine = []
 memory = []
+mount = []
+naming_scheme = []
 network = []
+os_release = []
 parse = []
 process = []
 rlimit = []
+security = []
 selinux = []
 sensors = []
+show_table = []
+signal = []
+socket = []
+stat = []
+string = []
 sysfs = []
 unistd = []
 uuid = []
