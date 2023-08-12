@@ -10,7 +10,7 @@ crate-type = ["dylib", "lib"]
 name = "mount"
 
 [dependencies]
-basic = { path = "../../../libs/basic" }
+basic = { path = "../../../libs/basic", default-features = false }
 core = { path = "../../libcore", default-features = false }
 event = { path = "../../../libs/event" }
 macros = { path = "../../../libs/macros" }

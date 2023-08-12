@@ -45,6 +45,7 @@ pub enum Error {
     #[snafu(display("Var: {}", source))]
     Var { source: std::env::VarError },
 
+    #[cfg(feature = "process")]
     #[snafu(display("procfs: {}", source))]
     Proc { source: procfs::ProcError },
 

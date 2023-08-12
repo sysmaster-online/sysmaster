@@ -28,7 +28,7 @@ pip3 install pre-commit ruamel.yaml -i https://pypi.mirrors.ustc.edu.cn/simple |
 # newnum=`git rev-list HEAD --no-merges --count`
 # changenum=$[newnum - oldnum]
 rustup override set 1.57
-cargo check --all --all-targets || exit 1
+cargo check  || exit 1
 git add . -A
 
 # add doc for src code

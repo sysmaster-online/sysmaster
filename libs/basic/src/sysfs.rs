@@ -10,10 +10,10 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! Common used device functions
-
+//! Common used sysfs functions
 use std::path::Path;
 
+///
 pub struct SysFs;
 
 impl SysFs {

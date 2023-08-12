@@ -3,51 +3,126 @@ name = "sysmaster"
 version = "0.5.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[[bin]]
-name = "sysmaster"
-path = "src/main.rs"
-
-[dev-dependencies.libtests]
-path = "../../libs/libtests"
-
 [dependencies]
-# internal libraries
-basic = { path = "../../libs/basic" }
-cgroup = { path = "../../libs/cgroup", default-features = false }
-cmdproto = { path = "../../libs/cmdproto" }
-constants = { path = "../../libs/constants" }
-core = { path = "../libcore", default-features = false }
-event = { path = "../../libs/event" }
-mount = { path = "../coms/mount", optional = true }
-service = { path = "../coms/service", optional = true }
-socket = { path = "../coms/socket", optional = true }
-target = { path = "../coms/target", optional = true }
-
-# third libraries
 bitflags = "1.3.2"
-confique = { version = "0.1.3", default-features = false }
-clap = { version = "3.1.8", features = [
-    "derive",
-    "std",
-], default-features = false }
-dynamic_reload = { version = "0.10.0", optional = true }
 fnmatch-regex = "0.2.0"
 lazy_static = "1.4.0"
-libc = { version = "0.2.*", default-features = false }
-log = { version = "=0.4.14", default_features = false }
-nix = { version = "0.24", default-features = false, features = [
-    "reboot",
-    "mount",
-    "socket",
-] }
-once_cell = { version = "=1.7.2", default-features = false }
-regex = { version = "1.6.0", default-features = false }
-serde = { version = "1.0.130", default-features = false }
-siphasher = { version = "0.3", default-features = false }
-# snafu = { version = "0.7", default-features = false }
 walkdir = "2"
+
+[dependencies.basic]
+path = "../../libs/basic"
+features = ["signal", "condition"]
+optional = false
+
+[dependencies.cgroup]
+path = "../../libs/cgroup"
+features = []
+optional = false
+default-features = false
+
+[dependencies.clap]
+version = "3.1.8"
+features = ["derive", "std"]
+optional = false
+default-features = false
+
+[dependencies.cmdproto]
+path = "../../libs/cmdproto"
+features = []
+optional = false
+
+[dependencies.confique]
+version = "0.1.3"
+features = []
+optional = false
+default-features = false
+
+[dependencies.constants]
+path = "../../libs/constants"
+features = []
+optional = false
+
+[dependencies.core]
+path = "../libcore"
+features = []
+optional = false
+default-features = false
+
+[dependencies.dynamic_reload]
+version = "0.10.0"
+features = []
+optional = true
+
+[dependencies.event]
+path = "../../libs/event"
+features = []
+optional = false
+
+[dependencies.libc]
+version = "0.2.*"
+features = []
+optional = false
+default-features = false
+
+[dependencies.log]
+version = "=0.4.14"
+features = []
+optional = false
+
+[dependencies.mount]
+path = "../coms/mount"
+features = []
+optional = true
+
+[dependencies.nix]
+version = "0.24"
+features = ["mount", "reboot"]
+optional = false
+default-features = false
+
+[dependencies.once_cell]
+version = "=1.7.2"
+features = []
+optional = false
+default-features = false
+
+[dependencies.regex]
+version = "1.6.0"
+features = []
+optional = false
+default-features = false
+
+[dependencies.serde]
+version = "1.0.130"
+features = []
+optional = false
+default-features = false
+
+[dependencies.service]
+path = "../coms/service"
+features = []
+optional = true
+default-features = false
+
+[dependencies.siphasher]
+version = "0.3"
+features = []
+optional = false
+default-features = false
+
+[dependencies.socket]
+path = "../coms/socket"
+features = []
+optional = true
+
+[dependencies.target]
+path = "../coms/target"
+features = []
+optional = true
+[dev-dependencies.libtests]
+path = "../../libs/libtests"
+features = []
+optional = false
 
 [features]
 default = ["linux", "noplugin", "mount", "socket", "service", "target"]
@@ -55,3 +130,10 @@ hongmeng = []
 linux = []
 noplugin = []
 plugin = ["dynamic_reload"]
+
+[[bin]]
+path = "src/main.rs"
+name = "sysmaster"
+plugin = false
+proc-macro = false
+required-features = []

@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 # internal libraries
-basic = { path = "../../libs/basic" }
+basic = { path = "../../libs/basic", features = ["rlimit", "show_table"] }
 cgroup = { path = "../../libs/cgroup" }
 event = { path = "../../libs/event" }
 

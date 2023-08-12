@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-/* from <linux/capability.h> */
+/// from <linux/capability.h>
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
 #[allow(non_camel_case_types)]
 #[repr(u8)]
@@ -34,12 +34,19 @@ pub enum Capability {
     CAP_SETUID = 7,
     /// `CAP_SETPCAP` (from Linux)
     CAP_SETPCAP = 8,
+    ///
     CAP_LINUX_IMMUTABLE = 9,
+    ///
     CAP_NET_BIND_SERVICE = 10,
+    ///
     CAP_NET_BROADCAST = 11,
+    ///
     CAP_NET_ADMIN = 12,
+    ///
     CAP_NET_RAW = 13,
+    ///
     CAP_IPC_LOCK = 14,
+    ///
     CAP_IPC_OWNER = 15,
     /// `CAP_SYS_MODULE` (from Linux)
     CAP_SYS_MODULE = 16,
@@ -67,16 +74,21 @@ pub enum Capability {
     CAP_MKNOD = 27,
     /// `CAP_LEASE` (from Linux, >= 2.4)
     CAP_LEASE = 28,
+    ///
     CAP_AUDIT_WRITE = 29,
     /// `CAP_AUDIT_CONTROL` (from Linux, >= 2.6.11)
     CAP_AUDIT_CONTROL = 30,
+    ///
     CAP_SETFCAP = 31,
+    ///
     CAP_MAC_OVERRIDE = 32,
+    ///
     CAP_MAC_ADMIN = 33,
     /// `CAP_SYSLOG` (from Linux, >= 2.6.37)
     CAP_SYSLOG = 34,
     /// `CAP_WAKE_ALARM` (from Linux, >= 3.0)
     CAP_WAKE_ALARM = 35,
+    ///
     CAP_BLOCK_SUSPEND = 36,
     /// `CAP_AUDIT_READ` (from Linux, >= 3.16).
     CAP_AUDIT_READ = 37,
@@ -191,10 +203,12 @@ impl std::str::FromStr for Capability {
 }
 
 impl Capability {
+    ///
     pub fn bitmask(&self) -> u64 {
         1u64 << (*self as u8)
     }
 
+    ///
     pub fn index(&self) -> u8 {
         *self as u8
     }

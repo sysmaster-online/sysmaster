@@ -6,12 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-basic = { path = "../../libs/basic" }
-# constants = { path = "../../libs/constants" }
-
-# libc = { version = "0.2.*", default-features = false }
-log = { version = "=0.4.14", default_features = false }
-nix = { version = "0.24", default-features = false, features = [
-    "mount",
-    "hostname",
+basic = { path = "../../libs/basic", features = [
+    "os_release",
+    "logger",
+    "cmdline",
+    "config",
 ] }
+
+log = { version = "=0.4.14", default_features = false }
+nix = { version = "0.24", default-features = false, features = ["hostname"] }

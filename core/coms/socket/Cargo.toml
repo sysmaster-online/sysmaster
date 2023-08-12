@@ -10,7 +10,7 @@ crate-type = ["dylib", "lib"]
 name = "socket"
 
 [dependencies]
-basic = { path = "../../../libs/basic" }
+basic = { path = "../../../libs/basic", features = ["io"] }
 constants = { path = "../../../libs/constants" }
 core = { path = "../../libcore", default-features = false }
 event = { path = "../../../libs/event" }

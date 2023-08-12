@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 # internal libraries
-basic = { path = "../basic" }
+basic = { path = "../basic", features = ["parse"] }
 event = { path = "../event" }
 
 # third libraries

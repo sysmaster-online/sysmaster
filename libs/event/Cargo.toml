@@ -9,10 +9,7 @@ edition = "2021"
 constants = { path = "../constants" }
 
 libc = { version = "0.2", default-features = false }
-nix = { version = "0.24", default-features = false, features = [
-    "inotify",
-    "ucontext",
-] }
+nix = { version = "0.24", default-features = false, features = ["ucontext", "inotify"] }
 snafu = { version = "0.7", default-features = false, features = ["std"] }
 
 [dev-dependencies.libtests]
