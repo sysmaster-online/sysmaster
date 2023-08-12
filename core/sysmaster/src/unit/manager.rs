@@ -37,7 +37,7 @@ use crate::utils::table::{TableOp, TableSubscribe};
 use basic::path_lookup::LookupPaths;
 use basic::proc_cmdline::get_process_cmdline;
 use basic::show_table::{CellColor, ShowTable};
-use basic::{machine, process_util, rlimit_util, signal_util};
+use basic::{machine, process_util, rlimit, signal_util};
 use constants::SIG_SWITCH_ROOT_OFFSET;
 use core::error::*;
 use core::exec::ExecParameters;
@@ -272,7 +272,7 @@ impl UnitManagerX {
 
             signal_util::reset_all_signal_handlers();
             signal_util::reset_signal_mask();
-            rlimit_util::rlimit_nofile_safe();
+            rlimit::rlimit_nofile_safe();
             let res = unsafe { libc::kill(getppid(), libc::SIGRTMIN() + SIG_SWITCH_ROOT_OFFSET) };
             if res == 0 {
                 self.set_state(State::SwitchRoot);
@@ -1164,7 +1164,7 @@ impl ReStation for UnitManager {
             } else {
                 let unit = self.load.try_new_unit(unit_id).unwrap();
                 unit.db_map(reload);
-                self.db.units_insert(unit_id.clone(), unit);
+                self.db.units_insert(unit_id.to_string(), unit);
             }
         }
         /* others: unit-dep and unit-child */

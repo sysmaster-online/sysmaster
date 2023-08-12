@@ -43,6 +43,7 @@ default = [
     "parse",
     "capability",
     "network",
+    "rlimit",
 ]
 cargo = ["pkg-config"]
 selinux = []
@@ -55,3 +56,4 @@ config = []
 parse = []
 capability = []
 network = []
+rlimit = []

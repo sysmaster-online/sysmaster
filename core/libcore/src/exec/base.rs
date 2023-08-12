@@ -12,7 +12,7 @@
 
 use crate::error::*;
 use crate::serialize::DeserializeWith;
-use basic::rlimit_util;
+use basic::rlimit;
 use bitflags::bitflags;
 use libc::EPERM;
 use nix::sys::stat::Mode;
@@ -41,9 +41,9 @@ impl Rlimit {
             self.hard
         );
 
-        if let Err(e) = rlimit_util::setrlimit(resource, self.soft, self.hard) {
+        if let Err(e) = rlimit::setrlimit(resource, self.soft, self.hard) {
             let (_soft, hard) = match e.raw_os_error() {
-                Some(code) if code == EPERM => rlimit_util::getrlimit(resource)?,
+                Some(code) if code == EPERM => rlimit::getrlimit(resource)?,
                 None => return Err(Error::from(e)),
                 Some(_) => return Err(Error::from(e)),
             };
@@ -60,7 +60,7 @@ impl Rlimit {
                 new_soft,
                 new_hard
             );
-            rlimit_util::setrlimit(resource, new_soft, new_hard)?;
+            rlimit::setrlimit(resource, new_soft, new_hard)?;
         }
         Ok(())
     }
@@ -73,7 +73,7 @@ fn parse_rlimit(limit: &str) -> Result<u64, Error> {
         });
     }
     if limit == "infinity" {
-        return Ok(rlimit_util::INFINITY);
+        return Ok(rlimit::INFINITY);
     }
 
     let ret = limit.parse::<u64>()?;
@@ -574,7 +574,7 @@ bitflags! {
 mod tests {
     use std::str::FromStr;
 
-    use basic::rlimit_util;
+    use basic::rlimit;
     use nix::{
         sys::stat::Mode,
         unistd::{Gid, Uid},
@@ -646,22 +646,22 @@ mod tests {
         let ret = Rlimit::from_str(source2);
         assert!(ret.is_ok());
         let rlimit = ret.unwrap();
-        assert_eq!(rlimit.soft, rlimit_util::INFINITY);
-        assert_eq!(rlimit.hard, rlimit_util::INFINITY);
+        assert_eq!(rlimit.soft, rlimit::INFINITY);
+        assert_eq!(rlimit.hard, rlimit::INFINITY);
 
         let source3 = "infinity:infinity";
         let ret = Rlimit::from_str(source3);
         assert!(ret.is_ok());
         let rlimit = ret.unwrap();
-        assert_eq!(rlimit.soft, rlimit_util::INFINITY);
-        assert_eq!(rlimit.hard, rlimit_util::INFINITY);
+        assert_eq!(rlimit.soft, rlimit::INFINITY);
+        assert_eq!(rlimit.hard, rlimit::INFINITY);
 
         let source4 = "100:infinity";
         let ret = Rlimit::from_str(source4);
         assert!(ret.is_ok());
         let rlimit = ret.unwrap();
         assert_eq!(rlimit.soft, 100);
-        assert_eq!(rlimit.hard, rlimit_util::INFINITY);
+        assert_eq!(rlimit.hard, rlimit::INFINITY);
 
         let source5 = "infinity:100";
         let rlimit = Rlimit::from_str(source5);
