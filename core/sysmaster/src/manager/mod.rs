@@ -24,7 +24,7 @@ use self::config::ManagerConfig;
 use crate::unit::UnitManagerX;
 use alive_timer::AliveTimer;
 use basic::path_lookup::LookupPaths;
-use basic::process_util::{self};
+use basic::process::{self};
 use basic::{CGROUP_SYSMASTER, MULTI_USER_TARGET};
 use cgroup::CgController;
 use cgroup::{cg_create_and_attach, CgFlags};
@@ -416,11 +416,11 @@ impl Manager {
             }
         }
 
-        let mut pids = process_util::kill_all_pids(15);
-        pids = process_util::wait_pids(pids, 10000000);
+        let mut pids = process::kill_all_pids(15);
+        pids = process::wait_pids(pids, 10000000);
         if !pids.is_empty() {
-            pids = process_util::kill_all_pids(9);
-            process_util::wait_pids(pids, 10000000);
+            pids = process::kill_all_pids(9);
+            process::wait_pids(pids, 10000000);
         }
 
         log::info!("Rebooting...");

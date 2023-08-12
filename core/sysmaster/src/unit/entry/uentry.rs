@@ -21,7 +21,7 @@ use super::UnitEmergencyAction;
 use crate::unit::data::{DataManager, UnitState};
 use crate::unit::rentry::{UnitLoadState, UnitRe};
 use crate::unit::util::UnitFile;
-use basic::process_util::{self, my_child};
+use basic::process::{self, my_child};
 use cgroup::{self, CgFlags};
 use core::error::*;
 use core::rel::ReStation;
@@ -367,7 +367,7 @@ impl Unit {
             c_pid
         );
         if let Some(pid) = m_pid {
-            match process_util::kill_and_cont(pid, sig) {
+            match process::kill_and_cont(pid, sig) {
                 Ok(_) => {
                     if !main_pid_alien {
                         wait_exit = true;
@@ -379,7 +379,7 @@ impl Unit {
             }
         }
         if let Some(pid) = c_pid {
-            match process_util::kill_and_cont(pid, sig) {
+            match process::kill_and_cont(pid, sig) {
                 Ok(_) => {
                     wait_exit = true;
                 }

@@ -37,7 +37,7 @@ use crate::utils::table::{TableOp, TableSubscribe};
 use basic::path_lookup::LookupPaths;
 use basic::proc_cmdline::get_process_cmdline;
 use basic::show_table::{CellColor, ShowTable};
-use basic::{machine, process_util, rlimit, signal_util};
+use basic::{machine, process, rlimit, signal_util};
 use constants::SIG_SWITCH_ROOT_OFFSET;
 use core::error::*;
 use core::exec::ExecParameters;
@@ -498,7 +498,7 @@ impl UmIf for UnitManager {
     }
 
     fn same_unit_with_pid(&self, unit: &str, pid: Pid) -> bool {
-        if !process_util::valid_pid(pid) {
+        if !process::valid_pid(pid) {
             return false;
         }
 

@@ -219,7 +219,7 @@ mod tests {
     use std::process::Command;
     use std::thread;
 
-    use crate::process_util::wait_pids;
+    use crate::process::wait_pids;
     #[test]
     fn test_wait_pids() {
         let mut pids: HashSet<i32> = HashSet::new();

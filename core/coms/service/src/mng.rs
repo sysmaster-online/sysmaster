@@ -21,7 +21,7 @@ use super::rentry::{
 use super::spawn::ServiceSpawn;
 use crate::rentry::{ExitStatus, PreserveMode};
 use basic::{do_entry_log, fd_util, IN_SET};
-use basic::{file_util, process_util};
+use basic::{file_util, process};
 use core::error::*;
 use core::exec::{ExecCommand, ExecContext, ExecFlag, ExecFlags};
 use core::rel::ReStation;
@@ -1080,7 +1080,7 @@ impl ServiceMng {
             });
         }
 
-        if !process_util::alive(pid) {
+        if !process::alive(pid) {
             return Err(Error::Other {
                 msg: "main pid is not alive".to_string(),
             });
@@ -1277,7 +1277,7 @@ impl ServiceMng {
 
     fn kill_control_process(&self) {
         if let Some(pid) = self.pid.control() {
-            if let Err(e) = process_util::kill_and_cont(pid, Signal::SIGKILL) {
+            if let Err(e) = process::kill_and_cont(pid, Signal::SIGKILL) {
                 self.log(
                     Level::Warn,
                     &format!("failed to kill control process {}, error: {}", pid, e),

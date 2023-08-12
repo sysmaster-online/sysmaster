@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use super::comm::ServiceUnitComm;
-use basic::process_util::{self, my_child};
+use basic::process::{self, my_child};
 use core::error::*;
 use nix::errno::Errno;
 use nix::unistd::Pid;
@@ -185,7 +185,7 @@ impl ServicePidData {
                     return Ok(false);
                 }
 
-                Ok(process_util::alive(self.main.unwrap()))
+                Ok(process::alive(self.main.unwrap()))
             }
         }
     }

@@ -44,6 +44,12 @@ default = [
     "capability",
     "network",
     "rlimit",
+    "cpu",
+    "disk",
+    "memory",
+    "sensors",
+    "host",
+    "process",
 ]
 cargo = ["pkg-config"]
 selinux = []
@@ -57,3 +63,9 @@ parse = []
 capability = []
 network = []
 rlimit = []
+cpu = []
+memory = []
+sensors = []
+host = []
+disk = []
+process = []
