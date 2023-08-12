@@ -12,7 +12,7 @@
 
 //!
 use crate::error::*;
-use crate::file_util;
+use crate::fs_util;
 use nix::errno::errno;
 use nix::errno::Errno;
 use nix::libc::{kill, ESRCH};
@@ -34,7 +34,7 @@ pub fn process_state(pid: Pid) -> Result<char> {
 
     let proc_file = format!("/proc/{:?}/stat", pid.as_raw());
     let stat_path = Path::new(&proc_file);
-    let first_line = file_util::read_first_line(stat_path)?;
+    let first_line = fs_util::read_first_line(stat_path)?;
     let stat: Vec<String> = first_line
         .split_whitespace()
         .map(|s| s.to_string())

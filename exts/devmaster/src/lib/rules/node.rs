@@ -33,8 +33,8 @@
 //! directory, the directory will be removed.
 
 use crate::{error::*, log_dev, log_dev_option};
+use basic::fs_util::path_simplify;
 use basic::fs_util::{fchmod_and_chown, futimens_opath, symlink};
-use basic::path_util::path_simplify;
 use basic::{fd_util::opendirat, fs_util::remove_dir_until};
 use cluFlock::ExclusiveFlock;
 use device::Device;

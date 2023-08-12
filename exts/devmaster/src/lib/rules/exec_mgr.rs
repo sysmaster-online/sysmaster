@@ -19,7 +19,7 @@ use crate::{
     rules::node::*, rules::TokenType::*, rules::*, utils::*,
 };
 use basic::{
-    file_util::write_string_file, naming_scheme::*, parse::parse_mode,
+    fs_util::write_string_file, naming_scheme::*, parse::parse_mode,
     proc_cmdline::cmdline_get_item, unistd::*,
 };
 use device::{Device, DeviceAction};

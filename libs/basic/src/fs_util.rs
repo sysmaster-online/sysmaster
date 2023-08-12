@@ -10,8 +10,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! the utils of the file operation
-//!
+//! the utils of the path operation
+use crate::Error;
 use crate::{error::*, format_proc_fd_path};
 use libc::{fchownat, mode_t, timespec, AT_EMPTY_PATH, S_IFLNK, S_IFMT};
 use nix::{
@@ -21,13 +21,33 @@ use nix::{
 };
 use pathdiff::diff_paths;
 use rand::Rng;
+use std::fs::OpenOptions;
+use std::io::{BufRead, BufReader, Write};
+use std::path::Path;
 use std::{
     ffi::CString,
     fs::{create_dir_all, remove_dir, File},
     io::ErrorKind,
     os::unix::prelude::{AsRawFd, FromRawFd, PermissionsExt, RawFd},
-    path::Path,
 };
+
+/// read first line from a file
+pub fn read_first_line(path: &Path) -> Result<String> {
+    let file = std::fs::File::open(path).context(IoSnafu)?;
+    let mut buffer = BufReader::new(file);
+    let mut first_line = String::with_capacity(1024);
+    let _ = buffer.read_line(&mut first_line);
+    Ok(first_line)
+}
+
+/// write string to file
+pub fn write_string_file<P: AsRef<Path>>(path: P, value: String) -> std::io::Result<()> {
+    let mut file = OpenOptions::new().write(true).open(&path)?;
+
+    let _ = file.write(value.as_bytes())?;
+
+    Ok(())
+}
 
 /// open the parent directory of path
 pub fn open_parent(path: &Path, flags: OFlag, mode: Mode) -> Result<File> {
@@ -353,16 +373,378 @@ macro_rules! do_entry_log {
     };
 }
 
+/// The maximum length of a linux path
+pub const PATH_LENGTH_MAX: usize = 4096;
+
+/// The maximum length of a linux file name
+pub const FILE_LENGTH_MAX: usize = 255;
+
+/// return true if the path of a and b equaled.
+pub fn path_equal(a: &str, b: &str) -> bool {
+    let p_a = Path::new(a);
+    let p_b = Path::new(b);
+    p_a == p_b
+}
+
+/// check if the path name contains unsafe character
+///
+/// return true if it doesn't contain unsafe character
+pub fn path_name_is_safe(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    for c in s.chars() {
+        if c > 0 as char && c < ' ' {
+            return false;
+        }
+        if c.is_ascii_control() {
+            return false;
+        }
+    }
+    true
+}
+
+/// check if the path length is valid
+pub fn path_length_is_valid(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    if s.len() > PATH_LENGTH_MAX {
+        return false;
+    }
+    let mut de_len = 0;
+    let mut last_c = '/';
+    for c in s.chars() {
+        match c {
+            '/' => {
+                de_len = 0;
+            }
+            '.' => {
+                if last_c == '/' {
+                    de_len = 1;
+                } else {
+                    de_len += 1;
+                }
+            }
+            _ => {
+                de_len += 1;
+            }
+        }
+        if de_len > FILE_LENGTH_MAX {
+            return false;
+        }
+        last_c = c;
+    }
+    true
+}
+
+/// Remove redundant inner and trailing slashes and unnecessary dots to simplify path.
+/// e.g., //foo//.//bar/ becomes /foo/bar
+/// /foo/foo1/../bar becomes /foo/bar
+pub fn path_simplify(p: &str) -> Option<String> {
+    let mut res = String::new();
+    let mut stack: Vec<&str> = Vec::new();
+    for f in p.split('/') {
+        if f.is_empty() || f == "." {
+            continue;
+        }
+        if f == ".." {
+            if let Some(v) = stack.last() {
+                if *v != ".." {
+                    stack.pop();
+                    continue;
+                }
+            }
+            if !p.starts_with('/') {
+                stack.push(f);
+                continue;
+            }
+            return None;
+        }
+        stack.push(f);
+    }
+
+    if stack.is_empty() {
+        if p.starts_with('/') {
+            return Some("/".to_string());
+        } else {
+            return Some(".".to_string());
+        }
+    }
+
+    if p.starts_with('/') {
+        res += "/";
+    }
+    res += stack.remove(0);
+
+    for f in stack {
+        res += "/";
+        res += f;
+    }
+
+    Some(res)
+}
+
+/// check if the given path is abololute path
+pub fn path_is_abosolute(s: &str) -> bool {
+    s.starts_with('/')
+}
+
+/// check if the absolute path is valid, return the simplified path String if it's valid.
+pub fn parse_absolute_path(s: &str) -> Result<String, Error> {
+    if !path_name_is_safe(s) {
+        return Err(Error::Invalid {
+            what: "path contains unsafe character".to_string(),
+        });
+    }
+
+    if !path_length_is_valid(s) {
+        return Err(Error::Invalid {
+            what: "path is too long or empty".to_string(),
+        });
+    }
+
+    if !path_is_abosolute(s) {
+        return Err(Error::Invalid {
+            what: "path is not abosolute".to_string(),
+        });
+    }
+
+    let path = match path_simplify(s) {
+        None => {
+            return Err(Error::Invalid {
+                what: "path can't be simplified".to_string(),
+            });
+        }
+        Some(v) => v,
+    };
+
+    Ok(path)
+}
+
+/// unit lookup path in /etc
+pub const ETC_SYSTEM_PATH: &str = "/etc/sysmaster/system";
+/// unit lookup path in /run
+pub const RUN_SYSTEM_PATH: &str = "/run/sysmaster/system";
+/// unit lookup path in /usr/lib
+pub const LIB_SYSTEM_PATH: &str = "/usr/lib/sysmaster/system";
+
+/// struct LookupPaths
+#[derive(Debug, Clone)]
+pub struct LookupPaths {
+    /// Used to search fragment, dropin, updated
+    pub search_path: Vec<String>,
+    /// Used to search preset file
+    pub preset_path: Vec<String>,
+    /// generator paths
+    pub generator: String,
+    /// generator early paths
+    pub generator_early: String,
+    /// generator late paths
+    pub generator_late: String,
+    /// transient paths
+    pub transient: String,
+    /// transient paths
+    pub persistent_path: String,
+}
+
+impl LookupPaths {
+    /// new
+    pub fn new() -> Self {
+        LookupPaths {
+            generator: String::from(""),
+            generator_early: String::from(""),
+            generator_late: String::from(""),
+            transient: String::from(""),
+            search_path: Vec::new(),
+            persistent_path: String::from(""),
+            preset_path: Vec::new(),
+        }
+    }
+
+    /// init lookup paths
+    pub fn init_lookup_paths(&mut self) {
+        self.search_path.push(LIB_SYSTEM_PATH.to_string());
+        self.search_path.push(RUN_SYSTEM_PATH.to_string());
+        self.search_path.push(ETC_SYSTEM_PATH.to_string());
+
+        self.preset_path
+            .push(format!("{}/{}", ETC_SYSTEM_PATH, "system-preset"));
+        self.preset_path
+            .push(format!("{}/{}", LIB_SYSTEM_PATH, "system-preset"));
+
+        self.persistent_path = ETC_SYSTEM_PATH.to_string();
+    }
+}
+
+impl Default for LookupPaths {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::LookupPaths;
     use super::*;
-    use crate::fs_util::symlink;
+    use crate::logger;
     use nix::unistd::{self, unlink};
     use std::{
         fs::{create_dir_all, remove_dir_all, remove_file, File},
+        io::BufWriter,
         os::unix::prelude::MetadataExt,
         time::SystemTime,
     };
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_read_first_line() {
+        let file = NamedTempFile::new().unwrap();
+        let mut buffer = BufWriter::new(&file);
+        buffer.write_all(b"Hello, world!\n").unwrap();
+        buffer.flush().unwrap();
+        let path = file.path();
+        let first_line: Result<String, crate::Error> = read_first_line(path);
+        assert_eq!(first_line.unwrap(), "Hello, world!\n");
+    }
+
+    #[test]
+    fn test_read_first_line_empty_file() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path();
+        let result = read_first_line(path);
+        assert_eq!(result.unwrap(), "");
+    }
+
+    #[test]
+    fn test_read_first_line_nonexistent_file() {
+        let path = Path::new("nonexistent_file.txt");
+        let result: Result<String, crate::Error> = read_first_line(path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_write_string_file() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path();
+        let result = write_string_file(path, String::from("Hello, world!\n"));
+        let first_line = read_first_line(path);
+        assert!(result.is_ok());
+        assert_eq!(first_line.unwrap(), "Hello, world!\n");
+    }
+
+    #[test]
+    fn test_write_string_noneexistent_file() {
+        let path = Path::new("nonexistent_file.txt");
+        let result = write_string_file(path, String::from("Hello, world!\n"));
+        assert!(result.is_err())
+    }
+
+    #[test]
+    fn test_path_equal() {
+        assert!(path_equal("/etc", "/etc"));
+        assert!(path_equal("//etc", "/etc"));
+        assert!(path_equal("/etc//", "/etc"));
+        assert!(!path_equal("/etc", "./etc"));
+        assert!(path_equal("/x/./y", "/x/y"));
+        assert!(path_equal("/x/././y", "/x/y/./."));
+        assert!(!path_equal("/etc", "/var"));
+    }
+
+    #[test]
+    fn test_path_name_is_safe() {
+        assert!(!path_name_is_safe(""));
+        assert!(path_name_is_safe("/abc"));
+        assert!(!path_name_is_safe("/abc\x7f/a"));
+        assert!(!path_name_is_safe("/abc\x1f/a"));
+        assert!(!path_name_is_safe("/\x0a/a"));
+    }
+
+    #[test]
+    fn test_path_length_is_valid() {
+        assert!(!path_length_is_valid(""));
+
+        let path = "/a/".to_string() + &String::from_iter(vec!['1'; 255]);
+        assert!(path_length_is_valid(&path));
+
+        let path = "/a/".to_string() + &String::from_iter(vec!['1'; 256]);
+        assert!(!path_length_is_valid(&path));
+
+        let path = "/a/".to_string() + &String::from_iter(vec!['/'; 256]);
+        assert!(path_length_is_valid(&path));
+
+        let path = "/a/".to_string() + &String::from_iter(vec!['.'; 255]);
+        assert!(path_length_is_valid(&path));
+
+        let mut path = "".to_string();
+        for _ in 0..40 {
+            path += "/";
+            path += &String::from_iter(vec!['1'; 100]);
+        }
+        assert!(path_length_is_valid(&path));
+
+        let mut path = "".to_string();
+        for _ in 0..41 {
+            path += "/";
+            path += &String::from_iter(vec!['1'; 100]);
+        }
+        assert!(!path_length_is_valid(&path));
+    }
+
+    #[test]
+    fn test_path_simplify() {
+        assert_eq!(path_simplify("//foo//.//bar/").unwrap(), "/foo/bar");
+        assert_eq!(path_simplify(".//foo//.//bar/").unwrap(), "foo/bar");
+        assert_eq!(path_simplify("foo//.//bar/").unwrap(), "foo/bar");
+        assert_eq!(path_simplify("/a///b/////././././c").unwrap(), "/a/b/c");
+        assert_eq!(path_simplify(".//././///././././a").unwrap(), "a");
+        assert_eq!(path_simplify("/////////////////").unwrap(), "/");
+        assert_eq!(path_simplify(".//////////////////").unwrap(), ".");
+        assert_eq!(
+            path_simplify("a/b/c../..d/e/f//g").unwrap(),
+            "a/b/c../..d/e/f/g"
+        );
+        assert_eq!(
+            path_simplify("aaa/bbbb/.//.//.....").unwrap(),
+            "aaa/bbbb/....."
+        );
+
+        assert_eq!(path_simplify("a/b/c/../../d").unwrap(), "a/d");
+        assert_eq!(path_simplify("a/b/c/../../..").unwrap(), ".");
+        assert_eq!(path_simplify("a/b/../../../c/d").unwrap(), "../c/d");
+        assert_eq!(path_simplify("../../../a/../").unwrap(), "../../..");
+        assert!(path_simplify("/../../../a/../").is_none());
+    }
+
+    #[test]
+    fn test_path_is_abosolute() {
+        assert!(path_is_abosolute("/a"));
+        assert!(path_is_abosolute("//"));
+        assert!(!path_is_abosolute("a"));
+    }
+
+    #[test]
+    fn test_init_lookup_paths() {
+        logger::init_log_to_console("test_init_lookup_paths", log::LevelFilter::Trace);
+        let mut lp = LookupPaths::default();
+        lp.init_lookup_paths();
+        assert_eq!(
+            lp.search_path,
+            vec![
+                "/usr/lib/sysmaster/system",
+                "/run/sysmaster/system",
+                "/etc/sysmaster/system"
+            ]
+        );
+        assert_eq!(
+            lp.preset_path,
+            vec![
+                "/etc/sysmaster/system/system-preset",
+                "/usr/lib/sysmaster/system/system-preset"
+            ]
+        );
+        assert_eq!(lp.persistent_path, "/etc/sysmaster/system")
+    }
 
     #[test]
     fn test_symlink() {

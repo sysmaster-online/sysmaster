@@ -21,7 +21,7 @@ use super::rentry::{
 use super::spawn::ServiceSpawn;
 use crate::rentry::{ExitStatus, PreserveMode};
 use basic::{do_entry_log, fd_util, IN_SET};
-use basic::{file_util, process};
+use basic::{fs_util, process};
 use core::error::*;
 use core::exec::{ExecCommand, ExecContext, ExecFlag, ExecFlags};
 use core::rel::ReStation;
@@ -1028,7 +1028,7 @@ impl ServiceMng {
             });
         }
 
-        let pid = match file_util::read_first_line(pid_file_path) {
+        let pid = match fs_util::read_first_line(pid_file_path) {
             Ok(line) => line.trim().parse::<i32>(),
             Err(e) => {
                 return Err(Error::Parse {

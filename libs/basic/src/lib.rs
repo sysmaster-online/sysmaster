@@ -26,7 +26,7 @@ pub mod cpu;
 #[cfg(feature = "disk")]
 pub mod disk;
 pub mod fd_util;
-pub mod file_util;
+#[cfg(feature = "fs")]
 pub mod fs_util;
 #[cfg(feature = "host")]
 pub mod host;
@@ -44,8 +44,6 @@ pub mod network;
 pub mod os_release;
 #[cfg(feature = "parse")]
 pub mod parse;
-pub mod path_lookup;
-pub mod path_util;
 pub mod proc_cmdline;
 #[cfg(feature = "process")]
 pub mod process;

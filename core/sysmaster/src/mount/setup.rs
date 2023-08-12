@@ -12,7 +12,7 @@
 
 //! mount the cgroup systems
 use basic::machine::Machine;
-use basic::{fs_util, machine, mount_util, path_util, proc_cmdline};
+use basic::{machine, mount_util, proc_cmdline};
 use bitflags::bitflags;
 use cgroup::{self, CgController, CgType, CG_BASE_DIR};
 use core::error::*;
@@ -350,7 +350,7 @@ impl MountPoint {
     }
 
     fn invalid_mount_point(&self, flags: AtFlags) -> Result<bool> {
-        if path_util::path_equal(&self.target, "/") {
+        if basic::fs_util::path_equal(&self.target, "/") {
             return Ok(true);
         }
 
@@ -358,7 +358,7 @@ impl MountPoint {
         // symlink
 
         let path = Path::new(&self.target);
-        let file = fs_util::open_parent(
+        let file = basic::fs_util::open_parent(
             path,
             OFlag::O_PATH | OFlag::O_CLOEXEC,
             Mode::from_bits(0).unwrap(),
@@ -482,7 +482,7 @@ fn pair_controller(controller: &str) -> Option<String> {
 fn symlink_controller(source: String, alias: String) -> Result<()> {
     let target_path = Path::new(CG_BASE_DIR).join(alias);
     let target = target_path.to_str().unwrap();
-    match fs_util::symlink(&source, target, false) {
+    match basic::fs_util::symlink(&source, target, false) {
         Ok(()) => Ok(()),
         Err(basic::Error::Nix {
             source: Errno::EEXIST,

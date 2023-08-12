@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use basic::fs_util::is_symlink;
-use basic::path_lookup::LookupPaths;
+use basic::fs_util::LookupPaths;
 use siphasher::sip::SipHasher24;
 use std::cell::RefCell;
 use std::collections::HashMap;

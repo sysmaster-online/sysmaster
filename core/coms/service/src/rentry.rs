@@ -13,7 +13,7 @@
 #![allow(non_snake_case)]
 use crate::monitor::ServiceMonitor;
 
-use basic::path_util::{
+use basic::fs_util::{
     parse_absolute_path, path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify,
 };
 use confique::Config;

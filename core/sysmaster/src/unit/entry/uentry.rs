@@ -769,7 +769,7 @@ mod tests {
     use crate::manager::RELI_HISTORY_MAX_DBS;
     use crate::unit::rentry::UnitRe;
     use crate::unit::test::test_utils::UmIfD;
-    use basic::{logger, path_lookup::LookupPaths};
+    use basic::{fs_util::LookupPaths, logger};
     use core::rel::{ReliConf, Reliability};
     use core::unit::UnitType;
     use std::rc::Rc;

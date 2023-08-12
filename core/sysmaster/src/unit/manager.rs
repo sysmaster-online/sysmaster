@@ -34,7 +34,7 @@ use crate::manager::pre_install::{Install, PresetMode};
 use crate::manager::State;
 use crate::unit::data::{DataManager, UnitState};
 use crate::utils::table::{TableOp, TableSubscribe};
-use basic::path_lookup::LookupPaths;
+use basic::fs_util::LookupPaths;
 use basic::proc_cmdline::get_process_cmdline;
 use basic::show_table::{CellColor, ShowTable};
 use basic::{machine, process, rlimit, signal_util};
@@ -201,8 +201,7 @@ impl UnitManagerX {
 
     pub(crate) fn mask_unit(&self, unit_file: &str) -> Result<()> {
         log::debug!("unit mask file {}", unit_file);
-        let link_name_path =
-            std::path::Path::new(basic::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
+        let link_name_path = std::path::Path::new(basic::fs_util::ETC_SYSTEM_PATH).join(unit_file);
         let target_path = std::path::Path::new("/dev/null");
         basic::fs_util::symlink(
             target_path.to_str().unwrap(),
@@ -214,8 +213,7 @@ impl UnitManagerX {
 
     pub(crate) fn unmask_unit(&self, unit_file: &str) -> Result<()> {
         log::debug!("unit unmask file {}", unit_file);
-        let link_name_path =
-            std::path::Path::new(basic::path_lookup::ETC_SYSTEM_PATH).join(unit_file);
+        let link_name_path = std::path::Path::new(basic::fs_util::ETC_SYSTEM_PATH).join(unit_file);
         if !link_name_path.exists() {
             return Ok(());
         }

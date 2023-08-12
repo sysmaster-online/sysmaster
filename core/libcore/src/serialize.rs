@@ -13,7 +13,7 @@
 //!
 use std::path::PathBuf;
 
-use basic::path_util::parse_absolute_path;
+use basic::fs_util::parse_absolute_path;
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer,

@@ -23,7 +23,7 @@ pub(crate) mod signals;
 use self::config::ManagerConfig;
 use crate::unit::UnitManagerX;
 use alive_timer::AliveTimer;
-use basic::path_lookup::LookupPaths;
+use basic::fs_util::LookupPaths;
 use basic::process::{self};
 use basic::{CGROUP_SYSMASTER, MULTI_USER_TARGET};
 use cgroup::CgController;

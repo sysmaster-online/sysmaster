@@ -447,7 +447,7 @@ impl Condition {
 mod test {
     use super::{Condition, ConditionType};
     use crate::{
-        file_util::write_string_file,
+        fs_util::write_string_file,
         logger, proc_cmdline,
         security::{self},
     };

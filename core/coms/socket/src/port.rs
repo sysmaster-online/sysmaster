@@ -18,7 +18,7 @@ use crate::{
     config::{SocketConfig, SocketPortConf},
     rentry::PortType,
 };
-use basic::{fd_util, fs_util, io_util, socket_util};
+use basic::{fd_util, io_util, socket_util};
 use nix::unistd::{Gid, Uid};
 use nix::{
     errno::Errno,
@@ -302,7 +302,7 @@ impl SocketPort {
         let target = self.listen();
         for symlink in config.borrow().Socket.Symlinks.as_ref().unwrap() {
             let symlink_str = symlink.to_str().unwrap();
-            if let Err(e) = fs_util::symlink(target, symlink_str, false) {
+            if let Err(e) = basic::fs_util::symlink(target, symlink_str, false) {
                 let unit_name = match self.comm.owner() {
                     None => "null".to_string(),
                     Some(v) => v.id().to_string(),

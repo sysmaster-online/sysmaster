@@ -12,8 +12,8 @@
 //
 #![allow(non_snake_case)]
 use crate::unit::{unit_name_to_type, UeConfigInstall, UnitType};
-use basic::fs_util::{self, is_symlink};
-use basic::path_lookup::LookupPaths;
+use basic::fs_util::is_symlink;
+use basic::fs_util::LookupPaths;
 use bitflags::bitflags;
 use confique::{Config, FileFormat, Partial};
 use core::error::*;
@@ -311,7 +311,7 @@ impl InstallContext {
         let source = install.path();
         for symlink in symlinks {
             let target = format!("{}/{}", target_path, symlink);
-            if let Err(e) = fs_util::symlink(&source, &target, false) {
+            if let Err(e) = basic::fs_util::symlink(&source, &target, false) {
                 log::warn!(
                     "create symlink from {} to {}, errno is: {}",
                     &source,
@@ -351,7 +351,7 @@ impl InstallContext {
                 }
             }
 
-            if let Err(e) = fs_util::symlink(&source, &target, false) {
+            if let Err(e) = basic::fs_util::symlink(&source, &target, false) {
                 log::warn!(
                     "create symlink from {} to {}, errno is: {}",
                     &source,
@@ -760,7 +760,7 @@ impl Install {
 #[cfg(test)]
 mod test {
     use super::{Install, PresetAction, PresetMode, PresetRule, Presets};
-    use basic::path_lookup::LookupPaths;
+    use basic::fs_util::LookupPaths;
     use std::rc::Rc;
 
     #[test]

@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::serialize::DeserializeWith;
-use basic::{path_util::parse_absolute_path, Error, Result};
+use basic::{fs_util::parse_absolute_path, Error, Result};
 use bitflags::bitflags;
 use serde::{
     de::{self, Unexpected},
