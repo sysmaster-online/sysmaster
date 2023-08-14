@@ -173,8 +173,24 @@ fn parse_exec(s: &str) -> Result<VecDeque<ExecCommand>> {
         let mut argv: Vec<String> = Vec::new();
         let mut cur = String::new();
         let mut found_semicolon_wait_space = false;
+        let mut found_single_quote = false;
         for c in content.chars() {
             argv_start += 1;
+
+            if found_single_quote && c != '\'' {
+                cur += &c.to_string();
+                continue;
+            }
+            if c == '\'' {
+                if found_single_quote {
+                    argv.push(cur);
+                    cur = "".to_string();
+                    found_single_quote = false;
+                    continue;
+                }
+                found_single_quote = true;
+                continue;
+            }
             if c == ' ' {
                 /* now we find " ; ", break the loop */
                 if found_semicolon_wait_space {
@@ -204,6 +220,12 @@ fn parse_exec(s: &str) -> Result<VecDeque<ExecCommand>> {
             }
             found_semicolon_wait_space = false;
             cur += &c.to_string();
+        }
+
+        if found_single_quote {
+            return Err(Error::Invalid {
+                what: "no valid exec command, wrong single quote".to_string(),
+            });
         }
         /* No more characters after " ;", drop current argv  */
         if found_semicolon_wait_space {
@@ -395,5 +417,23 @@ mod tests {
         assert!(parse_exec(&path).is_err());
 
         assert!(parse_exec("/bin/echo good ; ; ; ;").is_err());
+        assert!(parse_exec("/bin/echo 'good1 good2").is_err());
+        assert!(parse_exec("/bin/echo 'good good1' 'good2").is_err());
+        assert_eq!(
+            parse_exec("/bin/echo 'good good1' good2").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec!["good good1".to_string(), "good2".to_string()],
+                flags: ExecFlag::EXEC_COMMAND_EMPTY
+            }])
+        );
+        assert_eq!(
+            parse_exec("/bin/echo 'good good1' 'good2'").unwrap(),
+            VecDeque::from([ExecCommand {
+                path: "/bin/echo".to_string(),
+                argv: vec!["good good1".to_string(), "good2".to_string()],
+                flags: ExecFlag::EXEC_COMMAND_EMPTY
+            }])
+        );
     }
 }
