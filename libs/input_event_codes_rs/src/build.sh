@@ -4,7 +4,7 @@ echo "use crate::input_event_codes;
 use std::collections::HashMap;
 
 pub fn get_input_event_keycode(key_lookup: &str) -> u32 {
-    let input_map = HashMap::from(["
+    let input_map: HashMap<&str, u32> = HashMap::from(["
 
 cat "$1/input_event_codes.rs" | while read line
 do
