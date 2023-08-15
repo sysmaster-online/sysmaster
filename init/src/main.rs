@@ -703,12 +703,16 @@ fn shutdown_init() {
 }
 
 fn set_logger(loglevel: log::LevelFilter) {
-    let klog = match KernelLog::with_level(loglevel) {
-        Ok(v) => v,
-        Err(e) => panic!("Unsupported when cannot log into /dev/kmsg : {:?}!", e),
-    };
-    log::set_boxed_logger(Box::new(klog)).expect("Failed to set logger!");
-    log::set_max_level(loglevel);
+    match KernelLog::with_level(loglevel) {
+        Ok(klog) => {
+            log::set_boxed_logger(Box::new(klog)).expect("Failed to set logger!");
+            log::set_max_level(loglevel);
+        }
+        Err(e) => {
+            env_logger::builder().filter_level(loglevel).init();
+            log::error!("Unsupported when cannot log into /dev/kmsg : {:?}!", e);
+        }
+    }
 }
 
 fn main() -> std::io::Result<()> {
