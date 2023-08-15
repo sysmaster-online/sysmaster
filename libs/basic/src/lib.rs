@@ -33,8 +33,6 @@ pub mod fs_util;
 pub mod host;
 #[cfg(feature = "io")]
 pub mod io_util;
-#[cfg(feature = "logger")]
-pub mod logger;
 #[cfg(feature = "machine")]
 pub mod machine;
 pub mod macros;

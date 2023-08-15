@@ -1,0 +1,11 @@
+[package]
+name = "log"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = { version = "=0.4.14", default_features = false}
+libc = { version = "0.2.*" }
+constants = { path = "../constants" }

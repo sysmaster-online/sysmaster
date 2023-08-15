@@ -11,31 +11,45 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-use crate::Error;
 use constants::LOG_FILE_PATH;
-use log::{LevelFilter, Log};
+use log::Log;
 use std::{
     fs::{self, File, OpenOptions},
     io::Write,
+    io::{Error, ErrorKind},
     os::unix::{
         net::UnixDatagram,
         prelude::{OpenOptionsExt, PermissionsExt},
     },
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc, Mutex,
+    },
 };
 
+pub use crate::inner::Level;
+pub use crate::inner::{debug, error, info, trace, warn};
+
+static mut LOG_LEVEL: AtomicU32 = AtomicU32::new(4);
+static mut LOG_TARGET: AtomicU32 = AtomicU32::new(0);
+static mut LOG_FILE_SIZE: AtomicU32 = AtomicU32::new(1024);
+static mut LOG_FILE_NUMBER: AtomicU32 = AtomicU32::new(5);
+
 fn write_msg_common(writer: &mut impl Write, module: &str, msg: String) {
-    let now = time::now();
-    let now_str = format!(
-        "{:0>4}-{:0>2}-{:0>2} {:0>2}:{:0>2}:{:0>2} ",
-        now.tm_year + 1900, /* tm_year is years since 1900 */
-        now.tm_mon + 1,     /* tm_mon is months since Jan: [0, 11] */
-        now.tm_mday,
-        now.tm_hour,
-        now.tm_min,
-        now.tm_sec
-    );
+    let time: libc::time_t = unsafe { libc::time(std::ptr::null_mut()) };
+    let now = unsafe { libc::localtime(&time) };
+    let now_str = unsafe {
+        format!(
+            "{:0>4}-{:0>2}-{:0>2} {:0>2}:{:0>2}:{:0>2} ",
+            (*now).tm_year + 1900, /* tm_year is years since 1900 */
+            (*now).tm_mon + 1,     /* tm_mon is months since Jan: [0, 11] */
+            (*now).tm_mday,
+            (*now).tm_hour,
+            (*now).tm_min,
+            (*now).tm_sec
+        )
+    };
 
     /* 1. Write time */
     if let Err(e) = writer.write(now_str.as_bytes()) {
@@ -243,17 +257,13 @@ impl FileLogger {
     fn rotate(&self) -> Result<(), Error> {
         let dir = match self.file_path.parent() {
             None => {
-                return Err(Error::Other {
-                    msg: "Cannot determine the parent directory of log file".to_string(),
-                })
+                return Err(Error::from(ErrorKind::NotFound));
             }
             Some(v) => v,
         };
         let file_name = match self.file_path.file_name() {
             None => {
-                return Err(Error::Other {
-                    msg: "Cannot determine the file name of log file".to_string(),
-                })
+                return Err(Error::from(ErrorKind::InvalidData));
             }
             Some(v) => v.to_string_lossy().to_string(),
         };
@@ -262,7 +272,7 @@ impl FileLogger {
         /* Walk through the parent directory, save the suffix rotate number in num_list */
         let mut num_list: Vec<usize> = Vec::new();
         let read_dir = match dir.read_dir() {
-            Err(e) => return Err(Error::Io { source: e }),
+            Err(e) => return Err(e),
             Ok(v) => v,
         };
         for de in read_dir {
@@ -358,7 +368,7 @@ impl CombinedLogger {
 /// file_number: the maximum number of rotated log files (valid when target == "file")
 pub fn init_log_for_subum(
     app_name: &str,
-    level: LevelFilter,
+    level: Level,
     target: &str,
     file_size: u32,
     file_number: u32,
@@ -374,7 +384,7 @@ pub fn init_log_for_subum(
 /// [`app_name`]: which app output the log
 ///
 /// level: maximum log level
-pub fn init_log_to_console(app_name: &str, level: LevelFilter) {
+pub fn init_log_to_console(app_name: &str, level: Level) {
     init_log(app_name, level, "console-syslog", 0, 0);
 }
 
@@ -387,7 +397,7 @@ pub fn init_log_to_console(app_name: &str, level: LevelFilter) {
 /// file_size: the maximum size of an active log file
 ///
 /// file_number: the maximum number of rotated log files
-pub fn init_log_to_file(app_name: &str, level: LevelFilter, file_size: u32, file_number: u32) {
+pub fn init_log_to_file(app_name: &str, level: Level, file_size: u32, file_number: u32) {
     init_log(app_name, level, "file", file_size, file_number);
 }
 
@@ -402,13 +412,22 @@ pub fn init_log_to_file(app_name: &str, level: LevelFilter, file_size: u32, file
 /// file_size: the maximum size of an active log file (valid when target == "file")
 ///
 /// file_number: the maximum number of rotated log files (valid when target == "file")
-pub fn init_log(
-    _app_name: &str,
-    level: LevelFilter,
-    target: &str,
-    file_size: u32,
-    file_number: u32,
-) {
+pub fn init_log(_app_name: &str, level: Level, target: &str, file_size: u32, file_number: u32) {
+    let level_num: u32 = match level {
+        Level::Error => 0,
+        Level::Warn => 1,
+        Level::Info => 2,
+        Level::Debug => 3,
+        Level::Trace => 4,
+    };
+
+    let target_num: u32 = match target {
+        "syslog" => 0,
+        "console-syslog" => 1,
+        "file" => 2,
+        _ => 0,
+    };
+
     let mut target = target;
     if target == "file" && (file_size == 0 || file_number == 0) {
         println!(
@@ -422,7 +441,7 @@ pub fn init_log(
     if target == "syslog" {
         match SysLogger::connect() {
             Ok(l) => {
-                if let Err(e) = log::set_boxed_logger(Box::new(l)) {
+                if let Err(e) = crate::inner::set_boxed_logger(Box::new(l)) {
                     eprint!("Failed to set logger: {:?}", e);
                 }
             }
@@ -430,9 +449,16 @@ pub fn init_log(
                 eprint!("Failed to connect to /dev/log: {:?}", e);
             }
         }
-        log::set_max_level(level);
+        crate::inner::set_max_level(level);
+
+        unsafe {
+            LOG_LEVEL.store(level_num, Ordering::SeqCst);
+            LOG_TARGET.store(target_num, Ordering::SeqCst);
+        }
+
         return;
     }
+
     if target == "console-syslog" {
         let mut logger = CombinedLogger::empty();
         logger.push(Box::new(ConsoleLogger));
@@ -446,36 +472,128 @@ pub fn init_log(
             }
         }
 
-        if let Err(e) = log::set_boxed_logger(Box::new(logger)) {
+        if let Err(e) = crate::inner::set_boxed_logger(Box::new(logger)) {
             eprintln!("Failed to set logger: {:?}", e);
         }
-        log::set_max_level(level);
+        crate::inner::set_max_level(level);
+
+        unsafe {
+            LOG_LEVEL.store(level_num, Ordering::SeqCst);
+            LOG_TARGET.store(target_num, Ordering::SeqCst);
+        }
+
         return;
     }
+
     if target == "file" {
-        let _ = log::set_boxed_logger(Box::new(FileLogger::new(
+        let _ = crate::inner::set_boxed_logger(Box::new(FileLogger::new(
             log::Level::Debug,
             PathBuf::from(LOG_FILE_PATH),
             0o600,
             file_size,
             file_number,
         )));
-        log::set_max_level(level);
+        crate::inner::set_max_level(level);
+
+        unsafe {
+            LOG_LEVEL.store(level_num, Ordering::SeqCst);
+            LOG_TARGET.store(target_num, Ordering::SeqCst);
+            LOG_FILE_NUMBER.store(file_number, Ordering::SeqCst);
+            LOG_FILE_SIZE.store(file_size, Ordering::SeqCst);
+        }
+    }
+}
+
+/// Reinit the logger based on the former configuration
+pub fn reinit() {
+    let level = match unsafe { LOG_LEVEL.load(Ordering::SeqCst) } {
+        0 => Level::Error,
+        1 => Level::Warn,
+        2 => Level::Info,
+        3 => Level::Debug,
+        4 => Level::Trace,
+        _ => Level::Info,
+    };
+
+    let mut target: &str = match unsafe { LOG_TARGET.load(Ordering::SeqCst) } {
+        0 => "syslog",
+        1 => "console-syslog",
+        2 => "file",
+        _ => "syslog",
+    };
+
+    let file_size = unsafe { LOG_FILE_SIZE.load(Ordering::SeqCst) };
+    let file_number = unsafe { LOG_FILE_NUMBER.load(Ordering::SeqCst) };
+
+    if target == "file" && (file_size == 0 || file_number == 0) {
+        println!(
+            "LogTarget is configured to `file`, but configuration is invalid, changing the \
+             LogTarget to `syslog`, file_size: {}, file_number: {}",
+            file_size, file_number
+        );
+        target = "syslog";
+    }
+
+    if target == "syslog" {
+        match SysLogger::connect() {
+            Ok(l) => {
+                if let Err(e) = crate::inner::set_boxed_logger(Box::new(l)) {
+                    eprint!("Failed to set logger: {:?}", e);
+                }
+            }
+            Err(e) => {
+                eprint!("Failed to connect to /dev/log: {:?}", e);
+            }
+        }
+        crate::inner::set_max_level(level);
+        return;
+    }
+
+    if target == "console-syslog" {
+        let mut logger = CombinedLogger::empty();
+        logger.push(Box::new(ConsoleLogger));
+
+        match SysLogger::connect() {
+            Ok(l) => {
+                logger.push(Box::new(l));
+            }
+            Err(e) => {
+                eprint!("Failed to connect to /dev/log: {:?}", e);
+            }
+        }
+
+        if let Err(e) = crate::inner::set_boxed_logger(Box::new(logger)) {
+            eprintln!("Failed to set logger: {:?}", e);
+        }
+        crate::inner::set_max_level(level);
+        return;
+    }
+
+    if target == "file" {
+        let _ = crate::inner::set_boxed_logger(Box::new(FileLogger::new(
+            log::Level::Debug,
+            PathBuf::from(LOG_FILE_PATH),
+            0o600,
+            file_size,
+            file_number,
+        )));
+        crate::inner::set_max_level(level);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use log;
     #[test]
     fn test_init_log_to_console() {
-        init_log_to_console("test", LevelFilter::Debug);
-        // assert_eq!((), ());
-        log::info!("test for logger info");
-        log::error!("test for logger error");
-        log::warn!("test for logger warn");
-        log::debug!("test for logger debug");
-        log::trace!("test for logger trace");
+        init_log_to_console("test", Level::Debug);
+        crate::error!("hello, error!");
+        crate::inner::set_max_level(Level::Info);
+        crate::info!("hello, info!"); /* Won't print */
+        crate::debug!("hello debug!");
+        init_log("test", Level::Debug, "syslog", 0, 0);
+        crate::debug!("hello debug2!"); /* Only print in the syslog */
+        reinit();
+        crate::debug!("hello debug3!"); /* Only print in the syslog */
     }
 }
