@@ -1,0 +1,13 @@
+# Default configuration of devmaster daemon.
+
+# Support 'info' and 'debug'.
+log_level = "info"
+
+# Support multiple rules directories.
+rules_d = ["/etc/devmaster/rules.d"]
+
+# Support multiple network interface configuration directories.
+network_d = ["/etc/devmaster/network.d"]
+
+# The default value is 3.
+max_workers = 3

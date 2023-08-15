@@ -219,7 +219,7 @@ impl ExecuteManager {
             .files
             .clone();
 
-        loop {
+        while self.current_rule_file.is_some() {
             let next_file = self
                 .current_rule_file
                 .clone()
@@ -233,9 +233,6 @@ impl ExecuteManager {
             self.apply_rule_file()?;
 
             self.current_rule_file = next_file;
-            if self.current_rule_file.is_none() {
-                break;
-            }
         }
 
         Ok(())

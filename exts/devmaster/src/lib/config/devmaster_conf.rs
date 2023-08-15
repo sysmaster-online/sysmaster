@@ -44,7 +44,7 @@ pub(crate) struct DevmasterConfigData {
     pub(crate) rules_d: Option<Vec<String>>,
     pub(crate) max_workers: Option<u32>,
     pub(crate) log_level: Option<String>,
-    pub(crate) netif_cfg_d: Option<Vec<String>>,
+    pub(crate) network_d: Option<Vec<String>>,
 }
 
 impl DevmasterConfig {
@@ -101,7 +101,7 @@ impl DevmasterConfig {
     pub fn get_netif_cfg_d(&self) -> Vec<String> {
         self.inner
             .borrow()
-            .netif_cfg_d
+            .network_d
             .clone()
             .unwrap_or_else(|| DEFAULT_NETIF_CONFIG_DIRS.to_vec())
     }
@@ -116,7 +116,7 @@ mod tests {
     fn test_config() {
         let config_s = "
 rules_d = [\"/root/rules.d\"]
-netif_cfg_d = [\"/root/network\"]
+network_d = [\"/root/network.d\"]
 ";
         fs::write("/tmp/test_config.toml", config_s).unwrap();
         let config: DevmasterConfig = DevmasterConfig::new();
@@ -125,7 +125,10 @@ netif_cfg_d = [\"/root/network\"]
         assert_eq!(config.get_rules_d(), vec!["/root/rules.d".to_string()]);
         assert_eq!(config.get_max_workers(), 3);
         assert_eq!(config.get_log_level(), LevelFilter::Info);
-        assert_eq!(config.get_netif_cfg_d(), vec!["/root/network".to_string()]);
+        assert_eq!(
+            config.get_netif_cfg_d(),
+            vec!["/root/network.d".to_string()]
+        );
         fs::remove_file("/tmp/test_config.toml").unwrap();
 
         let default_conf = DevmasterConfig::new();

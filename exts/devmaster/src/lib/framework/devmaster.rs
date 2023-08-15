@@ -56,11 +56,11 @@ pub struct Cache {
 
 impl Cache {
     /// generate the shared cache
-    pub fn new(rules_d: Vec<String>, netif_cfg_d: Vec<String>) -> Cache {
+    pub fn new(rules_d: Vec<String>, network_d: Vec<String>) -> Cache {
         let rules = Rules::load_rules(rules_d, ResolveNameTime::Early);
 
         let mut netif_cfg_ctx = NetifConfigCtx::new();
-        netif_cfg_ctx.load(netif_cfg_d);
+        netif_cfg_ctx.load(network_d);
 
         Cache {
             rules,
