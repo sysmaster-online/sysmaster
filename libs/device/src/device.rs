@@ -1325,10 +1325,16 @@ impl Device {
 
     /// add tag to the device object
     pub fn add_tag(&self, tag: &str, both: bool) -> Result<(), Error> {
-        self.all_tags.borrow_mut().insert(tag.to_string());
+        if tag.trim().is_empty() {
+            return Ok(());
+        }
+
+        self.all_tags.borrow_mut().insert(tag.trim().to_string());
 
         if both {
-            self.current_tags.borrow_mut().insert(tag.to_string());
+            self.current_tags
+                .borrow_mut()
+                .insert(tag.trim().to_string());
         }
         self.property_tags_outdated.replace(true);
         Ok(())
