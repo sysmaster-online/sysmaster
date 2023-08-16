@@ -1,30 +1,49 @@
 #!/usr/bin/env bash
 
-mode="$1"
-work_dir=$(pwd)
-target_dir=${work_dir}/${mode}
-install_dir=/usr/lib/sysmaster
-conf_dir=/etc/sysmaster
+mode="${1:-debug}"
+pwd=$(pwd)
+target_dir=${pwd}/target/${mode}
+units_dir=${pwd}/units
+run_with_vm_dir=${pwd}/tools/run_with_vm
+sysmaster_install_target=/usr/lib/sysmaster
+conf_install_target=/etc/sysmaster
 
+# Install binaries of sysmaster.
 install -Dm0550 -t /usr/bin ${target_dir}/sctl || exit 1
-install -Dm0550 ${target_dir}/init /init || exit 1
-install -Dm0550 -t ${install_dir} ${target_dir}/sysmaster || exit 1
-install -Dm0550 -t ${install_dir} ${target_dir}/fstab || exit 1
-install -Dm0550 -t ${install_dir} ${target_dir}/sysmonitor || exit 1
-install -Dm0550 -t ${install_dir} ${target_dir}/random_seed || exit 1
-install -Dm0550 -t ${install_dir} ${target_dir}/rc-local-generator || exit 1
-install -Dm0550 -t ${install_dir} ${target_dir}/hostname_setup || exit 1
+install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/init || exit 1
+install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/sysmaster || exit 1
+install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/fstab || exit 1
+install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/sysmonitor || exit 1
+install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/random_seed || exit 1
+install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/rc-local-generator || exit 1
+install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/hostname_setup || exit 1
 
-install -Dm0640 -t ${install_dir}/system ${target_dir}/basic.target || exit 1
-install -Dm0640 -t ${install_dir}/system ${target_dir}/multi-user.target || exit 1
-install -Dm0640 -t ${install_dir}/system ${target_dir}/shutdown.target || exit 1
-install -Dm0640 -t ${install_dir}/system ${target_dir}/sysinit.target || exit 1
+# Install '.service', '.socket', and '.target' units.
+install -Dm0640 -t ${sysmaster_install_target}/system ${units_dir}/* || exit 1
+install -Dm0640 -t ${sysmaster_install_target}/system ${run_with_vm_dir}/*.service || exit 1
+install -Dm0640 -t ${sysmaster_install_target}/system ${run_with_vm_dir}/*.socket || exit 1
+
+# Simulate `sctl enable` command to automatically start services after bootup.
+mkdir -p /etc/sysmaster/system/multi-user.target.wants
+for unit in ${run_with_vm_dir}/*.service; do
+    # Serial port communication service should be manually started.
+    if [[ "${unit##*/}" == "serial-getty-ttyAMA0.service" ]] || [[ "${unit##*/}" == "serial-getty-ttyS0.service" ]]; then
+        continue
+    fi
+    ln -sf ${sysmaster_install_target}/system/${unit##*/} /etc/sysmaster/system/multi-user.target.wants/${unit##*/}
+done
 
 strip ${target_dir}/lib*.so
 
-install -Dm0550 -t ${install_dir}/plugin ${target_dir}/libmount.so || exit 1
-install -Dm0550 -t ${install_dir}/plugin ${target_dir}/libservice.so || exit 1
-install -Dm0550 -t ${install_dir}/plugin ${target_dir}/libsocket.so || exit 1
-install -Dm0550 -t ${install_dir}/plugin ${target_dir}/libtarget.so || exit 1
-install -Dm0550 -t ${install_dir}/plugin ${target_dir}/conf/plugin.conf || exit 1
-install -Dm0640 -t ${conf_dir} ${target_dir}/conf/system.conf || exit 1
+# Install the dynamic libraries of unit plugins.
+install -Dm0550 -t ${sysmaster_install_target}/plugin ${target_dir}/libmount.so || exit 1
+install -Dm0550 -t ${sysmaster_install_target}/plugin ${target_dir}/libservice.so || exit 1
+install -Dm0550 -t ${sysmaster_install_target}/plugin ${target_dir}/libsocket.so || exit 1
+install -Dm0550 -t ${sysmaster_install_target}/plugin ${target_dir}/libtarget.so || exit 1
+
+# Install configurations of sysmaster.
+install -Dm0550 -t ${sysmaster_install_target}/plugin ${pwd}/config/conf/plugin.conf || exit 1
+install -Dm0640 -t ${conf_install_target} ${pwd}/config/conf/system.conf || exit 1
+
+# Create the symbolic linkage '/init' to sysmaster-init.
+ln -sf ${sysmaster_install_target}/init /init

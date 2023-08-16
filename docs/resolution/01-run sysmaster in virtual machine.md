@@ -1,22 +1,21 @@
-# 虚拟机场景运行sysmaster
+# 在虚拟机环境中部署运行`sysmaster`
 
-## 思路
+## 概述
 
-以openEuler LTS 22.03版本为基础镜像创建虚拟机，通过dracut重做initrd，去除systemd影响；同时虚拟机中以sysmaster为init进程，实现以sysmaster为1号进程的虚拟机。
+本教程基于`openEuler LTS 22.03`版本进行实践，理论上适用于其他`Linux`发行版本。首先通过`dracut`命令制作剔除了`systemd`的`initramfs`镜像，然后基于该镜像添加新的`grub`启动条目，并在该启动条目中以`sysmaster-init`作为一号进程实现虚拟机环境的启动初始化。
 
-首先需要准备一台openEuler 22.03 LTS虚拟机(理论上来说对于虚拟机版本并没有严格要求，只是我使用此版本进行验证)，再进行后续操作。
 
-## 系统制作
+## 部署和使用
 
-### 小系统制作
+### `initramfs`镜像制作
 
-**1.** 为了避免小系统中systemd的影响，需要重新制作一个不包含systemd的initrd。可以使用如下命令制作：
+1. 为了避免`initrd`阶段`systemd`的影响，需要制作一个剔除`systemd`的`initramfs`镜像，并以该镜像进入`initrd`流程。使用如下命令：
 
 ```
-dracut -f --omit "systemd systemd-initrd systemd-networkd dracut-systemd" /boot/initrd_withoutsd.img
+# dracut -f --omit "systemd systemd-initrd systemd-networkd dracut-systemd" /boot/initrd_withoutsd.img
 ```
 
-**2.** 得到上述initrd后，修改grub.cfg增加启动项(`aarch64:/boot/efi/EFI/openEuler/grub.cfg;x86_64:/boot/grub2/grub.cfg`)，也避免对原系统有影响：
+2. 得到上述`initramfs`后，在`grub.cfg`中增加新的启动项，`aarch64`下的路径为`/boot/efi/EFI/openEuler/grub.cfg`，`x86_64`下的路径为`/boot/grub2/grub.cfg`：
 
 ```
 ...
@@ -39,7 +38,7 @@ menuentry 'openEuler (5.10.0-60.18.0.50.oe2203.aarch64) 22.03 LTS' --class opene
         initrd  /initramfs-5.10.0-60.18.0.50.oe2203.aarch64.img
 }
 ### 新增如下启动项 ###
-menuentry 'openEuler (5.10.0-60.18.0.50.oe2203.aarch64) 22.03 LTS without systemd' --class openeuler --class gnu-linux --class gnu --class os --unrestricted $menuentry_id_option 'gnulinux-5.10.0-60.18.0.50.oe2203.aarch64-advanced-53b0b401-a14c-43f1-9d96-9a66143bbb17' {
+menuentry 'Boot with sysmaster' --class openeuler --class gnu-linux --class gnu --class os --unrestricted $menuentry_id_option 'gnulinux-5.10.0-60.18.0.50.oe2203.aarch64-advanced-53b0b401-a14c-43f1-9d96-9a66143bbb17' {
         load_video
         set gfxpayload=keep
         insmod gzio
@@ -59,35 +58,58 @@ menuentry 'openEuler (5.10.0-60.18.0.50.oe2203.aarch64) 22.03 LTS without system
 ...
 ```
 
-修改点有以下几点注意：
+3. 增加启动项时，拷贝一份原有启动项，并做以下四处修改：
 
-- 名称需要修改，避免与原有启动项混淆，例如我增加了`without systemd`：
+- 新增启动项需要避免和原启动项重名，例如上述案例中设置为`Boot with sysmaster`：
 
 ```
-menuentry 'openEuler (5.10.0-60.18.0.50.oe2203.aarch64) 22.03 LTS without systemd'
+menuentry 'Boot with sysmaster'
 ```
 
-- linux启动项需要修改`root=/dev/mapper/openeuler-root ro`为`root=/dev/mapper/openeuler-root rw`。因为目前sysmaster并未实现在切根后重新挂载根分区的功能，所以小系统中的根分区需要挂载成`rw`。且需要指定`init=/init`，避免拉起systemd作为1号进程。
-- initrd项需要对应修改为`initrd  /initrd_withoutsd.img`，此img为步骤1生成。
+- 内核启动参数需要修改`root=/dev/mapper/openeuler-root ro`为`root=/dev/mapper/openeuler-root rw`。因为目前`sysmaster`并未实现在切根后重新挂载根分区的功能，所以小系统中的根分区需要挂载成`rw`。
 
-至此，小系统修改结束。
+- 启动参数中需要显示指定一号进程`init=/init`，在安装脚本`install_sysmaster.sh`中，我们会生成`/init`软链接指向`sysmaster-init`，从而避免内核以`systemd`作为1号进程启动。
+
+- `initrd`项需要对应修改为`initrd  /initrd_withoutsd.img`，此`img`为步骤1生成。
 
 
+### 安装`sysmaster`
 
-## 大系统准备
+1. 构建`sysmaster`的`debug`或`release`二进制版本：
 
-**1.** 将sysmaster编译二进制拷贝到对应目录，可以通过install_sysmaster.sh进行安装。使用方法是在sysmaster编译目录下(target目录)，执行`sh install_sysmaster.sh debug/release`，这里取决于你以debug还是release模式编译。注意这里将init二进制拷贝到为`/init`。与上面修改的linux启动项相对应。
+```
+# cargo build --all [--release]
+```
 
-**2.** 将`run_with_vm`目录下的service和target，以及`sysmaster/units`目录下的target拷贝到`/usr/lib/sysmaster/system`目录下：
+1. 在源码根目录下使用安装脚本`install_sysmaster.sh`将`sysmaster`的二进制文件、系统服务、配置文件等安装到系统中，执行以下命令：
 
-**3.** 在虚拟机通过执行/init &启动sysmaster，然后通过`sctl enable fstab.service sshd.service udevd.service getty-tty1.service lvm-activate-openeuler.service NetworkManager.service udev-trigger.service hostname-setup.service`上述服务实现开机启动。
+```
+# sh -x tools/run_with_vm/install_sysmaster.sh [debug|release]
+```
 
-**注意：**
+可以指定安装`debug`或`release`版本，未指定时默认安装`debug`二进制版本。
 
-- 上面提到`serial-getty-ttyAMA0.service`服务是实现aarch64架构平台串口登陆所需的服务；如果是x86_64，那么需要将服务改为`serial-getty-ttyS0.service`，此服务主要针对有console串口的情况，例如`virsh console`进入串口，私人笔记本创建的虚拟机，默认应该都是只有tty1。可以开机启动后手动通过sctl start启动，或者添加到multi-user.target里面的requires字段中实现开机自启。
+3. 启动串口登陆服务：
 
-至此，大系统准备完毕。
+根据体系结构启动对应的串口登陆服务，`aarch64`对应`serial-getty-ttyAMA0.service`，`x86_64`对应`serial-getty-ttyS0.service`。此服务主要针对有`console`串口的情况，例如`virsh console`进入串口，私人笔记本创建的虚拟机，默认应该都是只有`tty1`。
 
-## 启动
+开机启动后手动执行`sctl start`命令启动串口登陆服务，或者将该服务添加到`multi-user.target`配置的`Requires`字段中实现开机自启。
 
-虚拟机重启，在grub引导启动界面选择对于的启动项。启动后，可以通过tty1或者ssh登陆。
+```
+# sctl start <serial-getty-ttyAMA0.service|serial-getty-ttyS0.service>
+```
+
+### 系统启动
+
+虚拟机重启，在`grub`引导启动界面选择对应的启动项。启动后，可以通过`tty1`或者`ssh`登陆。
+
+
+## 卸载`sysmaster`
+
+执行以下命令，可以从系统中卸载`sysmaster`：
+
+```
+# rm -rf /lib/sysmaster
+# rm -rf /etc/sysmaster
+# unlink /init
+```
