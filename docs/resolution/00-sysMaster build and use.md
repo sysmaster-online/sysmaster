@@ -1,4 +1,4 @@
-# sysMaster Build and Use
+# sysMaster 构建和使用
 
 ## 构建
 
@@ -22,9 +22,13 @@ RUST_BACKTRACE=full cargo test --all-targets --all -v -- --nocapture --show-outp
 ```
 ## 使用
 
-在各场景下的使用，可以参考仓库`tools`目录下内容。
+在各场景下的使用，可以参考源码仓库`tools`目录下内容, 部分场景提供了自动化的工具。[sysmaster源码仓库](https://gitee.com/openeuler/sysmaster/tree/master/tools)
 ```
-ls tools
+musl-build
+run_with_busybox
+run_with_kubeos
+run_with_sd
+run_with_vm
 ```
 
 ## 代码目录结构说明

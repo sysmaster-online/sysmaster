@@ -1,4 +1,4 @@
-# 在容器中以sysmaster拉起sshd服务
+# 容器中管理sshd等服务
 
 ## 思路
 以openEuler容器镜像为基础，制作以sysmaster为1号进程的容器镜像，在镜像中实现拉起sshd服务，以满足kubeos admin容器要求。
