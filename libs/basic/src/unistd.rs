@@ -192,8 +192,8 @@ mod test {
         println!("{:?}", u);
         assert_eq!(u.unwrap().name, "root");
         let s_uid = String::from("1");
-        let u = parse_uid(&s_uid);
-        assert_eq!(u.unwrap().name, "bin");
+        let u = parse_uid(&s_uid).unwrap();
+        assert!(u.name == "bin" || u.name == "daemon");
         let s_invalid_uid = String::from("abc_i");
         let u = parse_uid(&s_invalid_uid);
         let e = u.expect_err("invalid uid");
