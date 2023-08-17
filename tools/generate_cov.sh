@@ -6,14 +6,14 @@
 
 # Install tools
 echo "Installing tools..."
-rustup override set 1.70.0 > /dev/null 2>&1
+rustup override set stable > /dev/null 2>&1
 cargo install grcov > /dev/null 2>&1
 rustup component add llvm-tools-preview > /dev/null 2>&1
 
 # Ensure build and test succeed
 find . -name "*.profraw" | xargs rm -f
 cargo clean
-rustup override set 1.60.0 > /dev/null 2>&1
+rustup override set 1.57.0 > /dev/null 2>&1
 
 echo "Starting to build..."
 export RUSTFLAGS="-Cinstrument-coverage"
@@ -44,7 +44,7 @@ if [ $result -ne 0 ]; then
 fi
 
 # Ensure grcov succeed
-rustup override set 1.70.0 > /dev/null 2>&1
+rustup override set stable > /dev/null 2>&1
 
 echo "Starting to generate coverage..."
 # To be compatible with the sysmaster of src-openeuler
@@ -61,4 +61,4 @@ fi
 
 find . -name "*.profraw" | xargs rm -f
 cargo clean
-rustup override set 1.60.0 > /dev/null 2>&1
+rustup override set 1.57.0 > /dev/null 2>&1
