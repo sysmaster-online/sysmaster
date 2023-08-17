@@ -13,4 +13,8 @@ basic = { path = "../../libs/basic", features = [
 ] }
 log = { path = "../../libs/log" }
 
-nix = { version = "0.24", default-features = false, features = ["hostname"] }
+nix = { version = "0.24", default-features = false, features = [
+    "hostname",
+    "process",
+    "feature",
+] }

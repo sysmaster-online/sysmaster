@@ -15,11 +15,12 @@ libc = { version = "0.2.140", default-features = false }
 nix = { version = "0.24", default-features = false, features = [
     "poll",
     "dir",
-    # "signal",
-    # "ioctl",
-    # "user",
-    # "net",
     "resource",
+    #"signal",
+    #"user",
+    #"ioctl",
+    #"socket",
+    #"net",
 ] }
 pathdiff = { version = "0.2.1", optional = true }
 procfs = { version = "0.12.0", default-features = false, optional = true }
@@ -66,12 +67,20 @@ full = [
 
 capability = []
 cargo = ["pkg-config"]
-cmdline = []
-condition = ["sysfs", "unistd"]
+cmdline = ["config"]
+condition = [
+    "sysfs",
+    "unistd",
+    "capability",
+    "fd",
+    "cmdline",
+    "security",
+    "mount",
+]
 config = []
 cpu = []
 disk = []
-fd = []
+fd = ["stat"]
 file = []
 fs = ["pathdiff", "rand"]
 host = []

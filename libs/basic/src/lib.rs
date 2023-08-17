@@ -19,8 +19,6 @@ pub mod cargo;
 pub mod condition;
 #[cfg(feature = "config")]
 pub mod config;
-pub mod error;
-pub use error::*;
 #[cfg(feature = "cpu")]
 pub mod cpu;
 #[cfg(feature = "disk")]
@@ -35,7 +33,6 @@ pub mod host;
 pub mod io_util;
 #[cfg(feature = "machine")]
 pub mod machine;
-pub mod macros;
 #[cfg(feature = "memory")]
 pub mod memory;
 #[cfg(feature = "mount")]
@@ -74,6 +71,11 @@ pub mod sysfs;
 pub mod unistd;
 #[cfg(feature = "uuid")]
 pub mod uuid;
+
+pub mod error;
+pub mod macros;
+
+pub use error::*;
 
 /// default startup target
 pub const DEFAULT_TARGET: &str = "default.target";
