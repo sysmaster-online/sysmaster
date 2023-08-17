@@ -26,6 +26,16 @@ use regex::Regex;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
+trait Location {
+    fn location(&self, context: &(u32, String, String)) -> String;
+}
+
+impl<T: Display> Location for T {
+    fn location(&self, context: &(u32, String, String)) -> String {
+        format!("{}:{} {} {}", context.1, context.0, context.2, self)
+    }
+}
+
 impl Rules {
     /// load all rules under specified directories
     pub(crate) fn load_rules(
@@ -436,13 +446,12 @@ impl RuleToken {
         op: OperatorType,
         attr: Option<String>,
         value: String,
-        line_number: u32,
-        rule_file: String,
-        content: String,
+        context: (u32, String, String),
     ) -> Result<RuleToken> {
         let mut match_type = MatchType::Invalid;
         let mut attr_subst_type = SubstituteType::Invalid;
         let mut value_regex = vec![];
+        let (line_number, rule_file, content) = context;
 
         if r#type <= TokenType::MatchResult {
             if r#type == TokenType::MatchSubsystem
@@ -504,20 +513,18 @@ impl RuleToken {
         rules: Option<Arc<RwLock<Rules>>>,
         context: (u32, String, String),
     ) -> Result<RuleToken> {
-        let (line_number, rule_file, content) = context;
-
         let mut op = op.parse::<OperatorType>()?;
         let op_is_match = [OperatorType::Match, OperatorType::Nomatch].contains(&op);
         match key.as_str() {
             "ACTION" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'ACTION' can not carry attribute.".to_string(),
+                        msg: "Key 'ACTION' can not carry attribute.".location(&context),
                     });
                 }
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'ACTION' can only take match operator.".to_string(),
+                        msg: "Key 'ACTION' can only take match operator.".location(&context),
                     });
                 }
 
@@ -526,20 +533,18 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "DEVPATH" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'DEVPATH' can not carry attribute.".to_string(),
+                        msg: "Key 'DEVPATH' can not carry attribute.".location(&context),
                     });
                 }
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'DEVPATH' can only take match operator.".to_string(),
+                        msg: "Key 'DEVPATH' can only take match operator.".location(&context),
                     });
                 }
 
@@ -548,20 +553,18 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "KERNEL" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'KERNEL' can not carry attribute.".to_string(),
+                        msg: "Key 'KERNEL' can not carry attribute.".location(&context),
                     });
                 }
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'KERNEL' can only take match operator.".to_string(),
+                        msg: "Key 'KERNEL' can only take match operator.".location(&context),
                     });
                 }
 
@@ -570,35 +573,31 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "SYMLINK" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'SYMLINK' can not carry attribute.".to_string(),
+                        msg: "Key 'SYMLINK' can not carry attribute.".location(&context),
                     });
                 }
                 if op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'SYMLINK' can not take remove operator.".to_string(),
+                        msg: "Key 'SYMLINK' can not take remove operator.".location(&context),
                     });
                 }
 
                 if !op_is_match {
                     if let Err(e) = check_value_format(key.as_str(), value.as_str(), false) {
-                        log::warn!("{}", e);
+                        log::warn!("{}", e.location(&context));
                     }
                     Ok(RuleToken::new(
                         TokenType::AssignDevlink,
                         op,
                         None,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -606,42 +605,42 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 }
             }
             "NAME" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'NAME' can not carry attribute.".to_string(),
+                        msg: "Key 'NAME' can not carry attribute.".location(&context),
                     });
                 }
                 if op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'NAME' can not take remove operator.".to_string(),
+                        msg: "Key 'NAME' can not take remove operator.".location(&context),
                     });
                 }
 
                 if op == OperatorType::Add {
-                    log::warn!("Key 'NAME' can only take '==', '!=', '=', or ':=' operator, change '+=' to '=' implicitly.");
+                    log::warn!("{}", "Key 'NAME' can only take '==', '!=', '=', or ':=' operator, change '+=' to '=' implicitly.".location(&context));
                     op = OperatorType::Assign;
                 }
 
                 if !op_is_match {
                     if value.eq("%k") {
                         return Err(Error::RulesLoadError {
-                            msg: "Ignore token NAME=\"%k\", as it takes no effect.".to_string(),
+                            msg: "Ignore token NAME=\"%k\", as it takes no effect."
+                                .location(&context),
                         });
                     }
                     if value.is_empty() {
                         return Err(Error::RulesLoadError {
-                            msg: "Ignore token NAME=\"\", as it takes no effect.".to_string(),
+                            msg: "Ignore token NAME=\"\", as it takes no effect."
+                                .location(&context),
                         });
                     }
                     if let Err(e) = check_value_format(key.as_str(), value.as_str(), false) {
-                        log::warn!("{}", e);
+                        log::warn!("{}", e.location(&context));
                     }
 
                     Ok(RuleToken::new(
@@ -649,9 +648,7 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -659,26 +656,26 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 }
             }
             "ENV" => {
                 if attr.is_none() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'ENV' must have attribute.".to_string(),
+                        msg: "Key 'ENV' must have attribute.".location(&context),
                     });
                 }
                 if op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'ENV' can not take '-=' operator.".to_string(),
+                        msg: "Key 'ENV' can not take '-=' operator.".location(&context),
                     });
                 }
                 if op == OperatorType::AssignFinal {
                     log::warn!(
+                        "{}",
                         "Key 'ENV' can not take ':=' operator, change ':=' to '=' implicitly."
+                            .location(&context)
                     );
                     op = OperatorType::Assign;
                 }
@@ -702,7 +699,8 @@ impl RuleToken {
                             msg: format!(
                                 "Key 'ENV' has invalid attribute. '{}' can not be set.",
                                 attr.as_ref().unwrap()
-                            ),
+                            )
+                            .location(&context),
                         });
                     }
 
@@ -715,9 +713,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -725,22 +721,20 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 }
             }
             "CONST" => {
                 if attr.is_none() || matches!(attr.as_ref().unwrap().as_str(), "arch" | "virt") {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'CONST' has invalid attribute.".to_string(),
+                        msg: "Key 'CONST' has invalid attribute.".location(&context),
                     });
                 }
 
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'CONST' must take match operator.".to_string(),
+                        msg: "Key 'CONST' must take match operator.".location(&context),
                     });
                 }
 
@@ -749,21 +743,21 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "TAG" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'TAG' can not have attribute.".to_string(),
+                        msg: "Key 'TAG' can not have attribute.".location(&context),
                     });
                 }
 
                 if op == OperatorType::AssignFinal {
                     log::warn!(
+                        "{}",
                         "Key 'TAG' can not take ':=' operator, change ':=' to '=' implicitly."
+                            .location(&context)
                     );
                     op = OperatorType::Assign;
                 }
@@ -778,9 +772,7 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -788,27 +780,29 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 }
             }
             "SUBSYSTEM" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'SUBSYSTEM' can not have attribute.".to_string(),
+                        msg: "Key 'SUBSYSTEM' can not have attribute.".location(&context),
                     });
                 }
 
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'SUBSYSTEM' must take match operator.".to_string(),
+                        msg: "Key 'SUBSYSTEM' must take match operator.".location(&context),
                     });
                 }
 
                 if matches!(value.as_str(), "bus" | "class") {
-                    log::warn!("The value of key 'SUBSYSTEM' must be specified as 'subsystem'");
+                    log::warn!(
+                        "{}",
+                        "The value of key 'SUBSYSTEM' must be specified as 'subsystem'"
+                            .location(&context)
+                    );
                 }
 
                 Ok(RuleToken::new(
@@ -816,21 +810,19 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "DRIVER" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'DRIVER' can not have attribute.".to_string(),
+                        msg: "Key 'DRIVER' can not have attribute.".location(&context),
                     });
                 }
 
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'DRIVER' must take match operator".to_string(),
+                        msg: "Key 'DRIVER' must take match operator".location(&context),
                     });
                 }
 
@@ -839,9 +831,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "ATTR" => {
@@ -855,29 +845,29 @@ impl RuleToken {
 
                 if op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'ATTR' can not take remove operator.".to_string(),
+                        msg: "Key 'ATTR' can not take remove operator.".location(&context),
                     });
                 }
 
                 if matches!(op, OperatorType::Add | OperatorType::AssignFinal) {
                     log::warn!(
+                        "{}",
                         "Key 'ATTR' can not take '+=' and ':=' operator, change to '=' implicitly."
+                            .location(&context)
                     );
                     op = OperatorType::Assign;
                 }
 
                 if !op_is_match {
                     if let Err(e) = check_value_format(key.as_str(), value.as_str(), false) {
-                        log::warn!("{}", e);
+                        log::warn!("{}", e.location(&context));
                     }
                     Ok(RuleToken::new(
                         TokenType::AssignAttr,
                         op,
                         attr,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -885,9 +875,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 }
             }
@@ -896,24 +884,24 @@ impl RuleToken {
                     key.as_str(),
                     attr.as_ref().unwrap_or(&"".to_string()).as_str(),
                 ) {
-                    log::warn!("{}", e);
+                    log::warn!("{}", e.location(&context));
                     return Err(e);
                 }
 
                 if op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'SYSCTL' can not take remove operator.".to_string(),
+                        msg: "Key 'SYSCTL' can not take remove operator.".location(&context),
                     });
                 }
 
                 if matches!(op, OperatorType::Add | OperatorType::AssignFinal) {
-                    log::warn!("Key 'SYSCTL' can not take '+=' and ':=' operator, change to '=' implicitly.");
+                    log::warn!("{}", "Key 'SYSCTL' can not take '+=' and ':=' operator, change to '=' implicitly.".location(&context));
                     op = OperatorType::Assign;
                 }
 
                 if !op_is_match {
                     if let Err(e) = check_value_format(key.as_str(), value.as_str(), false) {
-                        log::warn!("{}", e);
+                        log::warn!("{}", e.location(&context));
                     }
 
                     Ok(RuleToken::new(
@@ -921,9 +909,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -931,21 +917,19 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 }
             }
             "KERNELS" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'KERNELS' can not have attribute.".to_string(),
+                        msg: "Key 'KERNELS' can not have attribute.".location(&context),
                     });
                 }
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'KERNELS' should take match operator.".to_string(),
+                        msg: "Key 'KERNELS' should take match operator.".location(&context),
                     });
                 }
 
@@ -954,20 +938,18 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "SUBSYSTEMS" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'SUBSYSTEMS' can not have attribute.".to_string(),
+                        msg: "Key 'SUBSYSTEMS' can not have attribute.".location(&context),
                     });
                 }
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'SUBSYSTEMS' should take match operator.".to_string(),
+                        msg: "Key 'SUBSYSTEMS' should take match operator.".location(&context),
                     });
                 }
 
@@ -976,20 +958,18 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "DRIVERS" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'DRIVERS' can not have attribute.".to_string(),
+                        msg: "Key 'DRIVERS' can not have attribute.".location(&context),
                     });
                 }
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'DRIVERS' should take match operator.".to_string(),
+                        msg: "Key 'DRIVERS' should take match operator.".location(&context),
                     });
                 }
 
@@ -998,31 +978,36 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "ATTRS" => {
                 if let Err(e) =
                     check_attr_format(key.as_str(), attr.clone().unwrap_or_default().as_str())
                 {
-                    log::warn!("{}", e);
+                    log::warn!("{}", e.location(&context));
                     return Err(e);
                 }
 
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'ATTRS' must take match operators.".to_string(),
+                        msg: "Key 'ATTRS' must take match operators.".location(&context),
                     });
                 }
 
                 if attr.clone().unwrap().starts_with("device/") {
-                    log::warn!("'device' may be deprecated in future.");
+                    log::warn!(
+                        "{}",
+                        "'device' may be deprecated in future.".location(&context)
+                    );
                 }
 
                 if attr.clone().unwrap().starts_with("../") {
-                    log::warn!("direct reference to parent directory may be deprecated in future.");
+                    log::warn!(
+                        "{}",
+                        "direct reference to parent directory may be deprecated in future."
+                            .location(&context)
+                    );
                 }
 
                 Ok(RuleToken::new(
@@ -1030,21 +1015,19 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "TAGS" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'TAGS' can not have attribute.".to_string(),
+                        msg: "Key 'TAGS' can not have attribute.".location(&context),
                     });
                 }
 
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'TAGS' can only take match operator.".to_string(),
+                        msg: "Key 'TAGS' can only take match operator.".location(&context),
                     });
                 }
 
@@ -1053,25 +1036,23 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "TEST" => {
                 if attr.is_some() {
                     parse_mode(&attr.clone().unwrap()).map_err(|e| Error::RulesLoadError {
-                        msg: format!("Key 'TEST' failed to parse mode: {}", e),
+                        msg: format!("Key 'TEST' failed to parse mode: {}", e).location(&context),
                     })?;
                 }
 
                 if let Err(e) = check_value_format(key.as_str(), value.as_str(), true) {
-                    log::warn!("{}", e);
+                    log::warn!("{}", e.location(&context));
                 }
 
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'TEST' must tate match operator.".to_string(),
+                        msg: "Key 'TEST' must tate match operator.".location(&context),
                     });
                 }
 
@@ -1080,25 +1061,23 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "PROGRAM" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'PROGRAM' can not have attribute.".to_string(),
+                        msg: "Key 'PROGRAM' can not have attribute.".location(&context),
                     });
                 }
 
                 if let Err(e) = check_value_format(key.as_str(), value.as_str(), true) {
-                    log::warn!("{}", e);
+                    log::warn!("{}", e.location(&context));
                 }
 
                 if op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'PROGRAM' must have nonempty value.".to_string(),
+                        msg: "Key 'PROGRAM' must have nonempty value.".location(&context),
                     });
                 }
 
@@ -1111,24 +1090,26 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "IMPORT" => {
                 if attr.is_none() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'IMPORT' must have attribute.".to_string(),
+                        msg: "Key 'IMPORT' must have attribute.".location(&context),
                     });
                 }
 
                 if let Err(e) = check_value_format(key.as_str(), value.as_str(), true) {
-                    log::warn!("{}", e);
+                    log::warn!("{}", e.location(&context));
                 }
 
                 if !op_is_match {
-                    log::warn!("Key 'IMPORT' must take match operator, implicitly change to '='.");
+                    log::warn!(
+                        "{}",
+                        "Key 'IMPORT' must take match operator, implicitly change to '='."
+                            .location(&context)
+                    );
                     op = OperatorType::Match;
                 }
 
@@ -1138,22 +1119,21 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 } else if attr.as_ref().unwrap() == "program" {
                     match value.parse::<BuiltinCommand>() {
                         Ok(_) => {
-                            log::debug!("Parse the program into builtin command.");
+                            log::debug!(
+                                "{}",
+                                "Parse the program into builtin command.".location(&context)
+                            );
                             Ok(RuleToken::new(
                                 TokenType::MatchImportBuiltin,
                                 op,
                                 attr,
                                 value,
-                                line_number,
-                                rule_file,
-                                content,
+                                context,
                             )?)
                         }
                         Err(_) => Ok(RuleToken::new(
@@ -1161,15 +1141,13 @@ impl RuleToken {
                             op,
                             attr,
                             value,
-                            line_number,
-                            rule_file,
-                            content,
+                            context,
                         )?),
                     }
                 } else if attr.as_ref().unwrap() == "builtin" {
                     if value.parse::<BuiltinCommand>().is_err() {
                         return Err(Error::RulesLoadError {
-                            msg: format!("Invalid builtin command: {}", value),
+                            msg: format!("Invalid builtin command: {}", value).location(&context),
                         });
                     }
 
@@ -1178,9 +1156,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 } else {
                     let token_type = match attr.as_ref().unwrap().as_str() {
@@ -1189,32 +1165,24 @@ impl RuleToken {
                         "parent" => TokenType::MatchImportParent,
                         _ => {
                             return Err(Error::RulesLoadError {
-                                msg: "Key 'IMPORT' has invalid attribute.".to_string(),
+                                msg: "Key 'IMPORT' has invalid attribute.".location(&context),
                             })
                         }
                     };
 
-                    Ok(RuleToken::new(
-                        token_type,
-                        op,
-                        attr,
-                        value,
-                        line_number,
-                        rule_file,
-                        content,
-                    )?)
+                    Ok(RuleToken::new(token_type, op, attr, value, context)?)
                 }
             }
             "RESULT" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'RESULT' can not have attribute.".to_string(),
+                        msg: "Key 'RESULT' can not have attribute.".location(&context),
                     });
                 }
 
                 if !op_is_match {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'RESULT' must take match operator.".to_string(),
+                        msg: "Key 'RESULT' must take match operator.".location(&context),
                     });
                 }
 
@@ -1223,20 +1191,19 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "OPTIONS" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'OPTIONS' can not have attribute.".to_string(),
+                        msg: "Key 'OPTIONS' can not have attribute.".location(&context),
                     });
                 }
                 if op_is_match || op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'OPTIONS' can not take match or remove operator.".to_string(),
+                        msg: "Key 'OPTIONS' can not take match or remove operator."
+                            .location(&context),
                     });
                 }
                 if op == OperatorType::Add {
@@ -1249,45 +1216,35 @@ impl RuleToken {
                         op,
                         None,
                         "".to_string(),
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?),
                     "string_escape=replace" => Ok(RuleToken::new(
                         TokenType::AssignOptionsStringEscapeReplace,
                         op,
                         None,
                         "".to_string(),
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?),
                     "db_persist" => Ok(RuleToken::new(
                         TokenType::AssignOptionsDbPersist,
                         op,
                         None,
                         "".to_string(),
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?),
                     "watch" => Ok(RuleToken::new(
                         TokenType::AssignOptionsWatch,
                         op,
                         None,
                         "true".to_string(),
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?),
                     "nowatch" => Ok(RuleToken::new(
                         TokenType::AssignOptionsWatch,
                         op,
                         None,
                         "false".to_string(),
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?),
                     _ => {
                         if let Some(strip_value) = value.strip_prefix("static_node=") {
@@ -1296,13 +1253,11 @@ impl RuleToken {
                                 op,
                                 None,
                                 strip_value.to_string(),
-                                line_number,
-                                rule_file,
-                                content,
+                                context,
                             )?)
                         } else if let Some(strip_value) = value.strip_prefix("link_priority=") {
                             if value["link_priority=".len()..].parse::<i32>().is_err() {
-                                return Err(Error::RulesLoadError { msg: "Key 'OPTIONS' failed to parse link priority into a valid number.".to_string() });
+                                return Err(Error::RulesLoadError { msg: "Key 'OPTIONS' failed to parse link priority into a valid number.".location(&context) });
                             }
 
                             Ok(RuleToken::new(
@@ -1310,9 +1265,7 @@ impl RuleToken {
                                 op,
                                 None,
                                 strip_value.to_string(),
-                                line_number,
-                                rule_file,
-                                content,
+                                context,
                             )?)
                         } else if let Some(strip_value) = value.strip_prefix("log_level=") {
                             let level = if strip_value == "rest" {
@@ -1323,7 +1276,8 @@ impl RuleToken {
                                         msg: format!(
                                             "Key 'OPTIONS' failed to parse log level: {}",
                                             e
-                                        ),
+                                        )
+                                        .location(&context),
                                     });
                                 }
                                 strip_value
@@ -1334,13 +1288,11 @@ impl RuleToken {
                                 op,
                                 None,
                                 level.to_string(),
-                                line_number,
-                                rule_file,
-                                content,
+                                context,
                             )?)
                         } else {
                             Err(Error::RulesLoadError {
-                                msg: "Key 'OPTIONS' has invalid value.".to_string(),
+                                msg: "Key 'OPTIONS' has invalid value.".location(&context),
                             })
                         }
                     }
@@ -1349,18 +1301,23 @@ impl RuleToken {
             "OWNER" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'OWNER' can not have attribute.".to_string(),
+                        msg: "Key 'OWNER' can not have attribute.".location(&context),
                     });
                 }
 
                 if op_is_match || op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'OWNER' can not take match or remove operator.".to_string(),
+                        msg: "Key 'OWNER' can not take match or remove operator."
+                            .location(&context),
                     });
                 }
 
                 if op == OperatorType::Add {
-                    log::warn!("Key 'OWNER' can not take add operator, change to '=' implicitly.");
+                    log::warn!(
+                        "{}",
+                        "Key 'OWNER' can not take add operator, change to '=' implicitly."
+                            .location(&context)
+                    );
                     op = OperatorType::Assign;
                 }
 
@@ -1369,15 +1326,7 @@ impl RuleToken {
                      *  If a legal uid is provided, directly pass the uid to rules executer
                      */
                     if parse_uid(&value).is_ok() {
-                        return RuleToken::new(
-                            TokenType::AssignOwnerId,
-                            op,
-                            attr,
-                            value,
-                            line_number,
-                            rule_file,
-                            content,
-                        );
+                        return RuleToken::new(TokenType::AssignOwnerId, op, attr, value, context);
                     }
 
                     let time = rules.as_ref().read().unwrap().resolve_name_time;
@@ -1391,12 +1340,12 @@ impl RuleToken {
                         let user = rules.as_ref().write().unwrap().resolve_user(&value)?;
 
                         log::debug!(
-                            "{}:{}:'{}' owner '{}' is parsed into uid '{}' during rules loading",
-                            rule_file,
-                            line_number,
-                            content,
-                            value,
-                            user.uid
+                            "{}",
+                            format!(
+                                "owner '{}' is parsed into uid '{}' during rules loading",
+                                value, user.uid
+                            )
+                            .location(&context)
                         );
 
                         return RuleToken::new(
@@ -1404,9 +1353,7 @@ impl RuleToken {
                             op,
                             attr,
                             user.uid.to_string(),
-                            line_number,
-                            rule_file,
-                            content,
+                            context,
                         );
                     } else if time != ResolveNameTime::Never {
                         /*
@@ -1414,40 +1361,38 @@ impl RuleToken {
                          *  Here we only check whether the format of value is legal.
                          */
                         if let Err(e) = check_value_format("OWNER", value.as_str(), true) {
-                            log::warn!("{}", e);
+                            log::warn!("{}", e.location(&context));
                         }
 
-                        return RuleToken::new(
-                            TokenType::AssignOwner,
-                            op,
-                            attr,
-                            value,
-                            line_number,
-                            rule_file,
-                            content,
-                        );
+                        return RuleToken::new(TokenType::AssignOwner, op, attr, value, context);
                     }
                 }
 
                 Err(Error::IgnoreError {
-                    msg: format!("Ignore resolving user name: 'OWNER=\"{}\"'", value),
+                    msg: format!("Ignore resolving user name: 'OWNER=\"{}\"'", value)
+                        .location(&context),
                 })
             }
             "GROUP" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'GROUP' can not have attribute.".to_string(),
+                        msg: "Key 'GROUP' can not have attribute.".location(&context),
                     });
                 }
 
                 if op_is_match || op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'GROUP' can not take match or remove operator.".to_string(),
+                        msg: "Key 'GROUP' can not take match or remove operator."
+                            .location(&context),
                     });
                 }
 
                 if op == OperatorType::Add {
-                    log::warn!("Key 'GROUP' can not take add operator, change to '=' implicitly.");
+                    log::warn!(
+                        "{}",
+                        "Key 'GROUP' can not take add operator, change to '=' implicitly."
+                            .location(&context)
+                    );
                     op = OperatorType::Assign;
                 }
 
@@ -1456,15 +1401,7 @@ impl RuleToken {
                      *  If a legal gid is provided, directly pass the gid to rules executer
                      */
                     if parse_gid(&value).is_ok() {
-                        return RuleToken::new(
-                            TokenType::AssignGroupId,
-                            op,
-                            attr,
-                            value,
-                            line_number,
-                            rule_file,
-                            content,
-                        );
+                        return RuleToken::new(TokenType::AssignGroupId, op, attr, value, context);
                     }
 
                     let time = rules.as_ref().read().unwrap().resolve_name_time;
@@ -1478,12 +1415,12 @@ impl RuleToken {
                         let group: Group = rules.as_ref().write().unwrap().resolve_group(&value)?;
 
                         log::debug!(
-                            "{}:{}:'{}' group '{}' is parsed into gid '{}' during rules loading",
-                            rule_file,
-                            line_number,
-                            content,
-                            value,
-                            group.gid
+                            "{}",
+                            format!(
+                                "group '{}' is parsed into gid '{}' during rules loading",
+                                value, group.gid
+                            )
+                            .location(&context)
                         );
 
                         return RuleToken::new(
@@ -1491,9 +1428,7 @@ impl RuleToken {
                             op,
                             attr,
                             group.gid.to_string(),
-                            line_number,
-                            rule_file,
-                            content,
+                            context,
                         );
                     } else if time != ResolveNameTime::Never {
                         /*
@@ -1504,37 +1439,34 @@ impl RuleToken {
                             log::warn!("{}", e);
                         }
 
-                        return RuleToken::new(
-                            TokenType::AssignGroup,
-                            op,
-                            attr,
-                            value,
-                            line_number,
-                            rule_file,
-                            content,
-                        );
+                        return RuleToken::new(TokenType::AssignGroup, op, attr, value, context);
                     }
                 }
 
                 Err(Error::IgnoreError {
-                    msg: format!("Ignore resolving user name: 'GROUP=\"{}\"'", value),
+                    msg: format!("Ignore resolving user name: 'GROUP=\"{}\"'", value)
+                        .location(&context),
                 })
             }
             "MODE" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'MODE' can not have attribute.".to_string(),
+                        msg: "Key 'MODE' can not have attribute.".location(&context),
                     });
                 }
 
                 if op_is_match || op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'MODE' can not take match or remove operator.".to_string(),
+                        msg: "Key 'MODE' can not take match or remove operator.".location(&context),
                     });
                 }
 
                 if op == OperatorType::Add {
-                    log::warn!("Key 'MODE' can not take add operator, change to '=' implicitly.");
+                    log::warn!(
+                        "{}",
+                        "Key 'MODE' can not take add operator, change to '=' implicitly."
+                            .location(&context)
+                    );
                     op = OperatorType::Assign;
                 }
 
@@ -1550,13 +1482,11 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 } else {
                     if let Err(e) = check_value_format(key.as_str(), value.as_str(), true) {
-                        log::warn!("{}", e);
+                        log::warn!("{}", e.location(&context));
                     }
 
                     Ok(RuleToken::new(
@@ -1564,32 +1494,33 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 }
             }
             "SECLABEL" => {
                 if attr.is_none() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'SECLABEL' should take attribute.".to_string(),
+                        msg: "Key 'SECLABEL' should take attribute.".location(&context),
                     });
                 }
 
                 if let Err(e) = check_value_format("SECLABEL", value.as_str(), true) {
-                    log::warn!("{}", e);
+                    log::warn!("{}", e.location(&context));
                 }
 
                 if op_is_match || op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'SECLABEL' can not take match or remove operator.".to_string(),
+                        msg: "Key 'SECLABEL' can not take match or remove operator."
+                            .location(&context),
                     });
                 }
 
                 if op == OperatorType::AssignFinal {
                     log::warn!(
+                        "{}",
                         "Key 'SECLABEL' can not take ':=' operator, change to '=' implicitly."
+                            .location(&context)
                     );
                     op = OperatorType::Assign;
                 }
@@ -1599,20 +1530,18 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    line_number,
-                    rule_file,
-                    content,
+                    context,
                 )?)
             }
             "RUN" => {
                 if op_is_match || op == OperatorType::Remove {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'RUN' can not take match or remove operator.".to_string(),
+                        msg: "Key 'RUN' can not take match or remove operator.".location(&context),
                     });
                 }
 
                 if let Err(e) = check_value_format("RUN", value.as_str(), true) {
-                    log::warn!("{}", e);
+                    log::warn!("{}", e.location(&context));
                 }
 
                 let attr_content = attr.clone().unwrap_or_default();
@@ -1622,14 +1551,13 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 } else if attr_content == "builtin" {
                     if value.parse::<BuiltinCommand>().is_err() {
                         return Err(Error::RulesLoadError {
-                            msg: format!("Key 'RUN' failed to parse builin command '{}'", value),
+                            msg: format!("Key 'RUN' failed to parse builin command '{}'", value)
+                                .location(&context),
                         });
                     }
 
@@ -1638,67 +1566,50 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        line_number,
-                        rule_file,
-                        content,
+                        context,
                     )?)
                 } else {
                     Err(Error::IgnoreError {
                         msg: format!(
                             "Ignore 'Run' token with invalid attribute {}.",
                             attr.unwrap()
-                        ),
+                        )
+                        .location(&context),
                     })
                 }
             }
             "GOTO" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'GOTO' can not have attribute.".to_string(),
+                        msg: "Key 'GOTO' can not have attribute.".location(&context),
                     });
                 }
 
                 if op != OperatorType::Assign {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'GOTO' should take '=' operator.".to_string(),
+                        msg: "Key 'GOTO' should take '=' operator.".location(&context),
                     });
                 }
 
-                Ok(RuleToken::new(
-                    TokenType::Goto,
-                    op,
-                    None,
-                    value,
-                    line_number,
-                    rule_file,
-                    content,
-                )?)
+                Ok(RuleToken::new(TokenType::Goto, op, None, value, context)?)
             }
             "LABEL" => {
                 if attr.is_some() {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'LABEL' can not have attribute.".to_string(),
+                        msg: "Key 'LABEL' can not have attribute.".location(&context),
                     });
                 }
 
                 if op != OperatorType::Assign {
                     return Err(Error::RulesLoadError {
-                        msg: "Key 'LABEL' should take '=' operator.".to_string(),
+                        msg: "Key 'LABEL' should take '=' operator.".location(&context),
                     });
                 }
 
-                Ok(RuleToken::new(
-                    TokenType::Label,
-                    op,
-                    None,
-                    value,
-                    line_number,
-                    rule_file,
-                    content,
-                )?)
+                Ok(RuleToken::new(TokenType::Label, op, None, value, context)?)
             }
             _ => Err(Error::RulesLoadError {
-                msg: format!("Key '{}' is not supported.", key),
+                msg: format!("Key '{}' is not supported.", key).location(&context),
             }),
         }
     }
