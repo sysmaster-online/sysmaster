@@ -36,6 +36,7 @@ event = { path = "../../libs/event" }
 input_event_codes_rs = { path = "../../libs/input_event_codes_rs" }
 kmod_rs = { path = "../../libs/kmod_rs" }
 scsi_generic_rs = { path = "../../libs/scsi_generic_rs" }
+log = { path = "../../libs/log" }
 
 # third libraries
 bitflags = "1.3.2"
@@ -52,7 +53,6 @@ ioctl-sys = "0.7.1"
 ioctls = "0.6.1"
 lazy_static = "1.4.0"
 libc = { version = "0.2.*", default-features = false }
-log = { version = "=0.4.14", default_features = false }
 nix = { version = "0.24", default-features = false, features = ["uio"] }
 regex = { version = "1.7.0", default_features = false }
 rtnetlink = "0.8.1"

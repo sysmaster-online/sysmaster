@@ -1707,8 +1707,8 @@ impl RuleToken {
 #[cfg(test)]
 mod tests {
     use crate::config::*;
-    use basic::logger::init_log_to_console;
-    use log::LevelFilter;
+    use log::logger::init_log_to_console;
+    use log::Level;
 
     use super::*;
     use std::{fs, path::Path, thread::JoinHandle};
@@ -1735,7 +1735,7 @@ SYMLINK += \"test111111\"",
 
     #[test]
     fn test_rules_new() {
-        init_log_to_console("test_rules_new", LevelFilter::Debug);
+        init_log_to_console("test_rules_new", Level::Debug);
         clear_test_rules_dir("test_rules_new");
         create_test_rules_dir("test_rules_new");
         let rules = Rules::load_rules(DEFAULT_RULES_DIRS.to_vec(), ResolveNameTime::Early);

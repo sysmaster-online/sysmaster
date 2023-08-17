@@ -14,8 +14,8 @@
 //!
 
 use crate::{config::*, error::*, framework::*, rules::*};
-use basic::logger::init_log_to_console;
 use event::*;
+use log::logger::init_log_to_console;
 use std::{
     cell::RefCell,
     rc::Rc,

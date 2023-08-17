@@ -814,14 +814,14 @@ mod tests {
     use crate::unit::test_utils;
     use crate::unit::DataManager;
     use crate::unit::UnitRe;
-    use basic::logger;
     use core::rel::ReliConf;
     use core::unit::UnitRelations;
+    use log::logger;
 
     //#[test]
     #[allow(dead_code)]
     fn job_reli() {
-        logger::init_log_to_console("test_unit_load", log::LevelFilter::Trace);
+        logger::init_log_to_console("test_unit_load", log::Level::Trace);
         let reli = Rc::new(Reliability::new(
             ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
         ));
@@ -1179,7 +1179,7 @@ mod tests {
         rentryr: &Rc<UnitRe>,
         name: &str,
     ) -> Rc<UnitX> {
-        logger::init_log_to_console("test_unit_load", log::LevelFilter::Trace);
+        logger::init_log_to_console("test_unit_load", log::Level::Trace);
         log::info!("test");
 
         let unit = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);

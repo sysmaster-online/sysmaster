@@ -16,8 +16,9 @@
 use super::DEFAULT_NETIF_CONFIG_DIRS;
 use confique::Config;
 use lazy_static::lazy_static;
-use log::LevelFilter;
+use log::Level;
 use std::cell::RefCell;
+use std::str::FromStr;
 
 /// default configuration path
 pub const DEFAULT_CONFIG: &str = "/etc/devmaster/config.toml";
@@ -71,20 +72,10 @@ impl DevmasterConfig {
     }
 
     /// get the rules directories
-    pub fn get_log_level(&self) -> LevelFilter {
+    pub fn get_log_level(&self) -> Level {
         match self.inner.borrow().log_level.clone() {
-            Some(level) => match level.as_str() {
-                "debug" => LevelFilter::Debug,
-                "info" => LevelFilter::Info,
-                "trace" => LevelFilter::Trace,
-                "warn" => LevelFilter::Warn,
-                "error" => LevelFilter::Error,
-                _ => {
-                    println!("unsupported log level, set log level to off");
-                    LevelFilter::Off
-                }
-            },
-            None => LevelFilter::Info,
+            Some(level) => Level::from_str(&level).unwrap(),
+            None => Level::Info,
         }
     }
 
@@ -124,7 +115,7 @@ network_d = [\"/root/network.d\"]
 
         assert_eq!(config.get_rules_d(), vec!["/root/rules.d".to_string()]);
         assert_eq!(config.get_max_workers(), 3);
-        assert_eq!(config.get_log_level(), LevelFilter::Info);
+        assert_eq!(config.get_log_level(), Level::Info);
         assert_eq!(
             config.get_netif_cfg_d(),
             vec!["/root/network.d".to_string()]
@@ -134,7 +125,7 @@ network_d = [\"/root/network.d\"]
         let default_conf = DevmasterConfig::new();
         assert_eq!(default_conf.get_rules_d(), DEFAULT_RULES_DIRS.to_vec());
         assert_eq!(default_conf.get_max_workers(), 3);
-        assert_eq!(default_conf.get_log_level(), LevelFilter::Info);
+        assert_eq!(default_conf.get_log_level(), Level::Info);
         assert_eq!(
             default_conf.get_netif_cfg_d(),
             DEFAULT_NETIF_CONFIG_DIRS.to_vec()

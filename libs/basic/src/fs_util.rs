@@ -587,7 +587,6 @@ impl Default for LookupPaths {
 mod tests {
     use super::LookupPaths;
     use super::*;
-    use crate::logger;
     use nix::unistd::{self, unlink};
     use std::{
         fs::{create_dir_all, remove_dir_all, remove_file, File},
@@ -725,7 +724,6 @@ mod tests {
 
     #[test]
     fn test_init_lookup_paths() {
-        logger::init_log_to_console("test_init_lookup_paths", log::LevelFilter::Trace);
         let mut lp = LookupPaths::default();
         lp.init_lookup_paths();
         assert_eq!(

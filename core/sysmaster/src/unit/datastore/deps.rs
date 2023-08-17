@@ -391,8 +391,8 @@ mod tests {
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::unit::data::DataManager;
     use crate::unit::test::test_utils;
-    use basic::logger;
     use core::rel::{ReliConf, Reliability};
+    use log::logger;
 
     #[test]
     fn dep_insert() {
@@ -579,7 +579,7 @@ mod tests {
         rentryr: &Rc<UnitRe>,
         name: &str,
     ) -> Rc<UnitX> {
-        logger::init_log_to_console("test_unit_load", log::LevelFilter::Trace);
+        logger::init_log_to_console("test_unit_load", log::Level::Trace);
         log::info!("test");
         test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }

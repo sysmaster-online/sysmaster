@@ -580,9 +580,9 @@ pub(crate) fn cleanup_db(dev: Rc<RefCell<Device>>) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use basic::logger::init_log_to_console;
     use device::Device;
-    use log::LevelFilter;
+    use log::logger::init_log_to_console;
+    use log::Level;
 
     use super::*;
 
@@ -717,7 +717,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_spawn() {
-        init_log_to_console("test_spawn", LevelFilter::Debug);
+        init_log_to_console("test_spawn", Level::Debug);
 
         println!(
             "{}",

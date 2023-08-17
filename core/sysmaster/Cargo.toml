@@ -20,6 +20,10 @@ features = []
 optional = false
 default-features = false
 
+[dependencies.log]
+path = "../../libs/log"
+optional = false
+
 [dependencies.clap]
 version = "3.1.8"
 features = ["derive", "std"]
@@ -63,11 +67,6 @@ version = "0.2.*"
 features = []
 optional = false
 default-features = false
-
-[dependencies.log]
-version = "=0.4.14"
-features = []
-optional = false
 
 [dependencies.mount]
 path = "../coms/mount"

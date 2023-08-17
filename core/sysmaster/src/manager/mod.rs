@@ -577,12 +577,12 @@ impl Manager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use basic::logger;
+    use log::logger;
 
     //#[test]
     #[allow(dead_code)]
     fn manager_api() {
-        logger::init_log_to_console("test_target_unit_load", log::LevelFilter::Trace);
+        logger::init_log_to_console("test_target_unit_load", log::Level::Trace);
 
         // new
         let manager = Manager::new(Mode::System, Action::Run, Rc::new(ManagerConfig::new(None)));

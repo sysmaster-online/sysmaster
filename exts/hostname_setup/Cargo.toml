@@ -8,10 +8,9 @@ edition = "2021"
 [dependencies]
 basic = { path = "../../libs/basic", features = [
     "os_release",
-    "logger",
     "cmdline",
     "config",
 ] }
+log = { path = "../../libs/log" }
 
-log = { version = "=0.4.14", default_features = false }
 nix = { version = "0.24", default-features = false, features = ["hostname"] }

@@ -12,7 +12,6 @@
 
 //! hostname setup
 
-use basic::logger;
 use basic::os_release;
 use basic::proc_cmdline;
 use nix::Result;
@@ -180,7 +179,7 @@ impl Default for Hostname {
 }
 
 fn main() {
-    logger::init_log_to_console("hostname-setup", log::LevelFilter::Info);
+    log::logger::init_log_to_console("hostname-setup", log::Level::Info);
     let mut op_hostname = Hostname::from_cmdline();
     if op_hostname.is_none() {
         op_hostname = Hostname::from_etc_hostname();

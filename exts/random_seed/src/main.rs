@@ -17,10 +17,9 @@
 use std::{env, process};
 mod random_seed;
 use crate::random_seed::run;
-use basic::logger;
 
 fn main() {
-    logger::init_log_to_console("random-seed", log::LevelFilter::Debug);
+    log::logger::init_log_to_console("random-seed", log::Level::Debug);
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         log::error!("{}", "This program requires one argument.");

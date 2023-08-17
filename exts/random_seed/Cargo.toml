@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-basic = { path = "../../libs/basic", features = ["logger", "config"], default-features = false }
+basic = { path = "../../libs/basic", features = ["config"], default-features = false }
 
 libc = { version = "0.2.*", default-features = false }
-log = { version = "=0.4.14", default_features = false }
+log = { path = "../../libs/log" }
 nix = { version = "0.24", default-features = false }
 xattr = { version = "0.2.3", default-features = false }

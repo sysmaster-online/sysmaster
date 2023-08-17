@@ -1391,7 +1391,6 @@ mod tests {
     use super::*;
     use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
     use crate::mount::setup;
-    use basic::logger;
     use core::rel::ReliConf;
     use core::unit::UnitActiveState;
     use event::Events;
@@ -1400,7 +1399,7 @@ mod tests {
     use std::time::Duration;
 
     fn init_dm_for_test() -> (Rc<DataManager>, Rc<Events>, Rc<UnitManager>) {
-        logger::init_log_to_console("manager test", log::LevelFilter::Trace);
+        log::logger::init_log_to_console("manager test", log::Level::Trace);
         let mut l_path = LookupPaths::new();
         let test_units_dir = libtests::get_project_root()
             .unwrap()

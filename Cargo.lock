@@ -60,7 +60,7 @@ dependencies = [
  "bitflags",
  "constants",
  "libc",
- "log",
+ "log 0.1.0",
  "nix 0.24.3",
  "pathdiff",
  "pkg-config",
@@ -68,7 +68,6 @@ dependencies = [
  "rand",
  "snafu",
  "tempfile",
- "time",
 ]
 
 [[package]]
@@ -91,7 +90,7 @@ dependencies = [
  "clang-sys",
  "lazy_static",
  "lazycell",
- "log",
+ "log 0.4.14",
  "peeking_take_while",
  "proc-macro2",
  "quote",
@@ -160,7 +159,7 @@ version = "0.5.0"
 dependencies = [
  "basic",
  "bitflags",
- "log",
+ "log 0.1.0",
  "nix 0.24.3",
  "snafu",
  "walkdir",
@@ -301,7 +300,7 @@ dependencies = [
  "event",
  "heed",
  "libc",
- "log",
+ "log 0.1.0",
  "nix 0.24.3",
  "serde",
  "snafu",
@@ -345,7 +344,7 @@ dependencies = [
  "event",
  "fnmatch-regex",
  "libc",
- "log",
+ "log 0.1.0",
  "loopdev",
  "nix 0.24.3",
  "regex",
@@ -373,7 +372,7 @@ dependencies = [
  "kmod_rs",
  "lazy_static",
  "libc",
- "log",
+ "log 0.1.0",
  "nix 0.24.3",
  "regex",
  "rtnetlink",
@@ -530,7 +529,7 @@ name = "fstab"
 version = "0.5.0"
 dependencies = [
  "inotify",
- "log",
+ "log 0.1.0",
  "nix 0.24.3",
 ]
 
@@ -631,7 +630,7 @@ checksum = "be4136b2a15dd319360be1c07d9933517ccf0be8f16bf62a3bee4f0d618df427"
 dependencies = [
  "cfg-if",
  "libc",
- "wasi 0.11.0+wasi-snapshot-preview1",
+ "wasi",
 ]
 
 [[package]]
@@ -721,7 +720,7 @@ name = "hostname_setup"
 version = "0.5.0"
 dependencies = [
  "basic",
- "log",
+ "log 0.1.0",
  "nix 0.24.3",
 ]
 
@@ -847,7 +846,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0dd79b6ea06a97c93bc5587fba4c2ed6d723b939d35d5e3fb3c6870d12e6d17"
 dependencies = [
  "libc",
- "log",
+ "log 0.4.14",
 ]
 
 [[package]]
@@ -865,7 +864,7 @@ version = "0.5.0"
 dependencies = [
  "basic",
  "kmod-sys",
- "log",
+ "log 0.1.0",
  "nix 0.24.3",
 ]
 
@@ -940,6 +939,15 @@ dependencies = [
 
 [[package]]
 name = "log"
+version = "0.1.0"
+dependencies = [
+ "constants",
+ "libc",
+ "log 0.4.14",
+]
+
+[[package]]
+name = "log"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
@@ -1003,8 +1011,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "927a765cd3fc26206e66b296465fa9d3e5ab003e651c1b3c060e7956d96b19d2"
 dependencies = [
  "libc",
- "log",
- "wasi 0.11.0+wasi-snapshot-preview1",
+ "log 0.4.14",
+ "wasi",
  "windows-sys 0.48.0",
 ]
 
@@ -1017,7 +1025,7 @@ dependencies = [
  "epoll",
  "event",
  "libc",
- "log",
+ "log 0.1.0",
  "macros",
  "nix 0.24.3",
  "once_cell",
@@ -1076,7 +1084,7 @@ checksum = "ddd06e90449ae973fe3888c1ff85949604ef5189b4ac9a2ae39518da1e00762d"
 dependencies = [
  "bytes",
  "futures",
- "log",
+ "log 0.4.14",
  "netlink-packet-core",
  "netlink-sys",
  "tokio",
@@ -1091,7 +1099,7 @@ checksum = "f48ea34ea0678719815c3753155067212f853ad2d8ef4a49167bae7f7c254188"
 dependencies = [
  "futures",
  "libc",
- "log",
+ "log 0.4.14",
  "tokio",
 ]
 
@@ -1323,7 +1331,7 @@ dependencies = [
  "heck 0.3.3",
  "itertools",
  "lazy_static",
- "log",
+ "log 0.4.14",
  "multimap",
  "petgraph",
  "prost",
@@ -1407,7 +1415,7 @@ version = "0.5.0"
 dependencies = [
  "basic",
  "libc",
- "log",
+ "log 0.1.0",
  "nix 0.24.3",
  "xattr",
 ]
@@ -1417,7 +1425,7 @@ name = "rc-local-generator"
 version = "0.5.0"
 dependencies = [
  "libc",
- "log",
+ "log 0.1.0",
 ]
 
 [[package]]
@@ -1462,7 +1470,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c9a6200d18ec1acfc218ce71363dcc9b6075f399220f903fdfeacd476a876ef"
 dependencies = [
  "futures",
- "log",
+ "log 0.4.14",
  "netlink-packet-route",
  "netlink-proto",
  "nix 0.22.3",
@@ -1571,7 +1579,7 @@ dependencies = [
  "event",
  "libc",
  "libtests",
- "log",
+ "log 0.1.0",
  "macros",
  "nix 0.24.3",
  "once_cell",
@@ -1637,7 +1645,7 @@ dependencies = [
  "core",
  "event",
  "libtests",
- "log",
+ "log 0.1.0",
  "macros",
  "nix 0.24.3",
  "once_cell",
@@ -1692,7 +1700,7 @@ name = "switch_root"
 version = "0.5.0"
 dependencies = [
  "basic",
- "log",
+ "log 0.1.0",
  "nix 0.24.3",
 ]
 
@@ -1744,7 +1752,7 @@ name = "sysMaster"
 version = "0.5.0"
 dependencies = [
  "kernlog",
- "log",
+ "log 0.4.14",
  "mio",
  "nix 0.24.3",
 ]
@@ -1767,7 +1775,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "libtests",
- "log",
+ "log 0.1.0",
  "mount",
  "nix 0.24.3",
  "once_cell",
@@ -1798,7 +1806,7 @@ version = "0.5.0"
 dependencies = [
  "basic",
  "core",
- "log",
+ "log 0.1.0",
  "macros",
  "nix 0.24.3",
  "once_cell",
@@ -1846,17 +1854,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "time"
-version = "0.1.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b797afad3f312d1c66a56d11d0316f916356d11bd158fbc6ca6389ff6bf805a"
-dependencies = [
- "libc",
- "wasi 0.10.0+wasi-snapshot-preview1",
- "winapi",
-]
-
-[[package]]
 name = "tinyvec"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1897,7 +1894,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
- "log",
+ "log 0.4.14",
  "pin-project-lite",
  "tokio",
 ]
@@ -1985,12 +1982,6 @@ dependencies = [
  "same-file",
  "winapi-util",
 ]
-
-[[package]]
-name = "wasi"
-version = "0.10.0+wasi-snapshot-preview1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a143597ca7c7793eff794def352d41792a93c481eb1042423ff7ff72ba2c31f"
 
 [[package]]
 name = "wasi"

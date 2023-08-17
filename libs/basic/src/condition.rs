@@ -448,7 +448,7 @@ mod test {
     use super::{Condition, ConditionType};
     use crate::{
         fs_util::write_string_file,
-        logger, proc_cmdline,
+        proc_cmdline,
         security::{self},
     };
     use core::panic;
@@ -456,7 +456,6 @@ mod test {
     use tempfile::NamedTempFile;
 
     fn setup(_type: ConditionType, trigger: i8, revert: i8, params: String) -> Condition {
-        logger::init_log_to_console("test_condition", log::LevelFilter::Debug);
         Condition::new(_type, trigger, revert, params)
     }
 
@@ -938,7 +937,7 @@ mod test {
                     proc_cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot")
                 {
                     if ret {
-                        log::info!(
+                        println!(
                             "this test cannot be tested because we cannot modify the kernel parameters"
                         );
                         return;
@@ -966,7 +965,7 @@ mod test {
                     proc_cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot")
                 {
                     if ret {
-                        log::info!(
+                        println!(
                             "this test cannot be tested because we cannot modify the kernel parameters"
                         );
                         return;

@@ -146,8 +146,8 @@ mod tests {
     use crate::unit::UnitRe;
     use crate::unit::UnitX;
 
-    use basic::logger;
     use core::rel::{ReliConf, Reliability};
+    use log::logger;
 
     #[test]
     fn jn_api() {
@@ -195,7 +195,7 @@ mod tests {
         rentryr: &Rc<UnitRe>,
         name: &str,
     ) -> Rc<UnitX> {
-        logger::init_log_to_console("test_unit_load", log::LevelFilter::Trace);
+        logger::init_log_to_console("test_unit_load", log::Level::Trace);
         log::info!("test");
         test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }

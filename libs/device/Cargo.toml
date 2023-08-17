@@ -9,12 +9,12 @@ edition = "2021"
 # internal libraries
 basic = { path = "../basic", features = ["parse"] }
 event = { path = "../event" }
+log = { path = "../log" }
 
 # third libraries
 bitflags = "1.3.2"
 fnmatch-regex = "0.2.0"
 libc = { default-features = false, version = "0.2.140" }
-log = { version = "=0.4.14", default_features = false }
 loopdev = "0.4.0"
 nix = { default-features = false, version = "0.24" }
 regex = { default-features = false, version = "1.7.0" }

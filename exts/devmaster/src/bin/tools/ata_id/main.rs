@@ -14,9 +14,10 @@
 //!
 
 #![allow(deprecated)]
-use basic::{logger, IN_SET};
+use basic::IN_SET;
 use clap::Parser;
 use libdevmaster::utils::{encode_devnode_name, replace_chars, replace_whitespace};
+use log::logger;
 use nix::{
     errno::Errno,
     fcntl::{open, OFlag},
@@ -346,7 +347,7 @@ fn main() {
 
     let args = Args::parse();
 
-    logger::init_log_to_console("ata_id", log::LevelFilter::Info);
+    logger::init_log_to_console("ata_id", log::Level::Info);
 
     let mut id: hd_driveid = unsafe { mem::zeroed() };
     let mut identify = IdentifyUnion {

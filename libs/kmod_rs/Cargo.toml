@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 basic = { path = "../basic" }
+log = { path = "../log" }
 
 kmod-sys = "0.2.0"
-log = { version = "=0.4.14", default_features = false }
 nix = { default-features = false, version = "0.24" }

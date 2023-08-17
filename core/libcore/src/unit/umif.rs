@@ -224,17 +224,17 @@ pub trait UnitManagerObj: UnitMngUtil + ReStation {
 #[macro_export]
 macro_rules! declare_umobj_plugin {
     ($unit_type:ty, $constructor:path, $name:expr) => {
-        use log::LevelFilter;
+        use log::Level;
         /// method for create the sub-unit-manager instance
         #[cfg_attr(not(feature = "noplugin"), no_mangle)]
         pub fn __um_obj_create(
-            level: LevelFilter,
+            level: Level,
             target: &str,
             file_size: u32,
             file_number: u32,
         ) -> *mut dyn $crate::unit::UnitManagerObj {
             #[cfg(feature = "plugin")]
-            logger::init_log_for_subum($name, level, target, file_size, file_number);
+            log::logger::init_log_for_subum($name, level, target, file_size, file_number);
             let construcotr: fn() -> $unit_type = $constructor;
             let obj = construcotr();
             let boxed: Box<dyn $crate::unit::UnitManagerObj> = Box::new(obj);

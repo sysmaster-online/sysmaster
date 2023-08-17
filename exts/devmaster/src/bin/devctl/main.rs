@@ -14,10 +14,10 @@
 //!
 #![allow(deprecated)]
 mod subcmds;
-use basic::logger::init_log_to_console;
 use clap::Parser;
 use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
-use log::LevelFilter;
+use log::logger::init_log_to_console;
+use log::Level;
 use std::{io::Write, net::TcpStream};
 use subcmds::devctl_monitor::subcommand_monitor;
 use subcmds::devctl_test_builtin::subcommand_test_builtin;
@@ -104,7 +104,7 @@ fn subcommand_kill() {
 }
 
 fn main() {
-    init_log_to_console("devctl", LevelFilter::Debug);
+    init_log_to_console("devctl", Level::Debug);
     let args = Args::parse();
 
     match args.subcmd {

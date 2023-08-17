@@ -166,8 +166,8 @@ mod tests {
     use crate::unit::data::DataManager;
     use crate::unit::rentry::UnitRe;
     use crate::unit::test::test_utils;
-    use basic::logger;
     use core::rel::{ReliConf, Reliability};
+    use log::logger;
 
     #[test]
     #[should_panic]
@@ -248,7 +248,7 @@ mod tests {
         rentryr: &Rc<UnitRe>,
         name: &str,
     ) -> Rc<UnitX> {
-        logger::init_log_to_console("test_unit_load", log::LevelFilter::Trace);
+        logger::init_log_to_console("test_unit_load", log::Level::Trace);
         log::info!("test");
 
         test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)

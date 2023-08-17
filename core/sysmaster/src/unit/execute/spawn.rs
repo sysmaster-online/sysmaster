@@ -222,21 +222,29 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
     let envs_cstr = envs.iter().map(|v| v.as_c_str()).collect::<Vec<_>>();
     let mut keep_fds = params.fds();
 
-    /* Be careful! We have closed the log fd from here, Don't log. */
+    /* Be careful! We have closed the log fd from here. */
     let ret = close_all_fds(&keep_fds);
+
+    /* Reinit the logger before logging. */
+    log::logger::reinit();
+
     if !ret {
         return;
     }
 
     if !shift_fds(&mut keep_fds) {
+        log::error!("Failed to shift fds");
         return;
     }
 
     if !flags_fds(&mut keep_fds, params.get_nonblock()) {
+        log::error!("Failed to set fd flags");
         return;
     }
 
+    log::debug!("Begin to execute {:?}, args: {:?}", cmd, cstr_args);
     if unistd::execve(&cmd, &cstr_args, &envs_cstr).is_err() {
+        log::error!("Failed to execute cmd: {:?}", cmd);
         std::process::exit(1);
     }
 }

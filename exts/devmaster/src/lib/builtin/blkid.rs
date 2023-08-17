@@ -498,14 +498,14 @@ impl Builtin for Blkid {
 #[cfg(test)]
 mod test {
     use super::*;
-    use basic::logger;
     use device::Device;
+    use log::logger;
     use std::path;
 
     #[test]
     #[ignore]
     fn test_builtin_example() {
-        logger::init_log_to_console("test_builtin_example", log::LevelFilter::Debug);
+        logger::init_log_to_console("test_builtin_example", log::Level::Debug);
         let path = path::Path::new("/sys/class/block/");
         if !path.exists() {
             return;

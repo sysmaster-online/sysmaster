@@ -41,18 +41,18 @@ use crate::manager::config::ManagerConfig;
 use crate::manager::signals::EVENT_SIGNALS;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
-use basic::logger::{self};
 use clap::Parser;
 use core::error::*;
 use core::rel;
 use libc::{c_int, getpid, getppid, prctl, PR_SET_CHILD_SUBREAPER};
-use log::{self, LevelFilter};
+use log::{self, Level};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use std::convert::TryFrom;
 use std::env::{self};
 use std::os::unix::process::CommandExt;
 use std::process::{exit, Command};
 use std::rc::Rc;
+use std::str::FromStr;
 
 /// parse program arguments
 #[derive(Parser, Debug)]
@@ -79,19 +79,9 @@ fn main() -> Result<()> {
     //---------------------------------------------------------------------------
 
     let manager_config = Rc::new(ManagerConfig::new(None));
-    logger::init_log(
+    log::logger::init_log(
         "sysmaster",
-        match manager_config.LogLevel.as_str() {
-            "debug" => LevelFilter::Debug,
-            "info" => LevelFilter::Info,
-            "trace" => LevelFilter::Trace,
-            "warn" => LevelFilter::Warn,
-            "error" => LevelFilter::Error,
-            _ => {
-                println!("unsupported log level, set log level to off");
-                LevelFilter::Off
-            }
-        },
+        Level::from_str(&manager_config.LogLevel).unwrap(),
         &manager_config.LogTarget,
         manager_config.LogFileSize,
         manager_config.LogFileNumber,

@@ -12,9 +12,9 @@ name = "target"
 [dependencies]
 basic = { path = "../../../libs/basic" }
 core = { path = "../../libcore", default-features = false }
+log = { path = "../../../libs/log" }
 macros = { path = "../../../libs/macros" }
 
-log = { version = "=0.4.14", default_features = false }
 nix = { version = "0.24", default-features = false }
 once_cell = { version = "=1.7.2", default-features = false }
 serde = { version = "1.0.130", default-features = false }

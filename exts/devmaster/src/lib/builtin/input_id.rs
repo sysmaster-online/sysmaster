@@ -740,12 +740,12 @@ impl InputId {
 mod tests {
     use super::InputId;
     use crate::{builtin::Builtin, rules::exec_unit::ExecuteUnit};
-    use basic::logger;
     use device::device_enumerator::DeviceEnumerator;
+    use log::logger;
 
     #[test]
     fn test_builtin_example() {
-        logger::init_log_to_console("test_builtin_input_id", log::LevelFilter::Debug);
+        logger::init_log_to_console("test_builtin_input_id", log::Level::Debug);
 
         let mut enumerator = DeviceEnumerator::new();
 

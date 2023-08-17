@@ -315,7 +315,7 @@ impl Plugin {
         type FnTypeSubUnit = fn(um: Rc<dyn UmIf>) -> *mut dyn SubUnit;
         type FnTypeUnitManagerObj = fn(
             um: Rc<dyn UmIf>,
-            level: LevelFilter,
+            level: Level,
             target: &str,
             file_size: u32,
             file_number: u32,
@@ -491,7 +491,7 @@ impl Plugin {
         };
 
         type FnType = fn(
-            level: LevelFilter,
+            level: Level,
             target: &str,
             file_size: u32,
             file_number: u32,

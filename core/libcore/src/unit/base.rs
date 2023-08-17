@@ -174,7 +174,7 @@ pub trait SubUnit: ReStation + UnitMngUtil {
 #[macro_export]
 macro_rules! declare_unitobj_plugin_with_param {
     ($unit_type:ty, $constructor:path) => {
-        use log::LevelFilter;
+        use log::Level;
         /// method for create the unit instance
         #[cfg_attr(not(feature = "noplugin"), no_mangle)]
         pub fn __subunit_create_with_params(
