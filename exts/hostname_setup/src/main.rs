@@ -12,8 +12,8 @@
 
 //! hostname setup
 
+use basic::cmdline;
 use basic::os_release;
-use basic::proc_cmdline;
 use nix::Result;
 use std::fmt;
 use std::fmt::Display;
@@ -38,7 +38,7 @@ impl Hostname {
     }
 
     fn from_cmdline() -> Option<Hostname> {
-        let systemd_hostname = match proc_cmdline::cmdline_get_value(SYSTEMD_HOSTNAME_KEY) {
+        let systemd_hostname = match cmdline::cmdline_get_value(SYSTEMD_HOSTNAME_KEY) {
             Err(e) => {
                 log::warn!(
                     "Failed to get proc cmdline by key {}: {}",
@@ -51,7 +51,7 @@ impl Hostname {
         };
 
         systemd_hostname.map_or_else(
-            || match proc_cmdline::cmdline_get_value(SYSMASTER_HOSTNAME_KEY) {
+            || match cmdline::cmdline_get_value(SYSMASTER_HOSTNAME_KEY) {
                 Err(e) => {
                     log::warn!(
                         "Failed to get proc cmdline by key {}: {}",

@@ -23,7 +23,7 @@ use libc::{glob, glob_t, GLOB_NOSORT};
 #[cfg(not(target_env = "musl"))]
 use libc::{statx, STATX_ATTR_MOUNT_ROOT};
 
-use crate::{fd_util, proc_cmdline, security, sysfs::SysFs, unistd};
+use crate::{cmdline, fd_util, security, sysfs::SysFs, unistd};
 
 #[cfg(target_env = "musl")]
 use crate::mount_util::MountInfoParser;
@@ -231,7 +231,7 @@ impl Condition {
     }
 
     fn test_first_boot(&self) -> i8 {
-        if let Ok(ret) = proc_cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot") {
+        if let Ok(ret) = cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot") {
             if ret {
                 return ret as i8;
             }
@@ -250,7 +250,7 @@ impl Condition {
         } else {
             &self.params
         };
-        let value = match proc_cmdline::cmdline_get_item(search_value) {
+        let value = match cmdline::cmdline_get_item(search_value) {
             Err(_) => {
                 log::info!("Failed to get cmdline content, assuming ConditionKernelCommandLine check failed.");
                 return 0;
@@ -447,8 +447,8 @@ impl Condition {
 mod test {
     use super::{Condition, ConditionType};
     use crate::{
+        cmdline,
         fs_util::write_string_file,
-        proc_cmdline,
         security::{self},
     };
     use core::panic;
@@ -933,9 +933,7 @@ mod test {
     fn test_condition_first_boot() {
         run_test(
             |c| {
-                if let Ok(ret) =
-                    proc_cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot")
-                {
+                if let Ok(ret) = cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot") {
                     if ret {
                         println!(
                             "this test cannot be tested because we cannot modify the kernel parameters"
@@ -961,9 +959,7 @@ mod test {
     fn test_condition_first_boot_false() {
         run_test(
             |c| {
-                if let Ok(ret) =
-                    proc_cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot")
-                {
+                if let Ok(ret) = cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot") {
                     if ret {
                         println!(
                             "this test cannot be tested because we cannot modify the kernel parameters"

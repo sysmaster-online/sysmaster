@@ -12,7 +12,7 @@
 
 //! mount the cgroup systems
 use basic::machine::Machine;
-use basic::{machine, mount_util, proc_cmdline};
+use basic::{cmdline, machine, mount_util};
 use bitflags::bitflags;
 use cgroup::{self, CgController, CgType, CG_BASE_DIR};
 use core::error::*;
@@ -506,12 +506,12 @@ fn cg_unified_wanted() -> bool {
         return v == CgType::UnifiedV2;
     }
 
-    let ret = proc_cmdline::proc_cmdline_get_bool("sysmaster.unified_cgroup_hierarchy");
+    let ret = cmdline::proc_cmdline_get_bool("sysmaster.unified_cgroup_hierarchy");
     if let Ok(v) = ret {
         return v;
     }
 
-    let ret = proc_cmdline::cmdline_get_value("cgroup_no_v1");
+    let ret = cmdline::cmdline_get_value("cgroup_no_v1");
     if let Ok(v) = ret {
         if v.is_some() && v.unwrap() == "all" {
             return true;
@@ -540,7 +540,7 @@ fn cg_unifiedv1_wanted() -> bool {
         }
     }
 
-    let ret = proc_cmdline::proc_cmdline_get_bool("sysmaster.unified_v1_controller");
+    let ret = cmdline::proc_cmdline_get_bool("sysmaster.unified_v1_controller");
     if let Ok(v) = ret {
         return v;
     }

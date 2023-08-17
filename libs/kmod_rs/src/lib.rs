@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 //! innner lib of kmod
-use basic::proc_cmdline;
+use basic::cmdline;
 use nix::errno;
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, OsStr};
@@ -239,8 +239,8 @@ impl LibKmod {
                         }
                         Err(errno::Errno::EPERM) => {
                             if !denylisy_parsed {
-                                proc_cmdline::proc_cmdline_parse(
-                                    proc_cmdline::parse_proc_cmdline_item,
+                                cmdline::proc_cmdline_parse(
+                                    cmdline::parse_proc_cmdline_item,
                                     &mut denylist,
                                 );
                                 denylisy_parsed = true;

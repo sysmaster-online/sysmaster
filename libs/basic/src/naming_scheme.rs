@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 //! network interface naming scheme
-use crate::{error::Error, proc_cmdline};
+use crate::{cmdline, error::Error};
 use bitflags::bitflags;
 use std::{env, fmt::Display, str::FromStr};
 
@@ -116,7 +116,7 @@ impl Display for NamingScheme {
 
 /// get the naming scheme according to cmdline and environment variables
 pub fn naming_scheme() -> NamingScheme {
-    let cmdline_value = proc_cmdline::cmdline_get_value("net.naming-scheme")
+    let cmdline_value = cmdline::cmdline_get_value("net.naming-scheme")
         .unwrap_or(None)
         .unwrap_or_default();
 
@@ -150,7 +150,7 @@ pub fn naming_scheme() -> NamingScheme {
 
 /// check whether the naming scheme is enabled
 pub fn naming_scheme_enabled() -> bool {
-    if let Ok(Some(v)) = proc_cmdline::cmdline_get_value("net.ifnames") {
+    if let Ok(Some(v)) = cmdline::cmdline_get_value("net.ifnames") {
         if ["0", "false"].contains(&v.as_str()) {
             return false;
         }
@@ -169,7 +169,7 @@ pub fn naming_scheme_has(flag: NamingSchemeFlags) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proc_cmdline;
+    use crate::cmdline;
     use std::env;
 
     #[test]
@@ -182,7 +182,7 @@ mod tests {
         env::set_var("NET_NAMING_SCHEME", "0");
         assert_eq!(naming_scheme(), NamingScheme::V000);
 
-        let cmdline_value = proc_cmdline::cmdline_get_value("net.naming-scheme")
+        let cmdline_value = cmdline::cmdline_get_value("net.naming-scheme")
             .unwrap_or(None)
             .unwrap_or_default();
 
@@ -202,7 +202,7 @@ mod tests {
     #[test]
     fn test_naming_scheme_enabled() {
         let ret = naming_scheme_enabled();
-        if let Ok(Some(v)) = proc_cmdline::cmdline_get_value("net.ifnames") {
+        if let Ok(Some(v)) = cmdline::cmdline_get_value("net.ifnames") {
             if ["0", "false"].contains(&v.as_str()) {
                 assert!(!ret);
             } else {

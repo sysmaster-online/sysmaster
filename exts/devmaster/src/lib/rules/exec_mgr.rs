@@ -19,8 +19,8 @@ use crate::{
     rules::node::*, rules::TokenType::*, rules::*, utils::*,
 };
 use basic::{
-    fs_util::write_string_file, naming_scheme::*, parse::parse_mode,
-    proc_cmdline::cmdline_get_item, unistd::*,
+    cmdline::cmdline_get_item, fs_util::write_string_file, naming_scheme::*, parse::parse_mode,
+    unistd::*,
 };
 use device::{Device, DeviceAction};
 use libc::{gid_t, mode_t, uid_t};

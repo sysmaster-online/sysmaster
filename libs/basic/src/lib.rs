@@ -15,6 +15,8 @@
 pub mod capability;
 #[cfg(feature = "cargo")]
 pub mod cargo;
+#[cfg(feature = "cmdline")]
+pub mod cmdline;
 #[cfg(feature = "condition")]
 pub mod condition;
 #[cfg(feature = "config")]
@@ -45,8 +47,6 @@ pub mod network;
 pub mod os_release;
 #[cfg(feature = "parse")]
 pub mod parse;
-#[cfg(feature = "cmdline")]
-pub mod proc_cmdline;
 #[cfg(feature = "process")]
 pub mod process;
 #[cfg(feature = "rlimit")]
