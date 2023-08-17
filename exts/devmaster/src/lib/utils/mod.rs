@@ -65,10 +65,14 @@ pub(crate) fn check_attr_format(key: &str, attr: &str) -> Result<()> {
 pub(crate) fn check_format(key: &str, value: &str) -> Result<()> {
     lazy_static! {
         static ref VALUE_RE: Regex =
-            Regex::new("(\\$(?P<long>\\w+)|%(?P<short>\\w))(\\{(?P<attr>[^\\{\\}]+)\\})?").unwrap();
+            Regex::new("(?P<placeholder>(\\$(?P<long>\\w+)|%(?P<short>\\w))(\\{(?P<attr>[^\\{\\}]+)\\})?)|(?P<escaped>(\\$\\$)|(%%))").unwrap();
     }
 
     for subst in VALUE_RE.captures_iter(value) {
+        if subst.name("escaped").is_some() {
+            continue;
+        }
+
         let long = subst.name("long");
         let short = subst.name("short");
         let attr = subst.name("attr");
@@ -640,6 +644,14 @@ mod tests {
         check_value_format("", "aaa$attr", false).unwrap_err();
         check_value_format("", "aaa$sysfs", false).unwrap_err();
         check_value_format("", "aaa$env", false).unwrap_err();
+
+        // test && and %%
+        check_value_format("", "$$", false).unwrap();
+        check_value_format("", "$$kernel", false).unwrap();
+        check_value_format("", "$$1", false).unwrap();
+        check_value_format("", "%%", false).unwrap();
+        check_value_format("", "%%N", false).unwrap();
+        check_value_format("", "%%1", false).unwrap();
     }
 
     #[test]
