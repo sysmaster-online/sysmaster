@@ -98,11 +98,15 @@ impl Plugin {
     fn get_unit_type_lib_map() -> String {
         let mut buf = String::with_capacity(256);
 
-        let devel_path = || {
+        let check_other_path = || {
+            #[cfg(test)]
             let out_dir = env::var("OUT_DIR").unwrap_or_else(|_x| {
                 let _tmp_str: Option<&'static str> = option_env!("OUT_DIR");
                 _tmp_str.unwrap_or("").to_string()
             });
+
+            #[cfg(not(test))]
+            let out_dir = String::new();
 
             if out_dir.is_empty() {
                 env::var("PROCESS_LIB_LOAD_PATH").map_or("".to_string(), |_v| _v)
@@ -114,7 +118,7 @@ impl Plugin {
         let mut conf_file = format!("{}plugin.conf", LIB_PLUGIN_PATH);
         let mut path = Path::new(&conf_file);
         if !path.exists() {
-            let lib_path_str = devel_path();
+            let lib_path_str = check_other_path();
             log::debug!(
                 "plugin conf file not found in:[{}],try find in devel path:[{}]",
                 conf_file,
@@ -152,15 +156,22 @@ impl Plugin {
 
     fn get_default_libpath() -> String {
         let mut ret: String = String::with_capacity(256);
-        let devel_path = |out_dir: &str| {
-            if out_dir.contains("build") {
-                let _tmp: Vec<_> = out_dir.split("build").collect();
-                String::from(_tmp[0])
-            } else {
-                out_dir.to_string()
-            }
+        #[cfg(test)]
+        let lib_path_devel = {
+            let devel_path = |out_dir: &str| {
+                if out_dir.contains("build") {
+                    let _tmp: Vec<_> = out_dir.split("build").collect();
+                    String::from(_tmp[0])
+                } else {
+                    out_dir.to_string()
+                }
+            };
+            devel_path(env!("OUT_DIR"))
         };
-        let lib_path_devel = devel_path(env!("OUT_DIR"));
+
+        #[cfg(not(test))]
+        let lib_path_devel = String::new();
+
         let lib_path_env = env::var("PROCESS_LIB_LOAD_PATH").map_or("".to_string(), |_v| _v);
         let _lib_path = [
             LIB_PLUGIN_PATH,
@@ -554,8 +565,8 @@ impl Plugin {
 #[cfg(test)]
 mod tests {
 
-    use basic::logger;
     use core::unit::UmIf;
+    use log::logger;
 
     use super::*;
     // use services::service::ServiceUnit;
@@ -564,7 +575,7 @@ mod tests {
     impl UmIf for UmIfD {}
 
     fn init_test() -> Arc<Plugin> {
-        logger::init_log_to_console("test_plugin_log_init", log::LevelFilter::Trace);
+        logger::init_log_to_console("test_plugin_log_init", log::Level::Trace);
         Arc::clone(&Plugin::get_instance())
     }
 
