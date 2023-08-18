@@ -7,7 +7,11 @@ edition = "2021"
 
 [dependencies]
 # internal libraries
-basic = { path = "../basic", features = ["parse", "fs", "fd"] }
+basic = { path = "../basic", default-features = false, features = [
+    "parse",
+    "fs",
+    "fd",
+] }
 event = { path = "../event" }
 log = { path = "../log" }
 
@@ -21,6 +25,8 @@ nix = { default-features = false, version = "0.24", features = [
     "user",
     "socket",
     "uio",
+    "fs",
+    "dir",
 ] }
 regex = { default-features = false, version = "1.7.0" }
 snafu = { default-features = false, version = "0.7" }

@@ -13,9 +13,9 @@ bitflags = { version = "1.3.2", optional = true }
 pkg-config = { version = "0.3", optional = true }
 libc = { version = "0.2.140", default-features = false }
 nix = { version = "0.24", default-features = false, features = [
-    "poll",
-    "dir",
-    "resource",
+    #"poll",
+    #"dir",
+    #"resource",
     #"signal",
     #"user",
     #"ioctl",

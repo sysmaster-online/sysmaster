@@ -10,7 +10,11 @@ crate-type = ["dylib", "lib"]
 name = "service"
 
 [dependencies]
-basic = { path = "../../../libs/basic", features = ["process", "fs", "fd"] }
+basic = { path = "../../../libs/basic", default-features = false, features = [
+    "process",
+    "fs",
+    "fd",
+] }
 cgroup = { path = "../../../libs/cgroup", default-features = false }
 constants = { path = "../../../libs/constants" }
 core = { path = "../../libcore", default-features = false }
@@ -20,7 +24,13 @@ macros = { path = "../../../libs/macros" }
 
 confique = { version = "0.1.3", default-features = false, features = ["toml"] }
 libc = { version = "0.2.*", default-features = false }
-nix = { version = "0.24", default-features = false }
+nix = { version = "0.24", default-features = false, features = [
+    "ioctl",
+    "socket",
+    "poll",
+    "dir",
+    "resource",
+] }
 once_cell = { version = "=1.7.2", default-features = false }
 serde = { version = "1.0.130", default-features = false }
 

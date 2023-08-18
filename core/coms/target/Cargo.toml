@@ -10,12 +10,16 @@ crate-type = ["dylib", "lib"]
 name = "target"
 
 [dependencies]
-basic = { path = "../../../libs/basic" }
+basic = { path = "../../../libs/basic", default-features = false }
 core = { path = "../../libcore", default-features = false }
 log = { path = "../../../libs/log" }
 macros = { path = "../../../libs/macros" }
 
-nix = { version = "0.24", default-features = false }
+nix = { version = "0.24", default-features = false, features = [
+    "resource",
+    "poll",
+    "socket",
+] }
 once_cell = { version = "=1.7.2", default-features = false }
 serde = { version = "1.0.130", default-features = false }
 

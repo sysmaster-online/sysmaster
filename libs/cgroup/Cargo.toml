@@ -6,13 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-basic = { path = "../basic", features = ["fs"] }
+basic = { path = "../basic", default-features = false, features = ["fs"] }
 log = { path = "../log" }
 
 bitflags = "1.3.2"
 nix = { version = "0.24", default-features = false, features = [
     "user",
     "signal",
+    "fs",
 ] }
 # regex = { version = "1.6.0", default-features = false, features = ["std"] }
 snafu = { version = "0.7", default-features = false }

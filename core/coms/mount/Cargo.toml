@@ -20,7 +20,12 @@ macros = { path = "../../../libs/macros" }
 
 epoll = "=4.3.1"
 libc = { version = "0.2.*", default-features = false }
-nix = { version = "0.24", default-features = false }
+nix = { version = "0.24", default-features = false, features = [
+    "fs",
+    "resource",
+    "poll",
+    "socket",
+] }
 once_cell = { version = "=1.7.2", default-features = false }
 serde = { version = "1.0.130", default-features = false }
 

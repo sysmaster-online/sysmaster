@@ -10,7 +10,11 @@ crate-type = ["dylib", "lib"]
 name = "socket"
 
 [dependencies]
-basic = { path = "../../../libs/basic", features = ["io", "fd", "socket"] }
+basic = { path = "../../../libs/basic", default-features = false, features = [
+    "io",
+    "fd",
+    "socket",
+] }
 constants = { path = "../../../libs/constants" }
 core = { path = "../../libcore", default-features = false }
 event = { path = "../../../libs/event" }
@@ -18,7 +22,14 @@ log = { path = "../../../libs/log" }
 macros = { path = "../../../libs/macros" }
 
 confique = { version = "0.1.3", default-features = false, features = ["toml"] }
-nix = { version = "0.24", default-features = false }
+nix = { version = "0.24", default-features = false, features = [
+    "ioctl",
+    "poll",
+    "socket",
+    "dir",
+    "net",
+    "resource",
+] }
 once_cell = { version = "=1.7.2", default-features = false }
 serde = { version = "1.0.130", default-features = false }
 

@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-basic = { path = "../../libs/basic", features = [
+basic = { path = "../../libs/basic", default-features = false, features = [
     "stat",
     "config",
     "security",
@@ -26,4 +26,6 @@ nix = { version = "0.24", default-features = false, features = [
     "ioctl",
     "socket",
     "user",
+    "fs",
+    "dir",
 ] }

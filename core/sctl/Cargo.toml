@@ -10,5 +10,8 @@ edition = "2021"
 cmdproto = { path = "../../libs/cmdproto" }
 constants = { path = "../../libs/constants" }
 
-clap = { version = "3.1.8", features = ["derive", "std"], default-features = false }
+clap = { version = "3.1.8", features = [
+    "derive",
+    "std",
+], default-features = false }
 nix = { version = "0.24", default-features = false }
