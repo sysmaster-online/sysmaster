@@ -298,5 +298,3 @@ struct Section {
 * [freedesktop.org - Desktop Entry Specification](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html#recognized-keys "Desktop Entry Specification")
 
 　　‍
-
-
