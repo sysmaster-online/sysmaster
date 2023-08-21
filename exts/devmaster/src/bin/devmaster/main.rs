@@ -13,12 +13,38 @@
 //! devmaster daemon
 use event::Events;
 use libdevmaster::framework::devmaster::Devmaster;
-use std::rc::Rc;
+use std::{env, os::unix::net::UnixDatagram, rc::Rc};
+
+fn notify(unset_env: bool, msg: String) -> std::io::Result<()> {
+    let socket_path = match env::var_os("NOTIFY_SOCKET") {
+        Some(p) => p,
+        None => return Ok(()),
+    };
+
+    if unset_env {
+        env::remove_var("NOTIFY_SOCKET");
+    }
+
+    let sock = UnixDatagram::unbound()?;
+    let len = sock.send_to(msg.as_bytes(), socket_path)?;
+    if len != msg.len() {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::WriteZero,
+            "incomplete write",
+        ))
+    } else {
+        Ok(())
+    }
+}
 
 fn main() {
     let events = Rc::new(Events::new().unwrap());
 
     let devmaster = Devmaster::new(events);
+
+    if let Err(e) = notify(false, "READY=1\n".to_string()) {
+        log::warn!("Failed to notify pid 1: {}", e);
+    }
 
     devmaster.as_ref().borrow().run();
 

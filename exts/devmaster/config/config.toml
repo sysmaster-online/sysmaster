@@ -4,7 +4,7 @@
 log_level = "info"
 
 # Support multiple rules directories.
-rules_d = ["/etc/devmaster/rules.d"]
+rules_d = ["/etc/devmaster/rules.d", "/lib/devmaster/rules.d"]
 
 # Support multiple network interface configuration directories.
 network_d = ["/etc/devmaster/network.d"]
