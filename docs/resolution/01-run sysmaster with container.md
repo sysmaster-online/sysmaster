@@ -7,7 +7,7 @@
 1. 下载openeuler基础容器镜像：https://repo.openeuler.org/openEuler-22.03-LTS-SP1/docker_img/
 2. docker load -i openEuler-docker.aarch64.tar.xz 载入容器镜像；
 3. 构建sysmaster并将编译所得的整个debug目录拷贝到Dockerfile所在目录；
-4. 执行docker build -t [imagenam:tagname](例如syy:withsysmasterv2) . --rm,完成后可以通过docker images查看生成的容器镜像。
+4. 执行docker build -t [imagenam:tagname], 例如syy:withsysmasterv2 . --rm,完成后可以通过docker images查看生成的容器镜像。
 
 ## 验证sshd功能
 1. 启动docker镜像:docker run -itd --privileged -v /sys/fs/cgroup:/sys/fs/cgroup:rw syy:withsysmasterv1 /sbin/init
