@@ -64,6 +64,7 @@ pub(super) struct ServiceMng {
     rd: Rc<RunningData>,
     monitor: RefCell<ServiceMonitor>,
     current_main_command: RefCell<ExecCommand>,
+    current_control_command: RefCell<ExecCommand>,
 }
 
 impl ReStation for ServiceMng {
@@ -164,6 +165,7 @@ impl ServiceMng {
             rd: rd.clone(),
             monitor: RefCell::new(ServiceMonitor::new()),
             current_main_command: RefCell::new(ExecCommand::empty()),
+            current_control_command: RefCell::new(ExecCommand::empty()),
         }
     }
 
@@ -291,6 +293,7 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::Condition);
         match self.control_command_pop() {
             Some(cmd) => {
+                *self.current_control_command.borrow_mut() = cmd.clone();
                 match self.spawn.start_service(
                     &cmd,
                     self.config.config_data().borrow().Service.TimeoutStartSec,
@@ -316,6 +319,7 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::StartPre);
         match self.control_command_pop() {
             Some(cmd) => {
+                *self.current_control_command.borrow_mut() = cmd.clone();
                 match self.spawn.start_service(
                     &cmd,
                     self.config.config_data().borrow().Service.TimeoutStartSec,
@@ -423,6 +427,7 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::StartPost);
         match self.control_command_pop() {
             Some(cmd) => {
+                *self.current_control_command.borrow_mut() = cmd.clone();
                 match self.spawn.start_service(
                     &cmd,
                     self.config.config_data().borrow().Service.TimeoutStartSec,
@@ -484,6 +489,7 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::Stop);
         match self.control_command_pop() {
             Some(cmd) => {
+                *self.current_control_command.borrow_mut() = cmd.clone();
                 match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
@@ -532,6 +538,7 @@ impl ServiceMng {
         self.control_command_fill(ServiceCommand::StopPost);
         match self.control_command_pop() {
             Some(cmd) => {
+                *self.current_control_command.borrow_mut() = cmd.clone();
                 match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
@@ -636,6 +643,7 @@ impl ServiceMng {
 
         match self.control_command_pop() {
             Some(cmd) => {
+                *self.current_control_command.borrow_mut() = cmd.clone();
                 match self.spawn.start_service(
                     &cmd,
                     self.config.config_data().borrow().Service.TimeoutStartSec,
@@ -895,6 +903,7 @@ impl ServiceMng {
         };
 
         if let Some(cmd) = self.control_command_pop() {
+            *self.current_control_command.borrow_mut() = cmd.clone();
             match self.spawn.start_service(&cmd, time_out, ExecFlags::CONTROL) {
                 Ok(pid) => self.pid.set_control(pid),
                 Err(_e) => {
@@ -1489,6 +1498,15 @@ impl ServiceMng {
             }
         } else if self.pid.control() == Some(pid) {
             self.pid.reset_control();
+
+            if self
+                .current_control_command
+                .borrow()
+                .get_exec_flag()
+                .contains(ExecFlag::EXEC_COMMAND_IGNORE_FAILURE)
+            {
+                res = ServiceResult::Success;
+            }
 
             if !self.control_command.borrow().is_empty() && res == ServiceResult::Success {
                 self.run_next_control();

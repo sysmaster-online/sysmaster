@@ -24,7 +24,7 @@ use basic::{
     user_group_util::{get_group_creds, get_user_creds},
     IN_SET,
 };
-use core::exec::{ExecCommand, ExecContext};
+use core::exec::{ExecCommand, ExecContext, ExecFlag};
 use core::rel::ReliLastFrame;
 use core::rel::{ReStation, Reliability};
 use core::unit::{KillOperation, UnitActiveState, UnitNotifyFlags, UnitType};
@@ -137,6 +137,7 @@ pub(crate) struct SocketMng {
     result: RefCell<SocketResult>,
     control_cmd_type: RefCell<Option<SocketCommand>>,
     control_command: RefCell<VecDeque<ExecCommand>>,
+    current_control_command: RefCell<ExecCommand>,
     refused: RefCell<i32>,
 }
 
@@ -159,6 +160,7 @@ impl SocketMng {
             result: RefCell::new(SocketResult::Success),
             control_cmd_type: RefCell::new(None),
             control_command: RefCell::new(VecDeque::new()),
+            current_control_command: RefCell::new(ExecCommand::empty()),
             refused: RefCell::new(0),
         }
     }
@@ -270,7 +272,7 @@ impl SocketMng {
             }
             Some(v) => v,
         };
-
+        *self.current_control_command.borrow_mut() = cmd.clone();
         let pid = match self.spawn.start_socket(&cmd) {
             Err(e) => {
                 let unit_name = self
@@ -326,7 +328,7 @@ impl SocketMng {
             }
             Some(v) => v,
         };
-
+        *self.current_control_command.borrow_mut() = cmd.clone();
         match self.spawn.start_socket(&cmd) {
             Ok(pid) => self.pid.set_control(pid),
             Err(e) => {
@@ -453,6 +455,7 @@ impl SocketMng {
 
         match self.control_command_pop() {
             Some(cmd) => {
+                *self.current_control_command.borrow_mut() = cmd.clone();
                 match self.spawn.start_socket(&cmd) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(_e) => {
@@ -481,6 +484,7 @@ impl SocketMng {
 
         match self.control_command_pop() {
             Some(cmd) => {
+                *self.current_control_command.borrow_mut() = cmd.clone();
                 match self.spawn.start_socket(&cmd) {
                     Ok(pid) => self.pid.set_control(pid),
                     Err(e) => {
@@ -566,6 +570,7 @@ impl SocketMng {
 
     fn run_next(&self) {
         if let Some(cmd) = self.control_command_pop() {
+            *self.current_control_command.borrow_mut() = cmd.clone();
             match self.spawn.start_socket(&cmd) {
                 Ok(pid) => self.pid.set_control(pid),
                 Err(_e) => {
@@ -810,7 +815,16 @@ impl SocketMng {
     }
 
     pub(crate) fn sigchld_event(&self, wait_status: WaitStatus) {
-        let res = self.sigchld_result(wait_status);
+        let mut res = self.sigchld_result(wait_status);
+
+        if self
+            .current_control_command
+            .borrow()
+            .get_exec_flag()
+            .contains(ExecFlag::EXEC_COMMAND_IGNORE_FAILURE)
+        {
+            res = SocketResult::Success;
+        }
 
         if !self.control_command.borrow().is_empty() && res == SocketResult::Success {
             self.run_next();
