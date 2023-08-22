@@ -260,11 +260,13 @@ impl ServiceUnit {
         self.exec_ctx
             .set_state_directory(cfg_data.borrow().Service.StateDirectory.clone());
 
+        #[cfg(feature = "linux")]
         if let Err(e) = self.exec_ctx.set_user(&cfg_data.borrow().Service.User) {
             log::error!("Failed to set user: {}", e);
             return Err(e);
         }
 
+        #[cfg(feature = "linux")]
         if let Err(e) = self.exec_ctx.set_group(&cfg_data.borrow().Service.Group) {
             log::error!("Failed to set group: {}", e);
             return Err(e);

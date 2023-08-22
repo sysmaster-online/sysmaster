@@ -173,6 +173,7 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
 
     let _ = setup_exec_directory(ctx.clone());
 
+    #[cfg(feature = "linux")]
     if let Err(e) = apply_user_and_group(ctx.clone(), params) {
         log::error!("Failed to apply user or group: {}", e);
         return;

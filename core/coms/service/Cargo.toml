@@ -38,5 +38,7 @@ serde = { version = "1.0.130", default-features = false }
 libtests = { path = "../../../libs/libtests" }
 
 [features]
-default = ["noplugin"]
+default = ["linux", "noplugin"]
+hongmeng = []
+linux = []
 noplugin = []
