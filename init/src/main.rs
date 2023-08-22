@@ -11,6 +11,8 @@
 // See the Mulan PSL v2 for more details.
 
 //! The init daemon
+use core::panic;
+use kernlog::KernelLog;
 use mio::unix::SourceFd;
 use mio::Events;
 use mio::Interest;
@@ -86,15 +88,21 @@ impl InitConfig {
 
     pub fn load(path: Option<String>) -> std::io::Result<Self> {
         let mut config = Self::default();
-        let default_config_file = INIT_CONFIG.to_string();
-        let path = path.unwrap_or(default_config_file);
+        let path = path.unwrap_or_else(|| INIT_CONFIG.to_string());
         let file = Path::new(&path);
         if file.exists() {
             let mut content = String::new();
             let file = File::open(file);
             match file.map(|mut f| f.read_to_string(&mut content)) {
                 Ok(_) => (),
-                Err(_) => return Ok(config),
+                Err(e) => {
+                    log::info!(
+                        "failed to read config file {}: {}, use default value",
+                        path,
+                        e
+                    );
+                    return Ok(config);
+                }
             };
 
             for (_, line) in content.lines().enumerate() {
@@ -138,7 +146,7 @@ impl InitConfig {
                     }
                 }
             }
-            log::debug!("{:?}", config);
+            log::debug!("loaded configuration: {:?}", config);
         }
 
         Ok(config)
@@ -196,7 +204,7 @@ impl Runtime {
                             Err(e) => panic!("Invalid value: {:?}", e),
                         };
                     } else {
-                        panic!("Missing value for option --deserialize.");
+                        panic!("Missing value for option --pid.");
                     }
                 }
                 _ => {
@@ -361,7 +369,6 @@ impl Runtime {
             let (pid, _, _) = match si {
                 Some((pid, code, sig)) => (pid, code, sig),
                 None => {
-                    log::debug!("ignored child signal: {:?}!", wait_status);
                     return;
                 }
             };
@@ -374,8 +381,6 @@ impl Runtime {
             // pop: recycle the zombie
             if let Err(e) = waitid(Id::Pid(pid), WaitPidFlag::WEXITED) {
                 log::error!("error when reap the zombie({:?}), ignored: {:?}!", pid, e);
-            } else {
-                log::debug!("reap the zombie: {:?}.", pid);
             }
         }
     }
@@ -456,7 +461,6 @@ impl Runtime {
             // do not refresh the status.
             self.online = true;
             self.pid = pid;
-            log::debug!("keepalive: receive a heartbeat from pid({})!", pid);
         }
         Ok(())
     }
@@ -623,12 +627,13 @@ impl Drop for Runtime {
 fn prepare_init() {
     // version
     let version = env!("CARGO_PKG_VERSION");
-    log::info!("sysMaster init version: {}", version);
     let args: Vec<String> = std::env::args().collect();
     if args.contains(&String::from("--version")) || args.contains(&String::from("-V")) {
-        println!("sysMaster init version: {}!", version);
+        println!("sysMaster-init version: {}!", version);
         std::process::exit(0);
     }
+
+    log::info!("sysMaster-init version: {}", version);
 
     // common umask
     let mode = Mode::from_bits_truncate(0o77);
@@ -668,7 +673,7 @@ fn reset_all_signal_handlers() {
 }
 
 extern "C" fn crash_handler(_signal: i32) {
-    log::error!("crash_handler");
+    panic!("crash_handler");
 }
 
 fn install_crash_handler() {
@@ -694,14 +699,20 @@ fn install_crash_handler() {
 
 fn shutdown_init() {
     nix::unistd::sync();
-    log::info!("shutdowning init");
+    log::info!("shutdowning...");
+}
+
+fn set_logger(loglevel: log::LevelFilter) {
+    let klog = match KernelLog::with_level(loglevel) {
+        Ok(v) => v,
+        Err(e) => panic!("Unsupported when cannot log into /dev/kmsg : {:?}!", e),
+    };
+    log::set_boxed_logger(Box::new(klog)).expect("Failed to set logger!");
+    log::set_max_level(loglevel);
 }
 
 fn main() -> std::io::Result<()> {
-    match kernlog::init() {
-        Ok(_) => (),
-        Err(e) => panic!("Unsupported when cannot log into /dev/kmsg : {:?}!", e),
-    };
+    set_logger(log::LevelFilter::Info);
 
     prepare_init();
 
