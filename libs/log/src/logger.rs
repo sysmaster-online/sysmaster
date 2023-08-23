@@ -139,7 +139,9 @@ struct FileLogger {
     file_mode: u32,
     file_number: u32,
     max_size: u32,
-    file: Mutex<File>,
+    file: Mutex<Option<File>>,
+
+    open_when_needed: bool,
 }
 
 impl log::Log for FileLogger {
@@ -162,11 +164,28 @@ impl log::Log for FileLogger {
                 None => "unknown",
                 Some(v) => v,
             };
-            write_msg_file(&mut file, module_path, record.args().to_string());
-            current_size = match file.metadata() {
-                Err(_) => return,
-                Ok(v) => v.len() as u32,
-            };
+
+            match &mut *file {
+                Some(file) => {
+                    write_msg_file(file, module_path, record.args().to_string());
+                    current_size = match file.metadata() {
+                        Err(_) => return,
+                        Ok(v) => v.len() as u32,
+                    };
+                }
+                None => {
+                    if !self.open_when_needed {
+                        println!("Failed to open the log file.");
+                        return;
+                    }
+                    let mut file = FileLogger::file_open(&self.file_path, self.file_mode);
+                    write_msg_file(&mut file, module_path, record.args().to_string());
+                    current_size = match file.metadata() {
+                        Err(_) => return,
+                        Ok(v) => v.len() as u32,
+                    }
+                }
+            }
             /* file is automatically unlocked. */
         }
         if current_size > self.max_size {
@@ -174,11 +193,26 @@ impl log::Log for FileLogger {
                 Err(_) => return,
                 Ok(v) => v,
             };
+
             if let Err(e) = self.rotate() {
                 println!("Failed to rotate log file: {}", e);
             }
-            if let Err(e) = file.set_len(0) {
-                println!("Failed to clear log file: {}", e);
+
+            match &*file {
+                Some(file) => {
+                    if let Err(e) = file.set_len(0) {
+                        println!("Failed to clear log file: {}", e);
+                    }
+                }
+                None => {
+                    if !self.open_when_needed {
+                        return;
+                    }
+                    let file = FileLogger::file_open(&self.file_path, self.file_mode);
+                    if let Err(e) = file.set_len(0) {
+                        println!("Failed to clear log file: {}", e);
+                    }
+                }
             }
         }
     }
@@ -188,8 +222,21 @@ impl log::Log for FileLogger {
             Err(_) => return,
             Ok(v) => v,
         };
-        if let Err(e) = file.flush() {
-            println!("Failed to flush log file: {}", e);
+        match &mut *file {
+            Some(file) => {
+                if let Err(e) = file.flush() {
+                    println!("Failed to flush log file: {}", e);
+                }
+            }
+            None => {
+                if !self.open_when_needed {
+                    return;
+                }
+                let mut file = FileLogger::file_open(&self.file_path, self.file_mode);
+                if let Err(e) = file.flush() {
+                    println!("Failed to flush log file: {}", e);
+                }
+            }
         }
     }
 }
@@ -217,7 +264,20 @@ impl FileLogger {
         file_mode: u32,
         max_size: u32,
         file_number: u32,
+        open_when_needed: bool,
     ) -> Self {
+        if open_when_needed {
+            return Self {
+                level,
+                file_path,
+                file_mode,
+                file_number,
+                max_size: max_size * 1024,
+                file: Mutex::new(None),
+                open_when_needed: true,
+            };
+        }
+
         let file = Self::file_open(&file_path, file_mode);
         Self {
             level,
@@ -225,7 +285,8 @@ impl FileLogger {
             file_mode,
             file_number,
             max_size: max_size * 1024,
-            file: Mutex::new(file),
+            file: Mutex::new(Some(file)),
+            open_when_needed: false,
         }
     }
 
@@ -492,6 +553,7 @@ pub fn init_log(_app_name: &str, level: Level, target: &str, file_size: u32, fil
             0o600,
             file_size,
             file_number,
+            false,
         )));
         crate::inner::set_max_level(level);
 
@@ -505,7 +567,7 @@ pub fn init_log(_app_name: &str, level: Level, target: &str, file_size: u32, fil
 }
 
 /// Reinit the logger based on the former configuration
-pub fn reinit() {
+pub fn reinit(open_when_needed: bool) {
     let level = match unsafe { LOG_LEVEL.load(Ordering::SeqCst) } {
         0 => Level::Error,
         1 => Level::Warn,
@@ -576,6 +638,7 @@ pub fn reinit() {
             0o600,
             file_size,
             file_number,
+            open_when_needed,
         )));
         crate::inner::set_max_level(level);
     }
@@ -593,7 +656,7 @@ mod tests {
         crate::debug!("hello debug!");
         init_log("test", Level::Debug, "syslog", 0, 0);
         crate::debug!("hello debug2!"); /* Only print in the syslog */
-        reinit();
+        reinit(true);
         crate::debug!("hello debug3!"); /* Only print in the syslog */
     }
 }

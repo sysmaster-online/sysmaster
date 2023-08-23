@@ -226,8 +226,9 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
     /* Be careful! We have closed the log fd from here. */
     let ret = close_all_fds(&keep_fds);
 
-    /* Reinit the logger before logging. */
-    log::logger::reinit();
+    /* Reinit the logger before logging, and set the mode to open_when_needed. */
+    log::logger::reinit(true);
+    log::debug!("Logger has been re-enabled.");
 
     if !ret {
         return;
