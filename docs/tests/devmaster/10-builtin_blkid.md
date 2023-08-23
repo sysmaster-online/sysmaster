@@ -1,0 +1,154 @@
+# 特性名称
+
+builtin blkid
+
+## 特性描述
+
+blkid内置命令，用于读取块设备的属性
+
+## 特性约束
+
+无
+
+## 子场景 1
+
+测试读取块设备的属性
+
+### 备注
+
+无
+
+### 准备工作
+
+无
+
+### 测试步骤
+
+步骤1：使用devmaster的blkid内置命令读取块设备属性
+```
+# devctl test-builtin blkid /sys/class/block/<device>
+```
+
+步骤2：使用udev的blkid内置命令读取块设备属性
+```
+# udevadm test-builtin blkid /sys/class/block/<device>
+```
+
+### 结果验证
+
+预期结果:步骤1和2中如下项的值应保持一致，不在此列表中的值不比较，
+```
+ID_FS_TYPE
+ID_FS_USAGE
+ID_FS_VERSION
+ID_FS_UUID
+ID_FS_UUID_ENC
+ID_FS_UUID_SUB
+ID_FS_UUID_SUB_ENC
+ID_FS_LABEL
+ID_FS_LABEL_ENC
+ID_PART_TABLE_TYPE
+ID_PART_TABLE_UUID
+ID_PART_ENTRY_NAME
+ID_PART_ENTRY_TYPE
+ID_FS_SYSTEM_ID
+ID_FS_PUBLISHER_ID
+ID_FS_APPLICATION_ID
+ID_FS_BOOT_SYSTEM_ID
+ID_FS_VOLUME_ID
+ID_FS_LOGICAL_VOLUME_ID
+ID_FS_VOLUME_SET_ID
+ID_FS_DATA_PREPARER_ID
+ID_PART_GPT_AUTO_ROOT
+ID_PART_GPT_AUTO_ROOT_UUID
+```
+
+sda1块设备：
+```
+# devctl test-builtin blkid /sys/class/block/sda1/
+ID_FS_UUID=ca28c2be-2eb4-4a38-a80a-eb4f2798349c
+ID_FS_UUID_ENC=ca28c2be-2eb4-4a38-a80a-eb4f2798349c
+ID_FS_VERSION=1.0BLOCK_SIZE=4096
+ID_FS_TYPE=ext4
+ID_FS_USAGE=filesystem
+ID_PART_ENTRY_SCHEME=dos
+ID_PART_ENTRY_UUID=7487add7-01
+ID_PART_ENTRY_TYPE=0x83
+ID_PART_ENTRY_FLAGS=0x80
+ID_PART_ENTRY_NUMBER=1
+ID_PART_ENTRY_OFFSET=2048
+ID_PART_ENTRY_SIZE=2097152
+ID_PART_ENTRY_DISK=8:0
+
+# udevadm  test-builtin blkid /sys/class/block/sda1/
+ID_FS_UUID=ca28c2be-2eb4-4a38-a80a-eb4f2798349c
+ID_FS_UUID_ENC=ca28c2be-2eb4-4a38-a80a-eb4f2798349c
+ID_FS_VERSION=1.0
+ID_FS_TYPE=ext4
+ID_FS_USAGE=filesystem
+ID_PART_ENTRY_SCHEME=dos
+ID_PART_ENTRY_UUID=7487add7-01
+ID_PART_ENTRY_TYPE=0x83
+ID_PART_ENTRY_FLAGS=0x80
+ID_PART_ENTRY_NUMBER=1
+ID_PART_ENTRY_OFFSET=2048
+ID_PART_ENTRY_SIZE=2097152
+ID_PART_ENTRY_DISK=8:0
+```
+
+dm-1 dm设备
+```
+# devctl test-builtin blkid /sys/class/block/dm-1/
+ID_FS_UUID=c2e1fcdf-7b9a-4dfc-a922-f0a7a4e37e95
+ID_FS_UUID_ENC=c2e1fcdf-7b9a-4dfc-a922-f0a7a4e37e95
+ID_FS_VERSION=1
+ID_FS_TYPE=swap
+ID_FS_USAGE=other
+
+# udevadm test-builtin blkid /sys/class/block/dm-1/
+ID_FS_UUID=c2e1fcdf-7b9a-4dfc-a922-f0a7a4e37e95
+ID_FS_UUID_ENC=c2e1fcdf-7b9a-4dfc-a922-f0a7a4e37e95
+ID_FS_VERSION=1
+ID_FS_TYPE=swap
+ID_FS_USAGE=other
+```
+
+sr0 光盘设备：
+```
+# devctl test-builtin blkid /sys/class/block/sr0/
+BLOCK_SIZE=2048
+ID_FS_SYSTEM_ID=LINUX
+ID_FS_APPLICATION_ID=GENISOIMAGE\x20ISO\x209660\x2fHFS\x20FILESYSTEM\x20CREATOR\x20\x28C\x29\x201993\x20E.YOUNGDALE\x20\x28C\x29\x201997-2006\x20J.PEARSON\x2fJ.SCHILLING\x20\x28C\x29\x202006-2007\x20CDRKIT\x20TEAM
+ID_FS_UUID=2022-12-27-17-16-22-00
+ID_FS_UUID_ENC=2022-12-27-17-16-22-00
+ID_FS_BOOT_SYSTEM_ID=EL\x20TORITO\x20SPECIFICATION
+ID_FS_VERSION=Joliet Extension
+ID_FS_LABEL=openEuler-22.03-LTS-SP1-x86_64
+ID_FS_LABEL_ENC=openEuler-22.03-LTS-SP1-x86_64
+ID_FS_TYPE=iso9660
+ID_FS_USAGE=filesystem
+ID_PART_TABLE_UUID=6dc2d0b2
+ID_PART_TABLE_TYPE=dos
+
+# udevadm test-builtin blkid /sys/class/block/sr0/
+ID_FS_SYSTEM_ID=LINUX
+ID_FS_APPLICATION_ID=GENISOIMAGE\x20ISO\x209660\x2fHFS\x20FILESYSTEM\x20CREATOR\x20\x28C\x29\x201993\x20E.YOUNGDALE\x20\x28C\x29\x201997-2006\x20J.PEARSON\x2fJ.SCHILLING\x20\x28C\x29\x202006-2007\x20CDRKIT\x20TEAM
+ID_FS_UUID=2022-12-27-17-16-22-00
+ID_FS_UUID_ENC=2022-12-27-17-16-22-00
+ID_FS_BOOT_SYSTEM_ID=EL\x20TORITO\x20SPECIFICATION
+ID_FS_VERSION=Joliet Extension
+ID_FS_LABEL=openEuler-22.03-LTS-SP1-x86_64
+ID_FS_LABEL_ENC=openEuler-22.03-LTS-SP1-x86_64
+ID_FS_TYPE=iso9660
+ID_FS_USAGE=filesystem
+ID_PART_TABLE_UUID=6dc2d0b2
+ID_PART_TABLE_TYPE=dos
+```
+
+### 测试结束
+
+无
+
+### 测试场景约束
+
+无
