@@ -320,7 +320,7 @@ fn is_valid_fd(entry: &DirEntry) -> bool {
     };
 
     if fd < 3 {
-        log::debug!("close fd, filename is not valid fd < 3");
+        /* 0,1,2 shouldn't be closed. */
         return true;
     }
 
@@ -356,6 +356,7 @@ fn close_all_fds(fds: &[i32]) -> bool {
 }
 
 fn shift_fds(fds: &mut [i32]) -> bool {
+    /* moves fds[i] to i+3 */
     let mut start = 0;
     loop {
         let mut restart = -1;
@@ -373,11 +374,13 @@ fn shift_fds(fds: &mut [i32]) -> bool {
 
             fds[i as usize] = nfd;
 
+            /* i+3 is exactly the right place that fds[i] should shift to. If we fail, retry.
+             * Careful: this will leads to a dead loop if i+3 is already used. */
             if nfd != i + 3 && restart < 0 {
                 restart = i;
             }
         }
-
+        /* Every fd has been moved to the right place, break and return. */
         if restart < 0 {
             break;
         }
