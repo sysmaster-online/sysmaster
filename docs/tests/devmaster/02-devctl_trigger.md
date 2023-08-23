@@ -1,6 +1,4 @@
-# 特性名称
-
-devctl trigger
+# 02 客户端命令 devctl trigger
 
 ## 特性描述
 

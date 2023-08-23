@@ -1,6 +1,4 @@
-# 特性名称
-
-builtin keyboard
+# 12 内置命令 keyboard
 
 ## 特性描述
 

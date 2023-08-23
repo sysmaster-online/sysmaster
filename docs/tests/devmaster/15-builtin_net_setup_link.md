@@ -1,6 +1,4 @@
-# 特性名称
-
-builtin net_setup_link
+# 15 内置命令 net_setup_link
 
 ## 特性描述
 

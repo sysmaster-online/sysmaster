@@ -1,6 +1,4 @@
-# 特性名称
-
-builtin usb_id
+# 17 内置命令 usb_id
 
 ## 特性描述
 

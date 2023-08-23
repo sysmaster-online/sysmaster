@@ -1,6 +1,4 @@
-# 特性名称
-
-devctl test-builtin
+# 01 客户端命令 devctl test-builtin
 
 ## 特性约束
 

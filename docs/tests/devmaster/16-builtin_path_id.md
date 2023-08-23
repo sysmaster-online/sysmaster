@@ -1,6 +1,4 @@
-# 特性名称
-
-builtin path_id
+# 16 内置命令 path_id
 
 ## 特性描述
 

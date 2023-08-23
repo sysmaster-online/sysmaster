@@ -1,6 +1,4 @@
-# 特性名称
-
-builtin net_id
+# 14 内置命令 net_id
 
 ## 特性描述
 

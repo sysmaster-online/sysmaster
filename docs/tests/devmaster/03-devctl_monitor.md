@@ -1,6 +1,4 @@
-# 特性名称
-
-devctl monitor
+# 03 客户端命令 devctl monitor
 
 ## 特性描述
 

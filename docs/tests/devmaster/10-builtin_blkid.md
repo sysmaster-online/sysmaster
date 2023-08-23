@@ -1,6 +1,4 @@
-# 特性名称
-
-builtin blkid
+# 10 内置命令 blkid
 
 ## 特性描述
 

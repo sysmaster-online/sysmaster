@@ -1,6 +1,4 @@
-# 特性名称
-
-builtin input_id
+# 11 内置命令 input_id
 
 ## 特性描述
 
