@@ -18,6 +18,7 @@ use event::*;
 use log::logger::init_log_to_console;
 use std::{
     cell::RefCell,
+    fs::create_dir_all,
     rc::Rc,
     sync::{Arc, RwLock},
 };
@@ -77,6 +78,9 @@ impl Devmaster {
         config.load(DEFAULT_CONFIG);
 
         init_log_to_console("devmaster", config.get_log_level());
+
+        let _ = create_dir_all("/run/devmaster/");
+
         log::info!("daemon start");
 
         let cache = Cache::new(config.get_rules_d(), config.get_netif_cfg_d());

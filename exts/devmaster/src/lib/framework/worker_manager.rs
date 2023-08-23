@@ -18,14 +18,18 @@ use device::{
     Device,
 };
 use event::Source;
+use nix::unistd::unlink;
 use snafu::ResultExt;
 use std::{
     cell::RefCell,
     collections::HashMap,
     fmt::{self, Display},
     io::{Read, Write},
-    net::{TcpListener, TcpStream},
-    os::unix::prelude::{AsRawFd, RawFd},
+    os::unix::{
+        net::{UnixListener, UnixStream},
+        prelude::{AsRawFd, RawFd},
+    },
+    path::Path,
     rc::{Rc, Weak},
     sync::{mpsc, Arc, RwLock},
     thread::JoinHandle,
@@ -34,7 +38,7 @@ use std::{
 use super::devmaster::Devmaster;
 
 /// worker manager listen address
-pub const WORKER_MANAGER_LISTEN_ADDR: &str = "0.0.0.0:1223";
+pub const WORKER_MANAGER_LISTEN_ADDR: &str = "/run/devmaster/worker.sock";
 
 /// messages sended by manager to workers
 pub(crate) enum WorkerMessage {
@@ -52,7 +56,7 @@ pub struct WorkerManager {
     /// listening socket address
     pub(crate) listen_addr: String,
     /// listening socket
-    pub(crate) listener: RefCell<TcpListener>,
+    pub(crate) listener: RefCell<UnixListener>,
     /// reference to job queue
     pub(crate) job_queue: RefCell<Weak<JobQueue>>,
 
@@ -91,7 +95,7 @@ pub(crate) enum WorkerState {
 }
 
 impl Display for WorkerState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let state = match self {
             WorkerState::Undef => "Undef",
             WorkerState::Idle => "Idle",
@@ -110,7 +114,7 @@ impl Worker {
     pub(crate) fn new(
         id: u32,
         state: WorkerState,
-        tcp_address: String,
+        listen_addr: String,
         cache: Arc<RwLock<Cache>>,
     ) -> Worker {
         let (tx, rx) = mpsc::channel::<WorkerMessage>();
@@ -149,7 +153,7 @@ impl Worker {
                     broadcaster.send_device(&device.borrow(), None).unwrap();
 
                     let mut tcp_stream =
-                        TcpStream::connect(tcp_address.as_str()).unwrap_or_else(|error| {
+                        UnixStream::connect(listen_addr.as_str()).unwrap_or_else(|error| {
                             log::error!("Worker {}: failed to connect {}", id, error);
                             panic!();
                         });
@@ -168,7 +172,7 @@ impl Worker {
                     log::info!("Worker {} received cmd: {}", id, cmd);
                     match cmd.as_str() {
                         "kill" => {
-                            let mut tcp_stream = TcpStream::connect(tcp_address.as_str())
+                            let mut tcp_stream = UnixStream::connect(listen_addr.as_str())
                                 .unwrap_or_else(|error| {
                                     log::error!("Worker {}: failed to connect \"{}\"", id, error);
                                     panic!();
@@ -244,7 +248,15 @@ impl WorkerManager {
         listen_addr: String,
         devmaster: Weak<RefCell<Devmaster>>,
     ) -> WorkerManager {
-        let listener = RefCell::new(TcpListener::bind(listen_addr.as_str()).unwrap_or_else(
+        /*
+         * The named socket file will not automatically deleted after last devmaster existed.
+         * Thus before bind to it, try to unlink it explicitly.
+         */
+        if Path::new(listen_addr.as_str()).exists() {
+            let _ = unlink(listen_addr.as_str());
+        }
+
+        let listener = RefCell::new(UnixListener::bind(listen_addr.as_str()).unwrap_or_else(
             |error| {
                 log::error!("Worker Manager: failed to bind listener \"{}\"", error);
                 panic!();
