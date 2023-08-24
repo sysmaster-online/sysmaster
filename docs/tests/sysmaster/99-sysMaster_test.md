@@ -98,18 +98,17 @@ EOF
 cat Dockerfile
 
 docker build -t "${SYSMST_BASE_IMG}:latest"
-.
 
 popd
 ```
 
-# 2 基本功能测试方案
+## 2 基本功能测试方案
 
-## 2.1 测试内容
+### 2.1 测试内容
 
 基于容器场景，在x86_64、aarch64两种架构上测试单元的启停和查询功能。
 
-## 2.2 测试平台
+### 2.2 测试平台
 
 - x86_64
 
@@ -139,7 +138,7 @@ popd
 | **gcc版本**        | 10.3.1                      |
 | **musl-gcc版本**   | 1.2.3                       |
 
-## 2.3 测试步骤
+### 2.3 测试步骤
 
 执行docker_config_test_service_002用例
 
@@ -155,14 +154,14 @@ cargo test docker_config_test_service_002 --
 
 
 
-# 3 可靠性及性能测试方案
+## 3 可靠性及性能测试方案
 
-## 3.1 测试内容
+### 3.1 测试内容
 
 1. 编写dbus、udev、journal、login、systemctl、cgroup等子组件的查询和操作类脚本，后台并发持续运行，且dbus、重构1号进程每天reload一次，一周内整个系统运行正常，无复位重启、内存泄露和内存越界等安全问题。
 2. 在systemd-journald、nginx、mysql、redis等常用任务重启500次条件下，重构的1号进程相对于开源Systemd，占用CPU时间减少20%。
 
-## 3.2 测试平台
+### 3.2 测试平台
 
 | **工具/** **硬件** | **参数**                                  |
 | ------------------ | ----------------------------------------- |
@@ -175,7 +174,7 @@ cargo test docker_config_test_service_002 --
 | **system版本**     | 249-43                                    |
 | **nginx版本**      | 1.21.5                                    |
 
-## 3.3 测试步骤
+### 3.3 测试步骤
 
 执行docker_reliable_reload_001用例
 
@@ -222,7 +221,7 @@ cat /proc/1/stat | awk '{print $14,$15}' >>
 > 备注：/tmp/result文件中的两行数据分别代表测试前、后1号进程的耗时，差值便是重启nginx服务1000次的耗时，第一列是用户态，第二列是内核态。
 >
 
-## 3.4 测试结果
+### 3.4 测试结果
 
 - docker_reliable_reload_001用例连续运行 **X** **天** ，sysmaster进程占用RSS和fd无明显增长趋势，趋于稳定：
 
@@ -235,6 +234,6 @@ cat /proc/1/stat | awk '{print $14,$15}' >>
 | 内核态stime |           |         |          |
 | 总和        |           |         |          |
 
-# 参考资料
+## 参考资料
 
 如何添加测试用例, 请参考 [测试框架及用例编写](../01-integration_test.md)
