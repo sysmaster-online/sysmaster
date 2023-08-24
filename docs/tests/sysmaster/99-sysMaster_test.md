@@ -237,4 +237,4 @@ cat /proc/1/stat | awk '{print $14,$15}' >>
 
 # 参考资料
 
-如何添加测试用例, 请参考 [测试框架及用例编写](../design/01-integration_test.md)
+如何添加测试用例, 请参考 [测试框架及用例编写](../01-integration_test.md)
