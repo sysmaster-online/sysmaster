@@ -146,6 +146,11 @@ fn initialize_runtime(self_recovery_enable: bool) -> Result<()> {
         msg: format!("mount cgroup controllers failed: {}", e),
     })?;
 
+    #[cfg(feature = "hongmeng")]
+    setup::enable_subtree_control(cgroup::CG_BASE_DIR).map_err(|e| Error::Other {
+        msg: format!("enable hongmeng resmgr subtree_control failed: {}", e),
+    })?;
+
     set_child_reaper();
 
     Ok(())

@@ -460,6 +460,18 @@ pub fn mount_cgroup_controllers() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "hongmeng")]
+/// enable memory controller for sub cgroup
+pub fn enable_subtree_control(cg_base_dir: &str) -> Result<()> {
+    /* hongmeng doesn't enable cgroup controller for sub cgroup. So when we create a directory under
+     * /run/sysmaster/cgroup, i.e. foo.service, the file /run/sysmaster/cgroup/foo.service/controllers
+     * is empty. If controllers file is empty, we can't migrate our process to this cgroup. To avoid
+     * this problem, we forcely enable memory controller for sub cgroup. */
+    let sub_tree_control = Path::new(cg_base_dir).join("subtree_control");
+    fs::write(sub_tree_control, "+memory").context(IoSnafu)?;
+    Ok(())
+}
+
 // return the pair controller which will join with the original controller
 fn pair_controller(controller: &str) -> Option<String> {
     let mut pairs = HashMap::new();
