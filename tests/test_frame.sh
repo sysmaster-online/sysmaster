@@ -60,6 +60,8 @@ function setup_isula() {
 function test_cleanup() {
     [ -n "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"
 
+    [ -n "/run/sysmaster/reliability" ] &&  rm -rf /run/sysmaster/reliability/*
+
     if [ "${DOCKER_TEST}" == '1' ] && [ -n "${DOCKER_CMD}" ]; then
         cleanup_docker || return 1
     fi

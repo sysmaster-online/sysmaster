@@ -58,6 +58,7 @@ pub fn fd_is_cloexec(fd: i32) -> bool {
 
     let flags = nix::fcntl::fcntl(fd, FcntlArg::F_GETFD).unwrap_or(0);
     let fd_flag = FdFlag::from_bits(flags).unwrap();
+
     fd_flag.contains(FdFlag::FD_CLOEXEC)
 }
 

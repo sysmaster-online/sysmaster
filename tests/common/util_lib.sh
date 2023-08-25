@@ -133,15 +133,18 @@ function expect_str_eq() {
 function run_sysmaster() {
     local user="${1:-root}"
 
-    if [ "${user}" = root ]; then
-        RUST_BACKTRACE=full "${SYSMST_PATH}"/init &> "${SYSMST_LOG}" &
-    else
-        chmod 777 "${SYSMST_PATH}"/init
-        chmod -R 777 "${SYSMST_PATH}" /run
-        chmod -R 777 "$(dirname "${SYSMST_LOG}")"
-        sudo -u "${user}" "${SYSMST_PATH}"/init &> "${SYSMST_LOG}" &
+    init_pid="$(ps -elf | grep -v grep | grep " $(echo ${user} | cut -c1-7)" | grep -w "${SYSMST_PATH}"/init | awk '{print $4}')"
+    if [ -z "${init_pid}" ]; then
+        if [ "${user}" = root ]; then
+            RUST_BACKTRACE=full "${SYSMST_PATH}"/init &> "${SYSMST_LOG}" &
+        else
+            chmod 777 "${SYSMST_PATH}"/init
+            chmod -R 777 "${SYSMST_PATH}" /run
+            chmod -R 777 "$(dirname "${SYSMST_LOG}")"
+            sudo -u "${user}" "${SYSMST_PATH}"/init &> "${SYSMST_LOG}" &
+        fi
+        init_pid=$!
     fi
-    init_pid=$!
 
     # wait sysmaster init done
     sleep 3
@@ -197,7 +200,7 @@ function check_status() {
 
     sleep 0.1
     for ((cnt = 0; cnt < 3; ++cnt)); do
-        sctl status "${service}" |& grep -w 'Active:' | head -n1 | grep -w "${exp_status}" && return 0 || sleep 1
+        sctl status "${service}" 2>&1 |& grep -w 'Active:' | head -n1 | grep -w "${exp_status}" && return 0 || sleep 1
     done
     # debug
     sctl status "${service}"
@@ -213,7 +216,7 @@ function check_load() {
 
     sleep 0.1
     for ((cnt = 0; cnt < 3; ++cnt)); do
-        sctl status "${service}" |& grep -w 'Loaded:' | head -n1 | awk '{print $2}' | grep -w "${exp_status}" && return 0 || sleep 1
+        sctl status "${service}" 2>&1 |& grep -w 'Loaded:' | head -n1 | awk '{print $2}' | grep -w "${exp_status}" && return 0 || sleep 1
     done
     # debug
     sctl status "${service}"
@@ -225,7 +228,7 @@ function check_load() {
 function get_pids() {
     local service="$1"
 
-    sctl status "${service}" |& sed -n '/PID:/,$p' | sed 's/PID://' | awk '{print $1}'
+    sctl status "${service}" 2>&1 |& sed -n '/PID:/,$p' | sed 's/PID://' | awk '{print $1}'
 }
 
 # usage: check netstat

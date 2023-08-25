@@ -22,7 +22,7 @@ function test01() {
     check_status base inactive
     expect_eq $? 0 || return 1
     # check Description/Documentation
-    sctl status base | grep "base.service - this is a test" && sctl status base | grep "Docs: this is doc"
+    sctl status base 2>&1 | grep "base.service - this is a test" && sctl status base 2>&1 | grep "Docs: this is doc"
     expect_eq $? 0 || sctl status base
 
     # RemainAfterExit=true
@@ -55,7 +55,7 @@ function test02() {
     sleep 2
     check_status base active
     expect_eq $? 0 || return 1
-    sctl status base | grep active | grep 'exited'
+    sctl status base 2>&1 | grep active | grep 'exited'
     expect_eq $? 0 || sctl status base
     ps -elf | grep -v grep | awk '{print $4}' | grep -w "${main_pid}"
     expect_eq $? 1 || ps -elf
@@ -74,6 +74,7 @@ function test03() {
     sctl daemon-reload
     sctl restart base
     sleep 1
+    cp ${BUILD_PATH}/units/*.target ${SYSMST_LIB_PATH}
     check_status base inactive
     expect_eq $? 0 || return 1
 

@@ -27,7 +27,7 @@ function test01() {
     sctl start base
     expect_eq $? 0 || return 1
     sleep 1
-    sctl status base | grep Active | grep failed
+    sctl status base 2>&1 | grep Active | grep failed
     expect_eq $? 0
     sctl status base
     expect_eq $? 3

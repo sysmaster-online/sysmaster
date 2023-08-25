@@ -63,7 +63,7 @@ COPY yum.repos.d /etc/yum.repos.d/
 RUN yum install -y util-linux shadow sudo passwd net-tools iproute nmap
 
 COPY install/usr/bin/sctl /usr/bin/
-RUN mkdir /usr/lib/sysmaster /etc/sysmaster
+RUN mkdir /usr/lib/sysmaster /etc/sysmaster /usr/lib/sysmaster/system
 COPY install/usr/lib/sysmaster /usr/lib/sysmaster/
 COPY install/etc/sysmaster /etc/sysmaster/
 RUN sed -i '/LogTarget/ s/=.*/="console-syslog"/' /etc/sysmaster/system.conf

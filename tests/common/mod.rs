@@ -14,11 +14,17 @@ use std::{env, process::Command};
 
 pub fn run_script(suit: &str, name: &str, docker_flg: &str) {
     let m_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let testpath = format!("{}/tests/{}/{}/{}.sh", m_dir, suit, name, name);
-    let logpath = format!("{}/tests/{}/{}/{}.log", m_dir, suit, name, name);
+    let unit_config_test = match docker_flg {
+        "1" => "",
+        _ => "unit_config_test",
+    };
+    let base_path = format!(
+        "{}/tests/{}/{}/{}/{}",
+        m_dir, suit, unit_config_test, name, name
+    );
     let cmd = format!(
-        "BUILD_PATH={} DOCKER_TEST={} sh -x {} &> {}",
-        m_dir, docker_flg, testpath, logpath
+        "BUILD_PATH={} DOCKER_TEST={} sh -x {}.sh &> {}.log",
+        m_dir, docker_flg, base_path, base_path
     );
     println!("[{}]: {}", name, cmd);
 
@@ -32,7 +38,7 @@ pub fn run_script(suit: &str, name: &str, docker_flg: &str) {
         println!("[{}]: {}", name, status);
     } else {
         println!("[{}]: {}   Detail Log:", name, status);
-        let cmd = format!("cat {}", logpath);
+        let cmd = format!("cat {}", base_path + ".log");
         Command::new("/bin/bash")
             .arg("-c")
             .arg(cmd)

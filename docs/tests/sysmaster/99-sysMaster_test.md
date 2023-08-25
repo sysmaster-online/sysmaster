@@ -1,16 +1,16 @@
-# sysMaster 基础功能测试
+# sysMaster 功能测试
 
 **测试内容：**
 
 1. 基本功能：支持x86_64、aarch64；
-2. 可靠性：服务查询和操作类脚本与reload并发，sysmaster无崩溃和内存泄漏；
-3. 性能：nginx重启1000次，sysmaster相对于systemd占用CPU时间减少30%。
+2. 场景：支持容器、虚拟机场景
+# 容器场景下测试
 
-## 1 搭建测试环境
+## 搭建测试环境
 
-### 1.1 安装构建工具
+###  安装构建工具
 
-下载仓库代码及安装工具链, 生成的二进制程序位于`target`下.
+下载仓库代码及安装工具链, 生成的二进制程序位于 `target`下.
 
 ```bash
 # 下载仓库代码
@@ -27,12 +27,11 @@ sh ci/01-pre-commit.sh
 cargo build --all --release
 ```
 
-### 1.2 部署容器测试环境
+###  部署容器测试环境
 
-> 注: 可通过`cargo test`执行集成测试用例时会自动化部署，无需手动执行。
->
+> 注: 可通过 `cargo test`执行集成测试用例时会自动化部署，无需手动执行。
 
-- 归档二进制，归档后的二进制位于`target/install`目录下，用于构建容器镜像.
+- 归档二进制，归档后的二进制位于 `target/install`目录下，用于构建容器镜像.
 
 ```bash
 sh -x install.sh release
@@ -48,7 +47,6 @@ systemctl restart docker
 
 - 加载基础容器镜像
 
-
 ```bash
 OS_VER="openEuler-22.03-LTS-SP1"
 
@@ -62,20 +60,16 @@ SYSMST_BASE_IMG="sysmaster_base-${BASE_IMG}"
 
 TMP_DIR="$(mktemp -d /tmp/test_XXXX)"
 
-wget -P "${TMP_DIR}"
-"${DOCKER_IMG_URL}/${DOCKER_TAR}".xz
+wget -P "${TMP_DIR}" "${DOCKER_IMG_URL}/${DOCKER_TAR}".xz
 
-xz -d
-"${TMP_DIR}"/"${DOCKER_TAR}".xz
+xz -d "${TMP_DIR}"/"${DOCKER_TAR}".xz
 
-docker load --input
-"${TMP_DIR}"/"${DOCKER_TAR}"
+docker load --input "${TMP_DIR}"/"${DOCKER_TAR}"
 
 docker images
 ```
 
 - 构建测试镜像
-
 
 ```bash
 pushd "${TMP_DIR}"
@@ -84,156 +78,171 @@ cat << EOF > Dockerfile
 
 FROM ${BASE_IMG} as ${SYSMST_BASE_IMG}
 
+RUN rm -rf /etc/yum.repos.d && mkdir /etc/yum.repos.d
+COPY yum.repos.d /etc/yum.repos.d/
+RUN yum install -y util-linux shadow sudo passwd net-tools iproute nmap
 COPY install/usr/bin/sctl /usr/bin/
-
-COPY install/usr/bin/init /usr/bin/
-
-RUN mkdir /usr/lib/sysmaster
-
-COPY install/usr/lib/sysmaster
-/usr/lib/sysmaster/
-
+RUN mkdir /usr/lib/sysmaster /etc/sysmaster /usr/lib/sysmaster/system
+COPY install/usr/lib/sysmaster /usr/lib/sysmaster/
+COPY install/etc/sysmaster /etc/sysmaster/
+RUN sed -i '/LogTarget/ s/=.*/="console-syslog"/' /etc/sysmaster/system.conf
 EOF
 
 cat Dockerfile
 
-docker build -t "${SYSMST_BASE_IMG}:latest"
+docker build -t "${SYSMST_BASE_IMG}:latest" .
 
 popd
 ```
 
-## 2 基本功能测试方案
+## 基本功能测试
 
-### 2.1 测试内容
+### 测试内容
 
-基于容器场景，在x86_64、aarch64两种架构上测试单元的启停和查询功能。
+基于容器场景，在x86_64、aarch64两种架构上测试sysmaster功能
 
-### 2.2 测试平台
+### 测试平台
 
 - x86_64
 
-
-| **工具/** **硬件** | **参数**                                  |
-| ------------------ | ----------------------------------------- |
-| **设备类型**       | 2288H V5                                  |
-| **CPU**            | Intel(R) Xeon(R) Gold 5218R CPU @ 2.10GHz |
-| **内存**           | 8*16G                                     |
-| **硬盘**           | SAS3408                                   |
-| **虚拟机操作系统** | openEuler-22.03-LTS-SP1                   |
-| **docker版本**     | 18.09.0                                   |
-| **gcc版本**        | 10.3.1                                    |
-| **musl-gcc版本**   | 1.2.3                                     |
+| **工具/** **硬件** | **参数**                            |
+| ------------------------------ | ----------------------------------------- |
+| **设备类型**             | 2288H V5                                  |
+| **CPU**                  | Intel(R) Xeon(R) Gold 5218R CPU @ 2.10GHz |
+| **内存**                 | 8*16G                                     |
+| **硬盘**                 | SAS3408                                   |
+| **虚拟机操作系统**       | openEuler-22.03-LTS-SP1                   |
+| **docker版本**           | 18.09.0                                   |
+| **gcc版本**              | 10.3.1                                    |
+| **musl-gcc版本**         | 1.2.3                                     |
 
 - aarch64
 
+| **工具/** **硬件** | **参数**              |
+| ------------------------------ | --------------------------- |
+| **设备类型**             | Taishan 200                 |
+| **CPU**                  | Kunpeng920-6426 @ 2.6GHz *2 |
+| **内存**                 | 251G                        |
+| **硬盘**                 | 1.5T                        |
+| **虚拟机操作系统**       | openEuler-22.03-LTS-SP1     |
+| **docker版本**           | 18.09.0                     |
+| **gcc版本**              | 10.3.1                      |
+| **musl-gcc版本**         | 1.2.3                       |
 
-| **工具/** **硬件** | **参数**                    |
-| ------------------ | --------------------------- |
-| **设备类型**       | Taishan 200                 |
-| **CPU**            | Kunpeng920-6426 @ 2.6GHz *2 |
-| **内存**           | 251G                        |
-| **硬盘**           | 1.5T                        |
-| **虚拟机操作系统** | openEuler-22.03-LTS-SP1     |
-| **docker版本**     | 18.09.0                     |
-| **gcc版本**        | 10.3.1                      |
-| **musl-gcc版本**   | 1.2.3                       |
+### 测试项
 
-### 2.3 测试步骤
+可通过执行cargo test命令执行对应的测试用例
 
-执行docker_config_test_service_002用例
-
-``` bash
-cargo test docker_config_test_service_002 --
---ignored --test-threads=1
-```
-
-> 备注：该用例覆盖了forking类型单元文件的启动、停止以及状态查询。
->
-
-### 2.4 测试结果
-
-
-
-## 3 可靠性及性能测试方案
-
-### 3.1 测试内容
-
-1. 编写dbus、udev、journal、login、systemctl、cgroup等子组件的查询和操作类脚本，后台并发持续运行，且dbus、重构1号进程每天reload一次，一周内整个系统运行正常，无复位重启、内存泄露和内存越界等安全问题。
-2. 在systemd-journald、nginx、mysql、redis等常用任务重启500次条件下，重构的1号进程相对于开源Systemd，占用CPU时间减少20%。
-
-### 3.2 测试平台
-
-| **工具/** **硬件** | **参数**                                  |
-| ------------------ | ----------------------------------------- |
-| **设备类型**       | 2288H V5                                  |
-| **CPU**            | Intel(R) Xeon(R) Gold 5218R CPU @ 2.10GHz |
-| **内存**           | 8*16G                                     |
-| **硬盘**           | SAS3408                                   |
-| **虚拟机操作系统** | openEuler-22.03-LTS-SP1                   |
-| **docker版本**     | 18.09.0                                   |
-| **system版本**     | 249-43                                    |
-| **nginx版本**      | 1.21.5                                    |
-
-### 3.3 测试步骤
-
-执行docker_reliable_reload_001用例
-
+#### docker_config_test_action_001
+- 测试内容
+测试服务失败后Action是否执行
+- 配置项
+SuccessAction
+FailureAction
+- 测试步骤
+执行以下命令
 ```bash
-cargo test docker_reliable_reload_001 --
---ignored --test-threads=1
+cargo test --test docker_config_test -- docker_config_test_action_001 --exact --nocapture --ignored
 ```
+- 测试结果
 
-> 备注：用例会后台记录sysmaster资源占用情况，需人工观察资源走势。
->
+####  docker_config_test_condition_001
+- 测试内容
+测试服务的运行条件
+- 配置项
+ConditionPathExists
+AssertPathExists
+ConditionPathIsReadWrite
+AssertPathIsReadWrite
+ConditionDirectoryNotEmpty
+ConditionFileIsExecutable
+ConditionPathExistsGlob
+ConditionPathIsDirectory
+ConditionPathIsMountPoint
+ConditionPathIsSymbolicLink
+- 测试步骤
+执行以下命令
+```
+cargo test --test docker_config_test -- docker_config_test_condition_001 --exact --nocapture --ignored
+```
+- 测试结果
 
-执行docker_perf_001用例
+#### docker_config_test_condition_003
+- 测试内容
+测试检测条件类 Condition
+- 配置项
+ConditionCapability
+ConditionKernelCommandLine
+ConditionSecurity
+- 测试步骤
+执行以下命令
+```
+cargo test --test docker_config_test -- docker_config_test_condition_003 --exact --nocapture --ignored
+```
+- 测试结果
 
+#### docker_config_test_service_001
+- 测试内容
+- 配置项
+Description
+Documentation
+RemainAfterExit
+DefaultDependencies
+- 测试步骤
+执行以下命令
+```
+cargo test --test docker_config_test -- docker_config_test_service_001 --exact --nocapture --ignored
+```
+- 测试结果
+
+#### docker_config_test_service_002
+- 测试内容
+- 配置项
+Type=foring
+PIDFile
+- 测试步骤
+执行以下命令
+```
+cargo test --test docker_config_test -- docker_config_test_service_002 --exact --nocapture --ignored
+```
+- 测试结果
+
+# 虚拟机场景下测试
+
+## 搭建测试环境
+
+在编译完成后，进入源码根目录，使用安装脚本install_sysmaster.sh将sysmaster的二进制文件、系统服务、配置文件等安装到系统中
 ```bash
-cargo test docker_perf_001 -- --ignored
---test-threads=1
+# 安装sysmaster
+sh -x tools/run_with_vm/install_sysmaster.sh release
 ```
 
-> 备注：该用例基于nginx服务，测试服务间隔0.1s反复重启1000次，记录sysmaster进程的用户态和内核态耗时。
->
+## 基本功能测试
 
-systemd基线数据收集
+验证在虚拟机场景下sysmaster基本功能
 
-```bash
-yum install -y nginx
+### 测试项
 
-sed -i '/Description=/a StartLimitBurst=0'
-/usr/lib/systemd/system/nginx.service
+#### 登录功能
+- 测试内容
+此测试项主要测试能否将sysmaster做为1号进程，并运行用户通过tty1及ssh进行登录
+- 测试步骤
+1. 参考http://sysmaster.online/use/01-run%20sysmaster%20with%20vm/#sysmaster 搭建环境
+2. 重启虚拟机，并以新启动项运行
+3. 切换至tty1登录，通过ssh登录
+- 测试结果
+可以成功登录
 
-systemctl daemon-reload
-
-cat /proc/1/stat | awk '{print $14,$15}' >>
-/tmp/result
-
-for ((i=0; i<1000; ++i)); do
-    systemctl restart nginx
-    sleep 0.1
-done
-
-cat /proc/1/stat | awk '{print $14,$15}' >>
-/tmp/result
+#### service_001
+- 测试内容
+- 配置项
+Description
+Documentation
+RemainAfterExit
+DefaultDependencies
+- 测试步骤
+执行以下命令
 ```
-
-> 备注：/tmp/result文件中的两行数据分别代表测试前、后1号进程的耗时，差值便是重启nginx服务1000次的耗时，第一列是用户态，第二列是内核态。
->
-
-### 3.4 测试结果
-
-- docker_reliable_reload_001用例连续运行 **X** **天** ，sysmaster进程占用RSS和fd无明显增长趋势，趋于稳定：
-
-- nginx服务重启500次，sysmaster对比systemd CPU耗时降级 **20%** ：
-- nginx服务重启1000次，sysmaster对比systemd性能数据（单位：jiffies）
-
-|             | sysmaster | systemd | 性能提升 |
-| ----------- | --------- | ------- | -------- |
-| 用户态utime |           |         |          |
-| 内核态stime |           |         |          |
-| 总和        |           |         |          |
-
-## 参考资料
-
-如何添加测试用例, 请参考 [测试框架及用例编写](../01-integration_test.md)
+cargo test --test vm_config_test -- service_001 --exact --nocapture --ignored
+```
+- 测试结果

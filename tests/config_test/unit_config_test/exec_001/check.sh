@@ -20,7 +20,7 @@ function test01() {
     expect_eq $? 1
     check_log ${SYSMST_LOG} "${key_log_1}"
     expect_eq $? 0
-    sctl status base &> log
+    sctl status base 2>&1 &> log
     check_log log 'base.service: NotExisted'
     expect_eq $? 0
     rm -rf log
@@ -33,7 +33,7 @@ function test01() {
     expect_eq $? 1
     check_log ${SYSMST_LOG} "${key_log_2}"
     expect_eq $? 0
-    sctl status base &> log
+    sctl status base 2>&1 &> log
     check_log log 'base.service: NotExisted'
     expect_eq $? 0
     rm -rf log
@@ -51,7 +51,7 @@ function test02() {
     expect_eq $? 1
     check_log ${SYSMST_LOG} "${key_log_3}"
     expect_eq $? 0
-    sctl status base &> log
+    sctl status base 2>&1 &> log
     check_log log 'base.service: NotExisted'
     expect_eq $? 0
     rm -rf log
@@ -86,7 +86,7 @@ function test02() {
     expect_eq $? 1
     check_log ${SYSMST_LOG} "${key_log_2}"
     expect_eq $? 0
-    sctl status base &> log
+    sctl status base 2>&1 &> log
     check_log log 'base.service: NotExisted'
     expect_eq $? 0
     rm -rf log

@@ -40,7 +40,7 @@ function check_fun() {
     expect_eq $? 0 || return 1
     check_status reliable_001.service inactive || return 1
     sleep 3
-    sctl status reliable_001.service | grep 'PID:  No process'
+    sctl status reliable_001.service 2>&1 | grep 'PID:  No process'
     expect_eq $? 0 || return 1
     ps -elf | grep -v grep | grep 'sleep 888'
     expect_eq $? 1 || return 1

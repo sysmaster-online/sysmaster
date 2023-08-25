@@ -20,15 +20,15 @@ function test01() {
     sctl start timeout &
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpre)'
+    sctl status timeout 2>&1 | grep 'activating (startpre)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpost)'
+    sctl status timeout 2>&1 | grep 'activating (startpost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'active (running)'
+    sctl status timeout 2>&1 | grep 'active (running)'
     expect_eq $? 0
     main_pid="$(get_pids timeout)"
     ps -elf | grep -v grep | grep 'sleep 100' | awk '{print $4}' | grep -w "${main_pid}"
@@ -37,19 +37,19 @@ function test01() {
     sctl stop timeout &
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stop)'
+    sctl status timeout 2>&1 | grep 'deactivating (stop)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stop)'
+    sctl status timeout 2>&1 | grep 'deactivating (stop)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stoppost)'
+    sctl status timeout 2>&1 | grep 'deactivating (stoppost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'inactive (dead)'
+    sctl status timeout 2>&1 | grep 'inactive (dead)'
     expect_eq $? 0
 
     # TimeoutSec=1, start-pre and stop-post both timeout
@@ -59,15 +59,15 @@ function test01() {
     sctl start timeout &
     sleep 0.9
     sctl status timeout
-    sctl status timeout | grep 'activating (startpre)'
+    sctl status timeout 2>&1 | grep 'activating (startpre)'
     expect_eq $? 0
     sleep 0.2
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stoppost)'
+    sctl status timeout 2>&1 | grep 'deactivating (stoppost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'failed'
+    sctl status timeout 2>&1 | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${startpre_log}" "${stoppost_log}"
     expect_eq $? 0
@@ -80,15 +80,15 @@ function test01() {
     sctl start timeout &
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpre)'
+    sctl status timeout 2>&1 | grep 'activating (startpre)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpost)'
+    sctl status timeout 2>&1 | grep 'activating (startpost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'active (running)'
+    sctl status timeout 2>&1 | grep 'active (running)'
     expect_eq $? 0
     main_pid="$(get_pids timeout)"
     ps -elf | grep -v grep | grep 'sleep 100' | awk '{print $4}' | grep -w "${main_pid}"
@@ -97,19 +97,19 @@ function test01() {
     sctl stop timeout &
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stop)'
+    sctl status timeout 2>&1 | grep 'deactivating (stop)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stop)'
+    sctl status timeout 2>&1 | grep 'deactivating (stop)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stoppost)'
+    sctl status timeout 2>&1 | grep 'deactivating (stoppost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'inactive (dead)'
+    sctl status timeout 2>&1 | grep 'inactive (dead)'
     expect_eq $? 0
 
     # TimeoutSec=2, only start-post timeout
@@ -121,19 +121,19 @@ function test01() {
     sctl start timeout &
     sleep 0.9
     sctl status timeout
-    sctl status timeout | grep 'activating (startpre)'
+    sctl status timeout 2>&1 | grep 'activating (startpre)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpost)'
+    sctl status timeout 2>&1 | grep 'activating (startpost)'
     expect_eq $? 0
     sleep 0.2
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stoppost)'
+    sctl status timeout 2>&1 | grep 'deactivating (stoppost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'failed'
+    sctl status timeout 2>&1 | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${startpost_log}"
     expect_eq $? 0
@@ -148,15 +148,15 @@ function test01() {
     sctl start timeout &
     sleep 0.9
     sctl status timeout
-    sctl status timeout | grep 'activating (startpre)'
+    sctl status timeout 2>&1 | grep 'activating (startpre)'
     expect_eq $? 0
     sleep 0.2
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stoppost)'
+    sctl status timeout 2>&1 | grep 'deactivating (stoppost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'failed'
+    sctl status timeout 2>&1 | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${startpre_log}"
     expect_eq $? 0
@@ -175,15 +175,15 @@ function test02() {
     sctl start timeout &
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpre)'
+    sctl status timeout 2>&1 | grep 'activating (startpre)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpost)'
+    sctl status timeout 2>&1 | grep 'activating (startpost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'active (running)'
+    sctl status timeout 2>&1 | grep 'active (running)'
     expect_eq $? 0
     main_pid="$(get_pids timeout)"
     ps -elf | grep -v grep | grep 'sleep 100' | awk '{print $4}' | grep -w "${main_pid}"
@@ -192,19 +192,19 @@ function test02() {
     sctl stop timeout &
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stop)'
+    sctl status timeout 2>&1 | grep 'deactivating (stop)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stop)'
+    sctl status timeout 2>&1 | grep 'deactivating (stop)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stoppost)'
+    sctl status timeout 2>&1 | grep 'deactivating (stoppost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'inactive (dead)'
+    sctl status timeout 2>&1 | grep 'inactive (dead)'
     expect_eq $? 0
 
     # TimeoutStartSec/TimeoutStopSec have higher priority than TimeoutSec
@@ -218,15 +218,15 @@ function test02() {
     sctl start timeout &
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpre)'
+    sctl status timeout 2>&1 | grep 'activating (startpre)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpost)'
+    sctl status timeout 2>&1 | grep 'activating (startpost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'active (running)'
+    sctl status timeout 2>&1 | grep 'active (running)'
     expect_eq $? 0
     main_pid="$(get_pids timeout)"
     ps -elf | grep -v grep | grep 'sleep 100' | awk '{print $4}' | grep -w "${main_pid}"
@@ -237,14 +237,14 @@ function test02() {
     sctl stop timeout &
     sleep 0.9
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stop)'
+    sctl status timeout 2>&1 | grep 'deactivating (stop)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stoppost)'
+    sctl status timeout 2>&1 | grep 'deactivating (stoppost)'
     sleep 0.2
     sctl status timeout
-    sctl status timeout | grep 'failed'
+    sctl status timeout 2>&1 | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${stop_log}" "${stoppost_log}"
     expect_eq $? 0
@@ -260,15 +260,15 @@ function test02() {
     sctl start timeout &
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpre)'
+    sctl status timeout 2>&1 | grep 'activating (startpre)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpost)'
+    sctl status timeout 2>&1 | grep 'activating (startpost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'active (running)'
+    sctl status timeout 2>&1 | grep 'active (running)'
     expect_eq $? 0
     main_pid="$(get_pids timeout)"
     ps -elf | grep -v grep | grep 'sleep 100' | awk '{print $4}' | grep -w "${main_pid}"
@@ -280,19 +280,19 @@ function test02() {
     sctl stop timeout &
     sleep 0.8
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stop)'
+    sctl status timeout 2>&1 | grep 'deactivating (stop)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stop)'
+    sctl status timeout 2>&1 | grep 'deactivating (stop)'
     expect_eq $? 0
     sleep 0.9
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stoppost)'
+    sctl status timeout 2>&1 | grep 'deactivating (stoppost)'
     expect_eq $? 0
     sleep 0.2
     sctl status timeout
-    sctl status timeout | grep 'failed'
+    sctl status timeout 2>&1 | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${stop_log}"
     expect_eq $? 0
@@ -308,15 +308,15 @@ function test02() {
     sctl start timeout &
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpre)'
+    sctl status timeout 2>&1 | grep 'activating (startpre)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpost)'
+    sctl status timeout 2>&1 | grep 'activating (startpost)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'active (running)'
+    sctl status timeout 2>&1 | grep 'active (running)'
     expect_eq $? 0
     main_pid="$(get_pids timeout)"
     ps -elf | grep -v grep | grep 'sleep 100' | awk '{print $4}' | grep -w "${main_pid}"
@@ -327,19 +327,19 @@ function test02() {
     sctl stop timeout &
     sleep 0.8
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stop)'
+    sctl status timeout 2>&1 | grep 'deactivating (stop)'
     expect_eq $? 0
     sleep 0.9
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stop)'
+    sctl status timeout 2>&1 | grep 'deactivating (stop)'
     expect_eq $? 0
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stoppost)'
+    sctl status timeout 2>&1 | grep 'deactivating (stoppost)'
     expect_eq $? 0
     sleep 0.2
     sctl status timeout
-    sctl status timeout | grep 'failed'
+    sctl status timeout 2>&1 | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${stoppost_log}"
     expect_eq $? 0
@@ -354,19 +354,19 @@ function test02() {
     sctl start timeout &
     sleep 1
     sctl status timeout
-    sctl status timeout | grep 'activating (startpre)'
+    sctl status timeout 2>&1 | grep 'activating (startpre)'
     expect_eq $? 0
     sleep 0.9
     sctl status timeout
-    sctl status timeout | grep 'activating (startpost)'
+    sctl status timeout 2>&1 | grep 'activating (startpost)'
     expect_eq $? 0
     sleep 0.2
     sctl status timeout
-    sctl status timeout | grep 'deactivating (stoppost)'
+    sctl status timeout 2>&1 | grep 'deactivating (stoppost)'
     expect_eq $? 0
     sleep 1.5
     sctl status timeout
-    sctl status timeout | grep 'failed'
+    sctl status timeout 2>&1 | grep 'failed'
     expect_eq $? 0
     check_log "${SYSMST_LOG}" "${startpost_log}"
     expect_eq $? 0
