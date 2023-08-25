@@ -1923,9 +1923,10 @@ impl RunningData {
 
         if self.armd_timer() {
             let timer = self.timer();
-            events.set_enabled(timer.clone(), EventState::Off)?;
+            events.del_source(timer.clone())?;
 
             timer.set_time(usec);
+            events.add_source(timer.clone())?;
             events.set_enabled(timer, EventState::OneShot)?;
             return Ok(0);
         }
