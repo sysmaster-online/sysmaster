@@ -63,6 +63,7 @@ full = [
     "os_release",
     "show_table",
     "io",
+    "murmurhash2",
 ]
 
 capability = []
@@ -105,3 +106,4 @@ string = []
 sysfs = []
 unistd = []
 uuid = ["bitflags"]
+murmurhash2 = []

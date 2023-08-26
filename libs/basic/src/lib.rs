@@ -39,6 +39,8 @@ pub mod machine;
 pub mod memory;
 #[cfg(feature = "mount")]
 pub mod mount_util;
+#[cfg(feature = "murmurhash2")]
+pub mod murmurhash2;
 #[cfg(feature = "naming_scheme")]
 pub mod naming_scheme;
 #[cfg(feature = "network")]
