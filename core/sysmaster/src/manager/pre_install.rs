@@ -278,7 +278,7 @@ impl InstallContext {
             log::warn!("create unit {} alias error: {}", install.name(), e);
         }
 
-        if let Err(e) = self.install_symlinks_wants(
+        if let Err(e) = self.install_symlinks_dir(
             install.clone(),
             target_path,
             "wants".to_string(),
@@ -287,7 +287,7 @@ impl InstallContext {
             log::warn!("create unit {} wants error: {}", install.name(), e);
         }
 
-        if let Err(e) = self.install_symlinks_wants(
+        if let Err(e) = self.install_symlinks_dir(
             install.clone(),
             target_path,
             "requires".to_string(),
@@ -313,9 +313,9 @@ impl InstallContext {
             let target = format!("{}/{}", target_path, symlink);
             if let Err(e) = basic::fs_util::symlink(&source, &target, false) {
                 log::warn!(
-                    "create symlink from {} to {}, errno is: {}",
-                    &source,
+                    "Failed to create symlink {} -> {}: {}",
                     &target,
+                    &source,
                     e
                 );
                 continue;
@@ -326,7 +326,7 @@ impl InstallContext {
         Ok(n)
     }
 
-    fn install_symlinks_wants(
+    fn install_symlinks_dir(
         &self,
         install: Rc<UnitInstall>,
         target_path: &str,
@@ -353,9 +353,9 @@ impl InstallContext {
 
             if let Err(e) = basic::fs_util::symlink(&source, &target, false) {
                 log::warn!(
-                    "create symlink from {} to {}, errno is: {}",
-                    &source,
+                    "Failed to create symlink {} -> {}: {}",
                     &target,
+                    &source,
                     e
                 );
                 continue;
