@@ -12,15 +12,36 @@
 
 //! device monitor
 //!
+use basic::murmurhash2::murmurhash2;
 use nix::{
     errno::Errno,
     sys::socket::{
         recv, sendmsg, AddressFamily, MsgFlags, NetlinkAddr, SockFlag, SockProtocol, SockType,
     },
 };
-use std::{io::IoSlice, os::unix::prelude::RawFd};
+use std::{io::IoSlice, mem::size_of, os::unix::prelude::RawFd};
 
 use crate::{device::Device, error::Error};
+
+const UDEV_MONITOR_MAGIC: u32 = 0xfeedcafe;
+
+/// Compatible with 'string_hash32' in libsystemd
+fn string_hash32(s: &str) -> u32 {
+    murmurhash2(s.as_bytes(), s.len(), 0)
+}
+
+/// Compatible with 'string_bloom64' in libsystemd
+fn string_bloom64(s: &str) -> u64 {
+    let mut bits: u64 = 0;
+    let hash: u32 = string_hash32(s);
+
+    bits |= 1_u64 << (hash & 63);
+    bits |= 1_u64 << ((hash >> 6) & 63);
+    bits |= 1_u64 << ((hash >> 12) & 63);
+    bits |= 1_u64 << ((hash >> 18) & 63);
+
+    bits
+}
 
 /// netlink group of device monitor
 pub enum MonitorNetlinkGroup {
@@ -30,6 +51,46 @@ pub enum MonitorNetlinkGroup {
     Kernel,
     /// monitoring userspace message
     Userspace,
+}
+
+#[repr(C)]
+struct MonitorNetlinkHeader {
+    prefix: [u8; 8],
+    magic: u32,
+    header_size: u32,
+    properties_off: u32,
+    properties_len: u32,
+    filter_subsystem_hash: u32,
+    filter_devtype_hash: u32,
+    filter_tag_bloom_hi: u32,
+    filter_tag_bloom_lo: u32,
+}
+
+impl Default for MonitorNetlinkHeader {
+    fn default() -> Self {
+        Self {
+            prefix: *b"libudev\0",
+            magic: UDEV_MONITOR_MAGIC.to_be(),
+            header_size: size_of::<MonitorNetlinkHeader>() as u32,
+            properties_off: size_of::<MonitorNetlinkHeader>() as u32,
+            properties_len: 0,
+            filter_subsystem_hash: 0,
+            filter_devtype_hash: 0,
+            filter_tag_bloom_hi: 0,
+            filter_tag_bloom_lo: 0,
+        }
+    }
+}
+
+impl MonitorNetlinkHeader {
+    fn to_bytes(&self) -> &[u8] {
+        unsafe {
+            std::slice::from_raw_parts(
+                self as *const _ as *const u8,
+                size_of::<MonitorNetlinkHeader>(),
+            )
+        }
+    }
 }
 
 /// device monitor
@@ -94,13 +155,8 @@ impl DeviceMonitor {
 
         if prefix.contains("@/") {
             return Device::from_nulstr(&buf[prefix_split_idx + 1..n]);
-        } else if prefix == "libdevm" {
-            return Device::from_nulstr(&buf[40..n]);
         } else if prefix == "libudev" {
-            return Err(Error::Nix {
-                msg: "origin from udev".to_string(),
-                source: Errno::EINVAL,
-            });
+            return Device::from_nulstr(&buf[40..n]);
         }
 
         Err(Error::Nix {
@@ -115,29 +171,32 @@ impl DeviceMonitor {
         device: &Device,
         destination: Option<NetlinkAddr>,
     ) -> Result<(), Error> {
+        let mut header = MonitorNetlinkHeader::default();
+
         let dest = match destination {
             Some(addr) => addr,
             None => NetlinkAddr::new(0, 2),
         };
 
-        let (nulstr, len) = device.get_properties_nulstr()?;
+        let (properties, len) = device.get_properties_nulstr()?;
 
-        let len_bytes = len.to_be_bytes();
-        let iov = [
-            IoSlice::new(b"libdevm\0"),
-            IoSlice::new(&[254, 237, 190, 239]),
-            IoSlice::new(&[40, 0, 0, 0]),
-            IoSlice::new(&[40, 0, 0, 0]),
-            IoSlice::new(&len_bytes[0..4]),
-            // todo: supply subsystem hash
-            IoSlice::new(&[0, 0, 0, 0]),
-            // todo: supply devtype hash
-            IoSlice::new(&[0, 0, 0, 0]),
-            // todo: supply tag bloom high and low bytes
-            IoSlice::new(&[0, 0, 0, 0]),
-            IoSlice::new(&[0, 0, 0, 0]),
-            IoSlice::new(&nulstr),
-        ];
+        header.properties_len = len as u32;
+        header.filter_subsystem_hash = string_hash32(device.get_subsystem()?.as_str()).to_be();
+        if let Ok(devtype) = device.get_devtype() {
+            header.filter_devtype_hash = string_hash32(&devtype).to_be();
+        }
+
+        let mut tag_bloom_bits: u64 = 0;
+        for tag in &device.tag_iter() {
+            tag_bloom_bits |= string_bloom64(tag.as_str());
+        }
+
+        if tag_bloom_bits > 0 {
+            header.filter_tag_bloom_hi = ((tag_bloom_bits >> 32) as u32).to_be();
+            header.filter_tag_bloom_lo = ((tag_bloom_bits & 0xffffffff) as u32).to_be();
+        }
+
+        let iov = [IoSlice::new(header.to_bytes()), IoSlice::new(&properties)];
 
         sendmsg(self.fd(), &iov, &[], MsgFlags::empty(), Some(&dest)).unwrap();
 
@@ -239,6 +298,10 @@ mod tests {
 
         spawn(|| {
             let device = Device::from_devname("/dev/sda").unwrap();
+            device.set_action_from_string("change").unwrap();
+            device.set_subsystem("block").unwrap();
+            device.set_seqnum(1000).unwrap();
+
             let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
             broadcaster.send_device(&device, None).unwrap();
         })

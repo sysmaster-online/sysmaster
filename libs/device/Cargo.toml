@@ -11,6 +11,7 @@ basic = { path = "../basic", default-features = false, features = [
     "parse",
     "fs",
     "fd",
+    "murmurhash2",
 ] }
 event = { path = "../event" }
 log = { path = "../log" }
