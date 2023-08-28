@@ -20,6 +20,7 @@ features = [
     "security",
     "mount",
     "machine",
+    "unit_name",
 ]
 optional = false
 

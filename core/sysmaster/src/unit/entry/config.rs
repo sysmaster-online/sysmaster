@@ -14,10 +14,15 @@
 use super::base::UeBase;
 use crate::unit::rentry::{UeConfigInstall, UeConfigUnit};
 use crate::unit::util::UnitFile;
+use basic::unit_name::unit_name_to_instance;
 use confique::{Config, FileFormat, Partial};
 use core::error::*;
 use core::rel::ReStation;
 use core::serialize::DeserializeWith;
+use core::specifier::{
+    unit_string_specifier_escape, unit_strings_specifier_escape, UnitSpecifierData, LONG_LINE_MAX,
+    PATH_MAX, UNIT_NAME_MAX,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -166,6 +171,10 @@ impl UeConfig {
             configer.Unit.After.push(v.to_string_lossy().to_string());
         }
 
+        let mut unit_specifier_data = UnitSpecifierData::new();
+        unit_specifier_data.instance = unit_name_to_instance(self.base.id());
+        configer.update_with_specifier_escape(&unit_specifier_data);
+
         *self.data.borrow_mut() = configer;
         self.db_update();
 
@@ -193,12 +202,46 @@ impl UeConfigData {
             Install: install,
         }
     }
+
+    pub(self) fn update_with_specifier_escape(&mut self, unit_specifier_data: &UnitSpecifierData) {
+        if let Ok(ret) =
+            unit_string_specifier_escape(&self.Unit.Description, LONG_LINE_MAX, unit_specifier_data)
+        {
+            self.Unit.Description = ret;
+        }
+        if let Ok(ret) = unit_string_specifier_escape(
+            &self.Unit.ConditionPathExists,
+            PATH_MAX - 1,
+            unit_specifier_data,
+        ) {
+            self.Unit.ConditionPathExists = ret;
+        }
+        if let Ok(ret) =
+            unit_strings_specifier_escape(&self.Unit.BindsTo, UNIT_NAME_MAX, unit_specifier_data)
+        {
+            self.Unit.BindsTo = ret;
+        }
+        if let Ok(ret) =
+            unit_strings_specifier_escape(&self.Unit.After, UNIT_NAME_MAX, unit_specifier_data)
+        {
+            self.Unit.After = ret;
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::manager::RELI_HISTORY_MAX_DBS;
+    use crate::unit::entry::base::UeBase;
+    use crate::unit::entry::config::UeConfig;
+    use crate::unit::rentry::UnitRe;
+    use basic::unit_name::unit_name_to_instance;
     use confique::Config;
+    use core::rel::{ReliConf, Reliability};
+    use core::specifier::UnitSpecifierData;
+    use core::unit::UnitType;
     use libtests::get_project_root;
+    use std::rc::Rc;
 
     use crate::unit::entry::config::UeConfigData;
     #[test]
@@ -212,5 +255,57 @@ mod tests {
         let result = builder.load();
 
         println!("{:?}", result);
+    }
+
+    #[test]
+    fn test_unit_specifier_escape() {
+        let reli = Rc::new(Reliability::new(
+            ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
+        ));
+        let rentry = Rc::new(UnitRe::new(&reli));
+        let base = Rc::new(UeBase::new(&rentry, String::new(), UnitType::UnitService));
+        let config = UeConfig::new(&base);
+
+        /* Description="%i service"
+         * BindsTo="a.service %i.service"
+         * After="b.service %i.service;%i.service %I.service"
+         * ConditionPathExists="/%i %I"
+         */
+        config.data.borrow_mut().Unit.Description = "%i service".to_string();
+        config.data.borrow_mut().Unit.BindsTo = vec!["a.service %i.service".to_string()];
+        config.data.borrow_mut().Unit.After = vec![
+            "b.service %i.service".to_string(),
+            "%i.service %I.service".to_string(),
+        ];
+        config.data.borrow_mut().Unit.ConditionPathExists = "/%i %I".to_string();
+
+        // Construct instance="Hal\\xc3\\xb6-chen"
+        let mut unit_specifier_data = UnitSpecifierData::new();
+        unit_specifier_data.instance = unit_name_to_instance("config@Hal\\xc3\\xb6-chen.service");
+
+        config
+            .data
+            .borrow_mut()
+            .update_with_specifier_escape(&unit_specifier_data);
+
+        assert_eq!(
+            config.data.borrow().Unit.Description,
+            "Hal\\xc3\\xb6-chen service".to_string()
+        );
+        assert_eq!(
+            config.data.borrow().Unit.BindsTo,
+            vec!["a.service Hal\\xc3\\xb6-chen.service".to_string()]
+        );
+        assert_eq!(
+            config.data.borrow().Unit.After,
+            vec![
+                "b.service Hal\\xc3\\xb6-chen.service".to_string(),
+                "Hal\\xc3\\xb6-chen.service Halö/chen.service".to_string()
+            ]
+        );
+        assert_eq!(
+            config.data.borrow().Unit.ConditionPathExists,
+            "/Hal\\xc3\\xb6-chen Halö/chen".to_string()
+        );
     }
 }

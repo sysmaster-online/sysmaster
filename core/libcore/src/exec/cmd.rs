@@ -11,6 +11,9 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::serialize::DeserializeWith;
+use crate::specifier::{
+    unit_string_specifier_escape, unit_strings_specifier_escape, UnitSpecifierData,
+};
 use basic::{fs_util::parse_absolute_path, Error, Result};
 use bitflags::bitflags;
 use serde::{
@@ -80,6 +83,21 @@ impl ExecCommand {
     /// return the arguments of the command
     pub fn argv(&self) -> Vec<&String> {
         self.argv.iter().collect::<Vec<_>>()
+    }
+
+    /// escape the specifier of ExecCommand
+    pub fn specifier_escape_full(
+        &mut self,
+        max_len: usize,
+        unit_specifier_data: &UnitSpecifierData,
+    ) {
+        if let Ok(ret) = unit_string_specifier_escape(&self.path, max_len, unit_specifier_data) {
+            self.path = ret;
+        }
+
+        if let Ok(ret) = unit_strings_specifier_escape(&self.argv, max_len, unit_specifier_data) {
+            self.argv = ret;
+        }
     }
 }
 

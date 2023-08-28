@@ -25,6 +25,7 @@ pub use unit::UmIf;
 pub mod error;
 pub mod rel;
 pub mod serialize;
+pub mod specifier;
 pub mod unit;
 pub mod utils;
 pub use error::*;

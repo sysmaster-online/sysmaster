@@ -8,9 +8,11 @@ edition = "2021"
 [dependencies]
 # internal libraries
 basic = { path = "../../libs/basic", default-features = false, features = [
+    "fs",
     "rlimit",
     "show_table",
     "unistd",
+    "unit_name"
 ] }
 cgroup = { path = "../../libs/cgroup" }
 event = { path = "../../libs/event" }

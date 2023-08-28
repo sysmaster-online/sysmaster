@@ -13,11 +13,13 @@
 #![allow(non_snake_case)]
 use super::comm::ServiceUnitComm;
 use super::rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
+use basic::unit_name::unit_name_to_instance;
 use confique::{Config, FileFormat, Partial};
 use constants::{USEC_INFINITY, USEC_PER_SEC};
 use core::error::*;
 use core::exec::ExecCommand;
 use core::rel::ReStation;
+use core::specifier::{UnitSpecifierData, LONG_LINE_MAX};
 use core::unit::KillContext;
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
@@ -89,6 +91,12 @@ impl ServiceConfig {
         };
         self.data.borrow_mut().verify();
 
+        let mut unit_specifier_data = UnitSpecifierData::new();
+        unit_specifier_data.instance = unit_name_to_instance(&self.comm.get_owner_id());
+        self.data
+            .borrow_mut()
+            .update_with_specifier_escape(&unit_specifier_data);
+
         if update {
             self.db_update();
         }
@@ -145,6 +153,22 @@ impl ServiceConfig {
     }
 }
 
+fn specifier_escape_exec_command(
+    exec_command: &mut Option<VecDeque<ExecCommand>>,
+    max_len: usize,
+    unit_specifier_data: &UnitSpecifierData,
+) {
+    let ret_exec_command = exec_command.clone();
+
+    if let Some(mut commands) = ret_exec_command {
+        for cmd in &mut commands {
+            cmd.specifier_escape_full(max_len, unit_specifier_data);
+        }
+
+        *exec_command = Some(commands);
+    }
+}
+
 #[derive(Config, Default, Debug)]
 pub(super) struct ServiceConfigData {
     #[config(nested)]
@@ -193,6 +217,14 @@ impl ServiceConfigData {
             self.Service.RestartSec *= USEC_PER_SEC;
         }
     }
+
+    pub(self) fn update_with_specifier_escape(&mut self, unit_specifier_data: &UnitSpecifierData) {
+        specifier_escape_exec_command(
+            &mut self.Service.ExecStart,
+            LONG_LINE_MAX,
+            unit_specifier_data,
+        );
+    }
 }
 
 #[cfg(test)]
@@ -200,8 +232,11 @@ mod tests {
     use crate::comm::ServiceUnitComm;
     use crate::config::ServiceConfig;
     use crate::rentry::ServiceType;
+    use basic::unit_name::unit_name_to_instance;
+    use core::exec::ExecCommand;
+    use core::specifier::UnitSpecifierData;
     use libtests::get_project_root;
-    use std::rc::Rc;
+    use std::{collections::VecDeque, rc::Rc};
 
     #[test]
     fn test_service_parse() {
@@ -231,5 +266,40 @@ mod tests {
 
         assert!(config.load(paths, false).is_ok());
         assert_eq!(config.service_type(), ServiceType::Simple)
+    }
+
+    #[test]
+    fn test_service_specifier_escape() {
+        let comm = Rc::new(ServiceUnitComm::new());
+        let config = ServiceConfig::new(&comm);
+
+        // Construct ExecStart="/bin/%i %i %i ; /bin/%I %I %I"
+        let mut src = VecDeque::new();
+        let tmp_strings = ["%i".to_string(), "%I".to_string()];
+        for tmp in tmp_strings.iter() {
+            let argv = vec![tmp.to_string(), tmp.to_string()];
+            let cmd = ExecCommand::new("/bin/".to_string() + tmp, argv);
+            src.push_back(cmd);
+        }
+        config.data.borrow_mut().Service.ExecStart = Some(src);
+
+        // Construct instance="Hal\\xc3\\xb6-chen"
+        let mut unit_specifier_data = UnitSpecifierData::new();
+        unit_specifier_data.instance = unit_name_to_instance("config@Hal\\xc3\\xb6-chen.service");
+
+        config
+            .data
+            .borrow_mut()
+            .update_with_specifier_escape(&unit_specifier_data);
+
+        let mut dst = VecDeque::new();
+        let tmp_strings = ["Hal\\xc3\\xb6-chen".to_string(), "Halö/chen".to_string()];
+        for tmp in tmp_strings.iter() {
+            let argv = vec![tmp.to_string(), tmp.to_string()];
+            let cmd = ExecCommand::new("/bin/".to_string() + tmp, argv);
+            dst.push_back(cmd);
+        }
+
+        assert_eq!(config.data.borrow().Service.ExecStart, Some(dst));
     }
 }

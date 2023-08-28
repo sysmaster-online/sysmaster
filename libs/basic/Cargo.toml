@@ -64,6 +64,7 @@ full = [
     "show_table",
     "io",
     "murmurhash2",
+    "unit_name",
 ]
 
 capability = []
@@ -105,5 +106,6 @@ stat = []
 string = []
 sysfs = []
 unistd = []
+unit_name = []
 uuid = ["bitflags"]
 murmurhash2 = []

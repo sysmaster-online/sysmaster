@@ -71,6 +71,8 @@ pub mod string;
 pub mod sysfs;
 #[cfg(feature = "unistd")]
 pub mod unistd;
+#[cfg(feature = "unit_name")]
+pub mod unit_name;
 #[cfg(feature = "uuid")]
 pub mod uuid;
 
