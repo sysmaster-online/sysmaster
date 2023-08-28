@@ -70,7 +70,7 @@ RUST_BACKTRACE=full cargo test --all-targets --all -v -- --nocapture --show-outp
 ```
 ls tools
 ```
-也可访问，[sysmaster.online 官网案例](http://sysmaster.online/resolution/00-systemd2sysmaster/)
+也可访问，[sysmaster.online 官网案例](http://sysmaster.online)
 
 ## 代码目录结构说明
 
