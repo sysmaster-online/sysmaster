@@ -71,7 +71,7 @@ pub struct RuleFile {
 
 /// rule line contains at least a rule token
 /// the regex is as following:
-///     (<token>\s*,?\s*)+
+///     `(<token>\s*,?\s*)+`
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct RuleLine {
@@ -107,7 +107,7 @@ pub struct RuleLine {
 }
 
 /// rule token matches regex:
-/// <key>[{attr}]\s*<op>\s*\"<value>\"
+/// `<key>[{attr}]\s*<op>\s*\"<value>\"`
 /// where
 ///     key: [^={+\-!:\0\s]+
 ///     attr: [^\{\}]+

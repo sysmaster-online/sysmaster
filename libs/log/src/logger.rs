@@ -418,7 +418,7 @@ impl CombinedLogger {
 
 /// Init and set the sub unit manager's log
 ///
-/// [`app_name`]: which app output the log
+/// app_name: which app output the log
 ///
 /// level:  maximum log level
 ///
@@ -442,7 +442,7 @@ pub fn init_log_for_subum(
 
 /// Init and set the log target to console
 ///
-/// [`app_name`]: which app output the log
+/// app_name: which app output the log
 ///
 /// level: maximum log level
 pub fn init_log_to_console(app_name: &str, level: Level) {
@@ -451,7 +451,7 @@ pub fn init_log_to_console(app_name: &str, level: Level) {
 
 /// Init and set the log target to file
 ///
-/// [`app_name`]: which app output the log
+/// app_name: which app output the log
 ///
 /// level: maximum log level
 ///
@@ -464,7 +464,7 @@ pub fn init_log_to_file(app_name: &str, level: Level, file_size: u32, file_numbe
 
 /// Init and set the logger
 ///
-/// [`app_name`]: which app output the log
+/// app_name: which app output the log
 ///
 /// level:  maximum log level
 ///

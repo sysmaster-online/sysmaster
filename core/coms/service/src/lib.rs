@@ -30,7 +30,7 @@
 //! [Install]
 //! WantedBy="dbus.service"
 //! ```
-//! [Service] section related configuration
+//! `[Service]` section related configuration
 //!
 //! Type
 //!

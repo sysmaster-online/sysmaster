@@ -15,6 +15,7 @@ popd
 # set pre-commit init-templatedir
 git config --global init.templateDir ~/.git-template
 pre-commit init-templatedir ~/.git-template
+pre-commit install
 
 # cleanup temporary
 cargo clean

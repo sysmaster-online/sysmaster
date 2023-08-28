@@ -168,7 +168,6 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     }
 }
 
-/// #[macro_use]
 /// the macro for create a sub unit instance with dyn ref of UmIf,
 /// which sub unit wants invoke um interface, about UmIf see doc of UmIf
 #[macro_export]

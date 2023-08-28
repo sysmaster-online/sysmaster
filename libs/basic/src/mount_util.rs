@@ -79,11 +79,11 @@ pub struct MountInfo {
     pub mount_point: String,
     /// per mount options
     pub mount_options: String,
-    /// zero or more fields of the form "tag[:value]"
+    /// zero or more fields of the form `tag[:value]`
     pub optional_fields: String,
-    /// name of filesystem of the form "type[.subtype]"
+    /// name of filesystem of the form `type[.subtype]`
     pub fstype: String,
-    /// filesystem specific information or "none"
+    /// filesystem specific information or `none`
     pub mount_source: String,
     /// per super block options
     pub super_options: String,

@@ -19,13 +19,12 @@ compile_error!("feature plugin and noplugin cannot be enabled at the same time")
 mod job;
 mod manager;
 ///
-
 /// dependency:
-///    [manager]
+///    manager
 ///       ↑
-///[reliability] → [unit   job  plugin]
+///  reliability → unit   job  plugin
 ///            ↖  ↗
-///            [butil]
+///            butil
 ///
 // mount not to be here;
 mod mount;

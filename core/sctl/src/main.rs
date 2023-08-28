@@ -38,124 +38,124 @@ struct Args {
 
 #[derive(Parser, Debug)]
 enum SubCmd {
-    /// [unit] Isolate one or more units
+    /// `[unit]` Isolate one or more units
     #[clap(display_order = 1)]
     Isolate {
         #[clap(required = true)]
         units: Vec<String>,
     },
 
-    /// [unit] Reload one or more units
+    /// `[unit]` Reload one or more units
     #[clap(display_order = 2)]
     Reload {
         #[clap(required = true)]
         units: Vec<String>,
     },
 
-    /// [unit] Reset the failed state of one or more units
+    /// `[unit]` Reset the failed state of one or more units
     #[clap(display_order = 3)]
     ResetFailed {
         #[clap(required = true)]
         units: Vec<String>,
     },
 
-    /// [unit] Restart one or more units
+    /// `[unit]` Restart one or more units
     #[clap(display_order = 4)]
     Restart {
         #[clap(required = true)]
         units: Vec<String>,
     },
 
-    /// [unit] Show the status of one or more units
+    /// `[unit]` Show the status of one or more units
     #[clap(display_order = 5)]
     Status {
         #[clap(required = true)]
         units: Vec<String>,
     },
 
-    /// [unit] Start one or more units
+    /// `[unit]` Start one or more units
     #[clap(display_order = 6)]
     Start {
         #[clap(required = true)]
         units: Vec<String>,
     },
 
-    /// [unit] Stop one or more units
+    /// `[unit]` Stop one or more units
     #[clap(display_order = 7)]
     Stop {
         #[clap(required = true)]
         units: Vec<String>,
     },
 
-    /// [manager] Reload sysmaster manager configuration
+    /// `[manager]` Reload sysmaster manager configuration
     #[clap(display_order = 8)]
     DaemonReload {},
 
-    /// [manager] Reexecute sysmaster manager
+    /// `[manager]` Reexecute sysmaster manager
     #[clap(display_order = 9)]
     DaemonReexec {},
 
-    /// [manager] List all units
+    /// `[manager]` List all units
     #[clap(display_order = 10)]
     ListUnits {},
 
-    /// [system] Halt the system
+    /// `[system]` Halt the system
     #[clap(display_order = 11)]
     Halt {
         #[clap(short, required = false)]
         force: bool,
     },
 
-    /// [system] Poweroff the system
+    /// `[system]` Poweroff the system
     #[clap(display_order = 12)]
     Poweroff {
         #[clap(short, required = false)]
         force: bool,
     },
 
-    /// [system] Reboot the system
+    /// `[system]` Reboot the system
     #[clap(display_order = 13)]
     Reboot {
         #[clap(short, required = false)]
         force: bool,
     },
 
-    /// [system] Shutdown the system
+    /// `[system]` Shutdown the system
     #[clap(display_order = 14)]
     Shutdown {
         #[clap(short, required = false)]
         force: bool,
     },
 
-    /// [system] Switch to other root file system
+    /// `[system]` Switch to other root file system
     #[clap(display_order = 15)]
     SwitchRoot {
         #[clap(required = false)]
         init: Vec<String>,
     },
 
-    /// [unit-file] Enable one or more units
+    /// `[unit-file]` Enable one or more units
     #[clap(display_order = 16)]
     Enable {
         #[clap(required = true)]
         unit_file: Vec<String>,
     },
 
-    /// [unit-file] Disable one or more units
+    /// `[unit-file]` Disable one or more units
     #[clap(display_order = 17)]
     Disable {
         #[clap(required = true)]
         unit_file: Vec<String>,
     },
 
-    /// [unit-file] Mask one or more units
+    /// `[unit-file]` Mask one or more units
     #[clap(display_order = 18)]
     Mask {
         #[clap(required = true)]
         unit_file: Vec<String>,
     },
 
-    /// [unit-file] Unmask one or more units
+    /// `[unit-file]` Unmask one or more units
     #[clap(display_order = 19)]
     Unmask {
         #[clap(required = true)]

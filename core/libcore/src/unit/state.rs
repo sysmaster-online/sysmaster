@@ -14,6 +14,7 @@ use basic::show_table::{CellAlign, CellColor, ShowTable};
 use bitflags::bitflags;
 
 /**Unit stats：
+ ```graph LR
  A[UnitActive]
  B[UnitReloading]
  C[UnitInActive]
@@ -21,6 +22,7 @@ use bitflags::bitflags;
  E[UnitActivating]
  F[UnitDeActivating]
  G[UnitMaintenance]
+ ```
  ```graph LR
 C[UnitInActive] -> E[UnitActivating]
 E->A[UnitActive]

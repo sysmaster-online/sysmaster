@@ -32,9 +32,9 @@
 //!  [Install]
 //!  WantedBy="dbus.service"
 //! ```
-//!  [Socket] section related configuration
+//!  `[Socket]` section related configuration
 //!
-//!  [ExecStartPre]
+//!  `[ExecStartPre]`
 //!
 //!  The command line that needs to be executed before the socket starts. Similar configurations include ExecStartChown, ExecStartPost, ExecStopPre, and ExecStopPost, which are executed in the corresponding startup phase.
 //!
@@ -48,9 +48,9 @@
 //!
 //!  If it is a number type, it will create a socket of IPv6 type by default. If it does not support IPv6 type, it will create a socket of IPv4 type.
 //!
-//!  If the format is a.b.c.d: x, create an IPv4 socket with the IP address of "a.b.c.d" and port of x.
+//!  If the format is `a.b.c.d: x`, create an IPv4 socket with the IP address of "a.b.c.d" and port of x.
 //!
-//!  If the format is [a]: x, create a socket of IPv6 type with IP address of "a" and port of x.
+//!  If the format is `[a]: x`, create a socket of IPv6 type with IP address of "a" and port of x.
 //!
 //!  ListenNetlink
 //!

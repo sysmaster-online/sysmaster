@@ -219,7 +219,6 @@ pub trait UnitManagerObj: UnitMngUtil + ReStation {
     fn shutdown(&self) {}
 }
 
-/// #[macro_use]
 /// the macro for create a sub unit-manager instance
 #[macro_export]
 macro_rules! declare_umobj_plugin {
