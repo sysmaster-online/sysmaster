@@ -17,7 +17,7 @@ use super::condition::{assert_keys::*, condition_keys::*, UeCondition};
 use super::config::UeConfig;
 use super::load::UeLoad;
 use super::ratelimit::StartLimit;
-use super::UnitEmergencyAction;
+use super::{UnitEmergencyAction, UnitX};
 use crate::unit::data::{DataManager, UnitState};
 use crate::unit::rentry::{UnitLoadState, UnitRe};
 use crate::unit::util::UnitFile;
@@ -27,6 +27,7 @@ use core::error::*;
 use core::rel::ReStation;
 use core::unit::{KillContext, KillMode, KillOperation, UnitNotifyFlags};
 use core::unit::{SubUnit, UnitActiveState, UnitBase, UnitType};
+use std::cell::RefCell;
 use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
@@ -52,6 +53,7 @@ pub struct Unit {
     conditions: Rc<UeCondition>,
     start_limit: StartLimit,
     sub: Box<dyn SubUnit>,
+    merged_into: RefCell<Option<Rc<UnitX>>>,
 }
 
 impl PartialEq for Unit {
@@ -206,6 +208,7 @@ impl Unit {
             conditions: Rc::new(UeCondition::new()),
             sub,
             start_limit: StartLimit::new(),
+            merged_into: RefCell::new(None),
         });
         let owner = Rc::clone(&_u);
         _u.sub.attach_unit(owner);
@@ -571,6 +574,22 @@ impl Unit {
         self.load.set_in_target_dep_queue(t);
     }
 
+    pub(super) fn get_real_name(&self) -> String {
+        self.load.get_real_name()
+    }
+
+    pub(super) fn get_all_names(&self) -> Vec<String> {
+        self.load.get_all_names()
+    }
+
+    pub(super) fn set_merge_into(&self, unit: Option<Rc<UnitX>>) {
+        *self.merged_into.borrow_mut() = unit;
+    }
+
+    pub(super) fn merged_into(&self) -> Option<Rc<UnitX>> {
+        self.merged_into.borrow().clone()
+    }
+
     pub(super) fn load_unit(&self) -> Result<()> {
         self.set_in_load_queue(false);
         // Mount unit doesn't have config file, set its loadstate to
@@ -732,6 +751,10 @@ impl Unit {
 
     pub(super) fn load_state(&self) -> UnitLoadState {
         self.load.load_state()
+    }
+
+    pub(super) fn set_load_state(&self, state: UnitLoadState) {
+        self.load.set_load_state(state)
     }
 
     pub(super) fn child_add_pids(&self, pid: Pid) {

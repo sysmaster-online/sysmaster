@@ -81,6 +81,22 @@ impl UnitX {
         self.0.load_unit()
     }
 
+    pub(crate) fn get_real_name(&self) -> String {
+        self.0.get_real_name()
+    }
+
+    pub(crate) fn get_all_names(&self) -> Vec<String> {
+        self.0.get_all_names()
+    }
+
+    pub(crate) fn set_merge_into(&self, unit: Option<Rc<UnitX>>) {
+        self.0.set_merge_into(unit)
+    }
+
+    pub(crate) fn merged_into(&self) -> Option<Rc<UnitX>> {
+        self.0.merged_into()
+    }
+
     #[allow(dead_code)]
     pub(crate) fn try_load(&self) -> Result<()> {
         // transaction_add_job_and_dependencies: bus_unit_validate_load_state + manager_unit_cache_should_retry_load + unit_load + bus_unit_validate_load_state
@@ -220,6 +236,10 @@ impl UnitX {
 
     pub(crate) fn load_state(&self) -> UnitLoadState {
         self.0.load_state()
+    }
+
+    pub(crate) fn set_load_state(&self, state: UnitLoadState) {
+        self.0.set_load_state(state)
     }
 
     pub(crate) fn unit_type(&self) -> UnitType {

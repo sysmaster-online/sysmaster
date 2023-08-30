@@ -15,6 +15,7 @@ use basic::fs_util::LookupPaths;
 use siphasher::sip::SipHasher24;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs;
 use std::hash::Hasher;
 use std::path::{Path, PathBuf};
@@ -39,6 +40,14 @@ impl UnitFile {
         self.data.borrow().get_unit_id_fragment_pathbuf(name)
     }
 
+    pub fn get_real_name(&self) -> String {
+        self.data.borrow().get_real_name()
+    }
+
+    pub fn get_all_names(&self) -> Vec<String> {
+        self.data.borrow().get_all_names()
+    }
+
     pub fn get_unit_wants_symlink_units(&self, name: &str) -> Vec<PathBuf> {
         self.data.borrow().get_unit_wants_symlink_units(name)
     }
@@ -51,6 +60,8 @@ impl UnitFile {
 #[derive(Debug)]
 struct UnitFileData {
     pub unit_id_fragment: HashMap<String, Vec<PathBuf>>,
+    pub real_name: String,
+    pub all_names: HashSet<String>,
     pub unit_wants_symlink_units: HashMap<String, Vec<PathBuf>>,
     pub unit_requires_symlink_units: HashMap<String, Vec<PathBuf>>,
     _unit_name_map: HashMap<String, String>,
@@ -63,6 +74,8 @@ impl UnitFileData {
     pub(self) fn new(lookup_path: &Rc<LookupPaths>) -> UnitFileData {
         UnitFileData {
             unit_id_fragment: HashMap::new(),
+            real_name: String::new(),
+            all_names: HashSet::new(),
             unit_wants_symlink_units: HashMap::new(),
             unit_requires_symlink_units: HashMap::new(),
             _unit_name_map: HashMap::new(),
@@ -90,6 +103,18 @@ impl UnitFileData {
             Some(v) => v.to_vec(),
             None => Vec::<PathBuf>::new(),
         }
+    }
+
+    pub(self) fn get_real_name(&self) -> String {
+        self.real_name.clone()
+    }
+
+    pub(self) fn get_all_names(&self) -> Vec<String> {
+        let mut res: Vec<String> = Vec::new();
+        for v in &self.all_names {
+            res.push(String::from(v));
+        }
+        res
     }
 
     pub(self) fn build_id_map(&mut self, name: String, has_loaded: bool) {

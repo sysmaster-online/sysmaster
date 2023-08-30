@@ -100,6 +100,14 @@ impl UeLoad {
         self.file.get_unit_id_fragment_pathbuf(&self.base.id())
     }
 
+    pub(super) fn get_real_name(&self) -> String {
+        self.file.get_real_name()
+    }
+
+    pub(super) fn get_all_names(&self) -> Vec<String> {
+        self.file.get_all_names()
+    }
+
     pub(super) fn set_load_state(&self, load_state: UnitLoadState) {
         *self.load_state.borrow_mut() = load_state;
         self.db_update();
