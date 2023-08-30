@@ -23,13 +23,16 @@ use pathdiff::diff_paths;
 use rand::Rng;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::{
     ffi::CString,
     fs::{create_dir_all, remove_dir, File},
     io::ErrorKind,
     os::unix::prelude::{AsRawFd, FromRawFd, PermissionsExt, RawFd},
 };
+
+const CHASE_SYMLINK_MAX: i32 = 32;
 
 /// read first line from a file
 pub fn read_first_line(path: &Path) -> Result<String> {
@@ -104,6 +107,55 @@ pub fn symlink(target: &str, link: &str, relative: bool) -> Result<()> {
     log::debug!("Successfully created symlink: {} -> {}", link, target);
 
     Ok(())
+}
+
+/// chase the given symlink, and return the final target.
+pub fn chase_symlink(link_path: &Path) -> Result<PathBuf> {
+    let mut current_path = PathBuf::from(link_path);
+    let mut max_follows = CHASE_SYMLINK_MAX;
+    loop {
+        let mut current_dir = match current_path.parent() {
+            None => return Err(Error::NotExisted { what: "couldn't determine parent directory".to_string() }),
+            Some(v) => v.to_string_lossy().to_string(),
+        };
+
+        /* empty current_dir joined with "/target_path" will generate root directory mistakenly. */
+        if current_dir.is_empty() {
+            current_dir = ".".to_string();
+        }
+
+        let mut target_path = match std::fs::read_link(&current_path) {
+            Err(e) => return Err(Error::Io { source: e }),
+            Ok(v) => v,
+        };
+
+        if target_path.is_relative() {
+            let current_path_str = current_dir + "/" + &target_path.to_string_lossy().to_string();
+            let simplified_path = match path_simplify(&current_path_str) {
+                None => return Err(Error::Invalid { what: format!("invalid file path: {}", current_path_str) }),
+                Some(v) => v,
+            };
+            target_path = match PathBuf::from_str(&simplified_path) {
+                Err(_) => return Err(Error::Invalid { what: format!("invalid file path: {}", current_path_str) }),
+                Ok(v) => v,
+            };
+        }
+
+        if !target_path.exists() {
+            return Err(Error::Nix { source: nix::errno::Errno::ENOENT });
+        }
+
+        if !is_symlink(&target_path) {
+            return Ok(target_path);
+        }
+
+        max_follows -= 1;
+        if max_follows <= 0 {
+            break;
+        }
+        current_path = target_path;
+    }
+    Err(Error::Nix { source: nix::errno::Errno::ELOOP })
 }
 
 /// chmod based on fd opened with O_PATH
@@ -1010,5 +1062,30 @@ mod tests {
         assert!(is_symlink(link_name_path));
 
         let _ = unlink("/tmp/test_is_symlink");
+    }
+
+    #[test]
+    fn test_chase_symlink() {
+        let _ = std::fs::File::create("final_target").unwrap();
+        symlink("./final_target", "./link1", false).unwrap();
+        symlink("./link1", "./link2", false).unwrap();
+        assert_eq!(chase_symlink(Path::new("./link2")).unwrap(), PathBuf::from("final_target"));
+        let mut prev = "./link2".to_string();
+        for i in 3..33 {
+            let cur = format!("./link{}", i);
+            symlink(&prev, &cur, false).unwrap();
+            prev = cur;
+        }
+        assert_eq!(chase_symlink(Path::new("./link32")).unwrap(), PathBuf::from("final_target"));
+        symlink("./link32", "./link33", false).unwrap();
+        assert!(chase_symlink(Path::new("./link33")).is_err());
+
+        let _ = unlink("final_target");
+        assert!(chase_symlink(Path::new("./link1")).is_err());
+
+        for i in 1..34 {
+            let path = format!("./link{}", i);
+            let _ = unlink(Path::new(&path));
+        }
     }
 }
