@@ -572,7 +572,7 @@ impl ServiceMng {
             return;
         }
 
-        if self.comm.um().has_stop_job(self.comm.owner().unwrap().id()) {
+        if self.comm.um().has_stop_job(&self.comm.owner().unwrap().id()) {
             restart = false;
         }
 
@@ -664,7 +664,7 @@ impl ServiceMng {
     }
 
     fn enter_restart(&self) {
-        if self.comm.um().has_stop_job(self.comm.owner().unwrap().id()) {
+        if self.comm.um().has_stop_job(&self.comm.owner().unwrap().id()) {
             log::info!("there is stop in pending, not restart");
             return;
         }
@@ -1893,7 +1893,7 @@ impl RunningData {
             None => return false,
             Some(v) => v,
         };
-        self.comm.um().has_start_job(u.id())
+        self.comm.um().has_start_job(&u.id())
     }
 
     pub(self) fn attach_timer(&self, timer: Rc<ServiceTimer>) {

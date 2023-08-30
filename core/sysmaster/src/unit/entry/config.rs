@@ -172,7 +172,7 @@ impl UeConfig {
         }
 
         let mut unit_specifier_data = UnitSpecifierData::new();
-        unit_specifier_data.instance = unit_name_to_instance(self.base.id());
+        unit_specifier_data.instance = unit_name_to_instance(&self.base.id());
         configer.update_with_specifier_escape(&unit_specifier_data);
 
         *self.data.borrow_mut() = configer;

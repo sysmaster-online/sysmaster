@@ -70,12 +70,12 @@ impl SocketUnitComm {
 
     pub(super) fn rentry_conf_insert(&self, socket: &SectionSocket, service: Option<String>) {
         if let Some(u) = self.owner() {
-            self.rentry().conf_insert(u.id(), socket, service)
+            self.rentry().conf_insert(&u.id(), socket, service)
         }
     }
 
     pub(super) fn rentry_conf_get(&self) -> Option<(SectionSocket, Option<String>)> {
-        self.owner().map(|u| self.rentry().conf_get(u.id()))?
+        self.owner().map(|u| self.rentry().conf_get(&u.id()))?
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -91,7 +91,7 @@ impl SocketUnitComm {
     ) {
         if let Some(u) = self.owner() {
             self.rentry().mng_insert(
-                u.id(),
+                &u.id(),
                 state,
                 result,
                 control_pid,
@@ -115,7 +115,7 @@ impl SocketUnitComm {
         i32,
         Vec<(PortType, String, RawFd)>,
     )> {
-        self.owner().map(|u| self.rentry().mng_get(u.id()))?
+        self.owner().map(|u| self.rentry().mng_get(&u.id()))?
     }
 }
 

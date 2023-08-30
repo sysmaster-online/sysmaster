@@ -282,7 +282,7 @@ impl SocketConfig {
         if let Some(u) = self.comm.owner() {
             self.service
                 .borrow_mut()
-                .set_ref(u.id().to_string(), target)
+                .set_ref(u.id(), target)
         };
     }
 

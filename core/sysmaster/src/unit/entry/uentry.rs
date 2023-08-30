@@ -70,7 +70,7 @@ impl PartialOrd for Unit {
 
 impl Ord for Unit {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.base.id().cmp(other.base.id())
+        self.base.id().cmp(&other.base.id())
     }
 }
 
@@ -123,7 +123,7 @@ impl ReStation for Unit {
 }
 
 impl UnitBase for Unit {
-    fn id(&self) -> &String {
+    fn id(&self) -> String {
         self.id()
     }
 
@@ -309,12 +309,17 @@ impl Unit {
         }
 
         let u_state = UnitState::new(original_state, new_state, flags);
-        self.dm.insert_unit_state(self.id().clone(), u_state);
+        self.dm.insert_unit_state(self.id(), u_state);
     }
 
     ///
-    pub fn id(&self) -> &String {
+    pub fn id(&self) -> String {
         self.base.id()
+    }
+
+    ///
+    pub fn set_id(&self, id: &str) {
+        self.base.set_id(id)
     }
 
     /// return pids of the unit
@@ -524,7 +529,7 @@ impl Unit {
         if self.start_limit.ratelimit_below() {
             self.start_limit.set_hit(false);
             self.dm.insert_start_limit_result(
-                self.id().clone(),
+                self.id(),
                 super::StartLimitResult::StartLimitNotHit,
             );
             return true;
@@ -532,7 +537,7 @@ impl Unit {
 
         self.start_limit.set_hit(true);
         self.dm
-            .insert_start_limit_result(self.id().clone(), super::StartLimitResult::StartLimitHit);
+            .insert_start_limit_result(self.id(), super::StartLimitResult::StartLimitHit);
         false
     }
 
@@ -547,7 +552,7 @@ impl Unit {
 
     pub(super) fn trigger(&self, other: &Self) {
         let other_unit_id = other.id();
-        self.sub.trigger(other_unit_id);
+        self.sub.trigger(&other_unit_id);
     }
 
     pub(super) fn in_load_queue(&self) -> bool {

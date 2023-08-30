@@ -131,8 +131,12 @@ impl UnitX {
         Ok(())
     }
 
-    pub(in crate::unit) fn id(&self) -> &String {
+    pub(in crate::unit) fn id(&self) -> String {
         self.0.id()
+    }
+
+    pub(in crate::unit) fn set_id(&self, id: &str) {
+        self.0.set_id(id)
     }
 
     // pub(in crate::manager::unit) fn get_config(&self, item: &UnitConfigItem) -> UnitConfigItem {

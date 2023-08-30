@@ -43,7 +43,7 @@ impl SocketLoad {
             if let Some(owner) = self.comm.owner() {
                 let um = self.comm.um();
                 um.unit_add_two_dependency(
-                    owner.id(),
+                    &owner.id(),
                     UnitRelations::UnitBefore,
                     UnitRelations::UnitTriggers,
                     &self.config.unit_ref_target().unwrap(),
@@ -59,7 +59,7 @@ impl SocketLoad {
     }
 
     fn load_related_unit(&self, related_type: UnitType) -> Result<()> {
-        let unit_name = self.comm.owner().map(|u| u.id().to_string());
+        let unit_name = self.comm.owner().map(|u| u.id());
         let suffix = String::from(related_type);
         if suffix.is_empty() {
             return Err(format!("failed to load related unit {}", suffix).into());
@@ -107,14 +107,14 @@ impl SocketLoad {
         log::debug!("Adding default dependencies for socket: {}", u.id());
         let um = self.comm.um();
         um.unit_add_dependency(
-            u.id(),
+            &u.id(),
             UnitRelations::UnitAfter,
             SOCKETS_TARGET,
             true,
             UnitDependencyMask::Default,
         )?;
         um.unit_add_two_dependency(
-            u.id(),
+            &u.id(),
             UnitRelations::UnitAfter,
             UnitRelations::UnitRequires,
             SYSINIT_TARGET,
@@ -122,7 +122,7 @@ impl SocketLoad {
             UnitDependencyMask::Default,
         )?;
         um.unit_add_two_dependency(
-            u.id(),
+            &u.id(),
             UnitRelations::UnitBefore,
             UnitRelations::UnitConflicts,
             SHUTDOWN_TARGET,

@@ -200,7 +200,7 @@ impl Notify {
         //  record + pop + action
         let ret;
         if let Some(unit) = self.db.get_unit_by_pid(Pid::from_raw(pid)) {
-            self.reli.set_last_unit(unit.id());
+            self.reli.set_last_unit(&unit.id());
             ret = self.notify_recv_dispatch(flags, pid, Some(unit));
             self.reli.clear_last_unit();
         } else {

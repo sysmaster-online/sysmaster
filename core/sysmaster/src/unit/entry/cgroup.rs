@@ -92,7 +92,7 @@ impl UnitCgroupData {
     }
 
     fn set_default_cg_path(&mut self) {
-        let cg_tree_name = PathBuf::from(cgroup::cg_escape(self.base.id()));
+        let cg_tree_name = PathBuf::from(cgroup::cg_escape(&self.base.id()));
 
         self.cg_path = cg_tree_name;
     }

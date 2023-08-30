@@ -30,7 +30,7 @@ use std::{collections::HashMap, path::PathBuf, rc::Rc};
 ///
 pub trait UnitBase {
     ///
-    fn id(&self) -> &String;
+    fn id(&self) -> String;
     ///
     fn test_start_limit(&self) -> bool;
     ///

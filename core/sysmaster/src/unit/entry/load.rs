@@ -97,7 +97,7 @@ impl UeLoad {
     }
 
     pub(super) fn get_unit_id_fragment_pathbuf(&self) -> Vec<PathBuf> {
-        self.file.get_unit_id_fragment_pathbuf(self.base.id())
+        self.file.get_unit_id_fragment_pathbuf(&self.base.id())
     }
 
     pub(super) fn set_load_state(&self, load_state: UnitLoadState) {
@@ -125,11 +125,11 @@ impl UeLoad {
 
     pub(super) fn load_unit_confs(&self) -> Result<()> {
         self.file.build_name_map(
-            self.base.id().clone(),
+            self.base.id(),
             self.load_state() == UnitLoadState::Loaded,
         );
         self.config
-            .load_fragment_and_dropin(self.file.as_ref(), self.base.id())?;
+            .load_fragment_and_dropin(self.file.as_ref(), &self.base.id())?;
         self.parse();
         Ok(())
     }
@@ -197,6 +197,6 @@ impl UeLoad {
             ud_conf.deps.insert(ud_conf_relation.0, ud_conf_relation.1);
         }
 
-        self.dm.insert_ud_config(self.base.id().clone(), ud_conf);
+        self.dm.insert_ud_config(self.base.id(), ud_conf);
     }
 }

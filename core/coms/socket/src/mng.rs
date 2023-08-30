@@ -278,7 +278,7 @@ impl SocketMng {
                 let unit_name = self
                     .comm
                     .owner()
-                    .map_or("null".to_string(), |u| u.id().to_string());
+                    .map_or("null".to_string(), |u| u.id());
                 log::error!("Failed to run ExecStartPre for unit {}: {:?}", unit_name, e);
                 self.enter_dead(SocketResult::FailureResources);
                 return;
@@ -335,7 +335,7 @@ impl SocketMng {
                 let unit_name = self
                     .comm
                     .owner()
-                    .map_or("null".to_string(), |u| u.id().to_string());
+                    .map_or("null".to_string(), |u| u.id());
                 log::error!(
                     "Failed to run ExecStartPost for unit {}: {:?}",
                     unit_name,
@@ -363,7 +363,7 @@ impl SocketMng {
     fn enter_running(&self, fd: i32) {
         log::info!("enter running, fd: {}", fd);
         if let Some(u) = self.comm.owner() {
-            if self.comm.um().has_stop_job(u.id()) {
+            if self.comm.um().has_stop_job(&u.id()) {
                 if fd >= 0 {
                     *self.refused.borrow_mut() += 1;
                     return;
@@ -372,7 +372,7 @@ impl SocketMng {
                 return;
             }
             if fd < 0 {
-                if !self.comm.um().relation_active_or_pending(u.id()) {
+                if !self.comm.um().relation_active_or_pending(&u.id()) {
                     if self.config.unit_ref_target().is_none() {
                         self.enter_stop_pre(SocketResult::FailureResources);
                         return;
@@ -397,7 +397,8 @@ impl SocketMng {
                  * where 1 is the total accept number, 5247 is PID, 0 is UID. */
 
                 /* 1. build service name */
-                let socket_prefix = match u.id().split_once('.') {
+                let socket_name = u.id();
+                let socket_prefix = match socket_name.split_once('.') {
                     None => {
                         log::error!("Invalid socket name: {}, weird.", u.id());
                         return;
@@ -418,7 +419,7 @@ impl SocketMng {
                     .comm
                     .um()
                     .unit_add_two_dependency(
-                        u.id(),
+                        &u.id(),
                         UnitRelations::UnitBefore,
                         UnitRelations::UnitTriggers,
                         &service,
@@ -947,7 +948,7 @@ impl Source for SocketMngPort {
         );
         self.rentry().set_last_frame(SocketReFrame::FdListen(true));
         self.reli()
-            .set_last_unit(self.mng().comm.owner().unwrap().id());
+            .set_last_unit(&self.mng().comm.owner().unwrap().id());
         let ret = self.dispatch_io().map_err(|_| event::Error::Other {
             word: "Dispatch IO failed!",
         });

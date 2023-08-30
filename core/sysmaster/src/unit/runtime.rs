@@ -271,7 +271,7 @@ impl UnitRTData {
             };
 
             log::debug!("Loading unit: {}", unit.id());
-            self.reli.set_last_unit(unit.id());
+            self.reli.set_last_unit(&unit.id());
             if let Err(e) = unit.load() {
                 log::error!("Failed to load unit [{}]: {}", unit.id(), e);
             }
@@ -318,7 +318,7 @@ impl UnitRTData {
                 None => break,
                 Some(v) => v,
             };
-            self.reli.set_last_unit(unit.id());
+            self.reli.set_last_unit(&unit.id());
             dispatch_target_dep_unit(&self.db, &unit);
             self.reli.clear_last_unit();
         }

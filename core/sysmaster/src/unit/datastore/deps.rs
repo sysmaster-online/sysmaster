@@ -377,11 +377,11 @@ impl UnitDepData {
             deps.append(
                 &mut dv
                     .iter()
-                    .map(|(destr, _)| (*relation, destr.id().clone()))
+                    .map(|(destr, _)| (*relation, destr.id()))
                     .collect::<Vec<_>>(),
             );
         }
-        self.rentry.dep_insert(unit.id(), &deps);
+        self.rentry.dep_insert(&unit.id(), &deps);
     }
 }
 

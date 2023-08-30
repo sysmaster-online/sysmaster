@@ -88,7 +88,7 @@ impl Target {
         log::debug!("Adding default dependencies for target: {}", u.id());
         let um = self.um.clone();
         let deps = um.get_dependency_list(
-            u.id(),
+            &u.id(),
             UnitRelationAtom::UnitAtomAddDefaultTargetDependencyQueue,
         );
         for other in deps {
@@ -99,12 +99,12 @@ impl Target {
             }
 
             /* Don't create loop, as we will add UnitAfter later. */
-            if um.unit_has_dependecy(u.id(), UnitRelationAtom::UnitAtomBefore, &other) {
+            if um.unit_has_dependecy(&u.id(), UnitRelationAtom::UnitAtomBefore, &other) {
                 continue;
             }
 
             if let Err(e) = um.unit_add_dependency(
-                u.id(),
+                &u.id(),
                 UnitRelations::UnitAfter,
                 &other,
                 true,

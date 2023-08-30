@@ -283,7 +283,7 @@ impl ServiceUnit {
 
                 for socket in sockets {
                     if let Err(e) = um.unit_add_two_dependency(
-                        owner.id(),
+                        &owner.id(),
                         UnitRelations::UnitWants,
                         UnitRelations::UnitAfter,
                         &socket,
@@ -300,7 +300,7 @@ impl ServiceUnit {
                     }
 
                     if let Err(e) = um.unit_add_dependency(
-                        owner.id(),
+                        &owner.id(),
                         UnitRelations::UnitTriggeredBy,
                         &socket,
                         true,
@@ -403,7 +403,7 @@ impl ServiceUnit {
         log::debug!("Adding default dependencies for service: {}", u.id());
         let um = self.comm.um();
         um.unit_add_two_dependency(
-            u.id(),
+            &u.id(),
             UnitRelations::UnitAfter,
             UnitRelations::UnitRequires,
             SYSINIT_TARGET,
@@ -411,14 +411,14 @@ impl ServiceUnit {
             UnitDependencyMask::Default,
         )?;
         um.unit_add_dependency(
-            u.id(),
+            &u.id(),
             UnitRelations::UnitAfter,
             BASIC_TARGET,
             true,
             UnitDependencyMask::Default,
         )?;
         um.unit_add_two_dependency(
-            u.id(),
+            &u.id(),
             UnitRelations::UnitBefore,
             UnitRelations::UnitConflicts,
             SHUTDOWN_TARGET,

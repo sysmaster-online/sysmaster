@@ -536,7 +536,7 @@ impl UmIf for UnitManager {
         let dep_units = self.db.dep_gets_atom(&s_unit, atom);
         dep_units
             .iter()
-            .map(|uxr| uxr.unit().id().to_string())
+            .map(|uxr| uxr.unit().id())
             .collect::<Vec<_>>()
     }
 
@@ -553,7 +553,7 @@ impl UmIf for UnitManager {
         let units = self.db.units_get_all(unit_type);
         units
             .iter()
-            .map(|uxr| uxr.unit().id().to_string())
+            .map(|uxr| uxr.unit().id())
             .collect::<Vec<_>>()
     }
 
@@ -1523,7 +1523,7 @@ mod tests {
             let unit = dm.2.load_unitx(u_name);
 
             match unit {
-                Some(_unit_obj) => assert_eq!(_unit_obj.id(), u_name),
+                Some(_unit_obj) => assert_eq!(&_unit_obj.id(), u_name),
                 None => println!("test unit load, not found unit: {}", u_name),
             };
         }
@@ -1546,7 +1546,7 @@ mod tests {
                             .Unit
                             .Requires
                     );
-                    assert_eq!(_unit_obj.id(), u_name);
+                    assert_eq!(&_unit_obj.id(), u_name);
                 }
                 None => println!("test unit load, not found unit: {}", u_name),
             };

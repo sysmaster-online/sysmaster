@@ -113,7 +113,7 @@ impl JobTimer {
             }
             Some(v) => v,
         };
-        let unit_id = job.unit().unit().id().to_string();
+        let unit_id = job.unit().unit().id();
         log::info!("Job {:?} of unit {} timeout", job.kind(), unit_id);
         job.dm.insert_job_result(unit_id, JobResult::TimeOut);
         0
@@ -372,7 +372,7 @@ impl Job {
         }
 
         // update reliability
-        self.reli.set_last_unit(self.unit.id());
+        self.reli.set_last_unit(&self.unit.id());
         if stage == JobStage::Wait {
             // wait -> running
             self.rentry_suspends_remove();
@@ -473,28 +473,28 @@ impl Job {
 
     pub(super) fn rentry_trigger_insert(&self) {
         self.rentry
-            .trigger_insert(self.unit.id(), self.kind, &self.attr.borrow());
+            .trigger_insert(&self.unit.id(), self.kind, &self.attr.borrow());
     }
 
     fn rentry_trigger_remove(&self) {
-        self.rentry.trigger_remove(self.unit.id());
+        self.rentry.trigger_remove(&self.unit.id());
     }
 
     fn rentry_trigger_get(&self) -> Option<(JobKind, JobAttr)> {
-        self.rentry.trigger_get(self.unit.id())
+        self.rentry.trigger_get(&self.unit.id())
     }
 
     pub(super) fn rentry_suspends_insert(&self) {
         self.rentry
-            .suspends_insert(self.unit.id(), self.kind, &self.attr.borrow());
+            .suspends_insert(&self.unit.id(), self.kind, &self.attr.borrow());
     }
 
     fn rentry_suspends_remove(&self) {
-        self.rentry.suspends_remove(self.unit.id(), self.kind);
+        self.rentry.suspends_remove(&self.unit.id(), self.kind);
     }
 
     fn rentry_suspends_get(&self) -> Option<JobAttr> {
-        self.rentry.suspends_get(self.unit.id(), self.kind)
+        self.rentry.suspends_get(&self.unit.id(), self.kind)
     }
 
     fn rentry_suspends_update(&self) {

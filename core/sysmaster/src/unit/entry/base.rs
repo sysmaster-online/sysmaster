@@ -13,6 +13,7 @@
 use crate::unit::rentry::{UeConfigInstall, UeConfigUnit, UnitLoadState, UnitRe, UnitRePps};
 use core::rel::ReStation;
 use core::unit::UnitType;
+use std::cell::RefCell;
 use nix::unistd::Pid;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -22,7 +23,7 @@ pub(super) struct UeBase {
     rentry: Rc<UnitRe>,
 
     // owned objects
-    id: String,
+    id: RefCell<String>,
     unit_type: UnitType,
 }
 
@@ -34,13 +35,13 @@ impl ReStation for UeBase {
         if reload {
             return;
         }
-        let unit_type = self.rentry.base_get(&self.id).unwrap();
+        let unit_type = self.rentry.base_get(&self.id.borrow()).unwrap();
         assert_eq!(self.unit_type, unit_type);
     }
 
     fn db_insert(&self) {
-        self.rentry.base_insert(&self.id, self.unit_type);
-        self.rentry.pps_insert(&self.id);
+        self.rentry.base_insert(&self.id.borrow(), self.unit_type);
+        self.rentry.pps_insert(&self.id.borrow());
     }
 
     // reload: no external connections, no entry
@@ -50,15 +51,19 @@ impl UeBase {
     pub(super) fn new(rentryr: &Rc<UnitRe>, id: String, unit_type: UnitType) -> UeBase {
         let base = UeBase {
             rentry: Rc::clone(rentryr),
-            id,
+            id: RefCell::new(id),
             unit_type,
         };
         base.db_insert();
         base
     }
 
-    pub(super) fn id(&self) -> &String {
-        &self.id
+    pub(super) fn id(&self) -> String {
+        self.id.borrow().to_string()
+    }
+
+    pub(super) fn set_id(&self, id: &str) {
+        *self.id.borrow_mut() = String::from(id);
     }
 
     pub(super) fn unit_type(&self) -> UnitType {
@@ -66,47 +71,47 @@ impl UeBase {
     }
 
     pub(super) fn rentry_load_insert(&self, load_state: UnitLoadState) {
-        self.rentry.load_insert(&self.id, load_state);
+        self.rentry.load_insert(&self.id.borrow(), load_state);
     }
 
     pub(super) fn rentry_load_get(&self) -> Option<UnitLoadState> {
-        self.rentry.load_get(&self.id)
+        self.rentry.load_get(&self.id.borrow())
     }
 
     pub(super) fn rentry_conf_insert(&self, unit: &UeConfigUnit, install: &UeConfigInstall) {
-        self.rentry.conf_insert(&self.id, unit, install);
+        self.rentry.conf_insert(&self.id.borrow(), unit, install);
     }
 
     pub(super) fn rentry_conf_get(&self) -> Option<(UeConfigUnit, UeConfigInstall)> {
-        self.rentry.conf_get(&self.id)
+        self.rentry.conf_get(&self.id.borrow())
     }
 
     pub(super) fn rentry_cgroup_insert(&self, cg_path: &Path) {
-        self.rentry.cgroup_insert(&self.id, cg_path);
+        self.rentry.cgroup_insert(&self.id.borrow(), cg_path);
     }
 
     pub(super) fn rentry_cgroup_get(&self) -> Option<PathBuf> {
-        self.rentry.cgroup_get(&self.id)
+        self.rentry.cgroup_get(&self.id.borrow())
     }
 
     pub(super) fn rentry_child_insert(&self, pids: &[Pid]) {
-        self.rentry.child_insert(&self.id, pids);
+        self.rentry.child_insert(&self.id.borrow(), pids);
     }
 
     pub(super) fn rentry_child_get(&self) -> Vec<Pid> {
-        self.rentry.child_get(&self.id)
+        self.rentry.child_get(&self.id.borrow())
     }
 
     pub(super) fn rentry_pps_set(&self, pps_mask: UnitRePps) {
-        self.rentry.pps_set(&self.id, pps_mask);
+        self.rentry.pps_set(&self.id.borrow(), pps_mask);
     }
 
     pub(super) fn rentry_pps_clear(&self, pps_mask: UnitRePps) {
-        self.rentry.pps_clear(&self.id, pps_mask);
+        self.rentry.pps_clear(&self.id.borrow(), pps_mask);
     }
 
     #[allow(dead_code)]
     pub(super) fn rentry_pps_contains(&self, pps_mask: UnitRePps) -> bool {
-        self.rentry.pps_contains(&self.id, pps_mask)
+        self.rentry.pps_contains(&self.id.borrow(), pps_mask)
     }
 }

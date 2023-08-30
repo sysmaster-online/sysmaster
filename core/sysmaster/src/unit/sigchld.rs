@@ -212,9 +212,9 @@ impl SigchldData {
 
         // record + action
         if let Some(unit) = self.db.get_unit_by_pid(pid) {
-            self.reli.set_last_unit(unit.id());
+            self.reli.set_last_unit(&unit.id());
             unit.sigchld_events(wait_status);
-            self.db.child_unwatch_pid(unit.id(), pid);
+            self.db.child_unwatch_pid(&unit.id(), pid);
             self.reli.clear_last_unit();
         } else {
             log::debug!("not found unit obj of pid: {:?}", pid);

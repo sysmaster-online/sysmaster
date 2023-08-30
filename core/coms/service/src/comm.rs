@@ -58,14 +58,12 @@ impl ServiceUnitComm {
     }
 
     pub(super) fn get_owner_id(&self) -> String {
-        let u = self.owner().map_or_else(
+        self.owner().map_or_else(
             || "None".to_string(),
             |u| {
-                let ret = u.id().to_string();
-                ret
+                u.id()
             },
-        );
-        u
+        )
     }
     pub(super) fn um(&self) -> Rc<dyn UmIf> {
         self.umcomm.um()
@@ -73,12 +71,12 @@ impl ServiceUnitComm {
 
     pub(super) fn rentry_conf_insert(&self, service: &SectionService) {
         if let Some(u) = self.owner() {
-            self.rentry().conf_insert(u.id(), service)
+            self.rentry().conf_insert(&u.id(), service)
         }
     }
 
     pub(super) fn rentry_conf_get(&self) -> Option<SectionService> {
-        self.owner().map(|u| self.rentry().conf_get(u.id()))?
+        self.owner().map(|u| self.rentry().conf_get(&u.id()))?
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -100,7 +98,7 @@ impl ServiceUnitComm {
     ) {
         if let Some(u) = self.owner() {
             self.rentry().mng_insert(
-                u.id(),
+                &u.id(),
                 state,
                 result,
                 main_pid,
@@ -136,7 +134,7 @@ impl ServiceUnitComm {
         ExitStatus,
         ServiceMonitor,
     )> {
-        self.owner().map(|u| self.rentry().mng_get(u.id()))?
+        self.owner().map(|u| self.rentry().mng_get(&u.id()))?
     }
 
     pub(super) fn _reli(&self) -> Rc<Reliability> {
@@ -154,11 +152,10 @@ impl ServiceUnitComm {
     }
 
     fn id(&self) -> String {
-        if let Some(ref unit) = self.owner() {
-            return unit.id().to_string();
-        }
-
-        "".to_string()
+        self.owner().map_or_else(
+            || "".to_string(),
+            |u| u.id(),
+        )
     }
 
     fn rentry(&self) -> Rc<ServiceRe> {
