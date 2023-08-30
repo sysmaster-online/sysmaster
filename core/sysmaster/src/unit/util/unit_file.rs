@@ -13,9 +13,9 @@
 use basic::fs_util;
 use basic::fs_util::is_symlink;
 use basic::fs_util::LookupPaths;
-use siphasher::sip::SipHasher24;
-use core::unit::UnitNameFlags;
 use core::unit::unit_name_is_valid;
+use core::unit::UnitNameFlags;
+use siphasher::sip::SipHasher24;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -216,7 +216,7 @@ impl UnitFileData {
             return;
         }
 
-        /* This is a template service and we didn't find its instance configuation file, try to
+        /* This is a template service and we didn't find its instance configuration file, try to
          * load the template configuration file. */
         let template_name = name.split_once('@').unwrap().0.to_string() + "@.service";
         for search_path in &search_path_list {

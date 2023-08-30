@@ -312,12 +312,7 @@ impl InstallContext {
         for symlink in symlinks {
             let target = format!("{}/{}", target_path, symlink);
             if let Err(e) = basic::fs_util::symlink(&source, &target, false) {
-                log::warn!(
-                    "Failed to create symlink {} -> {}: {}",
-                    &target,
-                    &source,
-                    e
-                );
+                log::warn!("Failed to create symlink {} -> {}: {}", &target, &source, e);
                 continue;
             }
             n += 1;
@@ -352,12 +347,7 @@ impl InstallContext {
             }
 
             if let Err(e) = basic::fs_util::symlink(&source, &target, false) {
-                log::warn!(
-                    "Failed to create symlink {} -> {}: {}",
-                    &target,
-                    &source,
-                    e
-                );
+                log::warn!("Failed to create symlink {} -> {}: {}", &target, &source, e);
                 continue;
             }
             n += 1;

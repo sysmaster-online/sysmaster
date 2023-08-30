@@ -57,12 +57,7 @@ impl MountUnitComm {
     }
 
     pub(super) fn get_owner_id(&self) -> String {
-        self.owner().map_or_else(
-            || "None".to_string(),
-            |u| {
-                u.id()
-            },
-        )
+        self.owner().map_or_else(|| "None".to_string(), |u| u.id())
     }
 
     pub(super) fn rentry_mng_insert(&self, state: MountState) {

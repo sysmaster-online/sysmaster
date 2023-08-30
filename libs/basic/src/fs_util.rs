@@ -115,7 +115,11 @@ pub fn chase_symlink(link_path: &Path) -> Result<PathBuf> {
     let mut max_follows = CHASE_SYMLINK_MAX;
     loop {
         let mut current_dir = match current_path.parent() {
-            None => return Err(Error::NotExisted { what: "couldn't determine parent directory".to_string() }),
+            None => {
+                return Err(Error::NotExisted {
+                    what: "couldn't determine parent directory".to_string(),
+                })
+            }
             Some(v) => v.to_string_lossy().to_string(),
         };
 
@@ -132,17 +136,27 @@ pub fn chase_symlink(link_path: &Path) -> Result<PathBuf> {
         if target_path.is_relative() {
             let current_path_str = current_dir + "/" + &target_path.to_string_lossy().to_string();
             let simplified_path = match path_simplify(&current_path_str) {
-                None => return Err(Error::Invalid { what: format!("invalid file path: {}", current_path_str) }),
+                None => {
+                    return Err(Error::Invalid {
+                        what: format!("invalid file path: {}", current_path_str),
+                    })
+                }
                 Some(v) => v,
             };
             target_path = match PathBuf::from_str(&simplified_path) {
-                Err(_) => return Err(Error::Invalid { what: format!("invalid file path: {}", current_path_str) }),
+                Err(_) => {
+                    return Err(Error::Invalid {
+                        what: format!("invalid file path: {}", current_path_str),
+                    })
+                }
                 Ok(v) => v,
             };
         }
 
         if !target_path.exists() {
-            return Err(Error::Nix { source: nix::errno::Errno::ENOENT });
+            return Err(Error::Nix {
+                source: nix::errno::Errno::ENOENT,
+            });
         }
 
         if !is_symlink(&target_path) {
@@ -155,7 +169,9 @@ pub fn chase_symlink(link_path: &Path) -> Result<PathBuf> {
         }
         current_path = target_path;
     }
-    Err(Error::Nix { source: nix::errno::Errno::ELOOP })
+    Err(Error::Nix {
+        source: nix::errno::Errno::ELOOP,
+    })
 }
 
 /// chmod based on fd opened with O_PATH
@@ -1069,14 +1085,20 @@ mod tests {
         let _ = std::fs::File::create("final_target").unwrap();
         symlink("./final_target", "./link1", false).unwrap();
         symlink("./link1", "./link2", false).unwrap();
-        assert_eq!(chase_symlink(Path::new("./link2")).unwrap(), PathBuf::from("final_target"));
+        assert_eq!(
+            chase_symlink(Path::new("./link2")).unwrap(),
+            PathBuf::from("final_target")
+        );
         let mut prev = "./link2".to_string();
         for i in 3..33 {
             let cur = format!("./link{}", i);
             symlink(&prev, &cur, false).unwrap();
             prev = cur;
         }
-        assert_eq!(chase_symlink(Path::new("./link32")).unwrap(), PathBuf::from("final_target"));
+        assert_eq!(
+            chase_symlink(Path::new("./link32")).unwrap(),
+            PathBuf::from("final_target")
+        );
         symlink("./link32", "./link33", false).unwrap();
         assert!(chase_symlink(Path::new("./link33")).is_err());
 

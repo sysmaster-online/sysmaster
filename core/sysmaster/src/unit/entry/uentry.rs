@@ -27,11 +27,11 @@ use core::error::*;
 use core::rel::ReStation;
 use core::unit::{KillContext, KillMode, KillOperation, UnitNotifyFlags};
 use core::unit::{SubUnit, UnitActiveState, UnitBase, UnitType};
-use std::cell::RefCell;
 use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use nix::NixPath;
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
@@ -531,10 +531,8 @@ impl Unit {
 
         if self.start_limit.ratelimit_below() {
             self.start_limit.set_hit(false);
-            self.dm.insert_start_limit_result(
-                self.id(),
-                super::StartLimitResult::StartLimitNotHit,
-            );
+            self.dm
+                .insert_start_limit_result(self.id(), super::StartLimitResult::StartLimitNotHit);
             return true;
         }
 

@@ -58,12 +58,7 @@ impl ServiceUnitComm {
     }
 
     pub(super) fn get_owner_id(&self) -> String {
-        self.owner().map_or_else(
-            || "None".to_string(),
-            |u| {
-                u.id()
-            },
-        )
+        self.owner().map_or_else(|| "None".to_string(), |u| u.id())
     }
     pub(super) fn um(&self) -> Rc<dyn UmIf> {
         self.umcomm.um()
@@ -152,10 +147,7 @@ impl ServiceUnitComm {
     }
 
     fn id(&self) -> String {
-        self.owner().map_or_else(
-            || "".to_string(),
-            |u| u.id(),
-        )
+        self.owner().map_or_else(|| "".to_string(), |u| u.id())
     }
 
     fn rentry(&self) -> Rc<ServiceRe> {

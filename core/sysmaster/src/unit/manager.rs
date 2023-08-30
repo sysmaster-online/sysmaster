@@ -551,10 +551,7 @@ impl UmIf for UnitManager {
 
     fn units_get_all(&self, unit_type: Option<UnitType>) -> Vec<String> {
         let units = self.db.units_get_all(unit_type);
-        units
-            .iter()
-            .map(|uxr| uxr.unit().id())
-            .collect::<Vec<_>>()
+        units.iter().map(|uxr| uxr.unit().id()).collect::<Vec<_>>()
     }
 
     fn current_active_state(&self, _unit_name: &str) -> UnitActiveState {

@@ -275,10 +275,7 @@ impl SocketMng {
         *self.current_control_command.borrow_mut() = cmd.clone();
         let pid = match self.spawn.start_socket(&cmd) {
             Err(e) => {
-                let unit_name = self
-                    .comm
-                    .owner()
-                    .map_or("null".to_string(), |u| u.id());
+                let unit_name = self.comm.owner().map_or("null".to_string(), |u| u.id());
                 log::error!("Failed to run ExecStartPre for unit {}: {:?}", unit_name, e);
                 self.enter_dead(SocketResult::FailureResources);
                 return;
@@ -332,10 +329,7 @@ impl SocketMng {
         match self.spawn.start_socket(&cmd) {
             Ok(pid) => self.pid.set_control(pid),
             Err(e) => {
-                let unit_name = self
-                    .comm
-                    .owner()
-                    .map_or("null".to_string(), |u| u.id());
+                let unit_name = self.comm.owner().map_or("null".to_string(), |u| u.id());
                 log::error!(
                     "Failed to run ExecStartPost for unit {}: {:?}",
                     unit_name,

@@ -572,7 +572,11 @@ impl ServiceMng {
             return;
         }
 
-        if self.comm.um().has_stop_job(&self.comm.owner().unwrap().id()) {
+        if self
+            .comm
+            .um()
+            .has_stop_job(&self.comm.owner().unwrap().id())
+        {
             restart = false;
         }
 
@@ -664,7 +668,11 @@ impl ServiceMng {
     }
 
     fn enter_restart(&self) {
-        if self.comm.um().has_stop_job(&self.comm.owner().unwrap().id()) {
+        if self
+            .comm
+            .um()
+            .has_stop_job(&self.comm.owner().unwrap().id())
+        {
             log::info!("there is stop in pending, not restart");
             return;
         }

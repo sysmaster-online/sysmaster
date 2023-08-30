@@ -13,8 +13,8 @@
 use crate::unit::rentry::{UeConfigInstall, UeConfigUnit, UnitLoadState, UnitRe, UnitRePps};
 use core::rel::ReStation;
 use core::unit::UnitType;
-use std::cell::RefCell;
 use nix::unistd::Pid;
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 

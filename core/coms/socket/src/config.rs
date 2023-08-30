@@ -280,9 +280,7 @@ impl SocketConfig {
 
     fn set_ref(&self, target: String) {
         if let Some(u) = self.comm.owner() {
-            self.service
-                .borrow_mut()
-                .set_ref(u.id(), target)
+            self.service.borrow_mut().set_ref(u.id(), target)
         };
     }
 
