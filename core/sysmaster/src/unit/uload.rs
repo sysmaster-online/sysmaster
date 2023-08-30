@@ -139,10 +139,18 @@ impl UnitLoadData {
     }
 
     pub(self) fn load_unit(&self, name: &str) -> Option<Rc<UnitX>> {
-        self.prepare_unit(name).map(|u| {
-            self.rt.dispatch_load_queue();
-            u
-        })
+        let mut u = match self.prepare_unit(name) {
+            None => return None,
+            Some(v) => v,
+        };
+        self.rt.dispatch_load_queue();
+        while u.load_state() == UnitLoadState::Merged {
+            match u.merged_into() {
+                None => return None,
+                Some(v) => u = v,
+            }
+        }
+        Some(u)
     }
 
     pub(self) fn set_um(&self, um: &Rc<UnitManager>) {

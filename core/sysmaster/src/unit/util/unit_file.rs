@@ -10,9 +10,12 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use basic::fs_util;
 use basic::fs_util::is_symlink;
 use basic::fs_util::LookupPaths;
 use siphasher::sip::SipHasher24;
+use core::unit::UnitNameFlags;
+use core::unit::unit_name_is_valid;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -125,7 +128,7 @@ impl UnitFileData {
         }
     }
 
-    fn build_id_fragment_by_name(path: &str, name: &str) -> Option<Vec<PathBuf>> {
+    fn build_id_fragment_by_name(&mut self, path: &str, name: &str) -> Option<Vec<PathBuf>> {
         let mut res: Vec<PathBuf> = Vec::new();
         if fs::metadata(path).is_err() {
             return None;
@@ -151,9 +154,45 @@ impl UnitFileData {
         if !config_path.exists() {
             return None;
         }
-        /* Symlink is complicated, it is related to Alias, skip it for now. */
-        if is_symlink(config_path.as_path()) {
-            return None;
+
+        /* dispatch symlinks */
+        for de in Path::new(path).read_dir().unwrap() {
+            let de = de.unwrap().path();
+            if !is_symlink(&de) {
+                continue;
+            }
+
+            let file_name = de.file_name().unwrap().to_string_lossy().to_string();
+            let target_path = match fs_util::chase_symlink(&de) {
+                Err(e) => {
+                    log::debug!("Failed to get the symlink of {:?}: {}, ignoring.", de, e);
+                    continue;
+                }
+                Ok(v) => v,
+            };
+            let target_name = match target_path.file_name() {
+                None => {
+                    log::error!("Failed to get the filename of {:?}", target_path);
+                    return None;
+                }
+                Some(v) => v.to_string_lossy().to_string(),
+            };
+
+            /* Found a symlink points to the real unit. */
+            if target_name == name {
+                if !unit_name_is_valid(&target_name, UnitNameFlags::ANY) {
+                    continue;
+                }
+                /* Add this symlink to all_names */
+                self.all_names.insert(file_name.clone());
+            }
+            /* We are processing an alias service. */
+            if file_name == name {
+                self.real_name = target_name;
+                self.all_names.insert(file_name);
+                res.push(de);
+                return Some(res);
+            }
         }
 
         res.push(config_path);
@@ -162,21 +201,26 @@ impl UnitFileData {
 
     fn build_id_fragment(&mut self, name: &str) {
         let mut pathbuf_fragment = Vec::new();
-        for search_path in &self.lookup_path.search_path {
-            let mut v = match Self::build_id_fragment_by_name(search_path, name) {
+        let search_path_list = self.lookup_path.search_path.clone();
+        for search_path in &search_path_list {
+            let mut v = match self.build_id_fragment_by_name(search_path, name) {
                 None => continue,
                 Some(v) => v,
             };
             pathbuf_fragment.append(&mut v);
         }
+
         if !pathbuf_fragment.is_empty() || !name.contains('@') {
             self.unit_id_fragment
                 .insert(name.to_string(), pathbuf_fragment);
             return;
         }
+
+        /* This is a template service and we didn't find its instance configuation file, try to
+         * load the template configuration file. */
         let template_name = name.split_once('@').unwrap().0.to_string() + "@.service";
-        for search_path in &self.lookup_path.search_path {
-            let mut v = match Self::build_id_fragment_by_name(search_path, &template_name) {
+        for search_path in &search_path_list {
+            let mut v = match self.build_id_fragment_by_name(search_path, &template_name) {
                 None => continue,
                 Some(v) => v,
             };

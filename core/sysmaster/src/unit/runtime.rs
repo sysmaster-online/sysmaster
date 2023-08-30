@@ -276,6 +276,30 @@ impl UnitRTData {
                 log::error!("Failed to load unit [{}]: {}", unit.id(), e);
             }
 
+            let real_name = unit.get_real_name();
+            if !real_name.is_empty() {
+                /* We are starting an alias, merge it to the real unit. */
+                log::debug!("Merging {} to {}", unit.id(), real_name);
+                match self.db.units_get(&real_name) {
+                    None => {
+                        /* We haven't loaded the real unit, rename the current unit to real unit. */
+                        unit.set_id(&real_name);
+                        self.db.units_insert(real_name.to_string(), unit.clone());
+                    }
+                    Some(u) => {
+                        unit.set_load_state(UnitLoadState::Merged);
+                        unit.set_merge_into(Some(u.clone()));
+                        self.db.units_insert(unit.id().to_string(), u);
+                    }
+                }
+            } else {
+                /* We are starting a real unit, remember its aliases. */
+                for alias_name in unit.get_all_names() {
+                    log::debug!("Add name {} to {}", alias_name, real_name);
+                    self.db.units_insert(alias_name, unit.clone());
+                }
+            }
+
             let load_state = unit.load_state();
             if load_state == UnitLoadState::Loaded {
                 self.push_target_dep_queue(Rc::clone(&unit));
