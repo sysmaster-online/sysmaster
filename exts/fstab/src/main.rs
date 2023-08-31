@@ -19,6 +19,7 @@
 //! # limit
 //! 1. The current device only supports configuration as full directory or UUID.
 
+use basic::mount_util::{is_mount_point, is_swap};
 use inotify::{EventMask, Inotify, WatchMask};
 use std::collections::HashSet;
 use std::path::Path;
@@ -39,6 +40,13 @@ fn mount_one(fstab_item: &FSTabItem) -> i32 {
             .args(["/", "--options", "remount", "-w"])
             .status()
     } else {
+        /* Already mounted */
+        if is_mount_point(Path::new(&fstab_item.mount_point))
+            && !fstab_item.options.contains("remount")
+        {
+            log::debug!("{} is already mounted", fstab_item.mount_point);
+            return 1;
+        }
         Command::new(MOUNT_BIN)
             .args([
                 &fstab_item.device_spec,
@@ -77,6 +85,12 @@ fn mount_one(fstab_item: &FSTabItem) -> i32 {
 }
 
 fn swap_on(fstab_item: &FSTabItem) -> i32 {
+    /* Already swapped on */
+    if is_swap(Path::new(&fstab_item.device_spec)) {
+        log::debug!("{} is already swapped on.", fstab_item.device_spec);
+        return 1;
+    }
+
     let status = match Command::new(SWAP_BIN)
         .args([&fstab_item.device_spec])
         .status()

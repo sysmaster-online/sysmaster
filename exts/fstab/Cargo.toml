@@ -9,3 +9,4 @@ edition = "2021"
 log = { path = "../../libs/log" }
 inotify = { version = "0.9.2", default-features = false }
 nix = { version = "0.24", default-features = false }
+basic = { path = "../../libs/basic", features = ["mount"] }
