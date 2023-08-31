@@ -14,9 +14,12 @@
 
 #![allow(deprecated)]
 use clap::Parser;
-use cmdproto::proto::{
-    abi::{sys_comm, unit_comm, CommandRequest},
-    mngr_comm, unit_file, ProstClientStream,
+use cmdproto::{
+    error::ERROR_CODE_MASK_PRINT_STDOUT,
+    proto::{
+        abi::{sys_comm, unit_comm, CommandRequest},
+        mngr_comm, unit_file, ProstClientStream,
+    },
 };
 use constants::SCTL_SOCKET;
 use std::process::exit;
@@ -251,13 +254,12 @@ fn main() {
         exit(0);
     }
 
-    if data.error_code == 0 {
-        /* Don't care if we fail to write the error out. */
+    if data.error_code == 0 || (data.error_code & ERROR_CODE_MASK_PRINT_STDOUT != 0) {
+        /* Don't care if we fail to write the message out. */
         let _ = writeln!(std::io::stdout(), "{}", data.message);
-        exit(0);
+    } else {
+        eprintln!("{}", data.message);
     }
 
-    eprintln!("{}", data.message);
-
-    exit(data.error_code as i32);
+    exit((data.error_code & !ERROR_CODE_MASK_PRINT_STDOUT) as i32);
 }
