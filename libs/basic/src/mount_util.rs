@@ -110,6 +110,34 @@ pub fn is_mount_point(path: &Path) -> bool {
     false
 }
 
+/// check if the given path is a swap, return true if yes, return false if no or fail.
+pub fn is_swap(path: &Path) -> bool {
+    let device_path = if is_symlink(path) {
+        match chase_symlink(path) {
+            Err(_) => PathBuf::from(path),
+            Ok(v) => v,
+        }
+    } else {
+        PathBuf::from(path)
+    };
+
+    let file = match File::open("/proc/swaps") {
+        Err(_) => return false,
+        Ok(v) => v,
+    };
+    let reader = BufReader::new(file);
+    for line in reader.lines() {
+        let line = match line {
+            Err(_) => continue,
+            Ok(v) => v,
+        };
+        if line.starts_with(device_path.to_str().unwrap()) {
+            return true;
+        }
+    }
+    false
+}
+
 /// MountParser is a parser used to parse /proc/PID/mountinfo
 pub struct MountInfoParser {
     cur: usize,
