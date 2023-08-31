@@ -186,21 +186,21 @@ impl UnitManagerX {
     }
 
     pub(crate) fn enable_unit(&self, unit_file: &str) -> Result<()> {
-        log::debug!("unit enable file {}", unit_file);
+        log::info!("Enabling unit {}.", unit_file);
         let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
         install.unit_enable_files(unit_file)?;
         Ok(())
     }
 
     pub(crate) fn disable_unit(&self, unit_file: &str) -> Result<()> {
-        log::debug!("unit disable file {}", unit_file);
+        log::info!("Disabling unit {}.", unit_file);
         let install = Install::new(PresetMode::Disable, self.lookup_path.clone());
         install.unit_disable_files(unit_file)?;
         Ok(())
     }
 
     pub(crate) fn mask_unit(&self, unit_file: &str) -> Result<()> {
-        log::debug!("unit mask file {}", unit_file);
+        log::info!("Masking unit {}.", unit_file);
         let link_name_path = std::path::Path::new(basic::fs_util::ETC_SYSTEM_PATH).join(unit_file);
         let target_path = std::path::Path::new("/dev/null");
         basic::fs_util::symlink(
@@ -212,7 +212,7 @@ impl UnitManagerX {
     }
 
     pub(crate) fn unmask_unit(&self, unit_file: &str) -> Result<()> {
-        log::debug!("unit unmask file {}", unit_file);
+        log::info!("Unmasking unit {}.", unit_file);
         let link_name_path = std::path::Path::new(basic::fs_util::ETC_SYSTEM_PATH).join(unit_file);
         if !link_name_path.exists() {
             return Ok(());

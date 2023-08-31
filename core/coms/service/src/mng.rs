@@ -461,6 +461,7 @@ impl ServiceMng {
                 self.enter_stop_by_notify();
             } else {
                 self.set_state(ServiceState::Running);
+                log::info!("Started {}", self.comm.get_owner_id());
                 // for running service, the default timeout is runtime_max_usec, the default value is U64::MAX for not enable timer
                 if let Err(e) = self.rd.enable_timer(u64::MAX) {
                     self.log(
@@ -566,6 +567,7 @@ impl ServiceMng {
                 force_restart
             ),
         );
+        log::info!("Stopped {}", self.comm.get_owner_id());
         let mut restart = force_restart;
 
         if self.comm.owner().is_none() {
@@ -1513,7 +1515,6 @@ impl ServiceMng {
                 .get_exec_flag()
                 .contains(ExecFlag::EXEC_COMMAND_IGNORE_FAILURE)
             {
-                log::info!("(whorwe)control: 2 |");
                 res = ServiceResult::Success;
             }
 

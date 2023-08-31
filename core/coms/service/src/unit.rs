@@ -95,15 +95,17 @@ impl SubUnit for ServiceUnit {
     }
 
     fn start(&self) -> Result<()> {
-        log::debug!("begin to start the service unit.");
+        log::info!("Starting {}", self.comm.get_owner_id());
         let started = self.mng.start_check()?;
         if started {
-            log::debug!("service already in starting, just return immediately");
+            log::info!(
+                "Service {} is being started, skipping.",
+                self.comm.get_owner_id()
+            );
             return Ok(());
         }
 
         self.mng.start_action();
-
         Ok(())
     }
 
@@ -112,9 +114,11 @@ impl SubUnit for ServiceUnit {
     }
 
     fn stop(&self, force: bool) -> Result<()> {
-        log::debug!("begin to stop the service unit, force: {}.", force);
         if !force {
+            log::info!("Stopping {}", self.comm.get_owner_id());
             self.mng.stop_check()?;
+        } else {
+            log::info!("Stopping {} forcely.", self.comm.get_owner_id());
         }
         self.mng.stop_action();
         Ok(())

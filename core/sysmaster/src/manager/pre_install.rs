@@ -422,7 +422,6 @@ impl Install {
 
     /// enable one unit file
     pub fn unit_enable_files(&self, file: &str) -> Result<()> {
-        log::debug!("unit enable file: {}", file);
         let target_path = &self.lookup_path.persistent_path;
 
         self.unit_install_discover(file, self.enable_ctx.clone())?;
