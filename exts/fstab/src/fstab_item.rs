@@ -40,7 +40,8 @@ impl FSTabItem {
         let mut real_path = String::from(input[0]);
         if real_path.starts_with("UUID") {
             let uuid = String::from(&real_path["UUID".len() + 1..]);
-            real_path = String::from("/dev/disk/by-uuid/") + &uuid;
+            let quotes: &[_] = &['\'', '\"'];
+            real_path = String::from("/dev/disk/by-uuid/") + uuid.trim_start().trim_matches(quotes);
         }
         FSTabItem {
             device_spec: real_path,
