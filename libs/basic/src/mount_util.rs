@@ -11,9 +11,17 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-use std::os::unix::prelude::RawFd;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    os::unix::prelude::RawFd,
+    path::{Path, PathBuf},
+};
 
-use crate::error::*;
+use crate::{
+    error::*,
+    fs_util::{chase_symlink, is_symlink},
+};
 use nix::{
     fcntl::AtFlags,
     sys::stat::{fstatat, SFlag},
@@ -41,6 +49,65 @@ pub fn mount_point_fd_valid(fd: RawFd, file_name: &str, flags: AtFlags) -> Resul
     }
 
     Ok(f_stat.st_dev != d_stat.st_dev)
+}
+
+#[cfg(not(target_env = "musl"))]
+/// check if the given path is a mount point, return true if yes, return false if no or fail.
+pub fn is_mount_point(path: &Path) -> bool {
+    use std::{ffi::CString, os::unix::prelude::AsRawFd};
+
+    use libc::{statx, STATX_ATTR_MOUNT_ROOT};
+
+    let file = match File::open(path) {
+        Err(_) => {
+            return false;
+        }
+        Ok(v) => v,
+    };
+    let fd = AsRawFd::as_raw_fd(&file);
+    let path_name = CString::new(path.to_str().unwrap()).unwrap();
+    let mut statxbuf: statx = unsafe { std::mem::zeroed() };
+    unsafe {
+        /* statx was added to linux in kernel 4.11 per `stat(2)`,
+         * we can depend on it safely. So we only use statx to
+         * check if the path is a mount point, and chase the
+         * symlink unconditionally*/
+        statx(fd, path_name.as_ptr(), 0, 0, &mut statxbuf);
+        log::debug!(
+            "{} attributes_mask {},stx_attributes{}",
+            path.to_str().unwrap(),
+            statxbuf.stx_attributes_mask & (STATX_ATTR_MOUNT_ROOT as u64),
+            statxbuf.stx_attributes & (STATX_ATTR_MOUNT_ROOT as u64)
+        );
+        /* The mask is supported and is set */
+        statxbuf.stx_attributes_mask & (STATX_ATTR_MOUNT_ROOT as u64) != 0
+            && statxbuf.stx_attributes & (STATX_ATTR_MOUNT_ROOT as u64) != 0
+    }
+}
+
+#[cfg(target_env = "musl")]
+/// check if the given path is a mount point, return true if yes, return false if no or fail.
+/* musl can't use statx, check /proc/self/mountinfo. */
+pub fn is_mount_point(path: &Path) -> bool {
+    use std::io::Read;
+
+    let mut mount_data = String::new();
+    let mut file = match File::open("/proc/self/mountinfo") {
+        Err(_) => {
+            return false;
+        }
+        Ok(v) => v,
+    };
+    if file.read_to_string(&mut mount_data).is_err() {
+        return false;
+    }
+    let parser = MountInfoParser::new(mount_data);
+    for mount in parser {
+        if path.to_str().unwrap() == mount.mount_point {
+            return true;
+        }
+    }
+    false
 }
 
 /// MountParser is a parser used to parse /proc/PID/mountinfo

@@ -20,10 +20,8 @@ use nix::{
 };
 
 use libc::{glob, glob_t, GLOB_NOSORT};
-#[cfg(not(target_env = "musl"))]
-use libc::{statx, STATX_ATTR_MOUNT_ROOT};
 
-use crate::{cmdline, fd_util, security, sysfs::SysFs, unistd};
+use crate::{cmdline, fd_util, mount_util::is_mount_point, security, sysfs::SysFs, unistd};
 
 #[cfg(target_env = "musl")]
 use crate::mount_util::MountInfoParser;
@@ -305,64 +303,12 @@ impl Condition {
         Path::new(&self.params).is_dir() as i8
     }
 
-    #[cfg(not(target_env = "musl"))]
     fn test_path_is_mount_point(&self) -> i8 {
-        use std::os::unix::prelude::AsRawFd;
-
         if self.params.eq("/") {
             return 1;
         }
-        let file = match File::open(Path::new(&self.params)) {
-            Err(_) => {
-                return 0;
-            }
-            Ok(v) => v,
-        };
-        let fd = AsRawFd::as_raw_fd(&file);
-        let path_name = CString::new(self.params.as_str()).unwrap();
-        let mut statxbuf: statx = unsafe { std::mem::zeroed() };
-        unsafe {
-            /* statx was added to linux in kernel 4.11 per `stat(2)`,
-             * we can depend on it safely. So we only use statx to
-             * check if the path is a mount point, and chase the
-             * symlink unconditionally*/
-            statx(fd, path_name.as_ptr(), 0, 0, &mut statxbuf);
-            log::debug!(
-                "{} attributes_mask {},stx_attributes{}",
-                self.params,
-                statxbuf.stx_attributes_mask & (STATX_ATTR_MOUNT_ROOT as u64),
-                statxbuf.stx_attributes & (STATX_ATTR_MOUNT_ROOT as u64)
-            );
-            /* The mask is supported and is set */
-            i8::from(
-                statxbuf.stx_attributes_mask & (STATX_ATTR_MOUNT_ROOT as u64) != 0
-                    && statxbuf.stx_attributes & (STATX_ATTR_MOUNT_ROOT as u64) != 0,
-            )
-        }
-    }
 
-    #[cfg(target_env = "musl")]
-    /* musl can't use statx, check /proc/self/mountinfo. */
-    fn test_path_is_mount_point(&self) -> i8 {
-        use std::io::Read;
-
-        let mut mount_data = String::new();
-        let mut file = match File::open("/proc/self/mountinfo") {
-            Err(_) => {
-                return 0;
-            }
-            Ok(v) => v,
-        };
-        if file.read_to_string(&mut mount_data).is_err() {
-            return 0;
-        }
-        let parser = MountInfoParser::new(mount_data);
-        for mount in parser {
-            if self.params == mount.mount_point {
-                return 1;
-            }
-        }
-        0
+        i8::from(is_mount_point(Path::new(&self.params)))
     }
 
     fn test_path_is_read_write(&self) -> i8 {
