@@ -20,6 +20,7 @@
 //! 1. The current device only supports configuration as full directory or UUID.
 
 use basic::mount_util::{is_mount_point, is_swap};
+use basic::{MOUNT_BIN, SWAP_BIN, FSTAB_PATH};
 use inotify::{EventMask, Inotify, WatchMask};
 use std::collections::HashSet;
 use std::path::Path;
@@ -27,10 +28,6 @@ use std::process::Command;
 
 pub mod fstab_item;
 use fstab_item::FSTabItem;
-
-const MOUNT_BIN: &str = "/usr/bin/mount";
-const SWAP_BIN: &str = "/usr/sbin/swapon";
-const FSTAB_PATH: &str = "/etc/fstab";
 
 fn mount_one(fstab_item: &FSTabItem) -> i32 {
     // -.mount is different. It has already been mounted before

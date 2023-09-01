@@ -106,3 +106,12 @@ pub const CGROUP_SYSMASTER: &str = "sysmaster";
 
 /// the default running time directory of sysmaster
 pub const EXEC_RUNTIME_PREFIX: &str = "/run";
+
+/// the default mount command path
+pub const MOUNT_BIN: &str = "/usr/bin/mount";
+
+/// the default swapon path
+pub const SWAP_BIN: &str = "/usr/sbin/swapon";
+
+// the default fstab config file path
+pub const FSTAB_PATH: &str = "/etc/fstab";

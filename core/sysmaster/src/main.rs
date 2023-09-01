@@ -40,6 +40,7 @@ use crate::manager::config::ManagerConfig;
 use crate::manager::signals::EVENT_SIGNALS;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
+use basic::{MOUNT_BIN, FSTAB_PATH,machine,machine::Machine, mount_util::read_lines};
 use clap::Parser;
 use core::error::*;
 use core::rel;
@@ -52,6 +53,8 @@ use std::os::unix::process::CommandExt;
 use std::process::{exit, Command};
 use std::rc::Rc;
 use std::str::FromStr;
+use std::path::Path;
+use std::fs;
 
 /// parse program arguments
 #[derive(Parser, Debug)]
@@ -76,6 +79,9 @@ fn main() -> Result<()> {
     register_reexec_signal(true);
 
     //---------------------------------------------------------------------------
+
+    //remount / to rw permission, as log will create file if user want flush to to file
+    remount_sysroot();
 
     let manager_config = Rc::new(ManagerConfig::new(None));
     log::logger::init_log(
@@ -299,4 +305,58 @@ fn ignore_all_signals() {
             );
         }
     }
+}
+
+// Remount the / according to the configure in /etc/fstab.
+// We will do nothing if no configuration about / in /etc/fstab.
+// The conditin listed below should be satisfied for remounting
+// 1./etc/fstab exist
+// 2.There are configure about / in /etc/fstab
+fn remount_sysroot() {
+    // Check whether the /etc/fstab exist or not
+    if !Path::new(FSTAB_PATH).exists() {
+        return;
+    }
+
+    //Check whether we are in container
+    let virtualization = machine::Machine::detect_container();
+    if virtualization != Machine::None && virtualization != Machine::Host {
+        return;
+    }
+
+    let root_path = "/";
+
+    //check if the '/' has the write permission
+    if let Ok(md) = fs::metadata(root_path) {
+        let permissions = md.permissions();
+        if !permissions.readonly() {
+            return;
+        }
+    };
+
+    if let Ok(lines) = read_lines(FSTAB_PATH) {
+        for item_raw in lines.flatten() {
+            let item = item_raw.trim();
+            if item.starts_with('#') || item.is_empty() {
+                continue;
+            }
+            let mount: Vec<&str> = item.split_whitespace().collect();
+            //get the len of mount first in case the illegal configure in /etc/fstab
+            if mount.len() != 6 {
+                println!("Illegal configure in /etc/fstab!");
+                continue;
+            }
+
+            // remount the '/' if there are configuration about the '/'
+            if mount[1] == root_path {
+                println!("Remounting the '/'!");
+                Command::new(MOUNT_BIN)
+                    .args(["/", "-o", "remount"])
+                    .status()
+                    .expect("failed to remount /");
+                    return;
+            }
+        }
+    }
+
 }
