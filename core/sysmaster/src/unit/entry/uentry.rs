@@ -677,12 +677,12 @@ impl Unit {
 
         if active_state != UnitActiveState::UnitActivating && !self.conditions().conditions_test() {
             log::info!("The condition check failed, not starting {}.", self.id());
-            return Err(Error::UnitActionEInval);
+            return Err(Error::UnitActionEComm);
         }
 
         if active_state != UnitActiveState::UnitActivating && !self.conditions().asserts_test() {
             log::info!("The assert check failed, not starting {}.", self.id());
-            return Err(Error::UnitActionEInval);
+            return Err(Error::UnitActionEProto);
         }
 
         self.sub.start()
