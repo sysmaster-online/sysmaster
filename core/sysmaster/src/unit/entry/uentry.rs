@@ -725,7 +725,7 @@ impl Unit {
         self.sub.sigchld_events(wait_status)
     }
 
-    pub(super) fn load_state(&self) -> UnitLoadState {
+    pub fn load_state(&self) -> UnitLoadState {
         self.load.load_state()
     }
 
