@@ -879,7 +879,12 @@ impl UnitManager {
 
     pub(self) fn get_unit_status(&self, name: &str) -> Result<UnitStatus> {
         let unit = match self.units_get(name) {
-            Some(unit) => unit,
+            Some(unit) => {
+                if unit.load_state() == UnitLoadState::NotFound {
+                    return Err(Error::NotExisted);
+                }
+                unit
+            }
             None => {
                 return Err(Error::NotExisted);
             }
