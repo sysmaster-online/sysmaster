@@ -1,10 +1,43 @@
-# devmaster 手册
+# devmaster使用手册
 
 ## 1. 简介
 
 `devmaster`是用户态设备管理工具。其基于`Linux`内核的`uevent`机制，提供了设备热插拔管理的能力。`devmaster`的规则机制可以避免大部分场景下的设备热插拔处理逻辑的硬编码，规则机制提供的功能包括管理设备节点的权限、创建具有唯一标识能力的块设备软链接、网卡重命名等等，另外也支持运行用户自定义的用户态程序。`devmaster`的规则语法、客户端管理工具`devctl`以及用户态广播报文格式等对外接口保持对`udev`良好的兼容能力，使得在大部分场景下依赖`udev`提供的`sdk`、或者订阅了`udev`广播消息的用户态软件，可以在`devmaster`的运行环境中保持正常运行。
 
-## 2. 配置
+## 2. 安装部署
+
+### 安装`devmaster`
+
+使用`yum`安装`sysmaster-devmaster`包：
+
+```
+# yum install sysmaster-devmaster
+```
+
+### 启动`devmaster`
+
+以后台进程启动`devmaster`，将日志导出到`/tmp/devmaster.log`文件中：
+
+```
+# /lib/devmaster/devmaster &>> /tmp/devmaster.log &
+```
+
+### 添加规则文件
+
+在`/etc/devmaster/rules.d/`目录下创建自定义规则，通常以两位数字开头，以`.rules`作为后缀，比如`00-test.rules`，规则语法见下文。添加、删除、变更规则后，需要重新启动`devmaster`。
+
+### 触发设备事件
+
+使用`devctl`命令触发设备事件：
+
+```
+# devctl trigger --type subsystems --action add
+# devctl trigger --type devices --action add
+```
+
+查看`/run/devmaster/data/`目录下，生成每种设备和子系统对应的数据库。
+
+## 3. 配置
 
 ### 配置文件路径
 
@@ -22,7 +55,7 @@
 
 - `network_d`: 网卡配置加载路径，默认值为`["/etc/devmaster/network.d"]`。网卡配置用于控制`devmaster`的内置命令`net_setup_link`的行为，具体可参考`网卡配置`手册。
 
-## 3. 规则
+## 4. 规则
 
 ### 规则文件
 
