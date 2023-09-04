@@ -215,6 +215,8 @@ pub(crate) struct UeConfigUnit {
     pub AssertPathExists: String,
     #[config(default = 10)]
     pub StartLimitInterval: u64,
+    #[config(default = 10)]
+    pub StartLimitIntervalSec: u64,
     #[config(default = 5)]
     pub StartLimitBurst: u32,
     #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]

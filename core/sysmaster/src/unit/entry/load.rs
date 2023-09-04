@@ -156,6 +156,17 @@ impl UeLoad {
     fn parse(&self) {
         let mut ud_conf = UnitDepConf::new(); // need get config from config database,and update depends hereW
         let config_data = self.config.config_data();
+        let start_limit_interval = config_data.borrow().Unit.StartLimitInterval;
+        let start_limit_interval_sec = config_data.borrow().Unit.StartLimitIntervalSec;
+        if start_limit_interval != start_limit_interval_sec {
+            /* If StartLimitInterval is not the default value, use StartLimitInterval. */
+            if start_limit_interval != 10 {
+                config_data.borrow_mut().Unit.StartLimitInterval = start_limit_interval;
+            } else {
+                /* If StartLimitInterval is the default value, use StartLimitIntervalSec. */
+                config_data.borrow_mut().Unit.StartLimitInterval = start_limit_interval_sec;
+            }
+        }
         let ud_conf_insert_table = vec![
             (
                 UnitRelations::UnitWants,
