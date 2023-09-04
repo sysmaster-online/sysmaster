@@ -178,19 +178,18 @@ impl log::Log for FileLogger {
                         println!("Failed to open the log file.");
                         return;
                     }
-                    match FileLogger::file_open(&self.file_path, self.file_mode){
+                    match FileLogger::file_open(&self.file_path, self.file_mode) {
                         Ok(mut file) => {
                             write_msg_file(&mut file, module_path, record.args().to_string());
                             current_size = match file.metadata() {
-                            Err(_) => return,
-                            Ok(v) => v.len() as u32,
+                                Err(_) => return,
+                                Ok(v) => v.len() as u32,
                             }
-                        },
-                        Err(e)=> {
-                            println!("Failed to open the log file:{}.",e);
+                        }
+                        Err(e) => {
+                            println!("Failed to open the log file:{}.", e);
                             return;
                         }
-                        
                     };
                 }
             }
@@ -216,18 +215,16 @@ impl log::Log for FileLogger {
                     if !self.open_when_needed {
                         return;
                     }
-                    match FileLogger::file_open(&self.file_path, self.file_mode){
+                    match FileLogger::file_open(&self.file_path, self.file_mode) {
                         Ok(file) => {
                             if let Err(e) = file.set_len(0) {
-                            println!("Failed to clear log file: {}", e);
+                                println!("Failed to clear log file: {}", e);
                             }
                         }
-                        Err(e)=> {
+                        Err(e) => {
                             println!("Failed to open the log file:{}.", e);
-                            return;
                         }
                     };
-                    
                 }
             }
         }
@@ -248,7 +245,7 @@ impl log::Log for FileLogger {
                 if !self.open_when_needed {
                     return;
                 }
-                match FileLogger::file_open(&self.file_path, self.file_mode){
+                match FileLogger::file_open(&self.file_path, self.file_mode) {
                     Ok(mut file) => {
                         if let Err(e) = file.flush() {
                             println!("Failed to flush log file: {}", e);
@@ -258,7 +255,6 @@ impl log::Log for FileLogger {
                         println!("Failed to open file for flushing log file: {}", e);
                     }
                 };
-                
             }
         }
     }
@@ -268,14 +264,18 @@ impl FileLogger {
     fn file_open(file_path: &Path, file_mode: u32) -> Result<File, Error> {
         let dir = file_path.parent().unwrap();
         if !dir.exists() {
-            if let Err(e) = fs::create_dir_all(dir){
-                println!("Failed to create dir {}: {:?}",dir.to_string_lossy(), e);
+            if let Err(e) = fs::create_dir_all(dir) {
+                println!("Failed to create dir {}: {:?}", dir.to_string_lossy(), e);
                 return Err(e);
             };
         }
 
         if let Err(e) = fs::set_permissions(dir, fs::Permissions::from_mode(0o700)) {
-            println!("Failed to set permissions of dir {}: {:?}",dir.to_string_lossy(), e);
+            println!(
+                "Failed to set permissions of dir {}: {:?}",
+                dir.to_string_lossy(),
+                e
+            );
             return Err(e);
         }
 
@@ -284,13 +284,18 @@ impl FileLogger {
             .create(true)
             .append(true)
             .mode(file_mode)
-            .open(file_path) {
-                Err(e) => {
-                    println!("Failed to open file {} for log: {:?}",file_path.to_string_lossy(), e);
-                    return Err(e)
-                }
-                Ok(v) => return Ok(v),
+            .open(file_path)
+        {
+            Err(e) => {
+                println!(
+                    "Failed to open file {} for log: {:?}",
+                    file_path.to_string_lossy(),
+                    e
+                );
+                Err(e)
             }
+            Ok(v) => Ok(v),
+        }
     }
 
     fn new(
@@ -310,7 +315,7 @@ impl FileLogger {
                 max_size: max_size * 1024,
                 file: Mutex::new(None),
                 open_when_needed: true,
-            })
+            });
         }
 
         let file = Self::file_open(&file_path, file_mode)?;
@@ -543,22 +548,23 @@ pub fn init_log(_app_name: &str, level: Level, target: &str, file_size: u32, fil
             file_size,
             file_number,
             false,
-        ){
+        ) {
             Ok(filelogger) => {
                 let _ = crate::inner::set_boxed_logger(Box::new(filelogger));
                 crate::inner::set_max_level(level);
-        
+
                 unsafe {
                     LOG_LEVEL.store(level_num, Ordering::SeqCst);
                     LOG_TARGET.store(target_num, Ordering::SeqCst);
                     LOG_FILE_NUMBER.store(file_number, Ordering::SeqCst);
                     LOG_FILE_SIZE.store(file_size, Ordering::SeqCst);
                 }
-            },
+            }
             Err(e) => {
                 println!(
                     "LogTarget is configured to `file`, but we can't open file for writing, \
-                    changing the LogTarget to `syslog`!:{:?}", e
+                    changing the LogTarget to `syslog`!:{:?}",
+                    e
                 );
                 target = "syslog";
             }
@@ -577,7 +583,7 @@ pub fn init_log(_app_name: &str, level: Level, target: &str, file_size: u32, fil
             }
         }
         crate::inner::set_max_level(level);
-        
+
         // target may changed from 'file' to 'syslog',so we need to resign the value of target_num
         target_num = match target {
             "syslog" => 0,
@@ -589,8 +595,6 @@ pub fn init_log(_app_name: &str, level: Level, target: &str, file_size: u32, fil
             LOG_LEVEL.store(level_num, Ordering::SeqCst);
             LOG_TARGET.store(target_num, Ordering::SeqCst);
         }
-
-        return;
     }
 
     if target == "console-syslog" {
@@ -615,8 +619,6 @@ pub fn init_log(_app_name: &str, level: Level, target: &str, file_size: u32, fil
             LOG_LEVEL.store(level_num, Ordering::SeqCst);
             LOG_TARGET.store(target_num, Ordering::SeqCst);
         }
-
-        return;
     }
 }
 
@@ -658,15 +660,16 @@ pub fn reinit(open_when_needed: bool) {
             file_size,
             file_number,
             open_when_needed,
-        ){
+        ) {
             Ok(filelogger) => {
                 let _ = crate::inner::set_boxed_logger(Box::new(filelogger));
                 crate::inner::set_max_level(level);
-            },
+            }
             Err(e) => {
                 println!(
                     "LogTarget is configured to `file`, but we can't open file for writing, \
-                    changing the LogTarget to `syslog`!:{:?}", e
+                    changing the LogTarget to `syslog`!:{:?}",
+                    e
                 );
                 target = "syslog";
             }
@@ -698,7 +701,6 @@ pub fn reinit(open_when_needed: bool) {
         }
 
         crate::inner::set_max_level(level);
-        return;
     }
 
     if target == "console-syslog" {
@@ -718,7 +720,6 @@ pub fn reinit(open_when_needed: bool) {
             eprintln!("Failed to set logger: {:?}", e);
         }
         crate::inner::set_max_level(level);
-        return;
     }
 }
 

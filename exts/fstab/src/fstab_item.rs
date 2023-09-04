@@ -65,6 +65,13 @@ pub fn parse(filename: &str) -> Vec<FSTabItem> {
                 continue;
             }
             let mount: Vec<&str> = item.split_whitespace().collect();
+
+            //Check the legitimacy of configure in /etc/fstab
+            //Otherwise the process of FsTabItem::new may crash
+            if mount.len() != 6 {
+                println!("Illegal configure in /etc/fstab!");
+                continue;
+            }
             let fstab_item = FSTabItem::new(mount);
             res.push(fstab_item);
         }

@@ -306,6 +306,7 @@ impl Iterator for MountInfoParser {
     }
 }
 
+///Read the file of filename into the BufReader for later processing
 pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where
     P: AsRef<Path>,

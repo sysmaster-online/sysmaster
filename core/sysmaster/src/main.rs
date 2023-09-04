@@ -40,7 +40,7 @@ use crate::manager::config::ManagerConfig;
 use crate::manager::signals::EVENT_SIGNALS;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
-use basic::{MOUNT_BIN, FSTAB_PATH,machine,machine::Machine, mount_util::read_lines};
+use basic::{machine, machine::Machine, mount_util::read_lines, FSTAB_PATH, MOUNT_BIN};
 use clap::Parser;
 use core::error::*;
 use core::rel;
@@ -49,12 +49,12 @@ use log::{self, Level};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use std::convert::TryFrom;
 use std::env::{self};
+use std::fs;
 use std::os::unix::process::CommandExt;
+use std::path::Path;
 use std::process::{exit, Command};
 use std::rc::Rc;
 use std::str::FromStr;
-use std::path::Path;
-use std::fs;
 
 /// parse program arguments
 #[derive(Parser, Debug)]
@@ -354,9 +354,8 @@ fn remount_sysroot() {
                     .args(["/", "-o", "remount"])
                     .status()
                     .expect("failed to remount /");
-                    return;
+                return;
             }
         }
     }
-
 }

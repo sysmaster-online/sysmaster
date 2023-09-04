@@ -113,5 +113,5 @@ pub const MOUNT_BIN: &str = "/usr/bin/mount";
 /// the default swapon path
 pub const SWAP_BIN: &str = "/usr/sbin/swapon";
 
-// the default fstab config file path
+/// the default fstab config file path
 pub const FSTAB_PATH: &str = "/etc/fstab";
