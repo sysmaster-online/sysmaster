@@ -1,0 +1,13 @@
+[Unit]
+DefaultDependencies=false
+Wants="devmaster.service"
+After="devmaster.service"
+Requires="devmaster.service"
+Before="sysinit.target"
+
+[Service]
+Type="oneshot"
+ExecStart="/usr/bin/devctl trigger --type subsystems --action add ; /usr/bin/devctl trigger --type devices --action add"
+
+[Install]
+WantedBy="sysinit.target"
