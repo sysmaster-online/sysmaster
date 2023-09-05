@@ -327,7 +327,12 @@ impl ServiceUnit {
     }
 
     fn service_add_extras(&self) -> Result<()> {
-        if self.config.service_type() == ServiceType::Notify {
+        if self.config.service_type() == ServiceType::Notify
+            && (self.config.config_data().borrow().Service.NotifyAccess == None
+                || self.config.config_data().borrow().Service.NotifyAccess
+                    == Some(NotifyAccess::None)
+                || self.config.config_data().borrow().Service.WatchdogSec > 0)
+        {
             self.config.set_notify_access(NotifyAccess::Main);
         }
 

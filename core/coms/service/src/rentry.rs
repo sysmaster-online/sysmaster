@@ -84,8 +84,12 @@ where
 pub(super) enum NotifyAccess {
     #[serde(alias = "none")]
     None,
+    #[serde(alias = "all")]
+    All,
     #[serde(alias = "main")]
     Main,
+    #[serde(alias = "exec")]
+    Exec,
 }
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy)]

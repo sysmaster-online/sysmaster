@@ -19,7 +19,7 @@ use super::rentry::{
     NotifyState, ServiceCommand, ServiceRestart, ServiceResult, ServiceState, ServiceType,
 };
 use super::spawn::ServiceSpawn;
-use crate::rentry::{ExitStatus, PreserveMode};
+use crate::rentry::{ExitStatus, NotifyAccess, PreserveMode};
 use basic::{do_entry_log, fd_util, IN_SET};
 use basic::{fs_util, process};
 use core::error::*;
@@ -1666,6 +1666,72 @@ impl ServiceMng {
 }
 
 impl ServiceMng {
+    fn notify_message_authorized(&self, pid: Pid) -> bool {
+        let notify_access = match self.config.config_data().borrow().Service.NotifyAccess {
+            None => NotifyAccess::None,
+            Some(v) => v,
+        };
+
+        if notify_access == NotifyAccess::None {
+            log::warn!(
+                "Got notification message from {:?}, but NotifyAccess is configured to none.",
+                pid
+            );
+            return false;
+        }
+
+        let main_pid = match self.pid.main() {
+            None => {
+                log::warn!("Couldn't determine main pid.");
+                Pid::from_raw(0)
+            }
+            Some(v) => v,
+        };
+
+        if notify_access == NotifyAccess::Main && pid != main_pid {
+            if main_pid.as_raw() == 0 {
+                log::warn!(
+                    "Got notification message from {:?}, but main pid is currently not known.",
+                    pid
+                );
+            } else {
+                log::warn!("Got notification message from {:?}, but only message from main {:?} is accept.", pid, main_pid);
+            }
+            return false;
+        }
+
+        let control_pid = match self.pid.control() {
+            None => {
+                log::warn!("Couldn't determine control pid.");
+                Pid::from_raw(0)
+            }
+            Some(v) => v,
+        };
+
+        if notify_access == NotifyAccess::Exec && pid != main_pid && pid != control_pid {
+            if main_pid.as_raw() != 0 && control_pid.as_raw() != 0 {
+                log::warn!("Got notification message from {:?}, but only message from main {:?} or control {:?} is accept.", pid, main_pid, control_pid);
+            } else if main_pid.as_raw() != 0 {
+                log::warn!(
+                    "Got notification message from {:?}, but message is not from main {:?}.",
+                    pid,
+                    main_pid
+                );
+            } else if control_pid.as_raw() != 0 {
+                log::warn!(
+                    "Got notification message from {:?}, but message is not from control {:?}.",
+                    pid,
+                    control_pid
+                );
+            } else {
+                log::warn!("Got notification message from {:?}, but main pid and control pid are currently not known.", pid);
+            }
+            return false;
+        }
+
+        true
+    }
+
     pub(super) fn notify_message(
         &self,
         ucred: &UnixCredentials,
@@ -1683,6 +1749,10 @@ impl ServiceMng {
         messages: &HashMap<&str, &str>,
         _fds: Vec<i32>,
     ) -> Result<()> {
+        if !self.notify_message_authorized(Pid::from_raw(ucred.pid())) {
+            return Ok(());
+        }
+
         if let Some(&pidr) = messages.get("MAINPID") {
             if IN_SET!(
                 self.state(),
@@ -2586,7 +2656,9 @@ mod tests {
 
     #[test]
     fn test_watchdog_on() {
+        use crate::rentry::NotifyAccess;
         use nix::sys::socket::UnixCredentials;
+
         let (mng, rt, config) = create_mng();
 
         let ucred = UnixCredentials::new();
@@ -2594,7 +2666,7 @@ mod tests {
 
         messages.insert("WATCHDOG", "1");
         let fds = vec![];
-
+        mng.config.set_notify_access(NotifyAccess::All);
         assert!(mng.notify_message(&ucred, &messages, fds).is_ok());
         assert!(rt.armd_watchdog());
         assert_eq!(
@@ -2605,6 +2677,7 @@ mod tests {
 
     #[test]
     fn test_watchdog_reset_usec() {
+        use crate::rentry::NotifyAccess;
         use nix::sys::socket::UnixCredentials;
 
         let (mng, rt, config) = create_mng();
@@ -2614,6 +2687,7 @@ mod tests {
         messages.insert("WATCHDOG", "1");
         let fds = vec![];
 
+        mng.config.set_notify_access(NotifyAccess::All);
         assert!(mng.notify_message(&ucred, &messages, fds).is_ok());
         assert!(rt.armd_watchdog());
         assert_eq!(
