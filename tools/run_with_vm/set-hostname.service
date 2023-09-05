@@ -1,8 +1,0 @@
-[Unit]
-Description="set up hostname bydefaul"
-
-[Service]
-ExecStart="/usr/lib/sysmaster/set-hostname.sh"
-
-[Install]
-WantedBy="multi-user.target"

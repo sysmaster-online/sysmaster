@@ -8,6 +8,11 @@ run_with_vm_dir=${pwd}/tools/run_with_vm
 sysmaster_install_target=/usr/lib/sysmaster
 conf_install_target=/etc/sysmaster
 
+multi_user_target=(dbus.service fstab.service getty-tty1.service hostname-setup.service \
+lvm-activate-openeuler.service NetworkManager.service sshd-keygen@ecdsa.service \
+sshd-keygen@ed25519.service sshd-keygen@rsa.service sshd.service)
+sysinit_target=(udevd.service udev-trigger.service)
+
 # Install binaries of sysmaster.
 install -Dm0550 -t /usr/bin ${target_dir}/sctl || exit 1
 install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/init || exit 1
@@ -20,17 +25,23 @@ install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/hostname_setup || e
 
 # Install '.service', '.socket', and '.target' units.
 install -Dm0640 -t ${sysmaster_install_target}/system ${units_dir}/* || exit 1
-install -Dm0640 -t ${sysmaster_install_target}/system ${run_with_vm_dir}/*.service || exit 1
+
+for service in ${multi_user_target[@]} ${sysinit_target[@]}; do
+    install -Dm0640 -t ${sysmaster_install_target}/system ${run_with_vm_dir}/${service} || exit 1
+done
+
 install -Dm0640 -t ${sysmaster_install_target}/system ${run_with_vm_dir}/*.socket || exit 1
 
 # Simulate `sctl enable` command to automatically start services after bootup.
 mkdir -p /etc/sysmaster/system/multi-user.target.wants
-for unit in ${run_with_vm_dir}/*.service; do
-    # Serial port communication service should be manually started.
-    if [[ "${unit##*/}" == "serial-getty-ttyAMA0.service" ]] || [[ "${unit##*/}" == "serial-getty-ttyS0.service" ]]; then
-        continue
-    fi
-    ln -sf ${sysmaster_install_target}/system/${unit##*/} /etc/sysmaster/system/multi-user.target.wants/${unit##*/}
+mkdir -p /etc/sysmaster/system/sysinit.target.wants
+
+for unit in ${multi_user_target[@]}; do
+    ln -sf ${sysmaster_install_target}/system/${unit} /etc/sysmaster/system/multi-user.target.wants/${unit}
+done
+
+for unit in ${sysinit_target[@]}; do
+    ln -sf ${sysmaster_install_target}/system/${unit} /etc/sysmaster/system/sysinit.target.wants/${unit}
 done
 
 strip ${target_dir}/lib*.so
@@ -47,3 +58,5 @@ install -Dm0640 -t ${conf_install_target} ${pwd}/config/conf/system.conf || exit
 
 # Create the symbolic linkage '/init' to sysmaster-init.
 ln -sf ${sysmaster_install_target}/init /init
+
+sync
