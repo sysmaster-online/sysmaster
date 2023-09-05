@@ -632,9 +632,9 @@ impl LookupPaths {
 
     /// init lookup paths
     pub fn init_lookup_paths(&mut self) {
-        self.search_path.push(LIB_SYSTEM_PATH.to_string());
-        self.search_path.push(RUN_SYSTEM_PATH.to_string());
         self.search_path.push(ETC_SYSTEM_PATH.to_string());
+        self.search_path.push(RUN_SYSTEM_PATH.to_string());
+        self.search_path.push(LIB_SYSTEM_PATH.to_string());
 
         self.preset_path
             .push(format!("{}/{}", ETC_SYSTEM_PATH, "system-preset"));
@@ -797,9 +797,9 @@ mod tests {
         assert_eq!(
             lp.search_path,
             vec![
-                "/usr/lib/sysmaster/system",
+                "/etc/sysmaster/system",
                 "/run/sysmaster/system",
-                "/etc/sysmaster/system"
+                "/usr/lib/sysmaster/system"
             ]
         );
         assert_eq!(
