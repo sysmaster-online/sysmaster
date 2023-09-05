@@ -152,7 +152,11 @@ impl UnitFileData {
         /* {/etc/sysmater/system, /usr/lib/sysmaster/system}/foo.service */
         let config_path = Path::new(path).join(name);
         if !config_path.exists() {
-            return None;
+            if res.is_empty() {
+                return None;
+            } else {
+                return Some(res);
+            }
         }
 
         /* dispatch symlinks */
@@ -188,6 +192,9 @@ impl UnitFileData {
             }
             /* We are processing an alias service. */
             if file_name == name {
+                if !unit_name_is_valid(&target_name, UnitNameFlags::ANY) {
+                    return Some(Vec::new());
+                }
                 self.real_name = target_name;
                 self.all_names.insert(file_name);
                 res.push(de);
@@ -207,6 +214,13 @@ impl UnitFileData {
                 None => continue,
                 Some(v) => v,
             };
+            /* v is empty when we find a symlink, but it points to a invalid target. If
+             * pathbuf_fragment is also empty, this means we haven't found a valid path under
+             * higher priority search path. */
+            if v.is_empty() && pathbuf_fragment.is_empty() {
+                /* unit is masked */
+                return;
+            }
             pathbuf_fragment.append(&mut v);
         }
 
@@ -224,6 +238,9 @@ impl UnitFileData {
                 None => continue,
                 Some(v) => v,
             };
+            if v.is_empty() && pathbuf_fragment.is_empty() {
+                return;
+            }
             pathbuf_fragment.append(&mut v);
         }
         self.unit_id_fragment
