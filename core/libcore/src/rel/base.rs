@@ -116,8 +116,13 @@ where
     /// insert a entry
     pub fn insert(&self, k: K, v: V) {
         let switch = self.switch();
-        log::debug!("ReDb[{}] insert, key:{:?}, value:{:?}.", &self.name, &k, &v);
-        log::debug!("insert with switch:{:?}.", switch);
+        log::debug!(
+            "ReDb[{}] insert, key: {:?}, value: {:?}, switch: {:?}.",
+            &self.name,
+            &k,
+            &v,
+            switch
+        );
 
         match switch {
             Some(true) => {
