@@ -776,7 +776,7 @@ impl JobUnitTable {
     }
 
     pub(self) fn is_unit_empty(&self, unit: &UnitX) -> bool {
-        self.t_data.contains_key(unit)
+        !self.t_data.contains_key(unit)
     }
 
     pub(self) fn is_suspends_conflict(&self) -> bool {
