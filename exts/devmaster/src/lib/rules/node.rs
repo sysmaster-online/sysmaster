@@ -47,7 +47,7 @@ use nix::unistd::{symlinkat, unlinkat, Gid, Uid, UnlinkatFlags};
 use snafu::ResultExt;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fs::{create_dir_all, read_dir, File, remove_dir};
+use std::fs::{create_dir_all, read_dir, remove_dir, File};
 use std::io::ErrorKind;
 use std::os::unix::prelude::{AsRawFd, FromRawFd, RawFd};
 use std::path::Path;
