@@ -15,7 +15,7 @@
 use crate::log_dev;
 use device::Device;
 use snafu::prelude::*;
-use std::{cell::RefCell, rc::Rc, str::Utf8Error};
+use std::{cell::RefCell, ffi::OsString, rc::Rc, str::Utf8Error};
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -101,6 +101,9 @@ pub enum Error {
 
     #[snafu(display("Failed to deserialize .toml: {}", source))]
     Toml { source: toml::de::Error },
+
+    #[snafu(display("Invalid OsString: {:?}", s))]
+    InvalidOsString { s: OsString },
 }
 
 impl Error {

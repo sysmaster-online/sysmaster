@@ -47,7 +47,8 @@ use nix::unistd::{symlinkat, unlinkat, Gid, Uid, UnlinkatFlags};
 use snafu::ResultExt;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fs::{create_dir_all, File};
+use std::fs::{create_dir_all, read_dir, File, remove_dir};
+use std::io::ErrorKind;
 use std::os::unix::prelude::{AsRawFd, FromRawFd, RawFd};
 use std::path::Path;
 use std::rc::Rc;
@@ -604,6 +605,72 @@ pub(crate) fn find_prioritized_devnode(
     }
 
     Ok(devnode)
+}
+
+pub(crate) fn cleanup_prior_dir() -> Result<()> {
+    /*
+     * Cleanup prioritized link directory in post event. Avoid call
+     * this function when any worker is still running, which may result
+     * in data race.
+     */
+
+    let dir = match read_dir("/run/devmaster/links") {
+        Ok(d) => d,
+        Err(e) => {
+            if e.kind() == ErrorKind::NotFound {
+                return Ok(());
+            }
+
+            log::error!("Failed to open '/run/devmaster/links' directory: {}", e);
+            return Err(Error::Io {
+                filename: "/run/devmaster/links".to_string(),
+                source: e,
+            });
+        }
+    };
+
+    for entry in dir {
+        let de = entry.context(IoSnafu {
+            filename: "invalid entry".to_string(),
+        })?;
+
+        let de_name_oss = de.file_name();
+        let de_name = match de_name_oss.to_str() {
+            Some(s) => s,
+            None => return Err(Error::InvalidOsString { s: de_name_oss }),
+        };
+
+        if de_name.starts_with('.') {
+            continue;
+        }
+
+        if !de
+            .file_type()
+            .context(IoSnafu {
+                filename: de_name.to_string(),
+            })?
+            .is_dir()
+        {
+            continue;
+        }
+
+        /* As commented in the above, this is called when no worker exists, hence the file is not
+         * locked. On a later uevent, the lock file will be created if necessary. So, we can safely
+         * remove the file now. */
+        let prior_dir = Path::new("/run/devmaster/links").join(de_name);
+        let lock_file = prior_dir.join(".lock");
+
+        if let Err(e) = unlink(&lock_file) {
+            log::debug!("Failed to unlink '{:?}': {}", lock_file, e);
+            continue;
+        }
+
+        if let Err(e) = remove_dir(&prior_dir) {
+            log::debug!("Failed to remove '{:?}' dreictory: {}", prior_dir, e);
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

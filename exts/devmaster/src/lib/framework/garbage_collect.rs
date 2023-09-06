@@ -14,6 +14,7 @@
 //!
 
 use super::*;
+use crate::rules::node::cleanup_prior_dir;
 use event::*;
 use std::{
     cell::RefCell,
@@ -102,6 +103,7 @@ impl Source for GarbageCollect {
         if !worker_manager.workers.borrow().is_empty() {
             self.close_killer(e);
             self.start_killer(e);
+            return 0;
         } else {
             /*
              * Cleaning up idle wokers is asynchronous, thus when the
@@ -118,6 +120,8 @@ impl Source for GarbageCollect {
              */
             self.close_killer(e);
         }
+
+        let _ = cleanup_prior_dir();
 
         0
     }
