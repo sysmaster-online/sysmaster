@@ -18,7 +18,7 @@ use clap::Parser;
 use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
 use log::logger::init_log_to_console;
 use log::Level;
-use std::{io::Write, net::TcpStream};
+use std::{io::Write, os::unix::net::UnixStream};
 use subcmds::devctl_monitor::subcommand_monitor;
 use subcmds::devctl_test_builtin::subcommand_test_builtin;
 use subcmds::devctl_trigger::subcommand_trigger;
@@ -99,7 +99,7 @@ fn subcommand_test(devname: String) {
 
 /// subcommand for killing workers
 fn subcommand_kill() {
-    let mut stream = TcpStream::connect(CONTROL_MANAGER_LISTEN_ADDR).unwrap();
+    let mut stream = UnixStream::connect(CONTROL_MANAGER_LISTEN_ADDR).unwrap();
     stream.write_all(b"kill ").unwrap();
 }
 

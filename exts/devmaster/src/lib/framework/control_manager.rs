@@ -17,25 +17,27 @@ use crate::framework::job_queue::JobQueue;
 use crate::framework::worker_manager::WorkerManager;
 use device::device::Device;
 use event::Source;
+use nix::unistd::unlink;
 use snafu::ResultExt;
+use std::os::unix::net::UnixListener;
+use std::path::Path;
 use std::rc::Weak;
 use std::time::SystemTime;
 use std::{
     cell::RefCell,
     io::Read,
-    net::TcpListener,
     os::unix::prelude::{AsRawFd, RawFd},
     rc::Rc,
 };
 
 /// listening address for control manager
-pub const CONTROL_MANAGER_LISTEN_ADDR: &str = "0.0.0.0:1224";
+pub const CONTROL_MANAGER_LISTEN_ADDR: &str = "/run/devmaster/control.sock";
 
 /// control manager
 #[derive(Debug)]
 pub struct ControlManager {
     /// listener for devctl messages
-    listener: RefCell<TcpListener>,
+    listener: RefCell<UnixListener>,
 
     /// reference to worker manager
     worker_manager: Weak<WorkerManager>,
@@ -52,8 +54,22 @@ impl ControlManager {
         worker_manager: Rc<WorkerManager>,
         job_queue: Rc<JobQueue>,
     ) -> ControlManager {
+        /*
+         * Cleanup remaining socket if it exists.
+         */
+        if Path::new(listen_addr.as_str()).exists() {
+            let _ = unlink(listen_addr.as_str());
+        }
+
+        let listener = RefCell::new(UnixListener::bind(listen_addr.as_str()).unwrap_or_else(
+            |error| {
+                log::error!("Control Manager: failed to bind listener \"{}\"", error);
+                panic!();
+            },
+        ));
+
         ControlManager {
-            listener: RefCell::new(TcpListener::bind(listen_addr).unwrap()),
+            listener,
             worker_manager: Rc::downgrade(&worker_manager),
             job_queue: Rc::downgrade(&job_queue),
         }
