@@ -12,17 +12,13 @@
 
 //! control manager
 //!
-use crate::error::*;
 use crate::framework::job_queue::JobQueue;
 use crate::framework::worker_manager::WorkerManager;
-use device::device::Device;
 use event::Source;
 use nix::unistd::unlink;
-use snafu::ResultExt;
 use std::os::unix::net::UnixListener;
 use std::path::Path;
 use std::rc::Weak;
-use std::time::SystemTime;
 use std::{
     cell::RefCell,
     io::Read,
@@ -42,7 +38,7 @@ pub struct ControlManager {
     /// reference to worker manager
     worker_manager: Weak<WorkerManager>,
     /// reference to job queue
-    job_queue: Weak<JobQueue>,
+    _job_queue: Weak<JobQueue>,
     // events: Rc<Events>,
 }
 
@@ -71,7 +67,7 @@ impl ControlManager {
         ControlManager {
             listener,
             worker_manager: Rc::downgrade(&worker_manager),
-            job_queue: Rc::downgrade(&job_queue),
+            _job_queue: Rc::downgrade(&job_queue),
         }
     }
 }
@@ -82,29 +78,9 @@ impl ControlManager {
     pub(crate) fn cmd_process(&self, cmd: String) {
         let tokens: Vec<&str> = cmd.split(' ').collect();
 
-        let (cmd_kind, devname) = (tokens[0], tokens[1]);
+        let (cmd_kind, _devname) = (tokens[0], tokens[1]);
 
         match cmd_kind {
-            "test" => {
-                let seqnum = SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-                    % 1000;
-
-                let device = Device::new();
-                let _ = device
-                    .set_devname(devname)
-                    .context(DeviceSnafu)
-                    .log_error("failed to set devname");
-                let _ = device
-                    .set_seqnum(seqnum)
-                    .context(DeviceSnafu)
-                    .log_error("failed to set devname");
-
-                self.job_queue.upgrade().unwrap().job_queue_insert(device);
-                self.job_queue.upgrade().unwrap().job_queue_start(None);
-            }
             "kill" => {
                 self.worker_manager.upgrade().unwrap().kill_workers();
             }

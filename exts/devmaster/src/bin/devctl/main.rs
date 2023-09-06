@@ -43,16 +43,8 @@ enum SubCmd {
     #[clap(display_order = 2)]
     Kill {},
 
-    /// Send a fake device to devmaster
-    #[clap(display_order = 3)]
-    Test {
-        /// the device name to be sent
-        #[clap(required = true)]
-        devname: String,
-    },
-
     /// Trigger a fake device action, then the kernel will report an uevent
-    #[clap(display_order = 4)]
+    #[clap(display_order = 3)]
     Trigger {
         /// the kind of device action to trigger
         #[clap(short, long)]
@@ -76,7 +68,7 @@ enum SubCmd {
     },
 
     /// Test builtin command on a device
-    #[clap(display_order = 5)]
+    #[clap(display_order = 4)]
     TestBuiltin {
         /// device action
         #[clap(short, long)]
@@ -88,13 +80,6 @@ enum SubCmd {
         #[clap(required = true)]
         syspath: String,
     },
-}
-
-/// subcommand for testing communication
-fn subcommand_test(devname: String) {
-    let mut stream = TcpStream::connect(CONTROL_MANAGER_LISTEN_ADDR).unwrap();
-    let msg = format!("test {}", devname);
-    stream.write_all(msg.as_bytes()).unwrap();
 }
 
 /// subcommand for killing workers
@@ -110,7 +95,6 @@ fn main() {
     match args.subcmd {
         SubCmd::Monitor {} => subcommand_monitor(),
         SubCmd::Kill {} => subcommand_kill(),
-        SubCmd::Test { devname } => subcommand_test(devname),
         SubCmd::Trigger {
             action,
             r#type,
