@@ -164,15 +164,15 @@ mod tests {
     #[test]
     fn dm_unit_state() {
         let dm = DataManager::new();
-        let os = UnitActiveState::UnitInActive;
-        let ns = UnitActiveState::UnitActive;
+        let os = UnitActiveState::InActive;
+        let ns = UnitActiveState::Active;
         let flags = UnitNotifyFlags::RELOAD_FAILURE;
         let us_sub = Rc::new(UnitStatesTest::new(ns));
 
         let old = dm.insert_unit_state(String::from("test"), UnitState::new(os, ns, flags));
         assert!(old.is_none());
 
-        let ns_ing = UnitActiveState::UnitActivating;
+        let ns_ing = UnitActiveState::Activating;
         let old = dm.insert_unit_state(String::from("test"), UnitState::new(os, ns_ing, flags));
         assert_eq!(old.unwrap().ns, ns);
 
@@ -180,7 +180,7 @@ mod tests {
         let old = dm.register_unit_state(&String::from("state"), sub);
         assert!(old.is_none());
 
-        let ns_m = UnitActiveState::UnitMaintenance;
+        let ns_m = UnitActiveState::Maintenance;
         dm.insert_unit_state(String::from("test"), UnitState::new(os, ns_m, flags));
         assert_eq!(us_sub.get_ns(), ns_m);
     }

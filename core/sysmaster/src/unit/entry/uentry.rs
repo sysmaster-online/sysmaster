@@ -665,7 +665,7 @@ impl Unit {
             return Err(Error::UnitActionEAlready);
         }
 
-        if active_state == UnitActiveState::UnitMaintenance {
+        if active_state == UnitActiveState::Maintenance {
             log::error!("Failed to start {}: unit is in maintenance", self.id());
             return Err(Error::UnitActionEAgain);
         }
@@ -675,12 +675,12 @@ impl Unit {
             return Err(Error::UnitActionEInval);
         }
 
-        if active_state != UnitActiveState::UnitActivating && !self.conditions().conditions_test() {
+        if active_state != UnitActiveState::Activating && !self.conditions().conditions_test() {
             log::info!("The condition check failed, not starting {}.", self.id());
             return Err(Error::UnitActionEComm);
         }
 
-        if active_state != UnitActiveState::UnitActivating && !self.conditions().asserts_test() {
+        if active_state != UnitActiveState::Activating && !self.conditions().asserts_test() {
             log::info!("The assert check failed, not starting {}.", self.id());
             return Err(Error::UnitActionEProto);
         }
@@ -694,7 +694,7 @@ impl Unit {
             let active_state = self.current_active_state();
             let inactive_or_failed = matches!(
                 active_state,
-                UnitActiveState::UnitInActive | UnitActiveState::UnitFailed
+                UnitActiveState::InActive | UnitActiveState::Failed
             );
 
             if inactive_or_failed {
@@ -717,12 +717,12 @@ impl Unit {
         }
 
         let active_state = self.current_active_state();
-        if active_state == UnitActiveState::UnitReloading {
+        if active_state == UnitActiveState::Reloading {
             log::info!("Unit {} is being reloading", self.id());
             return Err(Error::UnitActionEAgain);
         }
 
-        if active_state != UnitActiveState::UnitActive {
+        if active_state != UnitActiveState::Active {
             log::info!("Unit {} is not active, no need to reload", self.id());
             return Err(Error::UnitActionENoExec);
         }
@@ -845,7 +845,7 @@ mod tests {
         assert!(load_stat.is_ok());
         /*let stat = _unit.start();
         assert!(stat.is_ok());
-        assert_eq!(_unit.current_active_state(),UnitActiveState::UnitActive);*/
+        assert_eq!(_unit.current_active_state(),UnitActiveState::Active);*/
     }
 
     #[allow(dead_code)]

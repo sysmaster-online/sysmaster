@@ -177,7 +177,7 @@ pub trait UmIf {
 
     /// check the unit active state of of reference name
     fn current_active_state(&self, _unit_name: &str) -> UnitActiveState {
-        UnitActiveState::UnitFailed
+        UnitActiveState::Failed
     }
 
     /// get the subunit state of one unit. i.e. running(service), listening(socket)

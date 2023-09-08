@@ -21,8 +21,8 @@ use std::{cell::RefCell, rc::Rc};
 impl MountState {
     fn mount_state_to_unit_state(&self) -> UnitActiveState {
         match *self {
-            MountState::Dead => UnitActiveState::UnitInActive,
-            MountState::Mounted => UnitActiveState::UnitActive,
+            MountState::Dead => UnitActiveState::InActive,
+            MountState::Mounted => UnitActiveState::Active,
         }
     }
 }

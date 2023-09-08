@@ -558,7 +558,7 @@ impl UmIf for UnitManager {
         let s_unit = if let Some(s_unit) = self.db.units_get(_unit_name) {
             s_unit
         } else {
-            return UnitActiveState::UnitFailed;
+            return UnitActiveState::Failed;
         };
         s_unit.current_active_state()
     }
@@ -800,7 +800,7 @@ impl UnitManager {
                 unit.load_state(),
                 UnitLoadState::NotFound | UnitLoadState::Error | UnitLoadState::BadSetting
             )
-            && unit.active_state() != UnitActiveState::UnitActive
+            && unit.active_state() != UnitActiveState::Active
         {
             return Err(Error::Other {
                 msg: format!("unit {} Not Found", unit.id()),
@@ -891,7 +891,7 @@ impl UnitManager {
         };
         let error_code = match self.current_active_state(name) {
             // systemd will return 3 if the unit's state is failed or inactive.
-            UnitActiveState::UnitFailed | UnitActiveState::UnitInActive => 3,
+            UnitActiveState::Failed | UnitActiveState::InActive => 3,
             _ => 0,
         };
         Ok(UnitStatus::new(
@@ -1017,13 +1017,13 @@ impl UnitManager {
             return;
         };
 
-        if state.os != UnitActiveState::UnitFailed && state.ns == UnitActiveState::UnitFailed {
+        if state.os != UnitActiveState::Failed && state.ns == UnitActiveState::Failed {
             self.unit_emergency_action(
                 unitx.get_failure_action(),
                 "unit ".to_string() + source + " failed",
             );
         }
-        if !state.os.is_inactive_or_failed() && state.ns == UnitActiveState::UnitInActive {
+        if !state.os.is_inactive_or_failed() && state.ns == UnitActiveState::InActive {
             self.unit_emergency_action(
                 unitx.get_success_action(),
                 "unit ".to_string() + source + " succeeded",
@@ -1492,17 +1492,17 @@ mod tests {
         thread::sleep(Duration::from_secs(4));
         let wait_status = WaitStatus::Exited(Pid::from_raw(-1), 0);
         u.sigchld_events(wait_status);
-        assert_eq!(u.active_state(), UnitActiveState::UnitActive);
+        assert_eq!(u.active_state(), UnitActiveState::Active);
 
         let ret = u.stop(false);
         log::debug!("socket stop ret is: {:?}", ret);
         assert!(ret.is_ok());
 
         thread::sleep(Duration::from_secs(4));
-        assert_eq!(u.active_state(), UnitActiveState::UnitDeActivating);
+        assert_eq!(u.active_state(), UnitActiveState::DeActivating);
         u.sigchld_events(wait_status);
 
-        assert_eq!(u.active_state(), UnitActiveState::UnitInActive);
+        assert_eq!(u.active_state(), UnitActiveState::InActive);
     }
 
     #[test]

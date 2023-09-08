@@ -329,7 +329,7 @@ impl MountMonitorData {
         let mut dead_mount_set: HashSet<String> = HashSet::new();
         let unit_type = Some(UnitType::UnitMount);
         for unit in self.comm.um().units_get_all(unit_type).iter() {
-            if self.comm.um().current_active_state(unit) == UnitActiveState::UnitActive {
+            if self.comm.um().current_active_state(unit) == UnitActiveState::Active {
                 dead_mount_set.insert(String::from(unit));
             }
         }

@@ -1832,14 +1832,14 @@ impl ServiceMng {
 impl ServiceState {
     fn to_unit_active_state(self) -> UnitActiveState {
         match self {
-            ServiceState::Dead => UnitActiveState::UnitInActive,
+            ServiceState::Dead => UnitActiveState::InActive,
             ServiceState::Condition
             | ServiceState::StartPre
             | ServiceState::Start
             | ServiceState::StartPost
-            | ServiceState::AutoRestart => UnitActiveState::UnitActivating,
-            ServiceState::Running | ServiceState::Exited => UnitActiveState::UnitActive,
-            ServiceState::Reload => UnitActiveState::UnitReloading,
+            | ServiceState::AutoRestart => UnitActiveState::Activating,
+            ServiceState::Running | ServiceState::Exited => UnitActiveState::Active,
+            ServiceState::Reload => UnitActiveState::Reloading,
             ServiceState::Stop
             | ServiceState::StopWatchdog
             | ServiceState::StopPost
@@ -1847,22 +1847,22 @@ impl ServiceState {
             | ServiceState::StopSigkill
             | ServiceState::FinalSigterm
             | ServiceState::FinalSigkill
-            | ServiceState::FinalWatchdog => UnitActiveState::UnitDeActivating,
-            ServiceState::Failed => UnitActiveState::UnitFailed,
-            ServiceState::Cleaning => UnitActiveState::UnitMaintenance,
+            | ServiceState::FinalWatchdog => UnitActiveState::DeActivating,
+            ServiceState::Failed => UnitActiveState::Failed,
+            ServiceState::Cleaning => UnitActiveState::Maintenance,
         }
     }
 
     fn to_unit_active_state_idle(self) -> UnitActiveState {
         match self {
-            ServiceState::Dead => UnitActiveState::UnitInActive,
+            ServiceState::Dead => UnitActiveState::InActive,
             ServiceState::Condition
             | ServiceState::StartPre
             | ServiceState::Start
             | ServiceState::StartPost
             | ServiceState::Running
-            | ServiceState::Exited => UnitActiveState::UnitActive,
-            ServiceState::Reload => UnitActiveState::UnitReloading,
+            | ServiceState::Exited => UnitActiveState::Active,
+            ServiceState::Reload => UnitActiveState::Reloading,
             ServiceState::Stop
             | ServiceState::StopWatchdog
             | ServiceState::StopPost
@@ -1870,10 +1870,10 @@ impl ServiceState {
             | ServiceState::StopSigkill
             | ServiceState::FinalSigterm
             | ServiceState::FinalSigkill
-            | ServiceState::FinalWatchdog => UnitActiveState::UnitDeActivating,
-            ServiceState::Failed => UnitActiveState::UnitFailed,
-            ServiceState::Cleaning => UnitActiveState::UnitMaintenance,
-            ServiceState::AutoRestart => UnitActiveState::UnitActivating,
+            | ServiceState::FinalWatchdog => UnitActiveState::DeActivating,
+            ServiceState::Failed => UnitActiveState::Failed,
+            ServiceState::Cleaning => UnitActiveState::Maintenance,
+            ServiceState::AutoRestart => UnitActiveState::Activating,
         }
     }
 

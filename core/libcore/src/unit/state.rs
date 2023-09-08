@@ -34,45 +34,37 @@ E->D[UnitFailed]
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum UnitActiveState {
     /// unit is activated
-    UnitActive,
+    Active,
     /// unit is in reloading
-    UnitReloading,
+    Reloading,
     /// unit is not active
-    UnitInActive,
+    InActive,
     /// unit action is failed
-    UnitFailed,
+    Failed,
     /// unit is in starting
-    UnitActivating,
+    Activating,
     /// unit is in stopping
-    UnitDeActivating,
+    DeActivating,
     /// unit is in maintenance
-    UnitMaintenance,
+    Maintenance,
 }
 
 impl UnitActiveState {
     ///
     pub fn is_active_or_reloading(&self) -> bool {
-        matches!(
-            self,
-            UnitActiveState::UnitActive | UnitActiveState::UnitReloading
-        )
+        matches!(self, UnitActiveState::Active | UnitActiveState::Reloading)
     }
 
     ///
     pub fn is_inactive_or_failed(&self) -> bool {
-        matches!(
-            self,
-            UnitActiveState::UnitInActive | UnitActiveState::UnitFailed
-        )
+        matches!(self, UnitActiveState::InActive | UnitActiveState::Failed)
     }
 
     ///
     pub fn is_active_or_activating(&self) -> bool {
         matches!(
             self,
-            UnitActiveState::UnitActive
-                | UnitActiveState::UnitActivating
-                | UnitActiveState::UnitReloading
+            UnitActiveState::Active | UnitActiveState::Activating | UnitActiveState::Reloading
         )
     }
 
@@ -80,9 +72,7 @@ impl UnitActiveState {
     pub fn is_inactive_or_deactivating(&self) -> bool {
         matches!(
             self,
-            UnitActiveState::UnitInActive
-                | UnitActiveState::UnitFailed
-                | UnitActiveState::UnitDeActivating
+            UnitActiveState::InActive | UnitActiveState::Failed | UnitActiveState::DeActivating
         )
     }
 }
@@ -90,13 +80,13 @@ impl UnitActiveState {
 impl std::fmt::Display for UnitActiveState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UnitActiveState::UnitActive => write!(f, "active"),
-            UnitActiveState::UnitReloading => write!(f, "reloading"),
-            UnitActiveState::UnitInActive => write!(f, "inactive"),
-            UnitActiveState::UnitFailed => write!(f, "failed"),
-            UnitActiveState::UnitActivating => write!(f, "activating"),
-            UnitActiveState::UnitDeActivating => write!(f, "deactivating"),
-            UnitActiveState::UnitMaintenance => write!(f, "maintenance"),
+            UnitActiveState::Active => write!(f, "active"),
+            UnitActiveState::Reloading => write!(f, "reloading"),
+            UnitActiveState::InActive => write!(f, "inactive"),
+            UnitActiveState::Failed => write!(f, "failed"),
+            UnitActiveState::Activating => write!(f, "activating"),
+            UnitActiveState::DeActivating => write!(f, "deactivating"),
+            UnitActiveState::Maintenance => write!(f, "maintenance"),
         }
     }
 }

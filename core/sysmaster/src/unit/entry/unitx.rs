@@ -176,16 +176,16 @@ impl UnitX {
     }
 
     pub(crate) fn active_state(&self) -> UnitActiveState {
-        //UnitActiveState::UnitActive
+        //UnitActiveState::Active
         self.0.current_active_state()
     }
 
     pub(crate) fn active_or_activating(&self) -> bool {
         IN_SET!(
             self.0.current_active_state(),
-            UnitActiveState::UnitActive,
-            UnitActiveState::UnitActivating,
-            UnitActiveState::UnitReloading
+            UnitActiveState::Active,
+            UnitActiveState::Activating,
+            UnitActiveState::Reloading
         )
     }
 
@@ -193,9 +193,9 @@ impl UnitX {
         // the unit is in activating or activated.
         if IN_SET!(
             self.0.current_active_state(),
-            UnitActiveState::UnitInActive,
-            UnitActiveState::UnitFailed,
-            UnitActiveState::UnitActivating
+            UnitActiveState::InActive,
+            UnitActiveState::Failed,
+            UnitActiveState::Activating
         ) {
             return false;
         }

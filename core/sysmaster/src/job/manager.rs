@@ -689,12 +689,12 @@ impl JobManagerData {
     fn simulate_job_notify(&self, unit: &Rc<UnitX>, os: UnitActiveState, ns: UnitActiveState) {
         match (os, ns) {
             (
-                UnitActiveState::UnitInActive | UnitActiveState::UnitFailed,
-                UnitActiveState::UnitActive | UnitActiveState::UnitActivating,
+                UnitActiveState::InActive | UnitActiveState::Failed,
+                UnitActiveState::Active | UnitActiveState::Activating,
             ) => self.do_notify(&JobConf::new(unit, JobKind::Start), None),
             (
-                UnitActiveState::UnitActive | UnitActiveState::UnitActivating,
-                UnitActiveState::UnitInActive | UnitActiveState::UnitDeActivating,
+                UnitActiveState::Active | UnitActiveState::Activating,
+                UnitActiveState::InActive | UnitActiveState::DeActivating,
             ) => self.do_notify(&JobConf::new(unit, JobKind::Stop), None),
             _ => {} // do nothing
         }
@@ -729,7 +729,7 @@ impl JobManagerData {
         // OnFailure=
         if ns != os
             && !flags.intersects(UnitNotifyFlags::WILL_AUTO_RESTART)
-            && ns == UnitActiveState::UnitFailed
+            && ns == UnitActiveState::Failed
         {
             let job_mode = unit
                 .get_config()
@@ -745,13 +745,12 @@ impl JobManagerData {
         }
 
         // OnSuccess=
-        if ns == UnitActiveState::UnitInActive
-            && !flags.intersects(UnitNotifyFlags::WILL_AUTO_RESTART)
+        if ns == UnitActiveState::InActive && !flags.intersects(UnitNotifyFlags::WILL_AUTO_RESTART)
         {
             match os {
-                UnitActiveState::UnitFailed
-                | UnitActiveState::UnitInActive
-                | UnitActiveState::UnitMaintenance => {}
+                UnitActiveState::Failed
+                | UnitActiveState::InActive
+                | UnitActiveState::Maintenance => {}
                 _ => {
                     let job_mode = unit
                         .get_config()
@@ -936,8 +935,8 @@ mod tests {
     fn job_try_finish_async() {
         let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
         let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
-        let os = UnitActiveState::UnitInActive;
-        let ns = UnitActiveState::UnitActive;
+        let os = UnitActiveState::InActive;
+        let ns = UnitActiveState::Active;
         let flags = UnitNotifyFlags::empty();
 
         let ret = jm.try_finish(&unit_test1, os, ns, flags);
@@ -948,8 +947,8 @@ mod tests {
     fn job_try_finish_sync() {
         let (event, reli, db, unit_test1, _unit_test2) = prepare_unit_multi(None);
         let jm = JobManager::new(&event, &reli, &db, &Rc::new(DataManager::new()));
-        let os = UnitActiveState::UnitInActive;
-        let ns = UnitActiveState::UnitActive;
+        let os = UnitActiveState::InActive;
+        let ns = UnitActiveState::Active;
         let flags = UnitNotifyFlags::empty();
 
         *jm.data.text.borrow_mut() = None; // reset every time

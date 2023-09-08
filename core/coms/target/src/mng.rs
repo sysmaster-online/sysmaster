@@ -23,8 +23,8 @@ use std::{cell::RefCell, rc::Rc};
 impl TargetState {
     fn to_unit_state(self) -> UnitActiveState {
         match self {
-            TargetState::Dead | TargetState::StateMax => UnitActiveState::UnitInActive,
-            TargetState::Active => UnitActiveState::UnitActive,
+            TargetState::Dead | TargetState::StateMax => UnitActiveState::InActive,
+            TargetState::Active => UnitActiveState::Active,
         }
     }
 }

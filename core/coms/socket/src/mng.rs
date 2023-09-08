@@ -47,20 +47,20 @@ use std::{cell::RefCell, collections::VecDeque};
 impl SocketState {
     pub(super) fn to_unit_active_state(self) -> UnitActiveState {
         match self {
-            SocketState::Dead => UnitActiveState::UnitInActive,
+            SocketState::Dead => UnitActiveState::InActive,
             SocketState::StartPre | SocketState::StartChown | SocketState::StartPost => {
-                UnitActiveState::UnitActivating
+                UnitActiveState::Activating
             }
-            SocketState::Listening | SocketState::Running => UnitActiveState::UnitActive,
+            SocketState::Listening | SocketState::Running => UnitActiveState::Active,
             SocketState::StopPre
             | SocketState::StopPreSigterm
             | SocketState::StopPost
             | SocketState::StopPreSigkill
             | SocketState::StateMax
             | SocketState::FinalSigterm
-            | SocketState::FinalSigkill => UnitActiveState::UnitDeActivating,
-            SocketState::Failed => UnitActiveState::UnitFailed,
-            SocketState::Cleaning => UnitActiveState::UnitMaintenance,
+            | SocketState::FinalSigkill => UnitActiveState::DeActivating,
+            SocketState::Failed => UnitActiveState::Failed,
+            SocketState::Cleaning => UnitActiveState::Maintenance,
         }
     }
 
@@ -1012,59 +1012,59 @@ mod tests {
     fn test_socket_active_state() {
         assert_eq!(
             SocketState::Dead.to_unit_active_state(),
-            UnitActiveState::UnitInActive
+            UnitActiveState::InActive
         );
         assert_eq!(
             SocketState::StartPre.to_unit_active_state(),
-            UnitActiveState::UnitActivating
+            UnitActiveState::Activating
         );
         assert_eq!(
             SocketState::StartChown.to_unit_active_state(),
-            UnitActiveState::UnitActivating
+            UnitActiveState::Activating
         );
         assert_eq!(
             SocketState::StartPost.to_unit_active_state(),
-            UnitActiveState::UnitActivating
+            UnitActiveState::Activating
         );
         assert_eq!(
             SocketState::Listening.to_unit_active_state(),
-            UnitActiveState::UnitActive
+            UnitActiveState::Active
         );
         assert_eq!(
             SocketState::Running.to_unit_active_state(),
-            UnitActiveState::UnitActive
+            UnitActiveState::Active
         );
         assert_eq!(
             SocketState::StopPre.to_unit_active_state(),
-            UnitActiveState::UnitDeActivating
+            UnitActiveState::DeActivating
         );
         assert_eq!(
             SocketState::StopPreSigterm.to_unit_active_state(),
-            UnitActiveState::UnitDeActivating
+            UnitActiveState::DeActivating
         );
         assert_eq!(
             SocketState::StopPost.to_unit_active_state(),
-            UnitActiveState::UnitDeActivating
+            UnitActiveState::DeActivating
         );
         assert_eq!(
             SocketState::StopPreSigkill.to_unit_active_state(),
-            UnitActiveState::UnitDeActivating
+            UnitActiveState::DeActivating
         );
         assert_eq!(
             SocketState::FinalSigterm.to_unit_active_state(),
-            UnitActiveState::UnitDeActivating
+            UnitActiveState::DeActivating
         );
         assert_eq!(
             SocketState::FinalSigterm.to_unit_active_state(),
-            UnitActiveState::UnitDeActivating
+            UnitActiveState::DeActivating
         );
         assert_eq!(
             SocketState::Failed.to_unit_active_state(),
-            UnitActiveState::UnitFailed
+            UnitActiveState::Failed
         );
         assert_eq!(
             SocketState::Cleaning.to_unit_active_state(),
-            UnitActiveState::UnitMaintenance
+            UnitActiveState::Maintenance
         );
     }
 }

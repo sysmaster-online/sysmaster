@@ -546,10 +546,8 @@ fn job_trigger_unit(unit: &UnitX, run_kind: JobKind, force: bool) -> Result<(), 
         JobKind::Stop => unit.stop(force),
         JobKind::Reload => unit.reload(),
         JobKind::Verify => match unit.active_state() {
-            UnitActiveState::UnitActive | UnitActiveState::UnitReloading => {
-                Err(Error::UnitActionEAlready)
-            }
-            UnitActiveState::UnitActivating => Err(Error::UnitActionEAgain),
+            UnitActiveState::Active | UnitActiveState::Reloading => Err(Error::UnitActionEAlready),
+            UnitActiveState::Activating => Err(Error::UnitActionEAgain),
             _ => Err(Error::UnitActionEBadR),
         },
         JobKind::Nop => Err(Error::UnitActionEAlready), // do nothing
@@ -585,33 +583,31 @@ fn job_trigger_err_to_result(err: Error) -> Option<JobResult> {
 fn job_process_unit_start(ns: UnitActiveState) -> (Option<JobResult>, bool) {
     match ns {
         // something generated from the job has been done
-        UnitActiveState::UnitActive => (Some(JobResult::Done), true),
+        UnitActiveState::Active => (Some(JobResult::Done), true),
         // something generated from the job is doing
-        UnitActiveState::UnitActivating => (None, true),
+        UnitActiveState::Activating => (None, true),
         // something not generated from the job has been done
-        UnitActiveState::UnitInActive => (Some(JobResult::Done), false),
-        UnitActiveState::UnitFailed => (Some(JobResult::Failed), false),
+        UnitActiveState::InActive => (Some(JobResult::Done), false),
+        UnitActiveState::Failed => (Some(JobResult::Failed), false),
         // something not generated from the job is doing
-        UnitActiveState::UnitReloading
-        | UnitActiveState::UnitDeActivating
-        | UnitActiveState::UnitMaintenance => (None, false),
+        UnitActiveState::Reloading
+        | UnitActiveState::DeActivating
+        | UnitActiveState::Maintenance => (None, false),
     }
 }
 
 fn job_process_unit_stop(ns: UnitActiveState) -> (Option<JobResult>, bool) {
     match ns {
         // something generated from the job has been done
-        UnitActiveState::UnitInActive | UnitActiveState::UnitFailed => {
-            (Some(JobResult::Done), true)
-        }
+        UnitActiveState::InActive | UnitActiveState::Failed => (Some(JobResult::Done), true),
         // something generated from the job is doing
-        UnitActiveState::UnitDeActivating => (None, true),
+        UnitActiveState::DeActivating => (None, true),
         // something not generated from the job has been done
-        UnitActiveState::UnitActive => (Some(JobResult::Failed), false),
+        UnitActiveState::Active => (Some(JobResult::Failed), false),
         // something not generated from the job is doing
-        UnitActiveState::UnitReloading
-        | UnitActiveState::UnitActivating
-        | UnitActiveState::UnitMaintenance => (Some(JobResult::Failed), false),
+        UnitActiveState::Reloading | UnitActiveState::Activating | UnitActiveState::Maintenance => {
+            (Some(JobResult::Failed), false)
+        }
     }
 }
 
@@ -625,16 +621,16 @@ fn job_process_unit_reload(
     }
     match ns {
         // something generated from the job has been done
-        UnitActiveState::UnitActive => (Some(result), true),
+        UnitActiveState::Active => (Some(result), true),
         // something generated from the job is doing
-        UnitActiveState::UnitReloading => (None, true),
+        UnitActiveState::Reloading => (None, true),
         // something not generated from the job has been done
-        UnitActiveState::UnitInActive => (Some(JobResult::Done), false),
-        UnitActiveState::UnitFailed => (Some(JobResult::Failed), false),
+        UnitActiveState::InActive => (Some(JobResult::Done), false),
+        UnitActiveState::Failed => (Some(JobResult::Failed), false),
         // something not generated from the job is doing
-        UnitActiveState::UnitActivating
-        | UnitActiveState::UnitDeActivating
-        | UnitActiveState::UnitMaintenance => (None, false),
+        UnitActiveState::Activating
+        | UnitActiveState::DeActivating
+        | UnitActiveState::Maintenance => (None, false),
     }
 }
 
