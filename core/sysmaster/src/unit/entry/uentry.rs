@@ -54,6 +54,7 @@ pub struct Unit {
     start_limit: StartLimit,
     sub: Box<dyn SubUnit>,
     merged_into: RefCell<Option<Rc<UnitX>>>,
+    in_stop_when_bound_queue: RefCell<bool>,
 }
 
 impl PartialEq for Unit {
@@ -209,6 +210,7 @@ impl Unit {
             sub,
             start_limit: StartLimit::new(),
             merged_into: RefCell::new(None),
+            in_stop_when_bound_queue: RefCell::new(false),
         });
         let owner = Rc::clone(&_u);
         _u.sub.attach_unit(owner);
@@ -570,6 +572,14 @@ impl Unit {
 
     pub(super) fn set_in_target_dep_queue(&self, t: bool) {
         self.load.set_in_target_dep_queue(t);
+    }
+
+    pub(super) fn in_stop_when_bound_queue(&self) -> bool {
+        *self.in_stop_when_bound_queue.borrow()
+    }
+
+    pub(super) fn set_in_stop_when_bound_queue(&self, t: bool) {
+        *self.in_stop_when_bound_queue.borrow_mut() = t
     }
 
     pub(super) fn get_real_name(&self) -> String {

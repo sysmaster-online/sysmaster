@@ -141,6 +141,14 @@ impl UnitX {
         self.0.set_in_target_dep_queue(t);
     }
 
+    pub(crate) fn in_stop_when_bound_queue(&self) -> bool {
+        self.0.in_stop_when_bound_queue()
+    }
+
+    pub(crate) fn set_in_stop_when_bound_queue(&self, t: bool) {
+        self.0.set_in_stop_when_bound_queue(t);
+    }
+
     pub(crate) fn dep_check(&self, _relation: UnitRelations, _other: &UnitX) -> Result<()> {
         // unit_add_dependency: check input
 

@@ -268,6 +268,15 @@ impl JobTable {
         self.t_id.borrow().get(&id).map(|job| JobInfo::map(job))
     }
 
+    pub(super) fn get_suspends(&self, unit: &UnitX) -> Vec<JobInfo> {
+        self.t_unit
+            .borrow()
+            .get_suspends(unit)
+            .into_iter()
+            .map(|job| JobInfo::map(&job))
+            .collect()
+    }
+
     pub(super) fn get_suspend(&self, unit: &UnitX, kind: JobKind) -> Option<JobInfo> {
         self.t_unit
             .borrow()

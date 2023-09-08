@@ -15,10 +15,12 @@ use super::entry::UnitX;
 use super::rentry::UnitLoadState;
 use super::rentry::{UnitRe, UnitRePps};
 use super::{UnitRelations, UnitType};
+use crate::job::{JobAffect, JobConf, JobKind, JobManager};
 use crate::manager::rentry::ReliLastQue;
+use crate::unit::JobMode;
 use crate::utils::table::{TableOp, TableSubscribe};
 use core::rel::{ReStation, ReliLastFrame, Reliability};
-use core::unit::{UnitDependencyMask, UnitRelationAtom};
+use core::unit::{UnitActiveState, UnitDependencyMask, UnitRelationAtom};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::convert::TryFrom;
@@ -82,6 +84,10 @@ impl UnitRT {
         self.data.dispatch_load_queue();
     }
 
+    pub(super) fn dispatch_stop_when_bound_queue(&self, jm: Rc<JobManager>) {
+        self.data.dispatch_stop_when_bound_queue(jm);
+    }
+
     pub(super) fn unit_add_dependency(
         &self,
         source: Rc<UnitX>,
@@ -96,6 +102,10 @@ impl UnitRT {
 
     pub(super) fn push_load_queue(&self, unit: Rc<UnitX>) {
         self.data.push_load_queue(unit);
+    }
+
+    pub(super) fn submit_to_stop_when_bound_queue(&self, unit: Rc<UnitX>) {
+        self.data.submit_to_stop_when_bound_queue(unit);
     }
 
     fn register(&self, dbr: &Rc<UnitDb>) {
@@ -114,6 +124,7 @@ struct UnitRTData {
     // owned objects
     load_queue: RefCell<VecDeque<Rc<UnitX>>>,
     target_dep_queue: RefCell<VecDeque<Rc<UnitX>>>,
+    stop_when_bound_queue: RefCell<VecDeque<Rc<UnitX>>>,
 }
 
 impl TableSubscribe<String, Rc<UnitX>> for UnitRTData {
@@ -217,6 +228,7 @@ impl UnitRTData {
             db: Rc::clone(dbr),
             load_queue: RefCell::new(VecDeque::new()),
             target_dep_queue: RefCell::new(VecDeque::new()),
+            stop_when_bound_queue: RefCell::new(VecDeque::new()),
         }
     }
 
@@ -365,6 +377,65 @@ impl UnitRTData {
         }
         unit.set_in_load_queue(true);
         self.load_queue.borrow_mut().push_back(unit);
+    }
+
+    pub(self) fn submit_to_stop_when_bound_queue(&self, unit: Rc<UnitX>) {
+        if unit.in_stop_when_bound_queue() {
+            return;
+        }
+        unit.set_in_stop_when_bound_queue(true);
+        self.stop_when_bound_queue.borrow_mut().push_back(unit);
+    }
+
+    pub(self) fn dispatch_stop_when_bound_queue(&self, jm: Rc<JobManager>) {
+        if self.stop_when_bound_queue.borrow().is_empty() {
+            return;
+        }
+        log::debug!("Dispatching stop_when_bound_queue.");
+        /* do some reli */
+        loop {
+            let unit = match self.stop_when_bound_queue.borrow_mut().pop_front() {
+                None => break,
+                Some(v) => v,
+            };
+            let bound_inactive = match self.unit_is_bound_by_inactive(unit.clone(), jm.clone()) {
+                None => continue,
+                Some(v) => v,
+            };
+            log::debug!(
+                "{} will be stopped due to bound unit {} is inactive",
+                unit.id(),
+                bound_inactive.id()
+            );
+            if let Err(e) = jm.exec(
+                &JobConf::new(&unit, JobKind::Stop),
+                JobMode::Replace,
+                &mut JobAffect::new(false),
+            ) {
+                log::error!("Failed to enqueue the stop job for {}: {}", unit.id(), e);
+            }
+        }
+        /* do some reli */
+    }
+
+    fn unit_is_bound_by_inactive(&self, unit: Rc<UnitX>, jm: Rc<JobManager>) -> Option<Rc<UnitX>> {
+        if unit.active_state() != UnitActiveState::Active || jm.has_job(&unit) {
+            return None;
+        }
+
+        for other in self
+            .db
+            .dep_gets_atom(&unit, UnitRelationAtom::UnitAtomCannotBeActiveWithout)
+        {
+            if jm.has_job(&other) {
+                continue;
+            }
+            if other.active_state().is_inactive_or_failed() {
+                return Some(other);
+            }
+        }
+
+        None
     }
 
     fn remove_unit(&self, _unit: &Rc<UnitX>) {}

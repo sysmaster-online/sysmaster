@@ -203,6 +203,10 @@ impl JobManager {
         self.data.get_jobinfo(id)
     }
 
+    pub(crate) fn has_job(&self, unit: &Rc<UnitX>) -> bool {
+        !self.data.jobs.get_suspends(unit).is_empty()
+    }
+
     pub(crate) fn has_stop_job(&self, unit: &Rc<UnitX>) -> bool {
         self.data.jobs.get_suspend(unit, JobKind::Stop).is_some()
     }

@@ -265,6 +265,7 @@ impl Manager {
         while self.state() == State::Ok {
             // queue
             self.um.dispatch_load_queue();
+            self.um.dispatch_stop_when_bound_queue();
 
             // event
             self.reli.set_last_frame1(ReliLastFrame::OtherEvent as u32);

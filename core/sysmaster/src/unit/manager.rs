@@ -166,6 +166,12 @@ impl UnitManagerX {
         self.data.rt.dispatch_load_queue()
     }
 
+    pub(crate) fn dispatch_stop_when_bound_queue(&self) {
+        self.data
+            .rt
+            .dispatch_stop_when_bound_queue(self.data.jm.clone());
+    }
+
     fn register(&self, dm: &DataManager, relir: &Reliability) {
         // dm-unit_state
         let subscriber = Rc::clone(&self.data);
@@ -977,6 +983,10 @@ impl UnitManager {
     fn load_unitx(&self, name: &str) -> Option<Rc<UnitX>> {
         self.load.load_unit(name)
     }
+
+    fn submit_to_stop_when_bound_queue(&self, unit: Rc<UnitX>) {
+        self.rt.submit_to_stop_when_bound_queue(unit);
+    }
 }
 
 // inert states need jm,so put here
@@ -1036,6 +1046,14 @@ impl UnitManager {
         let atom = UnitRelationAtom::UnitAtomTriggeredBy;
         for other in self.db.dep_gets_atom(&unitx, atom) {
             other.trigger(&unitx);
+        }
+
+        /* Trigger BindsTo unit state change */
+        if state.ns.is_inactive_or_failed() { /* submit to stop_when_bound_queue */ }
+
+        if state.ns.is_active_or_reloading() {
+            /* submit to stop_when_bound_queue */
+            self.submit_to_stop_when_bound_queue(unitx);
         }
     }
 
