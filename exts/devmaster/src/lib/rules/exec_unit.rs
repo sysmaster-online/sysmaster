@@ -18,7 +18,7 @@ use crate::{
     error::*,
     log_dev,
     rules::{node::*, *},
-    utils::{replace_chars, resolve_subsystem_kernel, DEVMASTER_LEGAL_CHARS},
+    utils::commons::{replace_chars, resolve_subsystem_kernel, DEVMASTER_LEGAL_CHARS},
 };
 use device::{Device, DeviceAction};
 use libc::mode_t;

@@ -16,6 +16,7 @@
 use crate::builtin::Builtin;
 use crate::error::*;
 use crate::rules::exec_unit::ExecuteUnit;
+use crate::utils::commons::*;
 use device::Device;
 use snafu::ResultExt;
 use sscanf::sscanf;
@@ -227,15 +228,15 @@ impl UsbId {
 
             let scsi_vendor: String = dev_scsi.get_sysattr_value("vendor").context(DeviceSnafu)?;
             // scsi_vendor to vendor
-            crate::utils::encode_devnode_name(&scsi_vendor, &mut info.vendor_enc);
-            info.vendor = crate::utils::replace_whitespace(&scsi_vendor);
-            info.vendor = crate::utils::replace_chars(&info.vendor, "");
+            encode_devnode_name(&scsi_vendor, &mut info.vendor_enc);
+            info.vendor = replace_whitespace(&scsi_vendor);
+            info.vendor = replace_chars(&info.vendor, "");
 
             let scsi_model = dev_scsi.get_sysattr_value("model").context(DeviceSnafu)?;
             // scsi_model to model
-            crate::utils::encode_devnode_name(&scsi_model, &mut info.model_enc);
-            info.model = crate::utils::replace_whitespace(&scsi_model);
-            info.model = crate::utils::replace_chars(&info.model, "");
+            encode_devnode_name(&scsi_model, &mut info.model_enc);
+            info.model = replace_whitespace(&scsi_model);
+            info.model = replace_chars(&info.model, "");
 
             let scsi_type_str = dev_scsi.get_sysattr_value("type").context(DeviceSnafu)?;
 
@@ -247,8 +248,8 @@ impl UsbId {
             let scsi_revision = dev_scsi.get_sysattr_value("rev").context(DeviceSnafu)?;
 
             // scsi_revision to revision, unimplemented!()
-            info.revision = crate::utils::replace_whitespace(&scsi_revision);
-            info.revision = crate::utils::replace_chars(&info.revision, "");
+            info.revision = replace_whitespace(&scsi_revision);
+            info.revision = replace_chars(&info.revision, "");
 
             info.instance = format!("{}:{}", target, lun);
         }
@@ -265,9 +266,9 @@ impl UsbId {
                 Ok(s) => s,
                 Err(_) => info.vendor_id.clone(),
             };
-            crate::utils::encode_devnode_name(&usb_vendor, &mut info.vendor_enc);
-            info.vendor = crate::utils::replace_whitespace(&usb_vendor);
-            info.vendor = crate::utils::replace_chars(&info.vendor, "");
+            encode_devnode_name(&usb_vendor, &mut info.vendor_enc);
+            info.vendor = replace_whitespace(&usb_vendor);
+            info.vendor = replace_chars(&info.vendor, "");
         }
 
         if info.model.is_empty() {
@@ -275,15 +276,15 @@ impl UsbId {
                 Ok(s) => s,
                 Err(_) => info.product_id.clone(),
             };
-            crate::utils::encode_devnode_name(&usb_model, &mut info.model_enc);
-            info.model = crate::utils::replace_whitespace(&usb_model);
-            info.model = crate::utils::replace_chars(&info.model, "");
+            encode_devnode_name(&usb_model, &mut info.model_enc);
+            info.model = replace_whitespace(&usb_model);
+            info.model = replace_chars(&info.model, "");
         }
 
         if info.revision.is_empty() {
             if let Ok(usb_revision) = device.get_sysattr_value("bcdDevice") {
-                info.revision = crate::utils::replace_whitespace(&usb_revision);
-                info.revision = crate::utils::replace_chars(&info.revision, "");
+                info.revision = replace_whitespace(&usb_revision);
+                info.revision = replace_chars(&info.revision, "");
             }
         }
 
@@ -298,8 +299,8 @@ impl UsbId {
                 }
 
                 if !usb_serial.is_empty() {
-                    info.serial_short = crate::utils::replace_whitespace(&usb_serial);
-                    info.serial_short = crate::utils::replace_chars(&info.serial_short, "");
+                    info.serial_short = replace_whitespace(&usb_serial);
+                    info.serial_short = replace_chars(&info.serial_short, "");
                 }
             }
 

@@ -16,7 +16,7 @@
 #![allow(deprecated)]
 use basic::IN_SET;
 use clap::Parser;
-use libdevmaster::utils::{encode_devnode_name, replace_chars, replace_whitespace};
+use libdevmaster::utils::commons::{encode_devnode_name, replace_chars, replace_whitespace};
 use log::logger;
 use nix::{
     errno::Errno,

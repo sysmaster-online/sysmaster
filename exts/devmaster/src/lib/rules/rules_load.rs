@@ -16,7 +16,7 @@
 use super::*;
 use crate::builtin::BuiltinCommand;
 use crate::error::{Error, Result};
-use crate::utils::*;
+use crate::utils::commons::*;
 use basic::parse::parse_mode;
 use basic::unistd::{parse_gid, parse_uid};
 use fnmatch_regex;
