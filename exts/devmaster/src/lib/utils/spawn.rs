@@ -13,23 +13,24 @@
 //! utilities for spawning a child process
 //!
 
+use crate::{error::*, rules::exec_unit::ExecuteUnit};
+use lazy_static::lazy_static;
+use shell_words::split;
 use std::{
     io::Read,
     process::{Command, Stdio},
     time::Duration,
 };
-
-use crate::error::*;
-use lazy_static::lazy_static;
-use shell_words::split;
 use wait_timeout::ChildExt;
 
 /// if the command is not absolute path, try to find it under lib directory first.
-pub(crate) fn spawn(cmd_str: &str, timeout: Duration) -> Result<(String, i32)> {
+pub(crate) fn spawn(cmd_str: &str, timeout: Duration, unit: &ExecuteUnit) -> Result<(String, i32)> {
     lazy_static! {
         static ref LIB_DIRS: Vec<String> =
             vec!["/lib/udev/".to_string(), "/lib/devmaster/".to_string()];
     }
+
+    let dev = unit.get_device();
 
     let cmd_tokens = split(cmd_str).map_err(|e| Error::Other {
         msg: format!(
@@ -55,6 +56,10 @@ pub(crate) fn spawn(cmd_str: &str, timeout: Duration) -> Result<(String, i32)> {
     } else {
         Command::new(&cmd_tokens[0])
     };
+
+    for (key, val) in &dev.borrow().property_iter() {
+        cmd.env(key, val);
+    }
 
     let cmd = cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
@@ -128,36 +133,53 @@ pub(crate) fn spawn(cmd_str: &str, timeout: Duration) -> Result<(String, i32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rules::exec_unit::ExecuteUnit;
+    use device::Device;
     use log::logger::init_log_to_console;
     use log::Level;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     #[test]
     fn test_spawn() {
         init_log_to_console("test_spawn", Level::Debug);
 
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        let unit = ExecuteUnit::new(Rc::new(RefCell::new(dev)));
+
         println!(
             "{}",
-            spawn("echo hello world", Duration::from_secs(1),)
+            spawn("echo hello world", Duration::from_secs(1), &unit)
                 .unwrap()
                 .0
         );
 
         println!(
             "{}",
-            spawn("/bin/echo hello world", Duration::from_secs(1),)
+            spawn("/bin/echo hello world", Duration::from_secs(1), &unit)
                 .unwrap()
                 .0
         );
 
-        println!("{}", spawn("sleep 2", Duration::from_secs(1),).unwrap_err());
-
-        println!("{}", spawn("sleep 1", Duration::from_secs(10),).unwrap().0);
+        println!(
+            "{}",
+            spawn("sleep 2", Duration::from_secs(1), &unit).unwrap_err()
+        );
 
         println!(
             "{}",
-            spawn("sh -c '/bin/echo test shell'", Duration::from_secs(1),)
-                .unwrap()
-                .0
+            spawn("sleep 1", Duration::from_secs(10), &unit).unwrap().0
+        );
+
+        println!(
+            "{}",
+            spawn(
+                "sh -c '/bin/echo test shell'",
+                Duration::from_secs(1),
+                &unit
+            )
+            .unwrap()
+            .0
         );
     }
 }

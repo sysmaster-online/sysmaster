@@ -566,7 +566,11 @@ impl ExecuteManager {
                     format!("Importing properties from output of cmd '{}'", cmd)
                 );
 
-                let result = match spawn(&cmd, Duration::from_secs(self.unit_spawn_timeout_usec)) {
+                let result = match spawn(
+                    &cmd,
+                    Duration::from_secs(self.unit_spawn_timeout_usec),
+                    self.current_unit.as_ref().unwrap(),
+                ) {
                     Ok(s) => {
                         if s.1 < 0 {
                             log_rule_token!(
@@ -821,7 +825,11 @@ impl ExecuteManager {
                     }
                 };
 
-                let result = match spawn(&cmd, Duration::from_secs(self.unit_spawn_timeout_usec)) {
+                let result = match spawn(
+                    &cmd,
+                    Duration::from_secs(self.unit_spawn_timeout_usec),
+                    self.current_unit.as_ref().unwrap(),
+                ) {
                     Ok(s) => {
                         if s.1 != 0 {
                             return Ok(token.op == OperatorType::Nomatch);
@@ -1523,7 +1531,11 @@ impl ExecuteManager {
                 format!("Running program '{}'", cmd_str)
             );
 
-            if let Err(e) = spawn(cmd_str, Duration::from_secs(self.unit_spawn_timeout_usec)) {
+            if let Err(e) = spawn(
+                cmd_str,
+                Duration::from_secs(self.unit_spawn_timeout_usec),
+                self.current_unit.as_ref().unwrap(),
+            ) {
                 log_dev!(
                     debug,
                     device.borrow(),
