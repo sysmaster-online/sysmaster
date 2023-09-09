@@ -544,12 +544,6 @@ impl Install {
         let canon_path = path.canonicalize()?;
         type ConfigPartial = <UeConfigData as Config>::Partial;
         let mut partial: ConfigPartial = Partial::from_env().context(ConfiqueSnafu)?;
-        /* The first config wins, so add default values at last. */
-        partial = partial.with_fallback(
-            confique::File::with_format(canon_path, FileFormat::Toml)
-                .load()
-                .context(ConfiqueSnafu)?,
-        );
 
         let dropin_dir_name = format!("{}.d", unit_install.name());
 
@@ -580,6 +574,12 @@ impl Install {
                 };
             }
         }
+        /* The first config wins, so add default values at last. */
+        partial = partial.with_fallback(
+            confique::File::with_format(canon_path, FileFormat::Toml)
+                .load()
+                .context(ConfiqueSnafu)?,
+        );
         partial = partial.with_fallback(ConfigPartial::default_values());
         let configer = UeConfigData::from_partial(partial).context(ConfiqueSnafu)?;
         unit_install.fill_struct(&configer);
