@@ -352,9 +352,9 @@ fn is_pci_bridge(dev: Rc<RefCell<Device>>) -> bool {
 fn parse_hotplug_slot_from_function_id(
     dev: Rc<RefCell<Device>>,
     slots_dirfd: RawFd,
-) -> Result<u32> {
+) -> Result<Option<u32>> {
     if !naming_scheme_has(NamingSchemeFlags::SLOT_FUNCTION_ID) {
-        return Ok(0);
+        return Ok(None);
     }
 
     /*
@@ -368,7 +368,7 @@ fn parse_hotplug_slot_from_function_id(
      */
     let attr = match dev.borrow().get_sysattr_value("function_id") {
         Ok(v) => v,
-        Err(_) => return Ok(0),
+        Err(_) => return Ok(None),
     };
 
     let function_id = attr.parse::<u64>().context(ParseIntSnafu).log_dev_debug(
@@ -416,7 +416,7 @@ fn parse_hotplug_slot_from_function_id(
         });
     }
 
-    Ok(function_id as u32)
+    Ok(Some(function_id as u32))
 }
 
 fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames) -> Result<()> {
@@ -522,12 +522,13 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
 
     loop {
         match parse_hotplug_slot_from_function_id(hotplug_slot_dev.clone(), dir.as_raw_fd()) {
-            Ok(r) => {
+            Ok(Some(r)) => {
                 if r > 0 {
                     domain = 0;
                     break;
                 }
             }
+            Ok(None) => {}
             Err(_) => return Ok(()),
         }
 
