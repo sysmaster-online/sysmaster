@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 constants = { path = "../constants" }
 log = { path = "../log" }
+selinux = { path = "../../libs/selinux", features = ["selinux"], optional = true }
 
 bitflags = { version = "1.3.2", optional = true }
 pkg-config = { version = "0.3", optional = true }
@@ -97,7 +98,6 @@ parse = []
 process = ["procfs"]
 rlimit = []
 security = []
-selinux = []
 sensors = []
 show_table = []
 signal = []

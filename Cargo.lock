@@ -66,6 +66,7 @@ dependencies = [
  "pkg-config",
  "procfs",
  "rand",
+ "selinux",
  "snafu",
  "tempfile",
 ]
@@ -1535,6 +1536,13 @@ dependencies = [
  "cmdproto",
  "constants",
  "nix 0.24.3",
+]
+
+[[package]]
+name = "selinux"
+version = "0.5.0"
+dependencies = [
+ "bindgen",
 ]
 
 [[package]]

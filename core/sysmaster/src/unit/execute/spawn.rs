@@ -166,12 +166,17 @@ fn apply_umask(umask: Option<Mode>) -> Result<()> {
 fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: Rc<ExecContext>) {
     log::debug!("exec context params: {:?}", ctx.envs());
 
+    let _ = setup_exec_directory(ctx.clone());
+
+    if let Err(e) = apply_umask(ctx.umask()) {
+        log::error!("Failed to apply umask: {}", e.to_string());
+        return;
+    }
+
     if let Err(e) = apply_root_directory(ctx.root_directory()) {
         log::error!("Failed to apply root directory: {}", e);
         return;
     }
-
-    let _ = setup_exec_directory(ctx.clone());
 
     #[cfg(feature = "linux")]
     if let Err(e) = apply_user_and_group(ctx.clone(), params) {
@@ -184,9 +189,15 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
         return;
     }
 
-    if let Err(e) = apply_umask(ctx.umask()) {
-        log::error!("Failed to apply umask: {}", e.to_string());
-        return;
+    /* Set SELinuxContext */
+    if let Some(context) = ctx.selinux_context() {
+        let res = basic::security::set_exec_context(&context);
+        if res < 0 {
+            log::error!("Failed to set selinux exec context");
+            if !context.starts_with('-') {
+                return;
+            }
+        }
     }
 
     if let Err(e) = ctx.load_env_from_file() {

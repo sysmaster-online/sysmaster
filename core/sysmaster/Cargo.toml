@@ -17,6 +17,7 @@ features = [
     "condition",
     "fd",
     "cmdline",
+    #"selinux", #uncomment this if you want to enable selinux
     "security",
     "mount",
     "machine",

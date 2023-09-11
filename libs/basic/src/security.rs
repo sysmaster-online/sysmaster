@@ -28,23 +28,34 @@ use nix::{
     },
 };
 
-#[cfg(feature = "selinux")]
-#[link(name = "selinux")]
-extern "C" {
-    fn is_selinux_enabled() -> c_int;
-}
-
-#[cfg(feature = "selinux")]
 /// check if selinux is enabled
 pub fn selinux_enabled() -> bool {
-    let res = unsafe { is_selinux_enabled() };
-    res > 0
+    #[cfg(feature = "selinux")]
+    {
+        let res = unsafe { selinux::is_selinux_enabled() };
+        res > 0
+    }
+
+    #[cfg(not(feature = "selinux"))]
+    {
+        false
+    }
 }
 
-#[cfg(not(feature = "selinux"))]
-/// check if selinux is enabled
-pub fn selinux_enabled() -> bool {
-    false
+/// sets the context used for the next execve call
+#[allow(unused_variables)]
+pub fn set_exec_context(context: &str) -> i32 {
+    #[cfg(feature = "selinux")]
+    {
+        let context = String::from(context);
+        let context = std::ffi::CString::new(context).unwrap();
+        unsafe { selinux::setexeccon(context.as_ptr()) }
+    }
+
+    #[cfg(not(feature = "selinux"))]
+    {
+        0
+    }
 }
 
 /// check if smack is enabled

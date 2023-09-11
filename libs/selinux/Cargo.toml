@@ -1,0 +1,18 @@
+[package]
+name = "selinux"
+version = "0.5.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies.bindgen]
+default_features = false
+features = ["runtime"]
+version = "0.63.0"
+
+[features]
+# selinux crate has a feature "selinux" is stupid, but I didn't find a good way to allow us not to
+# build libs/selinux when we just call `cargo build --all`. I have tried removing libs/selinux from
+# the root Cargo.toml and marking selinux as `optional = true` in libs/basic/Cargo.toml, either way
+# doesn't work fine.
+selinux = []

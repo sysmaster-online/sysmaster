@@ -426,6 +426,7 @@ pub(super) struct SectionService {
     #[config(deserialize_with = KillMode::deserialize_with)]
     #[config(default = "none")]
     pub KillMode: KillMode,
+    pub SELinuxContext: Option<String>,
     #[config(deserialize_with = deserialize_pathbuf)]
     pub RootDirectory: Option<PathBuf>,
     #[config(default = "")]

@@ -195,6 +195,7 @@ pub struct ExecContext {
     user: RefCell<Option<User>>,
     group: RefCell<Option<Group>>,
     umask: RefCell<Option<Mode>>,
+    selinux_context: RefCell<Option<String>>,
 }
 
 impl Default for ExecContext {
@@ -217,6 +218,7 @@ impl ExecContext {
             user: RefCell::new(None),
             group: RefCell::new(None),
             umask: RefCell::new(None),
+            selinux_context: RefCell::new(None),
         }
     }
 
@@ -420,6 +422,16 @@ impl ExecContext {
     ///
     pub fn umask(&self) -> Option<Mode> {
         *self.umask.borrow()
+    }
+
+    ///
+    pub fn set_selinux_context(&self, selinux_context: Option<String>) {
+        *self.selinux_context.borrow_mut() = selinux_context;
+    }
+
+    ///
+    pub fn selinux_context(&self) -> Option<String> {
+        self.selinux_context.borrow().clone()
     }
 }
 
