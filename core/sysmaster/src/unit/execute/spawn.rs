@@ -39,11 +39,11 @@ impl ExecSpawn {
         &self,
         unit: &Unit,
         cmdline: &ExecCommand,
-        params: &ExecParameters,
+        params: &mut ExecParameters,
         ctx: Rc<ExecContext>,
     ) -> Result<Pid> {
         let ret = unsafe { unistd::fork() };
-
+        params.set_cgroup_path(&unit.cg_path());
         match ret {
             Ok(ForkResult::Parent { child }) => {
                 log::debug!("child pid is :{}", child);
@@ -164,6 +164,12 @@ fn apply_umask(umask: Option<Mode>) -> Result<()> {
 }
 
 fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: Rc<ExecContext>) {
+    if let Some(cg_path) = params.cgroup_path() {
+        if let Err(e) = cgroup::cg_attach(Pid::from_raw(0), &cg_path) {
+            log::error!("Failed to migrate forked process to {:?}: {}", cg_path, e);
+        }
+    }
+
     log::debug!("exec context params: {:?}", ctx.envs());
 
     let _ = setup_exec_directory(ctx.clone());

@@ -149,7 +149,7 @@ pub trait UmIf {
         &self,
         _unit_name: &str,
         _cmdline: &ExecCommand,
-        _params: &ExecParameters,
+        _params: &mut ExecParameters,
         _ctx: Rc<ExecContext>,
     ) -> Result<Pid> {
         Ok(Pid::this())

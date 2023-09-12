@@ -21,6 +21,7 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 use std::cmp::min;
 use std::fs::File;
 use std::io::{self, BufRead};
+use std::path::Path;
 use std::str::FromStr;
 use std::{cell::RefCell, collections::HashMap};
 use std::{ffi::CString, path::PathBuf, rc::Rc};
@@ -455,6 +456,7 @@ pub struct ExecParameters {
     environment: Rc<EnvData>,
     fds: Vec<i32>,
     notify_sock: Option<PathBuf>,
+    cgroup_path: Option<PathBuf>,
     watchdog_usec: u64,
     flags: ExecFlags,
     nonblock: bool,
@@ -503,6 +505,7 @@ impl ExecParameters {
             environment: Rc::new(EnvData::new()),
             fds: Vec::new(),
             notify_sock: None,
+            cgroup_path: None,
             watchdog_usec: 0,
             flags: ExecFlags::CONTROL,
             nonblock: false,
@@ -567,6 +570,16 @@ impl ExecParameters {
     /// return the exec command flags
     pub fn exec_flags(&self) -> ExecFlags {
         self.flags
+    }
+
+    /// set the cgroup path
+    pub fn set_cgroup_path(&mut self, cgroup_path: &Path) {
+        self.cgroup_path = Some(PathBuf::from(cgroup_path));
+    }
+
+    /// get the cgroup path
+    pub fn cgroup_path(&self) -> Option<PathBuf> {
+        self.cgroup_path.clone()
     }
 }
 

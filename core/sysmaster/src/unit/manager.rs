@@ -473,7 +473,7 @@ impl UmIf for UnitManager {
         &self,
         unit: &str,
         cmdline: &ExecCommand,
-        params: &ExecParameters,
+        params: &mut ExecParameters,
         ctx: Rc<ExecContext>,
     ) -> Result<Pid> {
         let unit = self.units_get(unit);

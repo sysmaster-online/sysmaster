@@ -102,7 +102,7 @@ impl ServiceSpawn {
         params.set_watchdog_usec(self.watchdog_timer());
 
         log::debug!("begin to exec spawn");
-        let pid = match um.exec_spawn(&unit.id(), cmdline, &params, self.exec_ctx.clone()) {
+        let pid = match um.exec_spawn(&unit.id(), cmdline, &mut params, self.exec_ctx.clone()) {
             Ok(pid) => {
                 um.child_watch_pid(&unit.id(), pid);
                 pid

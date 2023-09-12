@@ -30,12 +30,12 @@ impl SocketSpawn {
     }
 
     pub(super) fn start_socket(&self, cmdline: &ExecCommand) -> Result<Pid> {
-        let params = ExecParameters::new();
+        let mut params = ExecParameters::new();
 
         if let Some(unit) = self.comm.owner() {
             let um = self.comm.um();
             unit.prepare_exec()?;
-            match um.exec_spawn(&unit.id(), cmdline, &params, self.exec_ctx.clone()) {
+            match um.exec_spawn(&unit.id(), cmdline, &mut params, self.exec_ctx.clone()) {
                 Ok(pid) => {
                     um.child_watch_pid(&unit.id(), pid);
                     Ok(pid)
