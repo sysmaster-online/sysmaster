@@ -460,6 +460,9 @@ impl Unit {
             );
         }
         let pids = cgroup::cg_get_pids(&cg_path);
+        if pids.is_empty() {
+            return Err(format!("No process in cgroup path: {:?}", cg_path).into());
+        }
         let mut main_pid = Pid::from_raw(0);
 
         for pid in pids {
