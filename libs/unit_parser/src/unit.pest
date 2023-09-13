@@ -1,0 +1,18 @@
+COMMENT = _{ (("#" | ";") ~ (!NEWLINE ~ ANY)*) ~ NEWLINE }
+WHITESPACE = _{ " " | "\t" | "\r" }
+
+identifier = _{ XID_START ~ XID_CONTINUE* }
+
+section_header = { identifier }
+
+key = { identifier }
+value_block = { (!(NEWLINE | "\\\n" | "%") ~ (ANY))* }
+value = ${ ( value_block ~ ( ("%" ~ specifier ) | "\\\n") )* ~ value_block }
+
+entry = { key ~ "=" ~ value ~ NEWLINE+ }
+
+section = { "[" ~ section_header ~ "]" ~ NEWLINE ~ entry+ }
+
+unit_file = { SOI ~ NEWLINE* ~ section + ~ EOI }
+
+specifier = { ANY }

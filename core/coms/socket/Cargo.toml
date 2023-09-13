@@ -30,7 +30,7 @@ nix = { version = "0.24", default-features = false, features = [
     "net",
     "resource",
 ] }
-once_cell = { version = "=1.7.2", default-features = false }
+once_cell = { version = "1.8.0", default-features = false }
 serde = { version = "1.0.130", default-features = false }
 
 [dev-dependencies]

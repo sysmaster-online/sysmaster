@@ -85,7 +85,7 @@ optional = false
 default-features = false
 
 [dependencies.once_cell]
-version = "=1.7.2"
+version = "=1.8.0"
 features = []
 optional = false
 default-features = false

@@ -1,0 +1,52 @@
+WHITESPACE = _{ " " }
+
+monday = { ^"mon" | ^"monday" }
+tuesday = { ^"tue" | ^"tuesday" }
+wednesday = { ^"wed" | ^"wednesday" }
+thursday = { ^"thu" | ^"thursday" }
+friday = { ^"fri" | ^"friday" }
+saturday = { ^"sat" | ^"saturday" }
+sunday = { ^"sun" | ^"sunday" }
+
+weekday = { monday | tuesday | wednesday | thursday | friday | saturday | sunday }
+
+number_4b = { ASCII_DIGIT{4} }
+number_2b = { ASCII_DIGIT{2} }
+number = { ASCII_DIGIT+ }
+
+date = ${ (number_4b | number_2b) ~ "-" ~ number_2b ~ "-" ~ number_2b }
+
+time = ${ number_2b ~ ":" ~ number_2b ~ ( ":" ~ number_2b ~ ("." ~ number)? )? }
+
+timezone = { ANY+ }
+
+full_len = { weekday? ~ ((date ~ time) | date | time ) ~ timezone? }
+
+usec = {"usec" | "us" | "μs"}
+msec = {"msec" | "ms"}
+seconds = {"seconds" | "second" | "sec" | "s"}
+minutes = {"minutes" | "minute" | "min" | "m"}
+hours = {"hours" | "hour" | "hr" | "h"}
+days = {"days" | "day" | "d"}
+weeks = {"weeks" | "week" | "w"}
+months = {"months" | "month" | "M"}
+years = {"years" | "year" | "y"}
+
+unit = _{ usec | msec | seconds | minutes | hours | days | weeks | months | years }
+segment = { number ~ unit }
+
+timespan = { segment+ | number }
+
+relative_forward = { ("+" ~ timespan) | (timespan ~ "left") }
+relative_backward = { ("-" ~ timespan) | (timespan ~ "ago") }
+relative = { relative_forward | relative_backward }
+
+today = { "today" }
+yesturday = { "yesturday" }
+tomorrow = { "tomorrow" }
+now = { "now" }
+special = { (today | yesturday | tomorrow | now) ~ timezone? }
+
+absolute = ${ "@" ~ number }
+
+timestamp = { full_len | absolute | relative | special }

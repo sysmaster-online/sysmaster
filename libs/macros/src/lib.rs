@@ -28,8 +28,11 @@
 mod enum_display;
 mod unit_conf_parse;
 
+mod unit_parser;
+use unit_parser::{gen_entry_derives, gen_section_derives, gen_unit_derives};
+
 use proc_macro::TokenStream;
-use syn::parse_macro_input;
+use syn::{parse_macro_input, DeriveInput};
 
 /// proc-macro: ConfigParseM
 #[proc_macro_derive(ConfigParseM, attributes(serdeName))]
@@ -55,4 +58,31 @@ mod tests {
         let result = 2 + 2;
         assert_eq!(result, 4);
     }
+}
+
+#[proc_macro_derive(UnitConfig, attributes(unit, section))]
+pub fn derive_unit_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    gen_unit_derives(input)
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+#[proc_macro_derive(UnitSection, attributes(entry))]
+pub fn derive_unit_section(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    gen_section_derives(input)
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+#[proc_macro_derive(UnitEntry)]
+pub fn derive_unit_entry(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    gen_entry_derives(input)
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
 }

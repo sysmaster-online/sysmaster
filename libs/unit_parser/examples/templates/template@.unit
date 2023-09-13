@@ -1,0 +1,3 @@
+[Section]
+Name=%i in a template
+Description=created via a template, with the parameter: %i

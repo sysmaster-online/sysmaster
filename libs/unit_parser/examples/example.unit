@@ -1,0 +1,14 @@
+[AlternativeKey]
+Field=test
+
+[Section2]
+Regular=reg
+Private = pri
+AlternativeKey=cus
+DefaultValued=def
+Enum=Val1
+Duration=1y1M1w5d 1h4m
+Multiple=10
+Multiple=
+Multiple=111 333
+Multiple=222

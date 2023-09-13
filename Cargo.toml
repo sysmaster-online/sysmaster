@@ -135,6 +135,7 @@ members = [
   "libs/device",
   "libs/blkid_rs",
   "libs/kmod_rs",
+  "libs/unit_parser",
 ]
 exclude = ["config", "tools"]
 

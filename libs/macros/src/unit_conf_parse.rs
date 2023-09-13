@@ -76,22 +76,59 @@ pub fn do_expand(st: &syn::DeriveInput) -> syn::Result<proc_macro2::TokenStream>
 }
 
 fn get_user_specific_serde_name(st: &syn::DeriveInput) -> Option<String> {
-    for attr in &st.attrs {
-        if let Ok(syn::Meta::List(syn::MetaList {
-            ref path,
-            ref nested,
-            ..
-        })) = attr.parse_meta()
-        {
-            if let Some(p) = path.segments.first() {
-                if p.ident == "serdeName" {
-                    let _n = nested.first();
-                    if let Some(syn::NestedMeta::Meta(syn::Meta::Path(p))) = _n {
-                        if let Some(p) = p.segments.first() {
-                            return Some(p.ident.to_string());
-                        }
-                    } else if let Some(syn::NestedMeta::Lit(syn::Lit::Str(lit_str))) = _n {
-                        return Some(lit_str.value());
+    let mut result = None;
+    for attr in st.attrs.iter() {
+        attr.parse_nested_meta(|nested| {
+            if nested.path.is_ident("serdeName") {
+                let value = nested.value()?;
+                if value.peek(syn::Ident) {
+                    let token: syn::Ident = value.parse()?;
+                    result = Some(token.to_string());
+                } else if value.peek(syn::LitStr) {
+                    let token: syn::LitStr = value.parse()?;
+                    result = Some(token.value());
+                }
+            }
+            Ok(())
+        })
+        .ok();
+    }
+    result
+    // for attr in &st.attrs {
+    //     if let Ok(syn::Meta::List(syn::MetaList {
+    //         ref path,
+    //         ref nested,
+    //         ..
+    //     })) = attr.parse_meta()
+    //     {
+    //         if let Some(p) = path.segments.first() {
+    //             if p.ident == "serdeName" {
+    //                 let _n = nested.first();
+    //                 if let Some(syn::NestedMeta::Meta(syn::Meta::Path(p))) = _n {
+    //                     if let Some(p) = p.segments.first() {
+    //                         return Some(p.ident.to_string());
+    //                     }
+    //                 } else if let Some(syn::NestedMeta::Lit(syn::Lit::Str(lit_str))) = _n {
+    //                     return Some(lit_str.value());
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+    // None
+}
+
+pub(crate) fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
+    if let syn::Type::Path(syn::TypePath { ref path, .. }) = ty {
+        if let Some(seg) = path.segments.last() {
+            if seg.ident == "Option" {
+                if let syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+                    ref args,
+                    ..
+                }) = seg.arguments
+                {
+                    if let Some(syn::GenericArgument::Type(inner_ty)) = args.first() {
+                        return Some(inner_ty);
                     }
                 }
             }
@@ -100,10 +137,10 @@ fn get_user_specific_serde_name(st: &syn::DeriveInput) -> Option<String> {
     None
 }
 
-fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
+pub(crate) fn get_vec_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
     if let syn::Type::Path(syn::TypePath { ref path, .. }) = ty {
         if let Some(seg) = path.segments.last() {
-            if seg.ident == "Option" {
+            if seg.ident == "Vec" {
                 if let syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
                     ref args,
                     ..
