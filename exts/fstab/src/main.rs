@@ -146,7 +146,7 @@ fn main() {
     let mut fstab_items: Vec<FSTabItem> = fstab_item::parse(FSTAB_PATH);
 
     // inotify: monitor, watch_set: what we care.
-    let (mut inotify, watch_set) = watch_devices(&fstab_items);
+    let (mut inotify, _watch_set) = watch_devices(&fstab_items);
 
     let mut complete_num = 0;
     loop {
@@ -170,9 +170,7 @@ fn main() {
                 .read_events_blocking(&mut buffer)
                 .expect("Failed to read events.");
             for event in events {
-                if event.mask == EventMask::CREATE
-                    && watch_set.contains(event.name.unwrap().to_str().unwrap())
-                {
+                if event.mask == EventMask::CREATE {
                     log::debug!("File created: {:?}", event.name.unwrap());
                     watch_updated = true;
                 }
