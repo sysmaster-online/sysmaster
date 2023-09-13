@@ -13,6 +13,10 @@ path = "src/bin/devctl/main.rs"
 name = "ata_id"
 path = "src/bin/tools/ata_id/main.rs"
 
+[[bin]]
+name = "scsi_id"
+path = "src/bin/tools/scsi_id/main.rs"
+
 [lib]
 name = "libdevmaster"
 path = "src/lib/lib.rs"
