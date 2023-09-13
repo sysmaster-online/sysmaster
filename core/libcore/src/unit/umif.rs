@@ -87,6 +87,12 @@ pub trait UmIf {
     fn unit_enabled(&self, _name: &str) -> Result<()> {
         Ok(())
     }
+
+    /// check if there is already a job in process
+    fn has_job(&self, _name: &str) -> bool {
+        false
+    }
+
     /// check if there is already a stop job in process
     fn has_stop_job(&self, _name: &str) -> bool {
         false

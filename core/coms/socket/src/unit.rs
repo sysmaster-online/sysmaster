@@ -17,6 +17,7 @@
 
 use crate::mng::SocketMngPort;
 use crate::port::SocketPort;
+use crate::rentry::SocketState;
 use crate::{comm::SocketUnitComm, config::SocketConfig, load::SocketLoad, mng::SocketMng};
 use core::error::*;
 use core::exec::ExecContext;
@@ -113,7 +114,20 @@ impl SubUnit for SocketUnit {
     }
 
     fn trigger(&self, other: &str) {
+        if ![SocketState::Running, SocketState::Listening].contains(&self.mng.state()) {
+            return;
+        }
+
+        if self.config.config_data().borrow().Socket.Accept {
+            return;
+        }
+
         let um = self.comm.um();
+
+        if um.has_job(other) {
+            return;
+        }
+
         let service_state = um.get_subunit_state(other);
         if [
             "dead".to_string(),

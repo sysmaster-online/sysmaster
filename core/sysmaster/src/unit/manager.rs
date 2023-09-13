@@ -405,6 +405,15 @@ impl UmIf for UnitManager {
         Ok(())
     }
 
+    /// check if there is already a job in process
+    fn has_job(&self, name: &str) -> bool {
+        let u = match self.db.units_get(name) {
+            None => return false,
+            Some(v) => v,
+        };
+        self.jm.has_job(&u)
+    }
+
     /// check if there is already a stop job in process
     fn has_stop_job(&self, name: &str) -> bool {
         let u = match self.db.units_get(name) {
