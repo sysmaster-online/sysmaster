@@ -12,11 +12,14 @@ lib_rules_install_dir=${lib_devmaster_dir}/rules.d
 
 service_install_dir=/lib/sysmaster/system
 sysinit_target_dir=/etc/sysmaster/system/sysinit.target.wants
+multi_user_target_dir=/etc/sysmaster/system/multi-user.target.wants
 
 for s in ${services[@]}; do
     rm -f ${service_install_dir}/$s
-    test -f ${sysinit_target_dir}/$s && unlink ${sysinit_target_dir}/$s
 done
+
+unlink ${sysinit_target_dir}/devmaster.service
+unlink ${multi_user_target_dir}/devctl-trigger.service
 
 rm -rf ${lib_devmaster_dir} ${etc_conf_install_dir}
 

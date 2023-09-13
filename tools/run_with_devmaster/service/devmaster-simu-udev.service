@@ -1,11 +1,7 @@
 [Unit]
 DefaultDependencies=false
-Before="sysinit.target"
 
 [Service]
 Type="oneshot"
-RemainAfterExit=false
+RemainAfterExit=true
 ExecStart="/usr/bin/mv /run/udev /run/udev_back ; /usr/bin/mkdir -p /run/devmaster ; /usr/bin/cp -r /run/udev_back/data /run/devmaster/ ; /usr/bin/ln -sf /run/devmaster /run/udev"
-
-[Install]
-WantedBy="sysinit.target"

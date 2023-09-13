@@ -24,6 +24,7 @@ lib_rules_install_dir=${lib_devmaster_dir}/rules.d
 
 service_install_dir=/lib/sysmaster/system
 sysinit_target_dir=/etc/sysmaster/system/sysinit.target.wants
+multi_user_target_dir=/etc/sysmaster/system/multi-user.target.wants
 
 # Install binaries.
 install -Dm0550 -t /usr/bin ${target_dir}/devctl || exit 1
@@ -42,9 +43,9 @@ install -Dm0640 -t ${lib_rules_install_dir} ${lib_rules_dir}/*.rules || exit 1
 
 # Install services.
 install -Dm0640 -t ${service_install_dir} ${service_dir}/*.service || exit 1
-for s in ${services[@]}; do
-    ln -sf ${service_install_dir}/$s ${sysinit_target_dir}/$s
-done
+
+ln -sf ${service_install_dir}/devmaster.service ${sysinit_target_dir}/devmaster.service
+ln -sf ${service_install_dir}/devctl-trigger.service ${multi_user_target_dir}/devctl-trigger.service
 
 # Disable udev rules if they exists
 test -f ${sysinit_target_dir}/udevd.service && unlink ${sysinit_target_dir}/udevd.service
