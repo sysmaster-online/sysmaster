@@ -12,9 +12,11 @@
 //
 #![allow(non_snake_case)]
 
+use crate::manager::Mode;
 use confique::{Config, FileFormat, Partial};
 
 pub const SYSTEM_CONFIG: &str = "/etc/sysmaster/system.conf";
+pub const USER_CONFIG: &str = "/etc/sysmaster/user.conf";
 const RELI_HISTORY_MAPSIZE_DEFAULT: usize = 1048576; // 1M
 
 #[derive(Config, Debug)]
@@ -39,15 +41,17 @@ pub struct ManagerConfig {
 
 impl ManagerConfig {
     #[allow(dead_code)]
-    pub fn new(file: Option<&str>) -> ManagerConfig {
+    pub fn new(mode: &Mode) -> ManagerConfig {
         type ConfigPartial = <ManagerConfig as Config>::Partial;
         let mut partial: ConfigPartial = match Partial::from_env() {
             Err(_) => return ManagerConfig::default(),
             Ok(v) => v,
         };
-        partial = match confique::File::with_format(file.unwrap_or(SYSTEM_CONFIG), FileFormat::Toml)
-            .load()
-        {
+        let file = match mode {
+            Mode::System => SYSTEM_CONFIG,
+            Mode::User => USER_CONFIG,
+        };
+        partial = match confique::File::with_format(file, FileFormat::Toml).load() {
             Err(_) => return ManagerConfig::default(),
             Ok(v) => partial.with_fallback(v),
         };
@@ -56,6 +60,10 @@ impl ManagerConfig {
             Ok(v) => v,
             Err(_) => ManagerConfig::default(),
         }
+    }
+
+    pub fn reload(&mut self, mode: &Mode) {
+        *self = ManagerConfig::new(mode);
     }
 }
 
@@ -70,20 +78,5 @@ impl Default for ManagerConfig {
             LogFileNumber: 10,
             DbSize: RELI_HISTORY_MAPSIZE_DEFAULT,
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use libtests::get_crate_root;
-    use std::path::PathBuf;
-
-    use super::*;
-    #[test]
-    fn load() {
-        let mut file: PathBuf = get_crate_root().unwrap();
-        file.push("config/system.conf");
-        let config = ManagerConfig::new(file.to_str());
-        assert_eq!(config.DefaultRestartSec, 100);
     }
 }

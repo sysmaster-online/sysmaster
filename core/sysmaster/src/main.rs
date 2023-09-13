@@ -47,6 +47,7 @@ use core::rel;
 use libc::{c_int, getpid, getppid, prctl, PR_SET_CHILD_SUBREAPER};
 use log::{self, Level};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
+use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::env::{self};
 use std::fs;
@@ -83,13 +84,14 @@ fn main() -> Result<()> {
     //remount / to rw permission, as log will create file if user want flush to to file
     remount_sysroot();
 
-    let manager_config = Rc::new(ManagerConfig::new(None));
+    let system = Mode::System;
+    let manager_config = Rc::new(RefCell::new(ManagerConfig::new(&system)));
     log::logger::init_log(
         "sysmaster",
-        Level::from_str(&manager_config.LogLevel).unwrap(),
-        &manager_config.LogTarget,
-        manager_config.LogFileSize,
-        manager_config.LogFileNumber,
+        Level::from_str(&manager_config.borrow().LogLevel).unwrap(),
+        &manager_config.borrow().LogTarget,
+        manager_config.borrow().LogFileSize,
+        manager_config.borrow().LogFileNumber,
     );
     log::info!("sysmaster running in system mode.");
 
@@ -108,7 +110,7 @@ fn main() -> Result<()> {
 
     initialize_runtime(self_recovery_enable)?;
 
-    let manager = Manager::new(Mode::System, Action::Run, manager_config);
+    let manager = Manager::new(system, Action::Run, manager_config);
 
     // enable clear
     if !self_recovery_enable && !args.deserialize {

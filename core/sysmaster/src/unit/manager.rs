@@ -68,7 +68,7 @@ pub(crate) struct UnitManagerX {
     lookup_path: Rc<LookupPaths>,
     state: Rc<RefCell<State>>,
     #[allow(dead_code)]
-    manager_config: Rc<ManagerConfig>,
+    manager_config: Rc<RefCell<ManagerConfig>>,
 }
 
 impl Drop for UnitManagerX {
@@ -85,7 +85,7 @@ impl UnitManagerX {
         relir: &Rc<Reliability>,
         lookup_path: &Rc<LookupPaths>,
         state: Rc<RefCell<State>>,
-        manager_config: Rc<ManagerConfig>,
+        manager_config: Rc<RefCell<ManagerConfig>>,
     ) -> UnitManagerX {
         let _dm = Rc::new(DataManager::new());
         let umx = UnitManagerX {
@@ -310,7 +310,7 @@ pub struct UnitManager {
     sigchld: Sigchld,
     notify: NotifyManager,
     sms: UnitSubManagers,
-    manager_config: Rc<ManagerConfig>,
+    manager_config: Rc<RefCell<ManagerConfig>>,
 }
 
 impl UmIf for UnitManager {
@@ -963,7 +963,7 @@ impl UnitManager {
         dmr: &Rc<DataManager>,
         lookup_path: &Rc<LookupPaths>,
         state: Rc<RefCell<State>>,
-        manager_config: Rc<ManagerConfig>,
+        manager_config: Rc<RefCell<ManagerConfig>>,
     ) -> Rc<UnitManager> {
         let _rentry = Rc::new(UnitRe::new(relir));
         let _db = Rc::new(UnitDb::new(&_rentry));
@@ -1100,16 +1100,16 @@ impl UnitManager {
 
     fn remove_job_result(&self, _source: &str) {}
 
-    fn get_log_target(&self) -> &str {
-        &self.manager_config.LogTarget
+    fn get_log_target(&self) -> String {
+        self.manager_config.borrow().LogTarget.clone()
     }
 
     fn get_log_file_size(&self) -> u32 {
-        self.manager_config.LogFileSize
+        self.manager_config.borrow().LogFileSize
     }
 
     fn get_log_file_number(&self) -> u32 {
-        self.manager_config.LogFileNumber
+        self.manager_config.borrow().LogFileNumber
     }
 }
 
@@ -1379,7 +1379,7 @@ mod unit_submanager {
             );
             let sub = match util::create_um_obj(
                 unit_type,
-                um.get_log_target(),
+                &um.get_log_target(),
                 um.get_log_file_size(),
                 um.get_log_file_number(),
             ) {
@@ -1418,7 +1418,7 @@ mod unit_submanager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manager::rentry::RELI_HISTORY_MAX_DBS;
+    use crate::manager::{rentry::RELI_HISTORY_MAX_DBS, Mode};
     use crate::mount::setup;
     use core::rel::ReliConf;
     use core::unit::UnitActiveState;
@@ -1450,7 +1450,7 @@ mod tests {
             &dm,
             &lookup_path,
             state,
-            Rc::new(ManagerConfig::new(None)),
+            Rc::new(RefCell::new(ManagerConfig::new(&Mode::System))),
         );
         (dm, event, um)
     }

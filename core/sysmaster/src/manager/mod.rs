@@ -33,6 +33,7 @@ use commands::Commands;
 use core::error::*;
 use core::rel::{ReliConf, ReliLastFrame, Reliability};
 use event::{EventState, Events};
+use log::{self, Level};
 use nix::sys::reboot::{self, RebootMode};
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
@@ -42,6 +43,7 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::str::FromStr;
 
 /// maximal size of process's arguments
 pub const MANAGER_ARGS_SIZE_MAX: usize = 5; // 6 - 1
@@ -198,7 +200,7 @@ pub struct Manager {
     lookup_path: Rc<LookupPaths>,
     alive_timer: Rc<AliveTimer>,
     #[allow(dead_code)]
-    config: Rc<ManagerConfig>,
+    config: Rc<RefCell<ManagerConfig>>,
 }
 
 impl Drop for Manager {
@@ -212,11 +214,11 @@ impl Drop for Manager {
 
 impl Manager {
     /// create factory instance
-    pub fn new(mode: Mode, action: Action, manager_config: Rc<ManagerConfig>) -> Self {
+    pub fn new(mode: Mode, action: Action, manager_config: Rc<RefCell<ManagerConfig>>) -> Self {
         let event = Rc::new(Events::new().unwrap());
         let reli = Rc::new(Reliability::new(
             ReliConf::new()
-                .set_map_size(manager_config.DbSize)
+                .set_map_size(manager_config.borrow().DbSize)
                 .set_max_dbs(rentry::RELI_HISTORY_MAX_DBS),
         ));
         let mut l_path = LookupPaths::new();
@@ -368,6 +370,15 @@ impl Manager {
     }
 
     fn reload(&self) {
+        self.config.borrow_mut().reload(&self.mode);
+        log::logger::init_log(
+            "sysmaster",
+            Level::from_str(&self.config.borrow().LogLevel).unwrap(),
+            &self.config.borrow().LogTarget,
+            self.config.borrow().LogFileSize,
+            self.config.borrow().LogFileNumber,
+        );
+
         // clear data
         self.um.entry_clear();
 
@@ -586,7 +597,11 @@ mod tests {
         logger::init_log_to_console("test_target_unit_load", log::Level::Trace);
 
         // new
-        let manager = Manager::new(Mode::System, Action::Run, Rc::new(ManagerConfig::new(None)));
+        let manager = Manager::new(
+            Mode::System,
+            Action::Run,
+            Rc::new(RefCell::new(ManagerConfig::new(&Mode::System))),
+        );
         manager.reli.data_clear(); // clear all data
 
         // startup
