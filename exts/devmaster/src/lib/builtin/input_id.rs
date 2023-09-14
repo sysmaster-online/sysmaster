@@ -744,8 +744,8 @@ mod tests {
     use log::logger;
 
     #[test]
-    fn test_builtin_example() {
-        logger::init_log_to_console("test_builtin_input_id", log::Level::Debug);
+    fn test_builtin_input_id() {
+        logger::init_log_to_console_syslog("test_builtin_input_id", log::Level::Debug);
 
         let mut enumerator = DeviceEnumerator::new();
 

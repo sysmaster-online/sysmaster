@@ -20,6 +20,9 @@ use event::Events;
 use nix::unistd::Pid;
 use std::{path::PathBuf, rc::Rc};
 
+#[cfg(feature = "plugin")]
+use constants::LOG_FILE_PATH;
+
 ///The trait Defining Shared Behavior of UnitManager
 ///
 ///The Behavior shared with all SubUnit,
@@ -239,7 +242,15 @@ macro_rules! declare_umobj_plugin {
             file_number: u32,
         ) -> *mut dyn $crate::unit::UnitManagerObj {
             #[cfg(feature = "plugin")]
-            log::logger::init_log_for_subum($name, level, target, file_size, file_number);
+            log::logger::init_log(
+                $name,
+                level,
+                target.split(&[' ', '-'][..]).collect(),
+                LOG_FILE_PATH,
+                file_size,
+                file_number,
+                false,
+            );
             let construcotr: fn() -> $unit_type = $constructor;
             let obj = construcotr();
             let boxed: Box<dyn $crate::unit::UnitManagerObj> = Box::new(obj);

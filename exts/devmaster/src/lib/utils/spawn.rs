@@ -135,14 +135,14 @@ mod tests {
     use super::*;
     use crate::rules::exec_unit::ExecuteUnit;
     use device::Device;
-    use log::logger::init_log_to_console;
+    use log::logger::init_log;
     use log::Level;
     use std::cell::RefCell;
     use std::rc::Rc;
 
     #[test]
     fn test_spawn() {
-        init_log_to_console("test_spawn", Level::Debug);
+        init_log("test_spawn", Level::Debug, vec!["console"], "", 0, 0, false);
 
         let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
         let unit = ExecuteUnit::new(Rc::new(RefCell::new(dev)));

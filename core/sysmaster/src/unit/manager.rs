@@ -1428,7 +1428,7 @@ mod tests {
     use std::time::Duration;
 
     fn init_dm_for_test() -> (Rc<DataManager>, Rc<Events>, Rc<UnitManager>) {
-        log::logger::init_log_to_console("manager test", log::Level::Trace);
+        log::logger::init_log_to_console("init_dm_for_test", log::Level::Trace);
         let mut l_path = LookupPaths::new();
         let test_units_dir = libtests::get_project_root()
             .unwrap()

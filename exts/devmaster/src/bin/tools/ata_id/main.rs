@@ -347,7 +347,7 @@ fn main() {
 
     let args = Args::parse();
 
-    logger::init_log_to_console("ata_id", log::Level::Info);
+    logger::init_log_to_console_syslog("ata_id", log::Level::Info);
 
     let mut id: hd_driveid = unsafe { mem::zeroed() };
     let mut identify = IdentifyUnion {

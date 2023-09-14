@@ -820,7 +820,7 @@ mod tests {
         unit::util::{self, UnitFile},
     };
     fn unit_init() -> Rc<Unit> {
-        logger::init_log_to_console("test_unit_entry", log::Level::Trace);
+        logger::init_log_to_console("unit_init", log::Level::Trace);
         let reli = Rc::new(Reliability::new(
             ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
         ));

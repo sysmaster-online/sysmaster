@@ -504,8 +504,16 @@ mod test {
 
     #[test]
     #[ignore]
-    fn test_builtin_example() {
-        logger::init_log_to_console("test_builtin_example", log::Level::Debug);
+    fn test_builtin_blkid() {
+        logger::init_log(
+            "test_builtin_blkid",
+            log::Level::Debug,
+            vec!["console"],
+            "",
+            0,
+            0,
+            false,
+        );
         let path = path::Path::new("/sys/class/block/");
         if !path.exists() {
             return;

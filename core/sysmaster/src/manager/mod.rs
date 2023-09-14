@@ -10,6 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use constants::LOG_FILE_PATH;
 use core::unit::UnitStatus;
 use nix::sys::signalfd::siginfo;
 #[cfg(test)]
@@ -374,9 +375,15 @@ impl Manager {
         log::logger::init_log(
             "sysmaster",
             Level::from_str(&self.config.borrow().LogLevel).unwrap(),
-            &self.config.borrow().LogTarget,
+            self.config
+                .borrow()
+                .LogTarget
+                .split(&[' ', '-'][..])
+                .collect(),
+            LOG_FILE_PATH,
             self.config.borrow().LogFileSize,
             self.config.borrow().LogFileNumber,
+            false,
         );
 
         // clear data
@@ -594,7 +601,7 @@ mod tests {
     //#[test]
     #[allow(dead_code)]
     fn manager_api() {
-        logger::init_log_to_console("test_target_unit_load", log::Level::Trace);
+        logger::init_log_to_console("manager_api", log::Level::Trace);
 
         // new
         let manager = Manager::new(

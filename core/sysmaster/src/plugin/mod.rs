@@ -575,7 +575,14 @@ mod tests {
     impl UmIf for UmIfD {}
 
     fn init_test() -> Arc<Plugin> {
-        logger::init_log_to_console("test_plugin_log_init", log::Level::Trace);
+        logger::_init_log(
+            log::Level::Trace,
+            vec!["console", "syslog"],
+            "",
+            0,
+            0,
+            false,
+        );
         Arc::clone(&Plugin::get_instance())
     }
 

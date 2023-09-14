@@ -42,6 +42,7 @@ use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
 use basic::{machine, machine::Machine, mount_util::read_lines, FSTAB_PATH, MOUNT_BIN};
 use clap::Parser;
+use constants::LOG_FILE_PATH;
 use core::error::*;
 use core::rel;
 use libc::{c_int, getpid, getppid, prctl, PR_SET_CHILD_SUBREAPER};
@@ -89,9 +90,15 @@ fn main() -> Result<()> {
     log::logger::init_log(
         "sysmaster",
         Level::from_str(&manager_config.borrow().LogLevel).unwrap(),
-        &manager_config.borrow().LogTarget,
+        manager_config
+            .borrow()
+            .LogTarget
+            .split(&[' ', '-'][..])
+            .collect(),
+        LOG_FILE_PATH,
         manager_config.borrow().LogFileSize,
         manager_config.borrow().LogFileNumber,
+        false,
     );
     log::info!("sysmaster running in system mode.");
 

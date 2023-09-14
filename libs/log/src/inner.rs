@@ -15,16 +15,18 @@ use std::{
     cmp, fmt,
     io::{Error, ErrorKind},
     mem,
+    ops::Deref,
     str::FromStr,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU8, AtomicUsize, Ordering},
         RwLock,
     },
 };
 
-use log::{LevelFilter, Log, Record};
+use crate::logger::ReInit;
+use log::{LevelFilter, Record};
 
-static mut LOGGER_LOCK: Option<RwLock<&dyn Log>> = None;
+static mut LOGGER_LOCK: Option<RwLock<&dyn ReInit>> = None;
 
 static STATE: AtomicUsize = AtomicUsize::new(0);
 
@@ -33,19 +35,19 @@ const INITIALIZING: usize = 1;
 const INITIALIZED: usize = 2;
 
 ///
-#[repr(usize)]
+#[repr(u8)]
 #[derive(Copy, Eq, Debug)]
 pub enum Level {
     ///
-    Error = 1,
+    Error = 0,
     ///
-    Warn,
+    Warn = 1,
     ///
-    Info,
+    Info = 2,
     ///
-    Debug,
+    Debug = 3,
     ///
-    Trace,
+    Trace = 4,
 }
 
 impl Level {
@@ -159,13 +161,13 @@ impl Ord for Level {
 }
 
 /// Set the global logger
-pub fn set_boxed_logger(logger: Box<dyn Log>) -> Result<(), Error> {
+pub fn set_boxed_logger(logger: Box<dyn ReInit>) -> Result<(), Error> {
     set_logger_inner(|| Box::leak(logger))
 }
 
 fn set_logger_inner<F>(make_logger: F) -> Result<(), Error>
 where
-    F: FnOnce() -> &'static dyn Log,
+    F: FnOnce() -> &'static dyn ReInit,
 {
     let old_state = match STATE.compare_exchange(
         UNINITIALIZED,
@@ -205,6 +207,18 @@ where
     }
 }
 
+/// Set the global logger
+pub(crate) fn reinit() {
+    unsafe {
+        if let Some(v) = &LOGGER_LOCK {
+            let a = v
+                .read()
+                .expect("failed to reinit global logger as lock failed");
+            a.deref().reinit();
+        }
+    }
+}
+
 ///
 #[macro_export]
 macro_rules! __log_format_args {
@@ -237,7 +251,7 @@ macro_rules! __log_line {
     };
 }
 
-static MAX_LOG_LEVEL_FILTER: AtomicUsize = AtomicUsize::new(0);
+static MAX_LOG_LEVEL_FILTER: AtomicU8 = AtomicU8::new(0);
 
 ///
 #[inline(always)]
@@ -248,7 +262,7 @@ pub fn max_level() -> Level {
 ///
 #[inline]
 pub fn set_max_level(level: Level) {
-    MAX_LOG_LEVEL_FILTER.store(level as usize, Ordering::SeqCst)
+    MAX_LOG_LEVEL_FILTER.store(level as u8, Ordering::SeqCst)
 }
 
 ///

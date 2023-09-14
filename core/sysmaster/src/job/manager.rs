@@ -824,7 +824,7 @@ mod tests {
     //#[test]
     #[allow(dead_code)]
     fn job_reli() {
-        logger::init_log_to_console("test_unit_load", log::Level::Trace);
+        logger::init_log_to_console("job_reli", log::Level::Trace);
         let reli = Rc::new(Reliability::new(
             ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
         ));
@@ -1182,7 +1182,7 @@ mod tests {
         rentryr: &Rc<UnitRe>,
         name: &str,
     ) -> Rc<UnitX> {
-        logger::init_log_to_console("test_unit_load", log::Level::Trace);
+        logger::init_log_to_console("create_unit", log::Level::Trace);
         log::info!("test");
 
         let unit = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
