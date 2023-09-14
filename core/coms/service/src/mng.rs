@@ -496,7 +496,9 @@ impl ServiceMng {
             Some(v) => v,
         };
         *self.current_control_command.borrow_mut() = cmd.clone();
-        match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
+
+        let time_out = self.config.config_data().borrow().Service.TimeoutStopSec;
+        match self.spawn.start_service(&cmd, time_out, ExecFlags::CONTROL) {
             Ok(pid) => self.pid.set_control(pid),
             Err(_e) => {
                 log::error!("Failed to run ExecStop of {}", self.comm.get_owner_id());
@@ -541,7 +543,9 @@ impl ServiceMng {
             Some(v) => v,
         };
         *self.current_control_command.borrow_mut() = cmd.clone();
-        match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
+
+        let time_out = self.config.config_data().borrow().Service.TimeoutStopSec;
+        match self.spawn.start_service(&cmd, time_out, ExecFlags::CONTROL) {
             Ok(pid) => self.pid.set_control(pid),
             Err(_e) => {
                 self.enter_signal(ServiceState::FinalSigterm, ServiceResult::FailureResources);
