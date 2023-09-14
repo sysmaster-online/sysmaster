@@ -488,27 +488,23 @@ impl ServiceMng {
         }
 
         self.control_command_fill(ServiceCommand::Stop);
-        match self.control_command_pop() {
-            Some(cmd) => {
-                *self.current_control_command.borrow_mut() = cmd.clone();
-                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
-                    Ok(pid) => self.pid.set_control(pid),
-                    Err(_e) => {
-                        log::error!(
-                            "Failed to run stop service: unit Name{}",
-                            self.comm.get_owner_id()
-                        );
-                        self.enter_signal(
-                            ServiceState::StopSigterm,
-                            ServiceResult::FailureResources,
-                        );
-                        return;
-                    }
-                }
-                self.set_state(ServiceState::Stop);
+        let cmd = match self.control_command_pop() {
+            None => {
+                self.enter_signal(ServiceState::StopSigterm, ServiceResult::Success);
+                return;
             }
-            None => self.enter_signal(ServiceState::StopSigterm, ServiceResult::Success),
+            Some(v) => v,
+        };
+        *self.current_control_command.borrow_mut() = cmd.clone();
+        match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
+            Ok(pid) => self.pid.set_control(pid),
+            Err(_e) => {
+                log::error!("Failed to run ExecStop of {}", self.comm.get_owner_id());
+                self.enter_signal(ServiceState::StopSigterm, ServiceResult::FailureResources);
+                return;
+            }
         }
+        self.set_state(ServiceState::Stop);
     }
 
     fn enter_stop_by_notify(&self) {
@@ -530,31 +526,30 @@ impl ServiceMng {
     fn enter_stop_post(&self, res: ServiceResult) {
         self.log(
             Level::Debug,
-            &format!("runring stop post, service result: {:?}", res),
+            &format!("running stop post, service result: {:?}", res),
         );
         if self.result() == ServiceResult::Success {
             self.set_result(res);
         }
 
         self.control_command_fill(ServiceCommand::StopPost);
-        match self.control_command_pop() {
-            Some(cmd) => {
-                *self.current_control_command.borrow_mut() = cmd.clone();
-                match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
-                    Ok(pid) => self.pid.set_control(pid),
-                    Err(_e) => {
-                        self.enter_signal(
-                            ServiceState::FinalSigterm,
-                            ServiceResult::FailureResources,
-                        );
-                        log::error!("Failed to run stop service: {}", self.comm.get_owner_id());
-                        return;
-                    }
-                }
-                self.set_state(ServiceState::StopPost);
+        let cmd = match self.control_command_pop() {
+            None => {
+                self.enter_signal(ServiceState::FinalSigterm, ServiceResult::Success);
+                return;
             }
-            None => self.enter_signal(ServiceState::FinalSigterm, ServiceResult::Success),
+            Some(v) => v,
+        };
+        *self.current_control_command.borrow_mut() = cmd.clone();
+        match self.spawn.start_service(&cmd, 0, ExecFlags::CONTROL) {
+            Ok(pid) => self.pid.set_control(pid),
+            Err(_e) => {
+                self.enter_signal(ServiceState::FinalSigterm, ServiceResult::FailureResources);
+                log::error!("Failed to run ExecStopPost of {}", self.comm.get_owner_id());
+                return;
+            }
         }
+        self.set_state(ServiceState::StopPost);
     }
 
     fn enter_dead(&self, res: ServiceResult, force_restart: bool) {
