@@ -482,13 +482,13 @@ impl SectionService {
     }
 
     pub(super) fn set_timeout_start(&mut self, time_out: u64) {
-        if self.TimeoutStartSec == 0 {
+        if self.TimeoutStartSec == u64::MAX {
             self.TimeoutStartSec = time_out;
         }
     }
 
     pub(super) fn set_timeout_stop(&mut self, time_out: u64) {
-        if self.TimeoutStopSec == 0 {
+        if self.TimeoutStopSec == u64::MAX {
             self.TimeoutStopSec = time_out;
         }
     }

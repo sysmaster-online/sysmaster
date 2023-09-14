@@ -1990,8 +1990,9 @@ impl RunningData {
 
     pub(super) fn enable_timer(&self, usec: u64) -> Result<i32> {
         let events = self.comm.um().events();
-
+        /* usec == 0 is allowed here, see: https://gitee.com/openeuler/sysmaster/pulls/518 */
         if usec == u64::MAX {
+            log::debug!("Timer is configured to u64::Max, won't enable.");
             // which means not enable the service timer, so delete the previous timer
             if self.armd_timer() {
                 let timer = self.timer();
@@ -1999,7 +2000,7 @@ impl RunningData {
             }
             return Ok(0);
         }
-
+        log::debug!("Enable a timer: {}us", usec);
         if self.armd_timer() {
             let timer = self.timer();
             events.del_source(timer.clone())?;

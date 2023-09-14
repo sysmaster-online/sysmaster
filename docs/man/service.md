@@ -119,15 +119,15 @@ service服务的类型，当前支持`simple`、`forking`、`oneshot`、`notify`
 
 ## TimeoutSec
 
-服务启动或停止时的超时时间，取值范围为0~u64::MAX, 当值为0或u64::Max时，不启动定时器。当`TimeoutSec`的值不为0且`TimeoutStartSec`或`TimeoutStopSec`值为0时，则将`TimeoutStartSec`或`TimeoutStopSec`的值更新为`TimeoutSec`选项的
+服务启动或停止时的超时时间，单位为秒，取值范围为0~u64::MAX, 当值为0或u64::Max时，不启动定时器。当`TimeoutSec`的值不为0且`TimeoutStartSec`或`TimeoutStopSec`值为0时，则将`TimeoutStartSec`或`TimeoutStopSec`的值更新为`TimeoutSec`选项的
 
 ## TimeoutStartSec
 
-服务启动时的超时时间，取值范围为0~u64::MAX, 当值为0或u64::Max时，不启动定时器。当执行`Condition`、`StartPre`、`Start`、`StartPost`、`Reload`命令时的超时时间。
+服务启动时的超时时间，单位为秒，取值范围为0~u64::MAX, 当值为0或u64::Max时，不启动定时器。当执行`Condition`、`StartPre`、`Start`、`StartPost`、`Reload`命令时的超时时间。
 
 ## TimeoutStopSec
 
-服务停止时的超时时间，取值范围为0~u64::MAX, 当值为0或u64::Max时，不启动定时器。当执行`Stop`、`StopPost`命令时的超时时间。
+服务停止时的超时时间，单位为秒，取值范围为0~u64::MAX, 当值为0或u64::Max时，不启动定时器。当执行`Stop`、`StopPost`命令时的超时时间。
 
 ## LimitCORE、LimitNOFILE、LimitNPROC
 
