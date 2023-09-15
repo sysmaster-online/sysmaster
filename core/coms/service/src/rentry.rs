@@ -584,7 +584,15 @@ impl From<ExitStatus> for WaitStatus {
     fn from(exit: ExitStatus) -> WaitStatus {
         match exit {
             ExitStatus::Status(pid, status) => {
-                if let Ok(wait) = WaitStatus::from_raw(Pid::from_raw(pid), status) {
+                if !libc::WIFEXITED(status)
+                    && !libc::WIFSIGNALED(status)
+                    && !libc::WIFSTOPPED(status)
+                    && !libc::WIFCONTINUED(status)
+                {
+                    // avoid WaitStatus::from_raw() assert
+                    log::error!("pid:{:?} status:{:?} is illegal!", pid, status);
+                    return WaitStatus::Exited(Pid::from_raw(pid), 0);
+                } else if let Ok(wait) = WaitStatus::from_raw(Pid::from_raw(pid), status) {
                     return wait;
                 }
                 WaitStatus::Exited(Pid::from_raw(-1), 0)
