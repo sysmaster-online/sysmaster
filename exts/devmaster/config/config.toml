@@ -11,3 +11,8 @@ network_d = ["/etc/devmaster/network.d"]
 
 # The default value is 3.
 max_workers = 3
+
+# Define the location where log message outputs.
+# Include: "file", "console", "syslog".
+# If not set, use "console" by default.
+log_targets = ["console"]

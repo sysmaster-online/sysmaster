@@ -46,6 +46,7 @@ pub(crate) struct DevmasterConfigData {
     pub(crate) max_workers: Option<u32>,
     pub(crate) log_level: Option<String>,
     pub(crate) network_d: Option<Vec<String>>,
+    pub(crate) log_targets: Option<Vec<String>>,
 }
 
 impl DevmasterConfig {
@@ -95,6 +96,15 @@ impl DevmasterConfig {
             .network_d
             .clone()
             .unwrap_or_else(|| DEFAULT_NETIF_CONFIG_DIRS.to_vec())
+    }
+
+    /// Get log targets. If not set, use "console" by default.
+    pub fn get_log_targets(&self) -> Vec<String> {
+        self.inner
+            .borrow()
+            .log_targets
+            .clone()
+            .unwrap_or_else(|| vec!["console".to_string()])
     }
 }
 

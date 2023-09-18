@@ -15,7 +15,7 @@
 
 use crate::{config::*, error::*, framework::*, rules::*};
 use event::*;
-use log::logger::init_log_to_console_syslog;
+use log::logger::init_log;
 use std::{
     cell::RefCell,
     fs::create_dir_all,
@@ -77,7 +77,19 @@ impl Devmaster {
 
         config.load(DEFAULT_CONFIG);
 
-        init_log_to_console_syslog("devmaster", config.get_log_level());
+        init_log(
+            "devmaster",
+            config.get_log_level(),
+            config
+                .get_log_targets()
+                .iter()
+                .map(|s| s.as_ref())
+                .collect(),
+            "/var/log/devmaster/devmaster.log",
+            10240,
+            10,
+            false,
+        );
 
         let _ = create_dir_all("/run/devmaster/");
 
