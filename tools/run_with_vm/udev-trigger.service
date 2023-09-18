@@ -9,9 +9,9 @@
 
 [Unit]
 DefaultDependencies=false
-Wants="udevd.service"
 After="udevd-kernel.socket;udevd-control.socket"
-Before="sysinit.target"
+Requires="udevd-kernel.socket;udevd-control.socket"
+Before="multi-user.target"
 ConditionPathIsReadWrite="/sys"
 
 [Service]
@@ -20,4 +20,4 @@ RemainAfterExit=true
 ExecStart="-/usr/sbin/udevadm trigger --type=subsystems --action=add ; /usr/sbin/udevadm trigger --type=devices --action=add"
 
 [Install]
-WantedBy="sysinit.target"
+WantedBy="multi-user.target"
