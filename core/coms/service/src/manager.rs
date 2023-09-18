@@ -11,7 +11,9 @@
 // See the Mulan PSL v2 for more details.
 
 #[cfg(feature = "plugin")]
-use {basic::logger, supper::base::PLUGIN_NAME};
+use crate::base::PLUGIN_NAME;
+#[cfg(feature = "plugin")]
+use constants::LOG_FILE_PATH;
 
 use super::comm::ServiceUmComm;
 use core::rel::{ReStation, Reliability};
@@ -62,4 +64,4 @@ impl Default for ServiceManager {
 }
 
 use core::declare_umobj_plugin;
-declare_umobj_plugin!(ServiceManager, ServiceManager::default, PLUGIN_NAME);
+declare_umobj_plugin!(ServiceManager, ServiceManager::default);

@@ -78,11 +78,6 @@ features = []
 optional = false
 default-features = false
 
-[dependencies.mount]
-path = "../coms/mount"
-features = []
-optional = true
-
 [dependencies.nix]
 version = "0.24"
 features = ["mount", "reboot", "net", "socket", "ioctl"]
@@ -113,25 +108,31 @@ features = []
 optional = false
 default-features = false
 
-[dependencies.service]
-path = "../coms/service"
-features = []
-optional = true
-
-[dependencies.socket]
-path = "../coms/socket"
-features = []
-optional = true
-
-[dependencies.target]
-path = "../coms/target"
-features = []
-optional = true
-
 [dev-dependencies.libtests]
 path = "../../libs/libtests"
 features = []
 optional = false
+
+# Unit components plugin
+[dependencies.service]
+path = "../coms/service"
+optional = true
+default-features = false
+
+[dependencies.socket]
+path = "../coms/socket"
+optional = true
+default-features = false
+
+[dependencies.target]
+path = "../coms/target"
+optional = true
+default-features = false
+
+[dependencies.mount]
+path = "../coms/mount"
+optional = true
+default-features = false
 
 [features]
 default = ["linux", "noplugin", "mount", "socket", "service", "target"]
@@ -143,6 +144,5 @@ plugin = ["dynamic_reload"]
 [[bin]]
 path = "src/main.rs"
 name = "sysmaster"
-plugin = false
 proc-macro = false
 required-features = []

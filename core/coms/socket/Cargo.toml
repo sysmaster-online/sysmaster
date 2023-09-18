@@ -39,3 +39,4 @@ libtests = { path = "../../../libs/libtests" }
 [features]
 default = ["noplugin"]
 noplugin = []
+plugin = []

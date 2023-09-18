@@ -11,7 +11,9 @@
 // See the Mulan PSL v2 for more details.
 
 #[cfg(feature = "plugin")]
-use {basic::logger, supper::base::PLUGIN_NAME};
+use crate::base::PLUGIN_NAME;
+#[cfg(feature = "plugin")]
+use constants::LOG_FILE_PATH;
 
 use super::comm::SocketUmComm;
 use super::rentry::SocketReFrame;
@@ -110,4 +112,4 @@ impl Default for SocketManager {
 }
 
 use core::declare_umobj_plugin;
-declare_umobj_plugin!(SocketManager, SocketManager::default, PLUGIN_NAME);
+declare_umobj_plugin!(SocketManager, SocketManager::default);

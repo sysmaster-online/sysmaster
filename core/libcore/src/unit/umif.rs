@@ -231,10 +231,10 @@ pub trait UnitManagerObj: UnitMngUtil + ReStation {
 /// the macro for create a sub unit-manager instance
 #[macro_export]
 macro_rules! declare_umobj_plugin {
-    ($unit_type:ty, $constructor:path, $name:expr) => {
+    ($unit_type:ty, $constructor:path) => {
         use log::Level;
         /// method for create the sub-unit-manager instance
-        #[cfg_attr(not(feature = "noplugin"), no_mangle)]
+        #[cfg_attr(feature = "plugin", no_mangle)]
         pub fn __um_obj_create(
             level: Level,
             target: &str,
@@ -243,7 +243,7 @@ macro_rules! declare_umobj_plugin {
         ) -> *mut dyn $crate::unit::UnitManagerObj {
             #[cfg(feature = "plugin")]
             log::logger::init_log(
-                $name,
+                PLUGIN_NAME,
                 level,
                 target.split(&[' ', '-'][..]).collect(),
                 LOG_FILE_PATH,

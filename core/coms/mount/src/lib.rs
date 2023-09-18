@@ -24,7 +24,6 @@
 #[cfg(all(feature = "plugin", feature = "noplugin"))]
 compile_error!("feature plugin and noplugin cannot be enabled at the same time");
 
-#[cfg(feature = "noplugin")]
 pub use {manager::__um_obj_create, unit::__subunit_create_with_params};
 
 // dependency: mount_base -> mount_rentry -> mount_comm -> {mount_mng -> mount_unit} -> mount_manager

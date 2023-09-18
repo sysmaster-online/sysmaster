@@ -175,7 +175,7 @@ macro_rules! declare_unitobj_plugin_with_param {
     ($unit_type:ty, $constructor:path) => {
         use log::Level;
         /// method for create the unit instance
-        #[cfg_attr(not(feature = "noplugin"), no_mangle)]
+        #[cfg_attr(feature = "plugin", no_mangle)]
         pub fn __subunit_create_with_params(
             um: Rc<dyn $crate::unit::UmIf>,
         ) -> *mut dyn $crate::unit::SubUnit {

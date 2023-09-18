@@ -14,6 +14,7 @@ basic = { path = "../../../libs/basic", default-features = false }
 core = { path = "../../libcore", default-features = false }
 log = { path = "../../../libs/log" }
 macros = { path = "../../../libs/macros" }
+constants = { path = "../../../libs/constants", optional = true }
 
 nix = { version = "0.24", default-features = false, features = [
     "resource",
@@ -26,3 +27,4 @@ serde = { version = "1.0.130", default-features = false }
 [features]
 default = ["noplugin"]
 noplugin = []
+plugin = ["constants"]

@@ -11,7 +11,9 @@
 // See the Mulan PSL v2 for more details.
 
 #[cfg(feature = "plugin")]
-use {basic::logger, supper::base::PLUGIN_NAME};
+use crate::base::PLUGIN_NAME;
+#[cfg(feature = "plugin")]
+use constants::LOG_FILE_PATH;
 
 use super::comm::MountUmComm;
 use super::rentry::{MountRe, MountReFrame};
@@ -415,7 +417,7 @@ impl Default for MountManager {
 }
 
 use core::declare_umobj_plugin;
-declare_umobj_plugin!(MountManager, MountManager::default, PLUGIN_NAME);
+declare_umobj_plugin!(MountManager, MountManager::default);
 
 #[cfg(test)]
 mod test {

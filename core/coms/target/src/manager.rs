@@ -11,7 +11,9 @@
 // See the Mulan PSL v2 for more details.
 
 #[cfg(feature = "plugin")]
-use {basic::logger, supper::base::PLUGIN_NAME};
+use crate::base::PLUGIN_NAME;
+#[cfg(feature = "plugin")]
+use constants::LOG_FILE_PATH;
 
 use super::comm::TargetUmComm;
 use core::rel::{ReStation, Reliability};
@@ -55,4 +57,4 @@ impl UnitMngUtil for TargetManager {
 }
 
 use core::declare_umobj_plugin;
-declare_umobj_plugin!(TargetManager, TargetManager::new, PLUGIN_NAME);
+declare_umobj_plugin!(TargetManager, TargetManager::new);
