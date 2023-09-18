@@ -1,9 +1,7 @@
 [Unit]
 DefaultDependencies=false
-Wants="devmaster-simu-udev.service"
 After="devmaster-simu-udev.service"
 Requires="devmaster-simu-udev.service"
-Before="sysinit.target"
 
 [Service]
 Type="notify"
