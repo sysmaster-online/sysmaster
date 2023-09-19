@@ -158,7 +158,7 @@ impl Builtin for NetSetupLink {
         exec_unit: &ExecuteUnit,
         _argc: i32,
         _argv: Vec<String>,
-        _test: bool,
+        test: bool,
     ) -> Result<bool> {
         let device = exec_unit.get_device();
 
@@ -190,13 +190,13 @@ impl Builtin for NetSetupLink {
         /* For compatibility with udev, choose the "ID_NET_LINK_FILE" as the property key. */
         self.add_property(
             device.clone(),
-            true,
+            test,
             "ID_NET_LINK_FILE",
             &link.netif_cfg.abs_path,
         )?;
 
         if !link.new_name.is_empty() {
-            self.add_property(device, true, "ID_NET_NAME", &link.new_name)?;
+            self.add_property(device, test, "ID_NET_NAME", &link.new_name)?;
         }
 
         // todo: dropins
