@@ -244,6 +244,7 @@ fn exec_child(unit: &Unit, cmdline: &ExecCommand, params: &ExecParameters, ctx: 
     let ret = close_all_fds(&keep_fds);
 
     /* Reinit the logger before logging, and set the mode to open_when_needed. */
+    log::logger::set_open_when_needed(true);
     log::logger::reinit();
     log::debug!("Logger has been re-enabled.");
 

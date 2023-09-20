@@ -22,7 +22,7 @@ use std::{
     },
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicU8, Ordering},
+        atomic::{AtomicBool, AtomicU8, Ordering},
         Mutex,
     },
 };
@@ -31,6 +31,7 @@ pub use crate::inner::Level;
 pub use crate::inner::{debug, error, info, trace, warn};
 
 static mut LOG_LEVEL: AtomicU8 = AtomicU8::new(4);
+static mut OPEN_WHEN_NEEDED: AtomicBool = AtomicBool::new(false);
 
 /// Logger instance should implement `ReInit` too.
 pub trait ReInit: Log {
@@ -76,37 +77,51 @@ fn write_msg_file(writer: &mut File, module: &str, msg: String) {
 }
 
 struct SysLogger {
-    dgram: Mutex<UnixDatagram>,
+    dgram: Mutex<Option<UnixDatagram>>,
 }
 
 impl SysLogger {
-    fn connect() -> Result<Self, std::io::Error> {
+    fn new() -> Result<Self, std::io::Error> {
+        if get_open_when_needed() {
+            Ok(Self {
+                dgram: Mutex::new(None),
+            })
+        } else {
+            let dgram = Self::connect()?;
+            Ok(Self {
+                dgram: Mutex::new(Some(dgram)),
+            })
+        }
+    }
+
+    fn connect() -> Result<UnixDatagram, std::io::Error> {
         let sock = UnixDatagram::unbound()?;
         sock.connect("/dev/log")?;
-        Ok(Self {
-            dgram: Mutex::new(sock),
-        })
+        Ok(sock)
     }
 }
 
 impl ReInit for SysLogger {
     fn reinit(&self) {
-        match UnixDatagram::unbound() {
-            Ok(dgr) => *self.dgram.lock().expect("failed to lock syslogger") = dgr,
+        if get_open_when_needed() {
+            *self.dgram.lock().expect("failed to lock syslogger") = None;
+            return;
+        }
+
+        let dgr = match UnixDatagram::unbound() {
+            Ok(dgr) => dgr,
             Err(e) => {
                 eprintln!("Failed to bound unix datagram: {}", e);
                 return;
             }
         };
 
-        if let Err(e) = self
-            .dgram
-            .lock()
-            .expect("failed to lock syslogger")
-            .connect("/dev/log")
-        {
-            eprintln!("Failed to connect '/dev/log': {}", e);
+        if let Err(e) = dgr.connect("/dev/log") {
+            eprintln!("Failed to connect /dev/log: {}", e);
+            return;
         }
+
+        *self.dgram.lock().expect("failed to lock syslogger") = Some(dgr);
     }
 }
 
@@ -126,13 +141,33 @@ impl log::Log for SysLogger {
         msg += " ";
         msg += &record.args().to_string();
 
-        if let Err(e) = self
-            .dgram
-            .lock()
-            .expect("failed to lock syslogger")
-            .send(msg.as_bytes())
-        {
-            println!("Failed to send message to '/dev/log': {}", e);
+        if get_open_when_needed() {
+            match Self::connect() {
+                Ok(dgr) => {
+                    if let Err(e) = dgr.send(msg.as_bytes()) {
+                        eprintln!("Failed to send message to syslogger: {}", e);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to connect syslogger: {}", e);
+                }
+            }
+        } else {
+            match self
+                .dgram
+                .lock()
+                .expect("Failed to lock syslogger")
+                .as_ref()
+            {
+                Some(dgr) => {
+                    if let Err(e) = dgr.send(msg.as_bytes()) {
+                        eprintln!("Failed to send message to syslogger: {}", e);
+                    }
+                }
+                None => {
+                    eprintln!("open_when_needed is unset but syslogger is invalid.");
+                }
+            }
         }
     }
 
@@ -167,15 +202,23 @@ struct FileLogger {
     file_number: u32,
     max_size: u32,
     file: Mutex<Option<File>>,
-
-    short_connection: bool,
 }
 
 impl ReInit for FileLogger {
     fn reinit(&self) {
-        if !self.short_connection {
-            if let Ok(file) = Self::file_open(self.file_path.as_path(), self.file_mode) {
-                *self.file.lock().expect("failed to lock filelogger") = Some(file);
+        if get_open_when_needed() {
+            *self.file.lock().expect("failed to lock filelogger") = None;
+            return;
+        }
+
+        match Self::file_open(self.file_path.as_path(), self.file_mode) {
+            Ok(file) => *self.file.lock().expect("failed to lock filelogger") = Some(file),
+            Err(e) => {
+                eprintln!(
+                    "Failed to open log file '{}': {}",
+                    self.file_path.display(),
+                    e
+                );
             }
         }
     }
@@ -211,8 +254,8 @@ impl log::Log for FileLogger {
                     };
                 }
                 None => {
-                    if !self.short_connection {
-                        println!("Failed to open the log file.");
+                    if !get_open_when_needed() {
+                        eprintln!("open_when_needed is unset but file logger is invalid.");
                         return;
                     }
                     match FileLogger::file_open(&self.file_path, self.file_mode) {
@@ -249,7 +292,7 @@ impl log::Log for FileLogger {
                     }
                 }
                 None => {
-                    if !self.short_connection {
+                    if !get_open_when_needed() {
                         return;
                     }
                     match FileLogger::file_open(&self.file_path, self.file_mode) {
@@ -279,7 +322,7 @@ impl log::Log for FileLogger {
                 }
             }
             None => {
-                if !self.short_connection {
+                if !get_open_when_needed() {
                     return;
                 }
                 match FileLogger::file_open(&self.file_path, self.file_mode) {
@@ -341,9 +384,8 @@ impl FileLogger {
         file_mode: u32,
         max_size: u32,
         file_number: u32,
-        open_when_needed: bool,
     ) -> Result<Self, Error> {
-        if open_when_needed {
+        if get_open_when_needed() {
             return Ok(Self {
                 level,
                 file_path,
@@ -351,7 +393,6 @@ impl FileLogger {
                 file_number,
                 max_size: max_size * 1024,
                 file: Mutex::new(None),
-                short_connection: true,
             });
         }
 
@@ -364,7 +405,6 @@ impl FileLogger {
             file_number,
             max_size: max_size * 1024,
             file: Mutex::new(Some(file)),
-            short_connection: false,
         })
     }
 
@@ -523,7 +563,7 @@ impl CombinedLogger {
 /// * `file_path` - The log file path.
 /// * `file_size` - Limit of the log file size. If the size of log file exceeds the limit, latter logs will override previous messages.
 /// * `file_number` - The log file number.
-/// * `short_connection` - If true, open the logger file just when logging messages.
+/// * `open_when_needed` - If true, open the logger file just when logging messages.
 pub fn init_log(
     name: &str,
     level: Level,
@@ -531,7 +571,7 @@ pub fn init_log(
     file_path: &str,
     file_size: u32,
     file_number: u32,
-    short_connection: bool,
+    open_when_needed: bool,
 ) {
     let level_num: u8 = match level {
         Level::Error => 1,
@@ -547,10 +587,10 @@ pub fn init_log(
     for target in targets {
         let logger = match target {
             "console" => Box::new(ConsoleLogger) as Box<dyn ReInit>,
-            "syslog" => match SysLogger::connect() {
+            "syslog" => match SysLogger::new() {
                 Ok(logger) => Box::new(logger) as Box<dyn ReInit>,
                 Err(e) => {
-                    eprint!("{}: failed to connect to /dev/log: {:?}", name, e);
+                    eprintln!("{} failed to create syslogger: {:?}", name, e);
                     continue;
                 }
             },
@@ -561,12 +601,11 @@ pub fn init_log(
                     0o600,
                     file_size,
                     file_number,
-                    short_connection,
                 ) {
                     Ok(logger) => Box::new(logger) as Box<dyn ReInit>,
                     Err(e) => {
                         eprint!(
-                            "{}: failed to init '{}' file logger: {:?}",
+                            "{} failed to create '{}' file logger: {:?}",
                             name, file_path, e
                         );
                         continue;
@@ -591,12 +630,8 @@ pub fn init_log(
         return;
     }
 
-    /* Set global static variables. */
-    unsafe {
-        LOG_LEVEL.store(level_num, Ordering::Release);
-    }
-
-    eprintln!("{}: finish setting logger", name);
+    set_log_level(level_num);
+    set_open_when_needed(open_when_needed);
 }
 
 /// Reinit the logger based on the previous configuration
@@ -621,7 +656,7 @@ pub fn init_log_to_file(
     file_path: &str,
     file_size: u32,
     file_number: u32,
-    short_connection: bool,
+    open_when_needed: bool,
 ) {
     init_log(
         name,
@@ -630,8 +665,32 @@ pub fn init_log_to_file(
         file_path,
         file_size,
         file_number,
-        short_connection,
+        open_when_needed,
     );
+}
+
+/// Set the `OPEN_WHEN_NEEDED` flag.
+pub fn set_open_when_needed(val: bool) {
+    unsafe {
+        OPEN_WHEN_NEEDED.store(val, Ordering::Release);
+    }
+}
+
+/// Get the `OPEN_WHEN_NEEDED` flag.
+pub fn get_open_when_needed() -> bool {
+    unsafe { OPEN_WHEN_NEEDED.load(Ordering::Acquire) }
+}
+
+/// Set the `LOG_LEVEL`.
+pub fn set_log_level(level: u8) {
+    unsafe {
+        LOG_LEVEL.store(level, Ordering::Release);
+    }
+}
+
+/// Get the `LOG_LEVEL`.
+pub fn get_log_level() -> u8 {
+    unsafe { LOG_LEVEL.load(Ordering::Acquire) }
 }
 
 #[cfg(test)]
