@@ -1,193 +1,101 @@
 //! Parser struct definitions.
-use crate::{config::Result, error::*, specifiers::resolve};
-use pest::{iterators::Pairs, Parser};
-use pest_derive::Parser;
-use snafu::ResultExt;
-use std::{
-    fs::read_dir,
-    path::{Path, PathBuf},
-    rc::Rc,
+use crate::specifiers::{resolve, SpecifierContext};
+use nom::{
+    branch::alt,
+    bytes::complete::{is_a, is_not, tag, take_till},
+    character::complete::{alphanumeric1, anychar, char, multispace0, multispace1, space0},
+    combinator::value,
+    multi::many_till,
+    sequence::{delimited, separated_pair, tuple},
+    IResult,
 };
+use std::{fs::read_dir, path::PathBuf, rc::Rc};
 
-/// A PEG parser created by [pest]("https://pest.rs/").
-#[doc(hidden)]
-#[derive(Parser, Debug)]
-#[grammar = "unit.pest"]
-pub struct UnitFileParser;
-
-/// A lazily-evaluated parser,
-/// which is an iterator that produces [SectionParser].
 pub struct UnitParser<'a> {
     paths: Rc<Vec<PathBuf>>,
-    filename: &'a str,
-    path: &'a Path,
-    inner: Pairs<'a, Rule>,
-    root: bool,
+    // the shared parsing cursor
+    inner: &'a str,
+    context: SpecifierContext<'a>,
 }
 
+// use a progress function to update inner cursor
+// when a section parser finishes
 impl<'a> UnitParser<'a> {
-    /// Initializes a [UnitParser] with the given
-    /// input string, search path array, root mode, filename and file path.
-    pub(crate) fn new(
-        input: &'a str,
-        paths: Rc<Vec<PathBuf>>,
-        root: bool,
-        filename: &'a str,
-        path: &'a Path,
-    ) -> Result<Self> {
-        let mut parse =
-            UnitFileParser::parse(Rule::unit_file, input.as_ref()).context(ParsingSnafu {})?;
-        // should never fail since rule unit_file restricts SOI and EOI
-        let sections = parse.next().unwrap().into_inner();
-        Ok(Self {
-            inner: sections,
+    pub fn new(input: &'a str, paths: Rc<Vec<PathBuf>>, context: SpecifierContext<'a>) -> Self {
+        UnitParser {
             paths,
-            filename,
-            path,
-            root,
-        })
+            inner: input,
+            context,
+        }
+    }
+
+    pub fn progress(&mut self, i: &'a str) {
+        self.inner = i;
+    }
+
+    pub fn next(&mut self) -> Option<SectionParser<'a>> {
+        if let Ok((i, name)) = section_header(self.inner) {
+            dbg!(name);
+            self.inner = i;
+            Some(SectionParser {
+                paths: Rc::clone(&self.paths),
+                name,
+                inner: self.inner,
+                context: self.context,
+            })
+        } else {
+            None
+        }
     }
 }
 
-impl<'a> Iterator for UnitParser<'a> {
-    type Item = Result<SectionParser<'a>>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let item = self.inner.next().unwrap();
-        if item.as_rule() == Rule::EOI {
-            return None;
-        }
-
-        if item.as_rule() != Rule::section {
-            return Some(Err(Error::SectionError {
-                actual: item.as_rule(),
-            }));
-        }
-
-        let mut inner = item.into_inner();
-
-        let first_item = inner.next().unwrap();
-
-        // probably also not needed as it would have already violated grammar test, but if we make the grammar
-        // less restrictive, then error messages would be more detailed
-        if first_item.as_rule() != Rule::section_header {
-            return Some(Err(Error::SectionNameError {
-                actual: first_item.as_rule(),
-            }));
-        }
-
-        let section_name = first_item.as_str();
-
-        let paths = Rc::clone(&self.paths);
-
-        Some(Ok(SectionParser {
-            paths,
-            name: section_name,
-            inner,
-            path: self.path,
-            filename: self.filename.into(),
-            root: self.root,
-        }))
-    }
+fn section_header(i: &str) -> IResult<&str, &str> {
+    let (i, result) = delimited(char('['), alphanumeric1, char(']'))(i)?;
+    let (i, _) = multispace1(i)?;
+    Ok((i, result))
 }
 
-/// A lazily-evaluated parser,
-/// which is an iterator that produces ([String], [String]) pairs,
-/// representing each entry in the form of key-value pairs.
 pub struct SectionParser<'a> {
     paths: Rc<Vec<PathBuf>>,
     pub name: &'a str,
-    inner: Pairs<'a, Rule>,
-    filename: Rc<str>,
-    path: &'a Path,
-    root: bool,
+    // the shared parsing cursor
+    inner: &'a str,
+    context: SpecifierContext<'a>,
 }
 
-impl<'a> Iterator for SectionParser<'a> {
-    type Item = Result<(&'a str, String)>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let entry = self.inner.next();
-        if let Some(entry) = entry {
-            if entry.as_rule() != Rule::entry {
-                return Some(Err(Error::EntryError {
-                    actual: entry.as_rule(),
-                }));
-            }
+impl<'a> SectionParser<'a> {
+    pub fn finish(self) -> &'a str {
+        dbg!(self.inner);
+        self.inner
+    }
 
-            let mut entry_inner = entry.into_inner();
-
-            // should not fail as the contents of an entry is restricted
-            let key = entry_inner.next().unwrap();
-            if key.as_rule() != Rule::key {
-                return Some(Err(Error::EntryKeyError {
-                    actual: key.as_rule(),
-                }));
-            }
-            let key = key.as_str();
-
-            // should not fail as the contents of an entry is restricted
-            let values = entry_inner.next().unwrap();
-            if values.as_rule() != Rule::value {
-                return Some(Err(Error::EntryValueError {
-                    actual: values.as_rule(),
-                }));
-            }
-
-            let mut value = String::new();
-            for item in values.into_inner() {
-                if item.as_rule() == Rule::value_block {
-                    value.push_str(item.as_str());
-                } else {
-                    resolve(
-                        &mut value,
-                        item.as_str().chars().nth(0).unwrap(),
-                        self.root,
-                        self.filename.as_ref(),
-                        self.path,
-                    )
-                    .map_err(|x| log::warn!("Error occured while resolving specifier: {}", x))
-                    .ok();
-                }
-            }
-
-            return Some(Ok((key, value)));
+    pub fn next(&mut self) -> Option<(&str, String)> {
+        if let Ok((i, result)) = entry(self.inner.as_ref(), self.context) {
+            dbg!(&result);
+            self.inner = i;
+            Some(result)
         } else {
-            return None;
+            None
         }
     }
 }
 
-/// A parser for subdirs
-/// created from [SectionParser].
-pub struct SubdirParser {
-    paths: Rc<Vec<PathBuf>>,
-    filename: Rc<str>,
-}
-
 impl<'a> SectionParser<'a> {
-    /// Creates a new [SubdirParser] from [SectionParser].
-    pub fn __subdir_parser(&'a self) -> SubdirParser {
-        let paths = Rc::clone(&self.paths);
-        let filename = Rc::clone(&self.filename);
-
-        SubdirParser { paths, filename }
-    }
-}
-
-impl SubdirParser {
-    /// Searches through every given search path, looking for directory with names like
-    /// `<filename>.<subdir name>`.
+    /// Parses subdirs from paths.
     pub fn __parse_subdir(&self, subdir: &str) -> Vec<String> {
         let mut result = Vec::new();
         for dir in (*self.paths).iter() {
             let mut path = dir.to_owned();
-            let path_end = format!("{}.{}", self.filename, subdir);
+            let path_end = format!("{}.{}", self.context.1, subdir);
             path.push(path_end.as_str());
             if let Ok(read_res) = read_dir(path) {
                 for item in read_res {
                     if let Ok(entry) = item {
                         // only look for symlinks
-                        if entry.metadata().is_ok_and(|x| x.is_symlink()) {
-                            result.push(entry.file_name().to_string_lossy().to_string());
+                        if let Ok(metadata) = entry.metadata() {
+                            if metadata.file_type().is_symlink() {
+                                result.push(entry.file_name().to_string_lossy().to_string());
+                            }
                         }
                     }
                 }
@@ -195,4 +103,67 @@ impl SubdirParser {
         }
         result
     }
+}
+
+// returns (key, value) pair
+// specifiers are resolved in the process, leading to string copies
+fn entry<'a>(i: &'a str, context: SpecifierContext<'a>) -> IResult<&'a str, (&'a str, String)> {
+    let (i, result) = separated_pair(
+        alphanumeric1,
+        delimited(space0, char('='), space0),
+        entry_value(context),
+    )(i)?;
+    let (i, _) = multispace0(i)?;
+    Ok((i, result))
+}
+
+fn entry_value<'a>(
+    context: SpecifierContext<'a>,
+) -> impl FnMut(&'a str) -> IResult<&'a str, String> {
+    move |i| {
+        let mut result = String::new();
+        let mut i = i;
+        loop {
+            let (new_i, (segments, terminator)) =
+                many_till(value_segment(context), alt((tag("\\\n"), tag("\n"))))(i)?;
+            result.extend(segments.into_iter());
+            i = new_i;
+
+            if terminator == "\n" {
+                break;
+            }
+        }
+
+        Ok((i, result))
+    }
+}
+
+fn value_segment<'a>(
+    context: SpecifierContext<'a>,
+) -> impl FnMut(&'a str) -> IResult<&'a str, String> {
+    move |i| {
+        let (i, segment) = take_till(|x| x == '\\' || x == '\n' || x == '%')(i)?;
+        if let Ok((i, spec)) = specifier(i) {
+            let mut result = segment.to_string();
+            if let Ok(_) = resolve(&mut result, spec, context) {
+                Ok((i, result))
+            } else {
+                Err(nom::Err::Failure(nom::error::Error::new(
+                    i,
+                    nom::error::ErrorKind::Fail,
+                )))
+            }
+        } else {
+            Ok((i, segment.to_string()))
+        }
+    }
+}
+
+fn specifier(i: &str) -> IResult<&str, char> {
+    let (i, _) = char('%')(i)?;
+    anychar(i)
+}
+
+fn comment(i: &str) -> IResult<&str, ()> {
+    value((), tuple((is_a("#;"), is_not("\n\r"), is_a("\n\r"))))(i)
 }

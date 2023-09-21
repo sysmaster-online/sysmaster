@@ -1,6 +1,8 @@
 [AlternativeKey]
 Field=test
 
+# this is a comment
+
 [Section2]
 Regular=reg
 Private = pri

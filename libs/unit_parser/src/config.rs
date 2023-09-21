@@ -8,7 +8,7 @@ use crate::{
 use snafu::ResultExt;
 use std::{
     ffi::OsString,
-    fs::{read_dir, File},
+    fs::{canonicalize, read_dir, File},
     io::Read,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     num::{
@@ -46,7 +46,12 @@ pub trait UnitConfig: Sized {
         file.read_to_string(&mut content).context(ReadFileSnafu {
             path: path.to_string_lossy().to_string(),
         })?;
-        let parser = crate::parser::UnitParser::new(content.as_ref(), paths, root, filename, path)?;
+        let canonical_path = canonicalize(path).unwrap_or(path.into());
+        let parser = crate::parser::UnitParser::new(
+            content.as_ref(),
+            paths,
+            (root, filename, &canonical_path),
+        );
         Self::__parse_unit(parser)
     }
 
@@ -66,7 +71,8 @@ pub trait UnitConfig: Sized {
         file.read_to_string(&mut content).context(ReadFileSnafu {
             path: path.to_string_lossy().to_string(),
         })?;
-        let parser = crate::parser::UnitParser::new(content.as_ref(), paths, root, filename, path)?;
+        let parser =
+            crate::parser::UnitParser::new(content.as_ref(), paths, (root, filename, path));
         Self::__patch_unit(parser, from)
     }
 
@@ -138,18 +144,20 @@ pub trait UnitConfig: Sized {
                 if let Ok(dir_entries) = read_dir(&path) {
                     for item in dir_entries {
                         if let Ok(entry) = item {
-                            if entry.metadata().is_ok_and(|x| x.is_file())
-                                && entry.path().extension().is_some_and(|x| x == "conf")
+                            if let (Ok(filetype), Some(extension)) =
+                                (entry.file_type(), entry.path().extension())
                             {
-                                let paths = Rc::clone(&paths_rc);
-                                if let Err(err) = Self::__patch(
-                                    entry.path(),
-                                    paths,
-                                    fullname.as_str(),
-                                    &mut result,
-                                    root,
-                                ) {
-                                    log::warn!("Failed to patch unit {}: {})", name, err);
+                                if filetype.is_file() && extension == "conf" {
+                                    let paths = Rc::clone(&paths_rc);
+                                    if let Err(err) = Self::__patch(
+                                        entry.path(),
+                                        paths,
+                                        fullname.as_str(),
+                                        &mut result,
+                                        root,
+                                    ) {
+                                        log::warn!("Failed to patch unit {}: {})", name, err);
+                                    }
                                 }
                             }
                         }
@@ -165,9 +173,9 @@ pub trait UnitConfig: Sized {
 /// The trait that needs to be implemented on each section of the unit.
 pub trait UnitSection: Sized {
     /// Parses the section from a [SectionParser].
-    fn __parse_section(__source: SectionParser) -> Result<Option<Self>>;
+    fn __parse_section(__source: &mut SectionParser) -> Result<Option<Self>>;
     /// Parses the section from a [SectionParser], but only patches the supplied entries onto the given struct.
-    fn __patch_section(__source: SectionParser, __from: &mut Self) -> Result<()>;
+    fn __patch_section(__source: &mut SectionParser, __from: &mut Self) -> Result<()>;
 }
 
 /// The trait that needs to be implemented on each entry of the unit.

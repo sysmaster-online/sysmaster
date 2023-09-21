@@ -1,52 +1,112 @@
 //! Parsers of systemd-style durations.
-use crate::{
-    config::UnitEntry,
-    datetime::{DatetimeParser, Rule},
-};
+use crate::config::UnitEntry;
 use chrono::Duration;
-use pest::{iterators::Pairs, Parser};
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    character::complete::{digit1, multispace0, space0},
+    combinator::{opt, value},
+    multi::many0,
+    sequence::delimited,
+    IResult,
+};
 
 /// Implementation of [chrono::Duration] parsing.
 impl UnitEntry for Duration {
-    type Error = pest::error::Error<Rule>;
+    type Error = &'static str;
     fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
-        let parse = DatetimeParser::parse(Rule::timespan, input.as_ref())?;
-        duration_from_parser(parse)
+        if let Ok((i, result)) = duration(input.as_ref()) {
+            if i.is_empty() {
+                Ok(result)
+            } else {
+                // TODO: log what went wrong
+                Err("Unexpected characters at the end of duration expression.")
+            }
+        } else {
+            Err("Failed to parse duration expression.")
+        }
     }
 }
 
-/// Parses [chrono::Duration] from a [crate::datetime::DatetimeParser].
-pub(crate) fn duration_from_parser(
-    mut parse: Pairs<'_, Rule>,
-) -> std::result::Result<Duration, pest::error::Error<Rule>> {
-    let timespan = parse.next().unwrap().into_inner();
-    let mut result = Duration::zero();
-    for segment in timespan {
-        if segment.as_rule() == Rule::segment {
-            let mut inner = segment.into_inner();
-            let number: i64 = inner.next().unwrap().as_str().parse().unwrap();
-            let unit = inner.next().unwrap();
-            let addition = match unit.as_rule() {
-                Rule::usec => Duration::microseconds(number),
-                Rule::msec => Duration::milliseconds(number),
-                Rule::seconds => Duration::seconds(number),
-                Rule::minutes => Duration::minutes(number),
-                Rule::hours => Duration::hours(number),
-                Rule::days => Duration::days(number),
-                Rule::weeks => Duration::weeks(number),
-                Rule::months => {
-                    Duration::seconds(/* 30.44 * 24 * 60 * 60 = */ 2630016 * number)
-                }
-                Rule::years => Duration::hours(/* 365.25 * 24 = */ 8766 * number),
-                _ => unreachable!(),
-            };
-            result = result + addition;
-        } else {
-            let number: i64 = segment.as_str().parse().unwrap();
-            result = result + Duration::seconds(number);
-        }
+/// Parses a [chrono::Duration], eating up whitespaces after it.
+pub(crate) fn duration(i: &str) -> IResult<&str, Duration> {
+    let (i, segments) = many0(time_segment)(i)?;
+    let mut result = segments
+        .into_iter()
+        .reduce(|a, b| a + b)
+        .unwrap_or(Duration::zero());
+    // captures a integer without unit
+    let (i, opt_int) = opt(digit1)(i)?;
+    if let Some(int) = opt_int {
+        let int = int.parse().unwrap();
+        result = result + Duration::seconds(int);
     }
-    Ok(result)
+    let (i, _) = space0(i)?;
+    Ok((i, result))
+}
+
+fn time_segment(i: &str) -> IResult<&str, Duration> {
+    let (i, int) = delimited(multispace0, digit1, multispace0)(i)?;
+    let int = int.parse().unwrap();
+    alt((
+        value(Duration::microseconds(int), usec),
+        value(Duration::milliseconds(int), msec),
+        value(Duration::seconds(int), sec),
+        value(Duration::minutes(int), min),
+        value(Duration::hours(int), hr),
+        value(Duration::days(int), day),
+        value(Duration::weeks(int), week),
+        value(
+            Duration::seconds(/* 30.44 * 24 * 60 * 60 = */ 2630016 * int),
+            month,
+        ),
+        value(Duration::hours(/* 365.25 * 24 = */ 8766 * int), year),
+    ))(i)
+}
+
+fn usec(i: &str) -> IResult<&str, ()> {
+    let (i, _) = alt((tag("us"), tag("μs"), tag("usec")))(i)?;
+    Ok((i, ()))
+}
+
+fn msec(i: &str) -> IResult<&str, ()> {
+    let (i, _) = alt((tag("ms"), tag("msec")))(i)?;
+    Ok((i, ()))
+}
+
+fn sec(i: &str) -> IResult<&str, ()> {
+    let (i, _) = alt((tag("seconds"), tag("second"), tag("sec"), tag("s")))(i)?;
+    Ok((i, ()))
+}
+
+fn min(i: &str) -> IResult<&str, ()> {
+    let (i, _) = alt((tag("minutes"), tag("minute"), tag("min"), tag("m")))(i)?;
+    Ok((i, ()))
+}
+
+fn hr(i: &str) -> IResult<&str, ()> {
+    let (i, _) = alt((tag("hours"), tag("hour"), tag("hr"), tag("h")))(i)?;
+    Ok((i, ()))
+}
+
+fn day(i: &str) -> IResult<&str, ()> {
+    let (i, _) = alt((tag("days"), tag("day"), tag("d")))(i)?;
+    Ok((i, ()))
+}
+
+fn week(i: &str) -> IResult<&str, ()> {
+    let (i, _) = alt((tag("weeks"), tag("week"), tag("w")))(i)?;
+    Ok((i, ()))
+}
+
+fn month(i: &str) -> IResult<&str, ()> {
+    let (i, _) = alt((tag("months"), tag("month"), tag("M")))(i)?;
+    Ok((i, ()))
+}
+
+fn year(i: &str) -> IResult<&str, ()> {
+    let (i, _) = alt((tag("years"), tag("year"), tag("y")))(i)?;
+    Ok((i, ()))
 }
 
 #[cfg(test)]

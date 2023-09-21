@@ -1,9 +1,6 @@
 //! Definitions for all possible errors used in this crate.
-use crate::parser::Rule;
 use snafu::Snafu;
 use std::io;
-
-type RuleError = pest::error::Error<Rule>;
 
 // TODO: change errors to `log::warn`s to prevent one bad file from stalling the entire loading process
 #[derive(Debug, Snafu)]
@@ -33,29 +30,11 @@ pub enum Error {
     #[snafu(display("Invalid filename {}.", filename))]
     InvalidFilenameError { filename: String },
 
-    #[snafu(display("Failed to parse input: {}.", source))]
-    ParsingError { source: RuleError },
-
     #[snafu(display("Unit file should provide at least one section."))]
     NoSectionError,
 
-    #[snafu(display("Expecting section but found {:?}.", actual))]
-    SectionError { actual: Rule },
-
-    #[snafu(display("Expecting section name but found {:?}.", actual))]
-    SectionNameError { actual: Rule },
-
     #[snafu(display("Failed to parse section {}.", key))]
     SectionParsingError { key: String },
-
-    #[snafu(display("Expecting entry but found {:?}.", actual))]
-    EntryError { actual: Rule },
-
-    #[snafu(display("Expecting entry key but found {:?}.", actual))]
-    EntryKeyError { actual: Rule },
-
-    #[snafu(display("Expecting entry value but found {:?}.", actual))]
-    EntryValueError { actual: Rule },
 
     #[snafu(display("Missing entry with key {}, which is required.", key))]
     EntryMissingError { key: String },

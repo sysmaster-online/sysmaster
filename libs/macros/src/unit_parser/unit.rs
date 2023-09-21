@@ -53,15 +53,20 @@ pub fn gen_unit_derives(input: DeriveInput) -> syn::Result<TokenStream> {
          impl unit_parser::internal::UnitConfig for #ident {
             const SUFFIX: &'static str = #suffix;
             fn __parse_unit(__source: unit_parser::internal::UnitParser) -> unit_parser::internal::Result<Self> {
+                let mut __source = __source;
                 #( #section_ensures )*
                 #( #section_inits )*
-                for __section in __source {
-                    let __section = __section?;
-                    match __section.name {
-                        #( #parse_parsers ),*
-                        _ => {
-                            log::warn!("{} is not a valid section.", __section.name);
+                loop {
+                    if let Some(mut __section) = __source.next() {
+                        match __section.name {
+                            #( #parse_parsers ),*
+                            _ => {
+                                log::warn!("{} is not a valid section.", __section.name);
+                            }
                         }
+                        __source.progress(__section.finish());
+                    } else {
+                        break;
                     }
                 }
                 #( #section_finalizes )*
@@ -71,14 +76,19 @@ pub fn gen_unit_derives(input: DeriveInput) -> syn::Result<TokenStream> {
             }
 
             fn __patch_unit(__source: unit_parser::internal::UnitParser, __from: &mut Self) -> unit_parser::internal::Result<()> {
+                let mut __source = __source;
                 #( #section_inits )*
-                for __section in __source {
-                    let __section = __section?;
-                    match __section.name {
-                        #( #patch_parsers ),*
-                        _ => {
-                            log::warn!("{} is not a valid section.", __section.name);
+                loop {
+                    if let Some(mut __section) = __source.next() {
+                        match __section.name {
+                            #( #patch_parsers ),*
+                            _ => {
+                                log::warn!("{} is not a valid section.", __section.name);
+                            }
                         }
+                        __source.progress(__section.finish());
+                    } else {
+                        break;
                     }
                 }
                 #( #section_patches )*

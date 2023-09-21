@@ -5,8 +5,6 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.26"
-pest = "2.7.0"
-pest_derive = "2.7.0"
 snafu = "0.7.4"
 macros = { path = "../macros" }
 log = "0.4"
@@ -15,12 +13,13 @@ nix = { version = "0.24", default-features = false, features = [
   "feature"
 ] }
 os-release = "0.1.0"
-chrono-tz = "0.8.3"
+chrono-tz = "0.6"
 once_cell = "^1.8.0"
+nom = "7"
 
-[dev-dependencies]
-criterion = { version = "0.4", features = ["html_reports"] }
+# [dev-dependencies]
+# criterion = { version = "0.4", features = ["html_reports"] }
 
-[[bench]]
-name = "all"
-harness = false
+# [[bench]]
+# name = "all"
+# harness = false

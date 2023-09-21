@@ -117,7 +117,7 @@ pub(crate) fn gen_entry_parse(field: &Field) -> Result<TokenStream> {
                             }
                         }
                     }
-                    let __subdirs = __subdir_parser.__parse_subdir(#subdir);
+                    let __subdirs = __source.__parse_subdir(#subdir);
                     #name.extend_from_slice(&__subdirs);
                 }
             }

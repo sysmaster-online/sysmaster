@@ -46,17 +46,19 @@ pub fn gen_section_derives(input: DeriveInput) -> Result<TokenStream> {
 
     let result = quote! {
         impl unit_parser::internal::UnitSection for #ident {
-            fn __parse_section(__source: unit_parser::internal::SectionParser) -> unit_parser::internal::Result<Option<Self>> {
-                let __subdir_parser = __source.__subdir_parser();
+            fn __parse_section(__source: &mut unit_parser::internal::SectionParser) -> unit_parser::internal::Result<Option<Self>> {
                 # ( #entry_ensures )*
                 # ( #entry_inits )*
-                for __entry in __source {
-                    let __pair = __entry?;
-                    match __pair.0 {
-                        #( #entry_parsers ),*
-                        _ => {
-                            log::warn!("{} is not a valid key.", __pair.0);
+                loop {
+                    if let Some(__pair) = __source.next() {
+                        match __pair.0 {
+                            #( #entry_parsers ),*
+                            _ => {
+                                log::warn!("{} is not a valid key.", __pair.0);
+                            }
                         }
+                    } else {
+                        break;
                     }
                 }
                 #( #entry_finalizes )*
@@ -65,17 +67,19 @@ pub fn gen_section_derives(input: DeriveInput) -> Result<TokenStream> {
                 }))
             }
 
-            fn __patch_section(__source: unit_parser::internal::SectionParser, __from: &mut Self) -> unit_parser::internal::Result<()> {
-                let __subdir_parser = __source.__subdir_parser();
+            fn __patch_section(__source: &mut unit_parser::internal::SectionParser, __from: &mut Self) -> unit_parser::internal::Result<()> {
                 # ( #entry_ensures )*
                 # ( #entry_inits )*
-                for __entry in __source {
-                    let __pair = __entry?;
-                    match __pair.0 {
-                        #( #entry_parsers ),*
-                        _ => {
-                            log::warn!("{} is not a valid key.", __pair.0);
+                loop {
+                    if let Some(__pair) = __source.next() {
+                        match __pair.0 {
+                            #( #entry_parsers ),*
+                            _ => {
+                                log::warn!("{} is not a valid key.", __pair.0);
+                            }
                         }
+                    } else {
+                        break;
                     }
                 }
                 #( #entry_patches )*
@@ -138,7 +142,7 @@ pub(crate) fn gen_section_parse(field: &Field) -> Result<(TokenStream, TokenStre
                         fn assert_impl<T: Default>() {}
                         assert_impl::<#ty>();
                     };
-                    if let Ok(__value) = unit_parser::internal::UnitSection::__parse_section(__section) {
+                    if let Ok(__value) = unit_parser::internal::UnitSection::__parse_section(&mut __section) {
                         if __value.is_some() {
                             #name = __value;
                         }
@@ -150,7 +154,7 @@ pub(crate) fn gen_section_parse(field: &Field) -> Result<(TokenStream, TokenStre
             quote! {
                 #key => {
                     let __section_partial = &mut __from.#name;
-                    if let Err(_)= unit_parser::internal::UnitSection::__patch_section(__section, __section_partial) {
+                    if let Err(_)= unit_parser::internal::UnitSection::__patch_section(&mut __section, __section_partial) {
                         log::warn!("Failed to parse section {}, skipping.", #key)
                     }
                 }
@@ -160,7 +164,7 @@ pub(crate) fn gen_section_parse(field: &Field) -> Result<(TokenStream, TokenStre
         (false, false) => (
             quote! {
                 #key => {
-                    if let Ok(__value) = unit_parser::internal::UnitSection::__parse_section(__section) {
+                    if let Ok(__value) = unit_parser::internal::UnitSection::__parse_section(&mut __section) {
                         #name = __value;
                     } else {
                         log::warn!("Failed to parse section {}, skipping.", #key);
@@ -170,11 +174,11 @@ pub(crate) fn gen_section_parse(field: &Field) -> Result<(TokenStream, TokenStre
             quote! {
                 #key => {
                     if let Some(__section_partial) = &mut __from.#name {
-                        if let Err(_) = unit_parser::internal::UnitSection::__patch_section(__section, __section_partial) {
+                        if let Err(_) = unit_parser::internal::UnitSection::__patch_section(&mut __section, __section_partial) {
                             log::warn!("Failed to patch section {}, skipping.", #key);
                         }
                     } else {
-                        if let Ok(__inner) = unit_parser::internal::UnitSection::__parse_section(__section) {
+                        if let Ok(__inner) = unit_parser::internal::UnitSection::__parse_section(&mut __section) {
                             __from.#name = __inner;
                         }
                     }
@@ -185,7 +189,7 @@ pub(crate) fn gen_section_parse(field: &Field) -> Result<(TokenStream, TokenStre
         (false, true) => (
             quote! {
                 #key => {
-                    let __value = unit_parser::internal::UnitSection::__parse_section(__section)?
+                    let __value = unit_parser::internal::UnitSection::__parse_section(&mut __section)?
                         .ok_or(unit_parser::internal::Error::SectionParsingError{ key: #key.to_string() })?;
                     #name = Some(__value);
                 }
@@ -193,7 +197,7 @@ pub(crate) fn gen_section_parse(field: &Field) -> Result<(TokenStream, TokenStre
             quote! {
                 #key => {
                     let __section_partial = &mut __from.#name;
-                    unit_parser::internal::UnitSection::__patch_section(__section, __section_partial)
+                    unit_parser::internal::UnitSection::__patch_section(&mut __section, __section_partial)
                         .map_err(|_| unit_parser::internal::Error::SectionParsingError{ key: #key.to_string() })?;                }
             },
         ),
