@@ -35,6 +35,7 @@ install -Dm0640 -t ${sysmaster_install_target}/system ${run_with_vm_dir}/*.socke
 # Simulate `sctl enable` command to automatically start services after bootup.
 mkdir -p /etc/sysmaster/system/multi-user.target.wants
 mkdir -p /etc/sysmaster/system/sysinit.target.wants
+mkdir -p /etc/sysmaster/system/syslog.target.wants
 
 for unit in ${multi_user_target[@]}; do
     ln -sf ${sysmaster_install_target}/system/${unit} /etc/sysmaster/system/multi-user.target.wants/${unit}
@@ -58,5 +59,8 @@ install -Dm0640 -t ${conf_install_target} ${pwd}/config/conf/system.conf || exit
 
 # Create the symbolic linkage '/init' to sysmaster-init.
 ln -sf ${sysmaster_install_target}/init /init
+
+# Install syslog.target
+ln -sf ${sysmaster_install_target}/system/syslog.socket /etc/sysmaster/system/syslog.target.wants/syslog.socket
 
 sync

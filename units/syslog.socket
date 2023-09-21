@@ -1,0 +1,12 @@
+[Unit]
+Description="syslog socket"
+DefaultDependencies=false
+
+[Socket]
+ListenDatagram="/dev/log"
+ReceiveBuffer=8196
+PassCredentials=true
+PassSecurity=true
+
+[Install]
+WantedBy="syslog.target"
