@@ -133,7 +133,10 @@ impl log::Log for SysLogger {
     }
 
     fn log(&self, record: &log::Record) {
-        let mut msg = String::new();
+        /* We find rsyslog will discard prefix two characters,
+         * thus add two white spaces in the prefix for adaption.
+         */
+        let mut msg = "  ".to_string();
         msg += match record.module_path() {
             None => "unknown",
             Some(v) => v,
