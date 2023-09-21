@@ -1,7 +1,8 @@
 # Default configuration of devmaster daemon.
 
-# Support 'info' and 'debug'.
-log_level = "info"
+# Support "error", "info" and "debug".
+# If not set, use "info" by default.
+log_level = "error"
 
 # Support multiple rules directories.
 rules_d = ["/etc/devmaster/rules.d", "/lib/devmaster/rules.d"]
@@ -15,4 +16,4 @@ max_workers = 3
 # Define the location where log message outputs.
 # Include: "file", "console", "syslog".
 # If not set, use "console" by default.
-log_targets = ["console"]
+log_targets = ["syslog"]
