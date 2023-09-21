@@ -73,9 +73,9 @@ impl Builtin for Kmod {
                 if let Err(e) = self
                     .kernel_module
                     .borrow_mut()
-                    .module_load_and_warn(&modalias)
+                    .module_load_and_warn(&modalias, false)
                 {
-                    log::error!("Load module {} failed: {}", modalias, e);
+                    log::debug!("Load module {} failed: {}", modalias, e);
                 }
             }
         } else {
@@ -83,7 +83,7 @@ impl Builtin for Kmod {
                 if let Err(e) = self
                     .kernel_module
                     .borrow_mut()
-                    .module_load_and_warn(&argv[i as usize])
+                    .module_load_and_warn(&argv[i as usize], false)
                 {
                     log::error!("Load module {} failed, {}", argv[i as usize], e);
                 }

@@ -194,25 +194,37 @@ impl LibKmod {
     }
 
     /// Load module
-    pub fn module_load_and_warn(&mut self, module: &str) -> Result<()> {
+    pub fn module_load_and_warn(&mut self, module: &str, verbose: bool) -> Result<()> {
         log::debug!("Loading module: {}", module);
 
         let mut denylisy_parsed = false;
         let mut denylist: HashSet<String> = HashSet::new();
 
         if let Err(e) = self.module_new_from_lookup(module) {
-            log::error!("Failed to look up module alias {}", module);
+            if verbose {
+                log::error!("Failed to look up module alias {}", module);
+            } else {
+                log::debug!("Failed to look up module alias {}", module);
+            }
             return Err(e);
         }
 
         if self.is_kmod_list_null() {
-            log::error!("Failed to find module {}", module);
+            if verbose {
+                log::error!("Failed to find module {}", module);
+            } else {
+                log::debug!("Failed to find module {}", module);
+            }
             return Err(errno::Errno::EINVAL);
         }
 
         for iter in self.iter() {
             if let Err(e) = self.set_module(&iter) {
-                log::error!("Set module failed : {}", e);
+                if verbose {
+                    log::error!("Set module failed : {}", e);
+                } else {
+                    log::debug!("Set module failed : {}", e);
+                }
                 break;
             }
 

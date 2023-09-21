@@ -3024,7 +3024,7 @@ impl Device {
     /// return the tag iterator
     pub fn tag_iter(&self) -> HashSetRefWrapper<String> {
         if let Err(e) = self.read_db() {
-            log::error!(
+            log::debug!(
                 "failed to read db of '{}': {}",
                 self.get_device_id()
                     .unwrap_or_else(|_| self.devpath.borrow().clone()),
@@ -3056,7 +3056,7 @@ impl Device {
     /// return the tag iterator
     pub fn devlink_iter(&self) -> HashSetRefWrapper<String> {
         if let Err(e) = self.read_db() {
-            log::error!(
+            log::debug!(
                 "failed to read db of '{}': {}",
                 self.get_device_id()
                     .unwrap_or_else(|_| self.devpath.borrow().clone()),
@@ -3072,7 +3072,7 @@ impl Device {
     /// return the tag iterator
     pub fn property_iter(&self) -> HashMapRefWrapper<String, String> {
         if let Err(e) = self.properties_prepare() {
-            log::error!(
+            log::debug!(
                 "failed to prepare properties of '{}': {}",
                 self.get_device_id()
                     .unwrap_or_else(|_| self.devpath.borrow().clone()),
@@ -3088,7 +3088,7 @@ impl Device {
     /// return the child iterator
     pub fn child_iter(&self) -> HashMapRefWrapper<String, Rc<RefCell<Device>>> {
         if let Err(e) = self.enumerate_children() {
-            log::error!(
+            log::debug!(
                 "failed to enumerate children of '{}': {}",
                 self.get_device_id()
                     .unwrap_or_else(|_| self.devpath.borrow().clone()),
@@ -3105,7 +3105,7 @@ impl Device {
     pub fn sysattr_iter(&self) -> HashSetRefWrapper<String> {
         if !*self.sysattrs_cached.borrow() {
             if let Err(e) = self.read_all_sysattrs() {
-                log::error!(
+                log::debug!(
                     "{}: failed to read all sysattrs: {}",
                     self.get_sysname()
                         .unwrap_or_else(|_| self.devpath.borrow().clone()),
