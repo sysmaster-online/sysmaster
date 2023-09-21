@@ -81,22 +81,31 @@ struct SysLogger {
 }
 
 impl SysLogger {
-    fn new() -> Result<Self, std::io::Error> {
+    fn new() -> Self {
         if get_open_when_needed() {
-            Ok(Self {
+            Self {
                 dgram: Mutex::new(None),
-            })
+            }
         } else {
-            let dgram = Self::connect()?;
-            Ok(Self {
-                dgram: Mutex::new(Some(dgram)),
-            })
+            match Self::connect() {
+                Ok(dgr) => Self {
+                    dgram: Mutex::new(Some(dgr)),
+                },
+                Err(_) => Self {
+                    dgram: Mutex::new(None),
+                },
+            }
         }
     }
 
     fn connect() -> Result<UnixDatagram, std::io::Error> {
         let sock = UnixDatagram::unbound()?;
-        sock.connect("/dev/log")?;
+        if let Err(e) = sock.connect("/dev/log") {
+            if e.kind() != ErrorKind::NotFound {
+                eprintln!("Failed to connect to '/dev/log' currently: {}", e);
+            }
+            return Err(e);
+        }
         Ok(sock)
     }
 }
@@ -108,20 +117,14 @@ impl ReInit for SysLogger {
             return;
         }
 
-        let dgr = match UnixDatagram::unbound() {
-            Ok(dgr) => dgr,
-            Err(e) => {
-                eprintln!("Failed to bound unix datagram: {}", e);
-                return;
+        match Self::connect() {
+            Ok(dgr) => {
+                *self.dgram.lock().expect("failed to lock syslogger") = Some(dgr);
             }
-        };
-
-        if let Err(e) = dgr.connect("/dev/log") {
-            eprintln!("Failed to connect /dev/log: {}", e);
-            return;
+            Err(_) => {
+                *self.dgram.lock().expect("failed to lock syslogger") = None;
+            }
         }
-
-        *self.dgram.lock().expect("failed to lock syslogger") = Some(dgr);
     }
 }
 
@@ -153,22 +156,40 @@ impl log::Log for SysLogger {
                 }
                 Err(e) => {
                     eprintln!("Failed to connect syslogger: {}", e);
+                    println!("{}", msg);
                 }
             }
         } else {
-            match self
+            if let Some(dgr) = self
                 .dgram
                 .lock()
                 .expect("Failed to lock syslogger")
                 .as_ref()
             {
-                Some(dgr) => {
+                if let Err(e) = dgr.send(msg.as_bytes()) {
+                    eprintln!("Failed to send message to syslogger: {}", e);
+                    println!("{}", msg);
+                }
+
+                return;
+            }
+
+            /* '/dev/log' is invalid until sysmaster starts syslog.service.
+             * Thus when OPEN_WHEN_NEEDED is unset and the syslogger does not
+             * contain valid '/dev/log' fd, try to reconnect it.
+             */
+            match Self::connect() {
+                Ok(dgr) => {
                     if let Err(e) = dgr.send(msg.as_bytes()) {
                         eprintln!("Failed to send message to syslogger: {}", e);
+                        println!("{}", msg);
+                        return;
                     }
+
+                    *self.dgram.lock().expect("Failed to lock syslogger") = Some(dgr);
                 }
-                None => {
-                    eprintln!("open_when_needed is unset but syslogger is invalid.");
+                Err(_) => {
+                    println!("{}", msg);
                 }
             }
         }
@@ -590,13 +611,7 @@ pub fn init_log(
     for target in targets {
         let logger = match target {
             "console" => Box::new(ConsoleLogger) as Box<dyn ReInit>,
-            "syslog" => match SysLogger::new() {
-                Ok(logger) => Box::new(logger) as Box<dyn ReInit>,
-                Err(e) => {
-                    eprintln!("{} failed to create syslogger: {:?}", name, e);
-                    continue;
-                }
-            },
+            "syslog" => Box::new(SysLogger::new()) as Box<dyn ReInit>,
             "file" => {
                 match FileLogger::new(
                     log::Level::Debug,
