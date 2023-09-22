@@ -460,7 +460,7 @@ pub(crate) fn cleanup_db(dev: Rc<RefCell<Device>>) -> Result<()> {
                 log_dev!(
                     error,
                     dev.borrow(),
-                    format!("failed to unlink '{}': {}", db_path, e)
+                    format!("failed to unlink '{}' when cleanup db: {}", db_path, e)
                 );
                 return Err(Error::Nix { source: e });
             }

@@ -154,7 +154,7 @@ impl Builtin for Keyboard {
             .borrow()
             .get_devname()
             .context(DeviceSnafu)
-            .log_error("Failed to get devname!")?;
+            .log_dev_error(&device.borrow(), "Failed to get devname!")?;
 
         for (key, value) in &device.borrow().property_iter() {
             // KEYBOARD_KEY_<hex scan code>=<key code identifier>

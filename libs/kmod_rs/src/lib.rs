@@ -195,36 +195,30 @@ impl LibKmod {
 
     /// Load module
     pub fn module_load_and_warn(&mut self, module: &str, verbose: bool) -> Result<()> {
+        let level = if verbose {
+            log::Level::Error
+        } else {
+            log::Level::Debug
+        };
+
         log::debug!("Loading module: {}", module);
 
         let mut denylisy_parsed = false;
         let mut denylist: HashSet<String> = HashSet::new();
 
         if let Err(e) = self.module_new_from_lookup(module) {
-            if verbose {
-                log::error!("Failed to look up module alias {}", module);
-            } else {
-                log::debug!("Failed to look up module alias {}", module);
-            }
+            log::log!(level, "Failed to look up module alias {}", module);
             return Err(e);
         }
 
         if self.is_kmod_list_null() {
-            if verbose {
-                log::error!("Failed to find module {}", module);
-            } else {
-                log::debug!("Failed to find module {}", module);
-            }
+            log::log!(level, "Failed to find module {}", module);
             return Err(errno::Errno::EINVAL);
         }
 
         for iter in self.iter() {
             if let Err(e) = self.set_module(&iter) {
-                if verbose {
-                    log::error!("Set module failed : {}", e);
-                } else {
-                    log::debug!("Set module failed : {}", e);
-                }
+                log::log!(level, "Set module failed : {}", e);
                 break;
             }
 
@@ -236,7 +230,7 @@ impl LibKmod {
             match self.get_initstate() {
                 Err(_) => log::error!("Module {} get initstate failed!", name),
                 Ok(kmod_sys::kmod_module_initstate_KMOD_MODULE_BUILTIN) => {
-                    log::info!("Module {} is built in", name)
+                    log::debug!("Module {} is built in", name)
                 }
                 Ok(kmod_sys::kmod_module_initstate_KMOD_MODULE_LIVE) => {
                     log::debug!("Module {} is already loaded", name)
@@ -247,22 +241,41 @@ impl LibKmod {
                     {
                         Ok(0) => log::info!("Inserted module {}", name),
                         Ok(kmod_sys::kmod_probe_KMOD_PROBE_APPLY_BLACKLIST) => {
-                            log::info!("Module {} is deny-listed", name)
+                            log::debug!("Module {} is deny-listed", name)
                         }
-                        Err(errno::Errno::EPERM) => {
-                            if !denylisy_parsed {
-                                cmdline::proc_cmdline_parse(
-                                    cmdline::parse_proc_cmdline_item,
-                                    &mut denylist,
-                                );
-                                denylisy_parsed = true;
+                        Err(e) => {
+                            if e == nix::Error::EPERM {
+                                if !denylisy_parsed {
+                                    cmdline::proc_cmdline_parse(
+                                        cmdline::parse_proc_cmdline_item,
+                                        &mut denylist,
+                                    );
+                                    denylisy_parsed = true;
+                                }
+
+                                if denylist.contains(&name) {
+                                    log::info!("Module {} is deny-listed (by kernel)", name);
+                                    continue;
+                                }
                             }
-                            if denylist.contains(&name) {
-                                log::info!("Module {} is deny-listed (by kernel)", name);
-                                continue;
+
+                            let fail_level = if !verbose {
+                                log::Level::Debug
+                            } else if [nix::Error::ENODEV, nix::Error::ENOENT].contains(&e) {
+                                log::Level::Warn
+                            } else {
+                                log::Level::Error
+                            };
+
+                            log::log!(fail_level, "Failed to insert module {}", name);
+
+                            if ![nix::Error::ENODEV, nix::Error::ENOENT].contains(&e) {
+                                return Err(e);
                             }
                         }
-                        _ => log::error!("Failed to insert module {}", name),
+                        _ => {
+                            log::error!("Reached unknown state.");
+                        }
                     }
                 }
             };

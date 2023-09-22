@@ -259,11 +259,13 @@ pub(crate) fn cleanup_node(dev: Rc<RefCell<Device>>) -> Result<()> {
     match unlink(filename.as_str()) {
         Ok(_) => log_dev!(debug, dev.borrow(), format!("unlinked '{}'", filename)),
         Err(e) => {
-            log_dev!(
-                error,
-                dev.borrow(),
-                format!("failed to unlink '{}': {}", filename, e)
-            );
+            if e != nix::Error::ENOENT {
+                log_dev!(
+                    error,
+                    dev.borrow(),
+                    format!("failed to unlink '{}' when cleanup node: {}", filename, e)
+                );
+            }
         }
     }
 
@@ -325,7 +327,10 @@ pub(crate) fn update_symlink(dev: Rc<RefCell<Device>>, symlink: &str, add: bool)
                 log_dev!(
                     error,
                     dev.borrow(),
-                    format!("failed to unlink '{}': {}", symlink, e)
+                    format!(
+                        "failed to unlink '{}' when updating symlink: {}",
+                        symlink, e
+                    )
                 );
             }
         }
@@ -436,11 +441,15 @@ pub(crate) fn update_prior_dir(dev: Rc<RefCell<Device>>, dirfd: RawFd, add: bool
         }
         match unlinkat(Some(dirfd), id.as_str(), UnlinkatFlags::NoRemoveDir) {
             Ok(_) => log_dev!(debug, dev.borrow(), format!("unlinked '{}'", id)),
-            Err(e) => log_dev!(
-                error,
-                dev.borrow(),
-                format!("failed to unlink '{}': {}", id, e)
-            ),
+            Err(e) => {
+                if e != nix::Error::ENOENT {
+                    log_dev!(
+                        error,
+                        dev.borrow(),
+                        format!("failed to unlink '{}' when updating prior dir: {}", id, e)
+                    );
+                }
+            }
         }
         symlinkat(dangle_link.as_str(), Some(dirfd), id.as_str())
             .context(NixSnafu)
@@ -456,7 +465,7 @@ pub(crate) fn update_prior_dir(dev: Rc<RefCell<Device>>, dirfd: RawFd, add: bool
                 log_dev!(
                     error,
                     dev.borrow(),
-                    format!("failed to unlink '{}': {}", id, e)
+                    format!("failed to unlink '{}' when cleanup prior dir: {}", id, e)
                 );
                 return Err(e);
             }
@@ -471,7 +480,7 @@ pub(crate) fn update_prior_dir(dev: Rc<RefCell<Device>>, dirfd: RawFd, add: bool
 fn prior_dir_read_one(dirfd: RawFd, name: &str) -> Result<(i32, String)> {
     let pointee = readlinkat(dirfd, name)
         .context(NixSnafu)
-        .log_error("readlinkat failed")?;
+        .log_error(&format!("readlinkat '{}' failed", name))?;
 
     let pointee_str = pointee.to_str().ok_or(Error::Other {
         msg: "invalid dangling symlink".to_string(),
@@ -584,7 +593,8 @@ pub(crate) fn find_prioritized_devnode(
 
     for e in dir.iter().flatten() {
         if let Ok(name) = e.file_name().to_str() {
-            if [".", ".."].contains(&name) {
+            /* Skip '.', '..', '.lock' entries. */
+            if name.starts_with('.') {
                 continue;
             }
 
@@ -597,7 +607,11 @@ pub(crate) fn find_prioritized_devnode(
                 }
                 Err(e) => {
                     if e.get_errno() != nix::Error::ENODEV {
-                        log_dev!(error, dev.borrow(), format!("{}", e));
+                        log_dev!(
+                            error,
+                            dev.borrow(),
+                            format!("prior_dir_read_one failed: {}", e)
+                        );
                     }
                 }
             }
@@ -661,7 +675,11 @@ pub(crate) fn cleanup_prior_dir() -> Result<()> {
         let lock_file = prior_dir.join(".lock");
 
         if let Err(e) = unlink(&lock_file) {
-            log::debug!("Failed to unlink '{:?}': {}", lock_file, e);
+            log::debug!(
+                "Failed to unlink '{:?}' when cleanup_prior_dir: {}",
+                lock_file,
+                e
+            );
             continue;
         }
 
