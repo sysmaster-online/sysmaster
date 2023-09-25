@@ -12,6 +12,7 @@
 
 //!
 use crate::error::*;
+use libc::off_t;
 use nix::{
     errno::Errno,
     fcntl::{openat, FcntlArg, FdFlag, OFlag},
@@ -170,6 +171,16 @@ pub fn opendirat(dirfd: i32, flags: OFlag) -> Result<nix::dir::Dir> {
     .context(NixSnafu)?;
 
     nix::dir::Dir::from_fd(nfd).context(NixSnafu)
+}
+
+/// Does the file offset exceed the memory size
+pub fn file_offset_beyond_memory_size(x: off_t) -> bool {
+    if x < 0 {
+        /* off_t is signed, filter that out */
+        return false;
+    }
+
+    x as u64 > usize::MAX as u64
 }
 
 #[cfg(test)]

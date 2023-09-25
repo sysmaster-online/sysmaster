@@ -65,6 +65,8 @@ pub mod signal_util;
 pub mod socket_util;
 #[cfg(feature = "stat")]
 pub mod stat_util;
+#[cfg(feature = "strbuf")]
+pub mod strbuf;
 #[cfg(feature = "string")]
 pub mod string;
 #[cfg(feature = "sysfs")]

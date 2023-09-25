@@ -61,6 +61,7 @@ full = [
     "io",
     "murmurhash2",
     "unit_name",
+    "strbuf",
 ]
 
 capability = []
@@ -106,3 +107,4 @@ unistd = ["nix/user"]
 unit_name = []
 uuid = ["bitflags"]
 murmurhash2 = []
+strbuf = []

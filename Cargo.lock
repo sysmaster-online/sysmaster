@@ -441,6 +441,8 @@ dependencies = [
  "event",
  "fnmatch-regex",
  "futures",
+ "glob",
+ "hwdb",
  "input-event-codes",
  "input_event_codes_rs",
  "ioctl-sys",
@@ -841,6 +843,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
+name = "hwdb"
+version = "0.5.0"
+dependencies = [
+ "basic",
+ "bincode",
+ "constants",
+ "glob",
+ "linked-hash-map",
+ "log 0.5.0",
+ "memoffset",
+ "nix 0.24.3",
+ "serde",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1056,6 +1073,12 @@ dependencies = [
 [[package]]
 name = "libtests"
 version = "0.5.0"
+
+[[package]]
+name = "linked-hash-map"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
 
 [[package]]
 name = "linux-raw-sys"
@@ -1998,6 +2021,16 @@ dependencies = [
  "socket",
  "target",
  "walkdir",
+]
+
+[[package]]
+name = "sysmaster-hwdb"
+version = "0.5.0"
+dependencies = [
+ "clap",
+ "hwdb",
+ "log 0.5.0",
+ "nix 0.24.3",
 ]
 
 [[package]]

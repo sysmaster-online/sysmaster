@@ -10,10 +10,14 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! the module of devctl subcommands
-//!
+//! lib of hwdb
 
-pub(crate) mod devctl_hwdb;
-pub(crate) mod devctl_monitor;
-pub(crate) mod devctl_test_builtin;
-pub(crate) mod devctl_trigger;
+/// Process the raw data of hwdb.bin
+pub mod sd_hwdb;
+
+/// Generic devmaster properties, key-value database based on modalias strings.
+/// Uses a Patricia/radix trie to index all matches for efficient lookup.
+pub mod hwdb_util;
+
+pub use crate::hwdb_util::*;
+pub use crate::sd_hwdb::*;

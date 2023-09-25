@@ -40,6 +40,7 @@ input_event_codes_rs = { path = "../../libs/input_event_codes_rs" }
 kmod_rs = { path = "../../libs/kmod_rs" }
 scsi_generic_rs = { path = "../../libs/scsi_generic_rs" }
 log = { path = "../../libs/log" }
+hwdb = {path = "../../libs/hwdb", default-features = false }
 
 # third libraries
 bitflags = "1.3.2"
@@ -75,6 +76,7 @@ tokio = { version = "1.29.1", default_features = false, features = [
 ] }
 toml = "0.5.8"
 wait-timeout = "0.2.0"
+glob = { version = "0.3.1", default_features = false }
 
 [build-dependencies]
 basic = { path = "../../libs/basic", features = ["cargo"] }

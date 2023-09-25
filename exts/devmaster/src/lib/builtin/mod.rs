@@ -180,7 +180,7 @@ impl BuiltinManager {
 
         builtins.insert(BuiltinCommand::Blkid, Box::new(blkid::Blkid {}));
         builtins.insert(BuiltinCommand::Btrfs, Box::new(btrfs::Btrfs {}));
-        builtins.insert(BuiltinCommand::Hwdb, Box::new(hwdb::Hwdb {}));
+        builtins.insert(BuiltinCommand::Hwdb, Box::new(hwdb::Hwdb::new()));
         builtins.insert(BuiltinCommand::InputId, Box::new(input_id::InputId {}));
         builtins.insert(BuiltinCommand::Keyboard, Box::new(keyboard::Keyboard {}));
         builtins.insert(BuiltinCommand::Kmod, Box::new(kmod::Kmod::new()));

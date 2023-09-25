@@ -19,6 +19,7 @@ use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
 use log::logger::init_log_to_console_syslog;
 use log::Level;
 use std::{io::Write, os::unix::net::UnixStream};
+use subcmds::devctl_hwdb::subcommand_hwdb;
 use subcmds::devctl_monitor::subcommand_monitor;
 use subcmds::devctl_test_builtin::subcommand_test_builtin;
 use subcmds::devctl_trigger::subcommand_trigger;
@@ -80,6 +81,28 @@ enum SubCmd {
         #[clap(required = true)]
         syspath: String,
     },
+    /// Test builtin command on a device
+    #[clap(display_order = 5)]
+    Hwdb {
+        /// update the hardware database
+        #[clap(short('u'), long)]
+        update: bool,
+        /// query database and print result
+        #[clap(short('t'), long)]
+        test: Option<String>,
+        /// Custom .hwdb file path
+        #[clap(long, value_parser)]
+        path: Option<String>,
+        /// generate in /usr/lib/devmaster instead of /etc/devmaster
+        #[clap(long)]
+        usr: bool,
+        /// when updating, return non-zero exit value on any parsing error
+        #[clap(short, long)]
+        strict: Option<bool>,
+        /// alternative root path in the filesystem
+        #[clap(short, long)]
+        root: Option<String>,
+    },
 }
 
 /// subcommand for killing workers
@@ -107,5 +130,13 @@ fn main() {
             builtin,
             syspath,
         } => subcommand_test_builtin(action, builtin, syspath),
+        SubCmd::Hwdb {
+            update,
+            test,
+            path,
+            usr,
+            strict,
+            root,
+        } => subcommand_hwdb(update, test, path, usr, strict, root),
     }
 }

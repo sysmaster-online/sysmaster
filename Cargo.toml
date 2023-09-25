@@ -123,6 +123,7 @@ members = [
   "exts/devmaster",
   "exts/switch_root",
   "exts/hostname_setup",
+  "exts/hwdb",
   #internal libraries crates
   "libs/cmdproto",
   #external libraries crates
@@ -136,6 +137,7 @@ members = [
   "libs/blkid_rs",
   "libs/kmod_rs",
   "libs/unit_parser",
+  "libs/hwdb",
 ]
 exclude = ["config", "tools"]
 
