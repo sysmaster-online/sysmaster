@@ -22,15 +22,14 @@ pub fn gen_unit_derives(input: DeriveInput) -> syn::Result<TokenStream> {
 
     if let Data::Struct(data_struct) = &input.data {
         for entry in &data_struct.fields {
-            section_ensures.push(gen_section_ensure(&entry)?);
-            section_inits.push(gen_section_init(&entry)?);
-            section_parsers.push(gen_section_parse(&entry)?);
-            section_finalizes.push(gen_section_finalize(&entry)?);
-            section_patches.push(gen_section_patches(&entry)?);
-            let ident = entry.ident.as_ref().ok_or(Error::new_spanned(
-                &entry,
-                "An entry must have an explicit name.",
-            ))?;
+            section_ensures.push(gen_section_ensure(entry)?);
+            section_inits.push(gen_section_init(entry)?);
+            section_parsers.push(gen_section_parse(entry)?);
+            section_finalizes.push(gen_section_finalize(entry)?);
+            section_patches.push(gen_section_patches(entry)?);
+            let ident = entry.ident.as_ref().ok_or_else(|| {
+                Error::new_spanned(&entry, "An entry must have an explicit name.")
+            })?;
             sections.push(ident);
         }
     } else {

@@ -20,11 +20,13 @@ use std::{
     str::FromStr,
 };
 
+/// Result of a [UnitParser].
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// The trait that needs to be implemented on the most-outer struct,
 /// representing a type of unit.
 pub trait UnitConfig: Sized {
+    /// The suffix of a type of unit, parsed from an attribute.
     const SUFFIX: &'static str;
     /// Parses the unit from a [UnitParser].
     fn __parse_unit(__source: UnitParser) -> Result<Self>;
@@ -46,7 +48,7 @@ pub trait UnitConfig: Sized {
         file.read_to_string(&mut content).context(ReadFileSnafu {
             path: path.to_string_lossy().to_string(),
         })?;
-        let canonical_path = canonicalize(path).unwrap_or(path.into());
+        let canonical_path = canonicalize(path).unwrap_or_else(|_| path.into());
         let parser = crate::parser::UnitParser::new(
             content.as_ref(),
             paths,
@@ -142,22 +144,20 @@ pub trait UnitConfig: Sized {
                     continue;
                 }
                 if let Ok(dir_entries) = read_dir(&path) {
-                    for item in dir_entries {
-                        if let Ok(entry) = item {
-                            if let (Ok(filetype), Some(extension)) =
-                                (entry.file_type(), entry.path().extension())
-                            {
-                                if filetype.is_file() && extension == "conf" {
-                                    let paths = Rc::clone(&paths_rc);
-                                    if let Err(err) = Self::__patch(
-                                        entry.path(),
-                                        paths,
-                                        fullname.as_str(),
-                                        &mut result,
-                                        root,
-                                    ) {
-                                        log::warn!("Failed to patch unit {}: {})", name, err);
-                                    }
+                    for entry in dir_entries.flatten() {
+                        if let (Ok(filetype), Some(extension)) =
+                            (entry.file_type(), entry.path().extension())
+                        {
+                            if filetype.is_file() && extension == "conf" {
+                                let paths = Rc::clone(&paths_rc);
+                                if let Err(err) = Self::__patch(
+                                    entry.path(),
+                                    paths,
+                                    fullname.as_str(),
+                                    &mut result,
+                                    root,
+                                ) {
+                                    log::warn!("Failed to patch unit {}: {})", name, err);
                                 }
                             }
                         }

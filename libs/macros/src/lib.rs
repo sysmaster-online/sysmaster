@@ -60,6 +60,7 @@ mod tests {
     }
 }
 
+/// proc-macro UnitConfig
 #[proc_macro_derive(UnitConfig, attributes(unit, section))]
 pub fn derive_unit_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -69,6 +70,7 @@ pub fn derive_unit_config(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         .into()
 }
 
+/// proc-macro UnitSection
 #[proc_macro_derive(UnitSection, attributes(entry))]
 pub fn derive_unit_section(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -78,6 +80,7 @@ pub fn derive_unit_section(input: proc_macro::TokenStream) -> proc_macro::TokenS
         .into()
 }
 
+/// proc-macro UnitEntry
 #[proc_macro_derive(UnitEntry)]
 pub fn derive_unit_entry(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

@@ -3,7 +3,9 @@ use snafu::Snafu;
 use std::io;
 
 // TODO: change errors to `log::warn`s to prevent one bad file from stalling the entire loading process
+/// Errors used in crate.
 #[derive(Debug, Snafu)]
+#[allow(missing_docs)]
 #[snafu(visibility(pub))]
 pub enum Error {
     #[snafu(display("{} is not a valid directory.", path))]

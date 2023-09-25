@@ -8,7 +8,7 @@ use quote::{quote, ToTokens};
 use syn::{Data, DeriveInput, Error, Field, Result};
 
 /// Generate statements that ensure the given struct implements [UnitEntry]
-/// by calling a function with generic constrants.
+/// by calling a function with generic constraints.
 pub(crate) fn gen_entry_ensure(field: &Field) -> Result<TokenStream> {
     let mut ty = &field.ty;
     let attribute = EntryAttributes::parse_vec(field, None)?;
@@ -31,10 +31,10 @@ pub(crate) fn gen_entry_ensure(field: &Field) -> Result<TokenStream> {
 /// let mut Field1 = None;
 /// ```
 pub(crate) fn gen_entry_init(field: &Field) -> Result<TokenStream> {
-    let name = field.ident.as_ref().ok_or(Error::new_spanned(
-        field,
-        "Tuple structs are not supported.",
-    ))?;
+    let name = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported."))?;
     let attributes = EntryAttributes::parse_vec(field, None)?;
     Ok(match attributes.multiple {
         false => quote! {
@@ -60,15 +60,15 @@ pub(crate) fn gen_entry_init(field: &Field) -> Result<TokenStream> {
 /// }
 /// ```
 pub(crate) fn gen_entry_parse(field: &Field) -> Result<TokenStream> {
-    let name = field.ident.as_ref().ok_or(Error::new_spanned(
-        field,
-        "Tuple structs are not supported.",
-    ))?;
+    let name = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported."))?;
     let ty = &field.ty;
     let attributes = EntryAttributes::parse_vec(field, Some(ty))?;
     let key = attributes
         .key
-        .unwrap_or((format!("{}", name)).into_token_stream());
+        .unwrap_or_else(|| (format!("{}", name)).into_token_stream());
 
     let result = match (
         attributes.default,
@@ -149,15 +149,15 @@ pub(crate) fn gen_entry_parse(field: &Field) -> Result<TokenStream> {
 
 /// Generate finalization statements which are in charge of processing [Option] and [Result]s during parsing.
 pub(crate) fn gen_entry_finalize(field: &Field) -> Result<TokenStream> {
-    let name = field.ident.as_ref().ok_or(Error::new_spanned(
-        field,
-        "Tuple structs are not supported.",
-    ))?;
+    let name = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported."))?;
     let ty = &field.ty;
     let attributes = EntryAttributes::parse_vec(field, None)?;
     let key = attributes
         .key
-        .unwrap_or((format!("{}", name)).into_token_stream());
+        .unwrap_or_else(|| (format!("{}", name)).into_token_stream());
 
     let result = match (attributes.default, attributes.multiple, attributes.must) {
         // invalid
@@ -184,7 +184,7 @@ pub(crate) fn gen_entry_finalize(field: &Field) -> Result<TokenStream> {
         // throw Error
         (None, false, true) => {
             quote! {
-                let #name = #name.ok_or(unit_parser::internal::Error::EntryMissingError { key: #key.to_string()})?;
+                let #name = #name.ok_or_else(||unit_parser::internal::Error::EntryMissingError { key: #key.to_string()})?;
             }
         }
     };
@@ -230,10 +230,10 @@ pub(crate) fn gen_entry_derives(input: DeriveInput) -> Result<TokenStream> {
 /// Generate patching statements that sets each field to a new value, if present.
 /// Append the new value to the [Vec] if possible.
 pub(crate) fn gen_entry_patch(field: &Field) -> Result<TokenStream> {
-    let name = field.ident.as_ref().ok_or(Error::new_spanned(
-        field,
-        "Tuple structs are not supported.",
-    ))?;
+    let name = field
+        .ident
+        .as_ref()
+        .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported."))?;
     let attributes = EntryAttributes::parse_vec(field, None)?;
 
     let result = match (attributes.must, attributes.multiple, attributes.default) {

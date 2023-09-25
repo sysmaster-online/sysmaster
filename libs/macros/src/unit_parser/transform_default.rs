@@ -12,7 +12,7 @@ pub(crate) fn transform_default(ty: &Type, default: &Expr) -> Result<TokenStream
             .path
             .segments
             .last()
-            .ok_or(Error::new_spanned(ty, "Invalid type."))?;
+            .ok_or_else(|| Error::new_spanned(ty, "Invalid type."))?;
         if path.ident == "String" {
             if let Expr::Lit(expr) = default {
                 if let Lit::Str(string) = &expr.lit {

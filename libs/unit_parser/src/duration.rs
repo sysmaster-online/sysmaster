@@ -34,7 +34,7 @@ pub(crate) fn duration(i: &str) -> IResult<&str, Duration> {
     let mut result = segments
         .into_iter()
         .reduce(|a, b| a + b)
-        .unwrap_or(Duration::zero());
+        .unwrap_or_else(Duration::zero);
     // captures a integer without unit
     let (i, opt_int) = opt(digit1)(i)?;
     if let Some(int) = opt_int {
@@ -115,7 +115,7 @@ mod tests {
 
     use crate::config::UnitEntry;
 
-    fn test_pairs(pair: &Vec<(&str, Duration)>) {
+    fn test_pairs(pair: &[(&str, Duration)]) {
         for each in pair {
             let parse = Duration::parse_from_str(each.0).unwrap();
             assert_eq!(parse, each.1);

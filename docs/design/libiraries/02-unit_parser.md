@@ -351,7 +351,7 @@ struct Service {
 ## 待完成
 
 * 错误处理（单个文件错误不应影响其他）
-* Calender Event 解析
+* Calendar Event 解析
 * 英文文档
 * 注释
 

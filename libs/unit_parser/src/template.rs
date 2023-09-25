@@ -9,8 +9,8 @@ pub(crate) enum UnitType<'a> {
 }
 
 /// Determines the type of a unit based on its filename.
-pub(crate) fn unit_type<'a>(filename: &'a str) -> Result<UnitType<'a>> {
-    let split: Vec<&str> = filename.split("@").collect();
+pub(crate) fn unit_type(filename: &str) -> Result<UnitType> {
+    let split: Vec<&str> = filename.split('@').collect();
     match split.len() {
         1 => Ok(UnitType::Regular(filename)),
         2 => {
@@ -18,7 +18,7 @@ pub(crate) fn unit_type<'a>(filename: &'a str) -> Result<UnitType<'a>> {
                 Ok(UnitType::Template(split.get(0).unwrap()))
             } else {
                 let mut sub_split = split.get(1).unwrap().split('.');
-                let template_name = sub_split.nth(0).unwrap();
+                let template_name = sub_split.next().unwrap();
                 let suffix = sub_split.last().unwrap();
                 Ok(UnitType::Instance(
                     split.get(0).unwrap(),

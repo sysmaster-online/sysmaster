@@ -19,5 +19,6 @@ mod duration;
 /// Use `use unit_parser::prelude::*;` to include.
 pub mod prelude;
 
+/// Internal interfaces, should only be used in macro generated code.
 #[doc(hidden)]
 pub mod internal;

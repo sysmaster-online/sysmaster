@@ -5,20 +5,14 @@ use quote::ToTokens;
 use syn::{Attribute, Error, Expr, Field, LitStr, Token, Type};
 
 /// Attributes valid for [UnitSection]s.
+#[derive(Default)]
 pub(crate) struct SectionAttributes {
+    /// Whether fallback to [std::default::Default] is enabled
     pub(crate) default: bool,
+    /// Whether alternative key is specified
     pub(crate) key: Option<TokenStream>,
+    /// Whether must-present is specified
     pub(crate) must: bool,
-}
-
-impl Default for SectionAttributes {
-    fn default() -> Self {
-        Self {
-            default: false,
-            key: None,
-            must: false,
-        }
-    }
 }
 
 impl SectionAttributes {
@@ -65,24 +59,18 @@ impl SectionAttributes {
 }
 
 /// Attributes valid for [UnitEntry]s.
+#[derive(Default)]
 pub(crate) struct EntryAttributes {
+    /// Whether fallback to default expression is enabled
     pub(crate) default: Option<Expr>,
+    /// Whether alternative key is specified
     pub(crate) key: Option<TokenStream>,
+    /// Whether multiple-present is specified
     pub(crate) multiple: bool,
+    /// Whether must-present is specified
     pub(crate) must: bool,
+    /// Whether systemd subdir resolve is specified
     pub(crate) subdir: Option<TokenStream>,
-}
-
-impl Default for EntryAttributes {
-    fn default() -> Self {
-        Self {
-            default: None,
-            key: None,
-            multiple: false,
-            must: false,
-            subdir: None,
-        }
-    }
 }
 
 impl EntryAttributes {
@@ -139,8 +127,7 @@ impl EntryAttributes {
             ));
         }
         if let Some(ty) = ty {
-            if (!result.must) & (!result.default.is_some()) & (!result.multiple) & (!is_option(ty))
-            {
+            if (!result.must) & (result.default.is_none()) & (!result.multiple) & (!is_option(ty)) {
                 return Err(Error::new_spanned(
                     input,
                     "Optional fields should be `Option`s.",
@@ -157,20 +144,16 @@ impl EntryAttributes {
     }
 }
 
+#[derive(Default)]
 pub(crate) struct UnitAttributes {
+    /// The suffix of a type of unit
     pub(crate) suffix: Option<LitStr>,
-}
-
-impl Default for UnitAttributes {
-    fn default() -> Self {
-        Self { suffix: None }
-    }
 }
 
 impl UnitAttributes {
     /// Parses [UnitAttributes] from [syn] tokens.
     /// Pass in [syn::Type] to do type check, or pass in [None] to prevent errors from showing up multiple times
-    pub(crate) fn parse_vec(input: &Vec<Attribute>) -> syn::Result<Self> {
+    pub(crate) fn parse_vec(input: &[Attribute]) -> syn::Result<Self> {
         let mut result = UnitAttributes::default();
         for attribute in input.iter() {
             if attribute.path().is_ident("unit") {

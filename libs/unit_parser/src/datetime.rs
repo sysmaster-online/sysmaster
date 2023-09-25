@@ -157,7 +157,8 @@ fn full_len(i: &str) -> IResult<&str, DateTime<Utc>> {
         )));
     }
 
-    let (year, month, day) = date.unwrap_or((now_date.year(), now_date.month(), now_date.day()));
+    let (year, month, day) =
+        date.unwrap_or_else(|| (now_date.year(), now_date.month(), now_date.day()));
     let (hour, minute, second, microsecond) = time.unwrap_or((0, 0, 0, 0));
 
     let result = match timezone {
@@ -168,19 +169,17 @@ fn full_len(i: &str) -> IResult<&str, DateTime<Utc>> {
             timezone
                 .with_ymd_and_hms(year, month, day, hour, minute, second)
                 .single()
-                .ok_or(nom::Err::Failure(nom::error::Error::new(
-                    i,
-                    nom::error::ErrorKind::Fail,
-                )))?
+                .ok_or_else(|| {
+                    nom::Err::Failure(nom::error::Error::new(i, nom::error::ErrorKind::Fail))
+                })?
                 .with_timezone(&Utc)
         }
         _ => Utc
             .with_ymd_and_hms(year, month, day, hour, minute, second)
             .single()
-            .ok_or(nom::Err::Failure(nom::error::Error::new(
-                i,
-                nom::error::ErrorKind::Fail,
-            )))?,
+            .ok_or_else(|| {
+                nom::Err::Failure(nom::error::Error::new(i, nom::error::ErrorKind::Fail))
+            })?,
     };
 
     let result = result + Duration::microseconds(microsecond);
@@ -263,19 +262,17 @@ fn special(i: &str) -> IResult<&str, DateTime<Utc>> {
                 timezone
                     .with_ymd_and_hms(now_date.year(), now_date.month(), now_date.day(), 0, 0, 0)
                     .single()
-                    .ok_or(nom::Err::Failure(nom::error::Error::new(
-                        i,
-                        nom::error::ErrorKind::Fail,
-                    )))?
+                    .ok_or_else(|| {
+                        nom::Err::Failure(nom::error::Error::new(i, nom::error::ErrorKind::Fail))
+                    })?
                     .with_timezone(&Utc)
             }
             _ => Utc
                 .with_ymd_and_hms(now_date.year(), now_date.month(), now_date.day(), 0, 0, 0)
                 .single()
-                .ok_or(nom::Err::Failure(nom::error::Error::new(
-                    i,
-                    nom::error::ErrorKind::Fail,
-                )))?,
+                .ok_or_else(|| {
+                    nom::Err::Failure(nom::error::Error::new(i, nom::error::ErrorKind::Fail))
+                })?,
         };
 
         result = match direction {
@@ -309,7 +306,7 @@ mod tests {
     use crate::config::UnitEntry;
     use chrono::{DateTime, TimeZone, Timelike, Utc};
 
-    fn test_pairs(pair: &Vec<(&str, DateTime<Utc>)>) {
+    fn test_pairs(pair: &[(&str, DateTime<Utc>)]) {
         for each in pair {
             let parse: DateTime<Utc> = UnitEntry::parse_from_str(each.0).unwrap();
             assert_eq!(parse, each.1);

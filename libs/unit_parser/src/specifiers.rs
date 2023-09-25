@@ -21,10 +21,11 @@ static BOOT_ID: Lazy<String> = Lazy::new(|| {
 });
 static MACHINE_ID: Lazy<String> =
     Lazy::new(|| fs::read_to_string("/etc/machine-id").expect("Failed to read machine_id."));
-static CURRENT_UID: Lazy<Uid> = Lazy::new(|| Uid::current());
-static CURRENT_GID: Lazy<Gid> = Lazy::new(|| Gid::current());
+static CURRENT_UID: Lazy<Uid> = Lazy::new(Uid::current);
+static CURRENT_GID: Lazy<Gid> = Lazy::new(Gid::current);
 
 // return Cow?
+/// Resolves a specifier, writes directly to the end of buffer.
 pub(crate) fn resolve(
     result: &mut String,
     specifier: char,
@@ -50,12 +51,10 @@ pub(crate) fn resolve(
         'C' => {
             if context.0 {
                 result.push_str("/var/cache");
+            } else if let Ok(res) = env::var("XDG_CACHE_HOME") {
+                result.push_str(&res);
             } else {
-                if let Ok(res) = env::var("XDG_CACHE_HOME") {
-                    result.push_str(&res);
-                } else {
-                    result.push_str("~/.cache");
-                }
+                result.push_str("~/.cache");
             }
         }
         'd' => {
@@ -66,29 +65,25 @@ pub(crate) fn resolve(
         'E' => {
             if context.0 {
                 result.push_str("/etc");
+            } else if let Ok(res) = env::var("XDG_CONFIG_HOME") {
+                result.push_str(&res);
             } else {
-                if let Ok(res) = env::var("XDG_CONFIG_HOME") {
-                    result.push_str(&res);
-                } else {
-                    result.push_str("~/.config");
-                }
+                result.push_str("~/.config");
             }
         }
         'f' => result.push_str(context.1),
         'g' => {
             if context.0 {
                 result.push_str("root");
-            } else {
-                if let Some(gid) =
-                    Group::from_gid(*CURRENT_GID).expect("Failed to read current group info.")
-                {
-                    result.push_str(&gid.name);
-                }
+            } else if let Some(gid) =
+                Group::from_gid(*CURRENT_GID).expect("Failed to read current group info.")
+            {
+                result.push_str(&gid.name);
             }
         }
         'G' => {
             if context.0 {
-                result.push_str("0");
+                result.push('0');
             } else {
                 result.push_str(&CURRENT_GID.to_string());
             }
@@ -96,12 +91,10 @@ pub(crate) fn resolve(
         'h' => {
             if context.0 {
                 result.push_str("/root");
+            } else if let Ok(res) = env::var("HOME") {
+                result.push_str(&res);
             } else {
-                if let Ok(res) = env::var("HOME") {
-                    result.push_str(&res);
-                } else {
-                    result.push_str("~");
-                }
+                result.push('~');
             }
         }
         'H' => {
@@ -127,7 +120,7 @@ pub(crate) fn resolve(
                     context
                         .1
                         .split('.')
-                        .nth(0)
+                        .next()
                         .unwrap()
                         .split('-')
                         .last()
@@ -143,7 +136,7 @@ pub(crate) fn resolve(
                     context
                         .1
                         .split('.')
-                        .nth(0)
+                        .next()
                         .unwrap()
                         .split('-')
                         .last()
@@ -156,42 +149,40 @@ pub(crate) fn resolve(
                 .nodename()
                 .to_string_lossy()
                 .split('.')
-                .nth(0)
+                .next()
                 .unwrap(),
         ),
         'L' => {
             if context.0 {
                 result.push_str("/var/log");
+            } else if let Ok(res) = env::var("XDG_STATE_HOME") {
+                result.push_str(&res);
+                result.push_str("/log");
             } else {
-                if let Ok(res) = env::var("XDG_STATE_HOME") {
-                    result.push_str(&res);
-                    result.push_str("/log");
-                } else {
-                    result.push_str("~/.local/state/log");
-                }
+                result.push_str("~/.local/state/log");
             }
         }
         'm' => result.push_str(&MACHINE_ID),
         'M' => {
             if let Some(res) = OS_RELEASE.extra.get("IMAGE_ID") {
-                result.push_str(&res)
+                result.push_str(res)
             }
         }
         'n' => result.push_str(&escape(context.1)),
-        'N' => result.push_str(&escape(context.1.split(".").nth(0).unwrap())),
+        'N' => result.push_str(&escape(context.1.split('.').next().unwrap())),
         'o' => result.push_str(&OS_RELEASE.id),
         'p' => {
             if let UnitType::Instance(instance_name, _) = unit_type(context.1)? {
                 result.push_str(&escape(instance_name));
             } else {
-                result.push_str(&escape(context.1.split('.').nth(0).unwrap()));
+                result.push_str(&escape(context.1.split('.').next().unwrap()));
             }
         }
         'P' => {
             if let UnitType::Instance(instance_name, _) = unit_type(context.1)? {
                 result.push_str(instance_name);
             } else {
-                result.push_str(context.1.split('.').nth(0).unwrap());
+                result.push_str(context.1.split('.').next().unwrap());
             }
         }
         'q' => result.push_str(
@@ -199,7 +190,7 @@ pub(crate) fn resolve(
                 .nodename()
                 .to_string_lossy()
                 .split('.')
-                .nth(0)
+                .next()
                 .unwrap(),
         ),
         's' => {
@@ -210,24 +201,20 @@ pub(crate) fn resolve(
         'S' => {
             if context.0 {
                 result.push_str("/var/lib");
+            } else if let Ok(res) = env::var("XDG_STATE_HOME") {
+                result.push_str(&res);
             } else {
-                if let Ok(res) = env::var("XDG_STATE_HOME") {
-                    result.push_str(&res);
-                } else {
-                    result.push_str("~/.local/share");
-                }
+                result.push_str("~/.local/share");
             }
         }
         't' => {
             if context.0 {
                 result.push_str("/run");
+            } else if let Ok(res) = env::var("XDG_RUNTIME_DIR") {
+                result.push_str(&res);
             } else {
-                if let Ok(res) = env::var("XDG_RUNTIME_DIR") {
-                    result.push_str(&res);
-                } else {
-                    result.push_str("run/user/");
-                    result.push_str(&CURRENT_UID.to_string());
-                }
+                result.push_str("run/user/");
+                result.push_str(&CURRENT_UID.to_string());
             }
         }
         'T' => {
@@ -266,17 +253,17 @@ pub(crate) fn resolve(
         'w' => result.push_str(&OS_RELEASE.version_id),
         'W' => {
             if let Some(res) = OS_RELEASE.extra.get("VARIANT_ID") {
-                result.push_str(&res);
+                result.push_str(res);
             }
         }
         'y' => {
             if let Some(res) = context.2.to_str() {
-                result.push_str(&res)
+                result.push_str(res)
             }
         }
         'Y' => {
             if let Some(res) = context.2.parent().expect("Invalid file path.").to_str() {
-                result.push_str(&res)
+                result.push_str(res)
             }
         }
         '%' => result.push('%'),
