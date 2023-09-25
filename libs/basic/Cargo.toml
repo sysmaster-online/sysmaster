@@ -8,21 +8,14 @@ edition = "2021"
 [dependencies]
 constants = { path = "../constants" }
 log = { path = "../log" }
-selinux = { path = "../../libs/selinux", features = ["selinux"], optional = true }
+selinux = { path = "../../libs/selinux", features = [
+    "selinux",
+], optional = true }
 
 bitflags = { version = "1.3.2", optional = true }
 pkg-config = { version = "0.3", optional = true }
 libc = { version = "0.2.140", default-features = false }
-nix = { version = "0.24", default-features = false, features = [
-    #"poll",
-    #"dir",
-    #"resource",
-    #"signal",
-    #"user",
-    #"ioctl",
-    #"socket",
-    #"net",
-] }
+nix = { version = "0.24", default-features = false }
 pathdiff = { version = "0.2.1", optional = true }
 procfs = { version = "0.12.0", default-features = false, optional = true }
 rand = { version = "0.8.5", optional = true }
@@ -32,6 +25,8 @@ snafu = { version = "0.7", features = ["std"], default-features = false }
 tempfile = "3.6.0"
 
 [features]
+default = ["full"]
+
 full = [
     "condition",
     "selinux",
@@ -79,33 +74,35 @@ condition = [
     "cmdline",
     "security",
     "mount",
+    "nix/dir",
+    "nix/user",
 ]
 config = []
 cpu = []
 disk = []
-fd = ["stat"]
+fd = ["stat", "nix/ioctl", "nix/socket"]
 file = []
 fs = ["pathdiff", "rand"]
 host = []
-io = []
+io = ["nix/poll", "nix/signal"]
 machine = []
 memory = []
 mount = []
-naming_scheme = ["bitflags"]
-network = []
+naming_scheme = ["bitflags", "nix/net"]
+network = ["nix/net"]
 os_release = []
 parse = []
-process = ["procfs"]
-rlimit = []
-security = []
+process = ["procfs", "nix/dir", "nix/signal"]
+rlimit = ["nix/resource"]
+security = ["nix/resource", "nix/socket"]
 sensors = []
 show_table = []
-signal = []
-socket = []
+signal = ["nix/signal"]
+socket = ["nix/socket", "nix/net"]
 stat = []
 string = []
-sysfs = []
-unistd = []
+sysfs = ["nix/dir"]
+unistd = ["nix/user"]
 unit_name = []
 uuid = ["bitflags"]
 murmurhash2 = []
