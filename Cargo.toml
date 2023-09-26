@@ -11,7 +11,7 @@ build = "build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [[bin]]
 name = "init"
-path = "init/src/main.rs"
+path = "init/main.rs"
 
 [dependencies]
 log = { version = "=0.4.14", default_features = false, features = ["std"] }
