@@ -19,7 +19,6 @@ use crate::error::{Error, Result};
 use crate::utils::commons::*;
 use basic::parse::parse_mode;
 use basic::unistd::{parse_gid, parse_uid};
-use fnmatch_regex;
 use lazy_static::lazy_static;
 use nix::unistd::{Group, User};
 use regex::Regex;
@@ -448,34 +447,8 @@ impl RuleToken {
         value: String,
         context: (u32, String, String),
     ) -> Result<RuleToken> {
-        let mut match_type = MatchType::Invalid;
         let mut attr_subst_type = SubstituteType::Invalid;
-        let mut value_regex = vec![];
         let (line_number, rule_file, content) = context;
-
-        if r#type <= TokenType::MatchResult {
-            if r#type == TokenType::MatchSubsystem
-                && matches!(value.as_str(), "subsystem" | "bus" | "class")
-            {
-                match_type = MatchType::Subsystem;
-            }
-
-            if r#type < TokenType::MatchTest || r#type == TokenType::MatchResult {
-                // compatible with udev rules
-                for s in value.split('|') {
-                    match fnmatch_regex::glob_to_regex(s) {
-                        Ok(r) => {
-                            value_regex.push(r);
-                        }
-                        Err(_) => {
-                            return Err(Error::RulesLoadError {
-                                msg: "Failed to parse token value to regex.".to_string(),
-                            })
-                        }
-                    }
-                }
-            }
-        }
 
         if matches!(r#type, TokenType::MatchAttr | TokenType::MatchParentsAttr) {
             attr_subst_type = match attr.clone().unwrap_or_default().parse::<SubstituteType>() {
@@ -491,8 +464,6 @@ impl RuleToken {
         Ok(RuleToken {
             r#type,
             op,
-            match_type,
-            value_regex,
             attr_subst_type,
             attr,
             value,

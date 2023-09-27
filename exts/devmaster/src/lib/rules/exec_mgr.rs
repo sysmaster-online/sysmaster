@@ -31,6 +31,7 @@ use basic::{
     unistd::*,
 };
 use device::{Device, DeviceAction};
+use fnmatch_sys::fnmatch;
 use libc::{gid_t, mode_t, uid_t};
 use nix::{
     errno::Errno,
@@ -38,8 +39,15 @@ use nix::{
 };
 use snafu::ResultExt;
 use std::{
-    cell::RefCell, collections::HashMap, fs::OpenOptions, io::Read, os::unix::fs::PermissionsExt,
-    rc::Rc, sync::Arc, sync::RwLock, time::Duration,
+    cell::RefCell,
+    collections::HashMap,
+    fs::OpenOptions,
+    io::Read,
+    os::{raw::c_char, unix::fs::PermissionsExt},
+    rc::Rc,
+    sync::Arc,
+    sync::RwLock,
+    time::Duration,
 };
 
 /// manage processing units
@@ -750,22 +758,12 @@ impl ExecuteManager {
                     }
                 };
 
-                let mut regex: Vec<regex::Regex> = Vec::new();
+                let mut glob_patterns: Vec<String> = vec![];
 
                 // generate regular expression depending on the formatted value
                 for s in value.split('|') {
-                    match fnmatch_regex::glob_to_regex(s) {
-                        Ok(r) => {
-                            regex.push(r);
-                        }
-                        Err(_) => {
-                            log_rule_token!(error, token, "invalid pattern");
-                            return Err(Error::RulesExecuteError {
-                                msg: "Failed to parse token value to regex.".to_string(),
-                                errno: Errno::EINVAL,
-                            });
-                        }
-                    }
+                    let pat = format!("{}\0", s);
+                    glob_patterns.push(pat);
                 }
 
                 let parent = match device.borrow().get_parent() {
@@ -786,11 +784,20 @@ impl ExecuteManager {
                 };
 
                 for (k, v) in &parent.borrow().property_iter() {
+                    let source = format!("{}\0", k);
+
                     // check whether the key of property matches the
                     if !{
                         let mut matched = false;
-                        for r in regex.iter() {
-                            if r.is_match(k) {
+                        for p in glob_patterns.iter() {
+                            if unsafe {
+                                fnmatch(
+                                    p.as_ptr() as *const c_char,
+                                    source.as_ptr() as *const c_char,
+                                    0,
+                                )
+                            } == 0
+                            {
                                 matched = true;
                                 break;
                             }
@@ -1548,9 +1555,38 @@ impl ExecuteManager {
 
 impl RuleToken {
     fn pattern_match(&self, s: &str) -> bool {
+        debug_assert!(self.r#type < TokenType::MatchTest || self.r#type == TokenType::MatchResult);
+
         let mut value_match = false;
-        for regex in self.value_regex.iter() {
-            if regex.is_match(s) {
+
+        /*
+         * fnmatch ffi function requires the raw string pointer as the input parameter, as it is in C language.
+         *
+         * However, C strings commonly end with '\0', while it is not in Rust. This is because Rust
+         * string objects use a field to indicate string length, thus string literals will be arranged
+         * tightly without '\0' as delimiter. Thus transferring normal Rust string to fnmatch ffi function
+         * will append garbled characters.
+         *
+         * To deal with this problem, create a temporary String with '\0' as suffix and transfer
+         * this String to fnmatch.
+         * */
+        let source = format!("{}\0", s);
+
+        for sub in self.value.split('|') {
+            if sub.is_empty() {
+                return (self.op == OperatorType::Nomatch) ^ (s.is_empty());
+            }
+
+            /* As mentioned above. */
+            let pattern = format!("{}\0", sub);
+
+            if 0 == unsafe {
+                fnmatch_sys::fnmatch(
+                    pattern.as_ptr() as *const c_char,
+                    source.as_ptr() as *const c_char,
+                    0,
+                )
+            } {
                 value_match = true;
                 break;
             }

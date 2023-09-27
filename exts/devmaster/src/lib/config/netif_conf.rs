@@ -14,10 +14,10 @@
 //!
 
 use device::Device;
+use fnmatch_sys::fnmatch;
 use lazy_static::lazy_static;
-use regex::Regex;
 use serde::Deserialize;
-use std::{cell::RefCell, path::Path, rc::Rc};
+use std::{cell::RefCell, os::raw::c_char, path::Path, rc::Rc};
 
 use crate::log_dev;
 
@@ -61,20 +61,20 @@ pub(crate) struct Link {
 impl NetifConfigData {
     pub(crate) fn match_netif(&self, netif: Rc<RefCell<Device>>) -> bool {
         if let Some(original_name) = &self.Match.OriginalName {
-            let regex = match fnmatch_regex::glob_to_regex(original_name) {
-                Ok(r) => r,
-                Err(_) => match Regex::new(original_name) {
-                    Ok(r) => r,
-                    Err(_) => {
-                        log::error!("Invalid OriginalName '{}'", original_name);
-                        return false;
-                    }
-                },
-            };
+            let pattern = format!("{}\0", original_name);
 
             match netif.borrow().get_sysname() {
                 Ok(sysname) => {
-                    if !regex.is_match(&sysname) {
+                    let source = format!("{}\0", sysname);
+
+                    if unsafe {
+                        fnmatch(
+                            pattern.as_ptr() as *const c_char,
+                            source.as_ptr() as *const c_char,
+                            0,
+                        )
+                    } != 0
+                    {
                         return false;
                     }
                 }

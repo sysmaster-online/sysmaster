@@ -439,7 +439,7 @@ dependencies = [
  "confique",
  "device",
  "event",
- "fnmatch-regex",
+ "fnmatch-sys",
  "futures",
  "glob",
  "hwdb",
@@ -589,6 +589,15 @@ dependencies = [
  "itertools",
  "quick-error",
  "regex",
+]
+
+[[package]]
+name = "fnmatch-sys"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2669e8526f74ef00ccd2011b1e357f6eebcea2925b28e67fcedd1740196f45b3"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

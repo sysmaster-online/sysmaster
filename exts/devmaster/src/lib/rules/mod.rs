@@ -113,12 +113,9 @@ pub struct RuleLine {
 ///     attr: [^\{\}]+
 ///     value: [^\"]+
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct RuleToken {
     r#type: TokenType,
     op: OperatorType,
-    match_type: MatchType,
-    value_regex: Vec<regex::Regex>,
     attr_subst_type: SubstituteType,
     attr: Option<String>,
     value: String,
