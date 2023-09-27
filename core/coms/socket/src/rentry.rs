@@ -60,6 +60,8 @@ pub(super) struct SectionSocket {
 
     #[config(default = false)]
     pub Accept: bool,
+    #[config(default = false)]
+    pub FlushPending: bool,
     pub Service: Option<String>,
     pub ReceiveBuffer: Option<u64>,
     pub SendBuffer: Option<u64>,

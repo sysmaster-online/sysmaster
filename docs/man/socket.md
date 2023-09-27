@@ -8,6 +8,14 @@
 
 **注意：** 为了避免`;`解析为命令参数，`;`作为分隔符使用时需要在前后添加空格。详情参考：[service说明文档中对应说明](./service.md)
 
+## FlushPending
+
+* 类型：布尔值
+
+该配置仅在`Accept`配置为`false`时有效，决定在socket激活对应的service前，是否清空socket缓冲区。默认为false。
+
+**注意：** 如果配置为`flase`，而激活的service又不主动去读取socket缓冲区的内容，会导致service将持续被激活。
+
 ## ListenStream、ListenDatagram、ListenSequentialPacket
 
 配置SOCK_STREAM、SOCK_DGRAM套接子的监听地址, 支持以下的配置格式。

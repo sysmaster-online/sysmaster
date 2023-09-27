@@ -344,8 +344,9 @@ impl SocketMng {
 
     pub(crate) fn enter_listening(&self) {
         log::debug!("enter start listening state");
-        /* Seem logic as systemd's socket has configured FlushPending=yes */
-        if !self.config.config_data().borrow().Socket.Accept {
+        if !self.config.config_data().borrow().Socket.Accept
+            && self.config.config_data().borrow().Socket.FlushPending
+        {
             self.flush_ports();
         }
 
