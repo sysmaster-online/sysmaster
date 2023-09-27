@@ -122,6 +122,11 @@ impl UnitFileData {
 
     pub(self) fn build_id_map(&mut self, name: String, has_loaded: bool) {
         if !has_loaded || self.lookup_paths_updated() {
+            /* Forget the old thing, because some config files may have been deleted. */
+            self.unit_id_fragment.remove(&name);
+            self.unit_wants_symlink_units.remove(&name);
+            self.unit_requires_symlink_units.remove(&name);
+
             self.build_id_fragment(&name);
             self.build_id_dropin(&name, "wants".to_string());
             self.build_id_dropin(&name, "requires".to_string());
@@ -239,6 +244,7 @@ impl UnitFileData {
                 Some(v) => v,
             };
             if v.is_empty() && pathbuf_fragment.is_empty() {
+                /* unit is masked */
                 return;
             }
             pathbuf_fragment.append(&mut v);
