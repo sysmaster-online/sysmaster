@@ -160,19 +160,21 @@ impl ExecuterAction for CommandActionMgr {
     }
 
     fn disable(&self, unit_file: &str) -> Result<(), Self::Error> {
-        self.um.disable_unit(unit_file)
+        self.um
+            .disable_unit(unit_file)
+            .map(|_| self.daemon_reload())
     }
 
     fn enable(&self, unit_file: &str) -> Result<(), Self::Error> {
-        self.um.enable_unit(unit_file)
+        self.um.enable_unit(unit_file).map(|_| self.daemon_reload())
     }
 
     fn mask(&self, unit_file: &str) -> Result<(), Self::Error> {
-        self.um.mask_unit(unit_file)
+        self.um.mask_unit(unit_file).map(|_| self.daemon_reload())
     }
 
     fn unmask(&self, unit_file: &str) -> Result<(), Self::Error> {
-        self.um.unmask_unit(unit_file)
+        self.um.unmask_unit(unit_file).map(|_| self.daemon_reload())
     }
 
     fn daemon_reload(&self) {
