@@ -78,7 +78,7 @@ function test02() {
     expect_eq $? 0 || return 1
     check_status base.service inactive
     expect_eq $? 0 || return 1
-    check_log ${SYSMST_LOG} 'Starting failed the unit condition test failed'
+    check_log ${SYSMST_LOG} ${cond_fail_log}
     expect_eq $? 0
     check_status requires.service active
     expect_eq $? 0 || return 1
@@ -90,7 +90,7 @@ function test02() {
     expect_eq $? 0 || return 1
     check_status base.service inactive
     expect_eq $? 0 || return 1
-    check_log ${SYSMST_LOG} 'Starting failed the unit condition test failed'
+    check_log ${SYSMST_LOG} ${cond_fail_log}
     expect_eq $? 0
     check_status requires.service active
     expect_eq $? 0 || return 1
@@ -148,7 +148,7 @@ function test02() {
     expect_eq $? 0 || return 1
     check_status base.service inactive
     expect_eq $? 0 || return 1
-    check_log ${SYSMST_LOG} 'Starting failed the unit condition test failed'
+    check_log ${SYSMST_LOG} ${cond_fail_log}
     expect_eq $? 0
     check_status bindsto.service inactive
     expect_eq $? 0 || return 1
@@ -160,7 +160,7 @@ function test02() {
     expect_eq $? 0 || return 1
     check_status base.service inactive
     expect_eq $? 0 || return 1
-    check_log ${SYSMST_LOG} 'Starting failed the unit condition test failed'
+    check_log ${SYSMST_LOG} ${cond_fail_log}
     expect_eq $? 0
     check_status bindsto.service inactive
     expect_eq $? 0 || return 1
@@ -252,7 +252,7 @@ function test04() {
     sed -i "/Conflicts=/a Requires=\"base.service\"" ${SYSMST_LIB_PATH}/conflicts.service
     sctl daemon-reload
     sctl restart conflicts.service &> log
-    expect_eq $? 1
+    expect_eq $? 53
     cat log
     grep 'Failed to restart .*: Conflict' log
     expect_eq $? 0

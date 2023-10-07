@@ -17,7 +17,7 @@ export RELIAB_SWITCH='switch.debug'
 export RELIAB_CLR='clear.debug'
 export init_pid=''
 export sysmaster_pid=''
-export cond_fail_log='Starting failed .* condition test failed'
+export cond_fail_log='The condition check failed, not starting'
 export asst_fail_log='Starting failed .* assert test failed'
 
 # ================== log function ==================

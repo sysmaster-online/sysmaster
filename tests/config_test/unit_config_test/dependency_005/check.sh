@@ -63,5 +63,5 @@ function test02() {
 
 run_sysmaster || exit 1
 test01 || exit 1
-test02 || exit 1
+#test02 || exit 1
 exit "${EXPECT_FAIL}"

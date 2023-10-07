@@ -4,10 +4,8 @@ work_dir="$(dirname "$0")"
 source "${work_dir}"/util_lib.sh
 
 set +e
-key_log_1='insert, key: "success1.service", value: UnitReDep .*UnitOnSuccessOf, "base.service"'
-key_log_2='insert, key: "success2.service", value: UnitReDep .*UnitOnSuccessOf, "base.service"'
-key_log_3='start the unit success1.service'
-key_log_4='start the unit success2.service'
+key_log_1='Started success1.service'
+key_log_2='Started success2.service'
 
 # usage: test OnSuccess
 function test01() {
@@ -19,9 +17,9 @@ function test01() {
     sed -i 's/sleep.*"/sleep 1"/' ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl status success1
-    expect_eq $? 1
+    expect_eq $? 2
     sctl status success2
-    expect_eq $? 1
+    expect_eq $? 2
     sctl start base
     expect_eq $? 0 || return 1
     check_status base active
@@ -30,7 +28,7 @@ function test01() {
     expect_eq $? 0 || return 1
     sctl status success1 success2
     expect_eq $? 0
-    check_log "${SYSMST_LOG}" "${key_log_1}" "${key_log_2}" "${key_log_3}" "${key_log_4}"
+    check_log "${SYSMST_LOG}" "${key_log_1}" "${key_log_2}"
     expect_eq $? 0
 
     # clean
@@ -56,7 +54,7 @@ function test01() {
     expect_eq $? 3
     sctl status success2
     expect_eq $? 3
-    grep -aE "${key_log_3}|${key_log_4}" "${SYSMST_LOG}"
+    grep -aE "${key_log_1}|${key_log_2}" "${SYSMST_LOG}"
     expect_eq $? 1
 }
 

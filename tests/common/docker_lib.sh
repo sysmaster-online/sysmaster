@@ -46,7 +46,7 @@ function build_base_img() {
     cp -arf /etc/yum.repos.d "${TMP_DIR}"
 
     pushd "${TMP_DIR}"
-    if yum list sysmaster; then
+    if yum list sysmaster && [ -z $1 ]; then
         cat << EOF > Dockerfile
 FROM ${BASE_IMG} as ${SYSMST_BASE_IMG}
 

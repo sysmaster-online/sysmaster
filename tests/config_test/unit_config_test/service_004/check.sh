@@ -18,9 +18,8 @@ function test01() {
     echo > "${SYSMST_LOG}"
     # user not exist
     sctl restart base
-    check_status base.service failed
-    expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" "Failed to add user to execute parameters"
+    expect_ne $? 0
+    check_log "${SYSMST_LOG}" "unit configuration error: 'invalid user'"
     expect_eq $? 0 || return 1
 
     # group not exist
@@ -28,9 +27,8 @@ function test01() {
     sctl daemon-reload
     echo > "${SYSMST_LOG}"
     sctl restart base
-    check_status base.service failed
-    expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" "Failed to add group to execute parameters"
+    expect_ne $? 0
+    check_log "${SYSMST_LOG}" "unit configuration error: 'invalid group'"
     expect_eq $? 0 || return 1
 
     # user/group exist

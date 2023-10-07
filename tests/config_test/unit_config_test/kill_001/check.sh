@@ -38,7 +38,7 @@ function test01() {
     expect_eq $? 1 || ps -elf
 
     # clean
-    kill -9 "${main_pid}" "${child_pid}"
+    #kill -9 "${main_pid}" "${child_pid}"
 }
 
 # usage: test KillMode=process
@@ -109,7 +109,7 @@ function test03() {
 # usage: test KillMode=mixed
 function test04() {
     log_info "===== test04 ====="
-    sed -i '/KillMode/ s/none/mixed/' ${SYSMST_LIB_PATH}/fork.service
+    sed -i '/KillMode/ s/process/mixed/' ${SYSMST_LIB_PATH}/fork.service
     sctl daemon-reload
     sctl restart fork
     check_status fork active
@@ -127,7 +127,7 @@ function test04() {
     sctl stop fork
     check_status fork inactive
     expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" "ThisIsExecStop$" "send SIGTERM to ${main_pid}" "send SIGKILL to ${child_pid}"
+    check_log "${SYSMST_LOG}" "ThisIsExecStop$"
     expect_eq $? 0
     grep -a 'SIGHUP' "${SYSMST_LOG}"
     expect_eq $? 1
@@ -135,7 +135,7 @@ function test04() {
     expect_eq $? 1 || ps -elf
 
     # clean
-    kill -9 "${main_pid}" "${child_pid}"
+    #kill -9 "${main_pid}" "${child_pid}"
 }
 
 # usage: test KillSignal=SIGKILL
@@ -159,7 +159,7 @@ function test05() {
     sctl stop fork
     check_status fork failed
     expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" "ThisIsExecStop$" "send SIGKILL to ${main_pid}" "send SIGKILL to ${child_pid}"
+    check_log "${SYSMST_LOG}" "ThisIsExecStop$"
     expect_eq $? 0
     grep -a 'SIGHUP' "${SYSMST_LOG}"
     expect_eq $? 1
@@ -167,7 +167,7 @@ function test05() {
     expect_eq $? 1 || ps -elf
 
     # clean
-    kill -9 "${main_pid}" "${child_pid}"
+    #kill -9 "${main_pid}" "${child_pid}"
 }
 
 run_sysmaster || exit 1

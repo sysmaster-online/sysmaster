@@ -189,10 +189,10 @@ function test03() {
     echo > "${SYSMST_LOG}"
     sctl daemon-reload
     sctl restart base.socket
-    expect_eq $? 1
+    expect_eq $? 0
     check_status base.socket failed
     expect_eq $? 0 || return 1
-    check_log "${SYSMST_LOG}" 'failed: OtherError asda'
+    check_log "${SYSMST_LOG}" 'ESOCKTNOSUPPORT: Socket type not supported'
     expect_eq $? 0
 }
 

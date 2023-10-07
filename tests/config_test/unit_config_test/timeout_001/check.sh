@@ -164,6 +164,7 @@ function test03() {
         cp -arf "${work_dir}"/tmp_units/"${cmd}".target ${SYSMST_LIB_PATH} || return 1
         sed -i "s/JobTimeoutAction=.*/JobTimeoutAction=\"${cmd}\"/" ${SYSMST_LIB_PATH}/base.service
         sctl daemon-reload
+        sleep 2
         echo > "${SYSMST_LOG}"
         sctl start base
         sleep 0.5

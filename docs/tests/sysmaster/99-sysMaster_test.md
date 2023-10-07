@@ -4,11 +4,12 @@
 
 1. 基本功能：支持x86_64、aarch64；
 2. 场景：支持容器、虚拟机场景
+
 # 容器场景下测试
 
 ## 搭建测试环境
 
-###  安装构建工具
+### 安装构建工具
 
 下载仓库代码及安装工具链, 生成的二进制程序位于 `target`下.
 
@@ -27,9 +28,9 @@ sh ci/01-pre-commit.sh
 cargo build --all --release
 ```
 
-###  部署容器测试环境
+### 部署容器测试环境
 
-> 注: 可通过 `cargo test`执行集成测试用例时会自动化部署，无需手动执行。
+如果需要使用本地构建的`sysmaster`进行测试，则使用以下步骤构建容器测试环境。
 
 - 归档二进制，归档后的二进制位于 `target/install`目录下，用于构建容器镜像.
 
@@ -45,54 +46,12 @@ yum install -y docker
 systemctl restart docker
 ```
 
-- 加载基础容器镜像
+- 创建容器
+
+此脚本使用本地编译的sysmaster来创建容器。
 
 ```bash
-OS_VER="openEuler-22.03-LTS-SP1"
-
-DOCKER_IMG_URL="https://mirrors.nju.edu.cn/openeuler/${OS_VER}/docker_img/$(arch)/"
-
-DOCKER_TAR="openEuler-docker.$(arch).tar"
-
-BASE_IMG="${OS_VER,,}"
-
-SYSMST_BASE_IMG="sysmaster_base-${BASE_IMG}"
-
-TMP_DIR="$(mktemp -d /tmp/test_XXXX)"
-
-wget -P "${TMP_DIR}" "${DOCKER_IMG_URL}/${DOCKER_TAR}".xz
-
-xz -d "${TMP_DIR}"/"${DOCKER_TAR}".xz
-
-docker load --input "${TMP_DIR}"/"${DOCKER_TAR}"
-
-docker images
-```
-
-- 构建测试镜像
-
-```bash
-pushd "${TMP_DIR}"
-
-cat << EOF > Dockerfile
-
-FROM ${BASE_IMG} as ${SYSMST_BASE_IMG}
-
-RUN rm -rf /etc/yum.repos.d && mkdir /etc/yum.repos.d
-COPY yum.repos.d /etc/yum.repos.d/
-RUN yum install -y util-linux shadow sudo passwd net-tools iproute nmap
-COPY install/usr/bin/sctl /usr/bin/
-RUN mkdir /usr/lib/sysmaster /etc/sysmaster /usr/lib/sysmaster/system
-COPY install/usr/lib/sysmaster /usr/lib/sysmaster/
-COPY install/etc/sysmaster /etc/sysmaster/
-RUN sed -i '/LogTarget/ s/=.*/="console-syslog"/' /etc/sysmaster/system.conf
-EOF
-
-cat Dockerfile
-
-docker build -t "${SYSMST_BASE_IMG}:latest" .
-
-popd
+sh tests/setup_docker.sh
 ```
 
 ## 基本功能测试
@@ -131,80 +90,215 @@ popd
 
 ### 测试项
 
-可通过执行cargo test命令执行对应的测试用例
+通过执行`cargo test`命令运行对应的测试用例，首次执行测试用例会自动构建容器测试环境，无需手动构建。测试的是当前`repo`仓中的`sysmaster`，如果需要测试本地`sysmaster`，可以参照上文[部署容器测试环境](#部署容器测试环境)
 
-#### docker_config_test_action_001
+#### docker_config_test_dependency_001测试项
+
 - 测试内容
-测试服务失败后Action是否执行
+测试服务启动失败后执行的操作
 - 配置项
-SuccessAction
-FailureAction
+`ConditionPathExists`
 - 测试步骤
 执行以下命令
+
+```bash
+cargo test --test docker_config_test -- docker_config_test_dependency_001 --exact --nocapture --ignored
+```
+
+#### docker_config_test_dependency_003测试项
+
+- 测试内容
+测试服务启动失败后执行的操作
+- 配置项
+`OnFailure`
+- 测试步骤
+执行以下命令
+
+```bash
+cargo test --test docker_config_test -- docker_config_test_dependency_003 --exact --nocapture --ignored
+```
+
+#### docker_config_test_dependency_004测试项
+
+- 测试内容
+测试服务启动成功后执行的操作
+- 配置项
+`OnSuccess`
+- 测试步骤
+执行以下命令
+
+```bash
+cargo test --test docker_config_test -- docker_config_test_dependency_004 --exact --nocapture --ignored
+```
+
+#### docker_config_test_dependency_005测试项
+
+- 测试内容
+测试服务执行的顺序
+- 配置项
+`Before`
+`After`
+- 测试步骤
+执行以下命令
+
+```bash
+cargo test --test docker_config_test -- docker_config_test_dependency_005 --exact --nocapture --ignored
+```
+
+#### docker_config_test_action_001测试项
+
+- 测试内容
+测试服务失败后`Action`是否执行
+- 配置项
+`SuccessAction`
+`FailureAction`
+- 测试步骤
+执行以下命令
+
 ```bash
 cargo test --test docker_config_test -- docker_config_test_action_001 --exact --nocapture --ignored
 ```
+
 - 测试结果
 
-####  docker_config_test_condition_001
+#### docker_config_test_condition_001测试项
+
 - 测试内容
 测试服务的运行条件
 - 配置项
-ConditionPathExists
-AssertPathExists
-ConditionPathIsReadWrite
-AssertPathIsReadWrite
-ConditionDirectoryNotEmpty
-ConditionFileIsExecutable
-ConditionPathExistsGlob
-ConditionPathIsDirectory
-ConditionPathIsMountPoint
-ConditionPathIsSymbolicLink
+`ConditionPathExists`
+`AssertPathExists`
+`ConditionPathIsReadWrite`
+`AssertPathIsReadWrite`
+`ConditionDirectoryNotEmpty`
+`ConditionFileIsExecutable`
+`ConditionPathExistsGlob`
+`ConditionPathIsDirectory`
+`ConditionPathIsMountPoint`
+`ConditionPathIsSymbolicLink`
 - 测试步骤
 执行以下命令
-```
+
+```bash
 cargo test --test docker_config_test -- docker_config_test_condition_001 --exact --nocapture --ignored
 ```
+
 - 测试结果
 
-#### docker_config_test_condition_003
+#### docker_config_test_condition_003测试项
+
 - 测试内容
-测试检测条件类 Condition
+测试检测条件类 `Condition`
 - 配置项
-ConditionCapability
-ConditionKernelCommandLine
-ConditionSecurity
+`ConditionCapability`
+`ConditionKernelCommandLine`
+`ConditionSecurity`
 - 测试步骤
 执行以下命令
-```
+
+```bash
 cargo test --test docker_config_test -- docker_config_test_condition_003 --exact --nocapture --ignored
 ```
+
 - 测试结果
 
-#### docker_config_test_service_001
+#### docker_config_test_action_001测试项
+
 - 测试内容
 - 配置项
-Description
-Documentation
-RemainAfterExit
-DefaultDependencies
+`SuccessAction`
+`FailureAction`
 - 测试步骤
 执行以下命令
+
+```bash
+cargo test --test docker_config_test -- docker_config_test_action_001 --exact --nocapture --ignored
 ```
+
+#### docker_config_test_timeout_001测试项
+
+- 测试内容
+- 配置项
+`JobTimeoutSec`
+`JobTimeoutAction`
+- 测试步骤
+执行以下命令
+
+```bash
+cargo test --test docker_config_test -- docker_config_test_timeout_001 --exact --nocapture --ignored
+```
+
+#### docker_config_test_service_001测试项
+
+- 测试内容
+- 配置项
+`Description`
+`Documentation`
+`RemainAfterExit`
+`DefaultDependencies`
+- 测试步骤
+执行以下命令
+
+```bash
 cargo test --test docker_config_test -- docker_config_test_service_001 --exact --nocapture --ignored
 ```
+
 - 测试结果
 
-#### docker_config_test_service_002
+#### docker_config_test_service_002测试项
+
 - 测试内容
 - 配置项
-Type=foring
-PIDFile
+`Type=foring`
+`PIDFile`
 - 测试步骤
 执行以下命令
-```
+
+```bash
 cargo test --test docker_config_test -- docker_config_test_service_002 --exact --nocapture --ignored
 ```
+
+#### docker_config_test_service_004测试项
+
+- 测试内容
+- 配置项
+`User`
+`Group`
+`UMask`
+- 测试步骤
+执行以下命令
+
+```bash
+cargo test --test docker_config_test -- docker_config_test_service_004 --exact --nocapture --ignored
+```
+
+#### docker_config_test_kill_001测试项
+
+- 测试内容
+- 配置项
+`KillMode`
+- 测试步骤
+执行以下命令
+
+```bash
+cargo test --test docker_config_test -- docker_config_test_kill_001 --exact --nocapture --ignored
+```
+
+#### docker_config_test_listen_001测试项
+
+- 测试内容
+- 配置项
+`ListenDatagram`
+`ListenStream`
+`ListenSequentialPacket`
+`ListenNetlink`
+- 测试步骤
+执行以下命令
+
+```bash
+cargo test --test docker_config_test -- docker_config_test_listen_001 --exact --nocapture --ignored
+```
+
 - 测试结果
 
 # 虚拟机场景下测试
@@ -212,6 +306,7 @@ cargo test --test docker_config_test -- docker_config_test_service_002 --exact -
 ## 搭建测试环境
 
 在编译完成后，进入源码根目录，使用安装脚本install_sysmaster.sh将sysmaster的二进制文件、系统服务、配置文件等安装到系统中
+
 ```bash
 # 安装sysmaster
 sh -x tools/run_with_vm/install_sysmaster.sh release
@@ -224,25 +319,31 @@ sh -x tools/run_with_vm/install_sysmaster.sh release
 ### 测试项
 
 #### 登录功能
+
 - 测试内容
 此测试项主要测试能否将sysmaster做为1号进程，并运行用户通过tty1及ssh进行登录
 - 测试步骤
-1. 参考http://sysmaster.online/use/01-run%20sysmaster%20with%20vm/#sysmaster 搭建环境
+
+1. 参考<http://sysmaster.online/use/01-run%20sysmaster%20with%20vm/#sysmaster> 搭建环境
 2. 重启虚拟机，并以新启动项运行
 3. 切换至tty1登录，通过ssh登录
+
 - 测试结果
 可以成功登录
 
 #### service_001
+
 - 测试内容
 - 配置项
-Description
-Documentation
-RemainAfterExit
-DefaultDependencies
+`Description`
+`Documentation`
+`RemainAfterExit`
+`DefaultDependencies`
 - 测试步骤
 执行以下命令
-```
+
+```bash
 cargo test --test vm_config_test -- service_001 --exact --nocapture --ignored
 ```
+
 - 测试结果
