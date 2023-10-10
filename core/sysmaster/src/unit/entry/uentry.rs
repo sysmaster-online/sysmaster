@@ -812,7 +812,6 @@ mod tests {
     use basic::fs_util::LookupPaths;
     use core::rel::{ReliConf, Reliability};
     use core::unit::UnitType;
-    use log::logger;
     use std::rc::Rc;
 
     use crate::{
@@ -820,7 +819,7 @@ mod tests {
         unit::util::{self, UnitFile},
     };
     fn unit_init() -> Rc<Unit> {
-        logger::init_log_to_console("unit_init", log::Level::Trace);
+        log::init_log_to_console("unit_init", log::Level::Trace);
         let reli = Rc::new(Reliability::new(
             ReliConf::new().set_max_dbs(RELI_HISTORY_MAX_DBS),
         ));

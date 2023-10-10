@@ -421,7 +421,6 @@ mod tests {
     use core::rel::{ReliConf, Reliability};
     use core::unit::UnitRelations;
     use event::Events;
-    use log::logger;
 
     #[test]
     fn jt_api_expand_check() {}
@@ -719,7 +718,7 @@ mod tests {
         rentryr: &Rc<UnitRe>,
         name: &str,
     ) -> Rc<UnitX> {
-        logger::init_log_to_console("create_unit", log::Level::Trace);
+        log::init_log_to_console("create_unit", log::Level::Trace);
         log::info!("test");
         let unit = test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name);
         unit.load().expect("load error");

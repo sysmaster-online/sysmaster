@@ -15,7 +15,7 @@
 
 use crate::{config::*, error::*, framework::*, rules::*};
 use event::*;
-use log::logger::init_log;
+use log::init_log;
 use std::{
     cell::RefCell,
     fs::create_dir_all,

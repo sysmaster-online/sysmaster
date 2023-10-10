@@ -22,15 +22,11 @@ use std::{
     },
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, AtomicU8, Ordering},
+        atomic::{AtomicBool, Ordering},
         Mutex,
     },
 };
 
-pub use crate::inner::Level;
-pub use crate::inner::{debug, error, info, trace, warn};
-
-static mut LOG_LEVEL: AtomicU8 = AtomicU8::new(4);
 static mut OPEN_WHEN_NEEDED: AtomicBool = AtomicBool::new(false);
 
 /// Logger instance should implement `ReInit` too.
@@ -528,6 +524,61 @@ impl FileLogger {
     }
 }
 
+struct KmsgLogger {
+    kmsg: Mutex<File>,
+}
+
+impl KmsgLogger {
+    pub fn new() -> Result<Self, Error> {
+        Ok(KmsgLogger {
+            kmsg: Mutex::new(OpenOptions::new().write(true).open("/dev/kmsg")?),
+        })
+    }
+}
+
+impl ReInit for KmsgLogger {
+    fn reinit(&self) {}
+}
+
+impl log::Log for KmsgLogger {
+    fn enabled(&self, _: &log::Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &log::Record) {
+        if record.level() > crate::max_level() {
+            return;
+        }
+
+        let level: u8 = match record.level() {
+            crate::Level::Error => 3,
+            crate::Level::Warn => 4,
+            crate::Level::Info => 5,
+            crate::Level::Debug => 6,
+            crate::Level::Trace => 7,
+        };
+
+        let mut buf = Vec::new();
+        if writeln!(
+            buf,
+            "<{}>{}[{}]: {}",
+            level,
+            record.target(),
+            unsafe { ::libc::getpid() },
+            record.args()
+        )
+        .is_ok()
+        {
+            if let Ok(mut kmsg) = self.kmsg.lock() {
+                let _ = kmsg.write(&buf);
+                let _ = kmsg.flush();
+            }
+        }
+    }
+
+    fn flush(&self) {}
+}
+
 /// Collect different kinds of loggers together that implements `ReInit` trait.
 ///
 /// Include: SysLogger, ConsoleLogger, FileLogger
@@ -573,6 +624,18 @@ impl CombinedLogger {
     }
 }
 
+/// Set the `OPEN_WHEN_NEEDED` flag.
+pub fn set_open_when_needed(val: bool) {
+    unsafe {
+        OPEN_WHEN_NEEDED.store(val, Ordering::Release);
+    }
+}
+
+/// Get the `OPEN_WHEN_NEEDED` flag.
+pub fn get_open_when_needed() -> bool {
+    unsafe { OPEN_WHEN_NEEDED.load(Ordering::Acquire) }
+}
+
 /// Initialize the global static logger instance.
 /// Available log `targets` include `file`, `syslog`, `console`.
 /// Arguments of `file_*` and `open_when_needed` only take effect on `file` target.
@@ -590,21 +653,14 @@ impl CombinedLogger {
 /// * `open_when_needed` - If true, open the logger file just when logging messages.
 pub fn init_log(
     name: &str,
-    level: Level,
+    level: crate::Level,
     targets: Vec<&str>,
     file_path: &str,
     file_size: u32,
     file_number: u32,
     open_when_needed: bool,
 ) {
-    let level_num: u8 = match level {
-        Level::Error => 1,
-        Level::Warn => 2,
-        Level::Info => 3,
-        Level::Debug => 4,
-        Level::Trace => 5,
-    };
-    crate::inner::set_max_level(level);
+    crate::set_max_level(level.to_level_filter());
 
     let mut combined_loggers = CombinedLogger::new();
 
@@ -622,7 +678,7 @@ pub fn init_log(
                 ) {
                     Ok(logger) => Box::new(logger) as Box<dyn ReInit>,
                     Err(e) => {
-                        eprint!(
+                        eprintln!(
                             "{} failed to create '{}' file logger: {:?}",
                             name, file_path, e
                         );
@@ -630,6 +686,13 @@ pub fn init_log(
                     }
                 }
             }
+            "kmsg" => match KmsgLogger::new() {
+                Ok(kmsg) => Box::new(kmsg) as Box<dyn ReInit>,
+                Err(e) => {
+                    eprintln!("Failed to open /dev/kmsg: {:?}", e);
+                    continue;
+                }
+            },
             _ => {
                 eprintln!("{}: log target '{}' is strange, ignoring.", name, target);
                 continue;
@@ -648,83 +711,5 @@ pub fn init_log(
         return;
     }
 
-    set_log_level(level_num);
     set_open_when_needed(open_when_needed);
-}
-
-/// Reinit the logger based on the previous configuration
-pub fn reinit() {
-    super::inner::reinit();
-}
-
-/// Initialize console and syslog logger.
-pub fn init_log_to_console(name: &str, level: Level) {
-    init_log(name, level, vec!["console"], "", 0, 0, false);
-}
-
-/// Initialize console and syslog logger.
-pub fn init_log_to_console_syslog(name: &str, level: Level) {
-    init_log(name, level, vec!["console", "syslog"], "", 0, 0, false);
-}
-
-/// Initialize console and syslog logger.
-pub fn init_log_to_file(
-    name: &str,
-    level: Level,
-    file_path: &str,
-    file_size: u32,
-    file_number: u32,
-    open_when_needed: bool,
-) {
-    init_log(
-        name,
-        level,
-        vec!["file"],
-        file_path,
-        file_size,
-        file_number,
-        open_when_needed,
-    );
-}
-
-/// Set the `OPEN_WHEN_NEEDED` flag.
-pub fn set_open_when_needed(val: bool) {
-    unsafe {
-        OPEN_WHEN_NEEDED.store(val, Ordering::Release);
-    }
-}
-
-/// Get the `OPEN_WHEN_NEEDED` flag.
-pub fn get_open_when_needed() -> bool {
-    unsafe { OPEN_WHEN_NEEDED.load(Ordering::Acquire) }
-}
-
-/// Set the `LOG_LEVEL`.
-pub fn set_log_level(level: u8) {
-    unsafe {
-        LOG_LEVEL.store(level, Ordering::Release);
-    }
-}
-
-/// Get the `LOG_LEVEL`.
-pub fn get_log_level() -> u8 {
-    unsafe { LOG_LEVEL.load(Ordering::Acquire) }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_init_log_to_console() {
-        init_log("test", Level::Debug, vec!["console"], "", 0, 0, false);
-        crate::error!("hello, error!");
-        crate::inner::set_max_level(Level::Info);
-        crate::info!("hello, info!"); /* Won't print */
-        crate::debug!("hello debug!");
-        init_log("test", Level::Debug, vec!["syslog"], "", 0, 0, false);
-        crate::debug!("hello debug2!"); /* Only print in the syslog */
-        reinit();
-        crate::debug!("hello debug3!"); /* Only print in the syslog */
-    }
 }

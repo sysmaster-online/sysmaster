@@ -87,7 +87,7 @@ fn main() -> Result<()> {
 
     let system = Mode::System;
     let manager_config = Rc::new(RefCell::new(ManagerConfig::new(&system)));
-    log::logger::init_log(
+    log::init_log(
         "sysmaster",
         Level::from_str(&manager_config.borrow().LogLevel).unwrap(),
         manager_config

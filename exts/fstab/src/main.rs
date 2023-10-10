@@ -143,7 +143,7 @@ fn watch_devices(fstab_items: &[FSTabItem]) -> (Inotify, HashSet<String>) {
 }
 
 fn main() {
-    log::logger::init_log_to_console("fstab", log::Level::Info);
+    log::init_log_to_console("fstab", log::Level::Info);
     let mut fstab_items: Vec<FSTabItem> = fstab_item::parse(FSTAB_PATH);
 
     // inotify: monitor, watch_set: what we care.

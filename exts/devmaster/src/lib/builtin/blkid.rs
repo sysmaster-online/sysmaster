@@ -499,13 +499,12 @@ impl Builtin for Blkid {
 mod test {
     use super::*;
     use device::Device;
-    use log::logger;
     use std::path;
 
     #[test]
     #[ignore]
     fn test_builtin_blkid() {
-        logger::init_log(
+        log::init_log(
             "test_builtin_blkid",
             log::Level::Debug,
             vec!["console"],

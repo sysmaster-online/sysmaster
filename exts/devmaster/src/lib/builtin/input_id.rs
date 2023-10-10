@@ -741,11 +741,10 @@ mod tests {
     use super::InputId;
     use crate::{builtin::Builtin, rules::exec_unit::ExecuteUnit};
     use device::device_enumerator::DeviceEnumerator;
-    use log::logger;
 
     #[test]
     fn test_builtin_input_id() {
-        logger::init_log_to_console_syslog("test_builtin_input_id", log::Level::Debug);
+        log::init_log_to_console_syslog("test_builtin_input_id", log::Level::Debug);
 
         let mut enumerator = DeviceEnumerator::new();
 

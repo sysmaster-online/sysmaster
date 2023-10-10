@@ -135,7 +135,7 @@ mod tests {
     use super::*;
     use crate::rules::exec_unit::ExecuteUnit;
     use device::Device;
-    use log::logger::init_log;
+    use log::init_log;
     use log::Level;
     use std::cell::RefCell;
     use std::rc::Rc;

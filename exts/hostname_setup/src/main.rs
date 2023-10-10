@@ -179,7 +179,7 @@ impl Default for Hostname {
 }
 
 fn main() {
-    log::logger::init_log_to_console_syslog("hostname-setup", log::Level::Info);
+    log::init_log_to_console_syslog("hostname-setup", log::Level::Info);
     let mut op_hostname = Hostname::from_cmdline();
     if op_hostname.is_none() {
         op_hostname = Hostname::from_etc_hostname();

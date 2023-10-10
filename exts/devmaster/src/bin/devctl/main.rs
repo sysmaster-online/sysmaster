@@ -16,7 +16,7 @@
 mod subcmds;
 use clap::Parser;
 use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
-use log::logger::init_log_to_console_syslog;
+use log::init_log_to_console_syslog;
 use log::Level;
 use std::{io::Write, os::unix::net::UnixStream};
 use subcmds::devctl_hwdb::subcommand_hwdb;

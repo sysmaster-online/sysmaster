@@ -1589,7 +1589,7 @@ impl RuleToken {
 #[cfg(test)]
 mod tests {
     use crate::config::*;
-    use log::logger::init_log;
+    use log::init_log;
     use log::Level;
 
     use super::*;

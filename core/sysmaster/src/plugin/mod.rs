@@ -524,7 +524,12 @@ impl Plugin {
             Ok(v) => v,
         };
 
-        let boxed_raw = fun(log::max_level(), target, file_size, file_number);
+        let boxed_raw = fun(
+            log::max_level().to_level_filter(),
+            target,
+            file_size,
+            file_number,
+        );
         Ok(unsafe { Box::from_raw(boxed_raw) })
     }
 
@@ -566,7 +571,6 @@ impl Plugin {
 mod tests {
 
     use core::unit::UmIf;
-    use log::logger;
 
     use super::*;
     // use services::service::ServiceUnit;
@@ -575,7 +579,7 @@ mod tests {
     impl UmIf for UmIfD {}
 
     fn init_test() -> Arc<Plugin> {
-        logger::_init_log(
+        log::init_log(
             log::Level::Trace,
             vec!["console", "syslog"],
             "",

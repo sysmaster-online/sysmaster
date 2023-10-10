@@ -374,7 +374,7 @@ impl Manager {
 
     fn reload(&self) {
         self.config.borrow_mut().reload(&self.mode);
-        log::logger::init_log(
+        log::init_log(
             "sysmaster",
             Level::from_str(&self.config.borrow().LogLevel).unwrap(),
             self.config
@@ -598,12 +598,11 @@ impl Manager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use log::logger;
 
     //#[test]
     #[allow(dead_code)]
     fn manager_api() {
-        logger::init_log_to_console("manager_api", log::Level::Trace);
+        log::init_log_to_console("manager_api", log::Level::Trace);
 
         // new
         let manager = Manager::new(

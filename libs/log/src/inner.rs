@@ -12,19 +12,17 @@
 
 //!
 use std::{
-    cmp, fmt,
+    fmt,
     io::{Error, ErrorKind},
-    mem,
     ops::Deref,
-    str::FromStr,
     sync::{
-        atomic::{AtomicU8, AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering},
         RwLock,
     },
 };
 
 use crate::logger::ReInit;
-use log::{LevelFilter, Record};
+use log::Record;
 
 static mut LOGGER_LOCK: Option<RwLock<&dyn ReInit>> = None;
 
@@ -33,132 +31,6 @@ static STATE: AtomicUsize = AtomicUsize::new(0);
 const UNINITIALIZED: usize = 0;
 const INITIALIZING: usize = 1;
 const INITIALIZED: usize = 2;
-
-///
-#[repr(u8)]
-#[derive(Copy, Eq, Debug)]
-pub enum Level {
-    ///
-    Error = 0,
-    ///
-    Warn = 1,
-    ///
-    Info = 2,
-    ///
-    Debug = 3,
-    ///
-    Trace = 4,
-}
-
-impl Level {
-    ///
-    pub fn to_ori_level(&self) -> log::Level {
-        match self {
-            Level::Error => log::Level::Error,
-            Level::Warn => log::Level::Warn,
-            Level::Info => log::Level::Info,
-            Level::Debug => log::Level::Debug,
-            Level::Trace => log::Level::Trace,
-        }
-    }
-}
-
-impl FromStr for Level {
-    type Err = std::io::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "error" => Ok(Level::Error),
-            "warn" => Ok(Level::Warn),
-            "info" => Ok(Level::Info),
-            "debug" => Ok(Level::Debug),
-            "trace" => Ok(Level::Trace),
-            _ => Ok(Level::Info),
-        }
-    }
-}
-
-impl Clone for Level {
-    #[inline]
-    fn clone(&self) -> Level {
-        *self
-    }
-}
-
-impl PartialEq for Level {
-    #[inline]
-    fn eq(&self, other: &Level) -> bool {
-        *self as usize == *other as usize
-    }
-}
-
-impl PartialEq<LevelFilter> for Level {
-    #[inline]
-    fn eq(&self, other: &LevelFilter) -> bool {
-        *self as usize == *other as usize
-    }
-}
-
-impl PartialOrd for Level {
-    #[inline]
-    fn partial_cmp(&self, other: &Level) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-
-    #[inline]
-    fn lt(&self, other: &Level) -> bool {
-        (*self as usize) < *other as usize
-    }
-
-    #[inline]
-    fn le(&self, other: &Level) -> bool {
-        *self as usize <= *other as usize
-    }
-
-    #[inline]
-    fn gt(&self, other: &Level) -> bool {
-        *self as usize > *other as usize
-    }
-
-    #[inline]
-    fn ge(&self, other: &Level) -> bool {
-        *self as usize >= *other as usize
-    }
-}
-
-impl PartialOrd<LevelFilter> for Level {
-    #[inline]
-    fn partial_cmp(&self, other: &LevelFilter) -> Option<cmp::Ordering> {
-        Some((*self as usize).cmp(&(*other as usize)))
-    }
-
-    #[inline]
-    fn lt(&self, other: &LevelFilter) -> bool {
-        (*self as usize) < *other as usize
-    }
-
-    #[inline]
-    fn le(&self, other: &LevelFilter) -> bool {
-        *self as usize <= *other as usize
-    }
-
-    #[inline]
-    fn gt(&self, other: &LevelFilter) -> bool {
-        *self as usize > *other as usize
-    }
-
-    #[inline]
-    fn ge(&self, other: &LevelFilter) -> bool {
-        *self as usize >= *other as usize
-    }
-}
-
-impl Ord for Level {
-    #[inline]
-    fn cmp(&self, other: &Level) -> cmp::Ordering {
-        (*self as usize).cmp(&(*other as usize))
-    }
-}
 
 /// Set the global logger
 pub fn set_boxed_logger(logger: Box<dyn ReInit>) -> Result<(), Error> {
@@ -251,26 +123,12 @@ macro_rules! __log_line {
     };
 }
 
-static MAX_LOG_LEVEL_FILTER: AtomicU8 = AtomicU8::new(0);
-
-///
-#[inline(always)]
-pub fn max_level() -> Level {
-    unsafe { mem::transmute(MAX_LOG_LEVEL_FILTER.load(Ordering::Relaxed)) }
-}
-
-///
-#[inline]
-pub fn set_max_level(level: Level) {
-    MAX_LOG_LEVEL_FILTER.store(level as u8, Ordering::SeqCst)
-}
-
 ///
 #[macro_export(local_inner_macros)]
 macro_rules! log {
     (target: $target:expr, $lvl:expr, $($arg:tt)+) => ({
         let lvl = $lvl;
-        if lvl <= $crate::inner::max_level() {
+        if lvl <= $crate::max_level() {
             $crate::inner::__private_api_log(
                 __log_format_args!($($arg)+),
                 lvl,
@@ -285,10 +143,10 @@ macro_rules! log {
 #[macro_export(local_inner_macros)]
 macro_rules! error {
     (target: $target:expr, $($arg:tt)+) => (
-        log!(target: $target, $crate::log::Level::Error, $($arg)+)
+        log!(target: $target, $crate::Level::Error, $($arg)+)
     );
     ($($arg:tt)+) => (
-        log!($crate::inner::Level::Error, $($arg)+)
+        log!($crate::Level::Error, $($arg)+)
     )
 }
 
@@ -296,10 +154,10 @@ macro_rules! error {
 #[macro_export(local_inner_macros)]
 macro_rules! warn {
     (target: $target:expr, $($arg:tt)+) => (
-        log!(target: $target, $crate::log::Level::Warn, $($arg)+)
+        log!(target: $target, $crate::Level::Warn, $($arg)+)
     );
     ($($arg:tt)+) => (
-        log!($crate::inner::Level::Warn, $($arg)+)
+        log!($crate::Level::Warn, $($arg)+)
     )
 }
 
@@ -307,10 +165,10 @@ macro_rules! warn {
 #[macro_export(local_inner_macros)]
 macro_rules! info {
     (target: $target:expr, $($arg:tt)+) => (
-        log!(target: $target, $crate::log::Level::Info, $($arg)+)
+        log!(target: $target, $crate::Level::Info, $($arg)+)
     );
     ($($arg:tt)+) => (
-        log!($crate::inner::Level::Info, $($arg)+)
+        log!($crate::Level::Info, $($arg)+)
     )
 }
 
@@ -318,10 +176,10 @@ macro_rules! info {
 #[macro_export(local_inner_macros)]
 macro_rules! debug {
     (target: $target:expr, $($arg:tt)+) => (
-        log!(target: $target, $crate::log::Level::Debug, $($arg)+)
+        log!(target: $target, $crate::Level::Debug, $($arg)+)
     );
     ($($arg:tt)+) => (
-        log!($crate::inner::Level::Debug, $($arg)+)
+        log!($crate::Level::Debug, $($arg)+)
     )
 }
 
@@ -329,10 +187,10 @@ macro_rules! debug {
 #[macro_export(local_inner_macros)]
 macro_rules! trace {
     (target: $target:expr, $($arg:tt)+) => (
-        log!(target: $target, $crate::logger::Level::Trace, $($arg)+)
+        log!(target: $target, $crate::Level::Trace, $($arg)+)
     );
     ($($arg:tt)+) => (
-        log!($crate::inner::Level::Trace, $($arg)+)
+        log!($crate::Level::Trace, $($arg)+)
     )
 }
 
@@ -340,7 +198,7 @@ macro_rules! trace {
 /* Private, shouldn't be used out of this file. */
 pub fn __private_api_log(
     args: fmt::Arguments,
-    level: Level,
+    level: crate::Level,
     &(target, module_path, file, line): &(&str, &'static str, &'static str, u32),
 ) {
     if STATE.load(Ordering::SeqCst) != INITIALIZED {
@@ -352,7 +210,7 @@ pub fn __private_api_log(
             v.read().unwrap().log(
                 &Record::builder()
                     .args(args)
-                    .level(level.to_ori_level())
+                    .level(level)
                     .target(target)
                     .module_path_static(Some(module_path))
                     .file_static(Some(file))

@@ -481,7 +481,6 @@ mod tests {
     use crate::unit::rentry::UnitRe;
     use crate::unit::test;
     use core::rel::{ReliConf, Reliability};
-    use log::logger;
 
     #[test]
     fn rt_push_load_queue() {
@@ -568,7 +567,7 @@ mod tests {
         rentryr: &Rc<UnitRe>,
         name: &str,
     ) -> Rc<UnitX> {
-        logger::init_log_to_console("create_unit", log::Level::Trace);
+        log::init_log_to_console("create_unit", log::Level::Trace);
         log::info!("test");
         test::test_utils::create_unit_for_test_pub(dmr, relir, rentryr, name)
     }
