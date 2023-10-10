@@ -1119,7 +1119,6 @@ dependencies = [
 name = "log"
 version = "0.5.0"
 dependencies = [
- "constants",
  "libc",
  "log 0.4.14",
 ]

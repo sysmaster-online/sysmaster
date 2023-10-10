@@ -39,6 +39,13 @@ pub const INIT_SOCK: &str = "/run/sysmaster/init.sock";
 #[cfg(test)]
 pub const INIT_SOCK: &str = "init.sock";
 
+pub static SIGNALS: [Signal; 4] = [
+    Signal::SIGINT,
+    Signal::SIGTERM,
+    Signal::SIGCHLD,
+    Signal::SIGHUP,
+];
+
 const ALLFD_TOKEN: Token = Token(0);
 const TIMERFD_TOKEN: Token = Token(1);
 const SIGNALFD_TOKEN: Token = Token(2);
@@ -111,13 +118,8 @@ impl Runtime {
 
         // add signal
         let mut mask = SigSet::empty();
-        for sig in [
-            Signal::SIGINT,
-            Signal::SIGTERM,
-            Signal::SIGCHLD,
-            Signal::SIGHUP,
-        ] {
-            mask.add(sig);
+        for sig in SIGNALS.iter() {
+            mask.add(*sig);
         }
         mask.thread_set_mask()?;
         let signalfd = SignalFd::with_flags(&mask, SfdFlags::SFD_CLOEXEC | SfdFlags::SFD_NONBLOCK)?;
