@@ -16,9 +16,7 @@
 4. 涉及到的sshd相关服务有下面五个单元。
 
 ```
-sshd-keygen@ecdsa.service
-sshd-keygen@ed25519.service
-sshd-keygen@rsa.service
+sshd-keygen@.service
 sshd-keygen.target
 sshd.service
 ```

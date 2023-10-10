@@ -9,8 +9,8 @@ sysmaster_install_target=/usr/lib/sysmaster
 conf_install_target=/etc/sysmaster
 
 multi_user_target=(dbus.service fstab.service getty-tty1.service hostname-setup.service \
-lvm-activate-openeuler.service NetworkManager.service sshd-keygen@ecdsa.service \
-sshd-keygen@ed25519.service sshd-keygen@rsa.service sshd.service udev-trigger.service)
+lvm-activate-openeuler.service NetworkManager.service sshd-keygen@.service \
+sshd.service udev-trigger.service)
 sysinit_target=(udevd.service)
 
 # Install binaries of sysmaster.

@@ -24,9 +24,7 @@ ADD ./debug/shutdown.target /usr/lib/sysmaster/system
 ADD ./debug/sysinit.target /usr/lib/sysmaster/system
 ADD sshd.service /usr/lib/sysmaster/system
 ADD sshd-keygen.target /usr/lib/sysmaster/system
-ADD sshd-keygen@rsa.service /usr/lib/sysmaster/system
-ADD sshd-keygen@ecdsa.service /usr/lib/sysmaster/system
-ADD sshd-keygen@ed25519.service /usr/lib/sysmaster/system
+ADD sshd-keygen@.service /usr/lib/sysmaster/system
 
 ENV TMOUT=0
 CMD [/sbin/init]
