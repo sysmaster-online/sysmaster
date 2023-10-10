@@ -39,8 +39,8 @@ struct Args {
     #[clap(short('p'), long, value_parser)]
     lookup_prefix: Option<String>,
     ///
-    #[clap(short, long, value_parser)]
-    modalias: Option<String>,
+    #[clap(required = false, value_parser)]
+    modalias: Vec<String>,
 }
 
 /// hwdb builtin command
@@ -208,7 +208,15 @@ impl Builtin for Hwdb {
         test: bool,
     ) -> Result<bool> {
         let dev = exec_unit.get_device();
-        let args = Args::parse_from(argv);
+        let args = match Args::try_parse_from(argv) {
+            Ok(args) => args,
+            Err(e) => {
+                return Err(Error::Other {
+                    msg: format!("Failed to parse argv {:?}", e),
+                    errno: nix::Error::EINVAL,
+                })
+            }
+        };
 
         if self.hwdb.borrow().is_none() {
             return Err(Error::Nix {
@@ -217,11 +225,11 @@ impl Builtin for Hwdb {
         }
 
         /* query a specific key given as argument */
-        if args.modalias.is_some() {
+        if !args.modalias.is_empty() {
             match self.lookup(
                 dev,
                 &args.lookup_prefix,
-                args.modalias.unwrap(),
+                args.modalias[0].clone(),
                 &args.filter,
                 test,
             ) {
