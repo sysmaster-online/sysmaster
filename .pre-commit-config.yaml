@@ -93,6 +93,14 @@ repos:
         pass_filenames: false
         files: \.(rs|toml)$
         verbose: true
+      - id: cargo-test-tmpfile-cleanup
+        name: tmpfile cleanup
+        description: tmpfile cleanup.
+        entry: bash -c 'rm -rf target/*/reliability/'
+        language: system
+        pass_filenames: false
+        files: \.(rs|toml)$
+        verbose: true
       - id: cargo-test
         name: cargo test
         description: test the package for errors.

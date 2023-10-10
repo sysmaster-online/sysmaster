@@ -14,7 +14,7 @@
 
 use clap::Parser;
 use hwdb::HwdbUtil;
-use log::{logger, Level};
+use log::Level;
 
 type Result<T> = std::result::Result<T, nix::Error>;
 
@@ -81,7 +81,7 @@ fn update(
 }
 
 fn main() -> Result<()> {
-    logger::init_log_to_console("sysmaster-hwdb", Level::Debug);
+    log::init_log_to_console("sysmaster-hwdb", Level::Debug);
     let args = Args::parse();
     match args.subcmd {
         SubCmd::Query { modalias, root } => query(modalias, root),
