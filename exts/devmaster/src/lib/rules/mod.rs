@@ -34,10 +34,10 @@ pub mod rules_load;
 pub struct Rules {
     /// the linked list to contain all rule files
     /// keeps the dictionary order
-    files: Option<Arc<RwLock<RuleFile>>>,
+    files: Arc<RwLock<Option<RuleFile>>>,
 
     /// current rule file
-    files_tail: Option<Arc<RwLock<RuleFile>>>,
+    files_tail: Arc<RwLock<Option<RuleFile>>>,
 
     /// directories for searching rule files
     dirs: Vec<String>,
@@ -55,18 +55,25 @@ pub struct Rules {
 #[derive(Debug, Clone)]
 pub struct RuleFile {
     /// the name of the rule file
-    rule_file: String,
+    file_name: String,
 
     /// the linked list to contain all lines in the rule file
     /// keeps in order of line number
-    lines: Option<Arc<RwLock<RuleLine>>>,
+    lines: Arc<RwLock<Option<RuleLine>>>,
     /// current rule line
-    lines_tail: Option<Arc<RwLock<RuleLine>>>,
+    lines_tail: Arc<RwLock<Option<RuleLine>>>,
 
     /// previous rule file
-    prev: Option<Arc<RwLock<RuleFile>>>,
+    prev: Arc<RwLock<Option<RuleFile>>>,
     /// next rule file
-    next: Option<Arc<RwLock<RuleFile>>>,
+    next: Arc<RwLock<Option<RuleFile>>>,
+}
+
+impl RuleFile {
+    #[inline]
+    fn get_file_name(&self) -> String {
+        self.file_name.clone()
+    }
 }
 
 /// rule line contains at least a rule token
@@ -76,7 +83,7 @@ pub struct RuleFile {
 #[allow(dead_code)]
 pub struct RuleLine {
     /// the content of the rule line
-    line: String,
+    line_content: String,
     /// the line number in its rule file
     line_number: u32,
 
@@ -88,22 +95,51 @@ pub struct RuleLine {
     /// whether this line has goto token
     goto_label: Option<String>,
     /// which line should be went to
-    goto_line: Option<Arc<RwLock<RuleLine>>>,
+    goto_line: Arc<RwLock<Option<RuleLine>>>,
 
     /// the linked list to contain all tokens in the rule line
-    tokens: Option<Arc<RwLock<RuleToken>>>,
+    tokens: Arc<RwLock<Option<RuleToken>>>,
     /// current rule token
-    tokens_tail: Option<Arc<RwLock<RuleToken>>>,
+    tokens_tail: Arc<RwLock<Option<RuleToken>>>,
 
-    /// the rule file to contain this line
-    rule_file_ptr: Weak<RwLock<RuleFile>>,
-    /// the rule file name
-    rule_file: String,
+    /// Pointer to the rule file containing this line.
+    /// Although it is optional, it must to be set actually.
+    /// Thus the RuleFile can be unwrapped no need to worry.
+    rule_file: Weak<RwLock<Option<RuleFile>>>,
 
     /// previous rule line
-    prev: Option<Arc<RwLock<RuleLine>>>,
+    prev: Arc<RwLock<Option<RuleLine>>>,
     /// next rule line
-    next: Option<Arc<RwLock<RuleLine>>>,
+    next: Arc<RwLock<Option<RuleLine>>>,
+}
+
+impl RuleLine {
+    #[inline]
+    fn get_file_name(&self) -> String {
+        match self.rule_file.upgrade() {
+            Some(arc) => {
+                if let Some(f) = arc.read().unwrap().as_ref() {
+                    f.get_file_name()
+                } else {
+                    "".to_string()
+                }
+            }
+            None => {
+                log::error!("Rule file is not set.");
+                "".to_string()
+            }
+        }
+    }
+
+    #[inline]
+    fn get_label(&self) -> Option<String> {
+        self.label.clone()
+    }
+
+    #[inline]
+    fn get_goto_label(&self) -> Option<String> {
+        self.goto_label.clone()
+    }
 }
 
 /// rule token matches regex:
@@ -119,17 +155,73 @@ pub struct RuleToken {
     attr_subst_type: SubstituteType,
     attr: Option<String>,
     value: String,
-    prev: Option<Arc<RwLock<RuleToken>>>,
-    next: Option<Arc<RwLock<RuleToken>>>,
+    prev: Arc<RwLock<Option<RuleToken>>>,
+    next: Arc<RwLock<Option<RuleToken>>>,
 
-    line_number: u32,
-    rule_file: String,
-    content: String,
+    rule_line: Weak<RwLock<Option<RuleLine>>>,
 }
 
 impl RuleToken {
+    #[inline]
     pub(crate) fn is_for_parents(&self) -> bool {
         self.r#type >= TokenType::MatchParentsKernel && self.r#type <= TokenType::MatchParentsTag
+    }
+
+    #[inline]
+    pub(crate) fn get_line_number(&self) -> u32 {
+        match self.rule_line.upgrade() {
+            Some(line) => {
+                if let Some(l) = line.read().unwrap().as_ref() {
+                    l.line_number
+                } else {
+                    log::error!("Failed to get line number: rule line is not set.");
+                    0
+                }
+            }
+            None => {
+                log::error!(
+                    "Failed to get line number: failed to upgrade rule line weak reference."
+                );
+                0
+            }
+        }
+    }
+
+    #[inline]
+    pub(crate) fn get_file_name(&self) -> String {
+        match self.rule_line.upgrade() {
+            Some(line) => {
+                if let Some(l) = line.read().unwrap().as_ref() {
+                    l.get_file_name()
+                } else {
+                    log::error!("Failed to get file name: rule line is not set for the token.");
+                    "".to_string()
+                }
+            }
+            None => {
+                log::error!("Failed to get file name: failed to upgrade rule line weak reference.");
+                "".to_string()
+            }
+        }
+    }
+
+    #[inline]
+    pub(crate) fn get_token_attribute(&self) -> Option<String> {
+        self.attr.clone()
+    }
+
+    #[inline]
+    pub(crate) fn get_token_value(&self) -> String {
+        self.value.clone()
+    }
+
+    #[inline]
+    pub(crate) fn get_token_content(&self) -> String {
+        if let Some(attribute) = self.get_token_attribute() {
+            format!("{}{{{}}}{}{}", self.r#type, attribute, self.op, self.value)
+        } else {
+            format!("{}{}{}", self.r#type, self.op, self.value)
+        }
     }
 }
 
@@ -204,6 +296,55 @@ pub(crate) enum TokenType {
     Label,
 }
 
+impl Display for TokenType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let t = match *self {
+            Self::MatchAction => "ACTION",
+            Self::MatchDevpath => "DEVPATH",
+            Self::MatchKernel => "KERNEL",
+            Self::MatchDevlink | Self::AssignDevlink => "SYMLINK",
+            Self::MatchName | Self::AssignName => "NAME",
+            Self::MatchEnv | Self::AssignEnv => "ENV",
+            Self::MatchConst => "CONST",
+            Self::MatchTag | Self::AssignTag => "TAG",
+            Self::MatchSubsystem => "SUBSYSTEM",
+            Self::MatchDriver => "DRIVER",
+            Self::MatchAttr | Self::AssignAttr => "ATTR",
+            Self::MatchSysctl | Self::AssignSysctl => "SYSCTL",
+            Self::MatchParentsKernel => "KERNELS",
+            Self::MatchParentsSubsystem => "SUBSYSTEMS",
+            Self::MatchParentsDriver => "DRIVERS",
+            Self::MatchParentsAttr => "ATTRS",
+            Self::MatchParentsTag => "TAGS",
+            Self::MatchResult => "RESULTS",
+            Self::MatchTest => "TEST",
+            Self::MatchProgram => "PROGRAM",
+            Self::MatchImportFile
+            | Self::MatchImportProgram
+            | Self::MatchImportBuiltin
+            | Self::MatchImportDb
+            | Self::MatchImportCmdline
+            | Self::MatchImportParent => "IMPORT",
+            Self::AssignOptionsStringEscapeNone
+            | Self::AssignOptionsStringEscapeReplace
+            | Self::AssignOptionsDbPersist
+            | Self::AssignOptionsWatch
+            | Self::AssignOptionsDevlinkPriority
+            | Self::AssignOptionsLogLevel
+            | Self::AssignOptionsStaticNode => "OPTIONS",
+            Self::AssignOwner | Self::AssignOwnerId => "OWNER",
+            Self::AssignGroup | Self::AssignGroupId => "GROUP",
+            Self::AssignMode | Self::AssignModeId => "MODE",
+            Self::AssignSeclabel => "SECLABEL",
+            Self::AssignRunBuiltin | Self::AssignRunProgram => "RUN",
+            Self::Goto => "GOTO",
+            Self::Label => "LABEL",
+        };
+
+        write!(f, "{}", t)
+    }
+}
+
 /// operator type
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub(crate) enum OperatorType {
@@ -261,7 +402,9 @@ impl Display for Rules {
         let mut s = String::new();
         // write!(f, "{}", s)
         for file in self.iter() {
-            s = format!("{}\n{}\n", s, file.as_ref().read().unwrap());
+            if let Some(f) = file.read().unwrap().as_ref() {
+                s = format!("{}\n{}\n", s, f);
+            }
         }
         write!(f, "{}", s)
     }
@@ -269,21 +412,22 @@ impl Display for Rules {
 
 /// iterate over all rule files
 pub struct RulesIter {
-    current_file: Option<Arc<RwLock<RuleFile>>>,
+    current_file: Arc<RwLock<Option<RuleFile>>>,
 }
 
 impl Iterator for RulesIter {
     /// iterate over each rule file in the rules
-    type Item = Arc<RwLock<RuleFile>>;
+    type Item = Arc<RwLock<Option<RuleFile>>>;
 
     /// iterate over the rule file list
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.current_file.clone();
-        self.current_file = match self.current_file.clone() {
-            Some(file) => file.read().unwrap().next.clone(),
-            None => None,
+        let next = match self.current_file.read().unwrap().as_ref() {
+            Some(file) => file.next.clone(),
+            None => return None,
         };
-        ret
+        self.current_file = next;
+        Some(ret)
     }
 }
 
@@ -299,9 +443,11 @@ impl Rules {
 
 impl Display for RuleFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = format!("File: {}", self.rule_file);
+        let mut s = format!("File: {}", self.get_file_name());
         for line in self.iter() {
-            s.push_str(format!("\n{}", line.as_ref().read().unwrap()).as_str());
+            if let Some(l) = line.read().unwrap().as_ref() {
+                s.push_str(&format!("\n{}", l));
+            }
         }
 
         write!(f, "{}", s)
@@ -310,21 +456,22 @@ impl Display for RuleFile {
 
 /// iterator over lines in the rule file
 pub struct RuleFileIter {
-    current_line: Option<Arc<RwLock<RuleLine>>>,
+    current_line: Arc<RwLock<Option<RuleLine>>>,
 }
 
 impl Iterator for RuleFileIter {
     /// iterate over each rule file in the rules
-    type Item = Arc<RwLock<RuleLine>>;
+    type Item = Arc<RwLock<Option<RuleLine>>>;
 
     /// iterate over the rule file list
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.current_line.clone();
-        self.current_line = match self.current_line.clone() {
-            Some(file) => file.read().unwrap().next.clone(),
-            None => None,
+        let next = match self.current_line.read().unwrap().as_ref() {
+            Some(line) => line.next.clone(),
+            None => return None,
         };
-        ret
+        self.current_line = next;
+        Some(ret)
     }
 }
 
@@ -342,18 +489,21 @@ impl Display for RuleLine {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = format!(
             "{}:{}:  {}",
-            self.rule_file_ptr
+            self.rule_file
                 .upgrade()
                 .unwrap()
-                .as_ref()
                 .read()
                 .unwrap()
-                .rule_file,
+                .as_ref()
+                .unwrap()
+                .get_file_name(),
             self.line_number,
-            self.line
+            self.line_content
         );
         for token in self.iter() {
-            s.push_str(format!("\n{}", token.as_ref().read().unwrap()).as_str());
+            if let Some(t) = token.read().unwrap().as_ref() {
+                s.push_str(&format!("\n{}", t));
+            }
         }
         write!(f, "{}", s)
     }
@@ -361,21 +511,22 @@ impl Display for RuleLine {
 
 /// iterator over tokens in the rule line
 pub struct RuleLineIter {
-    current_token: Option<Arc<RwLock<RuleToken>>>,
+    current_token: Arc<RwLock<Option<RuleToken>>>,
 }
 
 impl Iterator for RuleLineIter {
     /// iterate over each rule file in the rules
-    type Item = Arc<RwLock<RuleToken>>;
+    type Item = Arc<RwLock<Option<RuleToken>>>;
 
     /// iterate over the rule file list
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.current_token.clone();
-        self.current_token = match self.current_token.clone() {
-            Some(file) => file.read().unwrap().next.clone(),
-            None => None,
+        let next = match self.current_token.read().unwrap().as_ref() {
+            Some(token) => token.next.clone(),
+            None => return None,
         };
-        ret
+        self.current_token = next;
+        Some(ret)
     }
 }
 
@@ -392,11 +543,7 @@ impl RuleLine {
 impl Display for RuleToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // let s = String::new();
-        write!(
-            f,
-            "Token {}: {:?} {:?} {:?} {}",
-            self.content, self.r#type, self.attr, self.op, self.value
-        )
+        write!(f, "{}", self.get_token_content())
     }
 }
 

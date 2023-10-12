@@ -143,7 +143,7 @@ impl Worker {
                             .unwrap_or_default()
                     );
 
-                    let mut execute_mgr = exec_mgr::ExecuteManager::new(cache.clone());
+                    let execute_mgr = exec_mgr::ExecuteManager::new(cache.clone());
 
                     let device = Rc::new(RefCell::new(device));
                     let _ = execute_mgr.process_device(device.clone());

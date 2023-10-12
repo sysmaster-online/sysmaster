@@ -51,8 +51,8 @@ impl Rules {
     /// enumerate all .rules file under the directories and generate the rules object
     pub(crate) fn new(dirs: Vec<String>, resolve_name_time: ResolveNameTime) -> Rules {
         Rules {
-            files: None,
-            files_tail: None,
+            files: Arc::new(RwLock::new(None)),
+            files_tail: Arc::new(RwLock::new(None)),
             dirs,
             resolve_name_time,
             users: HashMap::new(),
@@ -101,30 +101,29 @@ impl Rules {
     /// parse a single rule file, and insert it into rules
     pub(crate) fn parse_file(rules: Arc<RwLock<Rules>>, file_name: String) {
         log::debug!("Parsing rule file: {}", file_name);
-        let file = RuleFile::load_file(file_name, Some(rules.clone()));
+        let file = RuleFile::load_file(file_name, rules.clone());
         Self::add_file(rules, file);
     }
 
     /// push the rule file into the tail of linked list
-    pub(crate) fn add_file(rules: Arc<RwLock<Rules>>, file: Arc<RwLock<RuleFile>>) {
-        let has_tail = rules.as_ref().read().unwrap().files_tail.is_none();
-        if has_tail {
-            rules.as_ref().write().unwrap().files = Some(file.clone());
+    pub(crate) fn add_file(rules: Arc<RwLock<Rules>>, file: Arc<RwLock<Option<RuleFile>>>) {
+        if rules.read().unwrap().files_tail.read().unwrap().is_none() {
+            rules.write().unwrap().files = file.clone();
         } else {
             rules
-                .as_ref()
-                .write()
+                .read()
                 .unwrap()
                 .files_tail
-                .as_mut()
-                .unwrap()
                 .write()
                 .unwrap()
-                .next = Some(file.clone());
-            file.write().unwrap().prev = rules.as_ref().read().unwrap().files_tail.clone();
+                .as_mut()
+                .unwrap()
+                .next = file.clone();
+            file.write().unwrap().as_mut().unwrap().prev =
+                rules.as_ref().read().unwrap().files_tail.clone();
         }
 
-        rules.as_ref().write().unwrap().files_tail = Some(file);
+        rules.write().unwrap().files_tail = file;
     }
 
     /// if the user name has valid credential, insert it to rules
@@ -172,15 +171,18 @@ impl RuleFile {
     /// which will directly modify some fields in rules
     pub(crate) fn load_file(
         file_name: String,
-        rules: Option<Arc<RwLock<Rules>>>,
-    ) -> Arc<RwLock<RuleFile>> {
-        let rule_file = Arc::<RwLock<RuleFile>>::new(RwLock::<RuleFile>::new(Self::new(file_name)));
+        rules: Arc<RwLock<Rules>>,
+    ) -> Arc<RwLock<Option<RuleFile>>> {
+        let rule_file = Arc::new(RwLock::new(Some(RuleFile::new(file_name))));
 
-        // rule file is locked here, thus can not do read or write operations inside parse_lines
-        rule_file
-            .write()
-            .unwrap()
-            .parse_lines(rule_file.clone(), rules);
+        /*
+         * It is right that RuleFile will change during parsing rules lines,
+         * but the fine-grained write lock guard should fall onto the RuleLine
+         * object rather than the RuleFile itself. Otherwise there will be
+         * deadlock when the RuleFile is accessed to read during parsing rule
+         * lines.
+         */
+        RuleFile::parse_lines(rule_file.clone(), rules);
 
         rule_file
     }
@@ -188,30 +190,27 @@ impl RuleFile {
     /// create a initial rule file object
     pub(crate) fn new(file_name: String) -> RuleFile {
         RuleFile {
-            rule_file: file_name,
-            lines: None,
-            lines_tail: None,
-            prev: None,
-            next: None,
+            file_name,
+            lines: Arc::new(RwLock::new(None)),
+            lines_tail: Arc::new(RwLock::new(None)),
+            prev: Arc::new(RwLock::new(None)),
+            next: Arc::new(RwLock::new(None)),
         }
     }
 
     /// parse and load all available lines in the rule file
     /// the pointer to rules is used for specific tokens, e.g., 'GOTO' and 'LABEL',
     /// which will directly modify some fields in rules
-    pub(crate) fn parse_lines(
-        &mut self,
-        self_ptr: Arc<RwLock<RuleFile>>,
-        rules: Option<Arc<RwLock<Rules>>>,
-    ) {
-        let file = File::open(&self.rule_file).unwrap();
+    pub(crate) fn parse_lines(rule_file: Arc<RwLock<Option<RuleFile>>>, rules: Arc<RwLock<Rules>>) {
+        let file_name = rule_file.read().unwrap().as_ref().unwrap().get_file_name();
+        let file = File::open(&file_name).unwrap();
         let reader = BufReader::new(file);
 
         let mut full_line = String::new();
         let mut offset = 0;
         for (line_number, line) in reader.lines().enumerate() {
             if let Err(e) = line {
-                log::warn!("Read line failed in {} : {:?}", self.rule_file, e);
+                log::warn!("Read line failed in {} : {:?}", file_name, e);
                 continue;
             }
             let line = line.unwrap();
@@ -226,48 +225,48 @@ impl RuleFile {
             } else {
                 full_line.push_str(line);
                 let line = RuleLine::load_line(
-                    full_line.to_string(),
+                    &full_line,
                     (line_number + 1 - offset) as u32,
-                    self_ptr.clone(),
+                    rule_file.clone(),
                     rules.clone(),
-                    self.rule_file.clone(),
                 )
                 .unwrap();
-                self.add_line(line);
+                rule_file.write().unwrap().as_mut().unwrap().add_line(line);
                 full_line.clear();
                 offset = 0;
             }
         }
 
-        self.resolve_goto();
+        rule_file.write().unwrap().as_mut().unwrap().resolve_goto();
     }
 
     /// push the rule line to the tail of linked list
-    pub(crate) fn add_line(&mut self, line: Arc<RwLock<RuleLine>>) {
-        if self.lines.is_none() {
-            self.lines = Some(line.clone());
+    pub(crate) fn add_line(&mut self, line: Arc<RwLock<Option<RuleLine>>>) {
+        if self.lines.read().unwrap().is_none() {
+            self.lines = line.clone();
         } else {
-            self.lines_tail.as_mut().unwrap().write().unwrap().next = Some(line.clone());
-            line.write().unwrap().prev = self.lines_tail.clone();
+            self.lines_tail.write().unwrap().as_mut().unwrap().next = line.clone();
+            line.write().unwrap().as_mut().unwrap().prev = self.lines_tail.clone();
         }
 
-        self.lines_tail = Some(line);
+        self.lines_tail = line;
     }
 
     /// bind goto with label lines
     pub(crate) fn resolve_goto(&mut self) {
-        let mut labels: HashMap<String, Arc<RwLock<RuleLine>>> = HashMap::new();
+        let mut labels: HashMap<String, Arc<RwLock<Option<RuleLine>>>> = HashMap::new();
 
         for line in self.iter() {
             if line
-                .as_ref()
                 .read()
+                .unwrap()
+                .as_ref()
                 .unwrap()
                 .r#type
                 .intersects(RuleLineType::HAS_LABEL)
             {
                 labels.insert(
-                    line.as_ref().read().unwrap().label.clone().unwrap(),
+                    line.read().unwrap().as_ref().unwrap().get_label().unwrap(),
                     line.clone(),
                 );
             }
@@ -275,8 +274,9 @@ impl RuleFile {
 
         for line in self.iter() {
             if !line
-                .as_ref()
                 .read()
+                .unwrap()
+                .as_ref()
                 .unwrap()
                 .r#type
                 .intersects(RuleLineType::HAS_GOTO)
@@ -284,9 +284,15 @@ impl RuleFile {
                 continue;
             }
 
-            let label = line.as_ref().read().unwrap().goto_label.clone().unwrap();
+            let label = line
+                .read()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .get_goto_label()
+                .unwrap();
 
-            line.as_ref().write().unwrap().goto_line = Some(labels.get(&label).unwrap().clone());
+            line.write().unwrap().as_mut().unwrap().goto_line = labels.get(&label).unwrap().clone();
         }
     }
 }
@@ -294,41 +300,40 @@ impl RuleFile {
 impl RuleLine {
     /// load a rule line
     pub(crate) fn new(
-        line: String,
+        line_content: String,
         line_number: u32,
-        file: Arc<RwLock<RuleFile>>,
-        file_name: String,
+        file: Arc<RwLock<Option<RuleFile>>>,
     ) -> RuleLine {
         RuleLine {
-            line,
+            line_content,
             line_number,
 
             r#type: RuleLineType::INITIAL,
 
             label: None,
             goto_label: None,
-            goto_line: None,
+            goto_line: Arc::new(RwLock::new(None)),
 
-            tokens: None,
-            tokens_tail: None,
+            tokens: Arc::new(RwLock::new(None)),
+            tokens_tail: Arc::new(RwLock::new(None)),
 
-            rule_file_ptr: Arc::downgrade(&file),
-            rule_file: file_name,
+            rule_file: Arc::downgrade(&file),
 
-            next: None,
-            prev: None,
+            next: Arc::new(RwLock::new(None)),
+            prev: Arc::new(RwLock::new(None)),
         }
     }
 
     /// create a rule line object
     /// Note: file is locked previously.
     pub(crate) fn load_line(
-        line: String,
+        line: &str,
         line_number: u32,
-        file: Arc<RwLock<RuleFile>>,
-        rules: Option<Arc<RwLock<Rules>>>,
-        file_name: String,
-    ) -> Result<Arc<RwLock<RuleLine>>> {
+        file: Arc<RwLock<Option<RuleFile>>>,
+        rules: Arc<RwLock<Rules>>,
+    ) -> Result<Arc<RwLock<Option<RuleLine>>>> {
+        debug_assert!(file.read().unwrap().is_some());
+
         lazy_static! {
             static ref RE_LINE: Regex =
                 Regex::new("((?P<key>[^=,\"{+\\-!:\0\\s]+)(\\{(?P<attr>[^\\{\\}]+)\\})?\\s*(?P<op>[!:+-=]?=)\\s*\"(?P<value>[^\"]+)\"\\s*,?\\s*)+").unwrap();
@@ -336,15 +341,19 @@ impl RuleLine {
                 Regex::new("(?P<key>[^=,\"{+\\-!:\0\\s]+)(\\{(?P<attr>[^\\{\\}]+)\\})?\\s*(?P<op>[!:+-=]?=)\\s*\"(?P<value>[^\"]+)\"\\s*,?\\s*").unwrap();
         }
 
-        let mut rule_line = RuleLine::new(line.clone(), line_number, file, file_name.clone());
+        let rule_line = Arc::new(RwLock::new(Some(RuleLine::new(
+            line.to_string(),
+            line_number,
+            file,
+        ))));
 
-        if !RE_LINE.is_match(&line) {
+        if !RE_LINE.is_match(line) {
             return Err(Error::RulesLoadError {
                 msg: "Invalid rule line".to_string(),
             });
         }
 
-        for token in RE_TOKEN.captures_iter(&line) {
+        for token in RE_TOKEN.captures_iter(line) {
             // through previous check through regular expression,
             // key, op, value must not be none
             // attr may be none in case of specific rule tokens
@@ -352,37 +361,24 @@ impl RuleLine {
             let attr = token.name("attr").map(|a| a.as_str().to_string());
             let op = token.name("op").map(|o| o.as_str().to_string()).unwrap();
             let value = token.name("value").map(|v| v.as_str().to_string()).unwrap();
-            let token_str = format!(
-                "{}{}{}\"{}\"",
-                key,
-                attr.clone()
-                    .map(|s| format!("{{{}}}", s))
-                    .unwrap_or_default(),
-                op,
-                value
-            );
 
             // if the token is 'GOTO' or 'LABEL', parse_token will return a IgnoreError
             // the following tokens in this line, if any, will be skipped
-            let rule_token = RuleToken::parse_token(
-                key,
-                attr,
-                op,
-                value,
-                rules.clone(),
-                (line_number, file_name.clone(), token_str),
-            )?;
+            let rule_token =
+                RuleToken::parse_token(key, attr, op, value, rules.clone(), rule_line.clone())?;
             match rule_token.r#type {
                 TokenType::Goto => {
-                    rule_line.goto_label = Some(rule_token.value.clone());
-                    rule_line.r#type |= RuleLineType::HAS_GOTO;
+                    rule_line.write().unwrap().as_mut().unwrap().goto_label =
+                        Some(rule_token.value.clone());
+                    rule_line.write().unwrap().as_mut().unwrap().r#type |= RuleLineType::HAS_GOTO;
                 }
                 TokenType::Label => {
-                    rule_line.label = Some(rule_token.value.clone());
-                    rule_line.r#type |= RuleLineType::HAS_LABEL;
+                    rule_line.write().unwrap().as_mut().unwrap().label =
+                        Some(rule_token.value.clone());
+                    rule_line.write().unwrap().as_mut().unwrap().r#type |= RuleLineType::HAS_LABEL;
                 }
                 TokenType::AssignName => {
-                    rule_line.r#type |= RuleLineType::HAS_NAME;
+                    rule_line.write().unwrap().as_mut().unwrap().r#type |= RuleLineType::HAS_NAME;
                 }
 
                 t => {
@@ -397,9 +393,11 @@ impl RuleLine {
                     ]
                     .contains(&t)
                     {
-                        rule_line.r#type |= RuleLineType::HAS_DEVLINK;
+                        rule_line.write().unwrap().as_mut().unwrap().r#type |=
+                            RuleLineType::HAS_DEVLINK;
                     } else if TokenType::AssignOptionsStaticNode == t {
-                        rule_line.r#type |= RuleLineType::HAS_STATIC_NODE;
+                        rule_line.write().unwrap().as_mut().unwrap().r#type |=
+                            RuleLineType::HAS_STATIC_NODE;
                     } else if t >= TokenType::AssignOptionsStringEscapeNone
                         || [
                             TokenType::MatchProgram,
@@ -412,29 +410,33 @@ impl RuleLine {
                         ]
                         .contains(&t)
                     {
-                        rule_line.r#type |= RuleLineType::UPDATE_SOMETHING;
+                        rule_line.write().unwrap().as_mut().unwrap().r#type |=
+                            RuleLineType::UPDATE_SOMETHING;
                     }
                 }
             }
-            rule_line.add_token(rule_token);
+            rule_line
+                .write()
+                .unwrap()
+                .as_mut()
+                .unwrap()
+                .add_token(rule_token);
         }
 
-        Ok(Arc::<RwLock<RuleLine>>::new(RwLock::<RuleLine>::new(
-            rule_line,
-        )))
+        Ok(rule_line)
     }
 
     /// push the rule token to the tail of linked list
     pub(crate) fn add_token(&mut self, rule_token: RuleToken) {
-        let rule_token = Arc::<RwLock<RuleToken>>::new(RwLock::<RuleToken>::new(rule_token));
-        if self.tokens.is_none() {
-            self.tokens = Some(rule_token.clone());
+        let rule_token = Arc::new(RwLock::new(Some(rule_token)));
+        if self.tokens.read().unwrap().is_none() {
+            self.tokens = rule_token.clone();
         } else {
-            self.tokens_tail.as_mut().unwrap().write().unwrap().next = Some(rule_token.clone());
-            rule_token.write().unwrap().prev = self.tokens_tail.clone();
+            self.tokens_tail.write().unwrap().as_mut().unwrap().next = rule_token.clone();
+            rule_token.write().unwrap().as_mut().unwrap().prev = self.tokens_tail.clone();
         }
 
-        self.tokens_tail = Some(rule_token);
+        self.tokens_tail = rule_token;
     }
 }
 
@@ -445,10 +447,9 @@ impl RuleToken {
         op: OperatorType,
         attr: Option<String>,
         value: String,
-        context: (u32, String, String),
+        rule_line: Arc<RwLock<Option<RuleLine>>>,
     ) -> Result<RuleToken> {
         let mut attr_subst_type = SubstituteType::Invalid;
-        let (line_number, rule_file, content) = context;
 
         if matches!(r#type, TokenType::MatchAttr | TokenType::MatchParentsAttr) {
             attr_subst_type = match attr.clone().unwrap_or_default().parse::<SubstituteType>() {
@@ -467,11 +468,9 @@ impl RuleToken {
             attr_subst_type,
             attr,
             value,
-            prev: None,
-            next: None,
-            line_number,
-            rule_file,
-            content,
+            prev: Arc::new(RwLock::new(None)),
+            next: Arc::new(RwLock::new(None)),
+            rule_line: Arc::downgrade(&rule_line),
         })
     }
 
@@ -479,13 +478,25 @@ impl RuleToken {
     pub fn parse_token(
         key: String,
         attr: Option<String>,
-        op: String,
+        op_str: String,
         value: String,
-        rules: Option<Arc<RwLock<Rules>>>,
-        context: (u32, String, String),
+        rules: Arc<RwLock<Rules>>,
+        rule_line: Arc<RwLock<Option<RuleLine>>>,
     ) -> Result<RuleToken> {
-        let mut op = op.parse::<OperatorType>()?;
+        let mut op = op_str.parse::<OperatorType>()?;
         let op_is_match = [OperatorType::Match, OperatorType::Nomatch].contains(&op);
+        let line_number = rule_line.read().unwrap().as_ref().unwrap().line_number;
+        let rule_file_name = rule_line.read().unwrap().as_ref().unwrap().get_file_name();
+        let rule_token_content = format!(
+            "{}{}{}{}",
+            key,
+            attr.as_ref()
+                .map(|s| format!("{{{}}}", s))
+                .unwrap_or_default(),
+            op_str,
+            value
+        );
+        let context = (line_number, rule_file_name, rule_token_content);
         match key.as_str() {
             "ACTION" => {
                 if attr.is_some() {
@@ -504,7 +515,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "DEVPATH" => {
@@ -524,7 +535,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "KERNEL" => {
@@ -544,7 +555,7 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "SYMLINK" => {
@@ -568,7 +579,7 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -576,7 +587,7 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 }
             }
@@ -619,7 +630,7 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -627,7 +638,7 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 }
             }
@@ -684,7 +695,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -692,7 +703,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 }
             }
@@ -714,7 +725,7 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "TAG" => {
@@ -743,7 +754,7 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -751,7 +762,7 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 }
             }
@@ -781,7 +792,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "DRIVER" => {
@@ -802,7 +813,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "ATTR" => {
@@ -838,7 +849,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -846,7 +857,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 }
             }
@@ -880,7 +891,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 } else {
                     Ok(RuleToken::new(
@@ -888,7 +899,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 }
             }
@@ -909,7 +920,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "SUBSYSTEMS" => {
@@ -929,7 +940,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "DRIVERS" => {
@@ -949,7 +960,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "ATTRS" => {
@@ -986,7 +997,7 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "TAGS" => {
@@ -1007,7 +1018,7 @@ impl RuleToken {
                     op,
                     None,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "TEST" => {
@@ -1032,7 +1043,7 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "PROGRAM" => {
@@ -1061,7 +1072,7 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "IMPORT" => {
@@ -1090,7 +1101,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 } else if attr.as_ref().unwrap() == "program" {
                     match value.parse::<BuiltinCommand>() {
@@ -1104,7 +1115,7 @@ impl RuleToken {
                                 op,
                                 attr,
                                 value,
-                                context,
+                                rule_line,
                             )?)
                         }
                         Err(_) => Ok(RuleToken::new(
@@ -1112,7 +1123,7 @@ impl RuleToken {
                             op,
                             attr,
                             value,
-                            context,
+                            rule_line,
                         )?),
                     }
                 } else if attr.as_ref().unwrap() == "builtin" {
@@ -1127,7 +1138,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 } else {
                     let token_type = match attr.as_ref().unwrap().as_str() {
@@ -1141,7 +1152,7 @@ impl RuleToken {
                         }
                     };
 
-                    Ok(RuleToken::new(token_type, op, attr, value, context)?)
+                    Ok(RuleToken::new(token_type, op, attr, value, rule_line)?)
                 }
             }
             "RESULT" => {
@@ -1162,7 +1173,7 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "OPTIONS" => {
@@ -1187,35 +1198,35 @@ impl RuleToken {
                         op,
                         None,
                         "".to_string(),
-                        context,
+                        rule_line,
                     )?),
                     "string_escape=replace" => Ok(RuleToken::new(
                         TokenType::AssignOptionsStringEscapeReplace,
                         op,
                         None,
                         "".to_string(),
-                        context,
+                        rule_line,
                     )?),
                     "db_persist" => Ok(RuleToken::new(
                         TokenType::AssignOptionsDbPersist,
                         op,
                         None,
                         "".to_string(),
-                        context,
+                        rule_line,
                     )?),
                     "watch" => Ok(RuleToken::new(
                         TokenType::AssignOptionsWatch,
                         op,
                         None,
                         "true".to_string(),
-                        context,
+                        rule_line,
                     )?),
                     "nowatch" => Ok(RuleToken::new(
                         TokenType::AssignOptionsWatch,
                         op,
                         None,
                         "false".to_string(),
-                        context,
+                        rule_line,
                     )?),
                     _ => {
                         if let Some(strip_value) = value.strip_prefix("static_node=") {
@@ -1224,7 +1235,7 @@ impl RuleToken {
                                 op,
                                 None,
                                 strip_value.to_string(),
-                                context,
+                                rule_line,
                             )?)
                         } else if let Some(strip_value) = value.strip_prefix("link_priority=") {
                             if value["link_priority=".len()..].parse::<i32>().is_err() {
@@ -1236,7 +1247,7 @@ impl RuleToken {
                                 op,
                                 None,
                                 strip_value.to_string(),
-                                context,
+                                rule_line,
                             )?)
                         } else if let Some(strip_value) = value.strip_prefix("log_level=") {
                             let level = if strip_value == "rest" {
@@ -1259,7 +1270,7 @@ impl RuleToken {
                                 op,
                                 None,
                                 level.to_string(),
-                                context,
+                                rule_line,
                             )?)
                         } else {
                             Err(Error::RulesLoadError {
@@ -1292,51 +1303,49 @@ impl RuleToken {
                     op = OperatorType::Assign;
                 }
 
-                if let Some(rules) = rules {
+                /*
+                 *  If a legal uid is provided, directly pass the uid to rules executer
+                 */
+                if parse_uid(&value).is_ok() {
+                    return RuleToken::new(TokenType::AssignOwnerId, op, attr, value, rule_line);
+                }
+
+                let time = rules.read().unwrap().resolve_name_time;
+                if time == ResolveNameTime::Early
+                    && SubstituteType::Plain == value.parse::<SubstituteType>().unwrap()
+                {
                     /*
-                     *  If a legal uid is provided, directly pass the uid to rules executer
+                     *  If the OWNER value is a legal user name, and resolve_name_time is set to 'Early',
+                     *  try to get the uid by resolving the user name.
                      */
-                    if parse_uid(&value).is_ok() {
-                        return RuleToken::new(TokenType::AssignOwnerId, op, attr, value, context);
+                    let user = rules.as_ref().write().unwrap().resolve_user(&value)?;
+
+                    log::debug!(
+                        "{}",
+                        format!(
+                            "owner '{}' is parsed into uid '{}' during rules loading",
+                            value, user.uid
+                        )
+                        .location(&context)
+                    );
+
+                    return RuleToken::new(
+                        TokenType::AssignOwnerId,
+                        op,
+                        attr,
+                        user.uid.to_string(),
+                        rule_line,
+                    );
+                } else if time != ResolveNameTime::Never {
+                    /*
+                     *  If the resolve_name_time is not set to 'Never', try to format the value during rules executing.
+                     *  Here we only check whether the format of value is legal.
+                     */
+                    if let Err(e) = check_value_format("OWNER", value.as_str(), true) {
+                        log::warn!("{}", e.location(&context));
                     }
 
-                    let time = rules.as_ref().read().unwrap().resolve_name_time;
-                    if time == ResolveNameTime::Early
-                        && SubstituteType::Plain == value.parse::<SubstituteType>().unwrap()
-                    {
-                        /*
-                         *  If the OWNER value is a legal user name, and resolve_name_time is set to 'Early',
-                         *  try to get the uid by resolving the user name.
-                         */
-                        let user = rules.as_ref().write().unwrap().resolve_user(&value)?;
-
-                        log::debug!(
-                            "{}",
-                            format!(
-                                "owner '{}' is parsed into uid '{}' during rules loading",
-                                value, user.uid
-                            )
-                            .location(&context)
-                        );
-
-                        return RuleToken::new(
-                            TokenType::AssignOwnerId,
-                            op,
-                            attr,
-                            user.uid.to_string(),
-                            context,
-                        );
-                    } else if time != ResolveNameTime::Never {
-                        /*
-                         *  If the resolve_name_time is not set to 'Never', try to format the value during rules executing.
-                         *  Here we only check whether the format of value is legal.
-                         */
-                        if let Err(e) = check_value_format("OWNER", value.as_str(), true) {
-                            log::warn!("{}", e.location(&context));
-                        }
-
-                        return RuleToken::new(TokenType::AssignOwner, op, attr, value, context);
-                    }
+                    return RuleToken::new(TokenType::AssignOwner, op, attr, value, rule_line);
                 }
 
                 Err(Error::IgnoreError {
@@ -1367,51 +1376,49 @@ impl RuleToken {
                     op = OperatorType::Assign;
                 }
 
-                if let Some(rules) = rules {
+                /*
+                 *  If a legal gid is provided, directly pass the gid to rules executer
+                 */
+                if parse_gid(&value).is_ok() {
+                    return RuleToken::new(TokenType::AssignGroupId, op, attr, value, rule_line);
+                }
+
+                let time = rules.as_ref().read().unwrap().resolve_name_time;
+                if time == ResolveNameTime::Early
+                    && SubstituteType::Plain == value.parse::<SubstituteType>().unwrap()
+                {
                     /*
-                     *  If a legal gid is provided, directly pass the gid to rules executer
+                     *  If the GROUP value is a legal group name, and resolve_name_time is set to 'Early',
+                     *  try to get the gid by resolving the group name.
                      */
-                    if parse_gid(&value).is_ok() {
-                        return RuleToken::new(TokenType::AssignGroupId, op, attr, value, context);
+                    let group: Group = rules.as_ref().write().unwrap().resolve_group(&value)?;
+
+                    log::debug!(
+                        "{}",
+                        format!(
+                            "group '{}' is parsed into gid '{}' during rules loading",
+                            value, group.gid
+                        )
+                        .location(&context)
+                    );
+
+                    return RuleToken::new(
+                        TokenType::AssignGroupId,
+                        op,
+                        attr,
+                        group.gid.to_string(),
+                        rule_line,
+                    );
+                } else if time != ResolveNameTime::Never {
+                    /*
+                     * If resolve_name_time is not set to 'Never', try to format the value during rules executing.
+                     * Here we only check the format of value is legal.
+                     */
+                    if let Err(e) = check_value_format("GROUP", value.as_str(), true) {
+                        log::warn!("{}", e);
                     }
 
-                    let time = rules.as_ref().read().unwrap().resolve_name_time;
-                    if time == ResolveNameTime::Early
-                        && SubstituteType::Plain == value.parse::<SubstituteType>().unwrap()
-                    {
-                        /*
-                         *  If the GROUP value is a legal group name, and resolve_name_time is set to 'Early',
-                         *  try to get the gid by resolving the group name.
-                         */
-                        let group: Group = rules.as_ref().write().unwrap().resolve_group(&value)?;
-
-                        log::debug!(
-                            "{}",
-                            format!(
-                                "group '{}' is parsed into gid '{}' during rules loading",
-                                value, group.gid
-                            )
-                            .location(&context)
-                        );
-
-                        return RuleToken::new(
-                            TokenType::AssignGroupId,
-                            op,
-                            attr,
-                            group.gid.to_string(),
-                            context,
-                        );
-                    } else if time != ResolveNameTime::Never {
-                        /*
-                         * If resolve_name_time is not set to 'Never', try to format the value during rules executing.
-                         * Here we only check the format of value is legal.
-                         */
-                        if let Err(e) = check_value_format("GROUP", value.as_str(), true) {
-                            log::warn!("{}", e);
-                        }
-
-                        return RuleToken::new(TokenType::AssignGroup, op, attr, value, context);
-                    }
+                    return RuleToken::new(TokenType::AssignGroup, op, attr, value, rule_line);
                 }
 
                 Err(Error::IgnoreError {
@@ -1453,7 +1460,7 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 } else {
                     if let Err(e) = check_value_format(key.as_str(), value.as_str(), true) {
@@ -1465,7 +1472,7 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 }
             }
@@ -1501,7 +1508,7 @@ impl RuleToken {
                     op,
                     attr,
                     value,
-                    context,
+                    rule_line,
                 )?)
             }
             "RUN" => {
@@ -1522,7 +1529,7 @@ impl RuleToken {
                         op,
                         None,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 } else if attr_content == "builtin" {
                     if value.parse::<BuiltinCommand>().is_err() {
@@ -1537,7 +1544,7 @@ impl RuleToken {
                         op,
                         attr,
                         value,
-                        context,
+                        rule_line,
                     )?)
                 } else {
                     Err(Error::IgnoreError {
@@ -1562,7 +1569,7 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::Goto, op, None, value, context)?)
+                Ok(RuleToken::new(TokenType::Goto, op, None, value, rule_line)?)
             }
             "LABEL" => {
                 if attr.is_some() {
@@ -1577,7 +1584,13 @@ impl RuleToken {
                     });
                 }
 
-                Ok(RuleToken::new(TokenType::Label, op, None, value, context)?)
+                Ok(RuleToken::new(
+                    TokenType::Label,
+                    op,
+                    None,
+                    value,
+                    rule_line,
+                )?)
             }
             _ => Err(Error::RulesLoadError {
                 msg: format!("Key '{}' is not supported.", key).location(&context),
@@ -1635,24 +1648,33 @@ SYMLINK += \"test111111\"",
 
     #[test]
     fn test_rules_file() {
+        let rules = Arc::new(RwLock::new(Rules::new(vec![], ResolveNameTime::Never)));
         fs::write(
             "test_rules_file.rules",
             "ACTION == \"change\", SYMLINK+=\"test\"\nACTION != \"change\"\n",
         )
         .unwrap();
-        RuleFile::load_file("test_rules_file.rules".to_string(), None);
+        RuleFile::load_file("test_rules_file.rules".to_string(), rules);
         fs::remove_file("test_rules_file.rules").unwrap();
     }
 
     #[test]
     fn test_rules_token() {
+        let rules = Arc::new(RwLock::new(Rules::new(vec![], ResolveNameTime::Never)));
+        let rule_file = Arc::new(RwLock::new(Some(RuleFile::new("test".to_string()))));
+        let rule_line = Arc::new(RwLock::new(Some(RuleLine::new(
+            "".to_string(),
+            0,
+            rule_file,
+        ))));
+
         assert!(RuleToken::parse_token(
             "ACTION".to_string(),
             None,
             "==".to_string(),
             "add".to_string(),
-            None,
-            (0, String::default(), String::from("ACTION==\"add\""))
+            rules.clone(),
+            rule_line.clone(),
         )
         .is_ok());
 
@@ -1661,8 +1683,8 @@ SYMLINK += \"test111111\"",
             None,
             "!=".to_string(),
             "add".to_string(),
-            None,
-            (0, String::default(), String::from("ACTION!=\"add\""))
+            rules.clone(),
+            rule_line.clone(),
         )
         .is_ok());
 
@@ -1671,8 +1693,8 @@ SYMLINK += \"test111111\"",
             None,
             "*=".to_string(),
             "add".to_string(),
-            None,
-            (0, String::default(), String::from("ACTION*=\"add\"")),
+            rules.clone(),
+            rule_line.clone(),
         )
         .is_err());
 
@@ -1681,25 +1703,29 @@ SYMLINK += \"test111111\"",
             Some("whatever".to_string()),
             "==".to_string(),
             "add".to_string(),
-            None,
-            (
-                0,
-                String::default(),
-                String::from("ACTION{whatever}==\"add\"")
-            ),
+            rules,
+            rule_line,
         )
         .is_err());
     }
 
     #[test]
     fn test_rules_token_regex() {
+        let rules = Arc::new(RwLock::new(Rules::new(vec![], ResolveNameTime::Never)));
+        let rule_file = Arc::new(RwLock::new(Some(RuleFile::new("test".to_string()))));
+        let rule_line = Arc::new(RwLock::new(Some(RuleLine::new(
+            "".to_string(),
+            0,
+            rule_file,
+        ))));
+
         let t = RuleToken::parse_token(
             "ACTION".to_string(),
             None,
             "==".to_string(),
             "add".to_string(),
-            None,
-            (0, String::default(), String::from("ACTION==\"add\"")),
+            rules.clone(),
+            rule_line.clone(),
         )
         .unwrap();
 
@@ -1710,8 +1736,8 @@ SYMLINK += \"test111111\"",
             None,
             "==".to_string(),
             ".?.*".to_string(),
-            None,
-            (0, String::default(), String::from("ACTION==\".?.*\"")),
+            rules.clone(),
+            rule_line.clone(),
         )
         .unwrap();
 
@@ -1722,8 +1748,8 @@ SYMLINK += \"test111111\"",
             None,
             "==".to_string(),
             "?*".to_string(),
-            None,
-            (0, String::default(), String::from("ACTION==\"?*\"")),
+            rules.clone(),
+            rule_line.clone(),
         )
         .unwrap();
 
@@ -1734,12 +1760,8 @@ SYMLINK += \"test111111\"",
             None,
             "==".to_string(),
             "hello|?*|hello*|3279/tty[0-9]*".to_string(),
-            None,
-            (
-                0,
-                String::default(),
-                String::from("ACTION==\"hello|?*|hello*|3279/tty[0-9]*\""),
-            ),
+            rules.clone(),
+            rule_line.clone(),
         )
         .unwrap();
 
@@ -1750,8 +1772,8 @@ SYMLINK += \"test111111\"",
             None,
             "==".to_string(),
             String::default(),
-            None,
-            (0, String::default(), String::from("ACTION==\"\"")),
+            rules.clone(),
+            rule_line.clone(),
         )
         .unwrap();
 
@@ -1762,12 +1784,8 @@ SYMLINK += \"test111111\"",
             None,
             "==".to_string(),
             "|hello|?*|hello*|3279/tty[0-9]*".to_string(),
-            None,
-            (
-                0,
-                String::default(),
-                String::from("ACTION==\"|hello|?*|hello*|3279/tty[0-9]*\""),
-            ),
+            rules.clone(),
+            rule_line.clone(),
         )
         .unwrap();
 
@@ -1778,12 +1796,8 @@ SYMLINK += \"test111111\"",
             Some("whatever".to_string()),
             "==".to_string(),
             "hello".to_string(),
-            None,
-            (
-                0,
-                String::default(),
-                String::from("ACTION{whatever}==\"hello\""),
-            ),
+            rules.clone(),
+            rule_line.clone(),
         )
         .unwrap();
 
@@ -1794,12 +1808,8 @@ SYMLINK += \"test111111\"",
             Some("whatever$".to_string()),
             "==".to_string(),
             "hello".to_string(),
-            None,
-            (
-                0,
-                String::default(),
-                String::from("ATTR{whatever$}==\"hello\""),
-            ),
+            rules.clone(),
+            rule_line.clone(),
         )
         .unwrap();
 
@@ -1810,12 +1820,8 @@ SYMLINK += \"test111111\"",
             Some("whatever%".to_string()),
             "==".to_string(),
             "hello".to_string(),
-            None,
-            (
-                0,
-                String::default(),
-                String::from("ATTR{whatever%}==\"hello\""),
-            ),
+            rules,
+            rule_line,
         )
         .unwrap();
 

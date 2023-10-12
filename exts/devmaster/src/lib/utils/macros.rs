@@ -20,13 +20,13 @@ macro_rules! execute_err {
         $e.map_err(|err| {
             log::error!(
                 "{}:{}:'{}' {}",
-                $t.rule_file,
-                $t.line_number,
-                $t.content,
+                $t.get_file_name(),
+                $t.get_line_number(),
+                $t,
                 err
             );
             Error::RulesExecuteError {
-                msg: format!("Apply '{}' error: {}", $t.content, err),
+                msg: format!("Apply '{}' error: {}", $t, err),
                 errno: err.get_errno(),
             }
         })
@@ -45,13 +45,13 @@ macro_rules! execute_err_ignore_ENOENT {
                 } else {
                     log::error!(
                         "{}:{}:'{}' {}",
-                        $t.rule_file,
-                        $t.line_number,
-                        $t.content,
+                        $t.get_file_name(),
+                        $t.get_line_number(),
+                        $t,
                         err
                     );
                     Err(Error::RulesExecuteError {
-                        msg: format!("Apply '{}' error: {}", $t.content, err),
+                        msg: format!("Apply '{}' error: {}", $t, err),
                         errno: err.get_errno(),
                     })
                 }
@@ -114,9 +114,9 @@ macro_rules! log_rule_token {
     ($l:ident, $t:expr, $m:expr) => {
         log::$l!(
             "{}:{}:'{}' {}",
-            $t.rule_file,
-            $t.line_number,
-            $t.content,
+            $t.get_file_name(),
+            $t.get_line_number(),
+            $t,
             $m
         )
     };
@@ -126,7 +126,7 @@ macro_rules! log_rule_token {
 #[macro_export]
 macro_rules! log_rule_line {
     ($l:ident, $t:expr, $m:expr) => {
-        log::$l!("{}:{}: {}", $t.rule_file, $t.line_number, $m)
+        log::$l!("{}:{}: {}", $t.get_file_name(), $t.line_number, $m)
     };
 }
 
