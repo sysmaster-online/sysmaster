@@ -12,10 +12,8 @@
 
 //! The init daemon
 mod config;
-mod logger;
 mod runtime;
 
-use logger::Logger;
 use nix::sys::signal;
 use nix::sys::signal::SaFlags;
 use nix::sys::signal::SigAction;
@@ -109,7 +107,7 @@ fn shutdown_init() {
 }
 
 fn main() -> std::io::Result<()> {
-    Logger::init(log::LevelFilter::Info);
+    log::init_log_to_kmsg("sysmaster-init", log::Level::Info);
 
     prepare_init();
 

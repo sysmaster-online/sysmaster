@@ -14,7 +14,7 @@ name = "init"
 path = "init/main.rs"
 
 [dependencies]
-log = { version = "=0.4.14", default_features = false, features = ["std"] }
+log = { path = "libs/log" }
 mio = { version = "0.8.8", default_features = false, features = [
   "os-poll",
   "os-ext",
@@ -26,8 +26,7 @@ nix = { version = "0.24", default-features = false, features = [
   "time",
   "user",
 ] }
-kernlog = "0.3.1"
-env_logger = "0.9.0"
+
 # tempfile = "=3.6.0"
 
 # 此为开发配置文件, 给 `cargo build` 所使用.
