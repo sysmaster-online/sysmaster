@@ -216,6 +216,13 @@ impl UeConfigData {
         ) {
             self.Unit.ConditionPathExists = ret;
         }
+        if let Ok(ret) = unit_string_specifier_escape(
+            &self.Unit.ConditionFileNotEmpty,
+            PATH_MAX - 1,
+            unit_specifier_data,
+        ) {
+            self.Unit.ConditionFileNotEmpty = ret;
+        }
         if let Ok(ret) =
             unit_strings_specifier_escape(&self.Unit.BindsTo, UNIT_NAME_MAX, unit_specifier_data)
         {
