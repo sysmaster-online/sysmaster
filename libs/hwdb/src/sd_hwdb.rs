@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::io::{Read, Seek};
+use std::io::Read;
 use std::os::unix::prelude::AsRawFd;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -283,7 +283,7 @@ impl SdHwdb {
             None => return Err(Errno::ENOENT),
         };
 
-        let value = self.trie_string(entry.value_off);
+        let value = self.trie_string(entry.value_off)?;
 
         Ok(value)
     }
@@ -313,7 +313,7 @@ impl SdHwdb {
         for it in self.properties.iter() {
             let key = it.0;
             let entry = it.1;
-            let value = self.trie_string(entry.value_off);
+            let value = self.trie_string(entry.value_off)?;
             map.insert(key.to_string(), value);
         }
 
@@ -329,13 +329,13 @@ impl SdHwdb {
     fn trie_search_f(&mut self, search: String) -> Result<()> {
         let mut i: usize = 0;
         let mut buf = LineBuf::new();
-        let mut node = self.trie_node_from_off(self.head.nodes_root_off);
+        let mut node = self.trie_node_from_off(self.head.nodes_root_off)?;
 
         loop {
             let mut p: usize = 0;
             if 0 != node.trie_node_f.prefix_off {
                 loop {
-                    let s = self.trie_string(node.trie_node_f.prefix_off);
+                    let s = self.trie_string(node.trie_node_f.prefix_off)?;
                     if s.len() == p {
                         break;
                     }
@@ -400,11 +400,10 @@ impl SdHwdb {
                 return Ok(());
             }
 
-            let child = self.node_lookup_f(&node, search.as_bytes()[i]);
-            if child.is_none() {
-                break;
+            match self.node_lookup_f(&node, search.as_bytes()[i]) {
+                Some(child) => node = child,
+                None => break,
             }
-            node = child.unwrap();
             i += 1;
         }
         Ok(())
@@ -418,13 +417,22 @@ impl SdHwdb {
             let off = node.node_index
                 + usize::from_le(self.head.node_size)
                 + child_count as usize * usize::from_le(self.head.child_entry_size);
-            let child: TrieChildEntryF = bincode::deserialize(&self.map[off..]).unwrap();
+            let child = match bincode::deserialize::<TrieChildEntryF>(&self.map[off..]) {
+                Ok(child) => child,
+                Err(e) => {
+                    log::error!("Failed to lookup child err:{:?}", e);
+                    continue;
+                }
+            };
             children.push(child);
         }
 
         children.sort_by_key(|search| search.c);
         match children.binary_search_by_key(&search.c, |search| search.c) {
-            Ok(a) => Some(self.trie_node_from_off(children[a].child_off)),
+            Ok(index) => match self.trie_node_from_off(children[index].child_off) {
+                Ok(trie_node) => Some(trie_node),
+                Err(_) => None,
+            },
             Err(_) => None,
         }
     }
@@ -436,26 +444,34 @@ impl SdHwdb {
         buf: &mut LineBuf,
         search: &str,
     ) -> Result<()> {
-        let prefix = self.trie_string(node.trie_node_f.prefix_off);
+        let prefix = self.trie_string(node.trie_node_f.prefix_off)?;
         let add_prefix = prefix[p..].to_string();
         buf.add(&add_prefix);
         let len = add_prefix.len();
 
         for i in 0..node.trie_node_f.children_count {
-            let child = self.trie_node_child(node.clone(), i as usize);
+            let child = self.trie_node_child(node.clone(), i as usize)?;
             buf.add_char(child.c);
-            let f = self.trie_node_from_off(child.child_off);
+            let f = self.trie_node_from_off(child.child_off)?;
             if let Err(e) = self.trie_fnmatch_f(f, 0, buf, search) {
                 return Err(e);
             }
             buf.rem_char();
         }
 
-        let pattern = Pattern::new(&buf.get()).unwrap();
-        if usize::from_le(node.trie_node_f.values_count) > 0 && pattern.matches(search) {
-            for i in 0..usize::from_le(node.trie_node_f.values_count) {
-                if let Err(e) = self.add_property(&node, i) {
-                    return Err(e);
+        if usize::from_le(node.trie_node_f.values_count) > 0 {
+            match Pattern::new(&buf.get()) {
+                Ok(pattern) => {
+                    if pattern.matches(search) {
+                        for i in 0..usize::from_le(node.trie_node_f.values_count) {
+                            if let Err(e) = self.add_property(&node, i) {
+                                return Err(e);
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::error!("Failed to new Pattern err:{:?} buf:{:?}", e, buf.get());
                 }
             }
         }
@@ -464,29 +480,39 @@ impl SdHwdb {
         Ok(())
     }
 
-    fn trie_node_value(&self, node: &TrieNode, idx: usize) -> TrieValueEntryF {
+    fn trie_node_value(&self, node: &TrieNode, idx: usize) -> Result<TrieValueEntryF> {
         let mut off = node.node_index + usize::from_le(self.head.node_size);
         off +=
             node.trie_node_f.children_count as usize * usize::from_le(self.head.child_entry_size);
         off += idx * usize::from_le(self.head.value_entry_size);
 
-        let value: TrieValueEntryF = bincode::deserialize(&self.map[off..]).unwrap();
-        value
+        match bincode::deserialize::<TrieValueEntryF>(&self.map[off..]) {
+            Ok(value) => Ok(value),
+            Err(e) => {
+                log::error!("Failed to deserialize node_value err:{:?}", e);
+                Err(Errno::EINVAL)
+            }
+        }
     }
 
-    fn trie_node_value2(&self, node: &TrieNode, idx: usize) -> TrieValueEntry2F {
+    fn trie_node_value2(&self, node: &TrieNode, idx: usize) -> Result<TrieValueEntry2F> {
         let mut off = node.node_index + usize::from_le(self.head.node_size);
         off +=
             node.trie_node_f.children_count as usize * usize::from_le(self.head.child_entry_size);
         off += idx * usize::from_le(self.head.value_entry_size);
 
-        let value: TrieValueEntry2F = bincode::deserialize(&self.map[off..]).unwrap();
-        value
+        match bincode::deserialize::<TrieValueEntry2F>(&self.map[off..]) {
+            Ok(value) => Ok(value),
+            Err(e) => {
+                log::error!("Failed to deserialize node_value2 err:{:?}", e);
+                Err(Errno::EINVAL)
+            }
+        }
     }
 
     fn add_property(&mut self, node: &TrieNode, idx: usize) -> Result<()> {
-        let entry = self.trie_node_value(node, idx);
-        let mut key = self.trie_string(entry.key_off);
+        let entry = self.trie_node_value(node, idx)?;
+        let mut key = self.trie_string(entry.key_off)?;
 
         let mut entry2 = TrieValueEntry2F::new(entry.key_off, entry.value_off, 0, 0, 0);
 
@@ -501,7 +527,7 @@ impl SdHwdb {
         key.remove(0);
 
         if usize::from_le(self.head.value_entry_size) >= std::mem::size_of::<TrieValueEntry2F>() {
-            entry2 = self.trie_node_value2(node, idx);
+            entry2 = self.trie_node_value2(node, idx)?;
             if let Some(old) = self.properties.get(&key) {
                 /* On duplicates, we order by filename priority and line-number.
                  *
@@ -548,23 +574,34 @@ impl SdHwdb {
         Ok(())
     }
 
-    fn trie_node_child(&self, node: TrieNode, idx: usize) -> TrieChildEntryF {
+    fn trie_node_child(&self, node: TrieNode, idx: usize) -> Result<TrieChildEntryF> {
         let off = node.node_index
             + usize::from_le(self.head.node_size)
             + idx * usize::from_le(self.head.child_entry_size);
 
-        let child: TrieChildEntryF = bincode::deserialize(&self.map[off..]).unwrap();
-        child
+        match bincode::deserialize::<TrieChildEntryF>(&self.map[off..]) {
+            Ok(child) => Ok(child),
+            Err(e) => {
+                log::error!("Failed to deserialize TrieChildEntryF err:{:?}", e);
+                Err(Errno::EINVAL)
+            }
+        }
     }
 
-    fn trie_node_from_off(&mut self, off: usize) -> TrieNode {
+    fn trie_node_from_off(&mut self, off: usize) -> Result<TrieNode> {
         let trie_node_off = usize::from_le(off);
-        let trie_node_f: TrieNodeF = bincode::deserialize(&self.map[trie_node_off..]).unwrap();
+        let trie_node_f = match bincode::deserialize::<TrieNodeF>(&self.map[trie_node_off..]) {
+            Ok(trie_node_f) => trie_node_f,
+            Err(e) => {
+                log::error!("Failed to deserialize TrieNodeF err:{:?}", e);
+                return Err(Errno::EINVAL);
+            }
+        };
 
-        TrieNode::new(trie_node_f, trie_node_off)
+        Ok(TrieNode::new(trie_node_f, trie_node_off))
     }
 
-    fn trie_string(&self, off: usize) -> String {
+    fn trie_string(&self, off: usize) -> Result<String> {
         let mut s: Vec<u8> = Vec::new();
         let mut i = 0;
         while let Ok(c) = bincode::deserialize::<u8>(&self.map[usize::from_le(off) + i..]) {
@@ -575,14 +612,12 @@ impl SdHwdb {
             }
             i += 1;
         }
-        String::from_utf8(s).unwrap()
-    }
-}
-
-impl Drop for SdHwdb {
-    fn drop(&mut self) {
-        if nix::unistd::close(self.f.as_raw_fd()).is_err() {
-            log::error!("Failed to close fd {:?}", self.f);
+        match String::from_utf8(s) {
+            Ok(trie_str) => Ok(trie_str),
+            Err(e) => {
+                log::error!("Failed to from_utf8 err:{:?}", e);
+                Err(Errno::EINVAL)
+            }
         }
     }
 }
@@ -598,26 +633,28 @@ fn hwdb_new(path: &str) -> Result<SdHwdb> {
         file = match OpenOptions::new().read(true).open(path) {
             Ok(f) => Some(f),
             Err(e) => {
-                log::error!("Failed to open {:?}", path);
-                return Err(Errno::from_i32(e.raw_os_error().unwrap()));
+                log::error!("Failed to open {:?} err:{:?}", path, e);
+                return Err(Errno::EINVAL);
             }
         };
     } else {
         for p in HWDB_BIN_PATHS {
             log::debug!("Trying to open \"{:?}\"...", p);
-            let f = OpenOptions::new().read(true).open(p);
-            if let Ok(ff) = f {
-                file = Some(ff);
-                hwdb_path = p;
-                break;
-            }
-
-            let err = Errno::from_i32(f.err().unwrap().raw_os_error().unwrap());
-            if err != Errno::ENOENT {
-                log::error!("Failed to open {:?}", p);
-                return Err(err);
+            match OpenOptions::new().read(true).open(p) {
+                Ok(f) => {
+                    file = Some(f);
+                    hwdb_path = p;
+                    break;
+                }
+                Err(e) => {
+                    if e.kind() != std::io::ErrorKind::NotFound {
+                        log::error!("Failed to open {:?} err:{:?}", p, e);
+                        return Err(Errno::EINVAL);
+                    }
+                }
             }
         }
+
         if file.is_none() {
             log::error!("hwdb.bin does not exist, please run 'sysmaster-hwdb update'");
             return Err(Errno::ENOENT);
@@ -642,18 +679,20 @@ fn hwdb_new(path: &str) -> Result<SdHwdb> {
         return Err(Errno::EFBIG);
     }
 
-    hwdb_file.seek(std::io::SeekFrom::Start(0)).unwrap();
-    let mut buffer: [u8; 1024] = [0; 1024];
-    let mut hwdb_map = Vec::new();
-    loop {
-        let n = hwdb_file.read(&mut buffer).unwrap();
-        if 0 == n {
-            break;
-        }
-        hwdb_map.extend_from_slice(&buffer[..n]);
+    let mut hwdb_map = Vec::with_capacity(hwdb_st.st_size as usize);
+    if let Err(e) = hwdb_file.read_to_end(&mut hwdb_map) {
+        log::error!("Failed to read_to_end of {:?} err:{:?}", hwdb_path, e);
+        return Err(Errno::EINVAL);
     }
 
-    let hwdb_head: TrieHeaderF = bincode::deserialize(&hwdb_map).unwrap();
+    let hwdb_head = match bincode::deserialize::<TrieHeaderF>(&hwdb_map) {
+        Ok(hwdb_head) => hwdb_head,
+        Err(e) => {
+            log::error!("Failed to deserialize TrieHeaderF err:{:?}", e);
+            return Err(Errno::EINVAL);
+        }
+    };
+
     if hwdb_head.signature != sig || hwdb_st.st_size as usize != usize::from_le(hwdb_head.file_size)
     {
         log::error!("Failed to recognize the format of {:?}", hwdb_path);

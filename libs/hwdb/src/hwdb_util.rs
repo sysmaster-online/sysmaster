@@ -48,7 +48,10 @@ impl Trie {
 
         let f = match File::open(filename) {
             Ok(f) => f,
-            Err(e) => return Err(Errno::from_i32(e.raw_os_error().unwrap())),
+            Err(e) => {
+                log::error!("Failed to open file:{:?} err:{:?}", filename, e);
+                return Err(Errno::EINVAL);
+            }
         };
 
         let mut line_number = 0;
@@ -64,7 +67,10 @@ impl Trie {
                         break;
                     }
                 }
-                Err(e) => return Err(Errno::from_i32(e.raw_os_error().unwrap())),
+                Err(e) => {
+                    log::error!("Failed to read line:{:?} err:{:?}", line, e);
+                    return Err(Errno::EINVAL);
+                }
             }
 
             line_number += 1;
@@ -352,15 +358,25 @@ impl Trie {
 
         t.store_nodes_size(&self.root, compat);
 
-        let mut f = match File::create(filename) {
+        let mut f = match File::create(&filename) {
             Ok(f) => f,
-            Err(e) => return Err(Errno::from_i32(e.raw_os_error().unwrap())),
+            Err(e) => {
+                log::error!("Failed to create file:{:?} err:{:?}", filename, e);
+                return Err(Errno::EINVAL);
+            }
         };
 
-        let mut permissions = f.metadata().unwrap().permissions();
+        let mut permissions = match f.metadata() {
+            Ok(data) => data.permissions(),
+            Err(e) => {
+                log::error!("Failed to get metadata err:{:?}", e);
+                return Err(Errno::EINVAL);
+            }
+        };
         permissions.set_mode(0o444);
         if let Err(e) = f.set_permissions(permissions) {
-            return Err(Errno::from_i32(e.raw_os_error().unwrap()));
+            log::error!("Failed to set permissions err:{:?}", e);
+            return Err(Errno::EINVAL);
         }
 
         let header_size = usize::to_le(size_of::<TrieHeaderF>());
@@ -382,29 +398,56 @@ impl Trie {
 
         /* write nodes */
         if let Err(e) = f.seek(SeekFrom::Start(size_of::<TrieHeaderF>() as u64)) {
-            return Err(Errno::from_i32(e.raw_os_error().unwrap()));
+            log::error!("Failed to seek file:{:?} err:{:?}", filename, e);
+            return Err(Errno::EINVAL);
         }
 
         let root_off = t.store_nodes(&mut f, &self.root, compat)?;
         h.set_nodes_root_off(usize::to_le(root_off));
 
-        let pos = f.seek(SeekFrom::Current(0)).unwrap() as usize;
+        let pos = match f.seek(SeekFrom::Current(0)) {
+            Ok(pos) => pos as usize,
+            Err(e) => {
+                log::error!("Failed to seek file:{:?} err:{:?}", filename, e);
+                return Err(Errno::EINVAL);
+            }
+        };
         h.set_nodes_len(usize::to_le(pos - size_of::<TrieHeaderF>()));
 
         /* write string buffer */
-        f.write_all(&self.strings.buf).unwrap();
+        if let Err(e) = f.write_all(&self.strings.buf) {
+            log::error!("Failed to write_all file:{:?} err:{:?}", filename, e);
+            return Err(Errno::EINVAL);
+        }
         h.set_strings_len(usize::to_le(self.strings.buf.len()));
 
         /* write header */
-        let size = f.seek(SeekFrom::Current(0)).unwrap() as usize;
+        let size = match f.seek(SeekFrom::Current(0)) {
+            Ok(size) => size as usize,
+            Err(e) => {
+                log::error!("Failed to seek file:{:?} err:{:?}", filename, e);
+                return Err(Errno::EINVAL);
+            }
+        };
         h.set_file_size(usize::to_le(size));
 
         if let Err(e) = f.seek(SeekFrom::Start(0)) {
-            return Err(Errno::from_i32(e.raw_os_error().unwrap()));
+            log::error!("Failed to seek file:{:?} err:{:?}", filename, e);
+            return Err(Errno::EINVAL);
         }
 
-        let encoded: Vec<u8> = bincode::serialize(&h).unwrap();
-        f.write_all(encoded.as_slice()).unwrap();
+        let encoded = match bincode::serialize(&h) {
+            Ok(encoded) => encoded,
+            Err(e) => {
+                log::error!("Failed to serialize TrieHeaderF err:{:?}", e);
+                return Err(Errno::EINVAL);
+            }
+        };
+
+        if let Err(e) = f.write_all(encoded.as_slice()) {
+            log::error!("Failed to write_all file:{:?} err:{:?}", filename, e);
+            return Err(Errno::EINVAL);
+        }
 
         /* write succeeded */
         log::debug!("=== trie on-disk ===");
@@ -495,16 +538,42 @@ impl TrieF {
         );
 
         /* write node */
-        let node_off = f.seek(SeekFrom::Current(0)).unwrap() as usize;
+        let node_off = match f.seek(SeekFrom::Current(0)) {
+            Ok(off) => off as usize,
+            Err(e) => {
+                log::error!("Failed to seek file err:{:?}", e);
+                return Err(Errno::EINVAL);
+            }
+        };
 
-        let encoded: Vec<u8> = bincode::serialize(&n).unwrap();
-        f.write_all(encoded.as_slice()).unwrap();
+        let encoded = match bincode::serialize(&n) {
+            Ok(encoded) => encoded,
+            Err(e) => {
+                log::error!("Failed to serialize TrieNodeF err:{:?}", e);
+                return Err(Errno::EINVAL);
+            }
+        };
+
+        if let Err(e) = f.write_all(encoded.as_slice()) {
+            log::error!("Failed to write_all file err:{:?}", e);
+            return Err(Errno::EINVAL);
+        }
         self.nodes_count += 1;
 
         /* append children array */
         for child in children.iter().take(node.borrow().children.len()) {
-            let encoded: Vec<u8> = bincode::serialize(&child).unwrap();
-            f.write_all(encoded.as_slice()).unwrap();
+            let encoded = match bincode::serialize(&child) {
+                Ok(encoded) => encoded,
+                Err(e) => {
+                    log::error!("Failed to serialize TrieChildEntryF err:{:?}", e);
+                    return Err(Errno::EINVAL);
+                }
+            };
+
+            if let Err(e) = f.write_all(encoded.as_slice()) {
+                log::error!("Failed to write_all file err:{:?}", e);
+                return Err(Errno::EINVAL);
+            }
         }
         self.children_count += node.borrow().children.len();
 
@@ -514,8 +583,18 @@ impl TrieF {
             let value_off = usize::to_le(self.strings_off + node.borrow().values[i].value_off);
             if compat {
                 let v = TrieValueEntryF::new(key_off, value_off);
-                let encoded: Vec<u8> = bincode::serialize(&v).unwrap();
-                f.write_all(encoded.as_slice()).unwrap();
+                let encoded = match bincode::serialize(&v) {
+                    Ok(encoded) => encoded,
+                    Err(e) => {
+                        log::error!("Failed to serialize TrieValueEntryF err:{:?}", e);
+                        return Err(Errno::EINVAL);
+                    }
+                };
+
+                if let Err(e) = f.write_all(encoded.as_slice()) {
+                    log::error!("Failed to write_all file err:{:?}", e);
+                    return Err(Errno::EINVAL);
+                }
             } else {
                 let filename_off =
                     usize::to_le(self.strings_off + node.borrow().values[i].filename_off);
@@ -528,8 +607,18 @@ impl TrieF {
                     line_number,
                     file_priority,
                 );
-                let encoded: Vec<u8> = bincode::serialize(&v).unwrap();
-                f.write_all(encoded.as_slice()).unwrap();
+                let encoded = match bincode::serialize(&v) {
+                    Ok(encoded) => encoded,
+                    Err(e) => {
+                        log::error!("Failed to serialize TrieValueEntry2F err:{:?}", e);
+                        return Err(Errno::EINVAL);
+                    }
+                };
+
+                if let Err(e) = f.write_all(encoded.as_slice()) {
+                    log::error!("Failed to write_all file err:{:?}", e);
+                    return Err(Errno::EINVAL);
+                }
             };
         }
         self.values_count += node.borrow().values.len();
@@ -711,8 +800,15 @@ impl HwdbUtil {
         log::debug!("strings:          {:?} bytes", trie.strings.buf.len());
 
         let permissions = Permissions::from_mode(0o755);
-        create_dir_all(&bin_dir).unwrap();
-        std::fs::set_permissions(&bin_dir, permissions).unwrap();
+        if let Err(e) = create_dir_all(&bin_dir) {
+            log::error!("Failed to create dir:{:?} err:{:?}", bin_dir, e);
+            return Err(Errno::EINVAL);
+        }
+
+        if let Err(e) = std::fs::set_permissions(&bin_dir, permissions) {
+            log::error!("Failed to set permissions dir:{:?} err:{:?}", bin_dir, e);
+            return Err(Errno::EINVAL);
+        }
 
         trie.store(hwdb_bin, compat)?;
 
