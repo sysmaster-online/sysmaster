@@ -29,5 +29,5 @@ nix = { default-features = false, version = "0.24", features = [
     "fs",
     "dir",
 ] }
-regex = { default-features = false, version = "1.7.0" }
+regex = { default-features = false, version = "=1.9.0" }
 snafu = { default-features = false, version = "0.7" }

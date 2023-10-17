@@ -151,7 +151,7 @@ impl DeviceMonitor {
             }
         }
 
-        let prefix = std::str::from_utf8(&buf[..prefix_split_idx]).unwrap();
+        let prefix = String::from_utf8(buf[..prefix_split_idx].to_vec()).unwrap();
 
         if prefix.contains("@/") {
             return Device::from_nulstr(&buf[prefix_split_idx + 1..n]);
