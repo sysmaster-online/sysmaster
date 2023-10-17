@@ -77,7 +77,7 @@ impl RuleFile {
 }
 
 /// rule line contains at least a rule token
-/// the regex is as following:
+/// the regular expression pattern is as following:
 ///     `(<token>\s*,?\s*)+`
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -142,7 +142,7 @@ impl RuleLine {
     }
 }
 
-/// rule token matches regex:
+/// rule token matches the following regular expression pattern:
 /// `<key>[{attr}]\s*<op>\s*\"<value>\"`
 /// where
 ///     key: [^={+\-!:\0\s]+

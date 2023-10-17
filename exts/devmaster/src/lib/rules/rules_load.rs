@@ -19,9 +19,8 @@ use crate::error::{Error, Result};
 use crate::utils::commons::*;
 use basic::parse::parse_mode;
 use basic::unistd::{parse_gid, parse_uid};
-use lazy_static::lazy_static;
+use basic::IN_SET;
 use nix::unistd::{Group, User};
-use regex::Regex;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
@@ -224,13 +223,18 @@ impl RuleFile {
                 offset += 1;
             } else {
                 full_line.push_str(line);
-                let line = RuleLine::load_line(
+                let line = match RuleLine::load_line(
                     &full_line,
                     (line_number + 1 - offset) as u32,
                     rule_file.clone(),
                     rules.clone(),
-                )
-                .unwrap();
+                ) {
+                    Ok(line) => line,
+                    Err(e) => {
+                        log::error!("{}:{} {}", &file_name, line_number, &e);
+                        panic!();
+                    }
+                };
                 rule_file.write().unwrap().as_mut().unwrap().add_line(line);
                 full_line.clear();
                 offset = 0;
@@ -334,93 +338,212 @@ impl RuleLine {
     ) -> Result<Arc<RwLock<Option<RuleLine>>>> {
         debug_assert!(file.read().unwrap().is_some());
 
-        lazy_static! {
-            static ref RE_LINE: Regex =
-                Regex::new("((?P<key>[^=,\"{+\\-!:\0\\s]+)(\\{(?P<attr>[^\\{\\}]+)\\})?\\s*(?P<op>[!:+-=]?=)\\s*\"(?P<value>[^\"]+)\"\\s*,?\\s*)+").unwrap();
-            static ref RE_TOKEN: Regex =
-                Regex::new("(?P<key>[^=,\"{+\\-!:\0\\s]+)(\\{(?P<attr>[^\\{\\}]+)\\})?\\s*(?P<op>[!:+-=]?=)\\s*\"(?P<value>[^\"]+)\"\\s*,?\\s*").unwrap();
-        }
-
         let rule_line = Arc::new(RwLock::new(Some(RuleLine::new(
             line.to_string(),
             line_number,
             file,
         ))));
 
-        if !RE_LINE.is_match(line) {
-            return Err(Error::RulesLoadError {
-                msg: "Invalid rule line".to_string(),
-            });
+        #[derive(Debug)]
+        enum State {
+            Pre,
+            Key,
+            Attribute,
+            PreOp,
+            Op,
+            PostOp,
+            Value,
+            PostValue,
         }
 
-        for token in RE_TOKEN.captures_iter(line) {
-            // through previous check through regular expression,
-            // key, op, value must not be none
-            // attr may be none in case of specific rule tokens
-            let key = token.name("key").map(|k| k.as_str().to_string()).unwrap();
-            let attr = token.name("attr").map(|a| a.as_str().to_string());
-            let op = token.name("op").map(|o| o.as_str().to_string()).unwrap();
-            let value = token.name("value").map(|v| v.as_str().to_string()).unwrap();
+        let mut state = State::Pre;
+        let mut key = "".to_string();
+        let mut attribute = "".to_string();
+        let mut op = "".to_string();
+        let mut value = "".to_string();
 
-            // if the token is 'GOTO' or 'LABEL', parse_token will return a IgnoreError
-            // the following tokens in this line, if any, will be skipped
-            let rule_token =
-                RuleToken::parse_token(key, attr, op, value, rules.clone(), rule_line.clone())?;
-            match rule_token.r#type {
-                TokenType::Goto => {
-                    rule_line.write().unwrap().as_mut().unwrap().goto_label =
-                        Some(rule_token.value.clone());
-                    rule_line.write().unwrap().as_mut().unwrap().r#type |= RuleLineType::HAS_GOTO;
-                }
-                TokenType::Label => {
-                    rule_line.write().unwrap().as_mut().unwrap().label =
-                        Some(rule_token.value.clone());
-                    rule_line.write().unwrap().as_mut().unwrap().r#type |= RuleLineType::HAS_LABEL;
-                }
-                TokenType::AssignName => {
-                    rule_line.write().unwrap().as_mut().unwrap().r#type |= RuleLineType::HAS_NAME;
-                }
+        for (idx, ch) in line.chars().enumerate() {
+            match state {
+                State::Pre => {
+                    if ch.is_ascii_whitespace() || ch == ',' {
+                        continue;
+                    }
 
-                t => {
-                    if [
-                        TokenType::AssignDevlink,
-                        TokenType::AssignOwner,
-                        TokenType::AssignGroup,
-                        TokenType::AssignMode,
-                        TokenType::AssignOwnerId,
-                        TokenType::AssignGroupId,
-                        TokenType::AssignModeId,
-                    ]
-                    .contains(&t)
-                    {
-                        rule_line.write().unwrap().as_mut().unwrap().r#type |=
-                            RuleLineType::HAS_DEVLINK;
-                    } else if TokenType::AssignOptionsStaticNode == t {
-                        rule_line.write().unwrap().as_mut().unwrap().r#type |=
-                            RuleLineType::HAS_STATIC_NODE;
-                    } else if t >= TokenType::AssignOptionsStringEscapeNone
-                        || [
-                            TokenType::MatchProgram,
-                            TokenType::MatchImportFile,
-                            TokenType::MatchImportProgram,
-                            TokenType::MatchImportBuiltin,
-                            TokenType::MatchImportDb,
-                            TokenType::MatchImportCmdline,
-                            TokenType::MatchImportParent,
-                        ]
-                        .contains(&t)
-                    {
-                        rule_line.write().unwrap().as_mut().unwrap().r#type |=
-                            RuleLineType::UPDATE_SOMETHING;
+                    if ch.is_ascii_uppercase() {
+                        key.push(ch);
+                        state = State::Key;
+                    } else {
+                        return Err(Error::RulesLoadError {
+                            msg: format!("Invalid rule line: {} {} {:?}", line, idx, state),
+                        });
+                    }
+                }
+                State::Key => {
+                    if ch.is_ascii_uppercase() {
+                        key.push(ch);
+                        state = State::Key;
+                    } else if ch.is_ascii_whitespace() {
+                        state = State::PreOp;
+                    } else if ch == '{' {
+                        state = State::Attribute;
+                    } else if IN_SET!(ch, '!', '+', '-', ':', '=') {
+                        op.push(ch);
+                        state = State::Op;
+                    } else {
+                        return Err(Error::RulesLoadError {
+                            msg: format!("Invalid rule line: {} {} {:?}", line, idx, state),
+                        });
+                    }
+                }
+                State::Attribute => {
+                    if ch == '}' {
+                        state = State::PreOp;
+                        continue;
+                    }
+
+                    if ch.is_ascii_alphanumeric() || IN_SET!(ch, '$', '%', '*', '.', '/', '_') {
+                        attribute.push(ch);
+                    } else {
+                        return Err(Error::RulesLoadError {
+                            msg: format!("Invalid rule line: {} {} {:?}", line, idx, state),
+                        });
+                    }
+                }
+                State::PreOp => {
+                    if ch.is_ascii_whitespace() {
+                        continue;
+                    }
+
+                    if IN_SET!(ch, '!', '+', '-', ':', '=') {
+                        op.push(ch);
+                        state = State::Op;
+                    } else {
+                        return Err(Error::RulesLoadError {
+                            msg: format!("Invalid rule line: {} {} {:?}", line, idx, state),
+                        });
+                    }
+                }
+                State::Op => {
+                    if ch == '=' {
+                        op.push(ch);
+                        state = State::PostOp;
+                    } else if ch.is_ascii_whitespace() {
+                        state = State::PostOp;
+                    } else if ch == '"' {
+                        state = State::Value;
+                    } else {
+                        return Err(Error::RulesLoadError {
+                            msg: format!("Invalid rule line: {} {} {:?}", line, idx, state),
+                        });
+                    }
+                }
+                State::PostOp => {
+                    if ch.is_ascii_whitespace() {
+                        continue;
+                    } else if ch == '"' {
+                        state = State::Value;
+                    } else {
+                        return Err(Error::RulesLoadError {
+                            msg: format!("Invalid rule line: {} {} {:?}", line, idx, state),
+                        });
+                    }
+                }
+                State::Value => {
+                    if ch == '"' {
+                        state = State::PostValue;
+
+                        let attr = if attribute.is_empty() {
+                            None
+                        } else {
+                            Some(attribute.clone())
+                        };
+
+                        // if the token is 'GOTO' or 'LABEL', parse_token will return a IgnoreError
+                        // the following tokens in this line, if any, will be skipped
+                        let rule_token = RuleToken::parse_token(
+                            key.clone(),
+                            attr,
+                            op.clone(),
+                            value.clone(),
+                            rules.clone(),
+                            rule_line.clone(),
+                        )?;
+                        match rule_token.r#type {
+                            TokenType::Goto => {
+                                rule_line.write().unwrap().as_mut().unwrap().goto_label =
+                                    Some(rule_token.value.clone());
+                                rule_line.write().unwrap().as_mut().unwrap().r#type |=
+                                    RuleLineType::HAS_GOTO;
+                            }
+                            TokenType::Label => {
+                                rule_line.write().unwrap().as_mut().unwrap().label =
+                                    Some(rule_token.value.clone());
+                                rule_line.write().unwrap().as_mut().unwrap().r#type |=
+                                    RuleLineType::HAS_LABEL;
+                            }
+                            TokenType::AssignName => {
+                                rule_line.write().unwrap().as_mut().unwrap().r#type |=
+                                    RuleLineType::HAS_NAME;
+                            }
+
+                            t => {
+                                if [
+                                    TokenType::AssignDevlink,
+                                    TokenType::AssignOwner,
+                                    TokenType::AssignGroup,
+                                    TokenType::AssignMode,
+                                    TokenType::AssignOwnerId,
+                                    TokenType::AssignGroupId,
+                                    TokenType::AssignModeId,
+                                ]
+                                .contains(&t)
+                                {
+                                    rule_line.write().unwrap().as_mut().unwrap().r#type |=
+                                        RuleLineType::HAS_DEVLINK;
+                                } else if TokenType::AssignOptionsStaticNode == t {
+                                    rule_line.write().unwrap().as_mut().unwrap().r#type |=
+                                        RuleLineType::HAS_STATIC_NODE;
+                                } else if t >= TokenType::AssignOptionsStringEscapeNone
+                                    || [
+                                        TokenType::MatchProgram,
+                                        TokenType::MatchImportFile,
+                                        TokenType::MatchImportProgram,
+                                        TokenType::MatchImportBuiltin,
+                                        TokenType::MatchImportDb,
+                                        TokenType::MatchImportCmdline,
+                                        TokenType::MatchImportParent,
+                                    ]
+                                    .contains(&t)
+                                {
+                                    rule_line.write().unwrap().as_mut().unwrap().r#type |=
+                                        RuleLineType::UPDATE_SOMETHING;
+                                }
+                            }
+                        }
+                        rule_line
+                            .write()
+                            .unwrap()
+                            .as_mut()
+                            .unwrap()
+                            .add_token(rule_token);
+                    } else {
+                        value.push(ch);
+                    }
+                }
+                State::PostValue => {
+                    if ch.is_ascii_whitespace() || ch == ',' {
+                        state = State::Pre;
+                        key.clear();
+                        attribute.clear();
+                        op.clear();
+                        value.clear();
+                    } else {
+                        return Err(Error::RulesLoadError {
+                            msg: format!("Invalid rule line: {} {} {:?}", line, idx, state),
+                        });
                     }
                 }
             }
-            rule_line
-                .write()
-                .unwrap()
-                .as_mut()
-                .unwrap()
-                .add_token(rule_token);
         }
 
         Ok(rule_line)
@@ -1865,5 +1988,115 @@ SYMLINK += \"test111111\"",
         assert!(rules.users.contains_key("tss"));
         assert!(rules.users.contains_key("root"));
         assert!(rules.resolve_user("cjy").is_err());
+    }
+
+    #[test]
+    fn test_load_line() {
+        let rules = Arc::new(RwLock::new(Rules::new(
+            vec![
+                "test_rules_new_1".to_string(),
+                "test_rules_new_2".to_string(),
+            ],
+            ResolveNameTime::Early,
+        )));
+        let rule_file = Arc::new(RwLock::new(Some(RuleFile::new("test".to_string()))));
+        let line =
+            RuleLine::load_line("TAG+=\"hello\"", 0, rule_file.clone(), rules.clone()).unwrap();
+
+        let mut iter = line.read().unwrap().as_ref().unwrap().iter();
+
+        let token = iter.next().unwrap();
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().r#type,
+            TokenType::AssignTag
+        );
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().op,
+            OperatorType::Add
+        );
+        assert_eq!(token.read().unwrap().as_ref().unwrap().attr, None);
+        assert_eq!(token.read().unwrap().as_ref().unwrap().value, "hello");
+
+        let line = RuleLine::load_line(
+            "TAG   += \"hello\", ENV{hello}=\"world\"",
+            0,
+            rule_file.clone(),
+            rules.clone(),
+        )
+        .unwrap();
+        let mut iter = line.read().unwrap().as_ref().unwrap().iter();
+        let token = iter.next().unwrap();
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().r#type,
+            TokenType::AssignTag
+        );
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().op,
+            OperatorType::Add
+        );
+        assert_eq!(token.read().unwrap().as_ref().unwrap().attr, None);
+        assert_eq!(token.read().unwrap().as_ref().unwrap().value, "hello");
+        let token = iter.next().unwrap();
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().r#type,
+            TokenType::AssignEnv
+        );
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().op,
+            OperatorType::Assign
+        );
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().attr,
+            Some("hello".to_string())
+        );
+        assert_eq!(token.read().unwrap().as_ref().unwrap().value, "world");
+
+        let line = RuleLine::load_line(
+            "KERNEL==\"md*\", TEST==\"/run/mdadm/creating-$kernel\", ENV{SYSTEMD_READY}=\"0\"",
+            0,
+            rule_file,
+            rules,
+        )
+        .unwrap();
+        let mut iter = line.read().unwrap().as_ref().unwrap().iter();
+        let token = iter.next().unwrap();
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().r#type,
+            TokenType::MatchKernel
+        );
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().op,
+            OperatorType::Match
+        );
+        assert_eq!(token.read().unwrap().as_ref().unwrap().attr, None);
+        assert_eq!(token.read().unwrap().as_ref().unwrap().value, "md*");
+        let token = iter.next().unwrap();
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().r#type,
+            TokenType::MatchTest
+        );
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().op,
+            OperatorType::Match
+        );
+        assert_eq!(token.read().unwrap().as_ref().unwrap().attr, None);
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().value,
+            "/run/mdadm/creating-$kernel"
+        );
+        let token = iter.next().unwrap();
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().r#type,
+            TokenType::AssignEnv
+        );
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().op,
+            OperatorType::Assign
+        );
+        assert_eq!(
+            token.read().unwrap().as_ref().unwrap().attr,
+            Some("SYSTEMD_READY".to_string())
+        );
+        assert_eq!(token.read().unwrap().as_ref().unwrap().value, "0");
     }
 }

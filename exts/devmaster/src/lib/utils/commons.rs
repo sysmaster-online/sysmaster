@@ -12,17 +12,32 @@
 
 //! common utilities
 
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{Arc, RwLock},
+};
 
-use crate::{error::*, log_dev, rules::FormatSubstitutionType};
-use basic::error::errno_is_privilege;
+use crate::{error::*, log_dev, rules::FormatSubstitutionType, utils::trie::*};
+use basic::{error::errno_is_privilege, IN_SET};
 use device::{Device, DB_BASE_DIR};
 use lazy_static::lazy_static;
 use nix::{errno::Errno, unistd::unlink};
-use regex::Regex;
 use snafu::ResultExt;
 
 pub(crate) const DEVMASTER_LEGAL_CHARS: &str = "/ $%?,";
+
+lazy_static! {
+    static ref PLACEHOLDER_LONG_TRIE: Arc<RwLock<Trie<FormatSubstitutionType>>> =
+        Trie::from_vec(vec![
+            "devnode", "tempnode", "attr", "sysfs", "env", "kernel", "number", "driver", "devpath",
+            "id", "major", "minor", "result", "parent", "name", "links", "root", "sys"
+        ]);
+    static ref PLACEHOLDER_SHORT_TRIE: Arc<RwLock<Trie<FormatSubstitutionType>>> =
+        Trie::from_vec(vec![
+            "N", "s", "E", "k", "n", "d", "p", "b", "M", "m", "c", "P", "D", "L", "r", "S"
+        ]);
+}
 
 /// check whether the formatters in the value are valid
 pub(crate) fn check_value_format(key: &str, value: &str, nonempty: bool) -> Result<()> {
@@ -52,65 +67,113 @@ pub(crate) fn check_attr_format(key: &str, attr: &str) -> Result<()> {
 /// that is to say the formatter must end with attribute '{xxx}'
 /// or non-unicode characters.
 pub(crate) fn check_format(key: &str, value: &str) -> Result<()> {
-    lazy_static! {
-        static ref VALUE_RE: Regex =
-            Regex::new("(?P<placeholder>(\\$(?P<long>\\w+)|%(?P<short>\\w))(\\{(?P<attr>[^\\{\\}]+)\\})?)|(?P<escaped>(\\$\\$)|(%%))").unwrap();
-    }
+    let mut idx = 0;
 
-    for subst in VALUE_RE.captures_iter(value) {
-        if subst.name("escaped").is_some() {
-            continue;
-        }
+    while idx < value.len() {
+        let ch = &value[idx..idx + 1];
+        if IN_SET!(ch, "%", "$") && idx + 1 < value.len() {
+            let subst_type: FormatSubstitutionType;
+            if &value[idx + 1..idx + 2]
+                == match ch {
+                    "%" => "%",
+                    "$" => "$",
+                    _ => panic!(),
+                }
+            {
+                idx += 2;
+                continue;
+            }
 
-        let long = subst.name("long");
-        let short = subst.name("short");
-        let attr = subst.name("attr");
-        let subst_type: FormatSubstitutionType = if let Some(long_match) = long {
-            long_match
-                .as_str()
-                .parse::<FormatSubstitutionType>()
-                .unwrap_or_default()
-        } else if let Some(short_match) = short {
-            short_match
-                .as_str()
-                .parse::<FormatSubstitutionType>()
-                .unwrap_or_default()
-        } else {
-            FormatSubstitutionType::Invalid
-        };
-
-        if subst_type == FormatSubstitutionType::Invalid {
-            return Err(Error::RulesLoadError {
-                msg: format!("Key '{}': invalid substitute formatter type.", key),
-            });
-        }
-
-        if matches!(
-            subst_type,
-            FormatSubstitutionType::Attr | FormatSubstitutionType::Env
-        ) && attr.is_none()
-        {
-            return Err(Error::RulesLoadError {
-                msg: format!("Key '{}': formatter attribute is missing.", key),
-            });
-        }
-
-        if matches!(subst_type, FormatSubstitutionType::Result) {
-            if let Some(m) = attr {
-                let s = m.as_str();
-                let num = if s.ends_with('+') {
-                    s[0..s.len() - 1].parse::<i32>()
-                } else {
-                    s.parse::<i32>()
-                };
-
-                if num.is_err() {
+            match Trie::search_prefix_partial(
+                match ch {
+                    "$" => PLACEHOLDER_LONG_TRIE.clone(),
+                    "%" => PLACEHOLDER_SHORT_TRIE.clone(),
+                    _ => panic!(),
+                },
+                &value[idx + 1..],
+            ) {
+                Some(node) => {
+                    idx += node.read().unwrap().depth;
+                    subst_type = node.read().unwrap().value.unwrap_or_default();
+                }
+                None => {
                     return Err(Error::RulesLoadError {
-                        msg: format!("Key '{}': formatter 'result' has invalid index.", key),
+                        msg: format!("Key '{}': invalid long placeholder.", key),
+                    });
+                }
+            }
+
+            if IN_SET!(
+                subst_type,
+                FormatSubstitutionType::Attr,
+                FormatSubstitutionType::Env,
+                FormatSubstitutionType::Result
+            ) {
+                let mut attr = "".to_string();
+
+                #[derive(PartialEq, Eq, PartialOrd, Ord)]
+                enum State {
+                    Left,
+                    Attr,
+                    Right,
+                }
+
+                let mut state = State::Left;
+
+                for (i, c) in value[idx + 1..].chars().enumerate() {
+                    match state {
+                        State::Left => {
+                            if c != '{' {
+                                break;
+                            }
+                            state = State::Attr;
+                        }
+                        State::Attr => {
+                            if c == '}' {
+                                state = State::Right;
+                                idx += i + 1;
+                                break;
+                            }
+                            attr.push(c);
+                        }
+                        State::Right => {
+                            panic!()
+                        }
+                    }
+                }
+
+                if state == State::Attr {
+                    return Err(Error::RulesLoadError {
+                        msg: format!("Key '{}': unmatched brackets.", key),
+                    });
+                }
+
+                if subst_type == FormatSubstitutionType::Result {
+                    if !attr.is_empty() {
+                        let num = if attr.ends_with('+') {
+                            attr[0..attr.len() - 1].parse::<i32>()
+                        } else {
+                            attr.parse::<i32>()
+                        };
+
+                        if num.is_err() {
+                            return Err(Error::RulesLoadError {
+                                msg: format!(
+                                    "Key '{}': 'result' placeholder has invalid index.",
+                                    key
+                                ),
+                            });
+                        }
+                    }
+                } else if attr.is_empty() {
+                    return Err(Error::RulesLoadError {
+                        msg: format!("Key '{}': attribute is missing.", key),
                     });
                 }
             }
         }
+
+        idx += 1;
     }
 
     Ok(())
@@ -177,11 +240,26 @@ pub(crate) fn replace_ifname(s: &str) -> String {
 pub fn replace_whitespace(s: &str) -> String {
     // Remove consecutive spaces after the last non-space character
     let s = s.trim_end_matches(' ');
-    // Create a regular expression to match one or more whitespace characters.
-    let re = Regex::new(r"\s+").unwrap();
-    // Use the regular expression to replace all matches with underscores.
-    // The resulting string is converted to a String and returned.
-    re.replace_all(s, "_").to_string()
+
+    let mut ret = "".to_string();
+
+    let mut whitespace_continue: bool = false;
+    for c in s.chars() {
+        if c.is_ascii_whitespace() {
+            if whitespace_continue {
+                continue;
+            }
+
+            whitespace_continue = true;
+            ret.push('_');
+            continue;
+        }
+
+        whitespace_continue = false;
+        ret.push(c);
+    }
+
+    ret
 }
 
 /// This function encodes a device node name string into a byte array.
@@ -230,93 +308,100 @@ macro_rules! device_trace {
 /// if 'read' is true, read the attribute from sysfs device tree and return the value
 /// else just return the attribute path under sysfs device tree.
 pub(crate) fn resolve_subsystem_kernel(s: &str, read: bool) -> Result<String> {
-    lazy_static! {
-        static ref PATTERN: Regex = Regex::new(
-            "\\[(?P<subsystem>[^/\\[\\]]+)/(?P<sysname>[^/\\[\\]]+)\\](?P<attribute>.*)"
-        )
-        .unwrap();
+    if !s.starts_with('[') {
+        return Err(Error::InvalidSubsystemKernel { s: s.to_string() });
     }
 
-    match PATTERN.captures(s) {
-        Some(c) => {
-            let subsystem = c
-                .name("subsystem")
-                .map(|m| m.as_str().to_string())
-                .unwrap_or_default();
-            let sysname = c
-                .name("sysname")
-                .map(|m| m.as_str().to_string())
-                .unwrap_or_default();
-            let attribute = c
-                .name("attribute")
-                .map(|m| m.as_str().to_string())
-                .unwrap_or_default()
-                .trim_start_matches('/')
-                .to_string();
+    let s = s.strip_prefix('[').unwrap();
 
-            if read && attribute.is_empty() {
-                return Err(Error::Other {
-                    msg: format!("can not read empty sysattr: '{}'", s),
-                    errno: nix::errno::Errno::EINVAL,
-                });
+    #[derive(PartialEq, Eq, PartialOrd, Ord)]
+    enum State {
+        Subsystem,
+        Sysname,
+        Attribute,
+    }
+
+    let mut subsystem = "".to_string();
+    let mut sysname = "".to_string();
+    let mut attribute = "".to_string();
+    let mut state = State::Subsystem;
+
+    for ch in s.chars() {
+        match state {
+            State::Subsystem => {
+                if ch == '/' {
+                    state = State::Sysname;
+                    continue;
+                }
+
+                subsystem.push(ch);
             }
+            State::Sysname => {
+                if ch == ']' {
+                    state = State::Attribute;
+                    continue;
+                }
 
-            let device =
-                Device::from_subsystem_sysname(&subsystem, &sysname).map_err(|e| Error::Other {
-                    msg: format!("failed to get device: ({})", e),
-                    errno: e.get_errno(),
-                })?;
-
-            if read {
-                let attr_value = match device.get_sysattr_value(&attribute) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        if e.get_errno() == nix::errno::Errno::ENOENT
-                            || errno_is_privilege(e.get_errno())
-                        {
-                            "".to_string()
-                        } else {
-                            return Err(Error::Other {
-                                msg: format!("failed to read sysattr: ({})", e),
-                                errno: e.get_errno(),
-                            });
-                        }
-                    }
-                };
-
-                log::debug!(
-                    "the sysattr value of '[{}/{}]{}' is '{}'",
-                    subsystem,
-                    sysname,
-                    attribute,
-                    attr_value
-                );
-                Ok(attr_value)
-            } else {
-                let syspath = device.get_syspath().context(DeviceSnafu)?;
-
-                let attr_path = if attribute.is_empty() {
-                    syspath
-                } else {
-                    syspath + "/" + attribute.as_str()
-                };
-                log::debug!(
-                    "resolve path '[{}/{}]{}' as '{}'",
-                    subsystem,
-                    sysname,
-                    attribute,
-                    attr_path
-                );
-                Ok(attr_path)
+                sysname.push(ch);
+            }
+            State::Attribute => {
+                attribute.push(ch);
             }
         }
-        None => Err(Error::Other {
-            msg: format!(
-                "invalid '[<SUBSYSTEM>/<KERNEL>]<attribute>' pattern: ({})",
-                s
-            ),
-            errno: nix::errno::Errno::EINVAL,
-        }),
+    }
+
+    if subsystem.is_empty() || sysname.is_empty() || state != State::Attribute {
+        return Err(Error::InvalidSubsystemKernel { s: s.to_string() });
+    }
+
+    let attribute = attribute.trim_start_matches('/').to_string();
+
+    if read && attribute.is_empty() {
+        return Err(Error::InvalidSubsystemKernel { s: s.to_string() });
+    }
+
+    let device = Device::from_subsystem_sysname(&subsystem, &sysname).map_err(|e| {
+        Error::InvalidSubsystemKernel {
+            s: format!("{}: {}", s, e),
+        }
+    })?;
+
+    if read {
+        let attr_value = match device.get_sysattr_value(&attribute) {
+            Ok(v) => v,
+            Err(e) => {
+                if e.get_errno() == nix::errno::Errno::ENOENT || errno_is_privilege(e.get_errno()) {
+                    "".to_string()
+                } else {
+                    return Err(Error::InvalidSubsystemKernel { s: s.to_string() });
+                }
+            }
+        };
+
+        log::debug!(
+            "the sysattr value of '[{}/{}]{}' is '{}'",
+            subsystem,
+            sysname,
+            attribute,
+            attr_value
+        );
+        Ok(attr_value)
+    } else {
+        let syspath = device.get_syspath().context(DeviceSnafu)?;
+
+        let attr_path = if attribute.is_empty() {
+            syspath
+        } else {
+            syspath + "/" + attribute.as_str()
+        };
+        log::debug!(
+            "resolve path '[{}/{}]{}' as '{}'",
+            subsystem,
+            sysname,
+            attribute,
+            attr_path
+        );
+        Ok(attr_path)
     }
 }
 
@@ -354,14 +439,9 @@ pub(crate) fn sysattr_subdir_subst(sysattr: &str) -> Result<String> {
     })
 }
 
+/// The property key should not contain any whitespace,
+/// the property value can contain whitespaces.
 pub(crate) fn get_property_from_string(s: &str) -> Result<(String, String)> {
-    lazy_static! {
-        static ref RE_KEY_VALUE: Regex = Regex::new(
-            "(?P<key>[^=]*)\\s*=\\s*(?P<value>([^\"']$)|([^\"'].*[^\"']$)|(\".*\"$)|('.*'$))"
-        )
-        .unwrap();
-    }
-
     let s = s.trim();
 
     if s.starts_with('#') {
@@ -371,13 +451,54 @@ pub(crate) fn get_property_from_string(s: &str) -> Result<(String, String)> {
         });
     }
 
-    let capture = RE_KEY_VALUE.captures(s).ok_or(Error::Other {
-        msg: format!("failed to parse key and value for '{}'", s),
-        errno: Errno::EINVAL,
-    })?;
+    let mut key = "".to_string();
+    let mut value = "".to_string();
 
-    let key = capture.name("key").unwrap().as_str();
-    let value = capture.name("value").unwrap().as_str();
+    enum StateMachine {
+        Key,
+        OpPre,
+        OpPost,
+        Value,
+    }
+
+    let mut state = StateMachine::Key;
+
+    for ch in s.chars() {
+        match state {
+            StateMachine::Key => {
+                if ch.is_ascii_whitespace() {
+                    state = StateMachine::OpPre;
+                    continue;
+                }
+
+                if ch == '=' {
+                    state = StateMachine::OpPost;
+                    continue;
+                }
+
+                key.push(ch);
+            }
+            StateMachine::OpPre => {
+                if ch.is_ascii_whitespace() {
+                    continue;
+                }
+
+                if ch == '=' {
+                    state = StateMachine::OpPost;
+                }
+            }
+            StateMachine::OpPost => {
+                if ch.is_ascii_whitespace() {
+                    continue;
+                }
+                state = StateMachine::Value;
+                value.push(ch);
+            }
+            StateMachine::Value => {
+                value.push(ch);
+            }
+        }
+    }
 
     if key.is_empty() || value.is_empty() {
         return Err(Error::Other {
@@ -387,9 +508,25 @@ pub(crate) fn get_property_from_string(s: &str) -> Result<(String, String)> {
     }
 
     if value.starts_with('"') || value.starts_with('\'') {
-        Ok((key.to_string(), value[1..value.len() - 1].to_string()))
+        let prefix_c = &value[0..1];
+        let suffix_c = &value[value.len() - 1..];
+
+        if prefix_c != suffix_c {
+            return Err(Error::Other {
+                msg: format!("unmatched quotes: {}", s),
+                errno: Errno::EINVAL,
+            });
+        }
+
+        Ok((key, value[1..value.len() - 1].to_string()))
     } else {
-        Ok((key.to_string(), value[0..].to_string()))
+        if value.ends_with(|c| IN_SET!(c, '\"', '\'')) {
+            return Err(Error::Other {
+                msg: format!("unmatched quotes: {}", s),
+                errno: Errno::EINVAL,
+            });
+        }
+        Ok((key, value))
     }
 }
 
@@ -518,9 +655,9 @@ mod tests {
         check_value_format("", "aaa %c   ccc", false).unwrap();
         check_value_format("", "aaa %s{[net/lo]ifindex} ccc", false).unwrap();
 
-        check_value_format("", "aaa$s{xxx}ccc", false).unwrap();
-        check_value_format("", "aaa$c{0}ccc", false).unwrap();
-        check_value_format("", "aaa$c{0+}ccc", false).unwrap();
+        check_value_format("", "aaa$s{xxx}ccc", false).unwrap_err();
+        check_value_format("", "aaa$c{0}ccc", false).unwrap_err();
+        check_value_format("", "aaa$c{0+}ccc", false).unwrap_err();
 
         // test multiple formatters
         check_value_format("", "aaa$devnode{xxx}bbb$env{ID_FSTYPE}ccc$result", false).unwrap();
@@ -618,6 +755,14 @@ mod tests {
             ("A".to_string(), "B".to_string())
         );
         assert_eq!(
+            get_property_from_string("A = B").unwrap(),
+            ("A".to_string(), "B".to_string())
+        );
+        assert_eq!(
+            get_property_from_string("A  =  B").unwrap(),
+            ("A".to_string(), "B".to_string())
+        );
+        assert_eq!(
             get_property_from_string("A=BB").unwrap(),
             ("A".to_string(), "BB".to_string())
         );
@@ -626,7 +771,15 @@ mod tests {
             ("A".to_string(), "B".to_string())
         );
         assert_eq!(
+            get_property_from_string("A  =  \"B\"").unwrap(),
+            ("A".to_string(), "B".to_string())
+        );
+        assert_eq!(
             get_property_from_string("A='B'").unwrap(),
+            ("A".to_string(), "B".to_string())
+        );
+        assert_eq!(
+            get_property_from_string("A  =  'B'").unwrap(),
             ("A".to_string(), "B".to_string())
         );
         assert_eq!(
@@ -662,5 +815,20 @@ mod tests {
         assert_eq!(replace_ifname("aaa:bbb"), "aaa_bbb");
         assert_eq!(replace_ifname("aaa%bbb"), "aaa_bbb");
         assert_eq!(replace_ifname("aaa bbb"), "aaa_bbb");
+    }
+
+    #[test]
+    fn test_replace_whitespace() {
+        assert_eq!(&replace_whitespace("hello world"), "hello_world");
+        assert_eq!(&replace_whitespace("hello world "), "hello_world");
+        assert_eq!(&replace_whitespace(" hello world"), "_hello_world");
+        assert_eq!(&replace_whitespace(""), "");
+        assert_eq!(&replace_whitespace("hello   world"), "hello_world");
+        assert_eq!(&replace_whitespace("hello world   "), "hello_world");
+        assert_eq!(&replace_whitespace("   hello   world"), "_hello_world");
+        assert_eq!(&replace_whitespace("hello   world   hi"), "hello_world_hi");
+        assert_eq!(&replace_whitespace("        "), "");
+        assert_eq!(&replace_whitespace("a        "), "a");
+        assert_eq!(&replace_whitespace("        a"), "_a");
     }
 }

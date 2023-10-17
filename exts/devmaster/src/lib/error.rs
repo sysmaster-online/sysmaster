@@ -104,6 +104,9 @@ pub enum Error {
 
     #[snafu(display("Invalid OsString: {:?}", s))]
     InvalidOsString { s: OsString },
+
+    #[snafu(display("Invalid subsystem kernel string: {}", s))]
+    InvalidSubsystemKernel { s: String },
 }
 
 impl Error {
