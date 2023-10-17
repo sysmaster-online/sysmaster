@@ -14,13 +14,13 @@
 //!
 
 use crate::builtin::Builtin;
-use crate::error::*;
 use crate::rules::exec_unit::ExecuteUnit;
 use crate::utils::commons::*;
+use crate::{error::*, log_dev};
 use device::Device;
 use snafu::ResultExt;
-use sscanf::sscanf;
 use std::cell::RefCell;
+use std::ffi::CString;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
@@ -219,33 +219,68 @@ impl UsbId {
             let dev_scsi = device
                 .get_parent_with_subsystem_devtype("scsi", Some("scsi_device"))
                 .context(DeviceSnafu)?;
-            let dev_scsi = dev_scsi.borrow().to_owned();
 
-            let scsi_sysname = dev_scsi.get_sysname().context(DeviceSnafu)?;
+            let scsi_sysname = dev_scsi.borrow().get_sysname().context(DeviceSnafu)?;
 
-            let (_host, _buss, target, lun) =
-                sscanf!(&scsi_sysname, "{}:{}:{}:{}", i32, i32, i32, i32).context(SscanfSnafu)?;
+            let mut _host: u32 = 0;
+            let mut _bus: u32 = 0;
+            let mut target: u32 = 0;
+            let mut lun: u32 = 0;
+            let cstr = CString::new(scsi_sysname.clone()).unwrap();
+            let fmt = CString::new("%u:%u:%u:%u").unwrap();
+            let ret = unsafe {
+                libc::sscanf(
+                    cstr.as_ptr(),
+                    fmt.as_ptr(),
+                    &mut _host as &mut libc::c_uint,
+                    &mut _bus as &mut libc::c_uint,
+                    &mut target as &mut libc::c_uint,
+                    &mut lun as &mut libc::c_uint,
+                )
+            };
+            if ret != 4 {
+                log_dev!(
+                    debug,
+                    &dev_scsi.borrow(),
+                    format!("Failed to parse target number '{}'", scsi_sysname)
+                );
+                return Err(Error::Nix {
+                    source: nix::Error::EINVAL,
+                });
+            }
 
-            let scsi_vendor: String = dev_scsi.get_sysattr_value("vendor").context(DeviceSnafu)?;
+            let scsi_vendor: String = dev_scsi
+                .borrow()
+                .get_sysattr_value("vendor")
+                .context(DeviceSnafu)?;
             // scsi_vendor to vendor
             encode_devnode_name(&scsi_vendor, &mut info.vendor_enc);
             info.vendor = replace_whitespace(&scsi_vendor);
             info.vendor = replace_chars(&info.vendor, "");
 
-            let scsi_model = dev_scsi.get_sysattr_value("model").context(DeviceSnafu)?;
+            let scsi_model = dev_scsi
+                .borrow()
+                .get_sysattr_value("model")
+                .context(DeviceSnafu)?;
             // scsi_model to model
             encode_devnode_name(&scsi_model, &mut info.model_enc);
             info.model = replace_whitespace(&scsi_model);
             info.model = replace_chars(&info.model, "");
 
-            let scsi_type_str = dev_scsi.get_sysattr_value("type").context(DeviceSnafu)?;
+            let scsi_type_str = dev_scsi
+                .borrow()
+                .get_sysattr_value("type")
+                .context(DeviceSnafu)?;
 
             // scsi_type_str to type_str
             if let Some(s) = UsbId::scsi_type(&scsi_type_str) {
                 info.type_str = s.to_string();
             };
 
-            let scsi_revision = dev_scsi.get_sysattr_value("rev").context(DeviceSnafu)?;
+            let scsi_revision = dev_scsi
+                .borrow()
+                .get_sysattr_value("rev")
+                .context(DeviceSnafu)?;
 
             // scsi_revision to revision, unimplemented!()
             info.revision = replace_whitespace(&scsi_revision);
@@ -528,5 +563,36 @@ mod test {
             let exec_unit = ExecuteUnit::new(device);
             let _ = builtin.cmd(&exec_unit, 0, vec![], true);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::CString;
+
+    #[test]
+    fn test_sscanf() {
+        let mut host: u32 = 0;
+        let mut bus: u32 = 0;
+        let mut target: u32 = 0;
+        let mut lun: u32 = 0;
+        let cstr = CString::new("100:200:300:400").unwrap();
+        let fmt = CString::new("%u:%u:%u:%u").unwrap();
+        let ret = unsafe {
+            libc::sscanf(
+                cstr.as_ptr(),
+                fmt.as_ptr(),
+                &mut host as &mut libc::c_uint,
+                &mut bus as &mut libc::c_uint,
+                &mut target as &mut libc::c_uint,
+                &mut lun as &mut libc::c_uint,
+            )
+        };
+
+        assert_eq!(ret, 4);
+        assert_eq!(host, 100);
+        assert_eq!(bus, 200);
+        assert_eq!(target, 300);
+        assert_eq!(lun, 400);
     }
 }

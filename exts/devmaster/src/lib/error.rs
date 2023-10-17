@@ -35,8 +35,6 @@ pub enum Error {
     },
     #[snafu(context)]
     ReadTooShort { filename: String },
-    #[snafu(display("Failed to sscanf: {}", source))]
-    Sscanf { source: sscanf::Error },
     #[snafu(display("Failed to parse integer: {}", source))]
     ParseInt { source: std::num::ParseIntError },
     #[snafu(display("Failed to parse float: {}", source))]

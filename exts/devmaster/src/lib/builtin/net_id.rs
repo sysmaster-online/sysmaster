@@ -15,6 +15,7 @@
 
 use crate::builtin::Builtin;
 use crate::rules::exec_unit::ExecuteUnit;
+use crate::utils::commons::{get_first_path_component, str_satisfy};
 use crate::{error::*, log_dev};
 use basic::naming_scheme::*;
 use basic::network::*;
@@ -23,6 +24,7 @@ use libc::{c_char, faccessat, ARPHRD_INFINIBAND, F_OK};
 use nix::errno::errno;
 use snafu::ResultExt;
 use std::cell::RefCell;
+use std::ffi::CString;
 use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::rc::Rc;
 
@@ -429,13 +431,34 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
         .context(DeviceSnafu)
         .log_dev_error(&dev.borrow(), "Failed to get sysname")?;
 
-    let (mut domain, bus, slot, mut func) =
-        sscanf::sscanf!(&sysname, "{:x}:{:x}:{:x}.{}", u16, u8, u8, u8)
-            .context(SscanfSnafu)
-            .log_dev_debug(
-                &dev.borrow(),
-                "Failed to parse slot information from PCI device sysname",
-            )?;
+    let mut domain: u32 = 0;
+    let mut bus: u32 = 0;
+    let mut slot: u32 = 0;
+    let mut func: u32 = 0;
+    let cstr = CString::new(sysname.clone()).unwrap();
+    let fmt = CString::new("%u:%u:%u:%u").unwrap();
+    let ret = unsafe {
+        libc::sscanf(
+            cstr.as_ptr(),
+            fmt.as_ptr(),
+            &mut domain as &mut libc::c_uint,
+            &mut bus as &mut libc::c_uint,
+            &mut slot as &mut libc::c_uint,
+            &mut func as &mut libc::c_uint,
+        )
+    };
+
+    if ret != 4 {
+        log_dev!(
+            debug,
+            dev.borrow(),
+            "Failed to parse slot information from PCI device sysname"
+        );
+
+        return Err(Error::Nix {
+            source: nix::Error::EINVAL,
+        });
+    }
 
     log_dev!(
         debug,
@@ -687,17 +710,33 @@ fn names_vio(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
         .context(DeviceSnafu)
         .log_dev_debug(&dev.borrow(), "failed to get syspath")?;
 
-    let (busid, slotid, _ethid) = sscanf::sscanf!(
-        &syspath,
-        r"/sys/devices/vio/{str:/.{4}/}{str:/.{4}/}/net/eth{u8}"
-    )
-    .context(SscanfSnafu)
-    .log_dev_debug(
-        &dev.borrow(),
-        &format!("Parsing vio slot information from syspath '{}'", syspath),
-    )?;
-    let _busid = u32::from_str_radix(busid, 16).context(ParseIntSnafu)?;
-    let slotid = u32::from_str_radix(slotid, 16).context(ParseIntSnafu)?;
+    let s = match get_first_path_component(&syspath, "/sys/devices/vio/") {
+        Some(s) => s,
+        None => {
+            log_dev!(
+                debug,
+                dev.borrow(),
+                "Syspath does not begin with /sys/devices/vio/"
+            );
+            return Err(Error::Nix {
+                source: nix::Error::EINVAL,
+            });
+        }
+    };
+
+    if s.len() != 8 || !str_satisfy(s, |c| c.is_ascii_hexdigit()) {
+        log_dev!(
+            debug,
+            dev.borrow(),
+            "VIO bus ID and slot ID contain non ascii digits."
+        );
+        return Err(Error::Nix {
+            source: nix::Error::EINVAL,
+        });
+    }
+
+    let slotid = u32::from_str_radix(&s[4..], 16).context(ParseIntSnafu)?;
+
     log_dev!(
         debug,
         dev.borrow(),
@@ -773,64 +812,51 @@ fn names_platform(dev: Rc<RefCell<Device>>, names: &mut NetNames, _test: bool) -
      * eg. "/sys/devices/platform/HISI00C2:00");
      * The Vendor (3 or 4 char), followed by hexadecimal model number : instance id.
      */
-    let (vendor, model, instance, ethid, validchars) =
-        if syspath.chars().nth(PLATFORM_TEST.len()).unwrap() == ':' {
-            let (vendor, model, instance, ethid) = sscanf::scanf!(
-                &syspath,
-                "/sys/devices/platform/{str:/.{4}/}{str:/.{4}/}:{str:/.{2}/}/net/eth{u8}"
-            )
-            .context(SscanfSnafu)
-            .log_dev_debug(
-                &dev.borrow(),
-                &format!(
-                    "Parsing platform device information from syspath '{}'",
-                    syspath
-                ),
-            )?;
+    let s = match get_first_path_component(&syspath, "/sys/devices/platform/") {
+        Some(s) => s,
+        None => {
+            log_dev!(debug, dev.borrow(), "Failed to get platform ID".to_string());
+            return Err(Error::Nix {
+                source: nix::Error::EINVAL,
+            });
+        }
+    };
 
-            (
-                vendor,
-                model,
-                instance,
-                ethid,
-                "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-            )
-        } else {
-            let (vendor, model, instance, ethid) = sscanf::scanf!(
-                &syspath,
-                "/sys/devices/platform/{str:/.{3}/}{str:/.{4}/}:{str:/.{2}/}/net/eth{u8}"
-            )
-            .context(SscanfSnafu)
-            .log_dev_debug(
-                &dev.borrow(),
-                &format!(
-                    "Parsing platform device information from syspath '{}'",
-                    syspath
-                ),
-            )?;
-            (vendor, model, instance, ethid, "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-        };
+    let (vendor, model, instance, validchars) = if s.len() == 10 && &s[7..8] == ":" {
+        (&s[0..3], &s[3..7], &s[8..10], "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    } else if s.len() == 11 && &s[8..9] == ":" {
+        (
+            &s[0..4],
+            &s[4..8],
+            &s[9..11],
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+        )
+    } else {
+        return Err(Error::Nix {
+            source: nix::Error::EOPNOTSUPP,
+        });
+    };
 
-    let (vendor, model, instance, _ethid) = (
-        vendor,
+    if !str_satisfy(vendor, |c| validchars.contains(c)) {
+        log_dev!(
+            debug,
+            &dev.borrow(),
+            format!("Platform vendor contains invalid characters: {}", vendor)
+        );
+        return Err(Error::Nix {
+            source: nix::Error::ENOENT,
+        });
+    }
+
+    let (vendor, model, instance) = (
+        vendor.to_ascii_lowercase(),
         u32::from_str_radix(model, 16)
             .context(ParseIntSnafu)
             .log_dev_debug(&dev.borrow(), &format!("invalid model '{}'", model))?,
         u32::from_str_radix(instance, 16)
             .context(ParseIntSnafu)
             .log_dev_debug(&dev.borrow(), &format!("invalid instance '{}'", instance))?,
-        ethid,
     );
-
-    if !vendor.chars().all(|c| validchars.contains(c)) {
-        log_dev!(
-            debug,
-            dev.borrow(),
-            format!("Platform vendor contains invalid characters: {}", vendor)
-        );
-    }
-
-    let vendor = vendor.to_lowercase();
 
     names.platform_path = format!("a{}{:x}i{}", vendor, model, instance);
     names.r#type = NetNameType::Platform;
@@ -1125,15 +1151,26 @@ fn names_bcma(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
         .log_dev_debug(&dev.borrow(), "Failed to get bcma device sysname")?;
 
     /* Bus num:core num */
-    let (_bus, core) = sscanf::sscanf!(&sysname, "bcma{u8}:{u8}")
-        .context(SscanfSnafu)
-        .log_dev_debug(
-            &dev.borrow(),
-            &format!(
-                "Parsing bcmadevice information from sysname '{}' failed",
-                sysname
-            ),
-        )?;
+    let core = match sysname.find(':') {
+        Some(idx) => sysname[idx + 1..]
+            .parse::<u8>()
+            .context(ParseIntSnafu)
+            .log_dev_debug(
+                &dev.borrow(),
+                &format!("core string is not a number: {}", sysname),
+            )?,
+        None => {
+            log_dev!(
+                debug,
+                &dev.borrow(),
+                format!("Failed to get core number: {}", sysname)
+            );
+            return Err(Error::Nix {
+                source: nix::Error::EINVAL,
+            });
+        }
+    };
+
     log_dev!(
         debug,
         dev.borrow(),
@@ -1319,7 +1356,22 @@ fn names_netdevsim(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNam
 
     let sysname = netdevsimdev.borrow().get_sysname().context(DeviceSnafu)?;
 
-    let addr = sscanf::sscanf!(&sysname, "netdevsim{}", u8).context(SscanfSnafu)?;
+    let addr = match sysname.strip_prefix("netdevsim") {
+        Some(suffix) => suffix.parse::<u8>().context(ParseIntSnafu).log_dev_debug(
+            &dev.borrow(),
+            &format!("Failed to parse netdevsim address '{}'", sysname),
+        )?,
+        None => {
+            log_dev!(
+                debug,
+                &dev.borrow(),
+                format!("Netdevsim does not contain address '{}'", sysname)
+            );
+            return Err(Error::Nix {
+                source: nix::Error::EINVAL,
+            });
+        }
+    };
 
     names.netdevsim_path = format!("i{}n{}", addr, info.physical_port_name);
     names.r#type = NetNameType::Netdevsim;

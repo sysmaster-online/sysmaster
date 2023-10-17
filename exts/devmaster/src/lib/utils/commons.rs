@@ -607,6 +607,28 @@ pub(crate) fn cleanup_db(dev: Rc<RefCell<Device>>) -> Result<()> {
     Ok(())
 }
 
+/// Check wether every character in stirng satisfy the condition.
+pub(crate) fn str_satisfy<F>(s: &str, f: F) -> bool
+where
+    F: Copy + FnOnce(char) -> bool,
+{
+    for ch in s.chars() {
+        if !f(ch) {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Find the first component in the path, with the prefix removed.
+pub(crate) fn get_first_path_component<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
+    s.strip_prefix(prefix).map(|suffix| match suffix.find('/') {
+        Some(i) => &suffix[0..i],
+        None => suffix,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -830,5 +852,29 @@ mod tests {
         assert_eq!(&replace_whitespace("        "), "");
         assert_eq!(&replace_whitespace("a        "), "a");
         assert_eq!(&replace_whitespace("        a"), "_a");
+    }
+
+    #[test]
+    fn test_str_satisfy() {
+        assert!(str_satisfy("aaa", |c| c.is_ascii_lowercase()));
+        assert!(str_satisfy("123", |c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn test_get_first_path_component() {
+        assert_eq!(
+            get_first_path_component("/sys/class/device/10002000", "/sys/class/device/").unwrap(),
+            "10002000"
+        );
+        assert_eq!(
+            get_first_path_component("/sys/class/device/10002000/aaa", "/sys/class/device/")
+                .unwrap(),
+            "10002000"
+        );
+        assert_eq!(
+            get_first_path_component("/sys/class/device/10002000/aaa/bbb", "/sys/class/device/")
+                .unwrap(),
+            "10002000"
+        );
     }
 }
