@@ -379,12 +379,11 @@ dependencies = [
  "basic",
  "bitflags",
  "event",
- "fnmatch-regex",
+ "fnmatch-sys",
  "libc",
  "log 0.5.0",
  "loopdev",
  "nix 0.24.3",
- "regex",
  "snafu",
 ]
 
