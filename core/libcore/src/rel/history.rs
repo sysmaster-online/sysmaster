@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use super::base::{ReDbRwTxn, ReDbTable};
+use super::base::{ReDbRwTxn, ReDbTable, ReliSwitch};
 use heed::Env;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -18,11 +18,8 @@ use std::fmt;
 use std::rc::Rc;
 
 pub struct ReliHistory {
-    // associated objects
-    env: Rc<Env>,
-
     // control
-    switch: RefCell<Option<bool>>,
+    switch: RefCell<ReliSwitch>,
 
     // database: multi-instance(N)
     dbs: RefCell<HashMap<String, Rc<dyn ReDbTable>>>, // key: name, value: db
@@ -31,23 +28,21 @@ pub struct ReliHistory {
 impl fmt::Debug for ReliHistory {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ReliHistory")
-            .field("env.path", &self.env.path())
             .field("env.dbs.len", &self.dbs.borrow().len())
             .finish()
     }
 }
 
 impl ReliHistory {
-    pub fn new(envr: &Rc<Env>) -> ReliHistory {
+    pub fn new() -> ReliHistory {
         ReliHistory {
-            switch: RefCell::new(None),
-            env: Rc::clone(envr),
+            switch: RefCell::new(ReliSwitch::CacheAll),
             dbs: RefCell::new(HashMap::new()),
         }
     }
 
-    pub fn data_clear(&self) {
-        let mut db_wtxn = ReDbRwTxn::new(&self.env).expect("history.write_txn");
+    pub fn data_clear(&self, env: &Env) {
+        let mut db_wtxn = ReDbRwTxn::new(env).expect("history.write_txn");
         for (_, db) in self.dbs.borrow().iter() {
             db.clear(&mut db_wtxn);
         }
@@ -58,9 +53,10 @@ impl ReliHistory {
         self.dbs.borrow_mut().insert(name.to_string(), db);
     }
 
-    pub fn commit(&self) {
+    #[allow(dead_code)]
+    pub fn commit(&self, env: &Env) {
         // create transaction
-        let mut db_wtxn = ReDbRwTxn::new(&self.env).expect("history.write_txn");
+        let mut db_wtxn = ReDbRwTxn::new(env).expect("history.write_txn");
 
         // export to db
         for (_, db) in self.dbs.borrow().iter() {
@@ -71,9 +67,9 @@ impl ReliHistory {
         db_wtxn.0.commit().expect("history.commit");
     }
 
-    pub(super) fn flush(&self, switch: bool) {
+    pub(super) fn flush(&self, env: &Env, switch: ReliSwitch) {
         // create transaction
-        let mut db_wtxn = ReDbRwTxn::new(&self.env).expect("history.write_txn");
+        let mut db_wtxn = ReDbRwTxn::new(env).expect("history.write_txn");
 
         // flush to db
         for (_, db) in self.dbs.borrow().iter() {
@@ -91,7 +87,7 @@ impl ReliHistory {
         }
     }
 
-    pub fn switch_set(&self, switch: Option<bool>) {
+    pub fn switch_set(&self, switch: ReliSwitch) {
         *self.switch.borrow_mut() = switch;
         for (_, db) in self.dbs.borrow().iter() {
             db.switch_set(switch);
@@ -102,7 +98,7 @@ impl ReliHistory {
         self.dbs.borrow_mut().clear();
     }
 
-    pub fn switch(&self) -> Option<bool> {
+    pub fn switch(&self) -> ReliSwitch {
         *self.switch.borrow()
     }
 }

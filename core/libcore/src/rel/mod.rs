@@ -11,20 +11,31 @@
 // See the Mulan PSL v2 for more details.
 
 //! reliability module
-pub use api::{reli_debug_get_switch, ReliConf, Reliability};
-pub use base::{reli_dir_prepare, ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable};
+pub use api_comm::{reli_debug_get_switch, ReliConf};
+#[cfg(feature = "norecovery")]
+pub use api_norecov::Reliability;
+#[cfg(not(feature = "norecovery"))]
+pub use api_recov::Reliability;
+pub use base::{reli_dir_prepare, ReDb, ReDbRoTxn, ReDbRwTxn, ReDbTable, ReliSwitch};
 use serde::{Deserialize, Serialize};
 pub use station::{ReStation, ReStationKind};
 use std::convert::TryFrom;
 
-// dependency: base -> {enable | last | history | pending | station} -> debug -> api
-mod api;
+// dependency: base -> {enable | last | history | pending | station} -> debug -> api(comm -> {recov or norecov})
+mod api_comm;
+#[cfg(feature = "norecovery")]
+mod api_norecov;
+#[cfg(not(feature = "norecovery"))]
+mod api_recov;
 mod base;
 #[cfg(debug)]
 mod debug;
+#[cfg(not(feature = "norecovery"))]
 mod enable;
 mod history;
+#[cfg(not(feature = "norecovery"))]
 mod last;
+#[cfg(not(feature = "norecovery"))]
 mod pending;
 mod station;
 

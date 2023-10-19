@@ -141,6 +141,7 @@ hongmeng = []
 linux = []
 noplugin = []
 plugin = ["dynamic_reload"]
+norecovery = []
 
 [[bin]]
 path = "src/main.rs"

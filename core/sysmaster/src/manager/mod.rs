@@ -313,7 +313,7 @@ impl Manager {
         /* register entire external events */
         self.register_ex();
         /* register entry's external events */
-        if restore {
+        if reload || restore {
             self.um.entry_coldplug();
         }
 
@@ -391,17 +391,24 @@ impl Manager {
             false,
         );
 
-        self.run_generators();
+        // flush db
+        if let Err(e) = self.reli.flush() {
+            log::error!("flush failed with error:{:?}, try next reload.", e);
+        } else {
+            log::info!("reload start.");
 
-        // clear data
-        self.um.entry_clear();
+            self.run_generators();
 
-        // recover entry
-        self.reli.recover(true);
+            // clear data
+            self.um.entry_clear();
 
-        // rebuild external connections
-        /* register entry's external events */
-        self.um.entry_coldplug();
+            // recover entry
+            self.reli.recover(true);
+
+            // rebuild external connections
+            /* register entry's external events */
+            self.um.entry_coldplug();
+        }
 
         // it's ok now
         self.set_state(State::Ok);
@@ -427,6 +434,9 @@ impl Manager {
     fn prepare_reexec(&self) -> Result<()> {
         // restore external resource, like: fd, ...
         // do nothing now
+
+        // flush db
+        self.reli.flush()?;
 
         // compact db
         self.reli.compact()?;

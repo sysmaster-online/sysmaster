@@ -27,6 +27,19 @@ use std::hash::Hash;
 use std::path::Path;
 use std::rc::Rc;
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+/// the switch of the reliability database, which control the caching behavior.
+pub enum ReliSwitch {
+    /// record to cache, including variable(add + del) and snapshot(snapshot)
+    CacheAll,
+    /// record to variable cache(add + del) only
+    CacheVar,
+    /// record to buffer
+    Buffer,
+    /// ignore the input
+    Ignore,
+}
+
 /// the reliability database
 /// K & V that can be deserialized without borrowing any data from the deserializer.
 pub struct ReDb<K, V> {
@@ -34,14 +47,14 @@ pub struct ReDb<K, V> {
     reli: Rc<Reliability>,
 
     // control
-    switch: RefCell<Option<bool>>, // Some(true): buffer, Some(false): cache, None: none
+    switch: RefCell<ReliSwitch>,
 
     // data
     /* database: create in use */
     /* db: Database<SerdeBincode<K>, SerdeBincode<V>>; */
 
     /* cache */
-    cache: RefCell<HashMap<K, V>>, // the copy of db
+    snapshot: RefCell<HashMap<K, V>>, // the copy of db
     add: RefCell<HashMap<K, V>>,
     del: RefCell<HashSet<K>>,
 
@@ -65,7 +78,7 @@ where
         self.cache_2_db(db_wtxn);
     }
 
-    fn flush(&self, db_wtxn: &mut ReDbRwTxn, switch: bool) {
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn, switch: ReliSwitch) {
         self.data_2_db(db_wtxn, switch);
     }
 
@@ -73,7 +86,7 @@ where
         self.db_2_cache();
     }
 
-    fn switch_set(&self, switch: Option<bool>) {
+    fn switch_set(&self, switch: ReliSwitch) {
         self.switch_buffer(switch);
     }
 }
@@ -87,8 +100,8 @@ where
     pub fn new(relir: &Rc<Reliability>, db_name: &str) -> ReDb<K, V> {
         ReDb {
             reli: Rc::clone(relir),
-            switch: RefCell::new(None),
-            cache: RefCell::new(HashMap::new()),
+            switch: RefCell::new(ReliSwitch::CacheAll),
+            snapshot: RefCell::new(HashMap::new()),
             add: RefCell::new(HashMap::new()),
             del: RefCell::new(HashSet::new()),
             buffer: RefCell::new(HashMap::new()),
@@ -103,11 +116,11 @@ where
         }
         self.add.borrow_mut().clear();
         self.del.borrow_mut().clear();
-        // Do not clear the cache and buffer, because their data are transient.
+        // Do not clear the snapshot and buffer, because their data are transient.
     }
 
     /// switch between cache and buffer
-    pub fn switch_buffer(&self, switch: Option<bool>) {
+    pub fn switch_buffer(&self, switch: ReliSwitch) {
         // Before using the buffer, data needs to be cleared.
         self.buffer.borrow_mut().clear();
         *self.switch.borrow_mut() = switch;
@@ -125,22 +138,25 @@ where
         );
 
         match switch {
-            Some(true) => {
-                // update buffer only
-                self.buffer.borrow_mut().insert(k, v);
-            }
-            Some(false) => {
+            ReliSwitch::CacheAll => {
                 // remove "del" + insert "add"
                 self.del.borrow_mut().remove(&k);
                 self.add.borrow_mut().insert(k.clone(), v.clone());
 
-                // update cache
-                self.cache.borrow_mut().insert(k, v);
+                // update snapshot
+                self.snapshot.borrow_mut().insert(k, v);
             }
-            None => {
+            ReliSwitch::CacheVar => {
                 // remove "del" + insert "add"
                 self.del.borrow_mut().remove(&k);
                 self.add.borrow_mut().insert(k, v);
+            }
+            ReliSwitch::Buffer => {
+                // update buffer only
+                self.buffer.borrow_mut().insert(k, v);
+            }
+            ReliSwitch::Ignore => {
+                // do nothing
             }
         }
     }
@@ -152,29 +168,32 @@ where
         log::debug!("remove with switch:{:?}.", switch);
 
         match switch {
-            Some(true) => {
-                // update buffer only
-                self.buffer.borrow_mut().remove(k);
-            }
-            Some(false) => {
+            ReliSwitch::CacheAll => {
                 // remove "add" + insert "del"
                 self.add.borrow_mut().remove(k);
                 self.del.borrow_mut().insert(k.clone());
 
-                // update cache
-                self.cache.borrow_mut().remove(k);
+                // update snapshot
+                self.snapshot.borrow_mut().remove(k);
             }
-            None => {
+            ReliSwitch::CacheVar => {
                 // remove "add" + insert "del"
                 self.add.borrow_mut().remove(k);
                 self.del.borrow_mut().insert(k.clone());
+            }
+            ReliSwitch::Buffer => {
+                // update buffer only
+                self.buffer.borrow_mut().remove(k);
+            }
+            ReliSwitch::Ignore => {
+                // do nothing
             }
         }
     }
 
     /// get a entry
     pub fn get(&self, k: &K) -> Option<V> {
-        let value = self.cache.borrow().get(k).cloned();
+        let value = self.snapshot.borrow().get(k).cloned();
         let n = &self.name;
         log::debug!("ReDb[{}] get, key: {:?}, value: {:?}.", n, k, &value);
         value
@@ -183,7 +202,7 @@ where
     /// get all keys
     pub fn keys(&self) -> Vec<K> {
         let keys = self
-            .cache
+            .snapshot
             .borrow()
             .iter()
             .map(|(k, _)| k.clone())
@@ -195,7 +214,7 @@ where
     /// get all entries
     pub fn entries(&self) -> Vec<(K, V)> {
         let entries = self
-            .cache
+            .snapshot
             .borrow()
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
@@ -222,20 +241,26 @@ where
     }
 
     /// flush internal data to database
-    pub fn data_2_db(&self, wtxn: &mut ReDbRwTxn, switch: bool) {
-        if switch {
-            // clear all data, including "db" and "add" + "del"
-            self.do_clear(wtxn);
-
-            // "buffer" -> db.put + clear "buffer"
-            let db = self.open_db(wtxn).unwrap();
-            for (k, v) in self.buffer.borrow().iter() {
-                db.put(&mut wtxn.0, k, v).expect("history.put");
+    pub fn data_2_db(&self, wtxn: &mut ReDbRwTxn, switch: ReliSwitch) {
+        match switch {
+            ReliSwitch::CacheAll | ReliSwitch::CacheVar => {
+                // clear "snapshot" only, which is the same with db.
+                self.snapshot.borrow_mut().clear();
             }
-            self.buffer.borrow_mut().clear();
-        } else {
-            // clear "cache" only, which is the same with db
-            self.cache.borrow_mut().clear();
+            ReliSwitch::Buffer => {
+                // clear all data, including "db" and "add" + "del"
+                self.do_clear(wtxn);
+
+                // "buffer" -> db.put + clear "buffer"
+                let db = self.open_db(wtxn).unwrap();
+                for (k, v) in self.buffer.borrow().iter() {
+                    db.put(&mut wtxn.0, k, v).expect("history.put");
+                }
+                self.buffer.borrow_mut().clear();
+            }
+            ReliSwitch::Ignore => {
+                // do nothing
+            }
         }
     }
 
@@ -245,44 +270,38 @@ where
         K: DeserializeOwned,
         V: DeserializeOwned,
     {
-        // clear "add" + "del" + "cache"
+        // clear "add" + "del" + "snapshot"
         self.add.borrow_mut().clear();
         self.del.borrow_mut().clear();
-        self.cache.borrow_mut().clear();
+        self.snapshot.borrow_mut().clear();
 
-        // db(open only) -> cache
-        if let Some(db) = self
-            .reli
-            .env()
+        // db(open only) -> snapshot
+        let env = self.reli.env().expect("get env");
+        if let Some(db) = env
             .open_database::<SerdeBincode<K>, SerdeBincode<V>>(Some(&self.name))
             .unwrap_or(None)
         {
-            let rtxn = ReDbRoTxn::new(self.reli.env()).expect("db_2_cache.ro_txn");
+            let rtxn = ReDbRoTxn::new(&env).expect("db_2_cache.ro_txn");
             let iter = db.iter(&rtxn.0).unwrap();
             for entry in iter {
                 let (k, v) = entry.unwrap();
-                self.cache.borrow_mut().insert(k, v);
+                self.snapshot.borrow_mut().insert(k, v);
             }
         }
     }
 
     fn open_db(&self, wtxn: &mut ReDbRwTxn) -> Result<Database<SerdeBincode<K>, SerdeBincode<V>>> {
-        let database = self
-            .reli
-            .env()
-            .open_database(Some(&self.name))
-            .context(HeedSnafu)?;
+        let env = self.reli.env().expect("get env");
+        let database = env.open_database(Some(&self.name)).context(HeedSnafu)?;
         if let Some(db) = database {
             Ok(db)
         } else {
-            self.reli
-                .env()
-                .create_database_with_txn(Some(&self.name), &mut wtxn.0)
+            env.create_database_with_txn(Some(&self.name), &mut wtxn.0)
                 .context(HeedSnafu)
         }
     }
 
-    fn switch(&self) -> Option<bool> {
+    fn switch(&self) -> ReliSwitch {
         *self.switch.borrow()
     }
 }
@@ -314,15 +333,17 @@ pub trait ReDbTable {
     /// export the changed data to database
     fn export(&self, wtxn: &mut ReDbRwTxn);
     /// flush data to database
-    fn flush(&self, wtxn: &mut ReDbRwTxn, switch: bool);
+    fn flush(&self, wtxn: &mut ReDbRwTxn, switch: ReliSwitch);
     /// import all data from database
     fn import(&self);
     /// set the switch flag of data, does switch control whether to use buffer, cache, or none
-    fn switch_set(&self, switch: Option<bool>);
+    fn switch_set(&self, switch: ReliSwitch);
 }
 
 pub(super) const RELI_DIR: &str = "reliability.mdb";
+#[allow(dead_code)]
 pub(super) const RELI_DATA_FILE: &str = "data.mdb";
+#[allow(dead_code)]
 pub(super) const RELI_LOCK_FILE: &str = "lock.mdb";
 
 pub(super) const RELI_INTERNAL_DB_ENABLE: &str = "enable";

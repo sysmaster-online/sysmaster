@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use core::rel::{ReDb, ReDbRwTxn, ReDbTable, Reliability};
+use core::rel::{ReDb, ReDbRwTxn, ReDbTable, ReliSwitch, Reliability};
 use macros::EnumDisplay;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
@@ -103,7 +103,7 @@ impl ReDbTable for MountReDb<String, MountReMng> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn flush(&self, db_wtxn: &mut ReDbRwTxn, switch: bool) {
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn, switch: ReliSwitch) {
         self.0.data_2_db(db_wtxn, switch);
     }
 
@@ -111,7 +111,7 @@ impl ReDbTable for MountReDb<String, MountReMng> {
         self.0.db_2_cache();
     }
 
-    fn switch_set(&self, switch: Option<bool>) {
+    fn switch_set(&self, switch: ReliSwitch) {
         self.0.switch_buffer(switch);
     }
 }
@@ -125,7 +125,7 @@ impl ReDbTable for MountReDb<u32, MountReFrame> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn flush(&self, db_wtxn: &mut ReDbRwTxn, switch: bool) {
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn, switch: ReliSwitch) {
         self.0.data_2_db(db_wtxn, switch);
     }
 
@@ -133,7 +133,7 @@ impl ReDbTable for MountReDb<u32, MountReFrame> {
         self.0.db_2_cache();
     }
 
-    fn switch_set(&self, switch: Option<bool>) {
+    fn switch_set(&self, switch: ReliSwitch) {
         self.0.switch_buffer(switch);
     }
 }

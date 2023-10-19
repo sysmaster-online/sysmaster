@@ -30,7 +30,7 @@ use unit_parser::internal::UnitEntry;
 
 use core::error::*;
 use core::exec::{ExecCommand, Rlimit, RuntimeDirectory, StateDirectory, WorkingDirectory};
-use core::rel::{ReDb, ReDbRwTxn, ReDbTable, Reliability};
+use core::rel::{ReDb, ReDbRwTxn, ReDbTable, ReliSwitch, Reliability};
 use core::unit::KillMode;
 
 use basic::EXEC_RUNTIME_PREFIX;
@@ -892,7 +892,7 @@ impl ReDbTable for ServiceReDb<String, ServiceReConf> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn flush(&self, db_wtxn: &mut ReDbRwTxn, switch: bool) {
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn, switch: ReliSwitch) {
         self.0.data_2_db(db_wtxn, switch);
     }
 
@@ -900,7 +900,7 @@ impl ReDbTable for ServiceReDb<String, ServiceReConf> {
         self.0.db_2_cache();
     }
 
-    fn switch_set(&self, switch: Option<bool>) {
+    fn switch_set(&self, switch: ReliSwitch) {
         self.0.switch_buffer(switch);
     }
 }
@@ -914,7 +914,7 @@ impl ReDbTable for ServiceReDb<String, ServiceReMng> {
         self.0.cache_2_db(db_wtxn);
     }
 
-    fn flush(&self, db_wtxn: &mut ReDbRwTxn, switch: bool) {
+    fn flush(&self, db_wtxn: &mut ReDbRwTxn, switch: ReliSwitch) {
         self.0.data_2_db(db_wtxn, switch);
     }
 
@@ -922,7 +922,7 @@ impl ReDbTable for ServiceReDb<String, ServiceReMng> {
         self.0.db_2_cache();
     }
 
-    fn switch_set(&self, switch: Option<bool>) {
+    fn switch_set(&self, switch: ReliSwitch) {
         self.0.switch_buffer(switch);
     }
 }

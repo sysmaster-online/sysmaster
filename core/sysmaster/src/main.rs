@@ -45,7 +45,7 @@ use clap::Parser;
 use constants::LOG_FILE_PATH;
 use core::error::*;
 use core::rel;
-use libc::{c_int, getpid, getppid, prctl, PR_SET_CHILD_SUBREAPER};
+use libc::{c_int, PR_SET_CHILD_SUBREAPER};
 use log::{self, Level};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use std::cell::RefCell;
@@ -171,7 +171,7 @@ fn initialize_runtime(self_recovery_enable: bool) -> Result<()> {
 }
 
 fn set_child_reaper() {
-    let ret = unsafe { prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) };
+    let ret = unsafe { libc::prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) };
 
     if ret < 0 {
         log::warn!("failed to set child reaper, errno: {}", ret);
@@ -243,13 +243,24 @@ fn install_crash_handler() {
     }
 }
 
+#[cfg(not(feature = "norecovery"))]
 extern "C" fn crash(signo: c_int, siginfo: *mut libc::siginfo_t, _con: *mut libc::c_void) {
     let signal = Signal::try_from(signo).unwrap(); // debug
-    if (signal == Signal::SIGABRT && unsafe { (*siginfo).si_pid() == getppid() })
-        || unsafe { (*siginfo).si_pid() == getpid() }
+    if (signal == Signal::SIGABRT && unsafe { (*siginfo).si_pid() == libc::getppid() })
+        || unsafe { (*siginfo).si_pid() == libc::getpid() }
     {
         let args: Vec<String> = env::args().collect();
         do_reexecute(&args, false);
+    }
+}
+
+#[cfg(feature = "norecovery")]
+extern "C" fn crash(_signo: c_int, _siginfo: *mut libc::siginfo_t, _con: *mut libc::c_void) {
+    // debug
+
+    // freeze
+    loop {
+        nix::unistd::pause();
     }
 }
 
@@ -267,7 +278,7 @@ fn execarg_build_default() -> (String, Vec<String>) {
 
 extern "C" fn crash_reexec(_signo: c_int, siginfo: *mut libc::siginfo_t, _con: *mut libc::c_void) {
     unsafe {
-        if (*siginfo).si_pid() == getppid() {
+        if (*siginfo).si_pid() == libc::getppid() {
             let args: Vec<String> = env::args().collect();
             do_reexecute(&args, false);
         }
