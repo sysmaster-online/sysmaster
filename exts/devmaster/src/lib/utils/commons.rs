@@ -607,7 +607,7 @@ pub(crate) fn cleanup_db(dev: Rc<RefCell<Device>>) -> Result<()> {
     Ok(())
 }
 
-/// Check wether every character in stirng satisfy the condition.
+/// Check whether every character in string satisfy the condition.
 pub(crate) fn str_satisfy<F>(s: &str, f: F) -> bool
 where
     F: Copy + FnOnce(char) -> bool,
