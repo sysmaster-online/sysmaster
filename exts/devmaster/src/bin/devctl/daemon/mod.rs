@@ -11,6 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 //! devmaster daemon
+
 use event::Events;
 use libdevmaster::framework::devmaster::Devmaster;
 use std::{env, os::unix::net::UnixDatagram, rc::Rc};
@@ -37,7 +38,7 @@ fn notify(unset_env: bool, msg: String) -> std::io::Result<()> {
     }
 }
 
-fn main() {
+pub fn run_daemon() {
     let events = Rc::new(Events::new().unwrap());
 
     let devmaster = Devmaster::new(events);

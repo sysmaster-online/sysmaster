@@ -11,6 +11,8 @@
 // See the Mulan PSL v2 for more details.
 
 //!
+#[cfg(feature = "argv")]
+pub mod argv_util;
 #[cfg(feature = "capability")]
 pub mod capability;
 #[cfg(feature = "cargo")]

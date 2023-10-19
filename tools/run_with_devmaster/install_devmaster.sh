@@ -28,8 +28,8 @@ multi_user_target_dir=/etc/sysmaster/system/multi-user.target.wants
 
 # Install binaries.
 install -Dm0550 -t /usr/bin ${target_dir}/devctl || exit 1
-install -Dm0550 -t ${lib_devmaster_dir} ${target_dir}/devmaster || exit 1
 install -Dm0550 -t ${lib_devmaster_dir} ${run_with_devmaster}/simulate_udev.sh || exit 1
+ln -sf -T /usr/bin/devctl ${lib_devmaster_dir}/devmaster || exit 1
 for tool in $tools; do
     install -Dm0550 -t ${lib_devmaster_dir} ${target_dir}/$tool || exit 1
 done

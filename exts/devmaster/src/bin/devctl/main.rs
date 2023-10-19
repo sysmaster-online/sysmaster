@@ -13,8 +13,11 @@
 //! devctrl is the client of devmaster
 //!
 #![allow(deprecated)]
+mod daemon;
 mod subcmds;
+use basic::argv_util::invoked_as;
 use clap::Parser;
+use daemon::run_daemon;
 use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
 use log::init_log_to_console_syslog;
 use log::Level;
@@ -112,6 +115,11 @@ fn subcommand_kill() {
 }
 
 fn main() {
+    let argv: Vec<String> = std::env::args().collect();
+    if invoked_as(argv, "devmaster") {
+        return run_daemon();
+    }
+
     init_log_to_console_syslog("devctl", Level::Debug);
     let args = Args::parse();
 
