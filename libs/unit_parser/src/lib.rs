@@ -3,7 +3,7 @@
 //! units and other systemd config files, as well as implementations of loading named units.
 
 mod config;
-mod error;
+pub mod error;
 mod escape;
 mod parser;
 mod specifiers;

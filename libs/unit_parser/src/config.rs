@@ -94,24 +94,31 @@ pub trait UnitConfig: Sized {
         } else {
             format!("{}.{}", name, Self::SUFFIX)
         };
-        let actual_file_name = match unit_type(fullname.as_str())? {
-            UnitType::Template(_) => {
-                return Err(Error::LoadTemplateError {
-                    name: fullname.to_owned(),
-                });
+
+        let config_file_names = match unit_type(fullname.as_str())? {
+            UnitType::Instance(_, template_filename) => {
+                vec![fullname.to_string(), template_filename]
             }
-            UnitType::Instance(_, template_filename) => template_filename,
-            UnitType::Regular(_) => fullname.to_owned(),
+            _ => {
+                vec![fullname.to_string()]
+            }
         };
         let mut result = None;
 
         // load itself
         let paths = Rc::clone(&paths_rc);
         for dir in (*paths).iter() {
-            let mut path = dir.to_owned();
-            path.push(actual_file_name.as_str());
-            if let Ok(res) = Self::__load(path, Rc::clone(&paths_rc), fullname.as_str(), root) {
-                result = Some(res);
+            for config_file_name in &config_file_names {
+                let mut path = dir.to_owned();
+                path.push(config_file_name.as_str());
+                if let Ok(res) =
+                    Self::__load(path, Rc::clone(&paths_rc), config_file_name.as_str(), root)
+                {
+                    result = Some(res);
+                    break;
+                }
+            }
+            if result.is_some() {
                 break;
             }
         }

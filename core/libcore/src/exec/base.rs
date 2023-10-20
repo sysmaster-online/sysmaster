@@ -11,13 +11,12 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::error::*;
-use crate::serialize::DeserializeWith;
 use basic::rlimit;
 use bitflags::bitflags;
 use libc::EPERM;
 use nix::sys::stat::Mode;
 use nix::unistd::{Group, Uid, User};
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::cmp::min;
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -25,6 +24,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::{cell::RefCell, collections::HashMap};
 use std::{ffi::CString, path::PathBuf, rc::Rc};
+use unit_parser::prelude::UnitEntry;
 
 /// the Rlimit soft and hard value
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -67,6 +67,15 @@ impl Rlimit {
     }
 }
 
+impl UnitEntry for Rlimit {
+    type Error = crate::error::Error;
+
+    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
+        let rlimit = Rlimit::from_str(input.as_ref())?;
+        Ok(rlimit)
+    }
+}
+
 fn parse_rlimit(limit: &str) -> Result<u64, Error> {
     if limit.is_empty() {
         return Err(Error::ConfigureError {
@@ -106,19 +115,6 @@ impl FromStr for Rlimit {
         }
 
         Ok(Rlimit { soft, hard })
-    }
-}
-
-impl DeserializeWith for Rlimit {
-    type Item = Self;
-
-    fn deserialize_with<'de, D>(de: D) -> Result<Self::Item, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(de)?;
-        let rlimit = Rlimit::from_str(&s).map_err(de::Error::custom)?;
-        Ok(rlimit)
     }
 }
 

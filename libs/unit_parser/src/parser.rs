@@ -2,8 +2,8 @@
 use crate::specifiers::{resolve, SpecifierContext};
 use nom::{
     branch::alt,
-    bytes::complete::{is_a, is_not, tag, take_till},
-    character::complete::{alphanumeric1, anychar, char, multispace1, space0},
+    bytes::complete::{escaped_transform, is_a, is_not, tag, take_till, take_until},
+    character::complete::{alphanumeric1, anychar, char, multispace1, none_of, space0},
     combinator::value,
     multi::{many0, many_till},
     sequence::{delimited, separated_pair},
@@ -43,16 +43,26 @@ impl<'a> UnitParser<'a> {
 impl<'a> Iterator for UnitParser<'a> {
     type Item = SectionParser<'a>;
     fn next(&mut self) -> Option<Self::Item> {
-        if let Ok((i, name)) = section_header(self.inner) {
-            self.inner = i;
-            Some(SectionParser {
-                paths: Rc::clone(&self.paths),
-                name,
-                inner: self.inner,
-                context: self.context,
-            })
-        } else {
-            None
+        loop {
+            if let Ok((i, name)) = section_header(self.inner) {
+                self.inner = i;
+                return Some(SectionParser {
+                    paths: Rc::clone(&self.paths),
+                    name,
+                    inner: self.inner,
+                    context: self.context,
+                });
+            } else {
+                let temp: IResult<&str, &str> = take_until("\n")(self.inner);
+                match temp {
+                    Ok((i, _)) => {
+                        self.inner = i.trim_start_matches('\n');
+                    }
+                    Err(_) => {
+                        return None;
+                    }
+                }
+            }
         }
     }
 }
@@ -161,9 +171,16 @@ fn value_segment<'a>(
     context: SpecifierContext<'a>,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, String> {
     move |i| {
-        let (i, segment) = take_till(|x| x == '\\' || x == '\n' || x == '%')(i)?;
+        let (i, segment) = take_till(|x| x == '\n' || x == '%')(i)?;
+        /* escape the '\\' in segment to '\' */
+        let excaped_segment: IResult<&str, String> =
+            escaped_transform(none_of("\\"), '\\', value("\\", tag("\\")))(segment);
+        let segment = match excaped_segment {
+            Err(_) => segment.to_string(),
+            Ok(v) => v.1,
+        };
         if let Ok((i, spec)) = specifier(i) {
-            let mut result = segment.to_string();
+            let mut result = segment;
             if resolve(&mut result, spec, context).is_ok() {
                 Ok((i, result))
             } else {
@@ -173,7 +190,7 @@ fn value_segment<'a>(
                 )))
             }
         } else {
-            Ok((i, segment.to_string()))
+            Ok((i, segment))
         }
     }
 }

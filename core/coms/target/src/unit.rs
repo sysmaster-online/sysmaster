@@ -149,6 +149,7 @@ impl SubUnit for Target {
     fn dump(&self) {}
 
     fn start(&self) -> Result<()> {
+        log::info!("Starting {}", self.comm.owner().unwrap().id());
         //if current state is not valid, just return.
         self.mng.start_check()?;
 

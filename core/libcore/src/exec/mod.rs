@@ -17,5 +17,6 @@ pub use base::{
     ExecContext, ExecDirectoryType, ExecFlags, ExecParameters, Rlimit, RuntimeDirectory,
     StateDirectory, WorkingDirectory,
 };
+pub use cmd::deserialize_exec_command;
 pub use cmd::ExecCommand;
 pub use cmd::ExecFlag;

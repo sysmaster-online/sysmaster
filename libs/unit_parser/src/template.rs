@@ -10,24 +10,25 @@ pub(crate) enum UnitType<'a> {
 
 /// Determines the type of a unit based on its filename.
 pub(crate) fn unit_type(filename: &str) -> Result<UnitType> {
-    let split: Vec<&str> = filename.split('@').collect();
-    match split.len() {
-        1 => Ok(UnitType::Regular(filename)),
-        2 => {
-            if split.get(1).unwrap().starts_with('.') {
-                Ok(UnitType::Template(split.get(0).unwrap()))
-            } else {
-                let mut sub_split = split.get(1).unwrap().split('.');
-                let template_name = sub_split.next().unwrap();
-                let suffix = sub_split.last().unwrap();
-                Ok(UnitType::Instance(
-                    split.get(0).unwrap(),
-                    format!("{}@.{}", template_name, suffix),
-                ))
-            }
-        }
-        _ => Err(Error::InvalidFilenameError {
-            filename: filename.to_string(),
-        }),
+    /* Take foo@123.service for example, "foo@123" is its first_name; "foo" is prefix or
+     * template; "service" is its last_name, suffix, or type; "123" is instance. */
+    let (template, instance_suffix) = match filename.split_once('@') {
+        None => return Ok(UnitType::Regular(filename)),
+        Some(v) => (v.0, v.1),
+    };
+    if instance_suffix.starts_with('.') {
+        return Ok(UnitType::Template(filename));
     }
+    let (instance, suffix) = match instance_suffix.split_once('.') {
+        None => {
+            return Err(Error::InvalidFilenameError {
+                filename: filename.to_string(),
+            })
+        }
+        Some(v) => (v.0, v.1),
+    };
+    Ok(UnitType::Instance(
+        instance,
+        format!("{}@.{}", template, suffix),
+    ))
 }

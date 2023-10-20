@@ -11,7 +11,11 @@ use syn::{Data, DeriveInput, Error, Field, Result};
 /// by calling a function with generic constraints.
 pub(crate) fn gen_entry_ensure(field: &Field) -> Result<TokenStream> {
     let mut ty = &field.ty;
-    let attribute = EntryAttributes::parse_vec(field, None)?;
+    let attribute = EntryAttributes::parse_attributes(field, None)?;
+    /* No need to check when user has defined his own parser */
+    if attribute.myparser.is_some() {
+        return Ok(quote! {});
+    }
     if attribute.multiple {
         ty = get_vec_inner_type(ty).unwrap();
     } else if (!attribute.must) & (attribute.default.is_none()) {
@@ -19,7 +23,7 @@ pub(crate) fn gen_entry_ensure(field: &Field) -> Result<TokenStream> {
     }
     Ok(quote! {
         const _: fn() = || {
-            fn assert_impl<T: UnitEntry>() {}
+            fn assert_impl<T: unit_parser::internal::UnitEntry>() {}
             assert_impl::<#ty>();
         };
     })
@@ -35,7 +39,7 @@ pub(crate) fn gen_entry_init(field: &Field) -> Result<TokenStream> {
         .ident
         .as_ref()
         .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported."))?;
-    let attributes = EntryAttributes::parse_vec(field, None)?;
+    let attributes = EntryAttributes::parse_attributes(field, None)?;
     Ok(match attributes.multiple {
         false => quote! {
             let mut #name = None;
@@ -65,86 +69,113 @@ pub(crate) fn gen_entry_parse(field: &Field) -> Result<TokenStream> {
         .as_ref()
         .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported."))?;
     let ty = &field.ty;
-    let attributes = EntryAttributes::parse_vec(field, Some(ty))?;
+    let attributes = EntryAttributes::parse_attributes(field, Some(ty))?;
     let key = attributes
         .key
         .unwrap_or_else(|| (format!("{}", name)).into_token_stream());
 
-    let result = match (
-        attributes.default,
-        attributes.multiple,
-        attributes.subdir,
-        attributes.must,
-    ) {
-        // unreachable
-        (Some(_), _, _, true) | (_, true, _, true) | (_, false, Some(_), _) => unreachable!(),
-        // add to Vec
-        (_, true, None, _) => {
-            quote! {
-                #key => {
-                    if __pair.1.as_str().is_empty() {
-                        #name.clear();
-                        continue;
+    if !attributes.multiple && attributes.subdir.is_some() {
+        return Err(Error::new_spanned(
+            field,
+            "\'subdir\' can only be used when \'multiple\' is true.",
+        ));
+    }
+
+    if attributes.multiple && attributes.must {
+        return Err(Error::new_spanned(
+            field,
+            "\'must\' should be false when \'multiple\' is true.",
+        ));
+    }
+
+    if (attributes.must || attributes.multiple) && attributes.default.is_some() {
+        return Err(Error::new_spanned(
+            field,
+            "\'default\' can only be used when \'must\' and \'multiple\' are false.",
+        ));
+    }
+
+    if attributes.multiple {
+        let clear_when_empty = quote! {
+            if __pair.1.as_str().is_empty() {
+                #name.clear();
+                continue;
+            }
+        };
+        /* myparser */
+        let parser = match attributes.myparser {
+            Some(myparser) => quote! {
+                match #myparser(__pair.1.as_str()) {
+                    Ok(__inner) => {
+                        #name.extend(__inner);
                     }
-                    for __part in __pair.1.split_ascii_whitespace(){
-                        match unit_parser::internal::UnitEntry::parse_from_str(__part){
-                            Ok(__inner) => {
-                                #name.push(__inner);
-                            }
-                            Err(_) => {
-                                log::warn!("Failed to parse {} for key {}, ignoring.", __pair.0, __pair.1);
-                            }
+                    Err(_) => {
+                        log::warn!("Failed to parse {} for key {}, ignoring.", __pair.0, __pair.1);
+                    }
+                }
+            },
+            None => quote! {
+                for __part in __pair.1.split_ascii_whitespace(){
+                    match unit_parser::internal::UnitEntry::parse_from_str(__part){
+                        Ok(__inner) => {
+                            #name.push(__inner);
+                        }
+                        Err(_) => {
+                            log::warn!("Failed to parse {} for key {}, ignoring.", __pair.0, __pair.1);
                         }
                     }
                 }
-            }
-        }
-        // add to Vec, as well as subdirs
-        (_, true, Some(subdir), _) => {
-            quote! {
-                #key => {
-                    if __pair.1.as_str().is_empty() {
-                        #name.clear();
-                        continue;
+            },
+        };
+        /* subdir */
+        match attributes.subdir {
+            None => {
+                return Ok(quote! {
+                    #key => {
+                        #clear_when_empty
+                        #parser
                     }
-                    for __part in __pair.1.split_ascii_whitespace(){
-                        match unit_parser::internal::UnitEntry::parse_from_str(__part){
-                            Ok(__inner) => {
-                                #name.push(__inner);
-                            }
-                            Err(_) => {
-                                log::warn!("Failed to parse {} for key {}, ignoring.", __pair.0, __pair.1);
-                            }
-                        }
+                })
+            }
+            Some(v) => {
+                return Ok(quote! {
+                    #key => {
+                        #clear_when_empty
+                        #parser
+                        let __subdirs = __source.__parse_subdir(#v);
+                        #name.extend_from_slice(&__subdirs);
                     }
-                    let __subdirs = __source.__parse_subdir(#subdir);
-                    #name.extend_from_slice(&__subdirs);
-                }
+                })
             }
         }
-        // set as Some if Ok
-        (_, false, None, false) => {
-            quote! {
-                #key => {
-                    if let Ok(__value) = unit_parser::internal::UnitEntry::parse_from_str(__pair.1.as_str()) {
-                        #name = Some(__value);
-                    }
-                }
+    }
+
+    let parser = match (attributes.must, attributes.myparser) {
+        (true, Some(entry_parser)) => quote! {
+            let __value = #entry_parser(__pair.1.as_str()).unwrap();
+            #name = Some(__value);
+        },
+        (true, None) => quote! {
+            let __value = unit_parser::internal::UnitEntry::parse_from_str(__pair.1.as_str()).unwrap();
+            #name = Some(__value);
+        },
+        (false, Some(entry_parser)) => quote! {
+            if let Ok(__value) = #entry_parser(__pair.1.as_str()) {
+                #name = Some(__value);
             }
-        }
-        // throw Error
-        (None, false, None, true) => {
-            quote! {
-                #key => {
-                    let __value = unit_parser::internal::UnitEntry::parse_from_str(__pair.1.as_str())
-                        .map_err(|_| unit_parser::internal::Error::ValueParsingError { key: #key.to_string(), value: __pair.1.to_string() })?;
-                    #name = Some(__value);
-                }
+        },
+        (false, None) => quote! {
+            if let Ok(__value) = unit_parser::internal::UnitEntry::parse_from_str(__pair.1.as_str()) {
+                #name = Some(__value)
             }
-        }
+        },
     };
 
-    Ok(result)
+    Ok(quote! {
+        #key => {
+            #parser
+        }
+    })
 }
 
 /// Generate finalization statements which are in charge of processing [Option] and [Result]s during parsing.
@@ -154,7 +185,7 @@ pub(crate) fn gen_entry_finalize(field: &Field) -> Result<TokenStream> {
         .as_ref()
         .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported."))?;
     let ty = &field.ty;
-    let attributes = EntryAttributes::parse_vec(field, None)?;
+    let attributes = EntryAttributes::parse_attributes(field, None)?;
     let key = attributes
         .key
         .unwrap_or_else(|| (format!("{}", name)).into_token_stream());
@@ -184,7 +215,8 @@ pub(crate) fn gen_entry_finalize(field: &Field) -> Result<TokenStream> {
         // throw Error
         (None, false, true) => {
             quote! {
-                let #name = #name.ok_or_else(||unit_parser::internal::Error::EntryMissingError { key: #key.to_string()})?;
+                let #name = #name.ok_or_else(|| {
+                    unit_parser::internal::Error::EntryMissingError { key: #key.to_string()}})?;
             }
         }
     };
@@ -234,7 +266,7 @@ pub(crate) fn gen_entry_patch(field: &Field) -> Result<TokenStream> {
         .ident
         .as_ref()
         .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported."))?;
-    let attributes = EntryAttributes::parse_vec(field, None)?;
+    let attributes = EntryAttributes::parse_attributes(field, None)?;
 
     let result = match (attributes.must, attributes.multiple, attributes.default) {
         // invalid

@@ -29,7 +29,6 @@ default = ["full"]
 
 full = [
     "condition",
-    "selinux",
     "sysfs",
     "unistd",
     "uuid",

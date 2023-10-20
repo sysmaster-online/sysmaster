@@ -60,7 +60,7 @@ pub fn gen_unit_derives(input: DeriveInput) -> syn::Result<TokenStream> {
                         match __section.name {
                             #( #parse_parsers ),*
                             _ => {
-                                log::warn!("{} is not a valid section.", __section.name);
+                                log::debug!("{} is not a valid section.", __section.name);
                             }
                         }
                         __source.progress(__section.finish());
@@ -82,7 +82,7 @@ pub fn gen_unit_derives(input: DeriveInput) -> syn::Result<TokenStream> {
                         match __section.name {
                             #( #patch_parsers ),*
                             _ => {
-                                log::warn!("{} is not a valid section.", __section.name);
+                                log::debug!("{} is not a valid section.", __section.name);
                             }
                         }
                         __source.progress(__section.finish());

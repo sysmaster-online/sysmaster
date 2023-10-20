@@ -16,23 +16,21 @@ use crate::monitor::ServiceMonitor;
 use basic::fs_util::{
     parse_absolute_path, path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify,
 };
-use confique::Config;
-use macros::EnumDisplay;
+use macros::{EnumDisplay, UnitSection};
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
-use serde::de::{self, Unexpected};
-use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::{HashMap, VecDeque};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
+use unit_parser::internal::UnitEntry;
 
 use core::error::*;
 use core::exec::{ExecCommand, Rlimit, RuntimeDirectory, StateDirectory, WorkingDirectory};
 use core::rel::{ReDb, ReDbRwTxn, ReDbTable, Reliability};
-use core::serialize::DeserializeWith;
 use core::unit::KillMode;
 
 use basic::EXEC_RUNTIME_PREFIX;
@@ -44,7 +42,7 @@ const RELI_DB_HSERVICE_CONF: &str = "svcconf";
 const RELI_DB_HSERVICE_MNG: &str = "svcmng";
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy)]
-pub(super) enum ServiceType {
+pub enum ServiceType {
     #[serde(alias = "simple")]
     Simple,
     #[serde(alias = "forking")]
@@ -59,29 +57,28 @@ pub(super) enum ServiceType {
     TypeInvalid = -1,
 }
 
+impl UnitEntry for ServiceType {
+    type Error = core::error::Error;
+
+    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
+        Ok(match input.as_ref() {
+            "simple" => ServiceType::Simple,
+            "forking" => ServiceType::Forking,
+            "oneshot" => ServiceType::Oneshot,
+            "notify" => ServiceType::Notify,
+            _ => ServiceType::Simple,
+        })
+    }
+}
+
 impl Default for ServiceType {
     fn default() -> Self {
         Self::Simple
     }
 }
 
-fn deserialize_service_type<'de, D>(de: D) -> Result<ServiceType, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(de)?;
-
-    match s.as_ref() {
-        "simple" => Ok(ServiceType::Simple),
-        "forking" => Ok(ServiceType::Forking),
-        "oneshot" => Ok(ServiceType::Oneshot),
-        "notify" => Ok(ServiceType::Notify),
-        &_ => Ok(ServiceType::Simple),
-    }
-}
-
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy)]
-pub(super) enum NotifyAccess {
+pub enum NotifyAccess {
     #[serde(alias = "none")]
     None,
     #[serde(alias = "all")]
@@ -92,8 +89,22 @@ pub(super) enum NotifyAccess {
     Exec,
 }
 
+impl UnitEntry for NotifyAccess {
+    type Error = core::error::Error;
+
+    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
+        Ok(match input.as_ref() {
+            "none" => NotifyAccess::None,
+            "all" => NotifyAccess::All,
+            "main" => NotifyAccess::Main,
+            "exec" => NotifyAccess::Exec,
+            _ => NotifyAccess::None,
+        })
+    }
+}
+
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone, Copy)]
-pub(super) enum ServiceRestart {
+pub enum ServiceRestart {
     #[serde(alias = "no")]
     No,
     #[serde(alias = "on-success")]
@@ -108,6 +119,23 @@ pub(super) enum ServiceRestart {
     OnAbort,
     #[serde(alias = "always")]
     Always,
+}
+
+impl UnitEntry for ServiceRestart {
+    type Error = core::error::Error;
+
+    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
+        Ok(match input.as_ref() {
+            "no" => ServiceRestart::No,
+            "on-success" => ServiceRestart::OnSuccess,
+            "on-failure" => ServiceRestart::OnFailure,
+            "on-watchdog" => ServiceRestart::OnWatchdog,
+            "on-abnormal" => ServiceRestart::OnAbnormal,
+            "on-abort" => ServiceRestart::OnAbort,
+            "always" => ServiceRestart::Always,
+            _ => ServiceRestart::No,
+        })
+    }
 }
 
 impl Default for ServiceRestart {
@@ -147,32 +175,31 @@ fn exit_status_from_string(status: &str) -> Result<u8> {
     Ok(s)
 }
 
-fn deserialize_exit_status_set<'de, D>(de: D) -> Result<ExitStatusSet, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(de)?;
+impl UnitEntry for ExitStatusSet {
+    type Error = core::error::Error;
 
-    let mut status_set = ExitStatusSet::default();
+    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
+        let mut status_set = ExitStatusSet::default();
 
-    for cmd in s.split_whitespace() {
-        if cmd.is_empty() {
-            continue;
+        for cmd in input.as_ref().split_whitespace() {
+            if cmd.is_empty() {
+                continue;
+            }
+
+            if let Ok(v) = exit_status_from_string(cmd) {
+                status_set.add_status(v);
+                continue;
+            }
+
+            if let Ok(_sig) = Signal::from_str(cmd) {
+                status_set.add_signal(cmd.to_string());
+                continue;
+            }
+            log::warn!("RestartPreventExitStatus: invalid config value {}", cmd);
         }
 
-        if let Ok(v) = exit_status_from_string(cmd) {
-            status_set.add_status(v);
-            continue;
-        }
-
-        if let Ok(_sig) = Signal::from_str(cmd) {
-            status_set.add_signal(cmd.to_string());
-            continue;
-        }
-        log::warn!("RestartPreventExitStatus: invalid config value {}", cmd);
+        Ok(status_set)
     }
-
-    Ok(status_set)
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -188,48 +215,44 @@ impl Default for PreserveMode {
     }
 }
 
-fn deserialize_preserve_mode<'de, D>(de: D) -> std::result::Result<PreserveMode, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(de)?;
-    let res = match s.as_str() {
-        "no" => PreserveMode::No,
-        "yes" => PreserveMode::Yes,
-        "restart" => PreserveMode::Restart,
-        _ => {
-            log::error!(
-                "Failed to parse RuntimeDirectoryPreserve: {}, assuming no",
-                s
-            );
-            PreserveMode::No
-        }
-    };
-    Ok(res)
+impl UnitEntry for PreserveMode {
+    type Error = core::error::Error;
+
+    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
+        let res = match input.as_ref() {
+            "no" => PreserveMode::No,
+            "yes" => PreserveMode::Yes,
+            "restart" => PreserveMode::Restart,
+            _ => {
+                log::error!(
+                    "Failed to parse RuntimeDirectoryPreserve: {}, assuming no",
+                    input.as_ref()
+                );
+                PreserveMode::No
+            }
+        };
+        Ok(res)
+    }
 }
 
-fn deserialize_pidfile<'de, D>(de: D) -> Result<PathBuf, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(de)?;
-    if !path_name_is_safe(&s) {
-        return Err(de::Error::invalid_value(
-            Unexpected::Str(&s),
-            &"safe character",
-        ));
+fn deserialize_pidfile(s: &str) -> Result<PathBuf> {
+    if !path_name_is_safe(s) {
+        return Err(core::error::Error::ConfigureError {
+            msg: "PIDFile contains invalid character".to_string(),
+        });
     }
 
-    if !path_length_is_valid(&s) {
-        return Err(de::Error::invalid_value(
-            Unexpected::Str(&s),
-            &"valid length",
-        ));
+    if !path_length_is_valid(s) {
+        return Err(core::error::Error::ConfigureError {
+            msg: "PIDFile is too long".to_string(),
+        });
     }
 
-    let s = match path_simplify(&s) {
+    let s = match path_simplify(s) {
         None => {
-            return Err(de::Error::invalid_value(Unexpected::Str(&s), &""));
+            return Err(core::error::Error::ConfigureError {
+                msg: "PIDFile is not valid".to_string(),
+            });
         }
         Some(v) => v,
     };
@@ -241,13 +264,10 @@ where
     }
 }
 
-fn deserialize_pathbuf<'de, D>(de: D) -> Result<PathBuf, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(de)?;
-    let path =
-        parse_absolute_path(&s).map_err(|_| de::Error::invalid_value(Unexpected::Str(&s), &""))?;
+fn deserialize_pathbuf(s: &str) -> Result<PathBuf> {
+    let path = parse_absolute_path(s).map_err(|_| core::error::Error::ConfigureError {
+        msg: "Invalid PathBuf".to_string(),
+    })?;
     Ok(PathBuf::from(path))
 }
 
@@ -270,18 +290,6 @@ fn parse_working_directory(s: &str) -> Result<WorkingDirectory, basic::Error> {
     }
 
     Ok(WorkingDirectory::new(Some(PathBuf::from(&s)), miss_ok))
-}
-
-fn deserialize_working_directory<'de, D>(de: D) -> Result<WorkingDirectory, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(de)?;
-
-    match parse_working_directory(&s) {
-        Ok(v) => Ok(v),
-        Err(_) => Err(de::Error::invalid_value(Unexpected::Str(&s), &"")),
-    }
 }
 
 #[cfg(test)]
@@ -329,20 +337,20 @@ fn is_valid_exec_directory(s: &str) -> bool {
     true
 }
 
-fn deserialize_runtime_directory<'de, D>(de: D) -> Result<RuntimeDirectory, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(de)?;
+fn deserialize_runtime_directory(s: &str) -> Result<RuntimeDirectory> {
     let mut res = RuntimeDirectory::default();
     for d in s.split_terminator(';') {
         if !is_valid_exec_directory(d) {
-            return Err(de::Error::invalid_value(Unexpected::Str(d), &""));
+            return Err(Error::ConfigureError {
+                msg: "invalid runtime directory".to_string(),
+            });
         }
 
         let path = match path_simplify(d) {
             None => {
-                return Err(de::Error::invalid_value(Unexpected::Str(d), &""));
+                return Err(Error::ConfigureError {
+                    msg: "invalid runtime directory".to_string(),
+                });
             }
             Some(v) => v,
         };
@@ -353,21 +361,21 @@ where
     Ok(res)
 }
 
-fn deserialize_state_directory<'de, D>(de: D) -> Result<StateDirectory, D::Error>
-where
-    D: Deserializer<'de>,
-{
+fn deserialize_state_directory(s: &str) -> Result<StateDirectory> {
     /* Similar with RuntimeDirectory */
-    let s = String::deserialize(de)?;
     let mut res = StateDirectory::default();
     for d in s.split_terminator(';') {
         if !is_valid_exec_directory(d) {
-            return Err(de::Error::invalid_value(Unexpected::Str(d), &""));
+            return Err(Error::ConfigureError {
+                msg: "not valid exec directory".to_string(),
+            });
         }
 
         let path = match path_simplify(d) {
             None => {
-                return Err(de::Error::invalid_value(Unexpected::Str(d), &""));
+                return Err(Error::ConfigureError {
+                    msg: "not valid exec directory".to_string(),
+                });
             }
             Some(v) => v,
         };
@@ -378,11 +386,8 @@ where
     Ok(res)
 }
 
-fn deserialize_timeout<'de, D>(de: D) -> Result<u64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let timeout = u64::deserialize(de)?;
+fn deserialize_timeout(s: &str) -> Result<u64> {
+    let timeout = s.parse::<u64>().unwrap();
     if timeout == 0 {
         return Ok(u64::MAX);
     }
@@ -392,87 +397,87 @@ where
     Ok(timeout * USEC_PER_SEC)
 }
 
-#[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
-pub(super) struct SectionService {
-    #[config(deserialize_with = deserialize_service_type)]
-    #[config(default = "simple")]
+fn parse_hash_map(s: &str) -> Result<HashMap<String, String>> {
+    let mut res = HashMap::new();
+    for v in s.split_ascii_whitespace() {
+        match v.split_once("=") {
+            Some((v1, v2)) => {
+                res.insert(v1.to_string(), v2.to_string());
+            }
+            None => continue,
+        }
+    }
+    Ok(res)
+}
+
+#[derive(UnitSection, Serialize, Deserialize, Debug, Default, Clone)]
+pub struct SectionService {
+    #[entry(default=ServiceType::Simple)]
     pub Type: ServiceType,
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStart: Option<VecDeque<ExecCommand>>,
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStartPre: Option<VecDeque<ExecCommand>>,
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStartPost: Option<VecDeque<ExecCommand>>,
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStop: Option<VecDeque<ExecCommand>>,
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStopPost: Option<VecDeque<ExecCommand>>,
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecReload: Option<VecDeque<ExecCommand>>,
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecCondition: Option<VecDeque<ExecCommand>>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub Sockets: Option<Vec<String>>,
-    #[config(default = 0)]
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecStart: Vec<ExecCommand>,
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecStartPre: Vec<ExecCommand>,
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecStartPost: Vec<ExecCommand>,
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecStop: Vec<ExecCommand>,
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecStopPost: Vec<ExecCommand>,
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecReload: Vec<ExecCommand>,
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecCondition: Vec<ExecCommand>,
+    #[entry(multiple)]
+    pub Sockets: Vec<String>,
+    #[entry(default = 0)]
     pub WatchdogSec: u64,
-    #[config(deserialize_with = deserialize_pidfile)]
+    #[entry(myparser = deserialize_pidfile)]
     pub PIDFile: Option<PathBuf>,
-    #[config(default = false)]
+    #[entry(default = false)]
     pub RemainAfterExit: bool,
     pub NotifyAccess: Option<NotifyAccess>,
-    #[config(default = false)]
+    #[entry(default = false)]
     pub NonBlocking: bool,
+    #[entry(myparser = parse_hash_map)]
     pub Environment: Option<HashMap<String, String>>,
-    #[config(deserialize_with = KillMode::deserialize_with)]
-    #[config(default = "none")]
+    #[entry(default = KillMode::ControlGroup)]
     pub KillMode: KillMode,
     pub SELinuxContext: Option<String>,
-    #[config(deserialize_with = deserialize_pathbuf)]
+    #[entry(myparser = deserialize_pathbuf)]
     pub RootDirectory: Option<PathBuf>,
-    #[config(default = "")]
-    #[config(deserialize_with = deserialize_working_directory)]
+    #[entry(default = WorkingDirectory::default(), myparser = parse_working_directory)]
     pub WorkingDirectory: WorkingDirectory,
-    #[config(default = "")]
-    #[config(deserialize_with = deserialize_state_directory)]
+    #[entry(default = StateDirectory::default(), myparser = deserialize_state_directory)]
     pub StateDirectory: StateDirectory,
-    #[config(deserialize_with = deserialize_runtime_directory)]
-    #[config(default = "")]
+    #[entry(default = RuntimeDirectory::default(), myparser = deserialize_runtime_directory)]
     pub RuntimeDirectory: RuntimeDirectory,
-    #[config(deserialize_with = deserialize_preserve_mode)]
-    #[config(default = "no")]
+    #[entry(default = PreserveMode::No)]
     pub RuntimeDirectoryPreserve: PreserveMode,
-    #[config(default = "")]
+    #[entry(default = "")]
     pub User: String,
-    #[config(default = "")]
+    #[entry(default = "")]
     pub Group: String,
-    #[config(default = "0022")]
+    #[entry(default = "0022")]
     pub UMask: String,
-    #[config(default = "no")]
+    #[entry(default = ServiceRestart::No)]
     pub Restart: ServiceRestart,
-    #[config(deserialize_with = deserialize_exit_status_set)]
-    #[config(default = "")]
+    #[entry(default = ExitStatusSet::default())]
     pub RestartPreventExitStatus: ExitStatusSet,
-    #[config(default = 1)]
+    #[entry(default = 1)]
     pub RestartSec: u64,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub EnvironmentFile: Vec<String>,
-    #[config(default = "SIGTERM")]
+    #[entry(default = "SIGTERM")]
     pub KillSignal: String,
-    #[config(deserialize_with = deserialize_timeout)]
-    #[config(default = 0)]
+    #[entry(default = 10000000, myparser = deserialize_timeout)]
     pub TimeoutSec: u64,
-    #[config(deserialize_with = deserialize_timeout)]
-    #[config(default = 0)]
+    #[entry(default = 10000000, myparser = deserialize_timeout)]
     pub TimeoutStartSec: u64,
-    #[config(deserialize_with = deserialize_timeout)]
-    #[config(default = 0)]
+    #[entry(default = 10000000, myparser = deserialize_timeout)]
     pub TimeoutStopSec: u64,
-    #[config(deserialize_with = Rlimit::deserialize_with)]
     pub LimitCORE: Option<Rlimit>,
-    #[config(deserialize_with = Rlimit::deserialize_with)]
     pub LimitNOFILE: Option<Rlimit>,
-    #[config(deserialize_with = Rlimit::deserialize_with)]
     pub LimitNPROC: Option<Rlimit>,
 }
 

@@ -8,6 +8,7 @@ bitflags = "1.3.2"
 fnmatch-regex = "0.2.0"
 lazy_static = "1.4.0"
 walkdir = "2"
+unit_parser = { path = "../../libs/unit_parser" }
 
 [dependencies.basic]
 path = "../../libs/basic"

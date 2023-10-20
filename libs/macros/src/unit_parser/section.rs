@@ -215,7 +215,7 @@ pub(crate) fn gen_section_ensure(field: &Field) -> Result<TokenStream> {
     }
     Ok(quote! {
         const _: fn() = || {
-            fn assert_impl<T: UnitSection>() {}
+            fn assert_impl<T: unit_parser::internal::UnitSection>() {}
             assert_impl::<#ty>();
         };
     })

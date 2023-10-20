@@ -285,10 +285,10 @@ impl ServiceUnit {
         }
 
         if let Some(owner) = self.comm.owner() {
-            if let Some(sockets) = self.config.sockets() {
+            if !self.config.sockets().is_empty() {
                 let um = self.comm.um();
 
-                for socket in sockets {
+                for socket in self.config.sockets() {
                     if let Err(e) = um.unit_add_two_dependency(
                         &owner.id(),
                         UnitRelations::UnitWants,

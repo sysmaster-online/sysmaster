@@ -223,12 +223,9 @@ impl SocketUnit {
         }
 
         let config = self.config.config_data();
-        if config.borrow().Socket.Symlinks.is_some()
-            && !config.borrow().Socket.Symlinks.as_ref().unwrap().is_empty()
-            && self.find_symlink_target().is_none()
-        {
+        if !config.borrow().Socket.Symlinks.is_empty() && self.find_symlink_target().is_none() {
             /* Set to None, so we won't create symlinks by mistake. */
-            config.borrow_mut().Socket.Symlinks = None;
+            config.borrow_mut().Socket.Symlinks = Vec::new();
             log::error!("Symlinks in [Socket] is configured, but there are none or more than one listen files.");
             return Err(Error::Nix {
                 source: nix::Error::ENOEXEC,

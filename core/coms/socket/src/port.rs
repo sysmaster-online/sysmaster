@@ -295,12 +295,9 @@ impl SocketPort {
             return;
         }
         let config = self.config.config_data();
-        if config.borrow().Socket.Symlinks.is_none() {
-            return;
-        }
 
         let target = self.listen();
-        for symlink in config.borrow().Socket.Symlinks.as_ref().unwrap() {
+        for symlink in &config.borrow().Socket.Symlinks {
             let symlink_str = symlink.to_str().unwrap();
             if let Err(e) = basic::fs_util::symlink(target, symlink_str, false) {
                 let unit_name = match self.comm.owner() {

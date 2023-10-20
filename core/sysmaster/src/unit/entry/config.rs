@@ -15,7 +15,6 @@ use super::base::UeBase;
 use crate::unit::rentry::{UeConfigInstall, UeConfigUnit};
 use crate::unit::util::UnitFile;
 use basic::unit_name::unit_name_to_instance;
-use confique::{Config, FileFormat, Partial};
 use core::error::*;
 use core::rel::ReStation;
 use core::serialize::DeserializeWith;
@@ -26,6 +25,7 @@ use core::specifier::{
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
+use unit_parser::prelude::{UnitConfig, UnitEntry};
 
 pub(crate) struct UeConfig {
     // associated objects
@@ -73,6 +73,25 @@ impl DeserializeWith for UnitEmergencyAction {
         let s = String::deserialize(de)?;
 
         match s.as_ref() {
+            "none" => Ok(UnitEmergencyAction::None),
+            "reboot" => Ok(UnitEmergencyAction::Reboot),
+            "reboot-force" => Ok(UnitEmergencyAction::RebootForce),
+            "reboot-immediate" => Ok(UnitEmergencyAction::RebootImmediate),
+            "poweroff" => Ok(UnitEmergencyAction::Poweroff),
+            "poweroff-force" => Ok(UnitEmergencyAction::PoweroffForce),
+            "poweroff-immediate" => Ok(UnitEmergencyAction::PoweroffImmediate),
+            "exit" => Ok(UnitEmergencyAction::Exit),
+            "exit-force" => Ok(UnitEmergencyAction::ExitForce),
+            &_ => Ok(UnitEmergencyAction::None),
+        }
+    }
+}
+
+impl UnitEntry for UnitEmergencyAction {
+    type Error = basic::error::Error;
+
+    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
+        match input.as_ref() {
             "none" => Ok(UnitEmergencyAction::None),
             "reboot" => Ok(UnitEmergencyAction::Reboot),
             "reboot-force" => Ok(UnitEmergencyAction::RebootForce),
@@ -137,28 +156,14 @@ impl UeConfig {
     }
 
     pub(super) fn load_fragment_and_dropin(&self, files: &UnitFile, name: &str) -> Result<()> {
-        type ConfigPartial = <UeConfigData as Config>::Partial;
-        let mut partial: ConfigPartial = Partial::from_env().context(ConfiqueSnafu)?;
-        /* The first config wins, so add default values at last. */
         let unit_conf_frag = files.get_unit_id_fragment_pathbuf(name);
         if unit_conf_frag.is_empty() {
             return Err(format!("{} doesn't have corresponding config file", name).into());
         }
+
         // fragment
-        for path in unit_conf_frag {
-            if !path.exists() {
-                return Err(format!("Config file {:?} of {} doesn't exist", path, name).into());
-            }
-            partial = match confique::File::with_format(&path, FileFormat::Toml).load() {
-                Err(e) => {
-                    log::error!("Failed to load {:?}: {}, skipping", path, e);
-                    continue;
-                }
-                Ok(v) => partial.with_fallback(v),
-            };
-        }
-        partial = partial.with_fallback(ConfigPartial::default_values());
-        let mut configer = UeConfigData::from_partial(partial).context(ConfiqueSnafu)?;
+        let unit_conf_frag = unit_conf_frag.iter().map(|x| x.parent().unwrap()).collect();
+        let mut configer = UeConfigData::load_named(unit_conf_frag, name, true).unwrap();
 
         // dropin
         for v in files.get_unit_wants_symlink_units(name) {
@@ -186,11 +191,11 @@ impl UeConfig {
     }
 }
 
-#[derive(Config, Default, Debug)]
+#[derive(UnitConfig, Default, Debug)]
 pub(crate) struct UeConfigData {
-    #[config(nested)]
+    #[section(default)]
     pub Unit: UeConfigUnit,
-    #[config(nested)]
+    #[section(default)]
     pub Install: UeConfigInstall,
 }
 
@@ -243,23 +248,20 @@ mod tests {
     use crate::unit::entry::config::UeConfig;
     use crate::unit::rentry::UnitRe;
     use basic::unit_name::unit_name_to_instance;
-    use confique::Config;
     use core::rel::{ReliConf, Reliability};
     use core::specifier::UnitSpecifierData;
     use core::unit::UnitType;
     use libtests::get_project_root;
     use std::rc::Rc;
+    use unit_parser::prelude::UnitConfig;
 
     use crate::unit::entry::config::UeConfigData;
     #[test]
     fn test_unit_parse() {
         let mut file_path = get_project_root().unwrap();
-        file_path.push("test_units/config.service");
-
-        let mut builder = UeConfigData::builder().env();
-        builder = builder.file(&file_path);
-
-        let result = builder.load();
+        file_path.push("tests/test_units");
+        println!("{:?}", file_path);
+        let result = UeConfigData::load_named(vec![file_path], "config.service", true).unwrap();
 
         println!("{:?}", result);
     }

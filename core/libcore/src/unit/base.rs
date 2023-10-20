@@ -213,7 +213,8 @@ pub fn unit_name_is_valid(name: &str, flag: UnitNameFlags) -> bool {
         return false;
     }
     /* Take foo@123.service for example, "foo@123" is its first_name,
-     * "foo" is prefix, "service" is its last_name, suffix, or type. */
+     * "foo" is prefix or template_name, "service" is its last_name, suffix, or type.
+     * "123.service" is instance_name. */
     let (first_name, last_name) = match name.split_once('.') {
         None => return false,
         Some(v) => (v.0, v.1),

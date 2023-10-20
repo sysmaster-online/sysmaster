@@ -14,6 +14,7 @@ use crate::serialize::DeserializeWith;
 use nix::sys::signal::Signal;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{cell::RefCell, rc::Rc};
+use unit_parser::prelude::UnitEntry;
 
 /// kill operation send to process
 #[allow(missing_docs)]
@@ -55,6 +56,20 @@ pub enum KillMode {
 impl Default for KillMode {
     fn default() -> Self {
         Self::ControlGroup
+    }
+}
+
+impl UnitEntry for KillMode {
+    type Error = crate::error::Error;
+
+    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
+        let s = String::from(input.as_ref());
+        match s {
+            s if s == "control-group" => Ok(KillMode::ControlGroup),
+            s if s == "process" => Ok(KillMode::Process),
+            s if s == "mixed" => Ok(KillMode::Mixed),
+            _ => Ok(KillMode::ControlGroup),
+        }
     }
 }
 

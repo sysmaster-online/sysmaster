@@ -21,24 +21,28 @@ impl SectionAttributes {
     pub(crate) fn parse_vec(input: &Field, ty: Option<&Type>) -> syn::Result<Self> {
         let mut result = SectionAttributes::default();
         for attribute in input.attrs.iter() {
-            if attribute.path().is_ident("section") {
-                attribute.parse_nested_meta(|nested| {
-                    if nested.path.is_ident("default") {
-                        result.default = true;
-                        Ok(())
-                    } else if nested.path.is_ident("key") {
-                        nested.input.parse::<Token![=]>()?;
-                        let value: LitStr = nested.input.parse()?;
-                        result.key = Some(value.into_token_stream());
-                        Ok(())
-                    } else if nested.path.is_ident("must") {
-                        result.must = true;
-                        Ok(())
-                    } else {
-                        Err(Error::new_spanned(attribute, "Not a valid attribute."))
-                    }
-                })?;
+            if !attribute.path().is_ident("section") {
+                continue;
             }
+            attribute.parse_nested_meta(|nested| {
+                if nested.path.is_ident("default") {
+                    result.default = true;
+                    Ok(())
+                } else if nested.path.is_ident("key") {
+                    nested.input.parse::<Token![=]>()?;
+                    let value: LitStr = nested.input.parse()?;
+                    result.key = Some(value.into_token_stream());
+                    Ok(())
+                } else if nested.path.is_ident("must") {
+                    result.must = true;
+                    Ok(())
+                } else {
+                    Err(Error::new_spanned(
+                        attribute,
+                        "section, Not a valid attribute.",
+                    ))
+                }
+            })?;
         }
         if result.default & result.must {
             return Err(Error::new_spanned(
@@ -71,42 +75,53 @@ pub(crate) struct EntryAttributes {
     pub(crate) must: bool,
     /// Whether systemd subdir resolve is specified
     pub(crate) subdir: Option<TokenStream>,
+    /// User's own parser
+    pub(crate) myparser: Option<syn::Path>,
 }
 
 impl EntryAttributes {
     /// Parses [EntryAttributes] from [syn] tokens.
     /// Pass in [syn::Type] to do type check, or pass in [None] to prevent errors from showing up multiple times
-    pub(crate) fn parse_vec(input: &Field, ty: Option<&Type>) -> syn::Result<Self> {
+    pub(crate) fn parse_attributes(input: &Field, ty: Option<&Type>) -> syn::Result<Self> {
         let mut result = EntryAttributes::default();
         for attribute in input.attrs.iter() {
-            if attribute.path().is_ident("entry") {
-                attribute.parse_nested_meta(|nested| {
-                    if nested.path.is_ident("default") {
-                        nested.input.parse::<Token![=]>()?;
-                        let value: Expr = nested.input.parse()?;
-                        result.default = Some(value);
-                        Ok(())
-                    } else if nested.path.is_ident("key") {
-                        nested.input.parse::<Token![=]>()?;
-                        let value: LitStr = nested.input.parse()?;
-                        result.key = Some(value.into_token_stream());
-                        Ok(())
-                    } else if nested.path.is_ident("multiple") {
-                        result.multiple = true;
-                        Ok(())
-                    } else if nested.path.is_ident("must") {
-                        result.must = true;
-                        Ok(())
-                    } else if nested.path.is_ident("subdir") {
-                        nested.input.parse::<Token![=]>()?;
-                        let value: LitStr = nested.input.parse()?;
-                        result.subdir = Some(value.into_token_stream());
-                        Ok(())
-                    } else {
-                        Err(Error::new_spanned(attribute, "Not a valid attribute."))
-                    }
-                })?;
+            if !attribute.path().is_ident("entry") {
+                continue;
             }
+            attribute.parse_nested_meta(|nested| {
+                if nested.path.is_ident("default") {
+                    nested.input.parse::<Token![=]>()?;
+                    let value: Expr = nested.input.parse()?;
+                    result.default = Some(value);
+                    Ok(())
+                } else if nested.path.is_ident("key") {
+                    nested.input.parse::<Token![=]>()?;
+                    let value: LitStr = nested.input.parse()?;
+                    result.key = Some(value.into_token_stream());
+                    Ok(())
+                } else if nested.path.is_ident("multiple") {
+                    result.multiple = true;
+                    Ok(())
+                } else if nested.path.is_ident("must") {
+                    result.must = true;
+                    Ok(())
+                } else if nested.path.is_ident("subdir") {
+                    nested.input.parse::<Token![=]>()?;
+                    let value: LitStr = nested.input.parse()?;
+                    result.subdir = Some(value.into_token_stream());
+                    Ok(())
+                } else if nested.path.is_ident("myparser") {
+                    nested.input.parse::<Token![=]>()?;
+                    let value: syn::Path = nested.input.parse()?;
+                    result.myparser = Some(value);
+                    Ok(())
+                } else {
+                    Err(Error::new_spanned(
+                        attribute,
+                        "entry, Not a valid attribute.",
+                    ))
+                }
+            })?;
         }
         if result.must & result.default.is_some() {
             return Err(Error::new_spanned(
@@ -164,7 +179,10 @@ impl UnitAttributes {
                         result.suffix = Some(value);
                         Ok(())
                     } else {
-                        Err(Error::new_spanned(attribute, "Not a valid attribute."))
+                        Err(Error::new_spanned(
+                            attribute,
+                            "unit, Not a valid attribute.",
+                        ))
                     }
                 })?;
             }

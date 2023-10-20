@@ -363,6 +363,7 @@ dependencies = [
  "nix 0.24.3",
  "serde",
  "snafu",
+ "unit_parser",
 ]
 
 [[package]]
@@ -1777,6 +1778,7 @@ dependencies = [
  "nix 0.24.3",
  "once_cell",
  "serde",
+ "unit_parser",
 ]
 
 [[package]]
@@ -1843,6 +1845,7 @@ dependencies = [
  "nix 0.24.3",
  "once_cell",
  "serde",
+ "unit_parser",
 ]
 
 [[package]]
@@ -1977,6 +1980,7 @@ dependencies = [
  "siphasher",
  "socket",
  "target",
+ "unit_parser",
  "walkdir",
 ]
 

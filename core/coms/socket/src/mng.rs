@@ -616,10 +616,7 @@ impl SocketMng {
         }
         // remove symlinks
         let config = self.config.config_data();
-        if config.borrow().Socket.Symlinks.is_none() {
-            return;
-        }
-        for symlink in config.borrow().Socket.Symlinks.as_ref().unwrap() {
+        for symlink in &config.borrow().Socket.Symlinks {
             let _ = unlink(symlink.to_str().unwrap());
         }
     }

@@ -11,18 +11,16 @@
 // See the Mulan PSL v2 for more details.
 //
 #![allow(non_snake_case)]
-use confique::Config;
 use core::exec::ExecCommand;
 use core::rel::{ReDb, ReDbRwTxn, ReDbTable, Reliability};
-use core::serialize::DeserializeWith;
 use core::unit::KillMode;
 use macros::EnumDisplay;
 use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
 use std::rc::Rc;
+use unit_parser::prelude::UnitSection;
 
 struct SocketReDb<K, V>(ReDb<K, V>);
 
@@ -31,36 +29,49 @@ const RELI_DB_HSOCKET_MNG: &str = "sockmng";
 const RELI_DB_HSOCKETM_FRAME: &str = "sockm-frame";
 const RELI_LAST_KEY: u32 = 0; // singleton
 
-#[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
+fn deserialize_pathbuf_vec(s: &str) -> Result<Vec<PathBuf>, core::error::Error> {
+    let mut res = Vec::new();
+    for v in s.split_ascii_whitespace() {
+        let path = basic::fs_util::parse_absolute_path(v).map_err(|_| {
+            core::error::Error::ConfigureError {
+                msg: "Invalid PathBuf".to_string(),
+            }
+        })?;
+        res.push(PathBuf::from(path));
+    }
+    Ok(res)
+}
+
+#[derive(UnitSection, Default, Clone, Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub(super) struct SectionSocket {
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStartPre: Option<VecDeque<ExecCommand>>,
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStartChown: Option<VecDeque<ExecCommand>>,
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStartPost: Option<VecDeque<ExecCommand>>,
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStopPre: Option<VecDeque<ExecCommand>>,
-    #[config(deserialize_with = ExecCommand::deserialize_with)]
-    pub ExecStopPost: Option<VecDeque<ExecCommand>>,
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecStartPre: Vec<ExecCommand>,
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecStartChown: Vec<ExecCommand>,
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecStartPost: Vec<ExecCommand>,
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecStopPre: Vec<ExecCommand>,
+    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    pub ExecStopPost: Vec<ExecCommand>,
 
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub ListenStream: Option<Vec<String>>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub ListenDatagram: Option<Vec<String>>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub ListenNetlink: Option<Vec<String>>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub ListenSequentialPacket: Option<Vec<String>>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub ListenFIFO: Option<Vec<String>>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    pub ListenSpecial: Option<Vec<String>>,
+    #[entry(multiple)]
+    pub ListenStream: Vec<String>,
+    #[entry(multiple)]
+    pub ListenDatagram: Vec<String>,
+    #[entry(multiple)]
+    pub ListenNetlink: Vec<String>,
+    #[entry(multiple)]
+    pub ListenSequentialPacket: Vec<String>,
+    #[entry(multiple)]
+    pub ListenFIFO: Vec<String>,
+    #[entry(multiple)]
+    pub ListenSpecial: Vec<String>,
 
-    #[config(default = false)]
+    #[entry(default = false)]
     pub Accept: bool,
-    #[config(default = false)]
+    #[entry(default = false)]
     pub FlushPending: bool,
     pub Service: Option<String>,
     pub ReceiveBuffer: Option<u64>,
@@ -72,21 +83,20 @@ pub(super) struct SectionSocket {
     pub KeepAliveIntervalSec: Option<u32>,
     pub KeepAliveProbes: Option<u32>,
     pub Broadcast: Option<bool>,
-    #[config(default = false)]
+    #[entry(default = false)]
     pub RemoveOnStop: bool,
-    #[config(deserialize_with = Vec::<PathBuf>::deserialize_with)]
-    pub Symlinks: Option<Vec<PathBuf>>,
+    #[entry(multiple, myparser = deserialize_pathbuf_vec)]
+    pub Symlinks: Vec<PathBuf>,
     pub PassSecurity: Option<bool>,
-    #[config(default = 0o666)]
+    #[entry(default = 0o666)]
     pub SocketMode: u32,
-    #[config(default = "")]
+    #[entry(default = "")]
     pub SocketUser: String,
-    #[config(default = "")]
+    #[entry(default = "")]
     pub SocketGroup: String,
-    #[config(deserialize_with = KillMode::deserialize_with)]
-    #[config(default = "none")]
+    #[entry(default = KillMode::ControlGroup)]
     pub KillMode: KillMode,
-    #[config(default = "SIGTERM")]
+    #[entry(default = "SIGTERM")]
     pub KillSignal: String,
 }
 

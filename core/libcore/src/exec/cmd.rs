@@ -101,14 +101,24 @@ impl ExecCommand {
     }
 }
 
-fn parse_exec(s: &str) -> Result<VecDeque<ExecCommand>> {
+pub fn deserialize_exec_command(s: &str) -> Result<Vec<ExecCommand>> {
+    match parse_exec(s) {
+        Ok(v) => Ok(v),
+        Err(e) => {
+            log::error!("Failed to parse ExecCommand: {}", e);
+            Err(e)
+        }
+    }
+}
+
+fn parse_exec(s: &str) -> Result<Vec<ExecCommand>> {
     if s.is_empty() {
         return Err(Error::Invalid {
             what: "empty string".to_string(),
         });
     }
 
-    let mut res = VecDeque::new();
+    let mut res = Vec::new();
     let mut next_start = 0_usize;
     loop {
         let mut flags = ExecFlag::EXEC_COMMAND_EMPTY;
@@ -179,7 +189,7 @@ fn parse_exec(s: &str) -> Result<VecDeque<ExecCommand>> {
         let mut argv_start = path_start + path_str.len();
         let content = s.split_at(argv_start).1;
         if content.is_empty() {
-            res.push_back(ExecCommand {
+            res.push(ExecCommand {
                 path,
                 argv: vec![],
                 flags,
@@ -245,7 +255,7 @@ fn parse_exec(s: &str) -> Result<VecDeque<ExecCommand>> {
                 what: "no valid exec command, wrong single quote".to_string(),
             });
         }
-        /* No more characters after " ;", drop current argv  */
+        /* No more characters after " ;", drop current argv */
         if found_semicolon_wait_space {
             cur = String::new();
         }
@@ -254,7 +264,7 @@ fn parse_exec(s: &str) -> Result<VecDeque<ExecCommand>> {
             argv.push(cur);
         }
 
-        res.push_back(ExecCommand {
+        res.push(ExecCommand {
             path: path.to_string(),
             argv,
             flags,
@@ -281,7 +291,13 @@ impl DeserializeWith for ExecCommand {
     {
         let s = String::deserialize(de)?;
         match parse_exec(&s) {
-            Ok(v) => Ok(v),
+            Ok(v) => {
+                let mut res = VecDeque::new();
+                for cmd in v {
+                    res.push_back(cmd);
+                }
+                Ok(res)
+            }
             Err(e) => {
                 log::error!("Failed to parse ExecCommand: {}", e);
                 return Err(de::Error::invalid_value(Unexpected::Str(&s), &""));
@@ -294,11 +310,10 @@ mod tests {
     #[test]
     fn test_exec() {
         use crate::exec::{cmd::parse_exec, ExecCommand, ExecFlag};
-        use std::collections::VecDeque;
         /* One command */
         assert_eq!(
             parse_exec("/bin/echo").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec![],
                 flags: ExecFlag::EXEC_COMMAND_EMPTY
@@ -307,7 +322,7 @@ mod tests {
 
         assert_eq!(
             parse_exec("!!/bin/echo").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec![],
                 flags: ExecFlag::EXEC_COMMAND_AMBIENT_MAGIC
@@ -316,7 +331,7 @@ mod tests {
 
         assert_eq!(
             parse_exec("-!/bin/echo").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec![],
                 flags: ExecFlag::EXEC_COMMAND_IGNORE_FAILURE | ExecFlag::EXEC_COMMAND_NO_SETUID
@@ -325,7 +340,7 @@ mod tests {
 
         assert_eq!(
             parse_exec("/bin/echo good1 good2").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec!["good1".to_string(), "good2".to_string()],
                 flags: ExecFlag::EXEC_COMMAND_EMPTY
@@ -334,7 +349,7 @@ mod tests {
 
         assert_eq!(
             parse_exec("/bin/echo good1;good2").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec!["good1;good2".to_string()],
                 flags: ExecFlag::EXEC_COMMAND_EMPTY
@@ -343,7 +358,7 @@ mod tests {
 
         assert_eq!(
             parse_exec("/bin/echo ;/bin/echo good").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec![";/bin/echo".to_string(), "good".to_string()],
                 flags: ExecFlag::EXEC_COMMAND_EMPTY
@@ -352,7 +367,7 @@ mod tests {
 
         assert_eq!(
             parse_exec("/bin/echo good1\\;good2").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec!["good1\\;good2".to_string()],
                 flags: ExecFlag::EXEC_COMMAND_EMPTY
@@ -361,7 +376,7 @@ mod tests {
 
         assert_eq!(
             parse_exec("/bin/echo \\;").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec![";".to_string()],
                 flags: ExecFlag::EXEC_COMMAND_EMPTY
@@ -370,7 +385,7 @@ mod tests {
 
         assert_eq!(
             parse_exec("/bin/echo good \\; /bin/echo good1 good2").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec![
                     "good".to_string(),
@@ -385,7 +400,7 @@ mod tests {
 
         assert_eq!(
             parse_exec("/bin/echo good ;").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec!["good".to_string()],
                 flags: ExecFlag::EXEC_COMMAND_EMPTY
@@ -395,7 +410,7 @@ mod tests {
         /* Many commands */
         assert_eq!(
             parse_exec("/bin/echo good ; /bin/echo good1 good2 ; /bin/echo").unwrap(),
-            VecDeque::from([
+            Vec::from([
                 ExecCommand {
                     path: "/bin/echo".to_string(),
                     argv: vec!["good".to_string()],
@@ -439,7 +454,7 @@ mod tests {
         assert!(parse_exec("/bin/echo 'good good1' 'good2").is_err());
         assert_eq!(
             parse_exec("/bin/echo 'good good1' good2").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec!["good good1".to_string(), "good2".to_string()],
                 flags: ExecFlag::EXEC_COMMAND_EMPTY
@@ -447,7 +462,7 @@ mod tests {
         );
         assert_eq!(
             parse_exec("/bin/echo 'good good1' 'good2'").unwrap(),
-            VecDeque::from([ExecCommand {
+            Vec::from([ExecCommand {
                 path: "/bin/echo".to_string(),
                 argv: vec!["good good1".to_string(), "good2".to_string()],
                 flags: ExecFlag::EXEC_COMMAND_EMPTY

@@ -17,7 +17,6 @@ use super::comm::SocketUnitComm;
 use super::rentry::{PortType, SectionSocket, SocketCommand};
 use crate::base::NetlinkProtocol;
 use basic::{fd_util, socket_util};
-use confique::{Config, FileFormat, Partial};
 use core::error::*;
 use core::exec::ExecCommand;
 use core::rel::ReStation;
@@ -40,6 +39,7 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
+use unit_parser::prelude::UnitConfig;
 
 ///
 #[derive(Default)]
@@ -133,20 +133,9 @@ impl SocketConfig {
     }
 
     pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<()> {
-        type ConfigPartial = <SocketConfigData as Config>::Partial;
-        let mut partial: ConfigPartial = Partial::from_env().context(ConfiqueSnafu)?;
-        /* The first config wins, so add default values at last. */
-        for path in paths {
-            partial = match confique::File::with_format(&path, FileFormat::Toml).load() {
-                Err(e) => {
-                    log::error!("Failed to load {:?}: {}, skipping", path, e);
-                    continue;
-                }
-                Ok(v) => partial.with_fallback(v),
-            }
-        }
-        partial = partial.with_fallback(ConfigPartial::default_values());
-        let data = SocketConfigData::from_partial(partial).context(ConfiqueSnafu)?;
+        let name = paths[0].file_name().unwrap().to_string_lossy().to_string();
+        let paths = paths.iter().map(|x| x.parent().unwrap()).collect();
+        let data = SocketConfigData::load_named(paths, name, true).unwrap();
 
         // record original configuration
         *self.data.borrow_mut() = data;
@@ -208,24 +197,15 @@ impl SocketConfig {
     fn parse_port(&self) -> Result<()> {
         log::debug!("begin to parse socket section");
         let config = &self.data.borrow().Socket;
-        if let Some(v) = config.ListenStream.as_ref() {
-            self.parse_sockets(v, ListenItem::Stream)?;
-        }
-        if let Some(v) = config.ListenDatagram.as_ref() {
-            self.parse_sockets(v, ListenItem::Datagram)?;
-        }
-        if let Some(v) = config.ListenNetlink.as_ref() {
-            self.parse_sockets(v, ListenItem::Netlink)?;
-        }
-        if let Some(v) = config.ListenSequentialPacket.as_ref() {
-            self.parse_sockets(v, ListenItem::SequentialPacket)?;
-        }
-        if let Some(v) = config.ListenFIFO.as_ref() {
-            self.parse_fifo(v)?;
-        }
-        if let Some(v) = config.ListenSpecial.as_ref() {
-            self.parse_special(v)?;
-        }
+        self.parse_sockets(config.ListenStream.as_ref(), ListenItem::Stream)?;
+        self.parse_sockets(config.ListenDatagram.as_ref(), ListenItem::Datagram)?;
+        self.parse_sockets(config.ListenNetlink.as_ref(), ListenItem::Netlink)?;
+        self.parse_sockets(
+            config.ListenSequentialPacket.as_ref(),
+            ListenItem::SequentialPacket,
+        )?;
+        self.parse_fifo(config.ListenFIFO.as_ref())?;
+        self.parse_special(config.ListenSpecial.as_ref())?;
         Ok(())
     }
 
@@ -310,9 +290,9 @@ enum ListenItem {
     SequentialPacket,
 }
 
-#[derive(Config, Default, Debug)]
+#[derive(UnitConfig, Default, Debug)]
 pub(crate) struct SocketConfigData {
-    #[config(nested)]
+    #[section(must)]
     pub Socket: SectionSocket,
 }
 
@@ -323,12 +303,16 @@ impl SocketConfigData {
 
     // keep consistency with the configuration, so just copy from configuration.
     pub(self) fn get_exec_cmds(&self, cmd_type: SocketCommand) -> Option<VecDeque<ExecCommand>> {
-        match cmd_type {
+        let mut res = VecDeque::new();
+        for v in match cmd_type {
             SocketCommand::StartPre => self.Socket.ExecStartPre.clone(),
             SocketCommand::StartPost => self.Socket.ExecStartPost.clone(),
             SocketCommand::StopPre => self.Socket.ExecStopPre.clone(),
             SocketCommand::StopPost => self.Socket.ExecStopPost.clone(),
+        } {
+            res.push_back(v)
         }
+        Some(res)
     }
 }
 

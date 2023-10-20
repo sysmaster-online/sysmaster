@@ -15,7 +15,6 @@ use crate::unit::{unit_name_to_type, UeConfigInstall, UnitType};
 use basic::fs_util::is_symlink;
 use basic::fs_util::LookupPaths;
 use bitflags::bitflags;
-use confique::{Config, FileFormat, Partial};
 use core::error::*;
 use nix::unistd::UnlinkatFlags;
 use std::{
@@ -27,6 +26,7 @@ use std::{
     rc::Rc,
     str::FromStr,
 };
+use unit_parser::prelude::UnitConfig;
 use walkdir::{DirEntry, WalkDir};
 
 #[derive(PartialEq, Eq)]
@@ -357,9 +357,9 @@ impl InstallContext {
     }
 }
 
-#[derive(Config, Default, Debug)]
+#[derive(UnitConfig, Default, Debug)]
 pub(crate) struct UeConfigData {
-    #[config(nested)]
+    #[section(default)]
     pub Install: UeConfigInstall,
 }
 
@@ -541,47 +541,26 @@ impl Install {
             unit_install.set_u_type(UnitFileType::Symlink);
         }
 
-        let canon_path = path.canonicalize()?;
-        type ConfigPartial = <UeConfigData as Config>::Partial;
-        let mut partial: ConfigPartial = Partial::from_env().context(ConfiqueSnafu)?;
-
-        let dropin_dir_name = format!("{}.d", unit_install.name());
-
-        for v in &self.lookup_path.search_path {
-            let base_dir = Path::new(v);
-            #[allow(clippy::needless_borrow)]
-            let dropin_dir = base_dir.join(&dropin_dir_name);
-
-            if !dropin_dir.exists() {
-                log::debug!("Dropin path {:?} does not exist, ignoring", dropin_dir);
-                continue;
+        let configer = match UeConfigData::load_named(
+            self.lookup_path.search_path.clone(),
+            unit_install.name(),
+            true,
+        ) {
+            Err(unit_parser::error::Error::LoadTemplateError { name: _ }) => {
+                return Err(Error::LoadError {
+                    msg: format!(
+                        "can't load a template unit directly: {}",
+                        unit_install.name()
+                    ),
+                })
             }
-
-            let dirs = dropin_dir.read_dir()?;
-            for entry in dirs {
-                let dir_entry = entry?;
-                let fragment = dir_entry.path();
-                if !fragment.is_file() {
-                    log::debug!("Fragment file {:?} is not a file, ignoring", fragment);
-                    continue;
-                }
-                partial = match confique::File::with_format(&fragment, FileFormat::Toml).load() {
-                    Err(e) => {
-                        log::error!("Failed to load {:?}: {}, skipping.", fragment, e);
-                        continue;
-                    }
-                    Ok(v) => partial.with_fallback(v),
-                };
+            Err(_) => {
+                return Err(Error::LoadError {
+                    msg: format!("failed to load unit: {}", unit_install.name()),
+                })
             }
-        }
-        /* The first config wins, so add default values at last. */
-        partial = partial.with_fallback(
-            confique::File::with_format(canon_path, FileFormat::Toml)
-                .load()
-                .context(ConfiqueSnafu)?,
-        );
-        partial = partial.with_fallback(ConfigPartial::default_values());
-        let configer = UeConfigData::from_partial(partial).context(ConfiqueSnafu)?;
+            Ok(v) => v,
+        };
         unit_install.fill_struct(&configer);
 
         for also in &configer.Install.Also {

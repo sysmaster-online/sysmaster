@@ -14,7 +14,6 @@
 use super::comm::ServiceUnitComm;
 use super::rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
 use basic::unit_name::unit_name_to_instance;
-use confique::{Config, FileFormat, Partial};
 use constants::{USEC_INFINITY, USEC_PER_SEC};
 use core::error::*;
 use core::exec::ExecCommand;
@@ -25,6 +24,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::rc::Rc;
+use unit_parser::prelude::UnitConfig;
 
 pub(super) struct ServiceConfig {
     // associated objects
@@ -67,28 +67,11 @@ impl ServiceConfig {
     }
 
     pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<()> {
-        type ConfigPartial = <ServiceConfigData as Config>::Partial;
-        let mut partial: ConfigPartial = Partial::from_env().context(ConfiqueSnafu)?;
-        /* The first config wins, so add default values at last. */
-        log::debug!("Loading service config from: {:?}", paths);
-        for path in paths {
-            partial = match confique::File::with_format(&path, FileFormat::Toml).load() {
-                Err(e) => {
-                    log::error!("Failed to load {:?}: {}, skipping", path, e);
-                    continue;
-                }
-                Ok(v) => partial.with_fallback(v),
-            }
-        }
-        partial = partial.with_fallback(ConfigPartial::default_values());
-        *self.data.borrow_mut() = match ServiceConfigData::from_partial(partial) {
-            Err(e) => {
-                /* The error message is pretty readable, just print it out. */
-                log::error!("{}", e);
-                return Err(Error::Confique { source: e });
-            }
-            Ok(v) => v,
-        };
+        let name = paths[0].file_name().unwrap().to_string_lossy().to_string();
+        let paths = paths.iter().map(|x| x.parent().unwrap()).collect();
+        log::debug!("Loading {} config from: {:?}", name, paths);
+        let service_config = ServiceConfigData::load_named(paths, name, true).unwrap();
+        *self.data.borrow_mut() = service_config;
         self.data.borrow_mut().verify();
 
         let mut unit_specifier_data = UnitSpecifierData::new();
@@ -125,13 +108,12 @@ impl ServiceConfig {
         self.data.borrow().Service.Environment.clone()
     }
 
-    pub(super) fn sockets(&self) -> Option<Vec<String>> {
-        self.data
-            .borrow()
-            .Service
-            .Sockets
-            .as_ref()
-            .map(|v| v.iter().map(|v| v.to_string()).collect())
+    pub(super) fn sockets(&self) -> Vec<String> {
+        let mut res = Vec::new();
+        for v in &self.data.borrow().Service.Sockets {
+            res.push(v.to_string());
+        }
+        res
     }
 
     pub(super) fn kill_context(&self) -> Rc<KillContext> {
@@ -154,24 +136,21 @@ impl ServiceConfig {
 }
 
 fn specifier_escape_exec_command(
-    exec_command: &mut Option<VecDeque<ExecCommand>>,
+    exec_command: &mut Vec<ExecCommand>,
     max_len: usize,
     unit_specifier_data: &UnitSpecifierData,
 ) {
-    let ret_exec_command = exec_command.clone();
-
-    if let Some(mut commands) = ret_exec_command {
-        for cmd in &mut commands {
-            cmd.specifier_escape_full(max_len, unit_specifier_data);
-        }
-
-        *exec_command = Some(commands);
+    let mut ret_exec_command = exec_command.clone();
+    for cmd in &mut ret_exec_command {
+        cmd.specifier_escape_full(max_len, unit_specifier_data);
     }
+
+    *exec_command = ret_exec_command;
 }
 
-#[derive(Config, Default, Debug)]
+#[derive(UnitConfig, Default, Debug)]
 pub(super) struct ServiceConfigData {
-    #[config(nested)]
+    #[section(must)]
     pub Service: SectionService,
 }
 
@@ -186,7 +165,8 @@ impl ServiceConfigData {
 
     // keep consistency with the configuration, so just copy from configuration.
     pub(self) fn get_exec_cmds(&self, cmd_type: ServiceCommand) -> Option<VecDeque<ExecCommand>> {
-        match cmd_type {
+        let mut res = VecDeque::new();
+        for v in match cmd_type {
             ServiceCommand::Condition => self.Service.ExecCondition.clone(),
             ServiceCommand::StartPre => self.Service.ExecStartPre.clone(),
             ServiceCommand::Start => self.Service.ExecStart.clone(),
@@ -194,7 +174,10 @@ impl ServiceConfigData {
             ServiceCommand::Reload => self.Service.ExecReload.clone(),
             ServiceCommand::Stop => self.Service.ExecStop.clone(),
             ServiceCommand::StopPost => self.Service.ExecStopPost.clone(),
+        } {
+            res.push_back(v)
         }
+        Some(res)
     }
 
     pub(self) fn set_timeout_start(&mut self, time_out: u64) {
@@ -236,7 +219,7 @@ mod tests {
     use core::exec::ExecCommand;
     use core::specifier::UnitSpecifierData;
     use libtests::get_project_root;
-    use std::{collections::VecDeque, rc::Rc};
+    use std::rc::Rc;
 
     #[test]
     fn test_service_parse() {
@@ -274,14 +257,14 @@ mod tests {
         let config = ServiceConfig::new(&comm);
 
         // Construct ExecStart="/bin/%i %i %i ; /bin/%I %I %I"
-        let mut src = VecDeque::new();
+        let mut src = Vec::new();
         let tmp_strings = ["%i".to_string(), "%I".to_string()];
         for tmp in tmp_strings.iter() {
             let argv = vec![tmp.to_string(), tmp.to_string()];
             let cmd = ExecCommand::new("/bin/".to_string() + tmp, argv);
-            src.push_back(cmd);
+            src.push(cmd);
         }
-        config.data.borrow_mut().Service.ExecStart = Some(src);
+        config.data.borrow_mut().Service.ExecStart = src;
 
         // Construct instance="Hal\\xc3\\xb6-chen"
         let mut unit_specifier_data = UnitSpecifierData::new();
@@ -292,14 +275,14 @@ mod tests {
             .borrow_mut()
             .update_with_specifier_escape(&unit_specifier_data);
 
-        let mut dst = VecDeque::new();
+        let mut dst = Vec::new();
         let tmp_strings = ["Hal\\xc3\\xb6-chen".to_string(), "Halö/chen".to_string()];
         for tmp in tmp_strings.iter() {
             let argv = vec![tmp.to_string(), tmp.to_string()];
             let cmd = ExecCommand::new("/bin/".to_string() + tmp, argv);
-            dst.push_back(cmd);
+            dst.push(cmd);
         }
 
-        assert_eq!(config.data.borrow().Service.ExecStart, Some(dst));
+        assert_eq!(config.data.borrow().Service.ExecStart, dst);
     }
 }

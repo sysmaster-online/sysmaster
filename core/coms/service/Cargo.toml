@@ -22,6 +22,7 @@ core = { path = "../../libcore", default-features = false }
 event = { path = "../../../libs/event" }
 log = { path = "../../../libs/log" }
 macros = { path = "../../../libs/macros" }
+unit_parser = { path = "../../../libs/unit_parser" }
 
 confique = { version = "0.1.3", default-features = false, features = ["toml"] }
 libc = { version = "0.2.*", default-features = false }

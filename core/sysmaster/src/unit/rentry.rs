@@ -18,7 +18,6 @@ use crate::manager::rentry::{
 };
 use crate::unit::entry::UnitEmergencyAction;
 use bitflags::bitflags;
-use confique::Config;
 use core::rel::{ReDb, Reliability};
 use core::serialize::DeserializeWith;
 use core::unit::{UnitRelations, UnitType};
@@ -27,6 +26,7 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
+use unit_parser::prelude::{UnitEntry, UnitSection};
 
 pub(crate) fn unit_name_to_type(unit_name: &str) -> UnitType {
     let words: Vec<&str> = unit_name.split('.').collect();
@@ -126,128 +126,120 @@ impl DeserializeWith for JobMode {
     }
 }
 
-#[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
+impl UnitEntry for JobMode {
+    type Error = basic::error::Error;
+
+    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
+        let job_mode = JobMode::from_str(input.as_ref())?;
+        Ok(job_mode)
+    }
+}
+
+#[derive(UnitSection, Default, Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct UeConfigUnit {
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub Description: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub Documentation: String,
     //When set to true, the unit will not be stopped when systemctl isolate is executed. For service, target, socket timer and path, the default value is false. For other units, the default value is true
-    #[config(default = false)]
+    #[entry(default = false)]
     pub IgnoreOnIsolate: bool,
-    #[config(default = true)]
+    #[entry(default = false)]
     pub DefaultDependencies: bool,
-    #[config(default = false)]
+    #[entry(default = false)]
     pub RefuseManualStart: bool,
-    #[config(default = false)]
+    #[entry(default = false)]
     pub RefuseManualStop: bool,
-    #[config(deserialize_with = JobMode::deserialize_with)]
-    #[config(default = "replace")]
+    #[entry(default = JobMode::Replace)]
+    #[entry(default = JobMode::Replace)]
     pub OnFailureJobMode: JobMode,
-    #[config(deserialize_with = JobMode::deserialize_with)]
-    #[config(default = "replace")]
+    #[entry(default = JobMode::Replace)]
     pub OnSuccessJobMode: JobMode,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub Wants: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub Requires: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub BindsTo: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub Requisite: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub PartOf: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub OnFailure: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub OnSuccess: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub Before: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub After: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub Conflicts: Vec<String>,
 
     /* Conditions */
+    #[entry()]
     pub ConditionACPower: Option<bool>,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionCapability: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionDirectoryNotEmpty: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionFileIsExecutable: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionFileNotEmpty: String,
+    #[entry()]
     pub ConditionFirstBoot: Option<bool>,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionKernelCommandLine: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionNeedsUpdate: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionPathExists: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionPathExistsGlob: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionPathIsDirectory: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionPathIsMountPoint: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionPathIsReadWrite: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionPathIsSymbolicLink: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionSecurity: String,
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub ConditionUser: String,
 
     /* Asserts */
-    #[config(default = "")]
+    #[entry(default = String::new())]
     pub AssertPathExists: String,
-    #[config(default = 10)]
+    #[entry(default = 10)]
     pub StartLimitInterval: u64,
-    #[config(default = 10)]
+    #[entry(default = 10)]
     pub StartLimitIntervalSec: u64,
-    #[config(default = 5)]
+    #[entry(default = 5)]
     pub StartLimitBurst: u32,
-    #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]
-    #[config(default = "none")]
+    #[entry(default = UnitEmergencyAction::None)]
     pub SuccessAction: UnitEmergencyAction,
-    #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]
-    #[config(default = "none")]
+    #[entry(default = UnitEmergencyAction::None)]
     pub FailureAction: UnitEmergencyAction,
-    #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]
-    #[config(default = "none")]
+    #[entry(default = UnitEmergencyAction::None)]
     pub StartLimitAction: UnitEmergencyAction,
-    #[config(default = 0)]
+    #[entry(default = 0)]
     pub JobTimeoutSec: u64,
-    #[config(deserialize_with = UnitEmergencyAction::deserialize_with)]
-    #[config(default = "none")]
+    #[entry(default = UnitEmergencyAction::None)]
     pub JobTimeoutAction: UnitEmergencyAction,
 }
 
-#[derive(Config, Default, Clone, Debug, Serialize, Deserialize)]
+#[derive(UnitSection, Default, Clone, Debug, Serialize, Deserialize)]
 pub struct UeConfigInstall {
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub Alias: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub WantedBy: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub RequiredBy: Vec<String>,
-    #[config(deserialize_with = Vec::<String>::deserialize_with)]
-    #[config(default = "")]
+    #[entry(multiple)]
     pub Also: Vec<String>,
 }
 
