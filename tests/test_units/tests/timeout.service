@@ -1,9 +1,9 @@
 [Unit]
-Description="timeout service"
+Description=timeout service
 
 [Service]
-ExecStartPre="/bin/sleep 1.5"
-ExecStart="/bin/sleep 100"
-ExecStartPost="/bin/sleep 1"
-ExecStop="/bin/sleep 1.5 ; /bin/sleep 1"
-ExecStopPost="/bin/sleep 1"
+ExecStartPre=/bin/sleep 1.5
+ExecStart=/bin/sleep 100
+ExecStartPost=/bin/sleep 1
+ExecStop=/bin/sleep 1.5 ; /bin/sleep 1
+ExecStopPost=/bin/sleep 1

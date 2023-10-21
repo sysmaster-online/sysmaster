@@ -1,18 +1,18 @@
 [Unit]
-Description="The nginx HTTP and reverse proxy server"
-After="network.target;remote-fs.target;nss-lookup.target"
+Description=The nginx HTTP and reverse proxy server
+After=network.target remote-fs.target nss-lookup.target
 StartLimitBurst=0
 
 [Service]
-Type="forking"
-PIDFile="/run/nginx.pid"
-ExecStartPre="/usr/bin/rm -f /run/nginx.pid ; /usr/sbin/nginx -t"
-ExecStart="/usr/sbin/nginx"
-ExecReload="/bin/kill -s HUP $MAINPID"
-KillSignal="SIGQUIT"
+Type=forking
+PIDFile=/run/nginx.pid
+ExecStartPre=/usr/bin/rm -f /run/nginx.pid ; /usr/sbin/nginx -t
+ExecStart=/usr/sbin/nginx
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
 TimeoutStopSec=5
-KillMode="mixed"
-PrivateTmp="true"
+KillMode=mixed
+PrivateTmp=true
 
 [Install]
-WantedBy="multi-user.target"
+WantedBy=multi-user.target

@@ -1,9 +1,9 @@
 [Unit]
-Description="job test 002"
+Description=job test 002
 DefaultDependencies=false
 
 [Service]
-ExecStart="/bin/sleep 888"
+ExecStart=/bin/sleep 888
 
 [Install]
-WantedBy="dbus.service"
+WantedBy=dbus.service

@@ -141,7 +141,7 @@ function test01() {
     expect_eq $? 1
 
     # TimeoutSec=1, only start-pre timeout
-    sed -i 's/ExecStopPost=.*/ExecStopPost="/bin/sleep 0.5"/' ${SYSMST_LIB_PATH}/timeout.service
+    sed -i 's/ExecStopPost=.*/ExecStopPost=/bin/sleep 0.5/' ${SYSMST_LIB_PATH}/timeout.service
     sed -i 's/TimeoutSec=.*/TimeoutSec=1/' ${SYSMST_LIB_PATH}/timeout.service
     sctl daemon-reload
     echo > "${SYSMST_LOG}"
@@ -300,8 +300,8 @@ function test02() {
     expect_eq $? 1
 
     # only stop-post timeout
-    sed -i 's/ExecStop=.*/ExecStop="/bin/sleep 0.9 ; /bin/sleep 0.9"/' ${SYSMST_LIB_PATH}/timeout.service
-    sed -i 's/ExecStopPost=.*/ExecStopPost="/bin/sleep 1.5"/' ${SYSMST_LIB_PATH}/timeout.service
+    sed -i 's/ExecStop=.*/ExecStop=/bin/sleep 0.9 ; /bin/sleep 0.9/' ${SYSMST_LIB_PATH}/timeout.service
+    sed -i 's/ExecStopPost=.*/ExecStopPost=/bin/sleep 1.5/' ${SYSMST_LIB_PATH}/timeout.service
     sctl daemon-reload
     echo > "${SYSMST_LOG}"
     # TimeoutStartSec > ExecStartPre + ExecStartPost, no timeout

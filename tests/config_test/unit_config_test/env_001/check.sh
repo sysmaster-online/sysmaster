@@ -29,7 +29,7 @@ function test01() {
 # usage: test EnvironmentFile
 function test02() {
     log_info "===== test02 ====="
-    sed -i '/Environment=/ a EnvironmentFile="/opt/env1;/opt/env2;-/opt/env3"' ${SYSMST_LIB_PATH}/env.service
+    sed -i '/Environment=/ a EnvironmentFile=/opt/env1 /opt/env2 -/opt/env3' ${SYSMST_LIB_PATH}/env.service
     sctl daemon-reload
 
     sctl restart env

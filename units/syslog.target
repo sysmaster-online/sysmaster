@@ -1,2 +1,2 @@
 [Unit]
-Description="Initialize syslog"
+Description=Initialize syslog

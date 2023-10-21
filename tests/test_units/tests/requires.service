@@ -1,6 +1,6 @@
 [Unit]
-Description="Requires service"
-Requires="base.service"
+Description=Requires service
+Requires=base.service
 
 [Service]
-ExecStart="/bin/sleep 100"
+ExecStart=/bin/sleep 100

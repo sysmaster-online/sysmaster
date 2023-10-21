@@ -1,8 +1,8 @@
 [Unit]
-Description="reliable test 002"
+Description=reliable test 002
 
 [Service]
-ExecStart="/bin/sleep 999"
+ExecStart=/bin/sleep 999
 
 [Install]
-RequiredBy="base.service"
+RequiredBy=base.service

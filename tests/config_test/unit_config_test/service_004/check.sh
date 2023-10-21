@@ -13,7 +13,7 @@ test_grp=test_grp_"${seed}"
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
-    sed -i "/Service/a User=\"${test_user}\"" ${SYSMST_LIB_PATH}/base.service
+    sed -i "/Service/a User=${test_user}" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     echo > "${SYSMST_LOG}"
     # user not exist
@@ -23,7 +23,7 @@ function test01() {
     expect_eq $? 0 || return 1
 
     # group not exist
-    sed -i "s/User=.*/Group=\"${test_grp}\"/" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s/User=.*/Group=${test_grp}/" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     echo > "${SYSMST_LOG}"
     sctl restart base
@@ -36,7 +36,7 @@ function test01() {
     expect_eq $? 0 || return 1
     useradd "${test_user}"
     groupadd "${test_grp}"
-    sed -i "/Service/a User=\"${test_user}\"" ${SYSMST_LIB_PATH}/base.service
+    sed -i "/Service/a User=${test_user}" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base
     check_status base.service active

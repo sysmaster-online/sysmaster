@@ -1,2 +1,2 @@
 [Unit]
-Description="rescue.target"
+Description=rescue.target

@@ -62,19 +62,19 @@ function test02() {
     check_status base inactive
     expect_eq $? 0 || return 1
 
-    sed -i "s/^ConditionKernelCommandLine=.*/ConditionKernelCommandLine=\"${cmdline_para}\"/" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s/^ConditionKernelCommandLine=.*/ConditionKernelCommandLine=${cmdline_para}/" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base
     check_status base active
     expect_eq $? 0 || return 1
 
-    sed -i "s/^ConditionKernelCommandLine=.*/ConditionKernelCommandLine=\"${cmdline_para#crash}\"/" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s/^ConditionKernelCommandLine=.*/ConditionKernelCommandLine=${cmdline_para#crash}/" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base
     check_status base inactive
     expect_eq $? 0 || return 1
 
-    sed -i "s/^ConditionKernelCommandLine=.*/ConditionKernelCommandLine=\"${cmdline_para%%M*}\"/" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s/^ConditionKernelCommandLine=.*/ConditionKernelCommandLine=${cmdline_para%%M*}/" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base
     check_status base inactive

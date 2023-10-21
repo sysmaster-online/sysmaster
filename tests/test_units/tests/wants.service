@@ -1,6 +1,6 @@
 [Unit]
-Description="Wants service"
-Wants="base.service"
+Description=Wants service
+Wants=base.service
 
 [Service]
-ExecStart="/bin/sleep 100"
+ExecStart=/bin/sleep 100

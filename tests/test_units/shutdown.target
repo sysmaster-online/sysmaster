@@ -1,4 +1,4 @@
 [Unit]
-Description="shutdown target"
-Documentation="man sysmaster shutdown target"
+Description=shutdown target
+Documentation=man sysmaster shutdown target
 DefaultDependencies=false

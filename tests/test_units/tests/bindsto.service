@@ -1,6 +1,6 @@
 [Unit]
-Description="BindsTo service"
-BindsTo="base.service"
+Description=BindsTo service
+BindsTo=base.service
 
 [Service]
-ExecStart="/bin/sleep 100"
+ExecStart=/bin/sleep 100

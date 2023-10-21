@@ -170,7 +170,7 @@ function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/restart_00*.service ${SYSMST_LIB_PATH} || return 1
     for sev in ${SYSMST_LIB_PATH}/restart_00*.service; do
-        sed -i 's/^Restart=.*/Restart="always"/' "${sev}"
+        sed -i 's/^Restart=.*/Restart=always/' "${sev}"
     done
     sctl daemon-reload
     # stop manually: no restart

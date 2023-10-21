@@ -249,7 +249,7 @@ function test03() {
 # usage: test contradictory dependency
 function test04() {
     log_info "===== test04 ====="
-    sed -i "/Conflicts=/a Requires=\"base.service\"" ${SYSMST_LIB_PATH}/conflicts.service
+    sed -i "/Conflicts=/a Requires=base.service" ${SYSMST_LIB_PATH}/conflicts.service
     sctl daemon-reload
     sctl restart conflicts.service &> log
     expect_eq $? 53
@@ -264,7 +264,7 @@ function test04() {
 # usage: test loop dependency
 function test05() {
     log_info "===== test05 ====="
-    sed -i "/Description/a Requires=\"requires.service\"" ${SYSMST_LIB_PATH}/base.service
+    sed -i "/Description/a Requires=requires.service" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart requires.service
     check_status requires.service active

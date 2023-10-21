@@ -26,7 +26,7 @@ function test01() {
     rm -rf log
 
     # null ExecStart
-    sed -i "/Service]/a ExecStart=\"\"" ${SYSMST_LIB_PATH}/base.service
+    sed -i "/Service]/a ExecStart=" ${SYSMST_LIB_PATH}/base.service
     echo > ${SYSMST_LOG}
     sctl daemon-reload
     sctl restart base
@@ -44,7 +44,7 @@ function test02() {
     log_info "===== test02 ====="
 
     # multiple commands in single ExecStart
-    sed -i "s#ExecStart=.*#ExecStart=\"/bin/sleep 2 ; /bin/sleep 222\"#" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s#ExecStart=.*#ExecStart=/bin/sleep 2 ; /bin/sleep 222#" ${SYSMST_LIB_PATH}/base.service
     echo > ${SYSMST_LOG}
     sctl daemon-reload
     sctl restart base
@@ -78,8 +78,8 @@ function test02() {
     expect_eq $? 0
 
     # single command in multiple ExecStart
-    sed -i "s#ExecStart=.*#ExecStart=\"/bin/sleep 99\"#" ${SYSMST_LIB_PATH}/base.service
-    sed -i "/Service]/a ExecStart=\"/bin/sleep 100\"" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s#ExecStart=.*#ExecStart=/bin/sleep 99#" ${SYSMST_LIB_PATH}/base.service
+    sed -i "/Service]/a ExecStart=/bin/sleep 100" ${SYSMST_LIB_PATH}/base.service
     echo > ${SYSMST_LOG}
     sctl daemon-reload
     sctl restart base
@@ -98,7 +98,7 @@ function test03() {
 
     # inexecutable
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
-    sed -i "s#ExecStart=\".*\"*#ExecStart=\"/inexec\"#" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s#ExecStart=.**#ExecStart=/inexec#" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     touch /inexec
     chmod 400 /inexec
@@ -112,7 +112,7 @@ function test03() {
     rm -rf /inexec
 
     # failed
-    sed -i "s#ExecStart=\".*\"#ExecStart=\"/usr/bin/false\"#" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s#ExecStart=.*#ExecStart=/usr/bin/false#" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base
     expect_eq $? 0
@@ -122,7 +122,7 @@ function test03() {
     expect_eq $? 0
 
     # failed but ignore
-    sed -i "s#ExecStart=\".*\"#ExecStart=\"-/usr/bin/false\"#" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s#ExecStart=.*#ExecStart=-/usr/bin/false#" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base
     expect_eq $? 0

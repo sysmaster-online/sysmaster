@@ -26,8 +26,8 @@ function test02() {
     local sec=123456
 
     # PIDFile=pidfile
-    sed -i '/ExecStart/a PIDFile="pidfile"' ${SYSMST_LIB_PATH}/fork.service
-    sed -i "s#^ExecStart=.*#ExecStart=\"/opt/fork_exec ${sec} /run/pidfile\"#" ${SYSMST_LIB_PATH}/fork.service
+    sed -i '/ExecStart/a PIDFile=pidfile' ${SYSMST_LIB_PATH}/fork.service
+    sed -i "s#^ExecStart=.*#ExecStart=/opt/fork_exec ${sec} /run/pidfile#" ${SYSMST_LIB_PATH}/fork.service
     sctl daemon-reload
     sctl restart fork
     check_status fork active

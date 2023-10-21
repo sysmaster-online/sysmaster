@@ -9,7 +9,7 @@ set +e
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/{base.service,base.socket} ${SYSMST_LIB_PATH} || return 1
-    sed -i "/Socket/a ListenStream=\"${test_socket}\"" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "/Socket/a ListenStream=${test_socket}" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     sctl restart base
     check_status base.service active
@@ -27,7 +27,7 @@ function test01() {
     expect_ne $? 0
 
     # use Sockets, without matching service
-    sed -i '/ExecStart/a Sockets="base1.socket"' ${SYSMST_LIB_PATH}/base.service
+    sed -i '/ExecStart/a Sockets=base1.socket' ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base
     check_status base.service active

@@ -1,6 +1,6 @@
 [Unit]
-Description="PartOf service"
-PartOf="base.service"
+Description=PartOf service
+PartOf=base.service
 
 [Service]
-ExecStart="/bin/sleep 100"
+ExecStart=/bin/sleep 100

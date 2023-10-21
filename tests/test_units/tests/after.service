@@ -1,7 +1,7 @@
 [Unit]
-Description="After service"
-After="fork.service"
+Description=After service
+After=fork.service
 
 [Service]
-Type="forking"
-ExecStart="/bin/sleep 5"
+Type=forking
+ExecStart=/bin/sleep 5

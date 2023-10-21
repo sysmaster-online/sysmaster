@@ -19,10 +19,10 @@ function test01() {
 
     # dropin path config
     echo "[Install]
-WantedBy=\"wantedby.service\"" >> ${SYSMST_LIB_PATH}/base.service
+WantedBy=wantedby.service" >> ${SYSMST_LIB_PATH}/base.service
     mkdir -p ${SYSMST_ETC_PATH}/base.service.d
     echo "[Install]
-WantedBy=\"requiredby.service\"" > ${SYSMST_ETC_PATH}/base.service.d/install.conf
+WantedBy=requiredby.service" > ${SYSMST_ETC_PATH}/base.service.d/install.conf
     sctl daemon-reload
     sctl enable base
     expect_eq $? 0
@@ -63,7 +63,7 @@ WantedBy=\"requiredby.service\"" > ${SYSMST_ETC_PATH}/base.service.d/install.con
 function test02() {
     log_info "===== test02 ====="
     echo "[Install]
-WantedBy=\"wantedby.service\"" >> ${SYSMST_LIB_PATH}/base.service
+WantedBy=wantedby.service" >> ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl enable base
     expect_eq $? 0
@@ -98,7 +98,7 @@ WantedBy=\"wantedby.service\"" >> ${SYSMST_LIB_PATH}/base.service
 # usage: test RequiredBy
 function test03() {
     log_info "===== test03 ====="
-    sed -i "s/WantedBy=.*/RequiredBy=\"requiredby.service\"/" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s/WantedBy=.*/RequiredBy=requiredby.service/" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl enable base
     expect_eq $? 0
@@ -137,8 +137,8 @@ function test04() {
     cp -arf ${SYSMST_LIB_PATH}/base.service ${SYSMST_LIB_PATH}/base1.service
     cp -arf ${SYSMST_LIB_PATH}/base.service ${SYSMST_LIB_PATH}/base2.service
     echo "[Install]
-Also=\"base1.service;base2.service\"
-WantedBy=\"wantedby.service\"" >> ${SYSMST_LIB_PATH}/base.service
+Also=base1.service base2.service
+WantedBy=wantedby.service" >> ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl enable base
     expect_eq $? 0
@@ -152,9 +152,9 @@ WantedBy=\"wantedby.service\"" >> ${SYSMST_LIB_PATH}/base.service
     expect_eq $? 2
 
     echo "[Install]
-WantedBy=\"requiredby.service\"" >> ${SYSMST_LIB_PATH}/base1.service
+WantedBy=requiredby.service" >> ${SYSMST_LIB_PATH}/base1.service
     echo "[Install]
-WantedBy=\"requiredby.service\"" >> ${SYSMST_LIB_PATH}/base2.service
+WantedBy=requiredby.service" >> ${SYSMST_LIB_PATH}/base2.service
     sctl daemon-reload
     sctl enable base
     expect_eq $? 0
@@ -186,7 +186,7 @@ WantedBy=\"requiredby.service\"" >> ${SYSMST_LIB_PATH}/base2.service
 function test05() {
     log_info "===== test05 ====="
     sed -i '/Also/d' ${SYSMST_LIB_PATH}/base.service
-    echo "Alias=\"base1.service;base2.service\"" >> ${SYSMST_LIB_PATH}/base.service
+    echo "Alias=base1.service base2.service" >> ${SYSMST_LIB_PATH}/base.service
     rm -rf ${SYSMST_LIB_PATH}/{base1.service,base2.service}
     sctl daemon-reload
     sctl enable base

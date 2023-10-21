@@ -9,7 +9,7 @@ set +e
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/{base.service,base.socket} ${SYSMST_LIB_PATH} || return 1
-    sed -i "/Socket/a ListenStream=\"${test_socket}\"" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "/Socket/a ListenStream=${test_socket}" ${SYSMST_LIB_PATH}/base.socket
     cp -arf ${SYSMST_LIB_PATH}/base.service ${SYSMST_LIB_PATH}/base1.service
     sctl daemon-reload
     sctl restart base.socket
@@ -67,7 +67,7 @@ function test01() {
 # usage: test Symlinks/RemoveOnStop
 function test02() {
     log_info "===== test02 ====="
-    sed -i "/ListenStream/a Symlinks=\"${test_symlink}1; ${test_symlink}2\"" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "/ListenStream/a Symlinks=${test_symlink}1 ${test_symlink}2" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     # multiple Symlinks
     sctl restart base.socket
@@ -107,7 +107,7 @@ function test02() {
 # usage: test Symlinks
 function test03() {
     log_info "===== test03 ====="
-    sed -i "s#ListenStream=.*#ListenStream=\"127.0.0.1:${seed}1\"#" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "s#ListenStream=.*#ListenStream=127.0.0.1:${seed}1#" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     # not AF_UNIX
     sctl restart base.socket

@@ -9,7 +9,7 @@ set +e
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/{base.service,base.socket} ${SYSMST_LIB_PATH} || return 1
-    sed -i "/Socket/a ListenDatagram=\"${test01_socket}\"" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "/Socket/a ListenDatagram=${test01_socket}" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     # ListenDatagram is file
     sctl restart base.socket
@@ -37,7 +37,7 @@ function test01() {
     expect_eq $? 0 || return 1
 
     # ListenDatagram is number
-    sed -i "s#^ListenDatagram=.*#ListenDatagram=\"${seed}1\"#" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "s#^ListenDatagram=.*#ListenDatagram=${seed}1#" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     sctl restart base.socket
     check_status base.socket 'active (listening)'
@@ -51,7 +51,7 @@ function test01() {
     expect_eq $? 0 || return 1
 
     # ListenDatagram is IPv4:port
-    sed -i "s#^ListenDatagram=.*#ListenDatagram=\"127.0.0.1:${seed}1\"#" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "s#^ListenDatagram=.*#ListenDatagram=127.0.0.1:${seed}1#" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     sctl restart base.socket
     check_status base.socket 'active (listening)'
@@ -65,7 +65,7 @@ function test01() {
     expect_eq $? 0 || return 1
 
     # ListenDatagram is IPv6:port
-    sed -i "s#^ListenDatagram=.*#ListenDatagram=\"[::]:${seed}1\"#" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "s#^ListenDatagram=.*#ListenDatagram=[::]:${seed}1#" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     sctl restart base.socket
     check_status base.socket 'active (listening)'
@@ -83,7 +83,7 @@ function test01() {
 function test02() {
     log_info "===== test02 ====="
     cp -arf "${work_dir}"/tmp_units/base.socket ${SYSMST_LIB_PATH} || return 1
-    sed -i "/Socket/a ListenStream=\"${test02_socket}\"" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "/Socket/a ListenStream=${test02_socket}" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     # ListenStream is file
     sctl restart base.socket
@@ -111,7 +111,7 @@ function test02() {
     expect_eq $? 0 || return 1
 
     # ListenStream is number
-    sed -i "s#^ListenStream=.*#ListenStream=\"${seed}2\"#" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "s#^ListenStream=.*#ListenStream=${seed}2#" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     sctl restart base.socket
     check_status base.socket 'active (listening)'
@@ -125,7 +125,7 @@ function test02() {
     expect_eq $? 0 || return 1
 
     # ListenStream is IPv4:port
-    sed -i "s#^ListenStream=.*#ListenStream=\"127.0.0.1:${seed}2\"#" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "s#^ListenStream=.*#ListenStream=127.0.0.1:${seed}2#" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     sctl restart base.socket
     check_status base.socket 'active (listening)'
@@ -139,7 +139,7 @@ function test02() {
     expect_eq $? 0 || return 1
 
     # ListenStream is IPv6:port
-    sed -i "s#^ListenStream=.*#ListenStream=\"[::]:${seed}2\"#" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "s#^ListenStream=.*#ListenStream=[::]:${seed}2#" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     sctl restart base.socket
     check_status base.socket 'active (listening)'
@@ -157,7 +157,7 @@ function test02() {
 function test03() {
     log_info "===== test03 ====="
     cp -arf "${work_dir}"/tmp_units/base.socket ${SYSMST_LIB_PATH} || return 1
-    sed -i "/Socket/a ListenSequentialPacket=\"${test03_socket}\"" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "/Socket/a ListenSequentialPacket=${test03_socket}" ${SYSMST_LIB_PATH}/base.socket
     sctl daemon-reload
     # ListenSequentialPacket is file
     sctl restart base.socket
@@ -185,7 +185,7 @@ function test03() {
     expect_eq $? 0 || return 1
 
     # ListenSequentialPacket is number (not supported)
-    sed -i "s#^ListenSequentialPacket=.*#ListenSequentialPacket=\"${seed}3\"#" ${SYSMST_LIB_PATH}/base.socket
+    sed -i "s#^ListenSequentialPacket=.*#ListenSequentialPacket=${seed}3#" ${SYSMST_LIB_PATH}/base.socket
     echo > "${SYSMST_LOG}"
     sctl daemon-reload
     sctl restart base.socket

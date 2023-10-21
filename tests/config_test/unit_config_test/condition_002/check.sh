@@ -57,7 +57,7 @@ function test02() {
 function test03() {
     log_info "===== test03 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
-    sed -i "/Description=/ a ConditionNeedsUpdate=\"/etc\"" ${SYSMST_LIB_PATH}/base.service
+    sed -i "/Description=/ a ConditionNeedsUpdate=/etc" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     stat /etc.updated
     stat /usr
@@ -117,7 +117,7 @@ function test04() {
     expect_eq $? 0 || return 1
 
     # user = normal user
-    sed -i "s/ConditionUser=.*/ConditionUser=\"${test_user_1}\"/" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s/ConditionUser=.*/ConditionUser=${test_user_1}/" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     echo > "${SYSMST_LOG}"
     # start service as root
@@ -142,7 +142,7 @@ function test04() {
     # id exist
     id="$(grep -w "${test_user_1}" /etc/passwd | awk -F ':' '{print $3}')"
     expect_eq $? 0
-    sed -i "s/ConditionUser=.*/ConditionUser=\"${id}\"/" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s/ConditionUser=.*/ConditionUser=${id}/" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     echo > "${SYSMST_LOG}"
     # start service as root

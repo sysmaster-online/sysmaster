@@ -1,6 +1,6 @@
 [Unit]
-Description="fork service"
+Description=fork service
 
 [Service]
-Type="forking"
-ExecStart="/bin/sleep 5"
+Type=forking
+ExecStart=/bin/sleep 5

@@ -1,6 +1,6 @@
 [Unit]
-Description="Conflicts service"
-Conflicts="base.service"
+Description=Conflicts service
+Conflicts=base.service
 
 [Service]
-ExecStart="/bin/sleep 100"
+ExecStart=/bin/sleep 100

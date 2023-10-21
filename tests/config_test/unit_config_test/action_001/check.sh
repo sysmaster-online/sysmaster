@@ -9,7 +9,7 @@ set +e
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
-    sed -i '/Description/ a SuccessAction="none"' ${SYSMST_LIB_PATH}/base.service
+    sed -i '/Description/ a SuccessAction=none' ${SYSMST_LIB_PATH}/base.service
     sed -i 's/sleep 100/sleep 2/' ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl start base
@@ -24,7 +24,7 @@ function test01() {
     local cmd_list="reboot poweroff exit"
     for cmd in ${cmd_list}; do
         cp -arf "${work_dir}"/tmp_units/"${cmd}".target ${SYSMST_LIB_PATH} || return 1
-        sed -i "s/SuccessAction=.*/SuccessAction=\"${cmd}\"/" ${SYSMST_LIB_PATH}/base.service
+        sed -i "s/SuccessAction=.*/SuccessAction=${cmd}/" ${SYSMST_LIB_PATH}/base.service
         sctl daemon-reload
         echo > "${SYSMST_LOG}"
         sctl restart base
@@ -43,7 +43,7 @@ function test01() {
         # service success: reboot-force, poweroff-force, exit-force
         for cmd in ${cmd_list}; do
             cp -arf "${work_dir}"/tmp_units/"${cmd}".target ${SYSMST_LIB_PATH} || return 1
-            sed -i "s/SuccessAction=.*/SuccessAction=\"${cmd}-force\"/" ${SYSMST_LIB_PATH}/base.service
+            sed -i "s/SuccessAction=.*/SuccessAction=${cmd}-force/" ${SYSMST_LIB_PATH}/base.service
             sctl daemon-reload
             echo > "${SYSMST_LOG}"
             sctl restart base
@@ -60,7 +60,7 @@ function test01() {
         # service success: reboot-immediate, poweroff-immediate, exit-immediate
         for cmd in ${cmd_list}; do
             cp -arf "${work_dir}"/tmp_units/"${cmd}".target ${SYSMST_LIB_PATH} || return 1
-            sed -i "s/SuccessAction=.*/SuccessAction=\"${cmd}-immediate\"/" ${SYSMST_LIB_PATH}/base.service
+            sed -i "s/SuccessAction=.*/SuccessAction=${cmd}-immediate/" ${SYSMST_LIB_PATH}/base.service
             sctl daemon-reload
             echo > "${SYSMST_LOG}"
             sctl restart base
@@ -78,7 +78,7 @@ function test01() {
     # service fail: reboot, poweroff, exit
     sed -i 's/sleep.*/false"/' ${SYSMST_LIB_PATH}/base.service
     for cmd in ${cmd_list}; do
-        sed -i "s/SuccessAction=.*/SuccessAction=\"${cmd}\"/" ${SYSMST_LIB_PATH}/base.service
+        sed -i "s/SuccessAction=.*/SuccessAction=${cmd}/" ${SYSMST_LIB_PATH}/base.service
         sctl daemon-reload
         echo > "${SYSMST_LOG}"
         sctl restart base
@@ -95,14 +95,14 @@ function test01() {
 function test02() {
     log_info "===== test02 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
-    sed -i '/Description/ a FailureAction="none"' ${SYSMST_LIB_PATH}/base.service
+    sed -i '/Description/ a FailureAction=none' ${SYSMST_LIB_PATH}/base.service
     sed -i 's/sleep 100/sleep 2/' ${SYSMST_LIB_PATH}/base.service
 
     # service success: reboot, poweroff, exit
     local cmd_list="reboot poweroff exit"
     for cmd in ${cmd_list}; do
         cp -arf "${work_dir}"/tmp_units/"${cmd}".target ${SYSMST_LIB_PATH} || return 1
-        sed -i "s/FailureAction=.*/FailureAction=\"${cmd}\"/" ${SYSMST_LIB_PATH}/base.service
+        sed -i "s/FailureAction=.*/FailureAction=${cmd}/" ${SYSMST_LIB_PATH}/base.service
         sctl daemon-reload
         echo > "${SYSMST_LOG}"
         sctl restart base
@@ -119,7 +119,7 @@ function test02() {
     # service fail: reboot, poweroff, exit
     sed -i 's/sleep.*/false"/' ${SYSMST_LIB_PATH}/base.service
     for cmd in ${cmd_list}; do
-        sed -i "s/FailureAction=.*/FailureAction=\"${cmd}\"/" ${SYSMST_LIB_PATH}/base.service
+        sed -i "s/FailureAction=.*/FailureAction=${cmd}/" ${SYSMST_LIB_PATH}/base.service
         sctl daemon-reload
         echo > "${SYSMST_LOG}"
         sctl restart base
@@ -137,7 +137,7 @@ function test02() {
     # service fail: reboot-force, poweroff-force, exit-force
     sed -i 's/sleep.*/false"/' ${SYSMST_LIB_PATH}/base.service
     for cmd in ${cmd_list}; do
-        sed -i "s/FailureAction=.*/FailureAction=\"${cmd}\"-force/" ${SYSMST_LIB_PATH}/base.service
+        sed -i "s/FailureAction=.*/FailureAction=${cmd}-force/" ${SYSMST_LIB_PATH}/base.service
         sctl daemon-reload
         echo > "${SYSMST_LOG}"
         sctl restart base
@@ -150,9 +150,9 @@ function test02() {
     done
 
     # service fail: reboot-immediate, poweroff-immediate, exit-immediate
-    sed -i 's/sleep.*/false"/' ${SYSMST_LIB_PATH}/base.service
+    sed -i 's/sleep.*/false/' ${SYSMST_LIB_PATH}/base.service
     for cmd in ${cmd_list}; do
-        sed -i "s/FailureAction=.*/FailureAction=\"${cmd}\"-immediate/" ${SYSMST_LIB_PATH}/base.service
+        sed -i "s/FailureAction=.*/FailureAction=${cmd}-immediate/" ${SYSMST_LIB_PATH}/base.service
         sctl daemon-reload
         echo > "${SYSMST_LOG}"
         sctl restart base

@@ -13,7 +13,7 @@ function test01() {
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH}/success1.service || return 1
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH}/success2.service || return 1
-    sed -i '/Description/a OnSuccess="success1.service;success2.service"' ${SYSMST_LIB_PATH}/base.service
+    sed -i '/Description/a OnSuccess=success1.service success2.service' ${SYSMST_LIB_PATH}/base.service
     sed -i 's/sleep.*"/sleep 1"/' ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl status success1
@@ -43,7 +43,7 @@ function test01() {
     expect_eq $? 3
 
     # failed
-    sed -i 's/sleep.*"/false"/' ${SYSMST_LIB_PATH}/base.service
+    sed -i 's/sleep.*"/false/' ${SYSMST_LIB_PATH}/base.service
     echo > "${SYSMST_LOG}"
     sctl daemon-reload
     sctl restart base

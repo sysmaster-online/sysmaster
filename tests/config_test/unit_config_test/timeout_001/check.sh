@@ -156,13 +156,13 @@ function test03() {
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     sed -i '/Description/ a JobTimeoutSec=1' ${SYSMST_LIB_PATH}/base.service
     sed -i '/Description/ a JobTimeoutAction=' ${SYSMST_LIB_PATH}/base.service
-    sed -i '/ExecStart/ a ExecStartPre="/usr/bin/sleep 2"' ${SYSMST_LIB_PATH}/base.service
+    sed -i '/ExecStart/ a ExecStartPre=/usr/bin/sleep 2' ${SYSMST_LIB_PATH}/base.service
 
     # service success: reboot, poweroff, exit
     local cmd_list="reboot poweroff exit"
     for cmd in ${cmd_list}; do
         cp -arf "${work_dir}"/tmp_units/"${cmd}".target ${SYSMST_LIB_PATH} || return 1
-        sed -i "s/JobTimeoutAction=.*/JobTimeoutAction=\"${cmd}\"/" ${SYSMST_LIB_PATH}/base.service
+        sed -i "s/JobTimeoutAction=.*/JobTimeoutAction=${cmd}/" ${SYSMST_LIB_PATH}/base.service
         sctl daemon-reload
         sleep 2
         echo > "${SYSMST_LOG}"

@@ -11,8 +11,8 @@ function test01() {
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
 
     # RemainAfterExit=false
-    sed -i 's/^Description=.*/Description="this is a test"/' ${SYSMST_LIB_PATH}/base.service
-    sed -i '/Description/ a Documentation="this is doc"' ${SYSMST_LIB_PATH}/base.service
+    sed -i 's/^Description=.*/Description=this is a test/' ${SYSMST_LIB_PATH}/base.service
+    sed -i '/Description/ a Documentation=this is doc' ${SYSMST_LIB_PATH}/base.service
     sed -i '/ExecStart/ a RemainAfterExit=false' ${SYSMST_LIB_PATH}/base.service
     sed -i 's/sleep 100/sleep 2/' ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
@@ -46,7 +46,7 @@ function test01() {
 # usage: test RemainAfterExit with oneshot service
 function test02() {
     log_info "===== test02 ====="
-    sed -i '/ExecStart/ a Type="oneshot"' ${SYSMST_LIB_PATH}/base.service
+    sed -i '/ExecStart/ a Type=oneshot' ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base &
     check_status base activating

@@ -10,9 +10,9 @@ sec=100
 function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/fork.service ${SYSMST_LIB_PATH} || return 1
-    sed -i '/ExecStart/a PIDFile="/run/pidfile"' ${SYSMST_LIB_PATH}/fork.service
-    sed -i '/ExecStart/a ExecStop="/usr/bin/echo ThisIsExecStop"' ${SYSMST_LIB_PATH}/fork.service
-    sed -i "s#^ExecStart=.*#ExecStart=\"/opt/kill_mode ${sec} /run/pidfile\"#" ${SYSMST_LIB_PATH}/fork.service
+    sed -i '/ExecStart/a PIDFile=/run/pidfile' ${SYSMST_LIB_PATH}/fork.service
+    sed -i '/ExecStart/a ExecStop=/usr/bin/echo ThisIsExecStop' ${SYSMST_LIB_PATH}/fork.service
+    sed -i "s#^ExecStart=.*#ExecStart=/opt/kill_mode ${sec} /run/pidfile#" ${SYSMST_LIB_PATH}/fork.service
     sctl daemon-reload
     sctl restart fork
     check_status fork active
@@ -44,7 +44,7 @@ function test01() {
 # usage: test KillMode=process
 function test02() {
     log_info "===== test02 ====="
-    sed -i '/ExecStart/a KillMode="process"' ${SYSMST_LIB_PATH}/fork.service
+    sed -i '/ExecStart/a KillMode=process' ${SYSMST_LIB_PATH}/fork.service
     sctl daemon-reload
     sctl restart fork
     check_status fork active
@@ -141,7 +141,7 @@ function test04() {
 # usage: test KillSignal=SIGKILL
 function test05() {
     log_info "===== test05 ====="
-    sed -i '/KillMode/a KillSignal="SIGKILL"' ${SYSMST_LIB_PATH}/fork.service
+    sed -i '/KillMode/a KillSignal=SIGKILL' ${SYSMST_LIB_PATH}/fork.service
     sctl daemon-reload
     sctl restart fork
     check_status fork active

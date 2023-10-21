@@ -1,8 +1,8 @@
 [Unit]
-Description="Requisite service"
-Requisite="base.service"
+Description=Requisite service
+Requisite=base.service
 # Requisite must be used with After, otherwise Requisite will be skipped
-After="base.service"
+After=base.service
 
 [Service]
-ExecStart="/bin/sleep 100"
+ExecStart=/bin/sleep 100

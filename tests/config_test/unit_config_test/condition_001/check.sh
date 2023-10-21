@@ -16,9 +16,9 @@ function test01() {
     log_info "===== test01 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     if [ "${condition_test}" -eq 1 ]; then
-        sed -i "/Description=/ a ConditionPathExists=\"/tmp/path_exist\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a ConditionPathExists=/tmp/path_exist" ${SYSMST_LIB_PATH}/base.service
     elif [ "${condition_test}" -eq 0 ]; then
-        sed -i "/Description=/ a AssertPathExists=\"/tmp/path_exist\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a AssertPathExists=/tmp/path_exist" ${SYSMST_LIB_PATH}/base.service
     fi
     rm -rf /tmp/path_exist
     sctl daemon-reload
@@ -63,9 +63,9 @@ function test02() {
     log_info "===== test02 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     if [ "${condition_test}" -eq 1 ]; then
-        sed -i "/Description=/ a ConditionFileNotEmpty=\"/tmp\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a ConditionFileNotEmpty=/tmp" ${SYSMST_LIB_PATH}/base.service
     elif [ "${condition_test}" -eq 0 ]; then
-        sed -i "/Description=/ a AssertFileNotEmpty=\"/tmp\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a AssertFileNotEmpty=/tmp" ${SYSMST_LIB_PATH}/base.service
     fi
     sctl daemon-reload
     echo > "${SYSMST_LOG}"
@@ -135,9 +135,9 @@ function test03() {
     log_info "===== test03 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     if [ "${condition_test}" -eq 1 ]; then
-        sed -i "/Description=/ a ConditionPathIsReadWrite=\"/path_rw\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a ConditionPathIsReadWrite=/path_rw" ${SYSMST_LIB_PATH}/base.service
     elif [ "${condition_test}" -eq 0 ]; then
-        sed -i "/Description=/ a AssertPathIsReadWrite=\"/path_rw\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a AssertPathIsReadWrite=/path_rw" ${SYSMST_LIB_PATH}/base.service
     fi
     sctl daemon-reload
     echo > "${SYSMST_LOG}"
@@ -197,7 +197,7 @@ function test04() {
     local dir=dir_"${RANDOM}"
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     if [ "${condition_test}" -eq 1 ]; then
-        sed -i "/Description=/ a ConditionDirectoryNotEmpty=\"/${dir}\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a ConditionDirectoryNotEmpty=/${dir}" ${SYSMST_LIB_PATH}/base.service
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
@@ -266,7 +266,7 @@ function test05() {
     log_info "===== test05 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     if [ "${condition_test}" -eq 1 ]; then
-        sed -i "/Description=/ a ConditionFileIsExecutable=\"/tmp\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a ConditionFileIsExecutable=/tmp" ${SYSMST_LIB_PATH}/base.service
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
@@ -280,7 +280,7 @@ function test05() {
 
     # file not exist
     local file=file_"$RANDOM"
-    sed -i "s#ConditionFileIsExecutable=.*#ConditionFileIsExecutable=\"/${file}\"#" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s#ConditionFileIsExecutable=.*#ConditionFileIsExecutable=/${file}#" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base
     sleep 1
@@ -330,7 +330,7 @@ function test06() {
     local file=file_"$RANDOM"
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     if [ "${condition_test}" -eq 1 ]; then
-        sed -i "/Description=/ a ConditionPathExistsGlob=\"/tmp/${file}*\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a ConditionPathExistsGlob=/tmp/${file}*" ${SYSMST_LIB_PATH}/base.service
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
@@ -360,7 +360,7 @@ function test07() {
     log_info "===== test07 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     if [ "${condition_test}" -eq 1 ]; then
-        sed -i "/Description=/ a ConditionPathIsDirectory=\"/tmp\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a ConditionPathIsDirectory=/tmp" ${SYSMST_LIB_PATH}/base.service
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
@@ -371,7 +371,7 @@ function test07() {
 
     # path not exist
     local path=path_${RANDOM}
-    sed -i "s#ConditionPathIsDirectory=.*#ConditionPathIsDirectory=\"/${path}\"#" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s#ConditionPathIsDirectory=.*#ConditionPathIsDirectory=/${path}#" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base
     sleep 1
@@ -418,7 +418,7 @@ function test08() {
     [ "${mnt}" = none ] && return 1
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     if [ "${condition_test}" -eq 1 ]; then
-        sed -i "/Description=/ a ConditionPathIsMountPoint=\"${mnt}\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a ConditionPathIsMountPoint=${mnt}" ${SYSMST_LIB_PATH}/base.service
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
@@ -429,7 +429,7 @@ function test08() {
 
     # path not exist
     local path=path_${RANDOM}
-    sed -i "s#ConditionPathIsMountPoint=.*#ConditionPathIsMountPoint=\"/${path}\"#" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s#ConditionPathIsMountPoint=.*#ConditionPathIsMountPoint=/${path}#" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base
     sleep 1
@@ -467,7 +467,7 @@ function test09() {
     log_info "===== test09 ====="
     cp -arf "${work_dir}"/tmp_units/base.service ${SYSMST_LIB_PATH} || return 1
     if [ "${condition_test}" -eq 1 ]; then
-        sed -i "/Description=/ a ConditionPathIsSymbolicLink=\"/tmp\"" ${SYSMST_LIB_PATH}/base.service
+        sed -i "/Description=/ a ConditionPathIsSymbolicLink=/tmp" ${SYSMST_LIB_PATH}/base.service
     elif [ "${condition_test}" -eq 0 ]; then
         return
     fi
@@ -479,7 +479,7 @@ function test09() {
 
     # path not exist
     local path=path_${RANDOM}
-    sed -i "s#ConditionPathIsSymbolicLink=.*#ConditionPathIsSymbolicLink=\"/${path}\"#" ${SYSMST_LIB_PATH}/base.service
+    sed -i "s#ConditionPathIsSymbolicLink=.*#ConditionPathIsSymbolicLink=/${path}#" ${SYSMST_LIB_PATH}/base.service
     sctl daemon-reload
     sctl restart base
     sleep 1

@@ -131,7 +131,7 @@ function test06() {
     local cmd_list="reboot poweroff exit"
     for cmd in ${cmd_list}; do
         cp -arf "${work_dir}"/tmp_units/"${cmd}".target ${SYSMST_LIB_PATH} || return 1
-        sed -i "s/StartLimitAction=.*/StartLimitAction=\"${cmd}\"/" ${SYSMST_LIB_PATH}/base.service
+        sed -i "s/StartLimitAction=.*/StartLimitAction=${cmd}/" ${SYSMST_LIB_PATH}/base.service
         sctl daemon-reload
         for ((i=0; i<5; ++i)); do
             sctl restart base

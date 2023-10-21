@@ -1,9 +1,9 @@
 [Unit]
-Description="restart 002 service"
+Description=restart 002 service
 
 [Service]
-ExecStartPre="/bin/sleep 2"
-ExecStart="/bin/aaa"
+ExecStartPre=/bin/sleep 2
+ExecStart=/bin/aaa
 Restart=
 # to avoid restart too frequently to reach start limit rate
 RestartSec=2

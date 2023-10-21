@@ -1,10 +1,10 @@
 [Unit]
-Description="restart 004 service"
+Description=restart 004 service
 
 [Service]
-ExecStartPre="/bin/sleep 2"
-RestartPreventExitStatus="SIGPIPE 203"
-ExecStart="/bin/aaa"
+ExecStartPre=/bin/sleep 2
+RestartPreventExitStatus=SIGPIPE 203
+ExecStart=/bin/aaa
 Restart=
 # to avoid restart too frequently to reach start limit rate
 RestartSec=2

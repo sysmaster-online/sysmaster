@@ -1,13 +1,13 @@
 [Unit]
-Description="test service"
-Documentation="man test"
+Description=test service
+Documentation=man test
 
 [Service]
-Environment={Name="sysmaster"}
-ExecCondition="/usr/bin/sleep 15"
-ExecStart="/bin/echo 'test'"
-ExecStop ="/bin/kill $MAINPID"
+Environment=Name=sysmaster
+ExecCondition=/usr/bin/sleep 15
+ExecStart=/bin/echo 'test'
+ExecStop =/bin/kill $MAINPID
 
 [Install]
-WantedBy="dbus.service"
-Also="test.socket"
+WantedBy=dbus.service
+Also=test.socket
