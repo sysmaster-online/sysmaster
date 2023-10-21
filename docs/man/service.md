@@ -103,11 +103,16 @@ service服务的类型，当前支持`simple`、`forking`、`oneshot`、`notify`
 
 ## Environment
 
-配置进程的环境变量，采用toml内联表的格式，如Environment = {var0="val0", var2="val1"};
+配置进程的环境变量，每个环境变量采用`Key=Value`键值对的格式，多个环境变量通过空格分隔，例如：`Environment=FOO=foo BAR=bar`。
 
-其中环境变量定义在花括号`{}`中，多个键值对以`,`分割，value的值以双引号`""`包含。
+支持使用双引号包裹`Value`，这常用于`Value`内包含空格的场景，例如：`Environment=FOO="foo foo" BAR="bar bar"`。如果`Value`包含`"`，可以使用反斜杠转义，例如：`Environment=FOO=\"foo`。
 
-**注意：** 环境变量不会默认在命令行中展开，和systemd在ExecXXX字段显式配置`:`的行为一致。
+合法的`Key`仅支持大小写字母、阿拉伯数字及下划线`_`。
+
+### 注意：
+
+1. 环境变量不会默认在命令行中展开，和systemd在ExecXXX字段显式配置`:`的行为一致。
+2. 当解析到非法的键值对时，sysmaster将停止解析，使用当前已解析到的合法值。
 
 ## EnvironmentFile
 

@@ -397,15 +397,109 @@ fn deserialize_timeout(s: &str) -> Result<u64> {
     Ok(timeout * USEC_PER_SEC)
 }
 
-fn parse_hash_map(s: &str) -> Result<HashMap<String, String>> {
-    let mut res = HashMap::new();
-    for v in s.split_ascii_whitespace() {
-        match v.split_once("=") {
-            Some((v1, v2)) => {
-                res.insert(v1.to_string(), v2.to_string());
+fn parse_environment(s: &str) -> Result<HashMap<String, String>> {
+    #[derive(PartialEq, Clone, Copy)]
+    enum ParseState {
+        Init,
+        Key,
+        Value,
+        Quotes,
+        BackSlash,
+        WaitSpace,
+        Invalid,
+    }
+
+    let mut state = ParseState::Init;
+    let mut state_before_back_slash = ParseState::Value;
+    let mut key = String::new();
+    let mut value = String::new();
+    let mut res: HashMap<String, String> = HashMap::new();
+    for c in s.chars() {
+        match state {
+            ParseState::Init => {
+                if !key.is_empty() && !value.is_empty() {
+                    res.insert(key, value);
+                }
+                key = String::new();
+                value = String::new();
+                if c.is_ascii_alphanumeric() || c == '_' {
+                    key += &c.to_string();
+                    state = ParseState::Key;
+                } else if c != ' ' {
+                    state = ParseState::Invalid;
+                    break;
+                }
             }
-            None => continue,
+            ParseState::Key => {
+                if c.is_ascii_alphanumeric() || c == '_' {
+                    key += &c.to_string();
+                } else if c == '=' {
+                    state = ParseState::Value;
+                } else {
+                    /* F-O=foo */
+                    state = ParseState::Invalid;
+                    break;
+                }
+            }
+            ParseState::Value => {
+                /* FOO="foo bar" */
+                if c == '\"' {
+                    state = ParseState::Quotes;
+                    continue;
+                }
+                /* FOO==\"foo */
+                if c == '\\' {
+                    state = ParseState::BackSlash;
+                    state_before_back_slash = ParseState::Value;
+                    continue;
+                }
+                if c != ' ' {
+                    value += &c.to_string();
+                    continue;
+                }
+                state = ParseState::Init;
+            }
+            ParseState::BackSlash => {
+                /* FOO=\"foo or FOO="\"foo bar" */
+                value += &c.to_string();
+                state = state_before_back_slash;
+            }
+            ParseState::Quotes => {
+                /* We have got the right ", there must a space after. */
+                if c == '\"' {
+                    state = ParseState::WaitSpace;
+                    continue;
+                }
+                if c == '\\' {
+                    state = ParseState::BackSlash;
+                    state_before_back_slash = ParseState::Quotes;
+                    continue;
+                }
+                value += &c.to_string();
+            }
+            ParseState::WaitSpace => {
+                if c != ' ' {
+                    /* FOO="foo bar"x */
+                    state = ParseState::Invalid;
+                    break;
+                } else {
+                    state = ParseState::Init;
+                }
+            }
+            ParseState::Invalid => {
+                break;
+            }
         }
+    }
+    if state == ParseState::Invalid {
+        log::warn!("Found invalid Environment, breaking");
+        return Ok(res);
+    }
+    if !key.is_empty()
+        && !value.is_empty()
+        && [ParseState::Init, ParseState::WaitSpace, ParseState::Value].contains(&state)
+    {
+        res.insert(key, value);
     }
     Ok(res)
 }
@@ -439,7 +533,7 @@ pub struct SectionService {
     pub NotifyAccess: Option<NotifyAccess>,
     #[entry(default = false)]
     pub NonBlocking: bool,
-    #[entry(myparser = parse_hash_map)]
+    #[entry(myparser = parse_environment)]
     pub Environment: Option<HashMap<String, String>>,
     #[entry(default = KillMode::ControlGroup)]
     pub KillMode: KillMode,
