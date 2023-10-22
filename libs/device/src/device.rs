@@ -18,8 +18,8 @@ use crate::{error::*, DeviceAction};
 use basic::fs_util::{open_temporary, touch_file};
 use basic::parse::{device_path_parse_devnum, parse_devnum, parse_ifindex};
 use libc::{
-    c_char, dev_t, faccessat, gid_t, mode_t, uid_t, F_OK, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK,
-    S_IFMT, S_IRUSR, S_IWUSR,
+    dev_t, faccessat, gid_t, mode_t, uid_t, F_OK, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT,
+    S_IRUSR, S_IWUSR,
 };
 use nix::dir::Dir;
 use nix::errno::{self, Errno};
@@ -30,6 +30,7 @@ use snafu::ResultExt;
 use std::cell::{Ref, RefCell};
 use std::collections::hash_set::Iter;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::ffi::CString;
 use std::fs::{self, rename, OpenOptions, ReadDir};
 use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
@@ -2458,13 +2459,13 @@ impl Device {
 
         let property_tags_outdated = *self.property_tags_outdated.borrow();
         if property_tags_outdated {
-            let all_tags: String = {
+            let mut all_tags: String = {
                 let all_tags = self.all_tags.borrow();
-                let tags_vec = all_tags.iter().map(|s| s.as_str()).collect::<Vec<_>>();
-                tags_vec.join(":")
+                all_tags.iter().map(|s| format!(":{}", s)).collect()
             };
 
             if !all_tags.is_empty() {
+                all_tags.push(':');
                 self.add_property_internal("TAGS", &all_tags)
                     .map_err(|e| Error::Nix {
                         msg: format!("properties_prepare failed: {}", e),
@@ -2472,13 +2473,13 @@ impl Device {
                     })?;
             }
 
-            let current_tags: String = {
+            let mut current_tags: String = {
                 let current_tags = self.current_tags.borrow();
-                let tags_vec = current_tags.iter().map(|s| s.as_str()).collect::<Vec<_>>();
-                tags_vec.join(":")
+                current_tags.iter().map(|s| format!(":{}", s)).collect()
             };
 
             if !current_tags.is_empty() {
+                current_tags.push(':');
                 self.add_property_internal("CURRENT_TAGS", &current_tags)
                     .map_err(|e| Error::Nix {
                         msg: format!("properties_prepare failed: {}", e),
@@ -2900,9 +2901,16 @@ impl Device {
         };
 
         if !subdir.is_empty() {
-            if unsafe { faccessat(dir.as_raw_fd(), "uevent".as_ptr() as *const c_char, F_OK, 0) }
-                >= 0
-            {
+            let uevent_str = match CString::new("uevent") {
+                Ok(uevent_str) => uevent_str,
+                Err(e) => {
+                    return Err(Error::Nix {
+                        msg: format!("failed to new CString({:?}) '{}'", "uevent", e),
+                        source: nix::Error::EINVAL,
+                    })
+                }
+            };
+            if unsafe { faccessat(dir.as_raw_fd(), uevent_str.as_ptr(), F_OK, 0) } >= 0 {
                 /* skip child device */
                 return Ok(());
             }

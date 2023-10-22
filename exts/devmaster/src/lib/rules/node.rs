@@ -35,7 +35,7 @@
 use crate::{error::*, log_dev, log_dev_option};
 use basic::fs_util::path_simplify;
 use basic::fs_util::{fchmod_and_chown, futimens_opath, symlink};
-use basic::{fd_util::opendirat, fs_util::remove_dir_until};
+use basic::{fd_util::xopendirat, fs_util::remove_dir_until};
 use cluFlock::ExclusiveFlock;
 use device::Device;
 use libc::{mode_t, S_IFBLK, S_IFCHR, S_IFLNK, S_IFMT};
@@ -584,7 +584,7 @@ pub(crate) fn find_prioritized_devnode(
     dev: Rc<RefCell<Device>>,
     dirfd: i32,
 ) -> Result<Option<String>> {
-    let mut dir = opendirat(dirfd, OFlag::O_NOFOLLOW)
+    let mut dir = xopendirat(dirfd, ".", OFlag::O_NOFOLLOW)
         .context(BasicSnafu)
         .log_error(&format!("failed to opendirat '{}'", dirfd))?;
 

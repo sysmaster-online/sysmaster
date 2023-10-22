@@ -1143,7 +1143,7 @@ impl DeviceEnumerator {
     }
 
     /// scan devices
-    pub(crate) fn scan_devices(&mut self) -> Result<(), Error> {
+    pub fn scan_devices(&mut self) -> Result<(), Error> {
         if *self.scan_up_to_date.borrow() && *self.etype.borrow() == DeviceEnumerationType::Devices
         {
             return Ok(());

@@ -23,9 +23,12 @@ use log::init_log_to_console_syslog;
 use log::Level;
 use std::{io::Write, os::unix::net::UnixStream};
 use subcmds::devctl_hwdb::subcommand_hwdb;
+use subcmds::devctl_info::InfoArgs;
 use subcmds::devctl_monitor::subcommand_monitor;
 use subcmds::devctl_test_builtin::subcommand_test_builtin;
 use subcmds::devctl_trigger::subcommand_trigger;
+
+type Result<T> = std::result::Result<T, nix::Error>;
 
 /// parse program arguments
 #[derive(Parser, Debug)]
@@ -39,16 +42,63 @@ struct Args {
 /// Kinds of subcommands
 #[derive(Parser, Debug)]
 enum SubCmd {
-    /// Monitor device events from kernel and userspace
+    /// Query sysfs or the devmaster database
     #[clap(display_order = 1)]
+    Info {
+        #[clap(short, long, possible_values(&["name", "symlink", "path", "property", "env", "all"]), help(
+            "Query device information:\n\
+                name                     Name of device node\n\
+                symlink                  Pointing to node\n\
+                path                     sysfs device path\n\
+                property or env          The device properties\n\
+                all                      All values\n")
+        )]
+        query: Option<String>,
+
+        /// Print all key matches walking along the chain
+        /// of parent devices
+        #[clap(short, long)]
+        attribute_walk: bool,
+
+        /// Print major:minor of device containing this file
+        #[clap(short, long)]
+        device_id_of_file: Option<String>,
+
+        /// Export key/value pairs
+        #[clap(short('x'), long)]
+        export: bool,
+
+        /// Export the key name with a prefix
+        #[clap(short('P'), long)]
+        export_prefix: Option<String>,
+
+        /// Export the content of the devmaster database
+        #[clap(short('e'), long)]
+        export_db: bool,
+
+        /// Clean up the devmaster database
+        #[clap(short, long)]
+        cleanup_db: bool,
+
+        /// Prepend dev directory to path names
+        #[clap(short, long)]
+        root: bool,
+
+        ///
+        #[clap(required = false)]
+        devices: Vec<String>,
+    },
+
+    /// Monitor device events from kernel and userspace
+    #[clap(display_order = 2)]
     Monitor {},
 
     /// Kill all devmaster workers
-    #[clap(display_order = 2)]
+    #[clap(display_order = 3)]
     Kill {},
 
     /// Trigger a fake device action, then the kernel will report an uevent
-    #[clap(display_order = 3)]
+    #[clap(display_order = 4)]
     Trigger {
         /// the kind of device action to trigger
         #[clap(short, long)]
@@ -72,7 +122,7 @@ enum SubCmd {
     },
 
     /// Test builtin command on a device
-    #[clap(display_order = 4)]
+    #[clap(display_order = 5)]
     TestBuiltin {
         /// device action
         #[clap(short, long)]
@@ -85,7 +135,7 @@ enum SubCmd {
         syspath: String,
     },
     /// Test builtin command on a device
-    #[clap(display_order = 5)]
+    #[clap(display_order = 6)]
     Hwdb {
         /// update the hardware database
         #[clap(short('u'), long)]
@@ -114,16 +164,41 @@ fn subcommand_kill() {
     stream.write_all(b"kill ").unwrap();
 }
 
-fn main() {
+fn main() -> Result<()> {
     let argv: Vec<String> = std::env::args().collect();
     if invoked_as(argv, "devmaster") {
-        return run_daemon();
+        run_daemon();
+        return Ok(());
     }
 
     init_log_to_console_syslog("devctl", Level::Debug);
     let args = Args::parse();
 
     match args.subcmd {
+        SubCmd::Info {
+            query,
+            attribute_walk,
+            device_id_of_file,
+            export,
+            export_prefix,
+            export_db,
+            cleanup_db,
+            root,
+            devices,
+        } => {
+            return InfoArgs::new(
+                query,
+                attribute_walk,
+                device_id_of_file,
+                export,
+                export_prefix,
+                export_db,
+                cleanup_db,
+                root,
+                devices,
+            )
+            .subcommand_info()
+        }
         SubCmd::Monitor {} => subcommand_monitor(),
         SubCmd::Kill {} => subcommand_kill(),
         SubCmd::Trigger {
@@ -147,4 +222,6 @@ fn main() {
             root,
         } => subcommand_hwdb(update, test, path, usr, strict, root),
     }
+
+    Ok(())
 }

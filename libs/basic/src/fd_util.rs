@@ -14,6 +14,7 @@
 use crate::error::*;
 use libc::off_t;
 use nix::{
+    dir::Dir,
     errno::Errno,
     fcntl::{openat, FcntlArg, FdFlag, OFlag},
     ioctl_read,
@@ -160,11 +161,15 @@ pub fn fd_get_diskseq(fd: RawFd) -> Result<u64> {
     Ok(diskseq)
 }
 
-/// open the directory at fd
-pub fn opendirat(dirfd: i32, flags: OFlag) -> Result<nix::dir::Dir> {
+/// open the directory at dirfd
+pub fn xopendirat(dirfd: i32, name: &str, flags: OFlag) -> Result<nix::dir::Dir> {
+    if dirfd == libc::AT_FDCWD && flags.is_empty() {
+        return Dir::open(name, flags, Mode::empty()).context(NixSnafu);
+    }
+
     let nfd = openat(
         dirfd,
-        ".",
+        name,
         OFlag::O_RDONLY | OFlag::O_NONBLOCK | OFlag::O_DIRECTORY | OFlag::O_CLOEXEC | flags,
         Mode::empty(),
     )
@@ -183,6 +188,10 @@ pub fn file_offset_beyond_memory_size(x: off_t) -> bool {
     x as u64 > usize::MAX as u64
 }
 
+/// "." or ".." directory
+pub fn dot_or_dot_dot(name: &str) -> bool {
+    name == "." || name == ".."
+}
 #[cfg(test)]
 mod tests {
     use crate::fd_util::{stat_is_char, stat_is_reg};
@@ -196,7 +205,7 @@ mod tests {
         path::Path,
     };
 
-    use super::opendirat;
+    use super::{dot_or_dot_dot, xopendirat};
 
     #[test]
     fn test_stats() {
@@ -228,12 +237,19 @@ mod tests {
         File::create("/tmp/test_opendirat/entry1").unwrap();
 
         let dirfd = open("/tmp/test_opendirat", OFlag::O_DIRECTORY, Mode::empty()).unwrap();
-        let mut dir = opendirat(dirfd, OFlag::O_NOFOLLOW).unwrap();
+        let mut dir = xopendirat(dirfd, ".", OFlag::O_NOFOLLOW).unwrap();
 
         for e in dir.iter() {
             let _ = e.unwrap();
         }
 
         remove_dir_all("/tmp/test_opendirat").unwrap();
+    }
+
+    #[test]
+    fn test_dot_or_dot_dot() {
+        assert!(dot_or_dot_dot("."));
+        assert!(dot_or_dot_dot(".."));
+        assert!(!dot_or_dot_dot("/"));
     }
 }
