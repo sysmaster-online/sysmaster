@@ -11,7 +11,7 @@ use once_cell::sync::Lazy;
 use os_release::OsRelease;
 use std::{env, fs, path::Path};
 
-pub(crate) type SpecifierContext<'a> = (bool, &'a str, &'a Path); // (root, filename, path)
+pub(crate) type SpecifierContext<'a> = (bool, &'a str, &'a str, &'a Path); // (root, filename, path)
 
 static OS_RELEASE: Lazy<OsRelease> =
     Lazy::new(|| OsRelease::new().expect("Failed to read os-release."));
@@ -103,17 +103,17 @@ pub(crate) fn resolve(
             }
         }
         'i' => {
-            if let UnitType::Instance(instance_name, _) = unit_type(context.1)? {
+            if let UnitType::Instance(instance_name, _) = unit_type(context.2)? {
                 result.push_str(&escape(instance_name));
             }
         }
         'I' => {
-            if let UnitType::Instance(instance_name, _) = unit_type(context.1)? {
+            if let UnitType::Instance(instance_name, _) = unit_type(context.2)? {
                 result.push_str(instance_name);
             }
         }
         'j' => {
-            if let UnitType::Instance(instance_name, _) = unit_type(context.1)? {
+            if let UnitType::Instance(instance_name, _) = unit_type(context.2)? {
                 result.push_str(&escape(instance_name.split('-').last().unwrap()));
             } else {
                 result.push_str(&escape(
@@ -168,21 +168,21 @@ pub(crate) fn resolve(
                 result.push_str(res)
             }
         }
-        'n' => result.push_str(&escape(context.1)),
-        'N' => result.push_str(&escape(context.1.split('.').next().unwrap())),
+        'n' => result.push_str(&escape(context.2)),
+        'N' => result.push_str(&escape(context.2.split('.').next().unwrap())),
         'o' => result.push_str(&OS_RELEASE.id),
         'p' => {
             if let UnitType::Instance(instance_name, _) = unit_type(context.1)? {
                 result.push_str(&escape(instance_name));
             } else {
-                result.push_str(&escape(context.1.split('.').next().unwrap()));
+                result.push_str(&escape(context.2.split('.').next().unwrap()));
             }
         }
         'P' => {
             if let UnitType::Instance(instance_name, _) = unit_type(context.1)? {
                 result.push_str(instance_name);
             } else {
-                result.push_str(context.1.split('.').next().unwrap());
+                result.push_str(context.2.split('.').next().unwrap());
             }
         }
         'q' => result.push_str(
@@ -257,12 +257,12 @@ pub(crate) fn resolve(
             }
         }
         'y' => {
-            if let Some(res) = context.2.to_str() {
+            if let Some(res) = context.3.to_str() {
                 result.push_str(res)
             }
         }
         'Y' => {
-            if let Some(res) = context.2.parent().expect("Invalid file path.").to_str() {
+            if let Some(res) = context.3.parent().expect("Invalid file path.").to_str() {
                 result.push_str(res)
             }
         }

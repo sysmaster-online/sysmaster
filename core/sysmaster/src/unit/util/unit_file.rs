@@ -239,7 +239,7 @@ impl UnitFileData {
          * load the template configuration file. */
         let template_name = name.split_once('@').unwrap().0.to_string() + "@.service";
         for search_path in &search_path_list {
-            let mut v = match self.build_id_fragment_by_name(search_path, &template_name) {
+            let v = match self.build_id_fragment_by_name(search_path, &template_name) {
                 None => continue,
                 Some(v) => v,
             };
@@ -247,7 +247,11 @@ impl UnitFileData {
                 /* unit is masked */
                 return;
             }
-            pathbuf_fragment.append(&mut v);
+            /* FIXME: this changes the template_name to full_name, it's a temporary solution. */
+            for p in v {
+                let path = p.parent().unwrap().join(name);
+                pathbuf_fragment.push(path);
+            }
         }
         self.unit_id_fragment
             .insert(name.to_string(), pathbuf_fragment);

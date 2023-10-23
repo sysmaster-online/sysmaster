@@ -37,7 +37,8 @@ pub trait UnitConfig: Sized {
     fn __load<S: AsRef<Path>>(
         path: S,
         paths: Rc<Vec<PathBuf>>,
-        filename: &str,
+        config_file_name: &str,
+        unit_name: &str,
         root: bool,
     ) -> Result<Self> {
         let path = path.as_ref();
@@ -52,7 +53,7 @@ pub trait UnitConfig: Sized {
         let parser = crate::parser::UnitParser::new(
             content.as_ref(),
             paths,
-            (root, filename, &canonical_path),
+            (root, config_file_name, unit_name, &canonical_path),
         );
         Self::__parse_unit(parser)
     }
@@ -61,7 +62,8 @@ pub trait UnitConfig: Sized {
     fn __patch<S: AsRef<Path>>(
         path: S,
         paths: Rc<Vec<PathBuf>>,
-        filename: &str,
+        config_file_name: &str,
+        unit_name: &str,
         from: &mut Self,
         root: bool,
     ) -> Result<()> {
@@ -74,7 +76,7 @@ pub trait UnitConfig: Sized {
             path: path.to_string_lossy().to_string(),
         })?;
         let parser =
-            crate::parser::UnitParser::new(content.as_ref(), paths, (root, filename, path));
+            crate::parser::UnitParser::new(content.as_ref(), paths, (root, config_file_name, unit_name, path));
         Self::__patch_unit(parser, from)
     }
 
@@ -112,7 +114,7 @@ pub trait UnitConfig: Sized {
                 let mut path = dir.to_owned();
                 path.push(config_file_name.as_str());
                 if let Ok(res) =
-                    Self::__load(path, Rc::clone(&paths_rc), config_file_name.as_str(), root)
+                    Self::__load(path, Rc::clone(&paths_rc), config_file_name.as_str(), &fullname, root)
                 {
                     result = Some(res);
                     break;
@@ -132,10 +134,11 @@ pub trait UnitConfig: Sized {
         };
 
         // load drop-ins
-        let mut dropin_dir_names = vec![
-            format!("{}.d", Self::SUFFIX),
-            format!("{}.d", fullname.as_str()),
-        ];
+        let mut dropin_dir_names: Vec<String> = Vec::new();
+        dropin_dir_names.push(format!("{}.d", Self::SUFFIX));
+        for config_file_name in config_file_names {
+            dropin_dir_names.push(format!("{}.d", config_file_name.as_str()));
+        }
         let segments: Vec<&str> = fullname.split('-').collect();
         for i in (1..segments.len()).rev() {
             let segmented = segments[0..i].join("-");
@@ -160,6 +163,7 @@ pub trait UnitConfig: Sized {
                                 if let Err(err) = Self::__patch(
                                     entry.path(),
                                     paths,
+                                    dir_name.as_str(),
                                     fullname.as_str(),
                                     &mut result,
                                     root,
