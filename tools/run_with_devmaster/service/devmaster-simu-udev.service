@@ -2,6 +2,6 @@
 DefaultDependencies=false
 
 [Service]
-Type="simple"
+Type=simple
 RemainAfterExit=true
-ExecStart="-/bin/bash /lib/devmaster/simulate_udev.sh"
+ExecStart=-/bin/bash /lib/devmaster/simulate_udev.sh

@@ -9,15 +9,15 @@
 
 [Unit]
 DefaultDependencies=false
-After="udevd-kernel.socket;udevd-control.socket"
-Requires="udevd-kernel.socket;udevd-control.socket"
-Before="multi-user.target"
-ConditionPathIsReadWrite="/sys"
+After=udevd-kernel.socket udevd-control.socket
+Requires=udevd-kernel.socket udevd-control.socket
+Before=multi-user.target
+ConditionPathIsReadWrite=/sys
 
 [Service]
-Type="oneshot"
+Type=oneshot
 RemainAfterExit=true
-ExecStart="-/usr/sbin/udevadm trigger --type=subsystems --action=add ; /usr/sbin/udevadm trigger --type=devices --action=add"
+ExecStart=-/usr/sbin/udevadm trigger --type=subsystems --action=add ; /usr/sbin/udevadm trigger --type=devices --action=add
 
 [Install]
-WantedBy="multi-user.target"
+WantedBy=multi-user.target

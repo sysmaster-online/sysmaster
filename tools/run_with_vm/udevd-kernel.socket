@@ -9,10 +9,10 @@
 
 [Unit]
 DefaultDependencies=false
-ConditionPathIsReadWrite="/sys"
+ConditionPathIsReadWrite=/sys
 
 [Socket]
-Service="udevd.service"
+Service=udevd.service
 ReceiveBuffer=134217728
-ListenNetlink="kobject-uevent 1"
+ListenNetlink=kobject-uevent 1
 PassCredentials=true

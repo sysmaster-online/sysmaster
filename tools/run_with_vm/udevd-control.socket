@@ -9,11 +9,11 @@
 
 [Unit]
 DefaultDependencies=false
-ConditionPathIsReadWrite="/sys"
+ConditionPathIsReadWrite=/sys
 
 [Socket]
-Service="udevd.service"
-ListenSequentialPacket="/run/udev/control"
+Service=udevd.service
+ListenSequentialPacket=/run/udev/control
 SocketMode=600
 PassCredentials=true
 RemoveOnStop=true
