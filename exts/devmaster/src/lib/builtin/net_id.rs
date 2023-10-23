@@ -436,7 +436,7 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
     let mut slot: u32 = 0;
     let mut func: u32 = 0;
     let cstr = CString::new(sysname.clone()).unwrap();
-    let fmt = CString::new("%u:%u:%u:%u").unwrap();
+    let fmt = CString::new("%u:%u:%u.%u").unwrap();
     let ret = unsafe {
         libc::sscanf(
             cstr.as_ptr(),
