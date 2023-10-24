@@ -329,7 +329,7 @@ fn remount_sysroot() {
 
     //Check whether we are in container
     let virtualization = machine::Machine::detect_container();
-    if virtualization != Machine::None && virtualization != Machine::Host {
+    if virtualization != Machine::None {
         return;
     }
 

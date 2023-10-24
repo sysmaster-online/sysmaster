@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $SCRIPT_DIR/common_function
 
 # Function to check if a file contains Chinese characters
 contains_chinese() {
@@ -47,42 +49,10 @@ crate_names=("https://github.com/rust-lang/crates.io-index" \
             "https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git" \
             "https://mirrors.sjtug.sjtu.edu.cn/git/crates.io-index")
 
-# Initialize minimum latency to a large value
-min_latency=9999999
 
-# Define timeout in seconds
-timeout=10
+fastest_source=$(test_fasturl "${crate_names[@]}")
 
-# Define the fastest source
-fastest_source=""
-
-# Test each crate
-for crate_name in "${crate_names[@]}"; do
-    echo "Running test for $crate_name..."
-
-    # Send an HTTP request to get crate information and measure the execution time
-    start_time=$(date +%s%N)
-    response=$(curl -s -o /dev/null --connect-timeout 10 -w "%{time_total}" "$crate_name" > /dev/null 2>&1)
-    if [ $? -ne 0 ]; then
-        continue
-    fi
-    end_time=$(date +%s%N)
-
-    # Calculate the request time in milliseconds
-    duration=$(( ($end_time - $start_time) / 1000000 ))
-
-    echo "Test result for $crate_name: $duration ms"
-
-    # Check if it's the fastest source
-    if [ "$duration" -lt "$min_latency" ]; then
-        min_latency="$duration"
-        fastest_source="$crate_name"
-    fi
-
-    echo ""
-done
-
-echo "Fastest source: $fastest_source with latency $min_latency ms"
+echo "Fastest source: $fastest_source"
 
 # Modify config
 mkdir -p ~/.cargo

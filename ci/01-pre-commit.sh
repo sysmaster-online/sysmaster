@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $SCRIPT_DIR/common_function
 
 function finish() {
     echo "--- PLEASE RUN sh -x ci/01-pre-commit.sh FIRST IN YOUR LOCALHOST!!! ---"
@@ -21,7 +23,7 @@ do
 done
 
 export PATH="$PATH:/home/jenkins/.local/bin"
-pip3 install pre-commit ruamel.yaml -i https://pypi.mirrors.ustc.edu.cn/simple || pip3 install  -i http://pypi.douban.com/simple/ pre-commit ruamel.yaml || pip3 install pre-commit ruamel.yaml
+pip3 install pre-commit ruamel.yaml -i https://pypi.mirrors.ustc.edu.cn/simple || pip3 install -i http://pypi.douban.com/simple/ pre-commit ruamel.yaml || pip3 install pre-commit ruamel.yaml
 
 ## one PR ? Commit
 # oldnum=`git rev-list origin/master --no-merges --count`
@@ -55,17 +57,8 @@ done
 #filelist=`git diff origin/master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`
 # ln -s `which python3` /home/jenkins/.local/bin/python
 # pre-commit autoupdate || pre-commit autoupdate || pre-commit autoupdate
-sources=("https://gitclone.com/github.com/" "https://gh.api.99988866.xyz/https://github.com/" "https://github.com/")
-set +e
-for url in ${sources[*]}
-do
-    git config --global url."${url}".insteadOf "https://github.com/"
-    git ls-remote --exit-code https://github.com/pre-commit/pre-commit-hooks &> /dev/null
-    if [[ $? -ne 0 ]]; then
-        git config --unset --global url."${url}".insteadOf "https://github.com/"
-    else
-        set -e
-        pre-commit run -vvv --all-files
-        break
-    fi
-done
+sources=("https://521github.com/" "https://gitclone.com/github.com/" "https://gh.api.99988866.xyz/https://github.com/" "https://github.com/")
+url=$(test_fasturl ${sources[@]})
+git config --global url."${url}".insteadOf "https://github.com/"
+pre-commit run -vvv --all-files
+git config --unset --global url."${url}".insteadOf "https://github.com/"
