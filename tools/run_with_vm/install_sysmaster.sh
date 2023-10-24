@@ -7,10 +7,10 @@ units_dir=${pwd}/units
 run_with_vm_dir=${pwd}/tools/run_with_vm
 sysmaster_install_target=/usr/lib/sysmaster
 conf_install_target=/etc/sysmaster
+rules_dir=${pwd}/rules
 
 multi_user_target=(dbus.service fstab.service getty-tty1.service hostname-setup.service \
-lvm-activate-openeuler.service NetworkManager.service \
-sshd.service udev-trigger.service)
+NetworkManager.service sshd.service udev-trigger.service)
 sysinit_target=(udevd.service)
 
 # Install binaries of sysmaster.
@@ -45,16 +45,10 @@ for unit in ${sysinit_target[@]}; do
     ln -sf ${sysmaster_install_target}/system/${unit} /etc/sysmaster/system/sysinit.target.wants/${unit}
 done
 
-strip ${target_dir}/lib*.so
-
-# Install the dynamic libraries of unit plugins.
-install -Dm0550 -t ${sysmaster_install_target}/plugin ${target_dir}/libmount.so || exit 1
-install -Dm0550 -t ${sysmaster_install_target}/plugin ${target_dir}/libservice.so || exit 1
-install -Dm0550 -t ${sysmaster_install_target}/plugin ${target_dir}/libsocket.so || exit 1
-install -Dm0550 -t ${sysmaster_install_target}/plugin ${target_dir}/libtarget.so || exit 1
+# Install compatible rules for lvm
+install -Dm444 -t /usr/lib/udev/rules.d ${rules_dir}/99-sysmaster.rules || exit 1
 
 # Install configurations of sysmaster.
-install -Dm0550 -t ${sysmaster_install_target}/plugin ${pwd}/config/conf/plugin.conf || exit 1
 install -Dm0640 -t ${conf_install_target} ${pwd}/config/conf/system.conf || exit 1
 
 # Create the symbolic linkage '/init' to sysmaster-init.
