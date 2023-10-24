@@ -4,7 +4,7 @@ Before=sysinit.target
 ConditionPathIsReadWrite=/sys
 
 [Service]
-Type=notify"
+Type=notify
 Sockets=udevd-control.socket udevd-kernel.socket
 Restart=always
 RestartSec=0

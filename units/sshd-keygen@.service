@@ -3,7 +3,7 @@ Description=OpenSSH %i Server Key Generation
 ConditionFileNotEmpty=|!/etc/ssh/ssh_host_%i_key
 
 [Service]
-Type=oneshot"
+Type=oneshot
 EnvironmentFile=-/etc/sysconfig/sshd
 ExecStart=/usr/libexec/openssh/sshd-keygen %i
 
