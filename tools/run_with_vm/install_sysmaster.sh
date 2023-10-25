@@ -8,10 +8,13 @@ run_with_vm_dir=${pwd}/tools/run_with_vm
 sysmaster_install_target=/usr/lib/sysmaster
 conf_install_target=/etc/sysmaster
 
-multi_user_target=(dbus.service fstab.service getty-tty1.service hostname-setup.service \
+multi_user_target=(dbus.service fstab.service getty.target hostname-setup.service \
 lvm-activate-openeuler.service NetworkManager.service \
 sshd.service udev-trigger.service)
 sysinit_target=(udevd.service)
+getty_target=(getty@.service serial-getty@.service)
+
+mkdir -p ${sysmaster_install_target}/system-generators
 
 # Install binaries of sysmaster.
 install -Dm0550 -t /usr/bin ${target_dir}/sctl || exit 1
@@ -22,11 +25,16 @@ install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/sysmonitor || exit 
 install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/random_seed || exit 1
 install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/rc-local-generator || exit 1
 install -Dm0550 -t ${sysmaster_install_target} ${target_dir}/hostname_setup || exit 1
+install -Dm0550 -t ${sysmaster_install_target}/system-generators ${target_dir}/getty-generator || exit 1
 
 # Install '.service', '.socket', and '.target' units.
 install -Dm0640 -t ${sysmaster_install_target}/system ${units_dir}/* || exit 1
 
 for service in ${multi_user_target[@]} ${sysinit_target[@]}; do
+    install -Dm0640 -t ${sysmaster_install_target}/system ${run_with_vm_dir}/${service} || exit 1
+done
+
+for service in ${getty_target[@]}; do
     install -Dm0640 -t ${sysmaster_install_target}/system ${run_with_vm_dir}/${service} || exit 1
 done
 

@@ -118,6 +118,7 @@ members = [
   "exts/fstab",
   "exts/random_seed",
   "exts/rc-local-generator",
+  "exts/getty-generator",
   "exts/sysmonitor",
   "exts/devmaster",
   "exts/switch_root",

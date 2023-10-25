@@ -75,8 +75,11 @@ pub trait UnitConfig: Sized {
         file.read_to_string(&mut content).context(ReadFileSnafu {
             path: path.to_string_lossy().to_string(),
         })?;
-        let parser =
-            crate::parser::UnitParser::new(content.as_ref(), paths, (root, config_file_name, unit_name, path));
+        let parser = crate::parser::UnitParser::new(
+            content.as_ref(),
+            paths,
+            (root, config_file_name, unit_name, path),
+        );
         Self::__patch_unit(parser, from)
     }
 
@@ -113,9 +116,13 @@ pub trait UnitConfig: Sized {
             for config_file_name in &config_file_names {
                 let mut path = dir.to_owned();
                 path.push(config_file_name.as_str());
-                if let Ok(res) =
-                    Self::__load(path, Rc::clone(&paths_rc), config_file_name.as_str(), &fullname, root)
-                {
+                if let Ok(res) = Self::__load(
+                    path,
+                    Rc::clone(&paths_rc),
+                    config_file_name.as_str(),
+                    &fullname,
+                    root,
+                ) {
                     result = Some(res);
                     break;
                 }

@@ -270,12 +270,20 @@ impl UnitFileData {
                 if !is_symlink(symlink_unit.as_path()) {
                     continue;
                 }
-                let abs_path = match symlink_unit.canonicalize() {
-                    Err(_) => continue,
-                    Ok(v) => v,
-                };
+
+                let symlink_name = symlink_unit.file_name().unwrap();
                 let mut file_name = PathBuf::new();
-                file_name.push(abs_path.file_name().unwrap());
+                if symlink_name.to_str().unwrap().contains('@') {
+                    file_name.push::<PathBuf>(symlink_name.into());
+                } else {
+                    file_name = match symlink_unit.canonicalize() {
+                        Err(_) => continue,
+                        Ok(v) => v,
+                    }
+                    .file_name()
+                    .unwrap()
+                    .into();
+                }
                 pathbuf_dropin.push(file_name);
             }
         }

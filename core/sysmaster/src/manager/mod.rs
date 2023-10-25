@@ -15,6 +15,7 @@ use core::unit::UnitStatus;
 use nix::sys::signalfd::siginfo;
 #[cfg(test)]
 pub(crate) use rentry::RELI_HISTORY_MAX_DBS;
+use std::vec;
 pub(crate) mod alive_timer;
 pub(crate) mod commands;
 pub(crate) mod config;
@@ -303,6 +304,8 @@ impl Manager {
             // Do nothing during the initialization phase or when interrupted by process one before restore is true.
         }
 
+        self.run_generators();
+
         // preset file before add default job
         self.preset_all().unwrap();
 
@@ -388,6 +391,8 @@ impl Manager {
             false,
         );
 
+        self.run_generators();
+
         // clear data
         self.um.entry_clear();
 
@@ -467,6 +472,14 @@ impl Manager {
         // time
         let timer = Rc::clone(&self.alive_timer);
         timer.enable(true);
+    }
+
+    fn run_generators(&self) {
+        let paths = vec!["/usr/lib/sysmaster/system-generators"];
+
+        if let Err(err) = basic::exec_util::execute_directories(paths) {
+            log::error!("run generators err: {}", err);
+        }
     }
 }
 

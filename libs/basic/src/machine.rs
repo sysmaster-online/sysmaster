@@ -201,11 +201,9 @@ impl Machine {
             return Machine::PowerRVM;
         }
         if let Ok(dir) = std::fs::read_dir("/proc/device-tree") {
-            for entry in dir {
-                if let Ok(entry) = entry {
-                    if entry.file_name().contains("fw-cfg") {
-                        return Machine::Qemu;
-                    }
+            for entry in dir.flatten() {
+                if entry.file_name().to_str().unwrap_or("").contains("fw-cfg") {
+                    return Machine::Qemu;
                 }
             }
         }

@@ -62,6 +62,7 @@ full = [
     "unit_name",
     "strbuf",
     "argv",
+    "exec_util"
 ]
 
 capability = []
@@ -83,7 +84,7 @@ cpu = []
 disk = []
 fd = ["stat", "nix/ioctl", "nix/socket"]
 file = []
-fs = ["pathdiff", "rand"]
+fs = ["pathdiff", "rand", "nix/fs", "nix/user"]
 host = []
 io = ["nix/poll", "nix/signal"]
 machine = []
@@ -109,3 +110,4 @@ uuid = ["bitflags"]
 murmurhash2 = []
 strbuf = []
 argv = []
+exec_util= []

@@ -1,0 +1,13 @@
+[package]
+name = "getty-generator"
+version = "0.5.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+basic = { path = "../../libs/basic", default-features = false, features = [
+    "fs",
+] }
+log = { path = "../../libs/log" }
+libc = { version = "0.2", default-features = false }
