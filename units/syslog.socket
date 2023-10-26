@@ -1,6 +1,7 @@
 [Unit]
 Description=syslog socket
 DefaultDependencies=false
+After=sysctl.service
 
 [Socket]
 ListenDatagram=/dev/log
