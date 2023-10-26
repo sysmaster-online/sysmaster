@@ -29,9 +29,7 @@ pip3 install pre-commit ruamel.yaml -i https://pypi.mirrors.ustc.edu.cn/simple |
 # oldnum=`git rev-list origin/master --no-merges --count`
 # newnum=`git rev-list HEAD --no-merges --count`
 # changenum=$[newnum - oldnum]
-rustup override set 1.57
 cargo check  || exit 1
-git add . -A
 
 # add doc for src code
 for rustlist in `git diff origin/master --name-only | grep \.rs$  | grep -v "/examples/" | tr '\n' ' '`
@@ -61,4 +59,3 @@ sources=("https://521github.com/" "https://gitclone.com/github.com/" "https://gh
 url=$(test_fasturl ${sources[@]})
 git config --global url."${url}".insteadOf "https://github.com/"
 pre-commit run -vvv --all-files
-git config --unset --global url."${url}".insteadOf "https://github.com/"
