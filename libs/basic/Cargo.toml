@@ -1,6 +1,6 @@
 [package]
 name = "basic"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -62,7 +62,7 @@ full = [
     "unit_name",
     "strbuf",
     "argv",
-    "exec_util"
+    "exec_util",
 ]
 
 capability = []
@@ -110,4 +110,4 @@ uuid = ["bitflags"]
 murmurhash2 = []
 strbuf = []
 argv = []
-exec_util= []
+exec_util = []
