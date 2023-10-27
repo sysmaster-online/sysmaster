@@ -17,3 +17,4 @@ pub mod commons;
 
 pub(crate) mod macros;
 pub(crate) mod spawn;
+pub(crate) mod trie;

@@ -18,8 +18,8 @@ log = { path = "../log" }
 
 # third libraries
 bitflags = "1.3.2"
-fnmatch-regex = "0.2.0"
 libc = { default-features = false, version = "0.2.140" }
+# only used in test case
 loopdev = "0.4.0"
 nix = { default-features = false, version = "0.24", features = [
     "ioctl",
@@ -29,5 +29,5 @@ nix = { default-features = false, version = "0.24", features = [
     "fs",
     "dir",
 ] }
-regex = { default-features = false, version = "1.7.0" }
 snafu = { default-features = false, version = "0.7" }
+fnmatch-sys = "1.0.0"

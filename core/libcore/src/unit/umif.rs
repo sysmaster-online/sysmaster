@@ -232,11 +232,11 @@ pub trait UnitManagerObj: UnitMngUtil + ReStation {
 #[macro_export]
 macro_rules! declare_umobj_plugin {
     ($unit_type:ty, $constructor:path) => {
-        use log::LevelFilter;
+        use log::Level;
         /// method for create the sub-unit-manager instance
         #[cfg_attr(feature = "plugin", no_mangle)]
         pub fn __um_obj_create(
-            level: LevelFilter,
+            level: Level,
             target: &str,
             file_size: u32,
             file_number: u32,

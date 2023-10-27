@@ -120,64 +120,68 @@ impl Worker {
         let (tx, rx) = mpsc::channel::<WorkerMessage>();
 
         // share rules in worker threads. worker should only read rules to avoid lock being poisoned.
-        let handler = std::thread::spawn(move || loop {
-            let msg = rx.recv().unwrap_or_else(|error| {
-                log::error!("Worker {}: panic at recv \"{}\"", id, error);
-                panic!();
-            });
-
+        let handler = std::thread::spawn(move || {
+            let execute_mgr = exec_mgr::ExecuteManager::new(cache.clone());
             let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
 
-            match msg {
-                WorkerMessage::Job(dev_nulstr) => {
-                    // deserialize the device object from job message
-                    let device = Device::from_nulstr(&dev_nulstr).unwrap();
+            loop {
+                let msg = rx.recv().unwrap_or_else(|error| {
+                    log::error!("Worker {}: panic at recv \"{}\"", id, error);
+                    panic!();
+                });
 
-                    log::info!(
-                        "Worker {}: received device '{}'",
-                        id,
-                        device
-                            .get_devpath()
-                            .context(DeviceSnafu)
-                            .log_error("worker received a device without devpath")
-                            .unwrap_or_default()
-                    );
+                match msg {
+                    WorkerMessage::Job(dev_nulstr) => {
+                        // deserialize the device object from job message
+                        let device = Device::from_nulstr(&dev_nulstr).unwrap();
 
-                    let mut execute_mgr = exec_mgr::ExecuteManager::new(cache.clone());
+                        log::info!(
+                            "Worker {}: received device '{}'",
+                            id,
+                            device
+                                .get_devpath()
+                                .context(DeviceSnafu)
+                                .log_error("worker received a device without devpath")
+                                .unwrap_or_default()
+                        );
 
-                    let device = Rc::new(RefCell::new(device));
-                    let _ = execute_mgr.process_device(device.clone());
+                        let device = Rc::new(RefCell::new(device));
+                        let _ = execute_mgr.process_device(device.clone());
 
-                    log::info!("Worker {}: finished job", id);
+                        log::info!("Worker {}: finished job", id);
 
-                    broadcaster.send_device(&device.borrow(), None).unwrap();
+                        broadcaster.send_device(&device.borrow(), None).unwrap();
 
-                    let mut tcp_stream =
-                        UnixStream::connect(listen_addr.as_str()).unwrap_or_else(|error| {
-                            log::error!("Worker {}: failed to connect {}", id, error);
-                            panic!();
-                        });
+                        let mut tcp_stream = UnixStream::connect(listen_addr.as_str())
+                            .unwrap_or_else(|error| {
+                                log::error!("Worker {}: failed to connect {}", id, error);
+                                panic!();
+                            });
 
-                    tcp_stream
-                        .write_all(format!("finished {}", id).as_bytes())
-                        .unwrap_or_else(|error| {
-                            log::error!(
-                                "Worker {}: failed to send ack to manager \"{}\"",
-                                id,
-                                error
-                            );
-                        });
-                }
-                WorkerMessage::Cmd(cmd) => {
-                    log::info!("Worker {} received cmd: {}", id, cmd);
-                    match cmd.as_str() {
-                        "kill" => {
-                            let mut tcp_stream = UnixStream::connect(listen_addr.as_str())
-                                .unwrap_or_else(|error| {
-                                    log::error!("Worker {}: failed to connect \"{}\"", id, error);
-                                    panic!();
-                                });
-                            let _ret = tcp_stream
+                        tcp_stream
+                            .write_all(format!("finished {}", id).as_bytes())
+                            .unwrap_or_else(|error| {
+                                log::error!(
+                                    "Worker {}: failed to send ack to manager \"{}\"",
+                                    id,
+                                    error
+                                );
+                            });
+                    }
+                    WorkerMessage::Cmd(cmd) => {
+                        log::info!("Worker {} received cmd: {}", id, cmd);
+                        match cmd.as_str() {
+                            "kill" => {
+                                let mut tcp_stream = UnixStream::connect(listen_addr.as_str())
+                                    .unwrap_or_else(|error| {
+                                        log::error!(
+                                            "Worker {}: failed to connect \"{}\"",
+                                            id,
+                                            error
+                                        );
+                                        panic!();
+                                    });
+                                let _ret = tcp_stream
                                 .write(format!("killed {}", id).as_bytes())
                                 .unwrap_or_else(|error| {
                                     log::error!(
@@ -185,11 +189,12 @@ impl Worker {
                                     );
                                     0
                                 });
-                            log::debug!("Worker {}: is killed", id);
-                            break;
-                        }
-                        _ => {
-                            todo!();
+                                log::debug!("Worker {}: is killed", id);
+                                break;
+                            }
+                            _ => {
+                                todo!();
+                            }
                         }
                     }
                 }

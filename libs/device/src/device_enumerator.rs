@@ -14,29 +14,16 @@
 //!
 use crate::{device::Device, err_wrapper, error::Error, utils::*};
 use bitflags::bitflags;
+use fnmatch_sys::fnmatch;
 use nix::errno::Errno;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
     iter::Iterator,
+    os::raw::c_char,
     path::Path,
     rc::Rc,
 };
-
-/// decide pattern recognition
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum FilterType {
-    /// fnmatch-style glob pattern
-    Glob,
-    /// regular expression
-    _Regular,
-}
-
-impl Default for FilterType {
-    fn default() -> Self {
-        Self::Glob
-    }
-}
 
 /// decide how to match devices
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,9 +91,6 @@ pub struct DeviceEnumerator {
 
     /// how to match device
     pub(crate) match_initialized: RefCell<MatchInitializedType>,
-
-    /// filter type
-    pub(crate) filter_type: RefCell<FilterType>,
 }
 
 /// decide enumerate devices or subsystems
@@ -1273,33 +1257,16 @@ impl DeviceEnumerator {
     /// if the enumerator filter is of Glob type, use unix glob-fnmatch to check whether match
     /// if the enumerator filter is of Regular type, use typical regular expression to check whether match
     pub(crate) fn pattern_match(&self, pattern: &str, value: &str) -> Result<bool, Error> {
-        let regex: regex::Regex = match *self.filter_type.borrow() {
-            FilterType::Glob => {
-                match fnmatch_regex::glob_to_regex(pattern) {
-                    Ok(ret) => ret,
-                    Err(e) => {
-                        return Err(Error::Nix {
-                        msg: format!("pattern_match failed: change glob-fnmatch to regular expression '{}'", e),
-                        source: Errno::EINVAL,
-                    });
-                    }
-                }
-            }
-            FilterType::_Regular => match pattern.parse() {
-                Ok(ret) => ret,
-                Err(e) => {
-                    return Err(Error::Nix {
-                        msg: format!(
-                            "pattern_match failed: can't parse '{}' to regular expression: {}",
-                            pattern, e
-                        ),
-                        source: Errno::EINVAL,
-                    });
-                }
-            },
-        };
+        let pattern = format!("{}\0", pattern);
+        let value = format!("{}\0", value);
 
-        Ok(regex.is_match(value))
+        Ok(unsafe {
+            fnmatch(
+                pattern.as_ptr() as *const c_char,
+                value.as_ptr() as *const c_char,
+                0,
+            )
+        } == 0)
     }
 
     /// if any exclude pattern matches, return false
@@ -1384,5 +1351,11 @@ mod tests {
         for i in enumerator.iter() {
             i.borrow().get_devpath().expect("can not get the devpath");
         }
+    }
+
+    #[test]
+    fn test_pattern_match() {
+        let enumerator = DeviceEnumerator::new();
+        assert!(enumerator.pattern_match("hello*", "hello world").unwrap());
     }
 }

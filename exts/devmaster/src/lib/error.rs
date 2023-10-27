@@ -35,8 +35,6 @@ pub enum Error {
     },
     #[snafu(context)]
     ReadTooShort { filename: String },
-    #[snafu(display("Failed to sscanf: {}", source))]
-    Sscanf { source: sscanf::Error },
     #[snafu(display("Failed to parse integer: {}", source))]
     ParseInt { source: std::num::ParseIntError },
     #[snafu(display("Failed to parse float: {}", source))]
@@ -104,6 +102,9 @@ pub enum Error {
 
     #[snafu(display("Invalid OsString: {:?}", s))]
     InvalidOsString { s: OsString },
+
+    #[snafu(display("Invalid subsystem kernel string: {}", s))]
+    InvalidSubsystemKernel { s: String },
 }
 
 impl Error {

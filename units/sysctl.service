@@ -1,0 +1,6 @@
+[Unit]
+Description=Configure sysctl.conf
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'echo 512 > /proc/sys/net/unix/max_dgram_qlen'

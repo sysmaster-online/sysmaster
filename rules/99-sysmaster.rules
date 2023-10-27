@@ -1,0 +1,2 @@
+# Rules used to compatible with 69-dm-lvm.rules as we don't have systemd-run yet
+PROGRAM!="/bin/test -d /run/systemd",ENV{LVM_VG_NAME_COMPLETE}=="?*", RUN+="/usr/sbin/lvm vgchange -aay --nohints $env{LVM_VG_NAME_COMPLETE}"

@@ -88,7 +88,10 @@ mod noplugin {
                 });
             }
         };
-        let boxed_raw = fun(log::max_level(), target, file_size, file_number);
+
+        /* The parameter for log level is only valid in plugin mode. Thus we could set arbitrary level here. */
+        let boxed_raw = fun(log::Level::max(), target, file_size, file_number);
+
         Ok(unsafe { Box::from_raw(boxed_raw) })
     }
 

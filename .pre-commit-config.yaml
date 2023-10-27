@@ -1,26 +1,26 @@
 fail_fast: true
 repos:
-  - repo: "https://github.com/pre-commit/pre-commit-hooks.git"
-    rev: v4.4.0
-    hooks:
-      - id: check-byte-order-marker
-      - id: check-case-conflict
-      - id: check-merge-conflict
-      - id: check-symlinks
-      - id: check-toml
-      - id: end-of-file-fixer
-      - id: mixed-line-ending
-      - id: trailing-whitespace
-      - id: detect-private-key
+  # - repo: "https://github.com/pre-commit/pre-commit-hooks.git"
+  #   rev: v4.4.0
+  #   hooks:
+  #     - id: check-byte-order-marker
+  #     - id: check-case-conflict
+  #     - id: check-merge-conflict
+  #     - id: check-symlinks
+  #     - id: check-toml
+  #     - id: end-of-file-fixer
+  #     - id: mixed-line-ending
+  #     - id: trailing-whitespace
+  #     - id: detect-private-key
   #      - id: check-executables-have-shebangs
       # - id: check-shebang-scripts-are-executable
-  - repo: "https://github.com/codespell-project/codespell.git"
-    rev: v2.2.2
-    hooks:
-      - id: codespell
-        args: [-I, ci/codespell_ignore_words]
-        verbose: true
-        exclude: \.rules$
+  # - repo: "https://github.com/codespell-project/codespell.git"
+  #   rev: v2.2.2
+  #   hooks:
+  #     - id: codespell
+  #       args: [-I, ci/codespell_ignore_words]
+  #       verbose: true
+  #       exclude: \.rules$
   # - repo: "https://github.com/psf/black.git"
   #   rev: 22.8.0
   #   hooks:

@@ -1,4 +1,4 @@
 [Unit]
 Description=system initialization target
 Documentation=man sysmaster secial target
-Wants=syslog.target
+Wants=sysctl.service syslog.target

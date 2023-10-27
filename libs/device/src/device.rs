@@ -210,7 +210,7 @@ impl Device {
     /// create Device from buffer
     pub fn from_nulstr(nulstr: &[u8]) -> Result<Device, Error> {
         let device = Device::new();
-        let s = std::str::from_utf8(nulstr).unwrap();
+        let s = String::from_utf8(nulstr.to_vec()).unwrap();
         let mut length = 0;
         let mut major = String::new();
         let mut minor = String::new();

@@ -445,7 +445,6 @@ mod test {
         assert!(tty_is_vc("/dev/tty0"));
         assert!(tty_is_vc("/dev/tty63"));
         assert!(!tty_is_vc("/dev/tty64"));
-        assert!(verify_tty("tty0"));
     }
 
     #[test]

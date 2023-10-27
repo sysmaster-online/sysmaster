@@ -202,7 +202,7 @@ impl Machine {
         }
         if let Ok(dir) = std::fs::read_dir("/proc/device-tree") {
             for entry in dir.flatten() {
-                if entry.file_name().to_str().unwrap_or("").contains("fw-cfg") {
+                if entry.path().to_string_lossy().contains("fw-cfg") {
                     return Machine::Qemu;
                 }
             }

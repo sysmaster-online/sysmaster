@@ -163,7 +163,15 @@ impl UeConfig {
 
         // fragment
         let unit_conf_frag = unit_conf_frag.iter().map(|x| x.parent().unwrap()).collect();
-        let mut configer = UeConfigData::load_named(unit_conf_frag, name, true).unwrap();
+        let mut configer = match UeConfigData::load_named(unit_conf_frag, name, true) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Invalid Configuration: {}", e);
+                return Err(Error::ConfigureError {
+                    msg: format!("Invalid Configuration: {}", e),
+                });
+            }
+        };
 
         // dropin
         for v in files.get_unit_wants_symlink_units(name) {
