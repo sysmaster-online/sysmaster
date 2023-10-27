@@ -22,7 +22,7 @@
 
 该配置仅在`Accept`配置为`false`时有效，决定在socket激活对应的service前，是否清空socket缓冲区。默认为false。
 
-**注意：** 如果配置为`flase`，而激活的service又不主动去读取socket缓冲区的内容，会导致service将持续被激活。
+**注意：** 如果配置为`false`，而激活的service又不主动去读取socket缓冲区的内容，会导致service将持续被激活。
 
 ## ListenStream、ListenDatagram、ListenSequentialPacket
 

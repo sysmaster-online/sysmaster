@@ -3491,7 +3491,7 @@ mod tests {
              * by reading the uevent file in kernel device tree.
              * According to different kernel versions, the content in uevent file may be
              * different, which may introduce new properties than the following ones.
-             * Thus when iterating the properties colleted by method 'property_iter',
+             * Thus when iterating the properties collected by method 'property_iter',
              * tolerate new properties.
              */
             for (k, v) in &dev_clone.property_iter() {

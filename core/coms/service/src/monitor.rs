@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-/// software watchdog, if the watchdog not receive the READY=1 message within the timeout period, the kill the servcie.
+/// software watchdog, if the watchdog not receive the READY=1 message within the timeout period, the kill the service.
 /// start the watchdog, compare the original and override timeout value, if it's invalid value then stop the watchdog.
 /// call recvmsg and read messages from the socket, and judge if it is the expected value, like READY=1.
 ///

@@ -2,6 +2,18 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $SCRIPT_DIR/common_function
 
+# 定义标志文件的路径
+flag_file="$SCRIPT_DIR/../.git/sysmaster-first-build.flag"
+
+# 检查标志文件是否存在
+if [ -e "$flag_file" ]; then
+    echo "Not first build, skipping."
+    exit 0
+else
+    echo "This is the first build, continue."
+    touch "$flag_file"
+fi
+
 # Function to check if a file contains Chinese characters
 contains_chinese() {
     grep -Pn '[\p{Han}]' "$1" && echo "DO NOT USE CHINESE CHARACTERS in code, 不要在源码中使用中文!" && exit 1
@@ -14,9 +26,9 @@ done
 
 # Install required tools if not already installed
 if [ ! -f "/etc/centos-release" ] && [ ! -f "/etc/fedora-release" ]; then
-    required_packages=("gcc" "openssl-libs" "python3-pip" "python3-devel" "clang" "util-linux-devel" "kmod-devel")
+    required_packages=("gcc" "openssl-libs" "python3-pip" "python3" "python3-devel" "clang" "util-linux-devel" "kmod-devel")
 else
-    required_packages=("gcc" "openssl-libs" "python3-pip" "python3-devel" "clang" "libblkid-devel" "kmod-devel" "libselinux-devel")
+    required_packages=("gcc" "openssl-libs" "python3-pip" "python3" "python3-devel" "clang" "libblkid-devel" "kmod-devel" "libselinux-devel")
 fi
 
 missing_packages=()
@@ -69,6 +81,10 @@ registry = "$fastest_source"
 [net]
 git-fetch-with-cli = true
 EOF
+
+sources=("https://521github.com/" "https://gitclone.com/github.com/" "https://gh.api.99988866.xyz/https://github.com/" "https://github.com/")
+url=$(test_fasturl ${sources[@]})
+git config --global url."${url}".insteadOf "https://github.com/"
 
 rm -rf  ~/.cargo/.package-cache
 

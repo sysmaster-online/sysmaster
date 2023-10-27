@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source $SCRIPT_DIR/common_function
 
 function finish() {
     echo "--- PLEASE RUN sh -x ci/01-pre-commit.sh FIRST IN YOUR LOCALHOST!!! ---"
@@ -23,13 +21,14 @@ do
 done
 
 export PATH="$PATH:/home/jenkins/.local/bin"
-pip3 install pre-commit ruamel.yaml -i https://pypi.mirrors.ustc.edu.cn/simple || pip3 install -i http://pypi.douban.com/simple/ pre-commit ruamel.yaml || pip3 install pre-commit ruamel.yaml
+files="pre-commit codespell ruamel.yaml"
+pip3 install $files -i https://pypi.mirrors.ustc.edu.cn/simple || pip3 install -i http://pypi.douban.com/simple/ $files || pip3 install $files
 
 ## one PR ? Commit
 # oldnum=`git rev-list origin/master --no-merges --count`
 # newnum=`git rev-list HEAD --no-merges --count`
 # changenum=$[newnum - oldnum]
-cargo check  || exit 1
+cargo check  >> /dev/null 2>&1 || exit 1
 
 # add doc for src code
 for rustlist in `git diff origin/master --name-only | grep \.rs$  | grep -v "/examples/" | tr '\n' ' '`
@@ -55,7 +54,5 @@ done
 #filelist=`git diff origin/master --stat | grep -v "files changed" | awk '{print $1}' | tr '\n' ' '`
 # ln -s `which python3` /home/jenkins/.local/bin/python
 # pre-commit autoupdate || pre-commit autoupdate || pre-commit autoupdate
-sources=("https://521github.com/" "https://gitclone.com/github.com/" "https://gh.api.99988866.xyz/https://github.com/" "https://github.com/")
-url=$(test_fasturl ${sources[@]})
-git config --global url."${url}".insteadOf "https://github.com/"
+
 pre-commit run -vvv --all-files

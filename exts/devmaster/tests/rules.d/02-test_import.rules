@@ -23,17 +23,17 @@ KERNEL=="sda1", IMPORT{db}=="ID_FS_TYPE", PROGRAM=="/bin/echo test MatchImportDb
 # Expect: Capture stdout from command '/bin/echo test imported properties Xiaoming Male 188 ext4': 'test imported properties Xiaoming Male 188 ext4'
 KERNEL=="sda1", PROGRAM=="/bin/echo test imported properties $env{PEOPLE} $env{GENDER} $env{HEIGHT} $env{ID_FS_TYPE}"
 
-# Description: test MatchImportCmdline, check /proc/cmdline contains paramenter 'root' and echo the value
+# Description: test MatchImportCmdline, check /proc/cmdline contains parameter 'root' and echo the value
 # Trigger: devctl trigger /dev/sda1
 # Expect: Capture stdout from command '/bin/echo test MatchImportCmdline 1 /dev/mapper/openeuler-root': 'test MatchImportCmdline 1 /dev/mapper/openeuler-root'
 KERNEL=="sda1", IMPORT{cmdline}=="root", PROGRAM=="/bin/echo test MatchImportCmdline 1 $env{root}"
 
-# Description: test MatchImportCmdline, check /proc/cmdline contains paramenter 'rhgb' and echo '1'
+# Description: test MatchImportCmdline, check /proc/cmdline contains parameter 'rhgb' and echo '1'
 # Trigger: devctl trigger /dev/sda1
 # Expect: Capture stdout from command '/bin/echo test MatchImportCmdline 2 1': 'test MatchImportCmdline 2 1'
 KERNEL=="sda1", IMPORT{cmdline}=="rhgb", PROGRAM=="/bin/echo test MatchImportCmdline 2 $env{rhgb}"
 
-# Description: test MatchImportCmdline, check /proc/cmdline does not contains paramenter 'none'
+# Description: test MatchImportCmdline, check /proc/cmdline does not contains parameter 'none'
 # Trigger: devctl trigger /dev/sda1
 # Expect: Capture stdout from command '/bin/echo test MatchImportCmdline 3': 'test MatchImportCmdline 3'
 KERNEL=="sda1", IMPORT{cmdline}!="none", PROGRAM=="/bin/echo test MatchImportCmdline 3"

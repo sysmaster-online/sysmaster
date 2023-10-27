@@ -1,56 +1,36 @@
 fail_fast: true
 repos:
-  # - repo: "https://github.com/pre-commit/pre-commit-hooks.git"
-  #   rev: v4.4.0
-  #   hooks:
-  #     - id: check-byte-order-marker
-  #     - id: check-case-conflict
-  #     - id: check-merge-conflict
-  #     - id: check-symlinks
-  #     - id: check-toml
-  #     - id: end-of-file-fixer
-  #     - id: mixed-line-ending
-  #     - id: trailing-whitespace
-  #     - id: detect-private-key
-  #      - id: check-executables-have-shebangs
-      # - id: check-shebang-scripts-are-executable
-  # - repo: "https://github.com/codespell-project/codespell.git"
-  #   rev: v2.2.2
-  #   hooks:
-  #     - id: codespell
-  #       args: [-I, ci/codespell_ignore_words]
-  #       verbose: true
-  #       exclude: \.rules$
-  # - repo: "https://github.com/psf/black.git"
-  #   rev: 22.8.0
-  #   hooks:
-  #     - id: black
-  # - repo: https://github.com/jumanjihouse/pre-commit-hooks
-  #   rev: master  # or specific git tag
-  #   hooks:
-  #     - id: bundler-audit
-  #     # - id: check-mailmap
-  #     - id: fasterer
-  #     # - id: forbid-binary
-  #     # - id: forbid-space-in-indent
-  #     - id: git-check  # Configure in .gitattributes
-  #     - id: git-dirty  # Configure in .gitignore
-  #     - id: markdownlint # Configure in .mdlrc
-  #     - id: reek
-  #     # - id: require-ascii
-  #     - id: rubocop
-  #     - id: script-must-have-extension
-  #     # - id: script-must-not-have-extension
-  #     - id: shellcheck
-  #     - id: shfmt
+  - repo: "https://github.com/pre-commit/pre-commit-hooks.git"
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=100']
+      - id: check-byte-order-marker
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+      - id: detect-private-key
+      - id: check-executables-have-shebangs
+        files: ^(.*\.sh|.*\.py)$
 
   - repo: local
     hooks:
+      - id: codespell
+        name: codespell
+        description: Checks for common misspellings in text files.
+        entry: bash -c 'cargo clean;codespell -I ci/codespell_ignore_words -x ci/codespell_ignore_words -S *.rules'
+        language: system
+        pass_filenames: false
+        verbose: true
       - id: cargo-override-set
         name: cargo-override-set
         description: unset override.
         entry: bash -c 'rustup override set 1.57 || true'
-        language: rust
+        language: system
         pass_filenames: false
         files: \.(rs|toml)$
         verbose: true
@@ -58,7 +38,7 @@ repos:
         name: cargo clippy
         description: Lint rust sources
         entry: bash -c 'RUSTC_WRAPPER="" cargo clippy -vvv --all-targets --features "default" --all -- -Dwarnings'
-        language: rust
+        language: system
         pass_filenames: false
         files: \.rs$
         verbose: true
@@ -73,7 +53,7 @@ repos:
         name: cargo fmt
         description: Format files with rustfmt.
         entry: bash -c 'cargo fmt -v --all -- --check -v'
-        language: rust
+        language: system
         pass_filenames: false
         files: \.rs$
         verbose: true
@@ -81,7 +61,7 @@ repos:
         name: cargo fix
         description: Check the package for errors.
         entry: bash -c 'cargo fix -v --broken-code --all-targets --all --allow-dirty --allow-staged'
-        language: rust
+        language: system
         pass_filenames: false
         files: \.rs$
         verbose: true
@@ -89,7 +69,7 @@ repos:
         name: cargo build
         description: build the package for errors.
         entry: bash -c 'cargo build --all --features "default" -v'
-        language: rust
+        language: system
         pass_filenames: false
         files: \.(rs|toml)$
         verbose: true
@@ -105,7 +85,7 @@ repos:
         name: cargo test
         description: test the package for errors.
         entry: bash -c 'RUST_BACKTRACE=full cargo test --all-targets --all -v -- --nocapture --show-output --test-threads=1'
-        language: rust
+        language: system
         pass_filenames: false
         files: \.(rs|toml)$
         verbose: true
@@ -113,7 +93,7 @@ repos:
         name: cargo-override-unset
         description: unset override.
         entry: bash -c 'rustup override unset || true'
-        language: rust
+        language: system
         pass_filenames: false
         files: \.(rs|toml)$
         verbose: true

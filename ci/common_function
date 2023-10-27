@@ -15,7 +15,7 @@ function test_fasturl()
     for url in "${urls[@]}"; do
         # Send an HTTP request to get crate information and measure the execution time
         start_time=$(date +%s%N)
-        response=$(curl -s -o /dev/null --connect-timeout 3 -w "%{time_total}" "$url" > /dev/null 2>&1)
+        response=$(curl -s -o /dev/null --connect-timeout 1 -w "%{time_total}" "$url" > /dev/null 2>&1)
         if [ $? -ne 0 ]; then
             continue
         fi
