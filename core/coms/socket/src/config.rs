@@ -135,7 +135,15 @@ impl SocketConfig {
     pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<()> {
         let name = paths[0].file_name().unwrap().to_string_lossy().to_string();
         let paths = paths.iter().map(|x| x.parent().unwrap()).collect();
-        let data = SocketConfigData::load_named(paths, name, true).unwrap();
+        let data = match SocketConfigData::load_named(paths, name, true) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Invalid Configuration: {}", e);
+                return Err(Error::ConfigureError {
+                    msg: format!("Invalid Configuration: {}", e),
+                });
+            }
+        };
 
         // record original configuration
         *self.data.borrow_mut() = data;

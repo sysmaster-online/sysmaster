@@ -70,7 +70,15 @@ impl ServiceConfig {
         let name = paths[0].file_name().unwrap().to_string_lossy().to_string();
         let paths = paths.iter().map(|x| x.parent().unwrap()).collect();
         log::debug!("Loading {} config from: {:?}", name, paths);
-        let service_config = ServiceConfigData::load_named(paths, name, true).unwrap();
+        let service_config = match ServiceConfigData::load_named(paths, name, true) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Invalid Configuration: {}", e);
+                return Err(Error::ConfigureError {
+                    msg: format!("Invalid Configuration: {}", e),
+                });
+            }
+        };
         *self.data.borrow_mut() = service_config;
         self.data.borrow_mut().verify();
 
