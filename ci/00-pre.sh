@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $SCRIPT_DIR/common_function
+flag_file="$SCRIPT_DIR/../.git/sysmaster-first-build.flag"
+
+function finish() {
+    echo "failed run, delete flag file"
+    rm -rf $flag_file
+}
+
+trap finish SIGINT SIGTERM SIGKILL
 
 # 定义标志文件的路径
-flag_file="$SCRIPT_DIR/../.git/sysmaster-first-build.flag"
+
 
 # 检查标志文件是否存在
 if [ -e "$flag_file" ]; then
@@ -86,7 +94,15 @@ sources=("https://521github.com/" "https://gitclone.com/github.com/" "https://gh
 url=$(test_fasturl ${sources[@]})
 git config --global url."${url}".insteadOf "https://github.com/"
 
-rm -rf  ~/.cargo/.package-cache
+
+pipurls=("https://pypi.tuna.tsinghua.edu.cn/simple" "http://mirrors.aliyun.com/pypi/simple/" "https://pypi.mirrors.ustc.edu.cn/simple/" "http://pypi.hustunique.com/" "http://pypi.sdutlinux.org/" "http://pypi.douban.com/simple/")
+url=$(test_fasturl ${pipurls[@]})
+
+if [[ $url =~ ^https?://([^/]+) ]]; then
+    domain="${BASH_REMATCH[1]}"
+    pip config set global.index-url $url
+    pip config set global.trusted-host $domain
+fi
 
 ##拉取代码
 #rm -rf sysmaster

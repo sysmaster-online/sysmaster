@@ -21,9 +21,8 @@ do
 done
 
 export PATH="$PATH:/home/jenkins/.local/bin"
-files="pre-commit codespell ruamel.yaml"
-pip3 install $files -i https://pypi.mirrors.ustc.edu.cn/simple || pip3 install -i http://pypi.douban.com/simple/ $files || pip3 install $files
-
+files="pre-commit codespell"
+pip3 install $files
 ## one PR ? Commit
 # oldnum=`git rev-list origin/master --no-merges --count`
 # newnum=`git rev-list HEAD --no-merges --count`
