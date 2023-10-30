@@ -31,18 +31,18 @@ repos:
         pass_filenames: false
         files: \.(rs|toml)$
         verbose: false
+      - id: cargo-build
+        name: cargo build
+        description: build the package for errors.
+        entry: bash -c 'cargo build --all --features "default" -v'
+        language: system
+        pass_filenames: false
+        files: \.(rs|toml)$
+        verbose: true
       - id: cargo-clippy
         name: cargo clippy
         description: Lint rust sources
         entry: bash -c 'RUSTC_WRAPPER="" cargo clippy -vvv --all-targets --features "default" --all -- -Dwarnings'
-        language: system
-        pass_filenames: false
-        files: \.rs$
-        verbose: true
-      - id: cargo-fmt
-        name: cargo fmt
-        description: Format files with rustfmt.
-        entry: bash -c 'cargo fmt -v --all -- --check -v'
         language: system
         pass_filenames: false
         files: \.rs$
@@ -55,13 +55,13 @@ repos:
         pass_filenames: false
         files: \.rs$
         verbose: true
-      - id: cargo-build
-        name: cargo build
-        description: build the package for errors.
-        entry: bash -c 'cargo build --all --features "default" -v'
+      - id: cargo-fmt
+        name: cargo fmt
+        description: Format files with rustfmt.
+        entry: bash -c 'cargo fmt -v --all -- --check -v'
         language: system
         pass_filenames: false
-        files: \.(rs|toml)$
+        files: \.rs$
         verbose: true
       - id: cargo-test-tmpfile-cleanup
         name: tmpfile cleanup

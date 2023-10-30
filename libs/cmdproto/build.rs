@@ -15,13 +15,14 @@
 // use std::{env, process::Command};
 
 fn main() {
-    let mut config = prost_build::Config::new();
-    config.bytes(["."]);
-    config.type_attribute(".", "#[rustfmt::skip]");
-    config
-        .out_dir("src/proto")
-        .compile_protos(&["abi.proto"], &["./src/proto"])
-        .unwrap();
-    println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=./src/proto/abi.proto");
+    // when update proto/abi.proto, can use the fowllow code to gengerate abi.rs
+    // let mut config = prost_build::Config::new();
+    // config.bytes(["."]);
+    // config.type_attribute(".", "#[rustfmt::skip]");
+    // config
+    //     .out_dir("src/proto")
+    //     .compile_protos(&["abi.proto"], &["./src/proto"])
+    //     .unwrap();
+    // println!("cargo:rerun-if-changed=build.rs");
+    // println!("cargo:rerun-if-changed=./src/proto/abi.proto");
 }

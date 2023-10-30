@@ -11,10 +11,10 @@ nix = { features = ["socket"], default-features = false, version = "0.24" }
 prost = "0.9"                                                               # 处理 protobuf 的代码
 snafu = { features = ["std"], default-features = false, version = "0.7" }
 
-[build-dependencies]
-prost-build = "0.9" # 编译 protobuf
+# [build-dependencies]
+# prost-build = "0.9" # 编译 protobuf
 
-[dev-dependencies]
+# [dev-dependencies]
 # libtests = { path = "../../libs/libtests" }
 
 [[example]]

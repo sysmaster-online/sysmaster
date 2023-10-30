@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-pip install mkdocs mkdocs-material
-mkdocs gh-deploy --force --no-history -f ../mkdocs.yml
+pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin
+mkdocs gh-deploy --force --no-history -f mkdocs.yml
