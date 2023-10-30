@@ -95,7 +95,7 @@ url=$(test_fasturl ${sources[@]})
 git config --global url."${url}".insteadOf "https://github.com/"
 
 
-pipurls=("https://pypi.tuna.tsinghua.edu.cn/simple" "http://mirrors.aliyun.com/pypi/simple/" "https://pypi.mirrors.ustc.edu.cn/simple/" "http://pypi.hustunique.com/" "http://pypi.sdutlinux.org/" "http://pypi.douban.com/simple/")
+pipurls=("https://pypi.tuna.tsinghua.edu.cn/simple" "http://mirrors.aliyun.com/pypi/simple/" "https://pypi.mirrors.ustc.edu.cn/simple/" "http://pypi.sdutlinux.org/" "http://pypi.douban.com/simple/")
 url=$(test_fasturl ${pipurls[@]})
 
 if [[ $url =~ ^https?://([^/]+) ]]; then
