@@ -19,7 +19,7 @@ repos:
       - id: codespell
         name: codespell
         description: Checks for common misspellings in text files.
-        entry: bash -c 'cargo clean;codespell -I ci/codespell_ignore_words -x ci/codespell_ignore_words -S *.rules'
+        entry: bash -c 'cargo clean;codespell -I ci/codespell_ignore_words -x ci/codespell_ignore_words -S *.rules -S ./vendor* -S ./target*'
         language: system
         pass_filenames: false
         verbose: true
@@ -30,7 +30,7 @@ repos:
         language: system
         pass_filenames: false
         files: \.(rs|toml)$
-        verbose: true
+        verbose: false
       - id: cargo-clippy
         name: cargo clippy
         description: Lint rust sources
@@ -38,13 +38,6 @@ repos:
         language: system
         pass_filenames: false
         files: \.rs$
-        verbose: true
-      - id: commit-msg
-        name: commit-msg
-        description: use commit-msg for commit.
-        entry: bash -c '\cp -ar ci/commit-msg .git/hooks/'
-        language: system
-        pass_filenames: false
         verbose: true
       - id: cargo-fmt
         name: cargo fmt
@@ -93,7 +86,7 @@ repos:
         language: system
         pass_filenames: false
         files: \.(rs|toml)$
-        verbose: true
+        verbose: false
 
 #      - id: cargo-deny
 #        name: cargo deny check

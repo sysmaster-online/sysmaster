@@ -12,7 +12,7 @@
 
 //! do prepared actions for build
 // if use env out_dir need add build.rs
-use std::{env, process::Command};
+use std::{env, fs, path::Path};
 
 const RELEASE: &str = "release";
 
@@ -22,31 +22,65 @@ macro_rules! warn {
     };
 }
 
+fn copy_directory(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if src.is_dir() {
+        if !dst.exists() {
+            fs::create_dir(dst)?;
+        }
+
+        for entry in fs::read_dir(src)? {
+            let entry = entry?;
+            let entry_path = entry.path();
+            if let Some(entry_name) = entry_path.file_name() {
+                let dst_path = dst.join(entry_name);
+
+                if entry_path.is_dir() {
+                    copy_directory(&entry_path, &dst_path)?;
+                } else {
+                    fs::copy(&entry_path, &dst_path)?;
+                }
+            }
+        }
+    } else {
+        fs::copy(src, dst)?;
+    }
+
+    Ok(())
+}
+
 fn main() {
-    let m_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let s_cmd = format!("{}/build.sh", m_dir);
+    // pre install git hooks
+    let hooks = vec!["pre-commit", "commit-msg"];
+    for hook in hooks {
+        let source_file = format!("ci/{}", hook);
+        let target_path = Path::new(".git/hooks/");
+        if !target_path.exists() {
+            let _ = std::fs::create_dir_all(target_path);
+        }
+        let target_file = target_path.join(hook);
+        if !target_file.exists() {
+            let _ = std::fs::copy(&source_file, target_path.join(hook));
+        }
+    }
+
+    // copy test config
+    let args: Vec<&str> = vec!["config", "tests/presets", "tests/test_units"];
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+
     let out_dir = env::var("OUT_DIR").unwrap();
     let t: Vec<_> = out_dir.split("build").collect();
-    println!("{:?},{:?}", s_cmd, t[0]);
+    let dst = t[0];
 
-    let result = Command::new(&s_cmd)
-        .args(&[t[0].to_string()])
-        .status()
-        .unwrap();
-    warn!(format!("{:?}", result));
+    for arg in args {
+        let src = format!("{}/{}", manifest_dir, arg);
+        if let Err(e) = copy_directory(Path::new(&src), Path::new(dst)) {
+            warn!(format!("{:?}", e));
+        }
+    }
 
-    // warn!(format!(
-    //     "{:?}",
-    //     pkg_config::Config::new().probe("liblmdb").is_ok()
-    // ));
-    //println!("cargo:rust-flags = -C prefer-dynamic -C target-feature=-crt-static");
-    //pkg_config::Config::new().probe("lmdb").unwrap();
-
-    // println!("cargo:rustc-link-search=native=/usr/lib");
-    // println!("cargo:rustc-link-lib=dylib=lmdb");
+    // set rerun
     println!("cargo:rerun-if-changed=build.sh");
     println!("cargo:rerun-if-changed=build.rs");
-    // println!("cargo:rerun-if-changed=config.service");
 
     // turn on "debug" for non-release build
     let profile = env::var("PROFILE").unwrap();

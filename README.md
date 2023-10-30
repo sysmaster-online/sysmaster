@@ -49,7 +49,7 @@ sysMaster 旨在改进传统的init守护进程，1+1+N架构。
 
 首先，下载仓库代码，并执行命令来预装项目依赖，构建开发环境， 项目主要基于rust 1.57构建，使用``pre-commit`做git commit检查。
 ```
-sh ./requirements.sh
+sh ./build.sh
 ```
 其次，可以通过提供的脚本来构建程序。也可以参考`.pre-commit-config.yaml`中的动作构建。
 ```
