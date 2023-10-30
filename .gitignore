@@ -1,4 +1,6 @@
 /target
+.envrc
+.direnv
 .vscode
 tests/**/*.log
 /site

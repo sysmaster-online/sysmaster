@@ -1,0 +1,5 @@
+name = "t1.service"
+kind = "Oneshot"
+start = "cp t1.service t1.service.tmp"
+stop = "rm t1.service.tmp"
+restart = "cp t1.service t1.service.tmp"

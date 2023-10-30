@@ -1,0 +1,6 @@
+name = "conflict-with-t1.service"
+kind = "Oneshot"
+start = "echo start conflict-with-t1.service"
+stop = "echo stop conflict-with-t1.service"
+restart = "echo restart t1.service"
+conflicts = "t1.service"

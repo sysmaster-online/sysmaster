@@ -1,0 +1,3 @@
+name = "ssh-keygen-ed25519.service"
+kind = "Oneshot"
+start = "/usr/libexec/openssh/sshd-keygen ed25519"

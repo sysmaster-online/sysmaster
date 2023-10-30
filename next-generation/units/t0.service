@@ -1,0 +1,7 @@
+name = "t0.service"
+kind = "Oneshot"
+start = "cat t1.service.tmp"
+stop = "echo stop t0.service"
+restart = "echo restart t0.service"
+requires = "t1.service"
+after = "t1.service"
