@@ -27,7 +27,7 @@ use std::{
 };
 
 /// listening address for control manager
-pub const CONTROL_MANAGER_LISTEN_ADDR: &str = "/run/devmaster/control.sock";
+pub const CONTROL_MANAGER_LISTEN_ADDR: &str = "/run/devmaster/control";
 
 /// control manager
 #[derive(Debug)]

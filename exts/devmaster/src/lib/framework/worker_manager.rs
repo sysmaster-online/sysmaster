@@ -38,7 +38,7 @@ use std::{
 use super::devmaster::Devmaster;
 
 /// worker manager listen address
-pub const WORKER_MANAGER_LISTEN_ADDR: &str = "/run/devmaster/worker.sock";
+pub const WORKER_MANAGER_LISTEN_ADDR: &str = "/run/devmaster/worker";
 
 /// messages sended by manager to workers
 pub(crate) enum WorkerMessage {
