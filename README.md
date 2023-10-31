@@ -99,7 +99,7 @@ daemon类型的bin crate的目录以d结尾。
 |     |...musl_build
 |     |...run_with_sd
 |...docs (sysmaster.online)
-|...requirements.sh (准备环境)
+|...build.sh (准备环境)
 ```
 
 如：

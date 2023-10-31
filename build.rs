@@ -64,7 +64,7 @@ fn main() {
     }
 
     // copy test config
-    let args: Vec<&str> = vec!["config", "tests/presets", "tests/test_units"];
+    let args: Vec<&str> = vec!["tests/presets", "tests/test_units"];
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
 
     let out_dir = env::var("OUT_DIR").unwrap();

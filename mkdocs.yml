@@ -28,8 +28,10 @@ theme:
     # - navigation.footer
     - navigation.indexes
     - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
     - navigation.prune
-    # - navigation.sections
+    - navigation.path
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.top
@@ -41,7 +43,7 @@ theme:
     # - toc.integrate
   palette:
     - scheme: default
-      primary: indigo
+      primary: black
       accent: indigo
       toggle:
         icon: material/brightness-7
@@ -53,14 +55,13 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   font:
-    text: Roboto
+    text: Ubuntu
     code: Roboto Mono
 
   icon:
     repo: fontawesome/brands/git-alt
-  # favicon: assets/favicon.png
-  # icon:
-  #   logo: logo
+
+  language: zh
 
 # Plugins
 plugins:
@@ -84,6 +85,8 @@ plugins:
   #   #   link: https://github.com/github
 
 markdown_extensions:
+  - attr_list
+  - md_in_html
   - abbr
   - admonition
   - attr_list
@@ -115,6 +118,7 @@ markdown_extensions:
           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
+  - def_list
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
