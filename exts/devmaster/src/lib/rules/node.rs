@@ -33,7 +33,7 @@
 //! directory, the directory will be removed.
 
 use crate::{error::*, log_dev, log_dev_option};
-use basic::fs_util::path_simplify;
+use basic::fs_util::{chmod, path_simplify};
 use basic::fs_util::{fchmod_and_chown, futimens_opath, symlink};
 use basic::{fd_util::xopendirat, fs_util::remove_dir_until};
 use cluFlock::ExclusiveFlock;
@@ -354,6 +354,14 @@ pub(crate) fn open_prior_dir(symlink: &str) -> Result<(Dir, File)> {
             filename: dirname.clone(),
         })
         .log_error(&format!("failed to create directory all '{}'", dirname))?;
+
+    if let Err(e) = chmod(dirname.as_str(), 0o750) {
+        log::error!("Failed to set permission for {}: {}", &dirname, e);
+    }
+
+    if let Err(e) = chmod("/run/devmaster/links", 0o750) {
+        log::error!("Failed to set permission for /run/devmaster/links: {}", e);
+    }
 
     let dir = nix::dir::Dir::from_fd(
         nix::fcntl::open(

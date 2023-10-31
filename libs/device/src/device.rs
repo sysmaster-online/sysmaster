@@ -15,7 +15,7 @@
 use crate::err_wrapper;
 use crate::utils::readlink_value;
 use crate::{error::*, DeviceAction};
-use basic::fs_util::{open_temporary, touch_file};
+use basic::fs_util::{chmod, open_temporary, touch_file};
 use basic::parse::{device_path_parse_devnum, parse_devnum, parse_ifindex};
 use libc::{
     dev_t, faccessat, gid_t, mode_t, uid_t, F_OK, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT,
@@ -1532,6 +1532,10 @@ impl Device {
                 .map_or_else(|| nix::Error::EIO, nix::Error::from_i32),
         })?;
 
+        if let Err(e) = chmod(DB_BASE_DIR, 0o750) {
+            log::error!("Failed to set permission for /run/devmaster/data/: {}", e);
+        }
+
         let (mut file, tmp_file) = open_temporary(&db_path).map_err(|e| {
             let errno = match e {
                 basic::error::Error::Nix { source } => source,
@@ -1546,9 +1550,9 @@ impl Device {
         fchmod(
             file.as_raw_fd(),
             if *self.db_persist.borrow() {
-                Mode::from_bits(0o1644).unwrap()
+                Mode::from_bits(0o1640).unwrap()
             } else {
-                Mode::from_bits(0o644).unwrap()
+                Mode::from_bits(0o640).unwrap()
             },
         )
         .map_err(|e| {
@@ -1696,6 +1700,18 @@ impl Device {
                 msg: format!("tag_persist failed: can't touch file '{}': {}", tag_path, e),
                 source: nix::Error::EINVAL,
             })?;
+
+            if let Err(e) = chmod(TAGS_BASE_DIR, 0o750) {
+                log::error!("Failed to set permission for {}: {}", TAGS_BASE_DIR, e);
+            }
+
+            if let Err(e) = chmod(&format!("{}{}", TAGS_BASE_DIR, tag), 0o750) {
+                log::error!(
+                    "Failed to set permission for {}: {}",
+                    format!("{}{}", TAGS_BASE_DIR, tag),
+                    e
+                );
+            }
 
             return Ok(());
         }
