@@ -2,6 +2,7 @@
 
 # cargo vendor
 echo "cargo vendor ..."
+pushd ..
 rustup override set stable
 rm -rf vendor
 cargo vendor
@@ -55,8 +56,6 @@ directory = "vendor"
 EOF
 fi
 
-
-
 echo "Applying patches in patch directory ..."
 for i in `ls patch/*.patch | sort -u -d`
 do
@@ -73,11 +72,24 @@ done
 cargo clean
 git checkout -- .cargo/config
 
+echo "You can replace crates.io with vendored-sources in .cargo/config!!!"
+cat .cargo/config
+
 # echo sysMaster version
 echo "Create a compressed archive of tar.gz ..."
 version_line=$(grep -Eo '^version = "[0-9]+\.[0-9]+\.[0-9]+"' ./Cargo.toml)
 version=$(echo "$version_line" | awk -F'"' '{print $2}')
 echo "You can create sysmaster-$version.tar.gz by using the tar -cJvf command."
+popd
 
-echo "You can replace crates.io with vendored-sources in .cargo/config!!!"
-cat .cargo/config
+# compress sysmaster
+pushd ../../
+    cp -a sysmaster sysmaster-$version
+    pushd sysmaster-$version
+    cargo clean
+    rm -rf .git
+    popd
+    tar -cJvf sysmaster-$version.tar.xz sysmaster-$version
+    echo "You can find sysmaster-$version.tar.xz in the $(PWD)."
+    rm -rf sysmaster-$version
+popd
