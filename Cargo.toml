@@ -139,7 +139,7 @@ members = [
   "libs/unit_parser",
   "libs/hwdb",
 ]
-exclude = ["config", "tools"]
+exclude = ["docs", "ci", "factory", "tools", "next-generation"]
 
 # fix https://github.com/mdaffin/loopdev/issues/65
 [patch.crates-io.loopdev]
