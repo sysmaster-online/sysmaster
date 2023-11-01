@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $SCRIPT_DIR/common_function
 
 function finish() {
     echo "--- PLEASE RUN sh -x ci/01-pre-commit.sh FIRST IN YOUR LOCALHOST!!! ---"
@@ -15,10 +17,7 @@ function finish() {
 
 trap finish EXIT
 
-for rustlist in `git diff origin/master --name-only | grep \.rs$ | tr '\n' ' '`
-do
-    grep -Pn '[\p{Han}]' $rustlist  && echo "DO NOT USE CHANESE CHARACTERS in code, 不要在源码中使用中文!" && exit 1
-done
+contains_chinese
 
 export PATH="$PATH:/home/jenkins/.local/bin"
 files="pre-commit codespell"

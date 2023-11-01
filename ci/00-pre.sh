@@ -1,36 +1,8 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $SCRIPT_DIR/common_function
-flag_file="$SCRIPT_DIR/../.git/sysmaster-first-build.flag"
 
-function finish() {
-    echo "failed run, delete flag file"
-    rm -rf $flag_file
-}
-
-trap finish SIGINT SIGTERM SIGKILL
-
-# 定义标志文件的路径
-
-
-# 检查标志文件是否存在
-if [ -e "$flag_file" ]; then
-    echo "Not first build, skipping."
-    exit 0
-else
-    echo "This is the first build, continue."
-    touch "$flag_file"
-fi
-
-# Function to check if a file contains Chinese characters
-contains_chinese() {
-    grep -Pn '[\p{Han}]' "$1" && echo "DO NOT USE CHINESE CHARACTERS in code, 不要在源码中使用中文!" && exit 1
-}
-
-# Check for Chinese characters in modified Rust files
-git diff origin/master --name-only | grep -F '.rs' | while IFS= read -r rustfile; do
-    contains_chinese "$rustfile"
-done
+contains_chinese
 
 # Install required tools if not already installed
 if [ ! -f "/etc/centos-release" ] && [ ! -f "/etc/fedora-release" ]; then
