@@ -401,7 +401,7 @@ fn parse_hotplug_slot_from_function_id(
         });
     }
 
-    let filename = format!("{:08}", function_id);
+    let filename = format!("{:08}\0", function_id);
 
     if unsafe { faccessat(slots_dirfd, filename.as_ptr() as *const c_char, F_OK, 0) } < 0 {
         log_dev!(
