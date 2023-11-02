@@ -1158,7 +1158,7 @@ fn do_scsi_page80_inquiry(
         return 1;
     }
 
-    let len: usize = (buffer[3] + 4) as usize;
+    let len: usize = buffer[3] as usize + 4;
 
     if get_serial {
         dev_scsi.serial = "S".to_string();
