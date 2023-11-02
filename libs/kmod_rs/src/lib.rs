@@ -73,21 +73,20 @@ impl Drop for LibKmod {
     }
 }
 
-impl Default for LibKmod {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl LibKmod {
     /// Create libkmod
-    pub fn new() -> LibKmod {
+    pub fn new() -> Option<LibKmod> {
         let c = unsafe { kmod_sys::kmod_new(std::ptr::null(), std::ptr::null()) };
-        LibKmod {
+
+        if c.is_null() {
+            return None;
+        }
+
+        Some(LibKmod {
             ctx: c,
             kmod_list_head: ptr::null::<kmod_sys::kmod_list>() as *mut kmod_sys::kmod_list,
             module: ptr::null::<kmod_sys::kmod_module>() as *mut kmod_sys::kmod_module,
-        }
+        })
     }
 
     /// Create KmodListIter with internal members

@@ -24,14 +24,14 @@ use std::rc::Rc;
 /// kmod builtin command
 pub(crate) struct Kmod {
     /// kmod struct
-    kernel_module: Rc<RefCell<kmod_rs::LibKmod>>,
+    kernel_module: Option<Rc<RefCell<kmod_rs::LibKmod>>>,
 }
 
 impl Kmod {
     /// create Kmod
     pub(crate) fn new() -> Kmod {
         Kmod {
-            kernel_module: Rc::new(RefCell::new(kmod_rs::LibKmod::new())),
+            kernel_module: kmod_rs::LibKmod::new().map(|inner| Rc::new(RefCell::new(inner))),
         }
     }
 }
@@ -53,7 +53,8 @@ impl Builtin for Kmod {
     ) -> Result<bool> {
         let device = exec_unit.get_device();
 
-        if self.kernel_module.borrow().is_ctx_null() {
+        if self.kernel_module.is_none() {
+            log::error!("Kmod context is not loaded.");
             return Ok(true);
         }
 
@@ -72,6 +73,8 @@ impl Builtin for Kmod {
             if !modalias.is_empty() {
                 if let Err(e) = self
                     .kernel_module
+                    .as_ref()
+                    .unwrap()
                     .borrow_mut()
                     .module_load_and_warn(&modalias, false)
                 {
@@ -82,6 +85,8 @@ impl Builtin for Kmod {
             for i in 2..argc {
                 if let Err(e) = self
                     .kernel_module
+                    .as_ref()
+                    .unwrap()
                     .borrow_mut()
                     .module_load_and_warn(&argv[i as usize], false)
                 {
@@ -94,7 +99,13 @@ impl Builtin for Kmod {
 
     /// builtin init function
     fn init(&self) {
-        if let Err(e) = self.kernel_module.borrow_mut().load_resources() {
+        if let Err(e) = self
+            .kernel_module
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .load_resources()
+        {
             log::error!("Load resources failed! {}", e);
         }
     }
@@ -105,6 +116,8 @@ impl Builtin for Kmod {
     /// check whether builtin command should reload
     fn should_reload(&self) -> bool {
         self.kernel_module
+            .as_ref()
+            .unwrap()
             .borrow_mut()
             .validate_resources()
             .map_or(false, |e| {
