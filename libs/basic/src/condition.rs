@@ -831,7 +831,7 @@ mod test {
             ConditionType::KernelCommandLine,
             0,
             0,
-            String::from("ro"),
+            String::from("root"),
         );
     }
 
