@@ -22,7 +22,7 @@ contains_chinese
 export PATH="$PATH:/home/jenkins/.local/bin"
 files="pre-commit codespell"
 pip3 install $files
-cargo check  >> /dev/null 2>&1 || exit 1
+cargo check || exit 1
 
 # add doc for src code
 for rustlist in `git diff origin/master --name-only | grep \.rs$  | grep -v "/examples/" | tr '\n' ' '`

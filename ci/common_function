@@ -37,4 +37,5 @@ contains_chinese() {
     do
         grep -Pn '[\p{Han}]' $rustlist  && echo "DO NOT USE CHANESE CHARACTERS in code, 不要在源码中使用中文!" && exit 1
     done
+    true
 }
