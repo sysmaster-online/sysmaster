@@ -338,7 +338,7 @@ fn is_pci_bridge(dev: Rc<RefCell<Device>>) -> bool {
 
     /* PCI device subclass 04 corresponds to PCI bridge */
     // modalias[idx+2:2
-    let pci_subclass = match modalias.get(idx + 2..idx + 5) {
+    let pci_subclass = match modalias.get(idx + 2..idx + 4) {
         Some(s) => s,
         None => return false,
     };
