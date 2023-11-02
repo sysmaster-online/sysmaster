@@ -390,7 +390,7 @@ impl PathId {
             Err(_) => return None,
         };
 
-        let sas_address = match asadev.get_sysattr_value("asa_address") {
+        let sas_address = match asadev.get_sysattr_value("sas_address") {
             Ok(addr) => addr,
             Err(_) => return None,
         };
@@ -430,7 +430,7 @@ impl PathId {
             Err(_) => return None,
         };
 
-        let target = match sessiondev.get_sysattr_value("asa_address") {
+        let target = match sessiondev.get_sysattr_value("sas_address") {
             Ok(port) => port,
             Err(_) => return None,
         };
