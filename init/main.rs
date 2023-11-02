@@ -12,8 +12,9 @@
 
 //! The init daemon
 mod config;
+mod mount;
 mod runtime;
-
+use mount::setup_mount_early;
 use nix::sys::signal;
 use nix::sys::signal::SaFlags;
 use nix::sys::signal::SigAction;
@@ -110,6 +111,8 @@ fn main() -> std::io::Result<()> {
     log::init_log_to_kmsg("sysmaster-init", log::Level::Info);
 
     prepare_init();
+
+    setup_mount_early();
 
     reset_all_signal_handlers();
     install_crash_handler();
