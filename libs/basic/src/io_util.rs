@@ -17,6 +17,8 @@ use nix::{
     poll::{self, PollFd, PollFlags},
     sys::{signal::SigSet, time::TimeSpec},
 };
+use std::fs::File;
+use std::io::Read;
 use std::os::unix::prelude::RawFd;
 
 fn ppoll_timeout(fds: &mut [PollFd], timeout: Option<TimeSpec>) -> Result<libc::c_int> {
@@ -57,4 +59,54 @@ pub fn wait_for_events(fd: RawFd, event: PollFlags, time_out: i64) -> Result<lib
     let ret = ppoll_timeout(&mut fds, Some(time_spec))?;
 
     Ok(ret)
+}
+
+/// Read data from file to buf, and return the number of bytes read.
+pub fn loop_read(file: &mut File, buf: &mut [u8]) -> Result<usize> {
+    let size = buf.len();
+    let mut pos = 0;
+    while pos < size {
+        let read_size = file.read(&mut buf[pos..]).context(IoSnafu)?;
+
+        pos += read_size;
+        if read_size == 0 {
+            return Ok(pos);
+        }
+    }
+    Ok(pos)
+}
+
+/// Read data from file to buf. If buf is full, succeeds, otherwise fails.
+pub fn loop_read_exact(file: &mut File, buf: &mut [u8]) -> Result<()> {
+    let n = loop_read(file, buf)?;
+
+    if n != buf.len() {
+        return Err(Error::Nix {
+            source: nix::errno::Errno::EIO,
+        });
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::io::Seek;
+
+    #[test]
+    fn loop_read_test() {
+        let mut file = std::fs::OpenOptions::new()
+            .read(true)
+            .open("/etc/machine-id")
+            .unwrap();
+        let mut buf = [0; 38];
+        assert_eq!(33, loop_read(&mut file, &mut buf).unwrap());
+        file.rewind().unwrap();
+        let mut buf = [0; 20];
+        assert_eq!(20, loop_read(&mut file, &mut buf).unwrap());
+
+        let mut buf = [0; 10];
+        loop_read_exact(&mut file, &mut buf).unwrap();
+    }
 }

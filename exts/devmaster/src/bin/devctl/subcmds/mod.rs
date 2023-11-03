@@ -19,3 +19,5 @@ pub(crate) mod devctl_monitor;
 pub(crate) mod devctl_test_builtin;
 pub(crate) mod devctl_trigger;
 pub(self) mod devctl_utils;
+
+pub(crate) type Result<T> = std::result::Result<T, nix::Error>;

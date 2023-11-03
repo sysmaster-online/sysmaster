@@ -46,7 +46,7 @@ pub const GPT_ROOT_NATIVE: Uuid = Uuid([
 ]);
 
 /// uuid
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub struct Uuid(pub(super) [u8; 16]);
 
 fn unhexchar(c: u8) -> Result<u8, ()> {
@@ -165,6 +165,33 @@ impl Uuid {
         }
         sum == 0
     }
+}
+
+/// get random uuid
+pub fn randomize() -> Result<Uuid, nix::Error> {
+    let mut id = Uuid::new();
+
+    crate::random_util::random_bytes(&mut id.0);
+
+    /* Turn this into a valid v4 UUID, to be nice. Note that we
+     * only guarantee this for newly generated UUIDs, not for
+     * pre-existing ones. */
+
+    Ok(id128_make_v4_uuid(id))
+}
+
+fn id128_make_v4_uuid(uuid: Uuid) -> Uuid {
+    /* Stolen from generate_random_uuid() of drivers/char/random.c
+     * in the kernel sources */
+
+    /* Set UUID version to 4 --- truly random generation */
+    let mut id = uuid;
+    id.0[6] = (id.0[6] & 0x0F) | 0x40;
+
+    /* Set the UUID variant to DCE */
+    id.0[8] = (id.0[8] & 0x3F) | 0x80;
+
+    id
 }
 
 #[cfg(test)]

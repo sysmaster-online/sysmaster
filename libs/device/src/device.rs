@@ -17,6 +17,7 @@ use crate::utils::readlink_value;
 use crate::{error::*, DeviceAction};
 use basic::fs_util::{chmod, open_temporary, touch_file};
 use basic::parse::{device_path_parse_devnum, parse_devnum, parse_ifindex};
+use basic::uuid::{randomize, Uuid};
 use libc::{
     dev_t, faccessat, gid_t, mode_t, uid_t, F_OK, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT,
     S_IRUSR, S_IWUSR,
@@ -1009,8 +1010,21 @@ impl Device {
     }
 
     /// get the trigger uuid of the device
-    pub fn get_trigger_uuid(&self) -> Result<[u8; 8], Error> {
-        todo!()
+    pub fn get_trigger_uuid(&self) -> Result<Option<Uuid>, Error> {
+        /* Retrieves the UUID attached to a uevent when triggering it from userspace via
+         * trigger_with_uuid() or an equivalent interface. Returns ENOENT if the record is not
+         * caused by a synthetic event and ENODATA if it was but no UUID was specified */
+        let s = self.get_property_value("SYNTH_UUID")?;
+
+        /* SYNTH_UUID=0 is set whenever a device is triggered by userspace without specifying a UUID */
+        if s == "0" {
+            return Err(Error::Nix {
+                msg: format!(""),
+                source: nix::errno::Errno::ENODATA,
+            });
+        }
+
+        Ok(Uuid::from_string(&s))
     }
 
     /// get the value of specific device sysattr
@@ -1103,8 +1117,33 @@ impl Device {
     }
 
     /// trigger with uuid
-    pub fn trigger_with_uuid(&self, _action: DeviceAction) -> Result<[u8; 8], Error> {
-        todo!()
+    pub fn trigger_with_uuid(
+        &self,
+        action: DeviceAction,
+        need_uuid: bool,
+    ) -> Result<Option<Uuid>, Error> {
+        if !need_uuid {
+            self.trigger(action)?;
+            return Ok(None);
+        }
+
+        let s = format!("{}", action);
+
+        let id = match randomize() {
+            Ok(id) => id,
+            Err(e) => {
+                return Err(Error::Nix {
+                    msg: "Failed to randomize".to_string(),
+                    source: e,
+                })
+            }
+        };
+
+        let j = s + " " + &id.to_string();
+
+        self.set_sysattr_value("uevent", Some(&j))?;
+
+        Ok(Some(id))
     }
 
     /// open device

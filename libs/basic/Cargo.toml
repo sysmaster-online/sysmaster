@@ -63,6 +63,7 @@ full = [
     "strbuf",
     "argv",
     "exec_util",
+    "random",
 ]
 
 capability = []
@@ -111,3 +112,4 @@ murmurhash2 = []
 strbuf = []
 argv = []
 exec_util = []
+random = []

@@ -10,6 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use basic::io_util::loop_read;
 use nix::ioctl_write_ptr;
 use std::alloc::{alloc, dealloc, Layout};
 use std::ffi::CString;
@@ -17,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::{env, mem, str};
 use std::{
     fs::{self, read_link, File},
-    io::{self, Read, Seek, Write},
+    io::{self, Seek, Write},
     os::unix::prelude::AsRawFd,
 };
 
@@ -171,26 +172,6 @@ fn fsync_full(file: &mut File) -> bool {
         }
     }
     true
-}
-
-fn loop_read(file: &mut File, buf: &mut [u8]) -> Result<usize, ()> {
-    let size = buf.len();
-    let mut pos = 0;
-    while pos < size {
-        let read_size = match file.read(&mut buf[pos..]) {
-            Ok(size) => size,
-            Err(err) => {
-                println!("{}", err);
-                return Err(());
-            }
-        };
-
-        pos += read_size;
-        if read_size == 0 {
-            return Ok(pos);
-        }
-    }
-    Ok(pos)
 }
 
 fn sd_id128_from_string(buf: &[u8]) -> Result<[u8; 16], ()> {
@@ -603,27 +584,12 @@ pub fn run(arg: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod test {
-    use std::io::Seek;
-
     use super::*;
 
     fn is_root() -> bool {
         let uid = unsafe { libc::geteuid() };
         uid == 0
     }
-    #[test]
-    fn loop_read_test() {
-        let mut file = fs::OpenOptions::new()
-            .read(true)
-            .open("/etc/machine-id")
-            .unwrap();
-        let mut buf = [0; 38];
-        assert_eq!(33, loop_read(&mut file, &mut buf).unwrap());
-        file.rewind().unwrap();
-        let mut buf = [0; 20];
-        assert_eq!(20, loop_read(&mut file, &mut buf).unwrap());
-    }
-
     #[test]
     fn sd_id128_from_string_test() {
         let buf = b"e57446f87c3f4f978a7eca30ff7197d3";

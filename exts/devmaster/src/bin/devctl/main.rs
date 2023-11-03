@@ -26,9 +26,8 @@ use subcmds::devctl_hwdb::subcommand_hwdb;
 use subcmds::devctl_info::InfoArgs;
 use subcmds::devctl_monitor::subcommand_monitor;
 use subcmds::devctl_test_builtin::subcommand_test_builtin;
-use subcmds::devctl_trigger::subcommand_trigger;
-
-type Result<T> = std::result::Result<T, nix::Error>;
+use subcmds::devctl_trigger::TriggerArgs;
+use subcmds::Result;
 
 /// parse program arguments
 #[derive(Parser, Debug)]
@@ -101,24 +100,73 @@ enum SubCmd {
     #[clap(display_order = 4)]
     Trigger {
         /// the kind of device action to trigger
-        #[clap(short, long)]
+        #[clap(short('c'), long)]
         action: Option<String>,
 
-        /// the enumerator type, can be devices (default) or subsystems
-        #[clap(short, long)]
+        /// Type of events to trigger
+        #[clap(short, long, possible_values(&["devices", "subsystems", "all"]), help(
+            "Query device information:\n\
+                devices                     sysfs devices (default)\n\
+                subsystems                  sysfs subsystems and drivers\n\
+                all                         sysfs devices, subsystems, and drivers\n")
+        )]
         r#type: Option<String>,
 
-        /// print searched devices by enumerator
+        /// Print searched devices by enumerator
         #[clap(short, long)]
         verbose: bool,
+
+        /// Do not actually trigger the device events
+        #[clap(short('n'), long)]
+        dry_run: bool,
+
+        /// Trigger devices from a matching subsystem
+        #[clap(short('s'), long)]
+        subsystem_match: Option<Vec<String>>,
+
+        /// Exclude devices from a matching subsystem
+        #[clap(short('S'), long)]
+        subsystem_nomatch: Option<Vec<String>>,
+
+        /// Trigger devices with a matching attribute
+        #[clap(short('a'), long)]
+        attr_match: Option<Vec<String>>,
+
+        /// Exclude devices with a matching attribute
+        #[clap(short('A'), long)]
+        attr_nomatch: Option<Vec<String>>,
+
+        /// Trigger devices with a matching property
+        #[clap(short('p'), long)]
+        property_match: Option<Vec<String>>,
+
+        /// Trigger devices with a matching tag
+        #[clap(short('g'), long)]
+        tag_match: Option<Vec<String>>,
+
+        /// Trigger devices with this /sys path
+        #[clap(short('y'), long)]
+        sysname_match: Option<Vec<String>>,
+
+        /// Trigger devices with this /dev name
+        #[clap(long)]
+        name_match: Option<Vec<String>>,
+
+        /// Trigger devices with this /sys path
+        #[clap(short('b'), long)]
+        parent_match: Option<Vec<String>>,
+
+        /// Wait for the triggered events to complete
+        #[clap(short('w'), long)]
+        settle: bool,
+
+        /// Print synthetic uevent UUID
+        #[clap(long)]
+        uuid: bool,
 
         /// the devices to be triggered
         #[clap(required = false)]
         devices: Vec<String>,
-
-        /// do not actually trigger the device events
-        #[clap(short('n'), long)]
-        dry_run: bool,
     },
 
     /// Test builtin command on a device
@@ -197,7 +245,7 @@ fn main() -> Result<()> {
                 root,
                 devices,
             )
-            .subcommand_info()
+            .subcommand()
         }
         SubCmd::Monitor {} => subcommand_monitor(),
         SubCmd::Kill {} => subcommand_kill(),
@@ -205,9 +253,40 @@ fn main() -> Result<()> {
             action,
             r#type,
             verbose,
-            devices,
             dry_run,
-        } => subcommand_trigger(devices, r#type, verbose, action, dry_run),
+            subsystem_match,
+            subsystem_nomatch,
+            attr_match,
+            attr_nomatch,
+            property_match,
+            tag_match,
+            sysname_match,
+            name_match,
+            parent_match,
+            settle,
+            uuid,
+            devices,
+        } => {
+            return TriggerArgs::new(
+                action,
+                r#type,
+                verbose,
+                dry_run,
+                subsystem_match,
+                subsystem_nomatch,
+                attr_match,
+                attr_nomatch,
+                property_match,
+                tag_match,
+                sysname_match,
+                name_match,
+                parent_match,
+                settle,
+                uuid,
+                devices,
+            )
+            .subcommand()
+        }
         SubCmd::TestBuiltin {
             action,
             builtin,

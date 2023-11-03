@@ -13,6 +13,7 @@
 //! subcommand for devctl trigger
 
 use crate::subcmds::devctl_utils;
+use crate::Result;
 use basic::fd_util::{dot_or_dot_dot, xopendirat};
 use device::{device_enumerator::DeviceEnumerator, Device};
 use nix::dir::Dir;
@@ -24,8 +25,6 @@ use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
-
-type Result<T> = std::result::Result<T, nix::Error>;
 
 #[derive(Debug)]
 enum QueryType {
@@ -94,7 +93,7 @@ impl InfoArgs {
     }
 
     /// subcommand for hwdb a fake device action, then the kernel will report an uevent
-    pub fn subcommand_info(&self) -> Result<()> {
+    pub fn subcommand(&self) -> Result<()> {
         let mut devs = Vec::new();
 
         let mut arg_export = false;

@@ -69,10 +69,10 @@ pub struct DeviceEnumerator {
 
     /// match sysattr
     /// key: sysattr, value: match value
-    pub(crate) match_sysattr: RefCell<HashMap<String, HashSet<String>>>,
+    pub(crate) match_sysattr: RefCell<HashMap<String, String>>,
     /// do not match sysattr
     /// key: sysattr, value: match value
-    pub(crate) not_match_sysattr: RefCell<HashMap<String, HashSet<String>>>,
+    pub(crate) not_match_sysattr: RefCell<HashMap<String, String>>,
 
     /// match property
     /// key: property, value: match value
@@ -240,46 +240,14 @@ impl DeviceEnumerator {
     ) -> Result<(), Error> {
         match whether_match {
             true => {
-                let sysattr_is_none = self.match_sysattr.borrow().get(sysattr).is_none();
-
-                if sysattr_is_none {
-                    self.match_sysattr
-                        .borrow_mut()
-                        .insert(sysattr.to_string(), HashSet::new());
-
-                    self.match_sysattr
-                        .borrow_mut()
-                        .get_mut(sysattr)
-                        .unwrap()
-                        .insert(value.to_string());
-                } else {
-                    self.match_sysattr
-                        .borrow_mut()
-                        .get_mut(sysattr)
-                        .unwrap()
-                        .insert(value.to_string());
-                }
+                self.match_sysattr
+                    .borrow_mut()
+                    .insert(sysattr.to_string(), value.to_string());
             }
             false => {
-                let not_match_sysattr_is_none =
-                    self.not_match_sysattr.borrow().get(sysattr).is_none();
-
-                if not_match_sysattr_is_none {
-                    self.not_match_sysattr
-                        .borrow_mut()
-                        .insert(sysattr.to_string(), HashSet::new());
-                    self.not_match_sysattr
-                        .borrow_mut()
-                        .get_mut(sysattr)
-                        .unwrap()
-                        .insert(value.to_string());
-                } else {
-                    self.not_match_sysattr
-                        .borrow_mut()
-                        .get_mut(sysattr)
-                        .unwrap()
-                        .insert(value.to_string());
-                }
+                self.not_match_sysattr
+                    .borrow_mut()
+                    .insert(sysattr.to_string(), value.to_string());
             }
         };
 
@@ -548,12 +516,20 @@ impl DeviceEnumerator {
     /// check whether the value of specific sysattr of a device matches
     pub(crate) fn match_sysattr_value(
         &self,
-        _device: &Device,
-        _sysattr: &str,
-        _patterns: &HashSet<String>,
+        device: &Device,
+        sysattr: &str,
+        patterns: &str,
     ) -> Result<bool, Error> {
-        todo!("Device::get_sysattr_value has not been implemented.");
-        // Ok(false)
+        let value = match device.get_sysattr_value(sysattr) {
+            Ok(value) => value,
+            Err(_) => return Ok(false),
+        };
+
+        if patterns.is_empty() {
+            return Ok(true);
+        }
+
+        self.pattern_match(patterns, &value)
     }
 
     /// check whether a device matches conditions according to flags
@@ -922,9 +898,77 @@ impl DeviceEnumerator {
     }
 
     /// scan devices for a single tag
-    pub(crate) fn scan_devices_tag(&self, _tag: &str) -> Result<(), Error> {
-        todo!("scan_devices_tag has not been implemented.");
-        // Ok(())
+    pub(crate) fn scan_devices_tag(&self, tag: &str) -> Result<(), Error> {
+        let path = Path::new("/run/devmaster/tags/").join(tag);
+        let dir = std::fs::read_dir(path);
+        let tag_dir = match dir {
+            Ok(d) => d,
+            Err(e) => {
+                if e.raw_os_error().unwrap_or_default() == libc::ENOENT {
+                    return Ok(());
+                } else {
+                    return Err(Error::Nix {
+                        msg: format!("scan_dir failed: can't read directory '{}'", tag),
+                        source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
+                    });
+                }
+            }
+        };
+
+        /* TODO: filter away subsystems? */
+
+        let mut ret = Ok(());
+        for entry in tag_dir {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    ret = Err(Error::Nix {
+                        msg: format!(
+                            "scan_dir failed: can't read entries from directory '{}'",
+                            tag
+                        ),
+                        source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
+                    });
+                    continue;
+                }
+            };
+
+            let file_name = entry.file_name().to_str().unwrap().to_string();
+            if file_name.contains('.') {
+                continue;
+            }
+
+            let mut device = match Device::from_device_id(&file_name) {
+                Ok(device) => device,
+                Err(e) => {
+                    if e.get_errno() != nix::errno::Errno::ENODEV {
+                        /* this is necessarily racy, so ignore missing devices */
+                        ret = Err(e);
+                    }
+                    continue;
+                }
+            };
+
+            /* Generated from tag, hence not necessary to check tag again. */
+            match self.test_matches(&mut device, MatchFlag::ALL & (!MatchFlag::TAG)) {
+                Ok(flag) => {
+                    if !flag {
+                        continue;
+                    }
+                }
+                Err(e) => {
+                    ret = Err(e);
+                    continue;
+                }
+            }
+
+            if let Err(e) = self.add_device(Rc::new(RefCell::new(device))) {
+                ret = Err(e);
+                continue;
+            }
+        }
+
+        ret
     }
 
     /// scan devices tags
@@ -944,7 +988,16 @@ impl DeviceEnumerator {
 
     /// parent add child
     pub(crate) fn parent_add_child(&mut self, path: &str, flags: MatchFlag) -> Result<bool, Error> {
-        let device = Rc::new(RefCell::new(Device::from_syspath(path, true)?));
+        let device = match Device::from_syspath(path, true) {
+            Ok(dev) => Rc::new(RefCell::new(dev)),
+            Err(err) => {
+                if err.get_errno() == nix::errno::Errno::ENODEV {
+                    /* this is necessarily racy, so ignore missing devices */
+                    return Ok(false);
+                }
+                return Err(err);
+            }
+        };
 
         if !self.test_matches(&mut device.borrow_mut(), flags)? {
             return Ok(false);

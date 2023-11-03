@@ -55,6 +55,8 @@ pub mod os_release;
 pub mod parse;
 #[cfg(feature = "process")]
 pub mod process;
+#[cfg(feature = "random")]
+pub mod random_util;
 #[cfg(feature = "rlimit")]
 pub mod rlimit;
 #[cfg(feature = "security")]
