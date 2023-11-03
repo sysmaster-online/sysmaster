@@ -2645,7 +2645,7 @@ mod tests {
         let config = Rc::new(ServiceConfig::new(&comm));
         let context = Rc::new(ExecContext::new());
 
-        let result = config.load(paths, false);
+        let result = config.load(paths, "config.service", false);
         assert!(result.is_ok());
 
         let rt = Rc::new(RunningData::new(&comm));

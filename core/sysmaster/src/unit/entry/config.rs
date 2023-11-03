@@ -161,9 +161,7 @@ impl UeConfig {
             return Err(format!("{} doesn't have corresponding config file", name).into());
         }
 
-        // fragment
-        let unit_conf_frag = unit_conf_frag.iter().map(|x| x.parent().unwrap()).collect();
-        let mut configer = match UeConfigData::load_named(unit_conf_frag, name, true) {
+        let mut configer = match UeConfigData::load_config(unit_conf_frag, name) {
             Ok(v) => v,
             Err(e) => {
                 log::error!("Invalid Configuration: {}", e);
@@ -269,7 +267,7 @@ mod tests {
         let mut file_path = get_project_root().unwrap();
         file_path.push("tests/test_units");
         println!("{:?}", file_path);
-        let result = UeConfigData::load_named(vec![file_path], "config.service", true).unwrap();
+        let result = UeConfigData::load_config(vec![file_path], "config.service").unwrap();
 
         println!("{:?}", result);
     }

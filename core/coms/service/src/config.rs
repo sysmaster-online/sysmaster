@@ -66,11 +66,9 @@ impl ServiceConfig {
         }
     }
 
-    pub(super) fn load(&self, paths: Vec<PathBuf>, update: bool) -> Result<()> {
-        let name = paths[0].file_name().unwrap().to_string_lossy().to_string();
-        let paths = paths.iter().map(|x| x.parent().unwrap()).collect();
+    pub(super) fn load(&self, paths: Vec<PathBuf>, name: &str, update: bool) -> Result<()> {
         log::debug!("Loading {} config from: {:?}", name, paths);
-        let service_config = match ServiceConfigData::load_named(paths, name, true) {
+        let service_config = match ServiceConfigData::load_config(paths, name) {
             Ok(v) => v,
             Err(e) => {
                 log::error!("Invalid Configuration: {}", e);
@@ -158,7 +156,6 @@ fn specifier_escape_exec_command(
 
 #[derive(UnitConfig, Default, Debug)]
 pub(super) struct ServiceConfigData {
-    #[section(must)]
     pub Service: SectionService,
 }
 
@@ -239,7 +236,7 @@ mod tests {
         let comm = Rc::new(ServiceUnitComm::new());
         let config = ServiceConfig::new(&comm);
 
-        let result = config.load(paths, false);
+        let result = config.load(paths, "config.service", false);
 
         println!("service data: {:?}", config.config_data());
 
@@ -255,7 +252,7 @@ mod tests {
         let comm = Rc::new(ServiceUnitComm::new());
         let config = ServiceConfig::new(&comm);
 
-        assert!(config.load(paths, false).is_ok());
+        assert!(config.load(paths, "config.service", false).is_ok());
         assert_eq!(config.service_type(), ServiceType::Simple)
     }
 

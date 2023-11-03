@@ -541,11 +541,14 @@ impl Install {
             unit_install.set_u_type(UnitFileType::Symlink);
         }
 
-        let configer = match UeConfigData::load_named(
-            self.lookup_path.search_path.clone(),
-            unit_install.name(),
-            true,
-        ) {
+        let mut paths: Vec<PathBuf> = Vec::new();
+        for p in &self.lookup_path.search_path {
+            let mut path = String::new();
+            path = path + p + &unit_install.name();
+            paths.push(PathBuf::from(path));
+        }
+
+        let configer = match UeConfigData::load_config(paths, &unit_install.name()) {
             Err(unit_parser::error::Error::LoadTemplateError { name: _ }) => {
                 return Err(Error::LoadError {
                     msg: format!(

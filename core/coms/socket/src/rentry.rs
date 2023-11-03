@@ -45,28 +45,28 @@ fn deserialize_pathbuf_vec(s: &str) -> Result<Vec<PathBuf>, core::error::Error> 
 #[derive(UnitSection, Default, Clone, Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub(super) struct SectionSocket {
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecStartPre: Vec<ExecCommand>,
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecStartChown: Vec<ExecCommand>,
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecStartPost: Vec<ExecCommand>,
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecStopPre: Vec<ExecCommand>,
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecStopPost: Vec<ExecCommand>,
 
-    #[entry(multiple)]
+    #[entry(append)]
     pub ListenStream: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub ListenDatagram: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub ListenNetlink: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub ListenSequentialPacket: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub ListenFIFO: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub ListenSpecial: Vec<String>,
 
     #[entry(default = false)]
@@ -85,18 +85,18 @@ pub(super) struct SectionSocket {
     pub Broadcast: Option<bool>,
     #[entry(default = false)]
     pub RemoveOnStop: bool,
-    #[entry(multiple, myparser = deserialize_pathbuf_vec)]
+    #[entry(append, parser = deserialize_pathbuf_vec)]
     pub Symlinks: Vec<PathBuf>,
     pub PassSecurity: Option<bool>,
     #[entry(default = 0o666)]
     pub SocketMode: u32,
-    #[entry(default = "")]
+    #[entry(default = String::new())]
     pub SocketUser: String,
-    #[entry(default = "")]
+    #[entry(default = String::new())]
     pub SocketGroup: String,
     #[entry(default = KillMode::ControlGroup)]
     pub KillMode: KillMode,
-    #[entry(default = "SIGTERM")]
+    #[entry(default = String::from("SIGTERM"))]
     pub KillSignal: String,
 }
 

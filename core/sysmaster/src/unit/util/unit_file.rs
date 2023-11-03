@@ -133,27 +133,32 @@ impl UnitFileData {
         }
     }
 
+    fn search_dropin_fragment(&mut self, path: &str, name: &str) -> Vec<PathBuf> {
+        let mut res: Vec<PathBuf> = Vec::new();
+        let pathd_str = format!("{}/{}.d", path, name);
+        let dir = Path::new(&pathd_str);
+        if !dir.is_dir() {
+            return res;
+        }
+        for entry in dir.read_dir().unwrap() {
+            let fragment = entry.unwrap().path();
+            if !fragment.is_file() {
+                continue;
+            }
+            let file_name = String::from(fragment.file_name().unwrap().to_str().unwrap());
+            if file_name.ends_with(".conf") {
+                res.push(fragment);
+            }
+        }
+        res
+    }
+
     fn build_id_fragment_by_name(&mut self, path: &str, name: &str) -> Option<Vec<PathBuf>> {
         let mut res: Vec<PathBuf> = Vec::new();
         if fs::metadata(path).is_err() {
             return None;
         }
-        /* {/etc/sysmaster/system, /usr/lib/sysmaster/system}/foo.service.d */
-        let pathd_str = format!("{}/{}.d", path, name);
-        let dir = Path::new(&pathd_str);
-        if dir.is_dir() {
-            for entry in dir.read_dir().unwrap() {
-                let fragment = entry.unwrap().path();
-                if !fragment.is_file() {
-                    continue;
-                }
-                let file_name = String::from(fragment.file_name().unwrap().to_str().unwrap());
-                if file_name.starts_with('.') || file_name.ends_with(".toml") {
-                    continue;
-                }
-                res.push(fragment);
-            }
-        }
+
         /* {/etc/sysmater/system, /usr/lib/sysmaster/system}/foo.service */
         let config_path = Path::new(path).join(name);
         if !config_path.exists() {
@@ -198,6 +203,8 @@ impl UnitFileData {
             /* We are processing an alias service. */
             if file_name == name {
                 if !unit_name_is_valid(&target_name, UnitNameFlags::ANY) {
+                    /* So this symlink is pointing an invalid unit, mark the vector as empty and
+                     * we will treat it as masked. */
                     return Some(Vec::new());
                 }
                 self.real_name = target_name;
@@ -227,9 +234,20 @@ impl UnitFileData {
                 return;
             }
             pathbuf_fragment.append(&mut v);
+            /* One is enough. */
+            break;
         }
 
         if !pathbuf_fragment.is_empty() || !name.contains('@') {
+            for search_path in &search_path_list {
+                let mut v = self.search_dropin_fragment(search_path, name);
+                if v.is_empty() {
+                    continue;
+                }
+                pathbuf_fragment.append(&mut v);
+                break;
+            }
+
             self.unit_id_fragment
                 .insert(name.to_string(), pathbuf_fragment);
             return;
@@ -239,7 +257,7 @@ impl UnitFileData {
          * load the template configuration file. */
         let template_name = name.split_once('@').unwrap().0.to_string() + "@.service";
         for search_path in &search_path_list {
-            let v = match self.build_id_fragment_by_name(search_path, &template_name) {
+            let mut v = match self.build_id_fragment_by_name(search_path, &template_name) {
                 None => continue,
                 Some(v) => v,
             };
@@ -247,12 +265,19 @@ impl UnitFileData {
                 /* unit is masked */
                 return;
             }
-            /* FIXME: this changes the template_name to full_name, it's a temporary solution. */
-            for p in v {
-                let path = p.parent().unwrap().join(name);
-                pathbuf_fragment.push(path);
-            }
+            pathbuf_fragment.append(&mut v);
+            break;
         }
+
+        for search_path in &search_path_list {
+            let mut v = self.search_dropin_fragment(search_path, &template_name);
+            if v.is_empty() {
+                continue;
+            }
+            pathbuf_fragment.append(&mut v);
+            break;
+        }
+
         self.unit_id_fragment
             .insert(name.to_string(), pathbuf_fragment);
     }

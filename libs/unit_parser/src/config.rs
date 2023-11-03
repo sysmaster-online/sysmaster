@@ -3,12 +3,11 @@ use crate::{
     error::ReadFileSnafu,
     internal::Error,
     parser::{SectionParser, UnitParser},
-    template::{unit_type, UnitType},
 };
 use snafu::ResultExt;
 use std::{
     ffi::OsString,
-    fs::{canonicalize, read_dir, File},
+    fs::File,
     io::Read,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     num::{
@@ -25,22 +24,16 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// The trait that needs to be implemented on the most-outer struct,
 /// representing a type of unit.
-pub trait UnitConfig: Sized {
+pub trait UnitConfig: Sized + Default {
     /// The suffix of a type of unit, parsed from an attribute.
     const SUFFIX: &'static str;
     /// Parses the unit from a [UnitParser].
-    fn __parse_unit(__source: UnitParser) -> Result<Self>;
-    /// Parses the unit from a [UnitParser], but only patches the supplied entries onto the given struct.
-    fn __patch_unit(__source: UnitParser, __from: &mut Self) -> Result<()>;
+    fn __parse_unit(__source: UnitParser, res: &mut Self) -> Result<()>;
+    /// Load the default value
+    fn __load_default(__res: &mut Self);
 
     /// A convenient function that opens the file that needs to be loaded.
-    fn __load<S: AsRef<Path>>(
-        path: S,
-        paths: Rc<Vec<PathBuf>>,
-        config_file_name: &str,
-        unit_name: &str,
-        root: bool,
-    ) -> Result<Self> {
+    fn __load<S: AsRef<Path>>(path: S, unit_name: &str, res: &mut Self) -> Result<()> {
         let path = path.as_ref();
         let mut file = File::open(path).context(ReadFileSnafu {
             path: path.to_string_lossy().to_string(),
@@ -49,139 +42,25 @@ pub trait UnitConfig: Sized {
         file.read_to_string(&mut content).context(ReadFileSnafu {
             path: path.to_string_lossy().to_string(),
         })?;
-        let canonical_path = canonicalize(path).unwrap_or_else(|_| path.into());
-        let parser = crate::parser::UnitParser::new(
-            content.as_ref(),
-            paths,
-            (root, config_file_name, unit_name, &canonical_path),
-        );
-        Self::__parse_unit(parser)
+        let parser = crate::parser::UnitParser::new(content.as_ref(), (unit_name,));
+        Self::__parse_unit(parser, res)
     }
 
-    /// A convenient function that opens the file that needs to be patched.
-    fn __patch<S: AsRef<Path>>(
-        path: S,
-        paths: Rc<Vec<PathBuf>>,
-        config_file_name: &str,
-        unit_name: &str,
-        from: &mut Self,
-        root: bool,
-    ) -> Result<()> {
-        let path = path.as_ref();
-        let mut file = File::open(path).context(ReadFileSnafu {
-            path: path.to_string_lossy().to_string(),
-        })?;
-        let mut content = String::new();
-        file.read_to_string(&mut content).context(ReadFileSnafu {
-            path: path.to_string_lossy().to_string(),
-        })?;
-        let parser = crate::parser::UnitParser::new(
-            content.as_ref(),
-            paths,
-            (root, config_file_name, unit_name, path),
-        );
-        Self::__patch_unit(parser, from)
-    }
-
-    /// Loads a unit with the given name and search paths.
+    /// Loads a unit with the given config file list and unit name
     /// If no suffix is given, the unit's defined suffix will be added to the end.
-    fn load_named<S: AsRef<str>, P: AsRef<Path>>(
-        paths: Vec<P>,
-        name: S,
-        root: bool,
-    ) -> Result<Self> {
+    fn load_config<P: AsRef<Path>>(paths: Vec<P>, unit_name: &str) -> Result<Self> {
         // return when first one is found?
         let paths: Vec<PathBuf> = paths.iter().map(|x| x.as_ref().to_path_buf()).collect();
         let paths_rc = Rc::new(paths);
-        let name = name.as_ref();
-        let fullname = if name.ends_with(Self::SUFFIX) {
-            name.to_string()
-        } else {
-            format!("{}.{}", name, Self::SUFFIX)
-        };
+        let fullname = unit_name.to_string();
 
-        let config_file_names = match unit_type(fullname.as_str())? {
-            UnitType::Instance(_, template_filename) => {
-                vec![fullname.to_string(), template_filename]
-            }
-            _ => {
-                vec![fullname.to_string()]
-            }
-        };
-        let mut result = None;
+        let mut result = Self::default();
+        Self::__load_default(&mut result);
 
         // load itself
         let paths = Rc::clone(&paths_rc);
         for dir in (*paths).iter() {
-            for config_file_name in &config_file_names {
-                let mut path = dir.to_owned();
-                path.push(config_file_name.as_str());
-                if let Ok(res) = Self::__load(
-                    path,
-                    Rc::clone(&paths_rc),
-                    config_file_name.as_str(),
-                    &fullname,
-                    root,
-                ) {
-                    result = Some(res);
-                    break;
-                }
-            }
-            if result.is_some() {
-                break;
-            }
-        }
-
-        let mut result = if let Some(result) = result {
-            result
-        } else {
-            return Err(Error::NoUnitFoundError {
-                name: name.to_string(),
-            });
-        };
-
-        // load drop-ins
-        let mut dropin_dir_names: Vec<String> = Vec::new();
-        dropin_dir_names.push(format!("{}.d", Self::SUFFIX));
-        for config_file_name in config_file_names {
-            dropin_dir_names.push(format!("{}.d", config_file_name.as_str()));
-        }
-        let segments: Vec<&str> = fullname.split('-').collect();
-        for i in (1..segments.len()).rev() {
-            let segmented = segments[0..i].join("-");
-            let dir_name = format!("{}-.{}.d", segmented, Self::SUFFIX);
-            dropin_dir_names.push(dir_name);
-        }
-
-        for dir_name in dropin_dir_names.iter() {
-            for dir in (*paths).iter() {
-                let mut path = dir.to_owned();
-                path.push(dir_name.as_str());
-                if !path.is_dir() {
-                    continue;
-                }
-                if let Ok(dir_entries) = read_dir(&path) {
-                    for entry in dir_entries.flatten() {
-                        if let (Ok(filetype), Some(extension)) =
-                            (entry.file_type(), entry.path().extension())
-                        {
-                            if filetype.is_file() && extension == "conf" {
-                                let paths = Rc::clone(&paths_rc);
-                                if let Err(err) = Self::__patch(
-                                    entry.path(),
-                                    paths,
-                                    dir_name.as_str(),
-                                    fullname.as_str(),
-                                    &mut result,
-                                    root,
-                                ) {
-                                    log::warn!("Failed to patch unit {}: {})", name, err);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            let _ = Self::__load(dir, &fullname, &mut result);
         }
 
         Ok(result)
@@ -191,9 +70,9 @@ pub trait UnitConfig: Sized {
 /// The trait that needs to be implemented on each section of the unit.
 pub trait UnitSection: Sized {
     /// Parses the section from a [SectionParser].
-    fn __parse_section(__source: &mut SectionParser) -> Result<Option<Self>>;
-    /// Parses the section from a [SectionParser], but only patches the supplied entries onto the given struct.
-    fn __patch_section(__source: &mut SectionParser, __from: &mut Self) -> Result<()>;
+    fn __parse_section(__source: &mut SectionParser, res: &mut Self) -> Result<()>;
+    /// Load the default value
+    fn __load_default(__res: &mut Self);
 }
 
 /// The trait that needs to be implemented on each entry of the unit.

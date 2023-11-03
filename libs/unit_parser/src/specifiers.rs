@@ -9,9 +9,9 @@ use nix::{
 };
 use once_cell::sync::Lazy;
 use os_release::OsRelease;
-use std::{env, fs, path::Path};
+use std::{env, fs};
 
-pub(crate) type SpecifierContext<'a> = (bool, &'a str, &'a str, &'a Path); // (root, filename, path)
+pub(crate) type SpecifierContext<'a> = (&'a str,); // (unit_name)
 
 static OS_RELEASE: Lazy<OsRelease> =
     Lazy::new(|| OsRelease::new().expect("Failed to read os-release."));
@@ -31,6 +31,7 @@ pub(crate) fn resolve(
     specifier: char,
     context: SpecifierContext,
 ) -> Result<(), Error> {
+    let in_system_mode = true;
     match specifier {
         'a' => {
             if let Some(res) = UTS_NAME.machine().to_str() {
@@ -49,7 +50,7 @@ pub(crate) fn resolve(
             }
         }
         'C' => {
-            if context.0 {
+            if in_system_mode {
                 result.push_str("/var/cache");
             } else if let Ok(res) = env::var("XDG_CACHE_HOME") {
                 result.push_str(&res);
@@ -63,7 +64,7 @@ pub(crate) fn resolve(
             }
         }
         'E' => {
-            if context.0 {
+            if in_system_mode {
                 result.push_str("/etc");
             } else if let Ok(res) = env::var("XDG_CONFIG_HOME") {
                 result.push_str(&res);
@@ -71,9 +72,9 @@ pub(crate) fn resolve(
                 result.push_str("~/.config");
             }
         }
-        'f' => result.push_str(context.1),
+        'f' => result.push_str(context.0),
         'g' => {
-            if context.0 {
+            if in_system_mode {
                 result.push_str("root");
             } else if let Some(gid) =
                 Group::from_gid(*CURRENT_GID).expect("Failed to read current group info.")
@@ -82,14 +83,14 @@ pub(crate) fn resolve(
             }
         }
         'G' => {
-            if context.0 {
+            if in_system_mode {
                 result.push('0');
             } else {
                 result.push_str(&CURRENT_GID.to_string());
             }
         }
         'h' => {
-            if context.0 {
+            if in_system_mode {
                 result.push_str("/root");
             } else if let Ok(res) = env::var("HOME") {
                 result.push_str(&res);
@@ -103,22 +104,22 @@ pub(crate) fn resolve(
             }
         }
         'i' => {
-            if let UnitType::Instance(instance_name, _) = unit_type(context.2)? {
+            if let UnitType::Instance(instance_name, _) = unit_type(context.0)? {
                 result.push_str(&escape(instance_name));
             }
         }
         'I' => {
-            if let UnitType::Instance(instance_name, _) = unit_type(context.2)? {
+            if let UnitType::Instance(instance_name, _) = unit_type(context.0)? {
                 result.push_str(instance_name);
             }
         }
         'j' => {
-            if let UnitType::Instance(instance_name, _) = unit_type(context.2)? {
+            if let UnitType::Instance(instance_name, _) = unit_type(context.0)? {
                 result.push_str(&escape(instance_name.split('-').last().unwrap()));
             } else {
                 result.push_str(&escape(
                     context
-                        .1
+                        .0
                         .split('.')
                         .next()
                         .unwrap()
@@ -129,12 +130,12 @@ pub(crate) fn resolve(
             }
         }
         'J' => {
-            if let UnitType::Instance(instance_name, _) = unit_type(context.1)? {
+            if let UnitType::Instance(instance_name, _) = unit_type(context.0)? {
                 result.push_str(instance_name.split('-').last().unwrap());
             } else {
                 result.push_str(
                     context
-                        .1
+                        .0
                         .split('.')
                         .next()
                         .unwrap()
@@ -153,7 +154,7 @@ pub(crate) fn resolve(
                 .unwrap(),
         ),
         'L' => {
-            if context.0 {
+            if in_system_mode {
                 result.push_str("/var/log");
             } else if let Ok(res) = env::var("XDG_STATE_HOME") {
                 result.push_str(&res);
@@ -168,21 +169,21 @@ pub(crate) fn resolve(
                 result.push_str(res)
             }
         }
-        'n' => result.push_str(&escape(context.2)),
-        'N' => result.push_str(&escape(context.2.split('.').next().unwrap())),
+        'n' => result.push_str(&escape(context.0)),
+        'N' => result.push_str(&escape(context.0.split('.').next().unwrap())),
         'o' => result.push_str(&OS_RELEASE.id),
         'p' => {
-            if let UnitType::Instance(instance_name, _) = unit_type(context.1)? {
+            if let UnitType::Instance(instance_name, _) = unit_type(context.0)? {
                 result.push_str(&escape(instance_name));
             } else {
-                result.push_str(&escape(context.2.split('.').next().unwrap()));
+                result.push_str(&escape(context.0.split('.').next().unwrap()));
             }
         }
         'P' => {
-            if let UnitType::Instance(instance_name, _) = unit_type(context.1)? {
+            if let UnitType::Instance(instance_name, _) = unit_type(context.0)? {
                 result.push_str(instance_name);
             } else {
-                result.push_str(context.2.split('.').next().unwrap());
+                result.push_str(context.0.split('.').next().unwrap());
             }
         }
         'q' => result.push_str(
@@ -199,7 +200,7 @@ pub(crate) fn resolve(
             }
         }
         'S' => {
-            if context.0 {
+            if in_system_mode {
                 result.push_str("/var/lib");
             } else if let Ok(res) = env::var("XDG_STATE_HOME") {
                 result.push_str(&res);
@@ -208,7 +209,7 @@ pub(crate) fn resolve(
             }
         }
         't' => {
-            if context.0 {
+            if in_system_mode {
                 result.push_str("/run");
             } else if let Ok(res) = env::var("XDG_RUNTIME_DIR") {
                 result.push_str(&res);
@@ -256,16 +257,16 @@ pub(crate) fn resolve(
                 result.push_str(res);
             }
         }
-        'y' => {
-            if let Some(res) = context.3.to_str() {
-                result.push_str(res)
-            }
-        }
-        'Y' => {
-            if let Some(res) = context.3.parent().expect("Invalid file path.").to_str() {
-                result.push_str(res)
-            }
-        }
+        // 'y' => {
+        //     if let Some(res) = context.3.to_str() {
+        //         result.push_str(res)
+        //     }
+        // }
+        // 'Y' => {
+        //     if let Some(res) = context.3.parent().expect("Invalid file path.").to_str() {
+        //         result.push_str(res)
+        //     }
+        // }
         '%' => result.push('%'),
         _ => return Err(Error::InvalidSpecifierError { specifier }),
     };

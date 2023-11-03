@@ -508,51 +508,51 @@ fn parse_environment(s: &str) -> Result<HashMap<String, String>> {
 pub struct SectionService {
     #[entry(default=ServiceType::Simple)]
     pub Type: ServiceType,
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecStart: Vec<ExecCommand>,
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecStartPre: Vec<ExecCommand>,
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecStartPost: Vec<ExecCommand>,
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecStop: Vec<ExecCommand>,
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecStopPost: Vec<ExecCommand>,
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecReload: Vec<ExecCommand>,
-    #[entry(multiple, myparser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::deserialize_exec_command)]
     pub ExecCondition: Vec<ExecCommand>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub Sockets: Vec<String>,
     #[entry(default = 0)]
     pub WatchdogSec: u64,
-    #[entry(myparser = deserialize_pidfile)]
+    #[entry(parser = deserialize_pidfile)]
     pub PIDFile: Option<PathBuf>,
     #[entry(default = false)]
     pub RemainAfterExit: bool,
     pub NotifyAccess: Option<NotifyAccess>,
     #[entry(default = false)]
     pub NonBlocking: bool,
-    #[entry(myparser = parse_environment)]
+    #[entry(parser = parse_environment)]
     pub Environment: Option<HashMap<String, String>>,
     #[entry(default = KillMode::ControlGroup)]
     pub KillMode: KillMode,
     pub SELinuxContext: Option<String>,
-    #[entry(myparser = deserialize_pathbuf)]
+    #[entry(parser = deserialize_pathbuf)]
     pub RootDirectory: Option<PathBuf>,
-    #[entry(default = WorkingDirectory::default(), myparser = parse_working_directory)]
+    #[entry(default = WorkingDirectory::default(), parser = parse_working_directory)]
     pub WorkingDirectory: WorkingDirectory,
-    #[entry(default = StateDirectory::default(), myparser = deserialize_state_directory)]
+    #[entry(default = StateDirectory::default(), parser = deserialize_state_directory)]
     pub StateDirectory: StateDirectory,
-    #[entry(default = RuntimeDirectory::default(), myparser = deserialize_runtime_directory)]
+    #[entry(default = RuntimeDirectory::default(), parser = deserialize_runtime_directory)]
     pub RuntimeDirectory: RuntimeDirectory,
     #[entry(default = PreserveMode::No)]
     pub RuntimeDirectoryPreserve: PreserveMode,
-    #[entry(default = "")]
+    #[entry(default = String::new())]
     pub User: String,
-    #[entry(default = "")]
+    #[entry(default = String::new())]
     pub Group: String,
-    #[entry(default = "0022")]
+    #[entry(default = String::from("0022"))]
     pub UMask: String,
     #[entry(default = ServiceRestart::No)]
     pub Restart: ServiceRestart,
@@ -560,15 +560,15 @@ pub struct SectionService {
     pub RestartPreventExitStatus: ExitStatusSet,
     #[entry(default = 1)]
     pub RestartSec: u64,
-    #[entry(multiple)]
+    #[entry(append)]
     pub EnvironmentFile: Vec<String>,
-    #[entry(default = "SIGTERM")]
+    #[entry(default = String::from("SIGTERM"))]
     pub KillSignal: String,
-    #[entry(default = 10000000, myparser = deserialize_timeout)]
+    #[entry(default = 10000000, parser = deserialize_timeout)]
     pub TimeoutSec: u64,
-    #[entry(default = 10000000, myparser = deserialize_timeout)]
+    #[entry(default = 10000000, parser = deserialize_timeout)]
     pub TimeoutStartSec: u64,
-    #[entry(default = 10000000, myparser = deserialize_timeout)]
+    #[entry(default = 10000000, parser = deserialize_timeout)]
     pub TimeoutStopSec: u64,
     pub LimitCORE: Option<Rlimit>,
     pub LimitNOFILE: Option<Rlimit>,

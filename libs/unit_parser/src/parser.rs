@@ -9,14 +9,10 @@ use nom::{
     sequence::{delimited, separated_pair},
     IResult,
 };
-use std::{fs::read_dir, path::PathBuf, rc::Rc};
-
 // TODO: error callsite marking
 
 /// A parser for parsing a whole unit.
 pub struct UnitParser<'a> {
-    /// Search paths
-    paths: Rc<Vec<PathBuf>>,
     /// Parsing cursor
     inner: &'a str,
     /// Specifier resolve context
@@ -25,9 +21,8 @@ pub struct UnitParser<'a> {
 
 impl<'a> UnitParser<'a> {
     /// Creates a new [UnitParser] with input, scan paths and specifier resolve context.
-    pub fn new(input: &'a str, paths: Rc<Vec<PathBuf>>, context: SpecifierContext<'a>) -> Self {
+    pub fn new(input: &'a str, context: SpecifierContext<'a>) -> Self {
         UnitParser {
-            paths,
             inner: input,
             context,
         }
@@ -47,7 +42,6 @@ impl<'a> Iterator for UnitParser<'a> {
             if let Ok((i, name)) = section_header(self.inner) {
                 self.inner = i;
                 return Some(SectionParser {
-                    paths: Rc::clone(&self.paths),
                     name,
                     inner: self.inner,
                     context: self.context,
@@ -78,8 +72,6 @@ fn section_header(i: &str) -> IResult<&str, &str> {
 
 /// A parser for parsing a section.
 pub struct SectionParser<'a> {
-    /// Specifier resolve context
-    paths: Rc<Vec<PathBuf>>,
     /// Section name
     pub name: &'a str,
     /// Parsing cursor
@@ -105,29 +97,6 @@ impl<'a> Iterator for SectionParser<'a> {
         } else {
             None
         }
-    }
-}
-
-impl<'a> SectionParser<'a> {
-    /// Parses subdirs from paths.
-    pub fn __parse_subdir(&self, subdir: &str) -> Vec<String> {
-        let mut result = Vec::new();
-        for dir in (*self.paths).iter() {
-            let mut path = dir.to_owned();
-            let path_end = format!("{}.{}", self.context.1, subdir);
-            path.push(path_end.as_str());
-            if let Ok(read_res) = read_dir(path) {
-                for entry in read_res.flatten() {
-                    // only look for symlinks
-                    if let Ok(metadata) = entry.metadata() {
-                        if metadata.file_type().is_symlink() {
-                            result.push(entry.file_name().to_string_lossy().to_string());
-                        }
-                    }
-                }
-            }
-        }
-        result
     }
 }
 

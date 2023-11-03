@@ -1,7 +1,7 @@
 //! Functions for generating entry parsing expressions.
 use crate::{
     unit_conf_parse::{get_option_inner_type, get_vec_inner_type},
-    unit_parser::{attribute::EntryAttributes, transform_default::transform_default},
+    unit_parser::attribute::EntryAttributes,
 };
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -13,12 +13,12 @@ pub(crate) fn gen_entry_ensure(field: &Field) -> Result<TokenStream> {
     let mut ty = &field.ty;
     let attribute = EntryAttributes::parse_attributes(field, None)?;
     /* No need to check when user has defined his own parser */
-    if attribute.myparser.is_some() {
+    if attribute.parser.is_some() {
         return Ok(quote! {});
     }
-    if attribute.multiple {
+    if attribute.append {
         ty = get_vec_inner_type(ty).unwrap();
-    } else if (!attribute.must) & (attribute.default.is_none()) {
+    } else if attribute.default.is_none() {
         ty = get_option_inner_type(ty).unwrap();
     }
     Ok(quote! {
@@ -34,20 +34,26 @@ pub(crate) fn gen_entry_ensure(field: &Field) -> Result<TokenStream> {
 /// ```
 /// let mut Field1 = None;
 /// ```
-pub(crate) fn gen_entry_init(field: &Field) -> Result<TokenStream> {
+pub(crate) fn gen_entry_default(field: &Field) -> Result<TokenStream> {
     let name = field
         .ident
         .as_ref()
         .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported."))?;
+    let _ty = &field.ty;
     let attributes = EntryAttributes::parse_attributes(field, None)?;
-    Ok(match attributes.multiple {
-        false => quote! {
-            let mut #name = None;
-        },
-        true => quote! {
-            let mut #name = Vec::new();
-        },
-    })
+    if attributes.append {
+        return Ok(quote! {
+            __res.#name = Vec::new();
+        });
+    }
+    match attributes.default {
+        None => Ok(quote! {
+            __res.#name = None;
+        }),
+        Some(v) => Ok(quote! {
+            __res.#name = #v;
+        }),
+    }
 }
 
 /// Generate entry parsing statements, in the form of an arm in a `match` statement.
@@ -74,40 +80,19 @@ pub(crate) fn gen_entry_parse(field: &Field) -> Result<TokenStream> {
         .key
         .unwrap_or_else(|| (format!("{}", name)).into_token_stream());
 
-    if !attributes.multiple && attributes.subdir.is_some() {
-        return Err(Error::new_spanned(
-            field,
-            "\'subdir\' can only be used when \'multiple\' is true.",
-        ));
-    }
-
-    if attributes.multiple && attributes.must {
-        return Err(Error::new_spanned(
-            field,
-            "\'must\' should be false when \'multiple\' is true.",
-        ));
-    }
-
-    if (attributes.must || attributes.multiple) && attributes.default.is_some() {
-        return Err(Error::new_spanned(
-            field,
-            "\'default\' can only be used when \'must\' and \'multiple\' are false.",
-        ));
-    }
-
-    if attributes.multiple {
+    if attributes.append {
         let clear_when_empty = quote! {
             if __pair.1.as_str().is_empty() {
-                #name.clear();
+                __res.#name.clear();
                 continue;
             }
         };
-        /* myparser */
-        let parser = match attributes.myparser {
+        /* parser */
+        let parser = match attributes.parser {
             Some(myparser) => quote! {
                 match #myparser(__pair.1.as_str()) {
                     Ok(__inner) => {
-                        #name.extend(__inner);
+                        __res.#name.extend(__inner);
                     }
                     Err(_) => {
                         log::warn!("Failed to parse {} for key {}, ignoring.", __pair.0, __pair.1);
@@ -118,7 +103,7 @@ pub(crate) fn gen_entry_parse(field: &Field) -> Result<TokenStream> {
                 for __part in __pair.1.split_ascii_whitespace(){
                     match unit_parser::internal::UnitEntry::parse_from_str(__part){
                         Ok(__inner) => {
-                            #name.push(__inner);
+                            __res.#name.push(__inner);
                         }
                         Err(_) => {
                             log::warn!("Failed to parse {} for key {}, ignoring.", __pair.0, __pair.1);
@@ -127,47 +112,29 @@ pub(crate) fn gen_entry_parse(field: &Field) -> Result<TokenStream> {
                 }
             },
         };
-        /* subdir */
-        match attributes.subdir {
-            None => {
-                return Ok(quote! {
-                    #key => {
-                        #clear_when_empty
-                        #parser
-                    }
-                })
+        return Ok(quote! {
+            #key => {
+                #clear_when_empty
+                #parser
             }
-            Some(v) => {
-                return Ok(quote! {
-                    #key => {
-                        #clear_when_empty
-                        #parser
-                        let __subdirs = __source.__parse_subdir(#v);
-                        #name.extend_from_slice(&__subdirs);
-                    }
-                })
-            }
-        }
+        });
     }
-
-    let parser = match (attributes.must, attributes.myparser) {
-        (true, Some(entry_parser)) => quote! {
+    let apply_value = match attributes.default {
+        None => quote! {
+            __res.#name = Some(__value);
+        },
+        Some(_) => quote! {
+            __res.#name = __value;
+        },
+    };
+    let parser = match attributes.parser {
+        Some(entry_parser) => quote! {
             let __value = #entry_parser(__pair.1.as_str()).unwrap();
-            #name = Some(__value);
+            #apply_value;
         },
-        (true, None) => quote! {
+        None => quote! {
             let __value = unit_parser::internal::UnitEntry::parse_from_str(__pair.1.as_str()).unwrap();
-            #name = Some(__value);
-        },
-        (false, Some(entry_parser)) => quote! {
-            if let Ok(__value) = #entry_parser(__pair.1.as_str()) {
-                #name = Some(__value);
-            }
-        },
-        (false, None) => quote! {
-            if let Ok(__value) = unit_parser::internal::UnitEntry::parse_from_str(__pair.1.as_str()) {
-                #name = Some(__value)
-            }
+            #apply_value;
         },
     };
 
@@ -176,51 +143,6 @@ pub(crate) fn gen_entry_parse(field: &Field) -> Result<TokenStream> {
             #parser
         }
     })
-}
-
-/// Generate finalization statements which are in charge of processing [Option] and [Result]s during parsing.
-pub(crate) fn gen_entry_finalize(field: &Field) -> Result<TokenStream> {
-    let name = field
-        .ident
-        .as_ref()
-        .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported."))?;
-    let ty = &field.ty;
-    let attributes = EntryAttributes::parse_attributes(field, None)?;
-    let key = attributes
-        .key
-        .unwrap_or_else(|| (format!("{}", name)).into_token_stream());
-
-    let result = match (attributes.default, attributes.multiple, attributes.must) {
-        // invalid
-        (Some(_), _, true) | (_, true, true) => unreachable!(),
-        // apply default if empty
-        (Some(default), true, false) => {
-            quote! {
-                if #name.is_empty() {
-                    #name = #default;
-                }
-            }
-        }
-        // leave unchanged (`Vec` and `Option`)
-        (None, true, false) | (None, false, false) => {
-            quote! {}
-        }
-        // unwrap to default
-        (Some(default), false, false) => {
-            let default = transform_default(ty, &default)?;
-            quote! {
-                let #name = #name.unwrap_or(#default);
-            }
-        }
-        // throw Error
-        (None, false, true) => {
-            quote! {
-                let #name = #name.ok_or_else(|| {
-                    unit_parser::internal::Error::EntryMissingError { key: #key.to_string()}})?;
-            }
-        }
-    };
-    Ok(result)
 }
 
 /// Generate implementation statements for custom enums.
@@ -257,44 +179,4 @@ pub(crate) fn gen_entry_derives(input: DeriveInput) -> Result<TokenStream> {
             "UnitEntry can only be derived on enum definitions.",
         ))
     }
-}
-
-/// Generate patching statements that sets each field to a new value, if present.
-/// Append the new value to the [Vec] if possible.
-pub(crate) fn gen_entry_patch(field: &Field) -> Result<TokenStream> {
-    let name = field
-        .ident
-        .as_ref()
-        .ok_or_else(|| Error::new_spanned(field, "Tuple structs are not supported."))?;
-    let attributes = EntryAttributes::parse_attributes(field, None)?;
-
-    let result = match (attributes.must, attributes.multiple, attributes.default) {
-        // invalid
-        (true, _, Some(_)) | (true, true, _) => unreachable!(),
-        // append
-        // TODO: or should it overwrite?
-        (false, true, _) => {
-            quote! {
-                __from.#name.extend_from_slice(&#name);
-            }
-        }
-        // set (as is) if not None
-        (false, false, None) => {
-            quote! {
-                if #name.is_some() {
-                    __from.#name = #name;
-                }
-            }
-        }
-        // set if not None
-        (_, false, _) => {
-            quote! {
-                if let Some(__inner) = #name {
-                    __from.#name = __inner;
-                }
-            }
-        }
-    };
-
-    Ok(result)
 }

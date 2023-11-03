@@ -155,25 +155,25 @@ pub(crate) struct UeConfigUnit {
     pub OnFailureJobMode: JobMode,
     #[entry(default = JobMode::Replace)]
     pub OnSuccessJobMode: JobMode,
-    #[entry(multiple)]
+    #[entry(append)]
     pub Wants: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub Requires: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub BindsTo: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub Requisite: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub PartOf: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub OnFailure: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub OnSuccess: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub Before: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub After: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub Conflicts: Vec<String>,
 
     /* Conditions */
@@ -233,13 +233,13 @@ pub(crate) struct UeConfigUnit {
 
 #[derive(UnitSection, Default, Clone, Debug, Serialize, Deserialize)]
 pub struct UeConfigInstall {
-    #[entry(multiple)]
+    #[entry(append)]
     pub Alias: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub WantedBy: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub RequiredBy: Vec<String>,
-    #[entry(multiple)]
+    #[entry(append)]
     pub Also: Vec<String>,
 }
 

@@ -85,7 +85,8 @@ impl SubUnit for ServiceUnit {
     }
 
     fn load(&self, paths: Vec<PathBuf>) -> Result<()> {
-        self.config.load(paths, true)?;
+        let unit_name = self.comm.get_owner_id();
+        self.config.load(paths, &unit_name, true)?;
 
         self.parse()?;
 

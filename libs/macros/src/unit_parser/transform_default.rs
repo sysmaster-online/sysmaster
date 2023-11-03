@@ -5,6 +5,7 @@ use syn::{Error, Expr, Lit, Type};
 
 /// If a field is defined to be a [String] and the given default expression is a [str],
 /// this functions adds `.to_string()` to the end of it.
+#[allow(unused)]
 pub(crate) fn transform_default(ty: &Type, default: &Expr) -> Result<TokenStream, Error> {
     // add `to_string()` suffix if ty is String
     if let Type::Path(inner) = ty {

@@ -4,64 +4,6 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::{Attribute, Error, Expr, Field, LitStr, Token, Type};
 
-/// Attributes valid for [UnitSection]s.
-#[derive(Default)]
-pub(crate) struct SectionAttributes {
-    /// Whether fallback to [std::default::Default] is enabled
-    pub(crate) default: bool,
-    /// Whether alternative key is specified
-    pub(crate) key: Option<TokenStream>,
-    /// Whether must-present is specified
-    pub(crate) must: bool,
-}
-
-impl SectionAttributes {
-    /// Parses [SectionAttributes] from [syn] tokens.
-    /// Pass in [syn::Type] to do type check, or pass in [None] to prevent errors from showing up multiple times
-    pub(crate) fn parse_vec(input: &Field, ty: Option<&Type>) -> syn::Result<Self> {
-        let mut result = SectionAttributes::default();
-        for attribute in input.attrs.iter() {
-            if !attribute.path().is_ident("section") {
-                continue;
-            }
-            attribute.parse_nested_meta(|nested| {
-                if nested.path.is_ident("default") {
-                    result.default = true;
-                    Ok(())
-                } else if nested.path.is_ident("key") {
-                    nested.input.parse::<Token![=]>()?;
-                    let value: LitStr = nested.input.parse()?;
-                    result.key = Some(value.into_token_stream());
-                    Ok(())
-                } else if nested.path.is_ident("must") {
-                    result.must = true;
-                    Ok(())
-                } else {
-                    Err(Error::new_spanned(
-                        attribute,
-                        "section, Not a valid attribute.",
-                    ))
-                }
-            })?;
-        }
-        if result.default & result.must {
-            return Err(Error::new_spanned(
-                input,
-                "`default` and `must` cannot co-exist.",
-            ));
-        }
-        if let Some(ty) = ty {
-            if (!result.must) & (!result.default) & (!is_option(ty)) {
-                return Err(Error::new_spanned(
-                    input,
-                    "Optional fields should be `Option`s.",
-                ));
-            }
-        }
-        Ok(result)
-    }
-}
-
 /// Attributes valid for [UnitEntry]s.
 #[derive(Default)]
 pub(crate) struct EntryAttributes {
@@ -69,14 +11,10 @@ pub(crate) struct EntryAttributes {
     pub(crate) default: Option<Expr>,
     /// Whether alternative key is specified
     pub(crate) key: Option<TokenStream>,
-    /// Whether multiple-present is specified
-    pub(crate) multiple: bool,
-    /// Whether must-present is specified
-    pub(crate) must: bool,
-    /// Whether systemd subdir resolve is specified
-    pub(crate) subdir: Option<TokenStream>,
+    /// Whether append-present is specified
+    pub(crate) append: bool,
     /// User's own parser
-    pub(crate) myparser: Option<syn::Path>,
+    pub(crate) parser: Option<syn::Path>,
 }
 
 impl EntryAttributes {
@@ -99,59 +37,39 @@ impl EntryAttributes {
                     let value: LitStr = nested.input.parse()?;
                     result.key = Some(value.into_token_stream());
                     Ok(())
-                } else if nested.path.is_ident("multiple") {
-                    result.multiple = true;
+                } else if nested.path.is_ident("append") {
+                    result.append = true;
                     Ok(())
-                } else if nested.path.is_ident("must") {
-                    result.must = true;
-                    Ok(())
-                } else if nested.path.is_ident("subdir") {
-                    nested.input.parse::<Token![=]>()?;
-                    let value: LitStr = nested.input.parse()?;
-                    result.subdir = Some(value.into_token_stream());
-                    Ok(())
-                } else if nested.path.is_ident("myparser") {
+                } else if nested.path.is_ident("parser") {
                     nested.input.parse::<Token![=]>()?;
                     let value: syn::Path = nested.input.parse()?;
-                    result.myparser = Some(value);
+                    result.parser = Some(value);
                     Ok(())
                 } else {
                     Err(Error::new_spanned(
                         attribute,
-                        "entry, Not a valid attribute.",
+                        "Not a valid entry attribute.",
                     ))
                 }
             })?;
         }
-        if result.must & result.default.is_some() {
+        if result.append & result.default.is_some() {
             return Err(Error::new_spanned(
                 input,
-                "`must` and `default` cannot co-exist.",
-            ));
-        }
-        if result.multiple & result.must {
-            return Err(Error::new_spanned(
-                input,
-                "`must` and `multiple` cannot co-exist.",
-            ));
-        }
-        if (!result.multiple) & result.subdir.is_some() {
-            return Err(Error::new_spanned(
-                input,
-                "`subdir` attributed fields must be `multiple`.",
+                "`append` and `default` cannot co-exist.",
             ));
         }
         if let Some(ty) = ty {
-            if (!result.must) & (result.default.is_none()) & (!result.multiple) & (!is_option(ty)) {
+            if result.default.is_none() && !result.append && !is_option(ty) {
                 return Err(Error::new_spanned(
                     input,
-                    "Optional fields should be `Option`s.",
+                    "Type must be `Option` if neither default nor append is configured.",
                 ));
             }
-            if result.multiple & (!is_vec(ty)) {
+            if result.append && (!is_vec(ty)) {
                 return Err(Error::new_spanned(
                     input,
-                    "`multiple` attributed fields should be `Vec`s.",
+                    "`append` attributed fields should be `Vec`s.",
                 ));
             }
         }
