@@ -81,6 +81,7 @@ daemon类型的bin crate的目录以d结尾。
 ```text
 / (sysmaster)
 |...init (init进程)
+|...factory (系统配置)
 |...libs (对外接口)
 |     |...libtests (test lib crate)
 |     |...cgroup (cgroup lib crate)
