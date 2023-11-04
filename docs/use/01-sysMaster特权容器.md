@@ -14,14 +14,12 @@ sysMaster特权容器是指，以sysMaster为1号进程，进而在容器中拉�
 
 ![image](assets/admin_docker.png)
 
-功能特点：
+sysMaster功能特点：
 
-1. 容器化运维，特权模式，可陷入HOST；
+1. 容器化运维，使用特权模式，可陷入HOST运行；
 2. 特权容器可通过K8S按需调度，灵活易用，即用即走；
 3. 进一步精简HostOS，转而在特权容器中部署更多运维和调测工具；
 4. HostOS可不提供登录通道，更加安全。
-
-
 
 ## 如何制作特权容器？
 
@@ -35,7 +33,7 @@ CMD ["/usr/lib/sysmaster/init"]
 
 **2、通过kubectl部署特权容器**
 
-特权容器部署示例YAML请见**特权容器部署YAML示例**，假定YAML保存到当前目录的admin-container.yaml，指定部署命令：
+特权容器部署示例YAML请见下面示例，假定YAML保存到当前目录的admin-container.yaml，指定部署命令：
 
 ```bash
 kubectl apply -f admin-container.yaml
@@ -47,7 +45,7 @@ kubectl apply -f admin-container.yaml
 kubectl get pods -A
 ```
 
-**admin-container.yaml示例**如下：
+**admin-container.yaml示例** 如下：
 
 ```yaml
 apiVersion: v1
@@ -130,12 +128,12 @@ ssh -p your-exposed-port root@your.worker.node.ip
 ```
 hostshell
 ```
+!!! warning
+    使用约束
 
-## 使用约束
-
-- hostshell需要root用户使用。
-- 特权容器内1号进程为sysmaster，不支持systemd。
-- 特权容器设计为运维场景使用的特殊容器，ssh登录特权容器需为root用户。
-- 在host上使用特权容器内命令时，若该命令会使用固定路径下的文件，例如/etc/xxxx，而host上该文件不存在，可能会出现命令执行失败。
-- 特权容器部署时需要为特权容器，并和host共享命名空间。
-- 特权容器设计为运维场景使用的特殊容器，特权容器部署的权限由k8s控制，特权容器部署前k8s需对当前用户进行认证和鉴权。
+    - hostshell需要root用户使用。
+    - 特权容器内1号进程为sysmaster，不支持systemd。
+    - 特权容器设计为运维场景使用的特殊容器，ssh登录特权容器需为root用户。
+    - 在host上使用特权容器内命令时，若该命令会使用固定路径下的文件，例如/etc/xxxx，而host上该文件不存在，可能会出现命令执行失败。
+    - 特权容器部署时需要为特权容器，并和host共享命名空间。
+    - 特权容器设计为运维场景使用的特殊容器，特权容器部署的权限由k8s控制，特权容器部署前k8s需对当前用户进行认证和鉴权。

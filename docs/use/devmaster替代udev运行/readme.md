@@ -2,6 +2,12 @@
 
 使用`devmaster`替换`sysmaster`虚拟机启动场景的`udev`，使得虚拟机启动后可以正常激活逻辑卷、挂载分区、加载网络等等。
 
+在`sysmaster`源码根目录下执行如下命令进行安装：
+
+```shell
+# sh -x tools/run_with_devmaster/install_devmaster.sh [debug|release]
+```
+
 ## 测试环境
 
 - 测试的虚拟机环境如下：
@@ -29,15 +35,15 @@ Linux localhost.localdomain 5.10.0-60.18.0.50.oe2203.x86_64 #1 SMP Wed Mar 30 03
 
 |编号  |  规则 | 包  | 是否需要适配 |
 | ---------------- | --- |-|-|
-|1     | 01-md-raid-creating.rules         | mdadm-4.1-5.oe2203.x86_64              | |
-|2     | 10-dm.rules                       | device-mapper-1.02.181-4.oe2203.x86_64 | |
-|3     | 11-dm-lvm.rules                   | lvm2-2.03.14-4.oe2203.x86_64           | |
-|4     | 11-dm-mpath.rules                 | multipath-tools-0.8.7-2.oe2203.x86_64  | |
-|5     | 11-dm-parts.rules                 | kpartx-0.8.7-2.oe2203.x86_64           | |
-|6     | 13-dm-disk.rules                  | device-mapper-1.02.181-4.oe2203.x86_64 | |
-|7     | 40-elevator.rules                 | systemd-udev-249-16.oe2203.x86_64      | |
-|8     | 40-openEuler.rules                | systemd-udev-249-16.oe2203.x86_64      | 是 |
-|9     | 50-udev-default.rules             | systemd-udev-249-16.oe2203.x86_64      | |
+|1  | 01-md-raid-creating.rules            | mdadm-4.1-5.oe2203.x86_64              | |
+|2  | 10-dm.rules                          | device-mapper-1.02.181-4.oe2203.x86_64 | |
+|3  | 11-dm-lvm.rules                      | lvm2-2.03.14-4.oe2203.x86_64           | |
+|4  | 11-dm-mpath.rules                    | multipath-tools-0.8.7-2.oe2203.x86_64  | |
+|5  | 11-dm-parts.rules                    | kpartx-0.8.7-2.oe2203.x86_64           | |
+|6  | 13-dm-disk.rules                     | device-mapper-1.02.181-4.oe2203.x86_64 | |
+|7  | 40-elevator.rules                    | systemd-udev-249-16.oe2203.x86_64      | |
+|8  | 40-openEuler.rules                   | systemd-udev-249-16.oe2203.x86_64      | 是 |
+|9  | 50-udev-default.rules                | systemd-udev-249-16.oe2203.x86_64      | |
 |10 | 60-autosuspend.rules                 | systemd-udev-249-16.oe2203.x86_64      | |
 |11 | 60-block.rules                       | systemd-udev-249-16.oe2203.x86_64      | |
 |12 | 60-cdrom_id.rules                    | systemd-udev-249-16.oe2203.x86_64      | |

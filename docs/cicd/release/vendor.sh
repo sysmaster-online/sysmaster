@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 
+# 获取当前脚本的目录
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+
+# 递归向上查找包含 Cargo.toml 文件的目录
+while [ ! -f "$SCRIPT_DIR/Cargo.lock" ] && [ "$SCRIPT_DIR" != "/" ]; do
+    SCRIPT_DIR=$(dirname "$SCRIPT_DIR")
+done
+
 # cargo vendor
 echo "cargo vendor ..."
-pushd ..
+pushd $SCRIPT_DIR
 rustup override set stable
 rm -rf vendor
 cargo vendor
@@ -83,7 +91,7 @@ echo "You can create sysmaster-$version.tar.gz by using the tar -cJvf command."
 popd
 
 # compress sysmaster
-pushd ../../
+pushd $SCRIPT_DIR/../
     cp -a sysmaster sysmaster-$version
     pushd sysmaster-$version
     cargo clean

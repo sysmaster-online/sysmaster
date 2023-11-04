@@ -6,7 +6,7 @@
 
 - [openEuler贡献攻略](https://www.openeuler.org/zh/community/contribution/)。
 - [行为准则](https://www.openeuler.org/zh/community/conduct/)
-- [rust API指南](https://zjp-cn.github.io/api-guidelines/)
+- [rust API指南](https://rust-chinese-translation.github.io/api-guidelines/)
 - [rust 设计模式](http://chuxiuhong.com/chuxiuhong-rust-patterns-zh/)
 
 我们强烈推荐，
