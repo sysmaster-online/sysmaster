@@ -8,7 +8,7 @@
     基于openEuler 21.09构建systemd，需要适配systemd源码以支持非1号运行。
 
 !!! warning
-    需要改造systemd的代码,适配的代码放在[patches](./patches/)目录，适配的systemd版本是systemd-248.13。
+    需要改造systemd的代码,适配的代码放在`patches`目录，适配的systemd版本是systemd-248.13。
 
 !!! warning
     本次适配用于原型验证，故相关代码的修改皆以简单原则，满足功能验证即可, 后续可能不会更新维护。
@@ -28,14 +28,13 @@
 === "容器方式（在容器中非1号进程运行systemd）"
 
 ```markdown
-1. 使用[patches]()目录下的适配代码编译systemd，并将输出的rpms，放在[rpms](./rpms)目录下。
+1. 使用`patches`目录下的适配代码编译systemd，并将输出的rpms，放在`rpms`目录下。
 2. 使用build.sh(systemd-dockerimg/build.sh)构建systemd的容器image。可以`chroot rootfs  /bin/bash`，通过`password`命令修改登录密码，然后执行`build.sh`更新镜像。
 3. 修改仓库根目录下的Dockerfile，修改`FROM scratch`为`FROM systemd`, 去除`#RUN rm -f /sbin/init`注释 并在根目录下执行`./docker-run.sh /usr/lib/systemd/systemd`
 4. 可另起窗口，执行`docker exec -it prun bash`进入容器。
 ```
 
 === "虚拟机方式（在虚拟机中非1号进程运行systemd）"
-
 
 ```markdown
 1. 安装21.09虚拟机镜像。

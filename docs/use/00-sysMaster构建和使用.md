@@ -29,7 +29,7 @@ RUST_BACKTRACE=full cargo test --all-targets --all -v -- --nocapture --show-outp
 ```
 ## 使用
 
-在各场景下的使用，可以参考[本栏目其他文章](../use/), 部分场景提供了自动化的工具。
+在各场景下的使用，可以参考`本栏目其他文章`, 部分场景提供了自动化的工具。
 
 !!! note
     也可阅读源码仓库了解[sysmaster源码仓库](https://gitee.com/openeuler/sysmaster/tree/master/tools)
