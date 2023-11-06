@@ -1,333 +1,164 @@
-# 0001-unit_parser
+# systemd单元文件配置解析
 
-* submit: by j4ger on 2023-08-14
-* change: by j4ger on 2023-08-20
 
-## 提供 Systemd Unit File 的解析方法
+## 背景
 
----
+systemd的单元文件采用ini风格的配置文件，为实现完全兼容ini风格配置文件，sysmaster采用自研的`unit_parser`配置解析库。
 
-## 目的
+## unit_parser的基础定义
 
-　　​	`unit_parser`​ 库提供了可以解析 Systemd Unit File 和部分 XDG Desktop Entry 文件的宏和函数，只需使用 `#[derive]`​ 宏为指定的 Unit Spec 定义 Struct 实现核心 Trait，即可直接在程序逻辑中调用解析函数得到对应 Struct 结果。
-
-## 详细设计
-
-　　	首先，我们将一个 Systemd Unit File 的结构总结为 **Section** 和 **Entry**，其中：
-
-* **Section ​**从一个由中括号包裹的 Section 名开头，到下一个 Section 头部或文件尾结束；
-* Section 体部分由 **Entry ​**组成，具体形式为以 `=`​​ 分隔的键值对。
-
-　　	以下文档以此 Unit File 为例：
+在unit_parser配置解析库中，我们将一个完整的unit配置文件称为`Unit`，一个Unit由多个`Section`组成，每个Section有包含多个`Entry`，例如：
 
 ```ini
-# /usr/lib/systemd/system/sddm.service
-
+# ./test.service
 [Unit]
-Description=Simple Desktop Display Manager
-Documentation=man:sddm(1) man:sddm.conf(5)
-Conflicts=getty@tty1.service
-After=systemd-user-sessions.service getty@tty1.service plymouth-quit.service systemd-logind.service
-PartOf=graphical.target
-StartLimitIntervalSec=30
-StartLimitBurst=2
+Description=Test Service
+Before=multi-user.target
 
 [Service]
-ExecStart=/usr/bin/sddm
-Restart=always
+Type=oneshot
+ExecStart=/bin/true
+RemainAfterExit=yes
 
 [Install]
-Alias=display-manager.service
+WantedBy=multi-user.target
 ```
 
-　　	该文件包含三个 Section：*Unit* *Service* 和 *Install*，以及内部的多条 Entry。
+该配置文件整体被称为Unit，`Unit`，`Service`，`Install`为Section。`Description`，`Before`为`Unit` Section的两个Entry；`Type`，`ExecStart`，`RemainAfterExit`为`Service` Section的三个Entry；`WantedBy`为`Install` Section的一个Entry。
 
-　　	`unit_parser`​​ 的核心 Trait 对应了 Unit File 的三个部分：
+通常，配置文件至少包含一个Section，而一个Section至少包含一个Entry。
 
-* ​`UnitConfig`​​​：对应一类 Unit File，其中每个 Field 对应一个 Section，应当为实现了 `UnitSection`​​​ 的 Struct；
-* ​`UnitSection`​​​：对应一类 Section，其中每个 Field 对应一个 Entry，应当为实现了 `UnitEntry`​​​ 的类型；
-* ​`UnitEntry`​​：对应一个 Entry 键值对，其类型应当实现 `UnitEntry`​​ Trait，本质与 `std::str::FromStr`​​ 相同，库中已对默认实现 `std::str::FromStr`​​ 的类型实现了 `UnitEntry`​​，详见下一部分。
+## unit_parser提供的功能
 
-　　	使用时，需要添加 `unit_parser`​​ 依赖：
+unit_parser能够根据用户提供的配置文件，解析得到一个Unit结构体。基础的使用方法如下：
 
-```sh
-cargo add unit_parser
-```
+```rs
+use std::path::PathBuf;
 
-　　	或在 `Cargo.toml`​​ 的 `[dependencies]`​​ 段落中添加：
+use unit_parser::prelude::{UnitConfig, UnitSection};
 
-```toml
-unit_parser = "0.1.0"
-```
-
-　　	并引入核心类型：
-
-```rust
-use unit_parser::prelude::*;
-```
-
-　　	由此，针对上述 Unit File，编写的 Struct 定义如下：
-
-```rust
-#![allow(non_snake_case)]
-
-use unit_parser::prelude::*;
-
-#[derive(UnitConfig, Debug, Clone)]
-#[unit(suffix = "service")]
-struct ServiceUnit {
-  #[section(must)]
-  Unit: UnitSection,
-
-  #[section(must)]
-  Service: ServiceSection,
-
-  Install: Option<InstallSection>
+#[derive(UnitConfig, Default)]
+pub struct SysmasterUnit {
+    pub Unit: SectionUnit,
+    pub Service: SectionService,
+    pub Install: SectionInstall,
 }
 
-#[derive(UnitSection, Debug, Clone)]
-struct UnitSection {
-  #[entry(must)]
-  Description: String,
-
-  Documentation: Option<String>,
-
-  #[entry(multiple)]
-  Conflicts: Vec<String>,
-
-  #[entry(multiple)]
-  After: Vec<String>,
-
-  #[entry(multiple)]
-  PartOf: Vec<String>,
-
-  StartLimitIntervalSec: Option<u32>,
-
-  StartLimitBurst: Option<u32>,
+#[derive(UnitSection, Default)]
+pub struct SectionUnit {
+    #[entry(default = String::new())]
+    pub Description: String,
+    #[entry(append)]
+    pub Before: Vec<String>,
 }
 
-#[derive(UnitSection, Debug, Clone)]
-struct ServiceSection {
-  #[entry(must)]
-  ExecStart: String,
-
-  Restart: Option<RestartStrategy>,
+#[derive(UnitSection, Default)]
+pub struct SectionService {
+    #[entry(default = String::new())]
+    pub Type: String,
+    #[entry(default = String::new())]
+    pub ExecStart: String,
+    #[entry(default = true)]
+    pub RemainAfterExit: bool,
 }
 
-#[derive(UnitEntry, Debug, Clone)]
-enum RestartStrategy {
-  always, never,
+#[derive(UnitSection, Default)]
+pub struct SectionInstall {
+    #[entry(append)]
+    pub WantedBy: Vec<String>,
 }
 
-#[derive(UnitSection, Debug, Clone)]
-struct InstallSection {
-  #[entry(multiple)]
-  Alias: Vec<String>,
+fn main() {
+    let config_path_vec = vec![
+        PathBuf::from("./test.service"),
+    ];
+    let sysmaster_unit = SysmasterUnit::load_config(config_path_vec, "test.service").unwrap();
+    println!("Type is: {}", sysmaster_unit.Service.Type)
 }
 ```
 
-　　	在主程序逻辑中，只需使用 `UnitConfig`​ 结构体上的 `load`​ 方法从文件读取，或使用 `load_from_string`​ 方法从字符串读取，如下：
+这里我们首先定义了`SysmasterUnit`结构体，这个结构体包含三个成员`Unit: SectionUnit`，`Service: SectionService`，`Install: SectionInstall`分别对应配置文件中的`Unit`，`Service`，`Install`三个Section。SectionUnit的每个成员分别对应`Unit` Section中的`Description`，`Before`，类似的，SectionService，SectionInstall与`Service`，`Install` Section中的Entry对应。
 
-```rust
-let unit = ServiceUnit::load("/usr/lib/systemd/system/sddm.service")?;
-```
+在main函数中，我们用config_path_vec构造解析地址，然后使用`SysmasterUnit::load_config`根据config_path_vec生成sysmaster_unit实体。
 
-　　	或使用 `load_dir`​ 加载目录下所有相同后缀的 Unit 文件，如下：
+最后我们尝试打印一下Service Section的Type Entry，如果一切ok，那么终端将打印出“Type is: oneshot”。
 
-```rust
-let units = ServiceUnit::load_dir(vec!["/usr/lib/systemd/system"])?;
-```
+在上面的最简示例中，我们存在以下四处特殊用法：
 
-### 特殊标记
+1. `load_config`：根据用户指定的配置文件，解析得到Unit实体。
+2. `#[derive(UnitConfig)]`：声明当前定义的结构体为Unit，并为Unit实现相应的初始化、解析函数。
+3. `#[derive(UnitSection)]`：声明顶前定义的结构体为Section，并为Section实现相应的初始化、解析函数。
+4. `#[entry()]`：为各个Entry配置属性。
 
-　　	在结构体定义中，可以使用特殊的 Attribute 来改变解析时的行为。
+下面我们对这几点内容做具体介绍。
 
-#### Unit Attribute
+## 外部接口：load_config
 
-　　	所有 Unit Attribute 应用在 `UnitConfig`​ 结构体外部，使用 `#[unit()]`​ 作为外标记。
+`UnitConfig::load_config()`是unit_parser对外提供的唯一解析函数，第一个参数为解析文件路径数组、第二个参数为Unit完整名称。
 
-##### suffix
+* 解析文件路径数组：一个Unit实体可以通过不同的配置文件解析得到，因此这里将配置文件路径按照数组的形式组合。对于相同的Entry，在数组后面出现的配置文件具有更高优先级。
+* Unit完整名称：某些Entry的解析依赖于Unit完整名称，因此用户必须传入完整的Unit名称。
 
-　　	指定 Unit 文件的后缀名，若指定则解析目录时只会解析匹配后缀名的文件。
+## 过程宏：UnitConfig、UnitSection
 
-```rust
-#[derive(UnitConfig, Debug, Clone)]
-#[unit(suffix = "service")]
-struct Unit {
-  #[section(default, must)]
-  Section: Section,
+UnitConfig、UnitSection是unit_parser定义的两个过程宏，两者的实现比较相似，我们首先介绍UnitConfig。
+
+UnitConfig自动为结构体实现UnitConfig trait，该trait主要包括四个函数：
+
+1. **load_config：** 对外提供的配置解析接口。
+2. **__load：** load_config的内部具体实现。
+1. **__load_default：** 负责解析结构体的初始化，加载缺省值。
+2. **__parse_unit：** 根据用户给定的配置文件，解析得到Unit实体。
+
+用户调用`UnitConfig::load_config()`，通过给定配置文件路径、Unit名称，解析得到Unit实体。
+
+`load_config()`首先调用`__load_default()`加载缺省值，然后调用`__load()`加载用户的配置文件，`__load()`的加载过程会调用`__parse_unit()`。
+
+## `#[entry()]`
+
+unit_parser允许通过配置属性的方式为不同的Entry采用不同的解析策略。例如：
+
+```rs
+pub struct SectionService {
+    #[entry(default = true)]
+    pub RemainAfterExit: bool,
 }
 ```
 
-#### Section Attribute
+这里的意思是：RemainAfterExit的缺省值为`true`。如果用户的配置文件中没有配置RemainAfterExit，那么最终的Unit实体中，RemainAfterExit的值为`true`。
 
-　　	所有 Section Attribute 应用在 `UnitConfig`​​ 结构体中的 Field 上，使用 `#[section()]`​​ 作为外标记。
+`#[entry()]`支持配置的属性如下：
 
-##### default
+* default: Entry的缺省值，如果不配置该属性，Entry的类型必须为Option<>
+* append：Entry采用追加模式更新。允许该Entry配置多次，后配置的值将追加到之前解析的值上。类型为Vec<>
+* prser：使用用户自定义的解析函数。
+* key：Entry的别名。例如为RemainAfterExit配置`#[entry(key = "RemainWhenExit")]`，在配置文件中解析到`RemainWhenExit`时按照`RemainAfterExit`处理。
 
-　　	指定对应 Section 的默认值，若文件中未找到该 Section 则使用默认值。对应 Section 结构体需要实现 `std::default::Default`​，即其默认值。
+### 过程宏：UnitEntry
 
-```rust
-#[derive(UnitConfig, Debug, Clone)]
-struct Unit {
-  #[section(default, must)]
-  Section: Section,
-}
+在前面的示例中，我们的每个Entry都是一些rust基础的数据类型，unit_parser为这些基础数据类型实现了UnitEntry trait。用户自定义的数据类型，需要手动实现UnitEntry trait，或者使用`parser`属性。
 
-#[derive(UnitSection, Debug, Clone)]
-struct Section {
-  #[entry(must)]
-  Entry: u64,
-}
-
-impl Default for Section {
-  fn default() -> Self {
-    Self { Entry: 0 }
-  }
+```rs
+pub trait UnitEntry: Sized {
+    type Error;
+    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error>;
 }
 ```
 
-##### key
+已经实现UnitEntry的数据类型包括：
 
-　　	指定对应 Section 的键名。默认使用 Field 名作为 Section 名在文件中寻找 Section 定义，可使用 `str`​​ 形式的键名覆盖这一行为。
-
-```rust
-#[derive(UnitConfig, Debug, Clone)]
-struct Unit {
-  #[section(key = "AlternativeName", must)]
-  Section: Section,
-}
-```
-
-##### must
-
-　　	指定对应的 Section 为必填。若不指定 `must`​，对应 Field 必须为 `Option`​。
-
-```rust
-#[derive(UnitConfig, Debug, Clone)]
-struct Unit {
-  #[section(must)]
-  Section: Section,
-
-  OptionalSection: Option<OptionalSection>,
-}
-```
-
-#### Entry Attribute
-
-　　	所有 Entry Attribute 应用在 `UnitSection`​​ 结构体中的 Field 上，使用 `#[entry()]`​​ 作为外标记。
-
-##### default
-
-　　	指定对应 Entry 的默认值，若文件中未找到该 Entry 则使用默认值。需要传入一个 `Expr`​​ 表达式。
-
-```rust
-#[derive(UnitSection, Debug, Clone)]
-struct Section {
-  #[entry(default = 114, must)]
-  Entry: u64,
-}
-```
-
-##### key
-
-　　	指定对应 Entry 的键名。默认使用 Field 名作为 Entry 名在文件中寻找 Entry 定义，可使用 `str`​​ 形式的键名覆盖这一行为。
-
-```rust
-#[derive(UnitSection, Debug, Clone)]
-struct Section {
-  #[entry(key = "AltKey", must)]
-  Entry: u64,
-}
-```
-
-##### must
-
-　　	指定对应的 Entry 为必填。若不指定 `must`​ 或 `multiple`​，则对应 Field 必须为 `Option`​。
-
-```rust
-#[derive(UnitSection, Debug, Clone)]
-struct Section {
-  #[entry(must)]
-  Entry: u64,
-
-  OptionalEntry: Option<u64>,
-}
-```
-
-|在未找到值时的行为|有 `must`​|无 `must`​|
-| --------------------| :---------------------------------------: | :--------------------: |
-|有 `default`​|使用默认值<br />||
-|无 `default`​|报错|必须为 `Option`​，结果为 `None`​|
-
-##### multiple
-
-　　	指定对应的 Entry 允许出现多次。默认情况下，最后一次出现的值会覆盖之前的值。指定 `multiple`​ 后，每次出现 Entry 时其值会被加入最终的 `Vec`​ 中。此外，每次解析字符串时，会首先按照空格分割字符串，再解析每一段，从而可以解析空格分隔的数组值。`multiple`​ Field 必须为 `Vec`​。
-
-```rust
-#[derive(UnitSection, Debug, Clone)]
-struct Section {
-  #[entry(multiple)]
-  Entry: Vec<u64>,
-}
-```
-
-|在 `Vec`​ 为空时的行为|有 `must`​<br />|无 `must`​|
-| --------------------| :---------------------------------------: | :--------------------: |
-|有 `default`​|使用默认值<br />||
-|无 `default`​|报错|保持为空，`log::warn`​|
-
-#### Entry 类型
-
-　　	`UnitEntry`​​ Trait 已为所有实现 `std::str::FromStr`​​ 的类型完成实现，此外特殊实现包括：
-
-* ​`bool`​​​：根据 systemd.syntax 中的定义，`yes`​​​ `1`​​​ `on`​​​ `true`​​​ 都被认为是 `true`​​​，`no`​​​ `0`​​​ `off`​​​ `false`​​​ 都被认为是 `false`​​​；
-* ​`chrono::Duration`​​​：根据 systemd.time 中的定义解析；
+* ​`bool`​​​：根据systemd.syntax的定义，`yes`​​​，`1`​​​，`on`​​​，`true`解析为`true`​；​`no`​​​，`0`​​​，`off`​​​，`false`​​​ 解析为`false`​​​。
+* ​`chrono::Duration`​​​：根据systemd.time的定义解析。
 * ​`Enum`​​：自定义的枚举类型，可以使用 `#[derive(UnitEntry)]`​​ 自动实现 `UnitEntry`​​。
 
-### 底层设计
+## nom解析器
 
-#### 预处理
+### 预处理
 
-　　　	首先，通过编写 PEG 语法文件和使用 `pest`​​ 库进行预解析，首先验证 Unit File 的基本结构是否合法。
+首先，通过编写PEG语法文件和使用`pest`​​库进行预解析，首先验证 Unit配置文件的基本结构是否合法。
 
-　　	解析后的内部状态被包装为 `UnitParser`​​ 和 `SectionParser`​​，其求值是惰性的，也不会产生额外的复制开销。`UnitParser`​​ 是一个返回 `SectionParser`​​ 的迭代器，`SectionParser`​​ 是一个返回 `(String, String)`​​ 键值对的迭代器。
+解析后的内部状态被包装为`UnitParser`​​和`SectionParser`​​，其求值是惰性的，也不会产生额外的复制开销。`UnitParser`​​是一个返回`SectionParser`​​的迭代器，`SectionParser`​​是一个返回`(String, String)`​​键值对的迭代器。
 
-#### 宏与代码生成
-
-　　	`unit_parser_macro`​ 库使用 `syn`​ 库解析 `#[derive()]`​ 修饰的结构体定义，处理其键名、类型和所加的 Attribute。对每个 Unit 的解析逻辑（其上生成的 `__parse_unit()`​ 方法）如下：
-
-* 对每个键初始化同名变量，值为 `None`​；
-* 调用 `unit_parser`​ 函数获得 `UnitParser`​，迭代其中每一个 `SectionParser`​，用 `match`​ 语句匹配其键名（或 `default`​ Attribute 指定的键名），并调用对应 Section 结构体的 `__parse_section`​ 方法解析 `SectionParser`​。若解析成功，将同名变量设置为 `Some(section)`​；若解析报错，且未定义 `default`​，则报错；若有定义 `default`​ 则使用默认值；
-* 在迭代完毕后对每个同名变量使用 `ok_or`​ （若无 `default`​ 定义）或 `unwrap_or`​ （若有 `default`​ 定义）得到内部值；若为 `optional`​，则跳过；
-* 构造并返回 `Self`​。
-
-　　　	类似地，每个 Section 的解析逻辑（其上生成的 `__parse_section`​​ 方法）如下：
-
-* 对每个键初始化同名变量，值为 `None`​​，若为 `multiple`​​，则初始化为 `Vec::new()`​​；
-* 迭代 `SectionParser`​​ 其中每一个 `(String, String)`​​ 键值对，用 `match`​​ 语句匹配其键名（或 `default`​​ Attribute 指定的键名），并调用对应 Entry 结构体的 `parse_from_str`​​ 方法解析。若解析成功，将同名变量设置为 `Some(entry)`​​；若解析报错，且未定义 `default`​​，则报错；若有定义 `default`​​ 则使用默认值；若为 `multiple`​​，则使用 `Vec::push()`​​ 方法加入数组；
-* 在迭代完毕后对每个同名变量使用 `ok_or`​​ （若无 `default`​​ 定义）或 `unwrap_or`​​ （若有 `default`​​ 定义）得到内部值；若为 `optional`​​，则跳过；
-* 构造并返回 `Self`​​。
-
-　　	为了实现模板构造，在解析时将文件分为*普通*、*模板*和*实例*三种进行处理，将模板加入数组，将实例加入待处理队列，变例完全部文件（解析完所有模板）后，对每个实例进行字符串替换，再从模板新建。
-
-　　	为了实现 Drop-in patching，每次解析时可选地传入一个已有的 Self Struct 以供修补，而非全部从头开始构造。
-
-## 特殊事项
-
-- XDG Desktop Entry 规范中定义了 locale 功能，在此并未实现；
-
-## 当前进展
-
-- 全部上述功能
-
-## 待完成
-
-* *service.wants ​*与*​ service.requires ​*的设计
-* 特殊变量（*specifiers*）
-* 错误处理（单个文件错误不应影响其他）
-* 英文文档
-* 注释
 
 ## 参考文档
 

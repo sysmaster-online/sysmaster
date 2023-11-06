@@ -27,8 +27,10 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub trait UnitConfig: Sized + Default {
     /// The suffix of a type of unit, parsed from an attribute.
     const SUFFIX: &'static str;
+
     /// Parses the unit from a [UnitParser].
     fn __parse_unit(__source: UnitParser, res: &mut Self) -> Result<()>;
+
     /// Load the default value
     fn __load_default(__res: &mut Self);
 
@@ -47,7 +49,10 @@ pub trait UnitConfig: Sized + Default {
     }
 
     /// Loads a unit with the given config file list and unit name
-    /// If no suffix is given, the unit's defined suffix will be added to the end.
+    ///
+    /// paths: full paths of the given config file
+    ///
+    /// unit_name: the full unit name
     fn load_config<P: AsRef<Path>>(paths: Vec<P>, unit_name: &str) -> Result<Self> {
         // return when first one is found?
         let paths: Vec<PathBuf> = paths.iter().map(|x| x.as_ref().to_path_buf()).collect();
