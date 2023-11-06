@@ -1,7 +1,7 @@
 #!/bin/bash
 
 pwd=$(pwd)
-run_with_rsyslog=${pwd}/tools/run_with_rsyslog
+run_with_rsyslog=${pwd}
 
 install -Dm0640 -t /lib/sysmaster/system ${run_with_rsyslog}/syslog.service
 

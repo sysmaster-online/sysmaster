@@ -21,7 +21,7 @@ Linux localhost.localdomain 5.10.0-60.18.0.50.oe2203.x86_64 #1 SMP Wed Mar 30 03
 
 ## 安装方法
 
-1. 参考[`sysmaster`虚拟机启动方案](<http://sysmaster.online/use/01-run%20sysmaster%20with%20vm/>)搭建启动环境。
+1. 参考[`sysmaster`虚拟机启动方案](<http://127.0.0.1:8000/use/%E8%99%9A%E6%9C%BA%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/>)搭建启动环境。
 
 2. 安装`devmaster`的二进制以及相关配置文件，在`sysmaster`源码根目录下执行如下命令：
 

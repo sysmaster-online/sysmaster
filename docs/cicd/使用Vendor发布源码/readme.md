@@ -27,4 +27,4 @@ cargo vendor
 将整个源码仓库打包
 
 !!! tips
-    也可以使用脚本[vendor.sh](./vendor.sh)在[脚本目录]()下自动化的做这些事情.
+    本项目也可以使用同级目录下的脚本[vendor.sh](./vendor.sh)自动化的做这些事情.

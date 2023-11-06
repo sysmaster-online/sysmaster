@@ -1,4 +1,4 @@
-# README
+# sysmaster下使能rsyslog
 
 本文档介绍在`sysmaster`环境中使用`rsyslog`管理日志的方法。
 
@@ -13,7 +13,7 @@
 2. 执行如下命令，在`sysmaster`的配置路径下安装`rsyslog`服务：
 
     ```shell
-    # sh tools/run_with_rsyslog/install_rsyslog.sh
+    # sh ./install_rsyslog.sh
     ```
 
 > **注意：**
