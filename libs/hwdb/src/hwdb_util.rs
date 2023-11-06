@@ -753,7 +753,7 @@ impl HwdbUtil {
                     hwdb_bin
                 ),
                 Err(e) => {
-                    if e == nix::Error::ENOENT {
+                    if e != nix::Error::ENOENT {
                         log::error!(
                             "Failed to remove compiled hwdb database {:?}:{:?}",
                             hwdb_bin,
