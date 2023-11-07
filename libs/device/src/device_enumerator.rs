@@ -12,7 +12,7 @@
 
 //! enumerate /sys to collect devices
 //!
-use crate::{device::Device, err_wrapper, error::Error, utils::*};
+use crate::{device::Device, error::Error, utils::*};
 use bitflags::bitflags;
 use fnmatch_sys::fnmatch;
 use nix::errno::Errno;
@@ -45,7 +45,7 @@ impl Default for MatchInitializedType {
 }
 
 /// enumerate devices or subsystems under /sys
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct DeviceEnumerator {
     /// enumerator type
     pub(crate) etype: RefCell<DeviceEnumerationType>,
@@ -289,7 +289,7 @@ impl DeviceEnumerator {
 
     /// add match parent
     pub fn add_match_parent_incremental(&mut self, parent: &Device) -> Result<(), Error> {
-        let syspath = err_wrapper!(parent.get_syspath(), "add_match_parent_incremental")?;
+        let syspath = parent.get_syspath()?;
         self.match_parent.borrow_mut().insert(syspath);
         self.scan_up_to_date.replace(false);
         Ok(())
@@ -364,7 +364,7 @@ impl DeviceEnumerator {
                 // remove already sorted devices from the hashmap (self.devices_by_syspath)
                 // avoid get repeated devices from the hashmap later
                 for device in devices.iter().skip(m) {
-                    let syspath = err_wrapper!(device.borrow().get_syspath(), "sort_devices")?;
+                    let syspath = device.borrow().get_syspath()?;
 
                     self.devices_by_syspath.borrow_mut().remove(&syspath);
                 }
@@ -400,7 +400,7 @@ impl DeviceEnumerator {
 
     /// add device
     pub(crate) fn add_device(&self, device: Rc<RefCell<Device>>) -> Result<bool, Error> {
-        let syspath = err_wrapper!(device.borrow().get_syspath(), "add_device")?;
+        let syspath = device.borrow().get_syspath()?;
 
         match self.devices_by_syspath.borrow_mut().insert(syspath, device) {
             Some(_) => {

@@ -286,7 +286,7 @@ fn print_device_chain(device: Device) -> Result<()> {
     while let Ok(parent) = child.get_parent() {
         print_all_attributes(&parent.borrow(), true)?;
 
-        child = parent.borrow().clone();
+        child = parent.borrow().shallow_clone().unwrap();
     }
 
     Ok(())
@@ -489,7 +489,7 @@ fn export_devices() -> Result<()> {
     }
 
     for device in e.iter() {
-        print_record(device.borrow().clone(), "");
+        print_record(device.borrow().shallow_clone().unwrap(), "");
     }
 
     Ok(())

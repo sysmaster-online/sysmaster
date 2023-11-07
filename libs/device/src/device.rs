@@ -12,7 +12,6 @@
 
 //! struct Device
 //!
-use crate::err_wrapper;
 use crate::utils::readlink_value;
 use crate::{error::*, DeviceAction};
 use basic::fs_util::{chmod, open_temporary, touch_file};
@@ -49,7 +48,7 @@ pub const DB_BASE_DIR: &str = "data";
 pub const TAGS_BASE_DIR: &str = "tags";
 
 /// Device
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Device {
     /// inotify handler
     pub watch_handle: RefCell<i32>,
@@ -355,33 +354,16 @@ impl Device {
 
         let buf_trans: &[u8] = unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const _, 16) };
 
-        let ifname = String::from_utf8(buf_trans.to_vec()).map_err(|e| Error::Nix {
-            msg: format!("from_ifindex failed: from_utf8 {:?} ({})", buf_trans, e),
-            source: Errno::EINVAL,
+        let ifname = String::from_utf8(buf_trans.to_vec()).context(FromUtf8 {
+            msg: format!("invalid utf-8 string {:?}", buf_trans),
         })?;
 
         let syspath = format!("/sys/class/net/{}", ifname.trim_matches(char::from(0)));
-        let dev = Self::from_syspath(&syspath, true).map_err(|e| Error::Nix {
-            msg: format!("from_ifindex failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        let dev = Self::from_syspath(&syspath, true)?;
 
-        let i = match dev.get_ifindex() {
-            Ok(i) => i,
-            Err(e) => {
-                if e.get_errno() == Errno::ENOENT {
-                    return Err(Error::Nix {
-                        msg: format!("from_ifindex failed: {}", e),
-                        source: Errno::ENXIO,
-                    });
-                }
-
-                return Err(Error::Nix {
-                    msg: format!("from_ifindex failed: {}", e),
-                    source: e.get_errno(),
-                });
-            }
-        };
+        let i = dev
+            .get_ifindex()
+            .map_err(|e| e.replace_errno(Errno::ENOENT, Errno::ENXIO))?;
 
         if i != ifindex {
             return Err(Error::Nix {
@@ -393,8 +375,9 @@ impl Device {
         Ok(dev)
     }
 
-    /// create a Device instance from subsystem and sysname
-    /// if subsystem is 'drivers', sysname should be like 'xxx:yyy'
+    /// Create a Device instance from subsystem and sysname.
+    ///
+    /// If subsystem is 'drivers', sysname should be like 'xxx:yyy'
     pub fn from_subsystem_sysname(subsystem: &str, sysname: &str) -> Result<Device, Error> {
         let sysname = sysname.replace('/', "!");
         if subsystem == "subsystem" {
@@ -506,10 +489,12 @@ impl Device {
         })
     }
 
-    /// set sysattr value
+    /// Set sysattr value.
+    ///
+    /// If the sysattr is not 'uevent', the value will be cached.
     pub fn set_sysattr_value(&self, sysattr: &str, value: Option<&str>) -> Result<(), Error> {
         if value.is_none() {
-            self.remove_cached_sysattr_value(sysattr)?;
+            self.remove_cached_sysattr_value(sysattr);
             return Ok(());
         }
 
@@ -529,7 +514,7 @@ impl Device {
         };
 
         if let Err(e) = file.write(value.unwrap().as_bytes()) {
-            self.remove_cached_sysattr_value(sysattr)?;
+            self.remove_cached_sysattr_value(sysattr);
             return Err(Error::Nix {
                 msg: format!(
                     "set_sysattr_value failed: can't write sysattr '{}'",
@@ -559,28 +544,18 @@ impl Device {
 
         match id.chars().next() {
             Some('b') | Some('c') => {
-                let devnum = parse_devnum(&id[1..]).map_err(|_| Error::Nix {
+                let devnum = parse_devnum(&id[1..]).context(Basic {
                     msg: format!("from_device_id failed: parse_devnum '{}' failed", id),
-                    source: Errno::EINVAL,
                 })?;
 
-                return Device::from_devnum(id.chars().next().unwrap(), devnum).map_err(|e| {
-                    Error::Nix {
-                        msg: format!("from_device_id failed: {}", e),
-                        source: e.get_errno(),
-                    }
-                });
+                Device::from_devnum(id.chars().next().unwrap(), devnum)
             }
             Some('n') => {
-                let ifindex = parse_ifindex(&id[1..]).map_err(|_| Error::Nix {
+                let ifindex = parse_ifindex(&id[1..]).context(Basic {
                     msg: format!("from_device_id failed: parse_ifindex '{}' failed", id),
-                    source: Errno::EINVAL,
                 })?;
 
-                Device::from_ifindex(ifindex).map_err(|e| Error::Nix {
-                    msg: format!("from_device_id failed: {}", e),
-                    source: e.get_errno(),
-                })
+                Device::from_ifindex(ifindex)
             }
             Some('+') => {
                 let sep = match id.find(':') {
@@ -604,10 +579,7 @@ impl Device {
 
                 let subsystem = id[1..sep].to_string();
                 let sysname = id[sep + 1..].to_string();
-                Device::from_subsystem_sysname(&subsystem, &sysname).map_err(|e| Error::Nix {
-                    msg: format!("from_device_id failed: {}", e),
-                    source: e.get_errno(),
-                })
+                Device::from_subsystem_sysname(&subsystem, &sysname)
             }
             _ => Err(Error::Nix {
                 msg: format!("from_device_id failed: invalid id '{}'", id),
@@ -648,7 +620,7 @@ impl Device {
     /// get the sysname of the device
     pub fn get_sysname(&self) -> Result<String, Error> {
         if self.sysname.borrow().is_empty() {
-            err_wrapper!(self.set_sysname_and_sysnum(), "get_sysname")?;
+            self.set_sysname_and_sysnum()?;
         }
 
         Ok(self.sysname.borrow().clone())
@@ -729,10 +701,7 @@ impl Device {
             // e.g. /sys/devices/pci0000:00/0000:00:10.0/host2/target2:0:1/2:0:1:0/block/sda/subsystem -> ../../../../../../../../class/block
             // get `block`
             let filename = if Path::exists(Path::new(subsystem_path)) {
-                readlink_value(subsystem_path).map_err(|e| Error::Nix {
-                    msg: format!("get_subsystem failed: {}", e),
-                    source: e.get_errno(),
-                })?
+                readlink_value(subsystem_path)?
             } else {
                 "".to_string()
             };
@@ -766,10 +735,7 @@ impl Device {
 
     /// get the ifindex of device
     pub fn get_ifindex(&self) -> Result<u32, Error> {
-        self.read_uevent_file().map_err(|e| Error::Nix {
-            msg: format!("get_ifindex failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        self.read_uevent_file()?;
 
         if *self.ifindex.borrow() == 0 {
             return Err(Error::Nix {
@@ -802,12 +768,7 @@ impl Device {
 
     /// get devnum
     pub fn get_devnum(&self) -> Result<u64, Error> {
-        match self.read_uevent_file() {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(e);
-            }
-        }
+        self.read_uevent_file()?;
 
         if major(*self.devnum.borrow()) == 0 {
             return Err(Error::Nix {
@@ -870,10 +831,7 @@ impl Device {
     /// get device sysnum
     pub fn get_sysnum(&self) -> Result<String, Error> {
         if self.sysname.borrow().is_empty() {
-            self.set_sysname_and_sysnum().map_err(|e| Error::Nix {
-                msg: format!("get_sysnum failed: {}", e),
-                source: e.get_errno(),
-            })?;
+            self.set_sysname_and_sysnum()?;
         }
 
         if self.sysnum.borrow().is_empty() {
@@ -915,10 +873,7 @@ impl Device {
 
     /// get device diskseq
     pub fn get_diskseq(&self) -> Result<u64, Error> {
-        self.read_uevent_file().map_err(|e| Error::Nix {
-            msg: format!("get_diskseq failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        self.read_uevent_file()?;
 
         if *self.diskseq.borrow() == 0 {
             return Err(Error::Nix {
@@ -935,7 +890,6 @@ impl Device {
 
     /// get is initialized
     pub fn get_is_initialized(&self) -> Result<bool, Error> {
-        // match self.read_db
         match self.read_db() {
             Ok(_) => {}
             Err(e) => {
@@ -979,30 +933,21 @@ impl Device {
 
     /// check whether the device has the tag
     pub fn has_tag(&self, tag: &str) -> Result<bool, Error> {
-        self.read_db().map_err(|e| Error::Nix {
-            msg: format!("has_tag failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        self.read_db()?;
 
         Ok(self.all_tags.borrow().contains(tag))
     }
 
     /// check whether the device has the current tag
     pub fn has_current_tag(&self, tag: &str) -> Result<bool, Error> {
-        self.read_db().map_err(|e| Error::Nix {
-            msg: format!("has_tag failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        self.read_db()?;
 
         Ok(self.current_tags.borrow().contains(tag))
     }
 
     /// get the value of specific device property
     pub fn get_property_value(&self, key: &str) -> Result<String, Error> {
-        self.properties_prepare().map_err(|e| Error::Nix {
-            msg: format!("get_property_value failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        self.properties_prepare()?;
 
         match self.properties.borrow().get(key) {
             Some(v) => Ok(v.clone()),
@@ -1083,27 +1028,22 @@ impl Device {
                     let mut file = std::fs::OpenOptions::new()
                         .read(true)
                         .open(&sysattr_path)
-                        .map_err(|e| Error::Nix {
+                        .context(Io {
                             msg: format!(
-                                "get_sysattr_value failed: can't open sysattr '{}': {}",
-                                sysattr, e
+                                "get_sysattr_value failed: can't open sysattr '{}'",
+                                sysattr
                             ),
-                            source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
                         })?;
                     let mut value = String::new();
-                    file.read_to_string(&mut value).map_err(|e| Error::Nix {
-                        msg: format!(
-                            "get_sysattr_value failed: can't read sysattr '{}': {}",
-                            sysattr, e
-                        ),
-                        source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
+                    file.read_to_string(&mut value).context(Io {
+                        msg: format!("get_sysattr_value failed: can't read sysattr '{}'", sysattr),
                     })?;
                     value.trim_end().to_string()
                 }
             }
 
             Err(e) => {
-                self.remove_cached_sysattr_value(sysattr).unwrap();
+                self.remove_cached_sysattr_value(sysattr);
                 return Err(Error::Nix {
                     msg: format!("get_sysattr_value failed: can't lstat '{}'", sysattr_path),
                     source: e,
@@ -1111,11 +1051,7 @@ impl Device {
             }
         };
 
-        self.cache_sysattr_value(sysattr, &value)
-            .map_err(|e| Error::Nix {
-                msg: format!("get_sysattr_value failed: {}", e),
-                source: e.get_errno(),
-            })?;
+        self.cache_sysattr_value(sysattr, &value)?;
 
         Ok(value)
     }
@@ -1133,15 +1069,9 @@ impl Device {
 
         let s = format!("{}", action);
 
-        let id = match randomize() {
-            Ok(id) => id,
-            Err(e) => {
-                return Err(Error::Nix {
-                    msg: "Failed to randomize".to_string(),
-                    source: e,
-                })
-            }
-        };
+        let id = randomize().context(Nix {
+            msg: "Failed to randomize".to_string(),
+        })?;
 
         let j = s + " " + &id.to_string();
 
@@ -1152,33 +1082,12 @@ impl Device {
 
     /// open device
     pub fn open(&self, oflags: OFlag) -> Result<File, Error> {
-        let devname = self.get_devname().map_err(|e| {
-            if e.get_errno() == Errno::ENOENT {
-                Error::Nix {
-                    msg: format!("open failed: {}", e),
-                    source: Errno::ENOEXEC,
-                }
-            } else {
-                Error::Nix {
-                    msg: format!("open failed: {}", e),
-                    source: e.get_errno(),
-                }
-            }
-        })?;
-
-        let devnum = self.get_devnum().map_err(|e| {
-            if e.get_errno() == Errno::ENOENT {
-                Error::Nix {
-                    msg: format!("open failed: {}", e),
-                    source: Errno::ENOEXEC,
-                }
-            } else {
-                Error::Nix {
-                    msg: format!("open failed: {}", e),
-                    source: e.get_errno(),
-                }
-            }
-        })?;
+        let devname = self
+            .get_devname()
+            .map_err(|e| e.replace_errno(Errno::ENOENT, Errno::ENOEXEC))?;
+        let devnum = self
+            .get_devnum()
+            .map_err(|e| e.replace_errno(Errno::ENOENT, Errno::ENOEXEC))?;
 
         let subsystem = match self.get_subsystem() {
             Ok(s) => s,
@@ -1212,19 +1121,13 @@ impl Device {
             }
         };
 
-        let stat = match nix::sys::stat::fstat(file.as_raw_fd()) {
-            Ok(s) => s,
-            Err(e) => {
-                return Err(Error::Nix {
-                    msg: format!(
-                        "open failed: can't fstat fd {} for '{}'",
-                        file.as_raw_fd(),
-                        devname
-                    ),
-                    source: e,
-                })
-            }
-        };
+        let stat = nix::sys::stat::fstat(file.as_raw_fd()).context(Nix {
+            msg: format!(
+                "open failed: can't fstat fd {} for '{}'",
+                file.as_raw_fd(),
+                devname
+            ),
+        })?;
 
         if stat.st_rdev != devnum {
             return Err(Error::Nix {
@@ -1265,18 +1168,11 @@ impl Device {
 
         let mut diskseq: u64 = 0;
 
-        if self.get_is_initialized().map_err(|e| Error::Nix {
-            msg: format!("open failed: {}", e),
-            source: e.get_errno(),
-        })? {
+        if self.get_is_initialized()? {
             match self.get_property_value("ID_IGNORE_DISKSEQ") {
                 Ok(value) => {
-                    if !value.parse::<bool>().map_err(|e| Error::Nix {
-                        msg: format!(
-                            "open failed: failed to parse value '{}' to boolean: {}",
-                            value, e
-                        ),
-                        source: Errno::EINVAL,
+                    if !value.parse::<bool>().context(ParseBool {
+                        msg: format!("invalid value '{}'", value),
                     })? {
                         match self.get_diskseq() {
                             Ok(n) => diskseq = n,
@@ -1302,28 +1198,16 @@ impl Device {
             }
         }
 
-        let file2 =
-            basic::fd_util::fd_reopen(file.as_raw_fd(), oflags).map_err(|e| Error::Nix {
-                msg: format!("open failed: {}", e),
-                source: match e {
-                    basic::Error::Nix { source } => source,
-                    _ => Errno::EINVAL,
-                },
-            })?;
+        let file2 = basic::fd_util::fd_reopen(file.as_raw_fd(), oflags).context(Basic {
+            msg: format!("failed to open {}", file.as_raw_fd()),
+        })?;
 
         if diskseq == 0 {
             return Ok(file2);
         }
 
-        let q = basic::fd_util::fd_get_diskseq(file2.as_raw_fd()).map_err(|e| Error::Nix {
-            msg: format!(
-                "open failed: failed to get diskseq on fd {}",
-                file2.as_raw_fd()
-            ),
-            source: match e {
-                basic::Error::Nix { source } => source,
-                _ => Errno::EINVAL,
-            },
+        let q = basic::fd_util::fd_get_diskseq(file2.as_raw_fd()).context(Basic {
+            msg: format!("failed to get diskseq on fd {}", file2.as_raw_fd()),
         })?;
 
         if q != diskseq {
@@ -1352,18 +1236,9 @@ impl Device {
 
     /// shadow clone a device object and import properties from db
     pub fn clone_with_db(&self) -> Result<Device, Error> {
-        let device = self.shallow_clone().map_err(|e| Error::Nix {
-            msg: format!("clone_with_db failed: {}", e),
-            source: e.get_errno(),
-        })?;
-
-        device.read_db().map_err(|e| Error::Nix {
-            msg: format!("clone_with_db failed: {}", e),
-            source: e.get_errno(),
-        })?;
-
+        let device = self.shallow_clone()?;
+        device.read_db()?;
         device.sealed.replace(true);
-
         Ok(device)
     }
 
@@ -1427,22 +1302,14 @@ impl Device {
     ///
     /// The format is like:
     ///
-    ///     character device:       c<major>:<minor>
-    ///
-    ///     block device:           b<major>:<minor>
-    ///
-    ///     network interface:      n<ifindex>
-    ///
-    ///     drivers:                +drivers:<driver subsystem>:<sysname>
-    ///
-    ///     other subsystems:       +<subsystem>:<sysname>
-    ///
+    /// - character device:       c<major>:<minor>
+    /// - block device:           b<major>:<minor>
+    /// - network interface:      n<ifindex>
+    /// - drivers:                +drivers:<driver subsystem>:<sysname>
+    /// - other subsystems:       +<subsystem>:<sysname>
     pub fn get_device_id(&self) -> Result<String, Error> {
         if self.device_id.borrow().is_empty() {
-            let subsystem = self.get_subsystem().map_err(|e| Error::Nix {
-                msg: format!("get_device_id failed: {}", e),
-                source: e.get_errno(),
-            })?;
+            let subsystem = self.get_subsystem()?;
 
             let id: String;
             if let Ok(devnum) = self.get_devnum() {
@@ -1455,10 +1322,7 @@ impl Device {
             } else if let Ok(ifindex) = self.get_ifindex() {
                 id = format!("n{}", ifindex);
             } else {
-                let sysname = self.get_sysname().map_err(|e| Error::Nix {
-                    msg: format!("get_device_id failed: {}", e),
-                    source: e.get_errno(),
-                })?;
+                let sysname = self.get_sysname()?;
 
                 if subsystem == "drivers" {
                     id = format!("+drivers:{}:{}", self.driver_subsystem.borrow(), sysname);
@@ -1571,21 +1435,14 @@ impl Device {
         let db_path = format!("{}/{}/{}", self.base_path.borrow(), DB_BASE_DIR, id);
 
         if !has_info && *self.devnum.borrow() == 0 && *self.ifindex.borrow() == 0 {
-            unlink(db_path.as_str()).map_err(|e| Error::Nix {
+            unlink(db_path.as_str()).context(Nix {
                 msg: format!("update_db failed: can't unlink db '{}'", db_path),
-                source: e,
             })?;
-
             return Ok(());
         }
 
-        create_dir_all(&format!("{}/{}", self.base_path.borrow(), DB_BASE_DIR)).map_err(|e| {
-            Error::Nix {
-                msg: "update_db failed: can't create db directory".to_string(),
-                source: e
-                    .raw_os_error()
-                    .map_or_else(|| nix::Error::EIO, nix::Error::from_i32),
-            }
+        create_dir_all(&format!("{}/{}", self.base_path.borrow(), DB_BASE_DIR)).context(Io {
+            msg: "failed to create db directory".to_string(),
         })?;
 
         if let Err(e) = chmod(
@@ -1595,22 +1452,14 @@ impl Device {
             log::error!("Failed to set permission for /run/devmaster/data/: {}", e);
         }
 
-        let (mut file, tmp_file) = open_temporary(&db_path).map_err(|e| {
-            let errno = match e {
-                basic::error::Error::Nix { source } => source,
-                _ => nix::Error::EINVAL,
-            };
-            Error::Nix {
-                msg: "update_db failed: can't open temporary file".to_string(),
-                source: errno,
-            }
+        let (mut file, tmp_file) = open_temporary(&db_path).context(Basic {
+            msg: "can't open temporary file".to_string(),
         })?;
 
-        self.atomic_create_db(&mut file, tmp_file.as_str(), db_path.as_str())
-            .map_err(|e| {
-                Self::cleanup(&db_path, &tmp_file);
-                e
-            })?;
+        if let Err(e) = self.atomic_create_db(&mut file, tmp_file.as_str(), db_path.as_str()) {
+            Self::cleanup(&db_path, &tmp_file);
+            return Err(e);
+        }
 
         Ok(())
     }
@@ -1713,9 +1562,8 @@ impl Device {
         );
 
         if add {
-            touch_file(&tag_path, true, Some(0o444), None, None).map_err(|e| Error::Nix {
-                msg: format!("tag_persist failed: can't touch file '{}': {}", tag_path, e),
-                source: nix::Error::EINVAL,
+            touch_file(&tag_path, true, Some(0o444), None, None).context(Basic {
+                msg: format!("can't touch file '{}'", tag_path),
             })?;
 
             if let Err(e) = chmod(
@@ -1765,10 +1613,7 @@ impl Device {
 
     /// read database
     pub fn read_db(&self) -> Result<(), Error> {
-        self.read_db_internal(false).map_err(|e| Error::Nix {
-            msg: format!("read_db failed: {}", e),
-            source: e.get_errno(),
-        })
+        self.read_db_internal(false)
     }
 
     /// read database internally
@@ -1777,18 +1622,11 @@ impl Device {
             return Ok(());
         }
 
-        let id = self.get_device_id().map_err(|e| Error::Nix {
-            msg: format!("read_db_internal failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        let id = self.get_device_id()?;
 
         let path = format!("{}/{}/{}", self.base_path.borrow(), DB_BASE_DIR, id);
 
         self.read_db_internal_filename(&path)
-            .map_err(|e| Error::Nix {
-                msg: format!("read_db_internal failed: {}", e),
-                source: e.get_errno(),
-            })
     }
 
     /// get properties nulstr, if it is out of date, update it
@@ -1836,10 +1674,7 @@ impl Device {
         }
 
         // verify subsystem
-        let subsystem_ret = device.get_subsystem().map_err(|e| Error::Nix {
-            msg: format!("from_mode_and_devnum failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        let subsystem_ret = device.get_subsystem()?;
         if (subsystem_ret == "block") != ((mode & S_IFMT) == S_IFBLK) {
             return Err(Error::Nix {
                 msg: "from_mode_and_devnum failed: inconsistent subsystem".to_string(),
@@ -1942,19 +1777,9 @@ impl Device {
 
     /// set the sysname and sysnum of device object
     pub fn set_sysname_and_sysnum(&self) -> Result<(), Error> {
-        let sysname = match self.devpath.borrow().rfind('/') {
-            Some(i) => String::from(&self.devpath.borrow()[i + 1..]),
-            None => {
-                return Err(Error::Nix {
-                    msg: format!(
-                        "set_sysname_and_sysnum failed: invalid devpath '{}'",
-                        self.devpath.borrow()
-                    ),
-                    source: Errno::EINVAL,
-                });
-            }
-        };
-
+        /* The devpath is validated to begin with '/' when setting syspath. */
+        let idx = self.devpath.borrow().rfind('/').unwrap();
+        let sysname = String::from(&self.devpath.borrow()[idx + 1..]);
         let sysname = sysname.replace('!', "/");
 
         let mut ridx = sysname.len();
@@ -2146,15 +1971,10 @@ impl Device {
     /// set ifindex
     pub fn set_ifindex(&self, ifindex: &str) -> Result<(), Error> {
         self.add_property_internal("IFINDEX", ifindex).unwrap();
-        self.ifindex.replace(match ifindex.parse::<u32>() {
-            Ok(idx) => idx,
-            Err(e) => {
-                return Err(Error::Nix {
-                    msg: format!("set_ifindex failed: {}", e),
-                    source: Errno::EINVAL,
-                });
-            }
-        });
+        self.ifindex
+            .replace(ifindex.parse::<u32>().context(ParseInt {
+                msg: format!("invalid integer '{}'", ifindex),
+            })?);
         Ok(())
     }
 
@@ -2172,12 +1992,8 @@ impl Device {
 
     /// set devmode
     pub fn set_devmode(&self, devmode: &str) -> Result<(), Error> {
-        let m = Some(mode_t::from_str_radix(devmode, 8).map_err(|e| Error::Nix {
-            msg: format!(
-                "set_devmode failed: can't change '{}' to mode: {}",
-                devmode, e
-            ),
-            source: Errno::EINVAL,
+        let m = Some(mode_t::from_str_radix(devmode, 8).context(ParseInt {
+            msg: format!("invalid octal mode '{}'", devmode),
         })?);
 
         self.devmode.replace(m);
@@ -2189,9 +2005,8 @@ impl Device {
 
     /// set device uid
     pub fn set_devuid(&self, devuid: &str) -> Result<(), Error> {
-        let uid = devuid.parse::<uid_t>().map_err(|e| Error::Nix {
-            msg: format!("set_devuid failed: can't change '{}' to uid: {}", devuid, e),
-            source: Errno::EINVAL,
+        let uid = devuid.parse::<uid_t>().context(ParseInt {
+            msg: format!("invalid uid '{}'", devuid),
         })?;
 
         self.devuid.replace(Some(Uid::from_raw(uid)));
@@ -2203,9 +2018,8 @@ impl Device {
 
     /// set device gid
     pub fn set_devgid(&self, devgid: &str) -> Result<(), Error> {
-        let gid = devgid.parse::<gid_t>().map_err(|e| Error::Nix {
-            msg: format!("set_devgid failed: can't change '{}' to gid: {}", devgid, e),
-            source: Errno::EINVAL,
+        let gid = devgid.parse::<gid_t>().context(ParseInt {
+            msg: format!("invalid gid '{}'", devgid),
         })?;
 
         self.devgid.replace(Some(Gid::from_raw(gid)));
@@ -2217,15 +2031,10 @@ impl Device {
 
     /// set devnum
     pub fn set_devnum(&self, major: &str, minor: &str) -> Result<(), Error> {
-        let major_num: u64 = match major.parse() {
-            Ok(n) => n,
-            Err(e) => {
-                return Err(Error::Nix {
-                    msg: format!("set_devnum failed: invalid major number '{}': {}", major, e),
-                    source: Errno::EINVAL,
-                });
-            }
-        };
+        let major_num: u64 = major.parse().context(ParseInt {
+            msg: format!("invalid major number '{}'", major),
+        })?;
+
         let minor_num: u64 = match minor.parse() {
             Ok(n) => n,
             Err(e) => {
@@ -2247,15 +2056,9 @@ impl Device {
     pub fn set_diskseq(&self, diskseq: &str) -> Result<(), Error> {
         self.add_property_internal("DISKSEQ", diskseq).unwrap();
 
-        let diskseq_num: u64 = match diskseq.parse() {
-            Ok(n) => n,
-            Err(e) => {
-                return Err(Error::Nix {
-                    msg: format!("set_diskseq failed: invalid diskseq '{}': {}", diskseq, e),
-                    source: Errno::EINVAL,
-                });
-            }
-        };
+        let diskseq_num: u64 = diskseq.parse().context(ParseInt {
+            msg: format!("invalid diskseq '{}'", diskseq),
+        })?;
 
         self.diskseq.replace(diskseq_num);
 
@@ -2271,18 +2074,7 @@ impl Device {
 
     /// set action from string
     pub fn set_action_from_string(&self, action_s: &str) -> Result<(), Error> {
-        let action = match action_s.parse::<DeviceAction>() {
-            Ok(a) => a,
-            Err(_) => {
-                return Err(Error::Nix {
-                    msg: format!(
-                        "set_action_from_string failed: invalid action '{}'",
-                        action_s
-                    ),
-                    source: Errno::EINVAL,
-                });
-            }
-        };
+        let action = action_s.parse::<DeviceAction>()?;
 
         self.set_action(action);
 
@@ -2291,19 +2083,9 @@ impl Device {
 
     /// set seqnum from string
     pub fn set_seqnum_from_string(&self, seqnum_s: &str) -> Result<(), Error> {
-        let seqnum: u64 = match seqnum_s.parse() {
-            Ok(n) => n,
-            Err(_) => {
-                return Err(Error::Nix {
-                    msg: format!(
-                        "set_seqnum_from_string failed: invalid seqnum '{}'",
-                        seqnum_s
-                    ),
-                    source: Errno::EINVAL,
-                });
-            }
-        };
-
+        let seqnum: u64 = seqnum_s.parse().context(ParseInt {
+            msg: format!("invalid seqnum '{}'", seqnum_s),
+        })?;
         self.set_seqnum(seqnum);
         Ok(())
     }
@@ -2325,7 +2107,7 @@ impl Device {
     /// cache sysattr value
     pub fn cache_sysattr_value(&self, sysattr: &str, value: &str) -> Result<(), Error> {
         if value.is_empty() {
-            self.remove_cached_sysattr_value(sysattr)?;
+            self.remove_cached_sysattr_value(sysattr);
         } else {
             self.sysattr_values
                 .borrow_mut()
@@ -2336,34 +2118,27 @@ impl Device {
     }
 
     /// remove cached sysattr value
-    pub fn remove_cached_sysattr_value(&self, sysattr: &str) -> Result<(), Error> {
+    pub fn remove_cached_sysattr_value(&self, sysattr: &str) {
         self.sysattr_values.borrow_mut().remove(sysattr);
-
-        Ok(())
     }
 
     /// get cached sysattr value
     pub fn get_cached_sysattr_value(&self, sysattr: &str) -> Result<String, Error> {
         if !self.sysattr_values.borrow().contains_key(sysattr) {
             return Err(Error::Nix {
-                msg: format!(
-                    "get_cached_sysattr_value failed: no cached sysattr '{}'",
-                    sysattr
-                ),
+                msg: format!("no cached sysattr '{}'", sysattr),
                 source: Errno::ESTALE,
             });
         }
 
-        match self.sysattr_values.borrow().get(sysattr) {
-            Some(value) => Ok(value.clone()),
-            None => Err(Error::Nix {
-                msg: format!(
-                    "get_cached_sysattr_value failed: non-existing sysattr '{}'",
-                    sysattr
-                ),
+        self.sysattr_values
+            .borrow()
+            .get(sysattr)
+            .cloned()
+            .ok_or(Error::Nix {
+                msg: format!("non-existing sysattr '{}'", sysattr),
                 source: Errno::ENOENT,
-            }),
-        }
+            })
     }
 
     /// new from child
@@ -2378,8 +2153,7 @@ impl Device {
                 Some(p) => {
                     if p == Path::new("/sys") {
                         return Err(Error::Nix {
-                            msg: "new_from_child failed: no available parent device until /sys"
-                                .to_string(),
+                            msg: "no available parent device".to_string(),
                             source: Errno::ENODEV,
                         });
                     }
@@ -2387,7 +2161,7 @@ impl Device {
                     let path = p
                         .to_str()
                         .ok_or(Error::Nix {
-                            msg: format!("new_from_child failed: invalid path '{:?}'", p),
+                            msg: format!("invalid path '{:?}'", p),
                             source: Errno::ENODEV,
                         })?
                         .to_string();
@@ -2444,15 +2218,9 @@ impl Device {
     /// 3. if self devlinks are outdated, add to internal property
     /// 4. if self tags are outdated ,add to internal property
     pub fn properties_prepare(&self) -> Result<(), Error> {
-        self.read_uevent_file().map_err(|e| Error::Nix {
-            msg: format!("properties_prepare failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        self.read_uevent_file()?;
 
-        self.read_db().map_err(|e| Error::Nix {
-            msg: format!("properties_prepare failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        self.read_db()?;
 
         let property_devlinks_outdated = *self.property_devlinks_outdated.borrow();
         if property_devlinks_outdated {
@@ -2518,15 +2286,8 @@ impl Device {
         };
 
         let mut buf = String::new();
-        file.read_to_string(&mut buf).map_err(|e| Error::Nix {
-            msg: format!(
-                "read_db_internal_filename failed: can't read db '{}': {}",
-                filename, e
-            ),
-            source: e
-                .raw_os_error()
-                .map(nix::Error::from_i32)
-                .unwrap_or(nix::Error::EIO),
+        file.read_to_string(&mut buf).context(Io {
+            msg: format!("can't read db '{}'", filename),
         })?;
 
         self.is_initialized.replace(true);
@@ -2540,10 +2301,7 @@ impl Device {
             let key = &line[0..1];
             let value = &line[2..];
 
-            self.handle_db_line(key, value).map_err(|e| Error::Nix {
-                msg: format!("read_db_internal_filename failed: {}", e),
-                source: e.get_errno(),
-            })?;
+            self.handle_db_line(key, value)?;
         }
 
         Ok(())
@@ -2572,29 +2330,18 @@ impl Device {
 
                 let (k, v) = (tokens[0], tokens[1]);
 
-                self.add_property_internal(k, v).map_err(|e| Error::Nix {
-                    msg: format!("handle_db_line failed: {}", e),
-                    source: e.get_errno(),
-                })?;
+                self.add_property_internal(k, v)?;
             }
             "I" => {
-                let time = value.parse::<u64>().map_err(|e| Error::Nix {
-                    msg: format!(
-                        "handle_db_line failed: invalid initialized time '{}': {}",
-                        value, e
-                    ),
-                    source: Errno::EINVAL,
+                let time = value.parse::<u64>().context(ParseInt {
+                    msg: format!("invalid usec integer '{}'", value),
                 })?;
 
                 self.set_usec_initialized(time);
             }
             "L" => {
-                let priority = value.parse::<i32>().map_err(|e| Error::Nix {
-                    msg: format!(
-                        "handle_db_line failed: failed to parse devlink priority '{}': {}",
-                        value, e
-                    ),
-                    source: Errno::EINVAL,
+                let priority = value.parse::<i32>().context(ParseInt {
+                    msg: format!("invalid link priority integer '{}'", value),
                 })?;
 
                 self.devlink_priority.replace(priority);
@@ -2603,12 +2350,8 @@ impl Device {
                 log::debug!("watch handle in database is deprecated.");
             }
             "V" => {
-                let version = value.parse::<u32>().map_err(|e| Error::Nix {
-                    msg: format!(
-                        "handle_db_line failed: failed to parse database version '{}': {}",
-                        value, e
-                    ),
-                    source: Errno::EINVAL,
+                let version = value.parse::<u32>().context(ParseInt {
+                    msg: format!("invalid db version integer '{}'", value),
                 })?;
 
                 self.database_version.replace(version);
@@ -2625,22 +2368,11 @@ impl Device {
     pub fn shallow_clone(&self) -> Result<Device, Error> {
         let device = Self::default();
 
-        let syspath = self.get_syspath().map_err(|e| Error::Nix {
-            msg: format!("shallow_clone failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        let syspath = self.get_syspath()?;
 
-        device
-            .set_syspath(&syspath, false)
-            .map_err(|e| Error::Nix {
-                msg: format!("shallow_clone failed: {}", e),
-                source: e.get_errno(),
-            })?;
+        device.set_syspath(&syspath, false)?;
 
-        let subsystem = self.get_subsystem().map_err(|e| Error::Nix {
-            msg: format!("shallow_clone failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        let subsystem = self.get_subsystem()?;
 
         device.set_subsystem(&subsystem);
 
@@ -2651,24 +2383,15 @@ impl Device {
         }
 
         if let Ok(ifindex) = self.get_property_value("IFINDEX") {
-            device.set_ifindex(&ifindex).map_err(|e| Error::Nix {
-                msg: format!("shallow_clone failed: failed to set_ifindex ({})", e),
-                source: e.get_errno(),
-            })?;
+            device.set_ifindex(&ifindex)?;
         }
 
         if let Ok(major) = self.get_property_value("MAJOR") {
             let minor = self.get_property_value("MINOR")?;
-            device.set_devnum(&major, &minor).map_err(|e| Error::Nix {
-                msg: format!("shallow_clone failed: {}", e),
-                source: e.get_errno(),
-            })?;
+            device.set_devnum(&major, &minor)?;
         }
 
-        device.read_uevent_file().map_err(|e| Error::Nix {
-            msg: format!("shallow_clone failed: {}", e),
-            source: e.get_errno(),
-        })?;
+        device.read_uevent_file()?;
 
         Ok(device)
     }
@@ -2685,12 +2408,8 @@ impl Device {
             "DRIVER" => self.set_driver(value),
             "IFINDEX" => self.set_ifindex(value)?,
             "USEC_INITIALIZED" => {
-                self.set_usec_initialized(value.parse::<u64>().map_err(|e| Error::Nix {
-                    msg: format!(
-                        "amend_key_value failed: failed to parse initialized time '{}': {}",
-                        value, e
-                    ),
-                    source: Errno::EINVAL,
+                self.set_usec_initialized(value.parse::<u64>().context(ParseInt {
+                    msg: format!("invalid usec integer '{}'", value),
                 })?);
             }
             "DEVMODE" => self.set_devmode(value)?,
@@ -2814,9 +2533,8 @@ impl Device {
             format!("{}/{}", syspath, subdir)
         };
 
-        std::fs::read_dir(&dir).map_err(|e| Error::Nix {
+        std::fs::read_dir(&dir).context(Io {
             msg: format!("Failed to read directory '{}'", &dir),
-            source: nix::Error::from_i32(e.raw_os_error().unwrap_or_default()),
         })
     }
 
@@ -3017,7 +2735,7 @@ impl Device {
             log::debug!(
                 "failed to read db of '{}': {}",
                 self.get_device_id()
-                    .unwrap_or(self.devpath.borrow().clone()),
+                    .unwrap_or_else(|_| self.devpath.borrow().clone()),
                 e
             )
         }
@@ -3033,7 +2751,7 @@ impl Device {
             log::error!(
                 "failed to read db of '{}': {}",
                 self.get_device_id()
-                    .unwrap_or(self.devpath.borrow().clone()),
+                    .unwrap_or_else(|_| self.devpath.borrow().clone()),
                 e
             )
         }
@@ -3049,7 +2767,7 @@ impl Device {
             log::debug!(
                 "failed to read db of '{}': {}",
                 self.get_device_id()
-                    .unwrap_or(self.devpath.borrow().clone()),
+                    .unwrap_or_else(|_| self.devpath.borrow().clone()),
                 e
             )
         }
@@ -3065,7 +2783,7 @@ impl Device {
             log::debug!(
                 "failed to prepare properties of '{}': {}",
                 self.get_device_id()
-                    .unwrap_or(self.devpath.borrow().clone()),
+                    .unwrap_or_else(|_| self.devpath.borrow().clone()),
                 e
             )
         }
@@ -3081,7 +2799,7 @@ impl Device {
             log::debug!(
                 "failed to enumerate children of '{}': {}",
                 self.get_device_id()
-                    .unwrap_or(self.devpath.borrow().clone()),
+                    .unwrap_or_else(|_| self.devpath.borrow().clone()),
                 e
             )
         }
@@ -3097,7 +2815,8 @@ impl Device {
             if let Err(e) = self.read_all_sysattrs() {
                 log::debug!(
                     "{}: failed to read all sysattrs: {}",
-                    self.get_sysname().unwrap_or(self.devpath.borrow().clone()),
+                    self.get_sysname()
+                        .unwrap_or_else(|_| self.devpath.borrow().clone()),
                     e
                 );
             }
@@ -3117,6 +2836,7 @@ impl PartialEq for Device {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::OpenOptions;
     use std::panic::catch_unwind;
 
     use crate::{
@@ -3425,6 +3145,11 @@ mod tests {
             device.add_devlink("/dev").unwrap_err().get_errno(),
             nix::Error::EINVAL
         );
+
+        /* Test other add_* methods. */
+        device.add_property("A", "AA").unwrap();
+        device.add_property("B", "BB").unwrap();
+        device.add_tags("A:B:C", true);
 
         device.update_db().unwrap();
 
@@ -3902,8 +3627,8 @@ Q:devmaster
 V:100
 ";
             touch_file("/tmp/tmp_db", false, None, None, None).unwrap();
-            let mut f = File::options().write(true).open("/tmp/tmp_db").unwrap();
-            f.write(content.as_bytes()).unwrap();
+            let mut f = OpenOptions::new().write(true).open("/tmp/tmp_db").unwrap();
+            f.write_all(content.as_bytes()).unwrap();
             let device = Device::new();
             device.read_db_internal_filename("/tmp/tmp_db").unwrap();
         }
@@ -3912,8 +3637,8 @@ V:100
         {
             let content = "error
 ";
-            let mut f = File::options().write(true).open("/tmp/tmp_db").unwrap();
-            f.write(content.as_bytes()).unwrap();
+            let mut f = OpenOptions::new().write(true).open("/tmp/tmp_db").unwrap();
+            f.write_all(content.as_bytes()).unwrap();
             let device = Device::new();
             device.read_db_internal_filename("/tmp/tmp_db").unwrap();
         }
@@ -3922,13 +3647,13 @@ V:100
         {
             let content = "I:invalid
 ";
-            let mut f = File::options().write(true).open("/tmp/tmp_db").unwrap();
-            f.write(content.as_bytes()).unwrap();
+            let mut f = OpenOptions::new().write(true).open("/tmp/tmp_db").unwrap();
+            f.write_all(content.as_bytes()).unwrap();
             let device = Device::new();
             assert!(device.read_db_internal_filename("/tmp/tmp_db").is_err());
         }
 
-        /* DB shoud be readable. */
+        /* DB should be readable. */
         {
             touch_file("/tmp/tmp_db_writeonly", false, Some(0o222), None, None).unwrap();
             let device = Device::new();
@@ -3972,5 +3697,99 @@ V:100
             dev.get_usec_since_initialized().unwrap();
         })
         .is_err());
+    }
+
+    #[test]
+    fn test_set() {
+        let device = Device::from_subsystem_sysname("net", "lo").unwrap();
+        device.set_devuid("1").unwrap();
+        device.set_devgid("1").unwrap();
+        device.set_devmode("666").unwrap();
+        device.set_diskseq("1").unwrap();
+        device.set_action_from_string("change").unwrap();
+        device.set_sysattr_value("ifalias", Some("test")).unwrap();
+
+        assert_eq!(&device.get_property_value("DEVUID").unwrap(), "1");
+        assert_eq!(&device.get_property_value("DEVGID").unwrap(), "1");
+        assert_eq!(&device.get_property_value("DEVMODE").unwrap(), "666");
+        assert_eq!(&device.get_property_value("DISKSEQ").unwrap(), "1");
+        assert_eq!(&device.get_property_value("ACTION").unwrap(), "change");
+        assert_eq!(&device.get_cached_sysattr_value("ifalias").unwrap(), "test");
+
+        assert!(device.set_devuid("invalid").is_err());
+        assert!(device.set_devgid("invalid").is_err());
+        assert!(device.set_devmode("invalid").is_err());
+        assert!(device.set_diskseq("invalid").is_err());
+        assert!(device.set_action_from_string("invalid").is_err());
+        assert!(device.set_sysattr_value("nonexist", Some("test")).is_err());
+
+        assert!(device.set_sysattr_value("nonexist", None).is_ok());
+        assert!(device.set_sysattr_value("ifalias", None).is_ok());
+    }
+
+    #[test]
+    fn test_from_device_id() {
+        assert!(Device::from_device_id("invalid").is_err());
+        assert!(Device::from_device_id("b").is_err());
+        assert!(Device::from_device_id("+drivers").is_err());
+        assert!(Device::from_device_id("+drivers:").is_err());
+        assert!(Device::from_device_id("+drivers::usb").is_err());
+
+        let dev = Device::from_device_id("+drivers:usb:usb").unwrap();
+        println!("{}", dev.get_device_id().unwrap());
+
+        let dev = Device::from_syspath("/sys/bus/usb/drivers/usb", true).unwrap();
+        println!("{}", dev.get_device_id().unwrap());
+
+        let _ = unlink("/tmp/devmaster/data/+drivers:usb:usb");
+        dev.set_base_path("/tmp/devmaster");
+        assert!(dev.update_db().is_err());
+        dev.add_property("hello", "world").unwrap();
+        dev.update_db().unwrap();
+        assert!(Path::new("/tmp/devmaster/data/+drivers:usb:usb").exists());
+    }
+
+    #[test]
+    fn test_get_err() {
+        let device = Device::new();
+        assert!(device.get_syspath().is_err());
+        assert!(device.get_devpath().is_err());
+        assert!(device.get_parent().is_err());
+        assert!(device.get_devtype().is_err());
+        assert!(!device.get_is_initialized().unwrap());
+    }
+
+    #[test]
+    fn test_cleanup() {
+        let _ = touch_file("/tmp/devmaster/a", false, None, None, None);
+        let _ = touch_file("/tmp/devmaster/b", false, None, None, None);
+        Device::cleanup("/tmp/devmaster/a", "/tmp/devmaster/b");
+    }
+
+    #[test]
+    fn test_fmt() {
+        let device = Device::from_subsystem_sysname("net", "lo").unwrap();
+        println!("{:?}", device);
+    }
+
+    #[test]
+    fn test_set_syspath_no_verify() {
+        let device = Device::new();
+        device.set_syspath("/sys/test", false).unwrap();
+
+        assert!(device.set_sysname_and_sysnum().is_ok());
+    }
+
+    #[test]
+    fn test_partial_eq_trait() {
+        let dev1 = Device::from_syspath("/sys/class/net/lo", true).unwrap();
+        let dev2 = Device::from_subsystem_sysname("net", "lo").unwrap();
+
+        assert!(dev1 == dev2);
+    }
+
+    #[test]
+    fn test_from_devnum_err() {
+        assert!(Device::from_devnum('x', 100).is_err());
     }
 }

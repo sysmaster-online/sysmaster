@@ -30,11 +30,11 @@ fn main() {
         let dev = Device::from_subsystem_sysname("drivers", "usb:hub").unwrap();
         println!("{}", dev.get_sysname().unwrap());
         println!("{}", dev.get_subsystem().unwrap());
-        println!("{:?}", dev);
+        println!("{}", dev.get_device_id().unwrap());
     }
 
     {
         let dev = Device::from_ifindex(2).unwrap();
-        println!("{:?}", dev);
+        println!("{}", dev.get_device_id().unwrap());
     }
 }

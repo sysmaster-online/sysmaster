@@ -38,6 +38,24 @@ pub enum Error {
 
     #[snafu(context, display("Basic error: {}", msg))]
     Basic { msg: String, source: basic::Error },
+
+    #[snafu(context, display("Failed to parse boolean: {}", msg))]
+    ParseBool {
+        msg: String,
+        source: std::str::ParseBoolError,
+    },
+
+    #[snafu(context, display("Failed to parse integer: {}", msg))]
+    ParseInt {
+        msg: String,
+        source: std::num::ParseIntError,
+    },
+
+    #[snafu(context, display("Failed to parse utf-8: {}", msg))]
+    FromUtf8 {
+        msg: String,
+        source: std::string::FromUtf8Error,
+    },
 }
 
 impl Error {
@@ -53,19 +71,11 @@ impl Error {
                 source: errno,
             } => Errno::from_i32(errno.raw_os_error().unwrap_or_default()),
             Self::Basic { msg: _, source } => Errno::from_i32(source.get_errno()),
+            Self::ParseBool { msg: _, source: _ } => nix::Error::EINVAL,
+            Self::ParseInt { msg: _, source: _ } => nix::Error::EINVAL,
+            Self::FromUtf8 { msg: _, source: _ } => nix::Error::EINVAL,
         }
     }
-}
-
-/// append current function and inherit the errno
-#[macro_export]
-macro_rules! err_wrapper {
-    ($e:expr, $s:expr) => {
-        $e.map_err(|e| Error::Nix {
-            msg: format!("$s failed: {}", e),
-            source: e.get_errno(),
-        })
-    };
 }
 
 impl Error {
@@ -80,5 +90,38 @@ impl Error {
             self.get_errno(),
             Errno::ENODEV | Errno::ENXIO | Errno::ENOENT
         )
+    }
+
+    pub(crate) fn replace_errno(self, from: Errno, to: Errno) -> Self {
+        let n = self.get_errno();
+
+        if n == from {
+            Self::Nix {
+                msg: self.to_string(),
+                source: to,
+            }
+        } else {
+            self
+        }
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use nix::errno::Errno;
+
+    #[test]
+    fn test_replace_errno() {
+        let e = Error::Nix {
+            msg: "test".to_string(),
+            source: Errno::ENOENT,
+        };
+
+        assert_eq!(
+            Errno::ENOEXEC,
+            e.replace_errno(Errno::ENOENT, Errno::ENOEXEC).get_errno(),
+        );
     }
 }
