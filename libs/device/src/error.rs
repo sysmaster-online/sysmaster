@@ -28,16 +28,31 @@ pub enum Error {
         /// errno indicates the error kind
         source: nix::Error,
     },
+
+    #[snafu(context, display("IO error: {}", msg))]
+    Io {
+        /// message
+        msg: String,
+        source: std::io::Error,
+    },
+
+    #[snafu(context, display("Basic error: {}", msg))]
+    Basic { msg: String, source: basic::Error },
 }
 
 impl Error {
     /// extract the errno from error
     pub fn get_errno(&self) -> Errno {
         match self {
-            Error::Nix {
+            Self::Nix {
                 msg: _,
                 source: errno,
             } => *errno,
+            Self::Io {
+                msg: _,
+                source: errno,
+            } => Errno::from_i32(errno.raw_os_error().unwrap_or_default()),
+            Self::Basic { msg: _, source } => Errno::from_i32(source.get_errno()),
         }
     }
 }
@@ -56,17 +71,14 @@ macro_rules! err_wrapper {
 impl Error {
     /// check whether the device error belongs to specific errno
     pub fn is_errno(&self, errno: nix::Error) -> bool {
-        match self {
-            Self::Nix { msg: _, source } => *source == errno,
-        }
+        self.get_errno() == errno
     }
 
     /// check whether the device error indicates the device is absent
     pub fn is_absent(&self) -> bool {
-        match self {
-            Self::Nix { msg: _, source } => {
-                matches!(source, Errno::ENODEV | Errno::ENXIO | Errno::ENOENT)
-            }
-        }
+        matches!(
+            self.get_errno(),
+            Errno::ENODEV | Errno::ENXIO | Errno::ENOENT
+        )
     }
 }

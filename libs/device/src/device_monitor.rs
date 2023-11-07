@@ -299,8 +299,8 @@ mod tests {
         spawn(|| {
             let device = Device::from_devname("/dev/sda").unwrap();
             device.set_action_from_string("change").unwrap();
-            device.set_subsystem("block").unwrap();
-            device.set_seqnum(1000).unwrap();
+            device.set_subsystem("block");
+            device.set_seqnum(1000);
 
             let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
             broadcaster.send_device(&device, None).unwrap();

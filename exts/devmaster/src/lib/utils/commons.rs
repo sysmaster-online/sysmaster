@@ -541,14 +541,7 @@ pub(crate) fn initialize_device_usec(
             .map_or(0, |v| v.as_secs())
     });
 
-    dev_new
-        .borrow()
-        .set_usec_initialized(timestamp)
-        .map_err(|e| {
-            log::error!("failed to set initialization timestamp: {}", e);
-            e
-        })
-        .context(DeviceSnafu)?;
+    dev_new.borrow().set_usec_initialized(timestamp);
 
     Ok(())
 }
