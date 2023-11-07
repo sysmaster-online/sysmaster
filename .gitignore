@@ -9,4 +9,4 @@ libs/blkid_rs/src/libblkid.rs
 tests/test_units/*.toml
 libs/input_event_codes_rs/src/get_input_event_key.rs
 libs/input_event_codes_rs/src/input_event_codes.rs
-next/target/
+*/target/

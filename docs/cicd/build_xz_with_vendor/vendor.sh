@@ -71,10 +71,12 @@ do
 done
 
 echo "Cargo build ..."
+set -e
 for i in `ls ci/*.sh | sort -u -d | grep -v "00-pre.sh" `
 do
     date; sh -x $i;
 done
+set +e
 
 # cleanup temporary
 cargo clean
@@ -92,12 +94,14 @@ popd
 
 # compress sysmaster
 pushd $SCRIPT_DIR/../
+    rm -rf sysmaster-$version
     cp -a sysmaster sysmaster-$version
     pushd sysmaster-$version
     cargo clean
-    rm -rf .git
-    popd
+    rm -rf .git next docs tools patch target
+    sed -i '/\[patch.crates-io.loopdev\]/{N;N;d}' Cargo.toml
+    popd > /dev/null 2>&1
     tar -cJvf sysmaster-$version.tar.xz sysmaster-$version
-    echo "You can find sysmaster-$version.tar.xz in the $(PWD)."
+    echo "You can find sysmaster-$version.tar.xz in the ${PWD}."
     rm -rf sysmaster-$version
-popd
+popd > /dev/null 2>&1
