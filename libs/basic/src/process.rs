@@ -23,8 +23,10 @@ use procfs::process::Stat;
 use std::collections::HashSet;
 use std::fs::{read_dir, File};
 use std::path::{Path, PathBuf};
-use std::thread::sleep;
 use std::time::{Duration, SystemTime};
+
+const PROCESS_FLAG_POS: usize = 8;
+const PF_KTHREAD: u64 = 0x00200000;
 
 ///
 pub fn process_state(pid: Pid) -> Result<char> {
@@ -105,9 +107,7 @@ pub fn kill_all_pids(signal: i32) -> HashSet<i32> {
         let file_name = String::from(entry.file_name().to_str().unwrap());
         // Check pid directory.
         if let Ok(pid_raw) = file_name.parse::<i32>() {
-            if Pid::from_raw(pid_raw) <= Pid::from_raw(1)
-                || Pid::from_raw(pid_raw) == nix::unistd::getpid()
-            {
+            if let Ok(true) = ignore_proc_during_shutdown(Pid::from_raw(pid_raw)) {
                 continue;
             }
             unsafe {
@@ -127,10 +127,6 @@ pub fn kill_all_pids(signal: i32) -> HashSet<i32> {
 pub fn wait_pids(mut pids: HashSet<i32>, timeout: u64) -> HashSet<i32> {
     let now = SystemTime::now();
     let until = now + Duration::from_micros(timeout);
-
-    // remove PID1, we shouldn't wait our self and init.
-    pids.remove(&1);
-    pids.remove(&nix::unistd::getpid().into());
 
     loop {
         // 1. Find killed process by kernel.
@@ -157,12 +153,11 @@ pub fn wait_pids(mut pids: HashSet<i32>, timeout: u64) -> HashSet<i32> {
             log::debug!("successfully killed pid: {} found by ourself.", pid);
             pids.remove(&pid);
         }
-        // 3. Sleep 1s to wait pid exits.
-        sleep(Duration::from_secs(1));
-        // 4. Wait or give up.
         if pids.is_empty() {
             break;
         }
+
+        // 3. Wait or give up.
         if SystemTime::now() >= until {
             log::info!("some pids haven't been killed yet, stop waiting.");
             break;
@@ -212,6 +207,53 @@ pub fn kill_and_cont(pid: Pid, sig: Signal) -> Result<(), Errno> {
     }
 }
 
+fn ignore_proc_during_shutdown(pid: Pid) -> Result<bool> {
+    if pid <= Pid::from_raw(1) {
+        return Ok(true);
+    }
+
+    if pid == nix::unistd::getpid() {
+        return Ok(true);
+    }
+
+    if is_kernel_thread(pid)? {
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
+fn is_kernel_thread(pid: Pid) -> Result<bool> {
+    if pid == Pid::from_raw(1) || pid == nix::unistd::getpid() {
+        return Ok(false);
+    }
+
+    if pid <= Pid::from_raw(0) {
+        return Err(Error::Invalid {
+            what: format!("Invalid pid: {}", pid),
+        });
+    }
+
+    let first_line = fs_util::read_first_line(Path::new(&format!("/proc/{}/stat", pid.as_raw())))?;
+    let stat: Vec<String> = first_line
+        .split_whitespace()
+        .map(|s| s.to_string())
+        .collect();
+
+    if stat.len() <= PROCESS_FLAG_POS {
+        return Err(Error::Invalid {
+            what: "process stat format".to_string(),
+        });
+    }
+
+    let flag: u64 = stat[PROCESS_FLAG_POS].parse()?;
+    if flag & PF_KTHREAD != 0 {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use nix::libc::kill;
@@ -243,5 +285,29 @@ mod tests {
 
         let res = wait_pids(pids, 10000000);
         assert_eq!(res.len(), 0);
+    }
+
+    #[test]
+    fn test_ignore_proc_during_shutdown() {
+        assert!(
+            crate::process::ignore_proc_during_shutdown(nix::unistd::Pid::from_raw(0))
+                .unwrap_or(false)
+        );
+        if let Ok(ignore) =
+            crate::process::ignore_proc_during_shutdown(nix::unistd::Pid::from_raw(1))
+        {
+            assert!(ignore);
+        }
+        if let Ok(ignore) = crate::process::ignore_proc_during_shutdown(nix::unistd::getpid()) {
+            assert!(ignore);
+        }
+        if let Ok(mut child) = Command::new("/usr/bin/sleep").arg("2").spawn() {
+            if let Ok(ignore) = crate::process::ignore_proc_during_shutdown(
+                nix::unistd::Pid::from_raw(child.id().try_into().unwrap()),
+            ) {
+                assert!(!ignore);
+            }
+            child.wait().unwrap();
+        }
     }
 }
