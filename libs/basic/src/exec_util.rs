@@ -18,7 +18,9 @@ use std::{fs, os::unix::prelude::PermissionsExt, path::PathBuf, process::Command
 ///
 pub fn execute_directories(directories: Vec<&str>) -> std::io::Result<()> {
     match unsafe { unistd::fork() } {
-        Ok(unistd::ForkResult::Child) => do_execute(directories),
+        Ok(unistd::ForkResult::Child) => {
+            std::process::exit(do_execute(directories).map_or(1, |_| 0))
+        }
         Ok(unistd::ForkResult::Parent { child }) => match nix::sys::wait::waitpid(child, None) {
             Ok(_) => Ok(()),
             Err(err) => Err(std::io::Error::from(err)),
