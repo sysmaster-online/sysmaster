@@ -35,20 +35,6 @@ enum QueryType {
     All,
 }
 
-struct QueryProperty {
-    export: bool,
-    export_prefix: Option<String>,
-}
-
-impl QueryProperty {
-    fn new(export: bool, export_prefix: Option<String>) -> Self {
-        QueryProperty {
-            export,
-            export_prefix,
-        }
-    }
-}
-
 struct SysAttr {
     name: String,
     value: String,
@@ -96,11 +82,6 @@ impl InfoArgs {
     pub fn subcommand(&self) -> Result<()> {
         let mut devs = Vec::new();
 
-        let mut arg_export = false;
-        if self.export || self.export_prefix.is_some() {
-            arg_export = true;
-        }
-
         if self.export_db {
             return export_devices();
         }
@@ -113,11 +94,8 @@ impl InfoArgs {
                 log::error!("Positional arguments are not allowed with -d/--device-id-of-file.");
                 return Err(nix::Error::EINVAL);
             }
-            return self.stat_device(name, arg_export);
+            return self.stat_device(name);
         }
-
-        let mut query_type = QueryType::All;
-        self.parse_query_type(&mut query_type)?;
 
         devs.extend(&self.devices);
         if devs.is_empty() {
@@ -145,43 +123,44 @@ impl InfoArgs {
             };
 
             if self.query.is_some() {
-                let query_property = QueryProperty::new(arg_export, self.export_prefix.clone());
-                r = self.query_device(&query_type, device, query_property);
+                r = self.query_device(device);
             } else if self.attribute_walk {
                 r = print_device_chain(device);
             } else {
-                log::error!("unknown action");
-                return Err(nix::Error::EINVAL);
+                r = self.query_device(device);
             }
         }
 
         r
     }
 
-    fn parse_query_type(&self, query_type: &mut QueryType) -> Result<()> {
+    fn is_export(&self) -> bool {
+        self.export || self.export_prefix.is_some()
+    }
+
+    fn parse_query_type(&self) -> Result<QueryType> {
         match &self.query {
             Some(q) => {
                 if q == "property" || q == "env" {
-                    *query_type = QueryType::Property;
+                    Ok(QueryType::Property)
                 } else if q == "name" {
-                    *query_type = QueryType::Name;
+                    Ok(QueryType::Name)
                 } else if q == "symlink" {
-                    *query_type = QueryType::Symlink;
+                    Ok(QueryType::Symlink)
                 } else if q == "path" {
-                    *query_type = QueryType::Path;
+                    Ok(QueryType::Path)
                 } else if q == "all" {
-                    *query_type = QueryType::All;
+                    Ok(QueryType::All)
                 } else {
                     log::error!("unknown query type");
-                    return Err(nix::Error::EINVAL);
+                    Err(nix::Error::EINVAL)
                 }
             }
-            None => *query_type = QueryType::All,
+            None => Ok(QueryType::All),
         }
-        Ok(())
     }
 
-    fn stat_device(&self, name: &str, export: bool) -> Result<()> {
+    fn stat_device(&self, name: &str) -> Result<()> {
         let metadata = match fs::metadata(name) {
             Ok(metadata) => metadata,
             Err(err) => {
@@ -190,7 +169,7 @@ impl InfoArgs {
             }
         };
 
-        if export {
+        if self.is_export() {
             match &self.export_prefix {
                 Some(p) => {
                     println!("{}MAJOR={}", p, nix::sys::stat::major(metadata.dev()));
@@ -212,12 +191,8 @@ impl InfoArgs {
         Ok(())
     }
 
-    fn query_device(
-        &self,
-        query: &QueryType,
-        device: Device,
-        property: QueryProperty,
-    ) -> Result<()> {
+    fn query_device(&self, device: Device) -> Result<()> {
+        let query = self.parse_query_type()?;
         match query {
             QueryType::Name => {
                 let node = match device.get_devname() {
@@ -275,8 +250,8 @@ impl InfoArgs {
             }
             QueryType::Property => {
                 for (key, value) in &device.property_iter() {
-                    if property.export {
-                        match &property.export_prefix {
+                    if self.is_export() {
+                        match &self.export_prefix {
                             Some(export_prefix) => println!("{}{}='{}'", export_prefix, key, value),
                             None => println!("{}='{}'", key, value),
                         }
