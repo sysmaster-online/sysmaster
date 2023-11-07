@@ -70,6 +70,42 @@ pub enum Error {
     Other { msg: String },
 }
 
+impl Error {
+    /// Translate the basic error to error number.
+    pub fn get_errno(&self) -> i32 {
+        match self {
+            Self::Syscall {
+                syscall: _,
+                ret: _,
+                errno,
+            } => *errno,
+            Error::Io { source } => source.raw_os_error().unwrap_or_default(),
+            Error::Caps { what: _ } => nix::errno::Errno::EINVAL as i32,
+            Error::Nix { source } => *source as i32,
+            Error::Var { source } => {
+                (match source {
+                    std::env::VarError::NotPresent => nix::errno::Errno::ENOENT,
+                    std::env::VarError::NotUnicode(_) => nix::errno::Errno::EINVAL,
+                }) as i32
+            }
+            Error::Proc { source } => match source {
+                procfs::ProcError::Incomplete(_) => nix::errno::Errno::EINVAL as i32,
+                procfs::ProcError::PermissionDenied(_) => nix::errno::Errno::EPERM as i32,
+                procfs::ProcError::NotFound(_) => nix::errno::Errno::ENOENT as i32,
+                procfs::ProcError::Io(_, _) => nix::errno::Errno::EIO as i32,
+                procfs::ProcError::Other(_) => nix::errno::Errno::EINVAL as i32,
+                procfs::ProcError::InternalError(_) => nix::errno::Errno::EINVAL as i32,
+            },
+            Error::NulError { source: _ } => nix::errno::Errno::EINVAL as i32,
+            Error::Parse { source: _ } => nix::errno::Errno::EINVAL as i32,
+            Error::ParseNamingScheme { what: _ } => nix::errno::Errno::EINVAL as i32,
+            Error::NotExisted { what: _ } => nix::errno::Errno::ENOENT as i32,
+            Error::Invalid { what: _ } => nix::errno::Errno::EINVAL as i32,
+            Error::Other { msg: _ } => nix::errno::Errno::EINVAL as i32,
+        }
+    }
+}
+
 #[allow(unused_macros)]
 macro_rules! errfrom {
     ($($st:ty),* => $variant:ident) => (
