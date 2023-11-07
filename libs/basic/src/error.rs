@@ -88,6 +88,7 @@ impl Error {
                     std::env::VarError::NotUnicode(_) => nix::errno::Errno::EINVAL,
                 }) as i32
             }
+            #[cfg(feature = "process")]
             Error::Proc { source } => match source {
                 procfs::ProcError::Incomplete(_) => nix::errno::Errno::EINVAL as i32,
                 procfs::ProcError::PermissionDenied(_) => nix::errno::Errno::EPERM as i32,
