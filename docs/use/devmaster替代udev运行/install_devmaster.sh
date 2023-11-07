@@ -7,7 +7,7 @@ target_dir=${pwd}/target/${mode}
 services=(devctl-trigger.service devmaster.service devmaster-simu-udev.service)
 tools=(ata_id)
 
-run_with_devmaster=tools/run_with_devmaster
+run_with_devmaster=${0%/*}
 service_dir=${run_with_devmaster}/service
 lib_rules_dir=${run_with_devmaster}/rules.d
 
