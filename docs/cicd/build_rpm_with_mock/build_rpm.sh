@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+set -e
 arch=$(uname -m)
 vendor="openeuler-22.03LTS_SP1"
 if [ $# -ne 1 ]; then
@@ -70,7 +70,7 @@ version=$(echo "$version_line" | awk -F'"' '{print $2}')
 # compress sysmaster
 pushd $ROOTDIR/../
     rm -rf sysmaster-$version
-    cp -a sysmaster sysmaster-$version
+    cp -a $(basename $ROOTDIR) sysmaster-$version
     pushd sysmaster-$version
     cargo clean
     rm -rf .git next docs tools patch target
@@ -79,9 +79,10 @@ pushd $ROOTDIR/../
     tar -cJvf $TARGETDIR/sysmaster-$version.tar.xz sysmaster-$version
     rm -rf sysmaster-$version
 popd > /dev/null 2>&1
-
+set +e
 # 构建srpm
 sudo dnf install -y mock rpm-build
+sudo groupadd mock
 sudo usermod -a -G mock $(who | awk '{print $1}' | sort -u)
 cp -a $SCRIPT_DIR/* $TARGETDIR
 mock -r $vendor-$arch --configdir $TARGETDIR --no-clean --isolation simple --buildsrpm --spec $TARGETDIR/sysmaster.spec  --sources=$TARGETDIR/sysmaster-$version.tar.xz --resultdir $TARGETDIR

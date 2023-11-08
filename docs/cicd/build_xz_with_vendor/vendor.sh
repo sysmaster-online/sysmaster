@@ -95,7 +95,7 @@ popd
 # compress sysmaster
 pushd $SCRIPT_DIR/../
     rm -rf sysmaster-$version
-    cp -a sysmaster sysmaster-$version
+    cp -a $(basename $(pwd)) sysmaster-$version
     pushd sysmaster-$version
     cargo clean
     rm -rf .git next docs tools patch target
