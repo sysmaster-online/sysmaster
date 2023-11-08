@@ -25,7 +25,6 @@ use std::{
 /// max time interval for idle worker
 const WORKER_MAX_IDLE_INTERVAL: u64 = 3;
 
-#[derive(Debug)]
 pub(crate) struct GarbageCollect {
     devmaster: Weak<RefCell<Devmaster>>,
 
@@ -128,7 +127,6 @@ impl Source for GarbageCollect {
 }
 
 /// kill idle workers
-#[derive(Debug)]
 pub(crate) struct IdleWorkerKiller {
     /// time interval
     pub(crate) time: u64,

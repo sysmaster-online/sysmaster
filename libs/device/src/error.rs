@@ -19,22 +19,13 @@ use snafu::prelude::Snafu;
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum Error {
-    /// other error
     #[snafu(context, display("Device error: {}", msg))]
-    Nix {
-        /// message
-        msg: String,
-        /// errno indicates the error kind
-        source: nix::Error,
-    },
+    Nix { msg: String, source: nix::Error },
 
     #[snafu(context, display("IO error: {}", msg))]
-    Io {
-        /// message
-        msg: String,
-        source: std::io::Error,
-    },
+    Io { msg: String, source: std::io::Error },
 
     #[snafu(context, display("Basic error: {}", msg))]
     Basic { msg: String, source: basic::Error },
@@ -105,7 +96,6 @@ impl Error {
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {

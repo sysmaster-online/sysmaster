@@ -47,7 +47,6 @@ pub(crate) enum WorkerMessage {
 }
 
 /// worker manager
-#[derive(Debug)]
 pub struct WorkerManager {
     /// max number of workers
     pub(crate) workers_capacity: u32,
@@ -65,7 +64,6 @@ pub struct WorkerManager {
 }
 
 /// worker
-#[derive(Debug)]
 pub struct Worker {
     /// worker unique id
     id: u32,
