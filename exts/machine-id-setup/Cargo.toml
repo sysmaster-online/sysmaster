@@ -1,0 +1,14 @@
+[package]
+name = "machine-id-setup"
+version = "0.5.1"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+basic = { path = "../../libs/basic", default-features = false, features = [
+    "machine",
+    "id128",
+] }
+log = { path = "../../libs/log" }
+nix = { version = "0.24", default-features = false }

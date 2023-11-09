@@ -64,6 +64,8 @@ full = [
     "argv",
     "exec_util",
     "random",
+    "id128",
+    "namespace",
 ]
 
 capability = []
@@ -87,10 +89,12 @@ fd = ["stat", "nix/ioctl", "nix/socket"]
 file = []
 fs = ["pathdiff", "rand", "nix/fs", "nix/user"]
 host = []
+id128 = ["bitflags", "nix/fs"]
 io = ["nix/poll", "nix/signal"]
-machine = []
+machine = ["nix/fs", "nix/dir", "mount", "id128", "namespace"]
 memory = []
-mount = []
+mount = ["fs"]
+namespace = ["nix/process", "nix/fs", "nix/sched", "nix/mount"]
 naming_scheme = ["bitflags", "nix/net"]
 network = ["nix/net"]
 os_release = []

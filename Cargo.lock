@@ -1056,6 +1056,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "machine-id-setup"
+version = "0.5.1"
+dependencies = [
+ "basic",
+ "log 0.5.1",
+ "nix 0.24.3",
+]
+
+[[package]]
 name = "macros"
 version = "0.5.1"
 dependencies = [

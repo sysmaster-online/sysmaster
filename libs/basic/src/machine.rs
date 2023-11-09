@@ -11,14 +11,33 @@
 // See the Mulan PSL v2 for more details.
 
 //!
-use nix::sys::statfs;
-use nix::unistd::AccessFlags;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::os::unix::prelude::MetadataExt;
-use std::path::{Path, PathBuf};
-use std::{env, fs};
-
+use crate::{
+    fs_util,
+    id128_util::{self, Id128FormatFlag},
+    mount_util, namespace_util,
+};
+use libc::syncfs;
+use log;
+use nix::{
+    dir::Dir,
+    errno::Errno,
+    fcntl,
+    fcntl::OFlag,
+    mount, sched,
+    sys::{stat::*, statfs},
+    unistd::{self, sync, AccessFlags, Pid},
+    Result,
+};
+use std::{
+    env, fs,
+    fs::File,
+    io::{BufRead, BufReader, ErrorKind},
+    ops::BitAnd,
+    os::unix::io::{AsRawFd, RawFd},
+    os::unix::prelude::MetadataExt,
+    path::{Path, PathBuf},
+    process,
+};
 macro_rules! unsafe_set_and_return {
     ($var:expr, $value:expr) => {
         #[allow(unused_unsafe)]
@@ -304,6 +323,254 @@ impl Machine {
 
         is_tmpfs && has_initrd_release
     }
+}
+
+fn syncfs_path(path: &str) -> Result<()> {
+    if path.is_empty() {
+        return Err(Errno::EINVAL);
+    }
+
+    let fd = Dir::open(
+        path,
+        OFlag::O_RDONLY | OFlag::O_CLOEXEC | OFlag::O_NONBLOCK,
+        Mode::empty(),
+    )?;
+    match unsafe { syncfs(fd.as_raw_fd()) } {
+        0 => Ok(()),
+        e => Err(Errno::from_i32(e)),
+    }
+}
+
+/// Write machine-id from memory to disk
+pub fn machine_id_commit() -> Result<()> {
+    #[cfg(target_env = "musl")]
+    type FsTypeT = libc::c_ulong;
+    #[cfg(not(target_env = "musl"))]
+    type FsTypeT = libc::c_long;
+
+    let etc_machine_id = Path::new("/etc/machine-id");
+    let id128: String;
+    let mnt_fd: RawFd;
+
+    syncfs_path("/etc/")?;
+    syncfs_path("/var/")?;
+
+    sync();
+
+    if !mount_util::is_mount_point(etc_machine_id) {
+        log::debug!("{:?} is not a mount point. Nothing to do.", etc_machine_id);
+        return Ok(());
+    }
+
+    if !fs_util::check_filesystem(etc_machine_id, statfs::FsType(libc::TMPFS_MAGIC as FsTypeT)) {
+        log::error!("{:?} is not on a temporary file system.", etc_machine_id);
+        return Err(nix::Error::EROFS);
+    }
+
+    match id128_util::id128_read_by_path(etc_machine_id, Id128FormatFlag::ID128_FORMAT_PLAIN) {
+        Ok(id128_string) => id128 = id128_string,
+        Err(e) => {
+            log::error!(
+                "We didn't find a valid machine ID in {:?}:{}",
+                etc_machine_id,
+                e
+            );
+            return Err(nix::Error::EINVAL);
+        }
+    }
+
+    mnt_fd = namespace_util::namespace_open(&Pid::from_raw(0), Path::new(&"mnt".to_string()))?;
+
+    namespace_util::detach_mount_namespace()?;
+
+    if let Err(e) = mount::umount2(etc_machine_id, mount::MntFlags::from_bits(0).unwrap()) {
+        log::error!("Failed to umount {:?}:{}", etc_machine_id, e);
+        return Err(e);
+    }
+
+    id128_util::id128_write(
+        etc_machine_id,
+        &true,
+        &id128,
+        Id128FormatFlag::ID128_FORMAT_PLAIN,
+    )?;
+
+    namespace_util::namespace_enter(&mnt_fd, sched::CloneFlags::CLONE_NEWNS)?;
+
+    mount::umount2(etc_machine_id, mount::MntFlags::MNT_DETACH)
+}
+
+fn generate_machine_id() -> Result<String> {
+    let dbus_machine_id = Path::new("/var/lib/dbus/machine-id");
+
+    if let Ok(id128) =
+        id128_util::id128_read_by_path(dbus_machine_id, Id128FormatFlag::ID128_FORMAT_PLAIN)
+    {
+        log::info!("Initializing machine ID from D-Bus machine ID (/var/lib/dbus/machine-id).");
+        return Ok(id128);
+    }
+
+    if process::id() == 1 {
+        if let Ok(id128) = env::var("container_uuid") {
+            if id128_util::id128_is_valid(&id128.clone().into_bytes()) {
+                log::info!(
+                    "Initializing machine ID from container UUID (process 1's container_uuid)."
+                );
+                return Ok(id128);
+            }
+        }
+    } else {
+        let penv = String::from_utf8(fs::read(Path::new("/proc/1/environ")).unwrap()).unwrap();
+        let idv: Vec<&str> = penv.split("container_uuid=").collect();
+        if idv.len() > 1 {
+            let id128 = idv[1];
+            let idplain: String = id128.chars().take(32).collect();
+            let idrfc: String = id128.chars().take(36).collect();
+
+            if id128_util::id128_is_valid(&idplain.clone().into_bytes()) {
+                log::info!("Initializing machine ID from environ's container UUID (/proc/1/environ's container_uuid).");
+                return Ok(idplain);
+            } else if id128_util::id128_is_valid(&idrfc.clone().into_bytes()) {
+                log::info!("Initializing machine ID from environ's container UUID (/proc/1/environ's container_uuid).");
+                return Ok(idrfc);
+            }
+        }
+    }
+
+    match id128_util::id128_read_by_path(
+        Path::new("/sys/class/dmi/id/product_uuid"),
+        Id128FormatFlag::ID128_FORMAT_UUID,
+    ) {
+        Ok(id128) => {
+            log::info!("Initializing machine ID from VM UUID (/sys/class/dmi/id/product_uuid).");
+            return Ok(id128);
+        }
+        Err(e) => {
+            if e.kind() == ErrorKind::NotFound {
+                if let Ok(id128) = id128_util::id128_read_by_path(
+                    Path::new("/proc/device-tree/vm,uuid"),
+                    Id128FormatFlag::ID128_FORMAT_UUID,
+                ) {
+                    log::info!("Initializing machine ID from VM UUID (/proc/device-tree/vm,uuid).");
+                    return Ok(id128);
+                }
+            }
+        }
+    }
+
+    log::info!("Initializing machine ID from random generator.");
+    id128_util::id128_randomize(Id128FormatFlag::ID128_FORMAT_PLAIN)
+}
+
+///
+pub fn machine_id_setup(force_transient: bool, machine_id: &str) -> Result<String> {
+    let etc_machine_id = Path::new("/etc/machine-id");
+    let run_machine_id = Path::new("/run/machine-id");
+    let mut writable = false;
+    let mut fd: RawFd = -1;
+    let ret_id128: String;
+
+    // with umask(0000)
+    let mut saved_umask = SFlag::from_bits_truncate(
+        umask(Mode::from_bits_truncate(0o0000)).bits() | SFlag::S_IFMT.bits(),
+    );
+    while saved_umask.contains(SFlag::S_IFMT) {
+        match fcntl::open(
+            etc_machine_id,
+            OFlag::O_RDWR | OFlag::O_CREAT | OFlag::O_NOCTTY | OFlag::O_CLOEXEC,
+            Mode::from_bits_truncate(0o0444),
+        ) {
+            Ok(f) => {
+                writable = true;
+                fd = f;
+            }
+            Err(e1) => {
+                match fcntl::open(
+                    etc_machine_id,
+                    OFlag::O_RDONLY | OFlag::O_NOCTTY | OFlag::O_CLOEXEC,
+                    Mode::from_bits_truncate(0o0444),
+                ) {
+                    Ok(_) => writable = false,
+                    Err(e2) => {
+                        if e1 == Errno::EROFS && e2 == Errno::ENOENT {
+                            log::error!("System cannot boot: Missing /etc/machine/id and /etc is mounted read-only.
+Booting up is supported only when:
+1) /etc/machine-id exists and is populated.
+2) /etc/machine-id exists and is empty
+3) /etc/machine-id is missing and /etc is writable.");
+                        } else {
+                            log::error!("Cannot open {:?}:{}", etc_machine_id, e2);
+                        }
+                        return Err(e2);
+                    }
+                }
+            }
+        };
+        saved_umask = saved_umask.bitand(SFlag::from_bits_truncate(0o0777));
+    }
+
+    if machine_id.is_empty() {
+        if let Ok(id128) =
+            id128_util::id128_read_by_path(etc_machine_id, Id128FormatFlag::ID128_FORMAT_PLAIN)
+        {
+            return Ok(id128);
+        }
+        ret_id128 = generate_machine_id()?;
+    } else {
+        ret_id128 = machine_id.to_string();
+    }
+
+    if writable {
+        if force_transient {
+            if let Err(e) = unistd::write(fd, "uninitialized\n".as_bytes()) {
+                log::error!("Failed to write uninitialized {:?}:{}", etc_machine_id, e);
+                return Err(e);
+            }
+        } else {
+            id128_util::id128_write(
+                etc_machine_id,
+                &true,
+                &ret_id128,
+                Id128FormatFlag::ID128_FORMAT_PLAIN,
+            )?;
+            unistd::close(fd)?;
+            return Ok(ret_id128);
+        }
+    }
+
+    unistd::close(fd)?;
+
+    // with umask(0022)
+    let mut saved_umask = SFlag::from_bits_truncate(
+        umask(Mode::from_bits_truncate(0o0022)).bits() | SFlag::S_IFMT.bits(),
+    );
+    while saved_umask.contains(SFlag::S_IFMT) {
+        id128_util::id128_write(
+            run_machine_id,
+            &false,
+            &ret_id128,
+            Id128FormatFlag::ID128_FORMAT_PLAIN,
+        )?;
+        saved_umask = saved_umask.bitand(SFlag::from_bits_truncate(0o0777));
+    }
+
+    mount::mount(
+        Some(run_machine_id),
+        etc_machine_id,
+        None::<&str>,
+        mount::MsFlags::MS_BIND,
+        None::<&str>,
+    )?;
+
+    mount::mount(
+        None::<&str>,
+        etc_machine_id,
+        None::<&str>,
+        mount::MsFlags::MS_BIND | mount::MsFlags::MS_RDONLY | mount::MsFlags::MS_REMOUNT,
+        None::<&str>,
+    )?;
+
+    Ok(ret_id128)
 }
 
 #[cfg(test)]

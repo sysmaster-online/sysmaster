@@ -125,6 +125,7 @@ members = [
   "exts/switch_root",
   "exts/hostname_setup",
   "exts/hwdb",
+  "exts/machine-id-setup",
   #internal libraries crates
   "libs/cmdproto",
   #external libraries crates

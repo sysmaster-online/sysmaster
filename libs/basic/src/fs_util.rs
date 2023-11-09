@@ -17,6 +17,7 @@ use libc::{fchownat, mode_t, timespec, AT_EMPTY_PATH, S_IFLNK, S_IFMT};
 use nix::{
     fcntl::{open, readlink, renameat, OFlag},
     sys::stat::{fstat, Mode},
+    sys::statfs,
     unistd::{unlinkat, Gid, Uid, UnlinkatFlags},
 };
 use pathdiff::diff_paths;
@@ -649,6 +650,17 @@ impl Default for LookupPaths {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Check whether $p belongs to $fstype fs
+pub fn check_filesystem(p: &Path, fstype: statfs::FsType) -> bool {
+    let fstp = match statfs::statfs(p) {
+        Ok(s) => s.filesystem_type(),
+        Err(_) => {
+            return false;
+        }
+    };
+    fstp == fstype
 }
 
 #[cfg(test)]

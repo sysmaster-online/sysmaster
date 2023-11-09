@@ -35,6 +35,8 @@ pub mod fd_util;
 pub mod fs_util;
 #[cfg(feature = "host")]
 pub mod host;
+#[cfg(feature = "id128")]
+pub mod id128_util;
 #[cfg(feature = "io")]
 pub mod io_util;
 #[cfg(feature = "machine")]
@@ -45,6 +47,8 @@ pub mod memory;
 pub mod mount_util;
 #[cfg(feature = "murmurhash2")]
 pub mod murmurhash2;
+#[cfg(feature = "namespace")]
+pub mod namespace_util;
 #[cfg(feature = "naming_scheme")]
 pub mod naming_scheme;
 #[cfg(feature = "network")]

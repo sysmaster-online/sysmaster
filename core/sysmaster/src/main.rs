@@ -165,6 +165,7 @@ fn initialize_runtime(self_recovery_enable: bool) -> Result<()> {
         msg: format!("enable hongmeng resmgr subtree_control failed: {}", e),
     })?;
 
+    machine::machine_id_setup(true, "")?;
     set_child_reaper();
 
     Ok(())
