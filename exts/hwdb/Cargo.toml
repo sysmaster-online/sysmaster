@@ -8,5 +8,8 @@ edition = "2021"
 [dependencies]
 nix = { version = "0.24", default-features = false }
 log = { path = "../../libs/log", default-features = false }
-clap = { version = "3.1.8", default_features = false, features = ["derive"] }
+clap = { version = "3.1.8", default_features = false, features = [
+    "derive",
+    "std",
+] }
 hwdb = { path = "../../libs/hwdb", default-features = false }

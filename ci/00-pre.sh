@@ -32,7 +32,7 @@ rm -rf rustlang.sh
 fi
 
 source "$HOME/.cargo/env"
-rustup default 1.57
+rustup default $rust_vendor
 
 # Define the crate names to test
 crate_names=("https://github.com/rust-lang/crates.io-index" \

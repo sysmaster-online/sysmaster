@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export rust_vendor="1.57.0"
 
 function test_fasturl()
 {

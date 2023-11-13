@@ -10,14 +10,28 @@ name = "sysrsctl"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 async-trait = "0.1.73"
-clap = { version = "4.4.4", features = ["derive"] }
+clap = { version = "4.4.4", features = [
+    "derive",
+    "std",
+], default-features = false }
 futures = "0.3.28"
 futures-util = "0.3.28"
 notify = "6.1.1"
 rustix = { version = "0.38.2", features = ["fs", "process", "thread"] }
 serde = { version = "1.0.188", features = ["derive"] }
 tap = "1.0.1"
-tokio = { version = "1.29.1", features = ["fs", "parking_lot", "rt-multi-thread", "rt", "io-util", "net", "signal", "time", "sync", "macros"] }
+tokio = { version = "1.29.1", features = [
+    "fs",
+    "parking_lot",
+    "rt-multi-thread",
+    "rt",
+    "io-util",
+    "net",
+    "signal",
+    "time",
+    "sync",
+    "macros",
+] }
 tokio-stream = { version = "0.1.14", features = ["io-util", "signal", "fs"] }
 toml = "0.8.0"
 zbus = { version = "3.14.1", features = ["tokio"], default-features = false }
