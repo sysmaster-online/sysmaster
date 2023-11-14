@@ -2774,7 +2774,7 @@ impl Device {
     }
 
     /// Return the devlink iterator
-    /// 
+    ///
     /// The device object will try to load devlinks from db firstly.
     pub fn devlink_iter(&self) -> HashSetRefWrapper<String> {
         let _ = self.read_db();
@@ -3451,6 +3451,8 @@ mod tests {
             assert!(dev.has_current_tag("test_update_tag2").unwrap());
 
             dev.cleanup_tags();
+
+            fs::remove_dir_all("/tmp/devmaster").unwrap();
 
             Ok(())
         }
