@@ -19,14 +19,33 @@ use snafu::prelude::Snafu;
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum Error {
-    /// other error
     #[snafu(context, display("Device error: {}", msg))]
-    Nix {
-        /// message
+    Nix { msg: String, source: nix::Error },
+
+    #[snafu(context, display("IO error: {}", msg))]
+    Io { msg: String, source: std::io::Error },
+
+    #[snafu(context, display("Basic error: {}", msg))]
+    Basic { msg: String, source: basic::Error },
+
+    #[snafu(context, display("Failed to parse boolean: {}", msg))]
+    ParseBool {
         msg: String,
-        /// errno indicates the error kind
-        source: nix::Error,
+        source: std::str::ParseBoolError,
+    },
+
+    #[snafu(context, display("Failed to parse integer: {}", msg))]
+    ParseInt {
+        msg: String,
+        source: std::num::ParseIntError,
+    },
+
+    #[snafu(context, display("Failed to parse utf-8: {}", msg))]
+    FromUtf8 {
+        msg: String,
+        source: std::string::FromUtf8Error,
     },
 }
 
@@ -34,39 +53,65 @@ impl Error {
     /// extract the errno from error
     pub fn get_errno(&self) -> Errno {
         match self {
-            Error::Nix {
+            Self::Nix {
                 msg: _,
                 source: errno,
             } => *errno,
+            Self::Io {
+                msg: _,
+                source: errno,
+            } => Errno::from_i32(errno.raw_os_error().unwrap_or_default()),
+            Self::Basic { msg: _, source } => Errno::from_i32(source.get_errno()),
+            Self::ParseBool { msg: _, source: _ } => nix::Error::EINVAL,
+            Self::ParseInt { msg: _, source: _ } => nix::Error::EINVAL,
+            Self::FromUtf8 { msg: _, source: _ } => nix::Error::EINVAL,
         }
     }
-}
-
-/// append current function and inherit the errno
-#[macro_export]
-macro_rules! err_wrapper {
-    ($e:expr, $s:expr) => {
-        $e.map_err(|e| Error::Nix {
-            msg: format!("$s failed: {}", e),
-            source: e.get_errno(),
-        })
-    };
 }
 
 impl Error {
     /// check whether the device error belongs to specific errno
     pub fn is_errno(&self, errno: nix::Error) -> bool {
-        match self {
-            Self::Nix { msg: _, source } => *source == errno,
-        }
+        self.get_errno() == errno
     }
 
     /// check whether the device error indicates the device is absent
     pub fn is_absent(&self) -> bool {
-        match self {
-            Self::Nix { msg: _, source } => {
-                matches!(source, Errno::ENODEV | Errno::ENXIO | Errno::ENOENT)
+        matches!(
+            self.get_errno(),
+            Errno::ENODEV | Errno::ENXIO | Errno::ENOENT
+        )
+    }
+
+    pub(crate) fn replace_errno(self, from: Errno, to: Errno) -> Self {
+        let n = self.get_errno();
+
+        if n == from {
+            Self::Nix {
+                msg: self.to_string(),
+                source: to,
             }
+        } else {
+            self
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use nix::errno::Errno;
+
+    #[test]
+    fn test_replace_errno() {
+        let e = Error::Nix {
+            msg: "test".to_string(),
+            source: Errno::ENOENT,
+        };
+
+        assert_eq!(
+            Errno::ENOEXEC,
+            e.replace_errno(Errno::ENOENT, Errno::ENOEXEC).get_errno(),
+        );
     }
 }

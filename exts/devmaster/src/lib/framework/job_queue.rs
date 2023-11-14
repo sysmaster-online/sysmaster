@@ -51,7 +51,6 @@ impl Display for JobState {
 }
 
 /// device job
-#[derive(Debug)]
 pub struct DeviceJob {
     /// internal device
     pub device: Device,
@@ -132,7 +131,6 @@ impl PartialEq for DeviceJob {
 }
 
 /// job queue
-#[derive(Debug)]
 pub struct JobQueue {
     /// internal container of jobs
     pub(crate) jobs: RefCell<VecDeque<Rc<DeviceJob>>>,

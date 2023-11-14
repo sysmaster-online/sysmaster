@@ -188,6 +188,8 @@ impl LoopDev {
             source: nix::Error::EINVAL,
         })?)?;
 
+        dev.set_base_path("/tmp/devmaster");
+
         f(&mut dev)
     }
 }

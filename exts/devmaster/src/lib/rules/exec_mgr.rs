@@ -150,13 +150,7 @@ impl ExecuteManager {
 
         // copy all tags to cloned device
         for tag in &device.borrow().tag_iter() {
-            device_db_clone
-                .borrow()
-                .add_tag(tag, false)
-                .map_err(|e| Error::RulesExecuteError {
-                    msg: format!("failed to add tag ({})", e),
-                    errno: e.get_errno(),
-                })?;
+            device_db_clone.borrow().add_tag(tag, false);
         }
 
         // add property to cloned device
@@ -1539,10 +1533,7 @@ impl ExecuteManager {
                 if token.read().unwrap().as_ref().unwrap().op == OperatorType::Remove {
                     device.borrow().remove_tag(&value);
                 } else {
-                    execute_err!(
-                        token.read().unwrap().as_ref().unwrap(),
-                        device.borrow().add_tag(&value, true)
-                    )?;
+                    device.borrow().add_tag(&value, true);
                 }
 
                 Ok(true)

@@ -24,7 +24,6 @@ use std::{
 };
 
 /// encapsulate all submanagers
-#[derive(Debug)]
 pub struct Devmaster {
     /// reference to events
     pub(crate) events: Rc<Events>,

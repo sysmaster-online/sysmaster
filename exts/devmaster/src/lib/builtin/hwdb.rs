@@ -123,7 +123,7 @@ impl Hwdb {
         let mut last = false;
         let mut src_dev = match srcdev {
             Some(d) => d,
-            None => dev.borrow_mut().clone(),
+            None => dev.borrow_mut().shallow_clone().unwrap(),
         };
 
         loop {
@@ -131,7 +131,7 @@ impl Hwdb {
                 Ok(str_subsystem) => str_subsystem,
                 Err(_) => {
                     src_dev = match src_dev.get_parent() {
-                        Ok(d) => d.borrow_mut().clone(),
+                        Ok(d) => d.borrow_mut().shallow_clone().unwrap(),
                         Err(_) => break,
                     };
                     continue;
@@ -142,7 +142,7 @@ impl Hwdb {
             if let Some(str_subsystem) = subsystem {
                 if &dsubsys != str_subsystem {
                     src_dev = match src_dev.get_parent() {
-                        Ok(d) => d.borrow_mut().clone(),
+                        Ok(d) => d.borrow_mut().shallow_clone().unwrap(),
                         Err(_) => break,
                     };
                     continue;
@@ -170,7 +170,7 @@ impl Hwdb {
 
             if modalias.is_empty() {
                 src_dev = match src_dev.get_parent() {
-                    Ok(d) => d.borrow_mut().clone(),
+                    Ok(d) => d.borrow_mut().shallow_clone().unwrap(),
                     Err(_) => break,
                 };
                 continue;
@@ -189,7 +189,7 @@ impl Hwdb {
             }
 
             src_dev = match src_dev.get_parent() {
-                Ok(d) => d.borrow_mut().clone(),
+                Ok(d) => d.borrow_mut().shallow_clone().unwrap(),
                 Err(_) => break,
             };
         }
@@ -258,7 +258,7 @@ impl Builtin for Hwdb {
                 Ok(srcdev) => Some(srcdev),
                 Err(e) => {
                     return Err(Error::Other {
-                        msg: format!("Failed to create sd_device object '{:?}'", dev),
+                        msg: format!("Failed to create device object '{}'", device_id),
                         errno: e.get_errno(),
                     });
                 }

@@ -22,7 +22,6 @@ use std::os::unix::io::RawFd;
 use std::rc::Rc;
 
 /// uevent monitor
-#[derive(Debug)]
 pub struct UeventMonitor {
     /// receive uevent from netlink socket
     device_monitor: DeviceMonitor,

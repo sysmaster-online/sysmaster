@@ -30,7 +30,6 @@ use std::{
 pub const CONTROL_MANAGER_LISTEN_ADDR: &str = "/run/devmaster/control";
 
 /// control manager
-#[derive(Debug)]
 pub struct ControlManager {
     /// listener for devctl messages
     listener: RefCell<UnixListener>,
