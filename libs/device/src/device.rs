@@ -955,14 +955,14 @@ impl Device {
 
     /// check whether the device has the tag
     pub fn has_tag(&self, tag: &str) -> Result<bool, Error> {
-        self.read_db()?;
+        let _ = self.read_db();
 
         Ok(self.all_tags.borrow().contains(tag))
     }
 
     /// check whether the device has the current tag
     pub fn has_current_tag(&self, tag: &str) -> Result<bool, Error> {
-        self.read_db()?;
+        let _ = self.read_db();
 
         Ok(self.current_tags.borrow().contains(tag))
     }
@@ -2751,48 +2751,33 @@ impl<'a, 'b: 'a, K: 'a, V: 'a> IntoIterator for &'b HashMapRefWrapper<'a, K, V> 
 }
 
 impl Device {
-    /// return the tag iterator
+    /// Return the tag iterator.
+    ///
+    /// The device object will try to load tags from db firstly.
     pub fn tag_iter(&self) -> HashSetRefWrapper<String> {
-        if let Err(e) = self.read_db() {
-            log::debug!(
-                "failed to read db of '{}': {}",
-                self.get_device_id()
-                    .unwrap_or_else(|_| self.devpath.borrow().clone()),
-                e
-            )
-        }
+        let _ = self.read_db();
 
         HashSetRefWrapper {
             r: self.all_tags.borrow(),
         }
     }
 
-    /// return the current tag iterator
+    /// Return the current tag iterator.
+    ///
+    /// The device object will try to load tags from db firstly.
     pub fn current_tag_iter(&self) -> HashSetRefWrapper<String> {
-        if let Err(e) = self.read_db() {
-            log::error!(
-                "failed to read db of '{}': {}",
-                self.get_device_id()
-                    .unwrap_or_else(|_| self.devpath.borrow().clone()),
-                e
-            )
-        }
+        let _ = self.read_db();
 
         HashSetRefWrapper {
             r: self.current_tags.borrow(),
         }
     }
 
-    /// return the tag iterator
+    /// Return the devlink iterator
+    /// 
+    /// The device object will try to load devlinks from db firstly.
     pub fn devlink_iter(&self) -> HashSetRefWrapper<String> {
-        if let Err(e) = self.read_db() {
-            log::debug!(
-                "failed to read db of '{}': {}",
-                self.get_device_id()
-                    .unwrap_or_else(|_| self.devpath.borrow().clone()),
-                e
-            )
-        }
+        let _ = self.read_db();
 
         HashSetRefWrapper {
             r: self.devlinks.borrow(),
