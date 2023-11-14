@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env -e bash
 
 #RUST_BACKTRACE=1 cargo run --release -p sysmaster --example signals
 echo "(Optional) Build sysMaster with musl."

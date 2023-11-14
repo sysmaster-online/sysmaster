@@ -15,7 +15,7 @@
         <keytable>us</keytable>
         <type image="docker">
             <containerconfig name="sysmaster" tag="latest">
-                <entrypoint execute="/usr/lib/sysmater/init"/>
+                <entrypoint execute="/usr/lib/sysmaster/init"/>
             </containerconfig>
         </type>
     </preferences>
@@ -30,6 +30,7 @@
     </repository>
     <packages type="image">
         <package name="sysmaster"/>
+        <package name="procps-ng"/>
         <package name="openssh-server"/>
     </packages>
     <packages type="bootstrap">

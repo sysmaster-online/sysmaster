@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env -e bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $SCRIPT_DIR/common_function
 
