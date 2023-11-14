@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<image schemaversion="7.5" name="sysmaster-test-image-docker">
+<image schemaversion="7.5" name="sysmasters">
     <description type="system">
         <author>sysmaster groups</author>
-        <contact>dev@openeuler.overweight</contact>
+        <contact>dev@openeuler.org</contact>
         <specification>docker test build</specification>
     </description>
     <preferences>
@@ -14,7 +14,9 @@
         <locale>en_US</locale>
         <keytable>us</keytable>
         <type image="docker">
-            <containerconfig name="sysmaster"/>
+            <containerconfig name="sysmaster" tag="latest">
+                <entrypoint execute="/usr/lib/sysmater/init"/>
+            </containerconfig>
         </type>
     </preferences>
     <users>
