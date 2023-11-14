@@ -19,7 +19,7 @@ Kiwi描述文件是一个XML文件，它描述了你的Linux发行版的配置�
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 
-<image schemaversion="7.5" name="sysmaster-test-image-docker">
+<image schemaversion="7.5" name="sysmaster">
     <description type="system">
         <author>sysmaster groups</author>
         <contact>dev@openeuler.overweight</contact>
@@ -89,7 +89,11 @@ kiwi-ng system build --description . --target-dir my_image
 使用Docker的docker run命令来运行你的Docker镜像。
 
 ```bash
-docker run --privileged --rm -it sysmaster /bin/bash
+docker load -i my_image/sysmaster.1.0.0.x86_64.tar.gz #docker images
+docker run --privileged --rm -it sysmaster /bin/bash #run images
 ```
 结论
 使用Kiwi和Docker，你可以轻松地创建和管理自己的Linux发行版。这不仅可以帮助你更好地理解Linux系统的工作原理，也可以帮助你更有效地管理和部署你的应用。
+
+!!! tips
+    可以通过配置文件filename.kiwi定制, config.sh是裁剪定制脚本, 请自己阅读实例中的路径, 要根据实际情况适配.
