@@ -216,7 +216,7 @@ impl Drop for DeviceMonitor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::device::*;
+    use crate::{device::*, DeviceAction};
     use event::*;
     use std::{os::unix::prelude::RawFd, rc::Rc, thread::spawn};
 
@@ -264,9 +264,13 @@ mod tests {
     }
 
     /// test whether device monitor can receive uevent from kernel normally
-    #[ignore]
     #[test]
     fn test_monitor_kernel() {
+        let device = Device::from_subsystem_sysname("net", "lo").unwrap();
+        if device.trigger(DeviceAction::Change).is_err() {
+            return;
+        }
+
         let e = Events::new().unwrap();
         let s: Rc<dyn Source> = Rc::new(Monitor {
             device_monitor: DeviceMonitor::new(MonitorNetlinkGroup::Kernel, None),
@@ -275,7 +279,7 @@ mod tests {
         e.set_enabled(s.clone(), EventState::On).unwrap();
 
         spawn(|| {
-            let device = Device::from_devname("/dev/sda").unwrap();
+            let device = Device::from_subsystem_sysname("net", "lo").unwrap();
             device.set_sysattr_value("uevent", Some("change")).unwrap();
         })
         .join()
@@ -287,9 +291,13 @@ mod tests {
     }
 
     /// test whether device monitor can receive device message from userspace normally
-    #[ignore]
     #[test]
     fn test_monitor_userspace() {
+        let device = Device::from_subsystem_sysname("net", "lo").unwrap();
+        if device.trigger(DeviceAction::Change).is_err() {
+            return;
+        }
+
         let e = Events::new().unwrap();
         let s: Rc<dyn Source> = Rc::new(Monitor {
             device_monitor: DeviceMonitor::new(MonitorNetlinkGroup::Userspace, None),
@@ -298,9 +306,8 @@ mod tests {
         e.set_enabled(s.clone(), EventState::On).unwrap();
 
         spawn(|| {
-            let device = Device::from_devname("/dev/sda").unwrap();
+            let device = Device::from_subsystem_sysname("net", "lo").unwrap();
             device.set_action_from_string("change").unwrap();
-            device.set_subsystem("block");
             device.set_seqnum(1000);
 
             let broadcaster = DeviceMonitor::new(MonitorNetlinkGroup::None, None);
