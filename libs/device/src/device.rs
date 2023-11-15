@@ -246,7 +246,29 @@ impl Device {
 
         device.update_properties_bufs()?;
 
-        Ok(device)
+        device.verify()
+    }
+
+    /// Verify the legality of a device object from nulstr.
+    fn verify(self) -> Result<Device, Error> {
+        if self.devpath.borrow().is_empty()
+            || self.subsystem.borrow().is_empty()
+            || *self.action.borrow() == DeviceAction::Invalid
+            || *self.seqnum.borrow() == 0
+        {
+            return Err(Error::Nix {
+                msg: "Received invalid device object from uevent".to_string(),
+                source: Errno::EINVAL,
+            });
+        }
+
+        if &*self.subsystem.borrow() == "drivers" {
+            self.set_drivers_subsystem()?;
+        }
+
+        self.sealed.replace(true);
+
+        Ok(self)
     }
 
     /// create a Device instance from devname
@@ -1237,7 +1259,7 @@ impl Device {
     /// shadow clone a device object and import properties from db
     pub fn clone_with_db(&self) -> Result<Device, Error> {
         let device = self.shallow_clone()?;
-        device.read_db()?;
+        device.read_db_internal(true)?;
         device.sealed.replace(true);
         Ok(device)
     }
@@ -3535,8 +3557,12 @@ mod tests {
             let syspath = dev.get_syspath().unwrap();
             let devnum = dev.get_devnum().unwrap();
             let id = dev.get_device_id().unwrap();
-            let (nulstr, _) = dev.get_properties_nulstr().unwrap();
             let devname = dev.get_devname().unwrap();
+
+            dev.set_action_from_string("change").unwrap();
+            dev.set_seqnum_from_string("1000").unwrap();
+
+            let (nulstr, _) = dev.get_properties_nulstr().unwrap();
 
             let dev_new = Device::from_syspath(&syspath, true).unwrap();
             assert_eq!(dev, &dev_new);
