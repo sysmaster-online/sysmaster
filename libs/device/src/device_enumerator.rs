@@ -12,10 +12,11 @@
 
 //! enumerate /sys to collect devices
 //!
-use crate::{device::Device, error::Error, utils::*};
+use crate::{device::Device, error::*, utils::*, TAGS_BASE_DIR};
 use bitflags::bitflags;
 use fnmatch_sys::fnmatch;
 use nix::errno::Errno;
+use snafu::ResultExt;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -45,7 +46,6 @@ impl Default for MatchInitializedType {
 }
 
 /// enumerate devices or subsystems under /sys
-#[derive(Default)]
 pub struct DeviceEnumerator {
     /// enumerator type
     pub(crate) etype: RefCell<DeviceEnumerationType>,
@@ -91,6 +91,40 @@ pub struct DeviceEnumerator {
 
     /// how to match device
     pub(crate) match_initialized: RefCell<MatchInitializedType>,
+
+    /// the base directory path to contain runtime temporary files of device database, tags, etc.
+    pub(crate) base_path: RefCell<String>,
+}
+
+impl Default for DeviceEnumerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DeviceEnumerator {
+    /// create a default instance of DeviceEnumerator
+    pub fn new() -> Self {
+        Self {
+            etype: RefCell::new(DeviceEnumerationType::All),
+            devices_by_syspath: RefCell::new(HashMap::new()),
+            devices: RefCell::new(Vec::new()),
+            scan_up_to_date: RefCell::new(false),
+            sorted: RefCell::new(false),
+            prioritized_subsystems: RefCell::new(Vec::new()),
+            match_subsystem: RefCell::new(HashSet::new()),
+            not_match_subsystem: RefCell::new(HashSet::new()),
+            match_sysattr: RefCell::new(HashMap::new()),
+            not_match_sysattr: RefCell::new(HashMap::new()),
+            match_property: RefCell::new(HashMap::new()),
+            match_sysname: RefCell::new(HashSet::new()),
+            not_match_sysname: RefCell::new(HashSet::new()),
+            match_tag: RefCell::new(HashSet::new()),
+            match_parent: RefCell::new(HashSet::new()),
+            match_initialized: RefCell::new(MatchInitializedType::ALL),
+            base_path: RefCell::new(crate::DEFAULT_BASE_DIR.to_string()),
+        }
+    }
 }
 
 /// decide enumerate devices or subsystems
@@ -186,11 +220,6 @@ bitflags! {
 
 /// public methods
 impl DeviceEnumerator {
-    /// create a default instance of DeviceEnumerator
-    pub fn new() -> DeviceEnumerator {
-        DeviceEnumerator::default()
-    }
-
     /// set the enumerator type
     pub fn set_enumerator_type(&mut self, etype: DeviceEnumerationType) {
         if *self.etype.borrow() != etype {
@@ -426,23 +455,11 @@ impl DeviceEnumerator {
 
         for (property_pattern, value_pattern) in self.match_property.borrow().iter() {
             for (property, value) in &device.property_iter() {
-                if !self
-                    .pattern_match(property_pattern, property)
-                    .map_err(|e| Error::Nix {
-                        msg: format!("match_property failed: {}", e),
-                        source: e.get_errno(),
-                    })?
-                {
+                if !self.pattern_match(property_pattern, property) {
                     continue;
                 }
 
-                if self
-                    .pattern_match(value_pattern, value)
-                    .map_err(|e| Error::Nix {
-                        msg: format!("match_property failed: {}", e),
-                        source: e.get_errno(),
-                    })?
-                {
+                if self.pattern_match(value_pattern, value) {
                     return Ok(true);
                 }
             }
@@ -458,7 +475,7 @@ impl DeviceEnumerator {
     }
 
     /// check whether the sysname of a device matches
-    pub(crate) fn match_sysname(&self, sysname: &str) -> Result<bool, Error> {
+    pub(crate) fn match_sysname(&self, sysname: &str) -> bool {
         self.set_pattern_match(
             &self.match_sysname.borrow(),
             &self.not_match_sysname.borrow(),
@@ -473,7 +490,7 @@ impl DeviceEnumerator {
     }
 
     /// check whether the subsystem of a device matches
-    pub(crate) fn match_subsystem(&self, subsystem: &str) -> Result<bool, Error> {
+    pub(crate) fn match_subsystem(&self, subsystem: &str) -> bool {
         self.set_pattern_match(
             &self.match_subsystem.borrow(),
             &self.not_match_subsystem.borrow(),
@@ -529,7 +546,7 @@ impl DeviceEnumerator {
             return Ok(true);
         }
 
-        self.pattern_match(patterns, &value)
+        Ok(self.pattern_match(patterns, &value))
     }
 
     /// check whether a device matches conditions according to flags
@@ -538,19 +555,8 @@ impl DeviceEnumerator {
         device: &mut Device,
         flags: MatchFlag,
     ) -> Result<bool, Error> {
-        if (flags & MatchFlag::SYSNAME).bits() != 0 {
-            match self.match_sysname(&device.get_sysname()?) {
-                Ok(ret) => match ret {
-                    true => {}
-                    false => return Ok(false),
-                },
-                Err(e) => {
-                    return Err(Error::Nix {
-                        msg: format!("test_matches failed: match sysname failed: {}", e),
-                        source: e.get_errno(),
-                    })
-                }
-            }
+        if (flags & MatchFlag::SYSNAME).bits() != 0 && !self.match_sysname(&device.get_sysname()?) {
+            return Ok(false);
         }
 
         if (flags & MatchFlag::SUBSYSTEM).bits() != 0 {
@@ -568,87 +574,29 @@ impl DeviceEnumerator {
                 }
             };
 
-            match self.match_subsystem(&subsystem) {
-                Ok(ret) => match ret {
-                    true => {}
-                    false => return Ok(false),
-                },
-                Err(e) => {
-                    return Err(Error::Nix {
-                        msg: format!("test_matches failed: match_subsystem ({})", e),
-                        source: e.get_errno(),
-                    });
-                }
+            if !self.match_subsystem(&subsystem) {
+                return Ok(false);
             }
         }
 
-        if (flags & MatchFlag::PARENT).bits() != 0 {
-            match self.match_parent(device) {
-                Ok(ret) => match ret {
-                    true => {}
-                    false => return Ok(false),
-                },
-                Err(e) => {
-                    return Err(Error::Nix {
-                        msg: format!("test_matches failed: match parent failed: {}", e),
-                        source: e.get_errno(),
-                    });
-                }
-            }
+        if (flags & MatchFlag::PARENT).bits() != 0 && !self.match_parent(device)? {
+            return Ok(false);
         }
 
-        if (flags & MatchFlag::TAG).bits() != 0 {
-            match self.match_tag(device) {
-                Ok(ret) => match ret {
-                    true => {}
-                    false => return Ok(false),
-                },
-                Err(e) => {
-                    return Err(Error::Nix {
-                        msg: format!("test_matches failed: match tag failed: {}", e),
-                        source: e.get_errno(),
-                    });
-                }
-            }
+        if (flags & MatchFlag::TAG).bits() != 0 && !self.match_tag(device)? {
+            return Ok(false);
         }
 
-        match self.match_initialized(device) {
-            Ok(ret) => match ret {
-                true => {}
-                false => return Ok(false),
-            },
-            Err(e) => {
-                return Err(Error::Nix {
-                    msg: format!("test_matches failed: match_initialized ({})", e),
-                    source: e.get_errno(),
-                });
-            }
+        if !self.match_initialized(device)? {
+            return Ok(false);
         }
 
-        match self.match_property(device) {
-            Ok(ret) => match ret {
-                true => {}
-                false => return Ok(false),
-            },
-            Err(e) => {
-                return Err(Error::Nix {
-                    msg: format!("test_matches failed: match property failed: {}", e),
-                    source: e.get_errno(),
-                });
-            }
+        if !self.match_property(device)? {
+            return Ok(false);
         }
 
-        match self.match_sysattr(device) {
-            Ok(ret) => match ret {
-                true => {}
-                false => return Ok(false),
-            },
-            Err(e) => {
-                return Err(Error::Nix {
-                    msg: format!("test_matches failed: match sysattr failed: {}", e),
-                    source: e.get_errno(),
-                });
-            }
+        if !self.match_sysattr(device)? {
+            return Ok(false);
         }
 
         Ok(true)
@@ -679,20 +627,11 @@ impl DeviceEnumerator {
 
             d = parent.clone();
 
-            if !self
-                .test_matches(&mut parent.borrow_mut(), flags)
-                .map_err(|e| Error::Nix {
-                    msg: format!("add_parent_devices failed: {}", e),
-                    source: e.get_errno(),
-                })?
-            {
+            if !self.test_matches(&mut parent.borrow_mut(), flags)? {
                 continue;
             }
 
-            if !self.add_device(parent.clone()).map_err(|e| Error::Nix {
-                msg: format!("add_parent_devices failed: {}", e),
-                source: e.get_errno(),
-            })? {
+            if !self.add_device(parent.clone())? {
                 break;
             }
         }
@@ -711,12 +650,8 @@ impl DeviceEnumerator {
         let mut path: Vec<String> = vec!["/sys".to_string(), basedir];
         path.append(&mut subdirs);
         let path = path.join("/");
-        let path = match Path::new(&path).canonicalize().map_err(|e| Error::Nix {
-            msg: format!(
-                "scan_dir_and_add_devices failed: canonicalize {} ({})",
-                path, e
-            ),
-            source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
+        let path = match Path::new(&path).canonicalize().context(Io {
+            msg: format!("failed to canonicalize '{}'", path),
         }) {
             Ok(p) => p,
             Err(e) => {
@@ -729,37 +664,31 @@ impl DeviceEnumerator {
 
         let entries = std::fs::read_dir(path).unwrap();
         for entry in entries {
-            if let Err(e) = entry {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_dir_and_add_devices failed: read entries ({})", e),
-                    source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
-                });
-                continue;
-            }
-
-            let entry = entry.unwrap();
+            let entry = match entry.context(Io {
+                msg: "failed to read directory entry".to_string(),
+            }) {
+                Ok(i) => i,
+                Err(e) => {
+                    ret = Err(e);
+                    continue;
+                }
+            };
 
             if !relevant_sysfs_subdir(&entry) {
                 continue;
             }
 
-            if !self.match_sysname(entry.file_name().to_str().unwrap_or_default())? {
+            if !self.match_sysname(entry.file_name().to_str().unwrap_or_default()) {
                 continue;
             }
 
-            let syspath = match entry.path().canonicalize() {
+            let syspath = match entry.path().canonicalize().context(Io {
+                msg: format!("failed to canonicalize '{:?}'", entry.path()),
+            }) {
                 Ok(ret) => ret,
                 Err(e) => {
-                    if let Some(errno) = e.raw_os_error() {
-                        if errno != libc::ENODEV {
-                            ret = Err(Error::Nix {
-                                msg: format!(
-                                    "scan_dir_and_add_devices failed: can't canonicalize '{:?}': {}",
-                                    entry, e
-                                ),
-                                source: Errno::from_i32(errno),
-                            });
-                        }
+                    if e.get_errno() != Errno::ENODEV {
+                        ret = Err(e);
                     }
                     continue;
                 }
@@ -787,10 +716,7 @@ impl DeviceEnumerator {
                     continue;
                 }
                 Err(e) => {
-                    ret = Err(Error::Nix {
-                        msg: format!("scan_dir_and_add_devices failed: {}", e),
-                        source: e.get_errno(),
-                    });
+                    ret = Err(e);
                     continue;
                 }
             };
@@ -806,15 +732,11 @@ impl DeviceEnumerator {
             };
 
             // also include all potentially matching parent devices.
-            match self.add_parent_devices(device.clone(), MatchFlag::ALL) {
-                Ok(_) => {}
-                Err(e) => {
-                    ret = Err(Error::Nix {
-                        msg: format!("scan_dir_and_add_devices failed: {}", e),
-                        source: e.get_errno(),
-                    });
-                }
-            };
+            let _ = self
+                .add_parent_devices(device.clone(), MatchFlag::ALL)
+                .map_err(|e| {
+                    ret = Err(e);
+                });
         }
 
         ret
@@ -828,15 +750,9 @@ impl DeviceEnumerator {
         subsystem: Option<String>,
     ) -> Result<(), Error> {
         let path_str = "/sys/".to_string() + basedir.as_str();
-        let path = match Path::new(&path_str).canonicalize() {
-            Ok(ret) => ret,
-            Err(e) => {
-                return Err(Error::Nix {
-                    msg: format!("scan_dir failed: can't canonicalize '{}': {}", basedir, e),
-                    source: Errno::EINVAL,
-                });
-            }
-        };
+        let path = Path::new(&path_str).canonicalize().context(Io {
+            msg: format!("fail to canonicalize '{}'", path_str),
+        })?;
 
         let dir = std::fs::read_dir(path);
         if let Err(e) = dir {
@@ -853,16 +769,12 @@ impl DeviceEnumerator {
         let mut ret = Result::<(), Error>::Ok(());
 
         for entry in dir.unwrap() {
-            let entry = match entry {
+            let entry = match entry.context(Io {
+                msg: format!("failed to read entry under '{}'", path_str),
+            }) {
                 Ok(e) => e,
                 Err(e) => {
-                    ret = Err(Error::Nix {
-                        msg: format!(
-                            "scan_dir failed: can't read entries from directory '{}'",
-                            path_str
-                        ),
-                        source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
-                    });
+                    ret = Err(e);
                     continue;
                 }
             };
@@ -871,14 +783,13 @@ impl DeviceEnumerator {
                 continue;
             }
 
-            match self.match_subsystem(
+            if !self.match_subsystem(
                 subsystem
                     .clone()
                     .unwrap_or_else(|| entry.file_name().to_str().unwrap_or_default().to_string())
                     .as_str(),
             ) {
-                Ok(false) | Err(_) => continue,
-                Ok(true) => {}
+                continue;
             }
 
             let mut subdirs = vec![entry.file_name().to_str().unwrap_or_default().to_string()];
@@ -887,30 +798,30 @@ impl DeviceEnumerator {
                 subdirs.push(subdir.clone().unwrap());
             }
 
-            if let Err(e) = self.scan_dir_and_add_devices(basedir.clone(), subdirs) {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_dir failed: {}", e),
-                    source: e.get_errno(),
+            let _ = self
+                .scan_dir_and_add_devices(basedir.clone(), subdirs)
+                .map_err(|e| {
+                    ret = Err(e);
                 });
-            }
         }
         ret
     }
 
     /// scan devices for a single tag
     pub(crate) fn scan_devices_tag(&self, tag: &str) -> Result<(), Error> {
-        let path = Path::new("/run/devmaster/tags/").join(tag);
-        let dir = std::fs::read_dir(path);
-        let tag_dir = match dir {
+        let path = Path::new(self.base_path.borrow().as_str())
+            .join(TAGS_BASE_DIR)
+            .join(tag);
+        let dir = std::fs::read_dir(&path);
+        let tag_dir = match dir.context(Io {
+            msg: format!("failed to read '{:?}'", path),
+        }) {
             Ok(d) => d,
             Err(e) => {
-                if e.raw_os_error().unwrap_or_default() == libc::ENOENT {
+                if e.get_errno() == Errno::ENOENT {
                     return Ok(());
                 } else {
-                    return Err(Error::Nix {
-                        msg: format!("scan_dir failed: can't read directory '{}'", tag),
-                        source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
-                    });
+                    return Err(e);
                 }
             }
         };
@@ -919,16 +830,12 @@ impl DeviceEnumerator {
 
         let mut ret = Ok(());
         for entry in tag_dir {
-            let entry = match entry {
+            let entry = match entry.context(Io {
+                msg: format!("failed to read entry under '{:?}'", path),
+            }) {
                 Ok(e) => e,
                 Err(e) => {
-                    ret = Err(Error::Nix {
-                        msg: format!(
-                            "scan_dir failed: can't read entries from directory '{}'",
-                            tag
-                        ),
-                        source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
-                    });
+                    ret = Err(e);
                     continue;
                 }
             };
@@ -977,10 +884,7 @@ impl DeviceEnumerator {
 
         for tag in self.match_tag.borrow().iter() {
             if let Err(e) = self.scan_devices_tag(tag) {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_devices_tags failed: {}", e),
-                    source: e.get_errno(),
-                });
+                ret = Err(e);
             }
         }
         ret
@@ -1012,40 +916,31 @@ impl DeviceEnumerator {
         path: &str,
         stack: &mut HashSet<String>,
     ) -> Result<(), Error> {
-        let entries = match std::fs::read_dir(path) {
+        let entries = match std::fs::read_dir(path).context(Io {
+            msg: format!("failed to read '{}'", path),
+        }) {
             Ok(ret) => ret,
             Err(e) => {
-                let errno = e.raw_os_error().unwrap_or_default();
-                if errno == libc::ENOENT {
+                if e.get_errno() == Errno::ENOENT {
                     return Ok(());
                 } else {
-                    return Err(Error::Nix {
-                        msg: format!(
-                            "parent_crawl_children failed: can't read directory '{}'",
-                            path
-                        ),
-                        source: Errno::from_i32(errno),
-                    });
+                    return Err(e);
                 }
             }
         };
         let mut ret = Result::<(), Error>::Ok(());
         for entry in entries {
-            let entry = match entry {
+            let entry = match entry.context(Io {
+                msg: format!("failed to read entry under'{:?}'", path),
+            }) {
                 Ok(e) => e,
                 Err(e) => {
-                    ret = Err(Error::Nix {
-                        msg: format!(
-                            "parent_crawl_children failed: can't read entries under '{}'",
-                            path
-                        ),
-                        source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
-                    });
+                    ret = Err(e);
                     continue;
                 }
             };
-            let file_name = entry.file_name();
-            let file_name = file_name.to_str().unwrap_or_default();
+
+            let file_name = entry.file_name().to_str().unwrap_or_default().to_string();
             if file_name.is_empty() || file_name.starts_with('.') {
                 continue;
             }
@@ -1055,29 +950,22 @@ impl DeviceEnumerator {
                 continue;
             }
 
-            let entry_path = match entry.path().canonicalize() {
+            let entry_path = match entry.path().canonicalize().context(Io {
+                msg: format!("fail to canonicalize '{:?}'", entry.path()),
+            }) {
                 Ok(p) => p.to_str().unwrap_or_default().to_string(),
                 Err(e) => {
-                    ret = Err(Error::Nix {
-                        msg: format!(
-                            "parent_crawl_children failed: can't canonicalize '{:?}'",
-                            entry
-                        ),
-                        source: Errno::from_i32(e.raw_os_error().unwrap_or_default()),
-                    });
+                    ret = Err(e);
                     continue;
                 }
             };
 
-            if let Ok(true) = self.match_sysname(file_name) {
+            if self.match_sysname(&file_name) {
                 if let Err(e) = self.parent_add_child(
                     &entry_path,
                     MatchFlag::ALL & !(MatchFlag::SYSNAME | MatchFlag::PARENT),
                 ) {
-                    ret = Err(Error::Nix {
-                        msg: format!("parent_crawl_children failed: {}", e),
-                        source: e.get_errno(),
-                    });
+                    ret = Err(e);
                 };
             }
 
@@ -1099,17 +987,11 @@ impl DeviceEnumerator {
                 .parent_add_child(path, MatchFlag::ALL & !MatchFlag::PARENT)
                 .map(|_| ())
             {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_devices_children failed: {}", e),
-                    source: e.get_errno(),
-                })
+                ret = Err(e)
             }
 
             if let Err(e) = self.parent_crawl_children(path, &mut stack) {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_devices_children failed: {}", e),
-                    source: e.get_errno(),
-                })
+                ret = Err(e)
             }
         }
 
@@ -1117,10 +999,7 @@ impl DeviceEnumerator {
             stack.remove(&path);
 
             if let Err(e) = self.parent_crawl_children(&path, &mut stack) {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_devices_children failed: {}", e),
-                    source: e.get_errno(),
-                })
+                ret = Err(e)
             }
         }
 
@@ -1132,17 +1011,11 @@ impl DeviceEnumerator {
         let mut ret = Result::<(), Error>::Ok(());
 
         if let Err(e) = self.scan_dir("bus".to_string(), Some("devices".to_string()), None) {
-            ret = Err(Error::Nix {
-                msg: format!("scan_devices_all failed: {}", e),
-                source: e.get_errno(),
-            })
+            ret = Err(e);
         }
 
         if let Err(e) = self.scan_dir("class".to_string(), None, None) {
-            ret = Err(Error::Nix {
-                msg: format!("scan_devices_all failed: {}", e),
-                source: e.get_errno(),
-            })
+            ret = Err(e);
         }
 
         ret
@@ -1152,44 +1025,35 @@ impl DeviceEnumerator {
     pub(crate) fn scan_subsystems_all(&mut self) -> Result<(), Error> {
         let mut ret = Result::<(), Error>::Ok(());
 
-        if self.match_subsystem("module").map_err(|e| Error::Nix {
-            msg: format!("scan_subsystems_all failed: {}", e),
-            source: e.get_errno(),
-        })? {
-            if let Err(e) = self.scan_dir_and_add_devices("module".to_string(), vec![]) {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_subsystems_all failed: {}", e),
-                    source: e.get_errno(),
-                })
-            }
+        if self.match_subsystem("module") {
+            let _ = self
+                .scan_dir_and_add_devices("module".to_string(), vec![])
+                .map_err(|e| {
+                    ret = Err(e);
+                    log::error!("Enumerator: failed to scan modules");
+                });
         }
 
-        if self.match_subsystem("subsystem").map_err(|e| Error::Nix {
-            msg: format!("scan_subsystems_all failed: {}", e),
-            source: e.get_errno(),
-        })? {
-            if let Err(e) = self.scan_dir_and_add_devices("bus".to_string(), vec![]) {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_subsystems_all failed: {}", e),
-                    source: e.get_errno(),
-                })
-            }
+        if self.match_subsystem("subsystem") {
+            let _ = self
+                .scan_dir_and_add_devices("bus".to_string(), vec![])
+                .map_err(|e| {
+                    ret = Err(e);
+                    log::error!("Enumerator: failed to scan subsystems");
+                });
         }
 
-        if self.match_subsystem("drivers").map_err(|e| Error::Nix {
-            msg: format!("scan_subsystems_all failed: {}", e),
-            source: e.get_errno(),
-        })? {
-            if let Err(e) = self.scan_dir(
-                "bus".to_string(),
-                Some("drivers".to_string()),
-                Some("drivers".to_string()),
-            ) {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_subsystems_all failed: {}", e),
-                    source: e.get_errno(),
-                })
-            }
+        if self.match_subsystem("drivers") {
+            let _ = self
+                .scan_dir(
+                    "bus".to_string(),
+                    Some("drivers".to_string()),
+                    Some("drivers".to_string()),
+                )
+                .map_err(|e| {
+                    ret = Err(e);
+                    log::error!("Enumerator: failed to scan drivers");
+                });
         }
 
         ret
@@ -1209,24 +1073,11 @@ impl DeviceEnumerator {
         let mut ret = Result::<(), Error>::Ok(());
 
         if !self.match_tag.borrow().is_empty() {
-            if let Err(e) = self.scan_devices_tags() {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_devices failed: {}", e),
-                    source: e.get_errno(),
-                })
-            }
+            let _ = self.scan_devices_tags().map_err(|e| ret = Err(e));
         } else if !self.match_parent.borrow().is_empty() {
-            if let Err(e) = self.scan_devices_children() {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_devices failed: {}", e),
-                    source: e.get_errno(),
-                })
-            }
+            let _ = self.scan_devices_children().map_err(|e| ret = Err(e));
         } else if let Err(e) = self.scan_devices_all() {
-            ret = Err(Error::Nix {
-                msg: format!("scan_devices failed: {}", e),
-                source: e.get_errno(),
-            })
+            ret = Err(e);
         }
 
         self.scan_up_to_date.replace(true);
@@ -1247,10 +1098,7 @@ impl DeviceEnumerator {
         self.devices_by_syspath.borrow_mut().clear();
         self.devices.borrow_mut().clear();
 
-        let ret = self.scan_subsystems_all().map_err(|e| Error::Nix {
-            msg: format!("scan_subsystems failed: {}", e),
-            source: e.get_errno(),
-        });
+        let ret = self.scan_subsystems_all();
 
         self.scan_up_to_date.replace(true);
         self.etype.replace(DeviceEnumerationType::Subsystems);
@@ -1271,33 +1119,18 @@ impl DeviceEnumerator {
         let mut ret = Result::<(), Error>::Ok(());
 
         if !self.match_tag.borrow().is_empty() {
-            if let Err(e) = self.scan_devices_tags() {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_devices_and_subsystems failed: {}", e),
-                    source: e.get_errno(),
-                })
-            }
+            ret = self.scan_devices_tags();
         } else if !self.match_parent.borrow().is_empty() {
-            if let Err(e) = self.scan_devices_children() {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_devices_and_subsystems failed: {}", e),
-                    source: e.get_errno(),
-                })
-            }
+            ret = self.scan_devices_children();
         } else {
-            if let Err(e) = self.scan_devices_all() {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_devices_and_subsystems failed: {}", e),
-                    source: e.get_errno(),
-                })
-            }
+            let _ = self.scan_devices_all().map_err(|e| {
+                ret = Err(e);
+                log::error!("Failed to scan devices.");
+            });
 
-            if let Err(e) = self.scan_subsystems_all() {
-                ret = Err(Error::Nix {
-                    msg: format!("scan_devices_and_subsystems failed: {}", e),
-                    source: e.get_errno(),
-                })
-            }
+            let _ = self.scan_subsystems_all().map_err(|e| {
+                ret = Err(e);
+            });
         }
 
         self.scan_up_to_date.replace(true);
@@ -1306,20 +1139,18 @@ impl DeviceEnumerator {
         ret
     }
 
-    /// pattern match
-    /// if the enumerator filter is of Glob type, use unix glob-fnmatch to check whether match
-    /// if the enumerator filter is of Regular type, use typical regular expression to check whether match
-    pub(crate) fn pattern_match(&self, pattern: &str, value: &str) -> Result<bool, Error> {
+    /// Pattern match based on glob style pattern
+    pub(crate) fn pattern_match(&self, pattern: &str, value: &str) -> bool {
         let pattern = format!("{}\0", pattern);
         let value = format!("{}\0", value);
 
-        Ok(unsafe {
+        unsafe {
             fnmatch(
                 pattern.as_ptr() as *const c_char,
                 value.as_ptr() as *const c_char,
                 0,
-            )
-        } == 0)
+            ) == 0
+        }
     }
 
     /// if any exclude pattern matches, return false
@@ -1330,38 +1161,32 @@ impl DeviceEnumerator {
         include_pattern_set: &HashSet<String>,
         exclude_pattern_set: &HashSet<String>,
         value: &str,
-    ) -> Result<bool, Error> {
+    ) -> bool {
         for pattern in exclude_pattern_set.iter() {
-            if self.pattern_match(pattern, value).map_err(|e| Error::Nix {
-                msg: format!("set_pattern_match failed: pattern_match exclude ({})", e),
-                source: e.get_errno(),
-            })? {
-                return Ok(false);
+            if self.pattern_match(pattern, value) {
+                return false;
             }
         }
 
         if include_pattern_set.is_empty() {
-            return Ok(true);
+            return true;
         }
 
         for pattern in include_pattern_set.iter() {
-            if self.pattern_match(pattern, value).map_err(|e| Error::Nix {
-                msg: format!("set_pattern_match failed: pattern_match include ({})", e),
-                source: e.get_errno(),
-            })? {
-                return Ok(true);
+            if self.pattern_match(pattern, value) {
+                return true;
             }
         }
 
-        Ok(false)
+        false
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::device_enumerator::DeviceEnumerationType;
+    use crate::{device_enumerator::DeviceEnumerationType, Device};
 
-    use super::DeviceEnumerator;
+    use super::{DeviceEnumerator, MatchInitializedType};
 
     #[test]
     fn test_enumerator_inialize() {
@@ -1374,6 +1199,17 @@ mod tests {
         enumerator.add_match_property("DEVTYPE", "char").unwrap();
         enumerator.add_match_sysname("sda", true).unwrap();
         enumerator.add_match_sysname("sdb", false).unwrap();
+        enumerator.add_prioritized_subsystem("net").unwrap();
+        enumerator.add_match_tag("devmaster").unwrap();
+
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+
+        enumerator.add_match_parent_incremental(&dev).unwrap();
+        enumerator.add_match_parent(&dev).unwrap();
+        enumerator.allow_uninitialized().unwrap();
+        enumerator
+            .add_match_is_initialized(MatchInitializedType::ALL)
+            .unwrap();
     }
 
     #[test]
@@ -1409,6 +1245,176 @@ mod tests {
     #[test]
     fn test_pattern_match() {
         let enumerator = DeviceEnumerator::new();
-        assert!(enumerator.pattern_match("hello*", "hello world").unwrap());
+        assert!(enumerator.pattern_match("hello*", "hello world"));
+        assert!(!enumerator.pattern_match("hello*", "world"));
+    }
+
+    trait State {
+        fn trans(self: Box<Self>, s: &str) -> Box<dyn State>;
+    }
+
+    struct StateMachine {
+        state: Option<Box<dyn State>>,
+    }
+
+    impl StateMachine {
+        fn trans(&mut self, s: &str) {
+            if let Some(state) = self.state.take() {
+                self.state = Some(state.trans(s));
+            }
+        }
+    }
+
+    struct Init;
+
+    impl State for Init {
+        fn trans(self: Box<Self>, s: &str) -> Box<dyn State> {
+            match s {
+                "net" => Box::new(Front {}),
+                _ => panic!(),
+            }
+        }
+    }
+
+    struct Front;
+
+    impl State for Front {
+        fn trans(self: Box<Self>, s: &str) -> Box<dyn State> {
+            match s {
+                "net" => Box::new(Front {}),
+                _ => Box::new(Tail {}),
+            }
+        }
+    }
+
+    struct Tail;
+
+    impl State for Tail {
+        fn trans(self: Box<Self>, s: &str) -> Box<dyn State> {
+            match s {
+                "net" => panic!(),
+                _ => Box::new(Tail {}),
+            }
+        }
+    }
+
+    #[test]
+    fn test_priority_subsystem() {
+        /* If the prioritized subsystem is set, e.g., "net",
+         * the "net" devices should be ordered in the front of the scanned devices.
+         */
+        let mut ert = DeviceEnumerator::new();
+        ert.set_enumerator_type(DeviceEnumerationType::Devices);
+        ert.add_prioritized_subsystem("net").unwrap();
+        ert.add_prioritized_subsystem("block").unwrap();
+
+        let mut sm = StateMachine {
+            state: Some(Box::new(Init {})),
+        };
+
+        for dev in ert.iter() {
+            sm.trans(&dev.borrow().get_subsystem().unwrap());
+        }
+
+        ert.sort_devices().unwrap();
+    }
+
+    #[test]
+    fn test_match_property() {
+        let mut ert = DeviceEnumerator::new();
+
+        let mut dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+
+        dev.add_property("helloxxx", "worldxxx").unwrap();
+
+        ert.add_match_property("hello*", "world*").unwrap();
+        assert!(ert.match_property(&mut dev).unwrap());
+    }
+
+    #[test]
+    fn test_match_subsystem() {
+        let mut ert = DeviceEnumerator::new();
+
+        ert.add_match_subsystem("net", true).unwrap();
+        ert.add_match_subsystem("block", false).unwrap();
+
+        assert!(ert.match_subsystem("net"));
+        assert!(!ert.match_subsystem("block"));
+    }
+
+    #[test]
+    fn test_match_sysattr() {
+        let mut ert = DeviceEnumerator::new();
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+
+        ert.add_match_sysattr("ifindex", "1", true).unwrap();
+        ert.add_match_sysattr("address", "aa:aa:aa:aa:aa:aa", false)
+            .unwrap();
+
+        assert!(ert.match_sysattr(&dev).unwrap());
+    }
+
+    #[test]
+    fn test_match_sysname() {
+        let mut ert = DeviceEnumerator::new();
+        ert.add_match_sysname("loop*", true).unwrap();
+        ert.add_match_sysname("sd*", false).unwrap();
+        assert!(ert.match_sysname("loop1"));
+        assert!(!ert.match_sysname("sda"));
+    }
+
+    #[test]
+    fn test_match_tag() {
+        let mut ert = DeviceEnumerator::new();
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        dev.set_base_path("/tmp/devmaster");
+        dev.add_tag("devmaster", true);
+        dev.update_tag("devmaster", true).unwrap();
+        ert.add_match_tag("devmaster").unwrap();
+        assert!(ert.match_tag(&dev).unwrap());
+
+        ert.set_enumerator_type(DeviceEnumerationType::Devices);
+        ert.scan_devices().unwrap();
+
+        dev.update_tag("devmaster", false).unwrap();
+    }
+
+    #[test]
+    fn test_match_parent_incremental() {
+        let mut ert = DeviceEnumerator::new();
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        assert!(ert.match_parent(&dev).unwrap());
+        ert.add_match_parent_incremental(&dev).unwrap();
+        assert!(ert.match_parent(&dev).unwrap());
+        let dev_1 = Device::from_subsystem_sysname("drivers", "usb:usb").unwrap();
+        assert!(!ert.match_parent(&dev_1).unwrap());
+
+        ert.set_enumerator_type(DeviceEnumerationType::Devices);
+        ert.scan_devices().unwrap();
+    }
+
+    #[test]
+    fn test_match_parent() {
+        let mut ert = DeviceEnumerator::new();
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        ert.add_match_parent_incremental(&dev).unwrap();
+        assert!(ert.match_parent(&dev).unwrap());
+    }
+
+    #[test]
+    fn test_match_is_initialized() {
+        let mut ert = DeviceEnumerator::new();
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        ert.add_match_is_initialized(MatchInitializedType::ALL)
+            .unwrap();
+        assert!(ert.match_initialized(&dev).unwrap());
+    }
+
+    #[test]
+    fn test_scan_subsystems_all() {
+        let mut ert = DeviceEnumerator::new();
+        ert.add_match_subsystem("module", true).unwrap();
+        ert.add_match_subsystem("subsystem", true).unwrap();
+        ert.add_match_subsystem("drivers", true).unwrap();
     }
 }

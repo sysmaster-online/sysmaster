@@ -12,6 +12,7 @@
 
 //! Error definition of device
 //!
+use basic::IN_SET;
 use nix::errno::Errno;
 use snafu::prelude::Snafu;
 
@@ -77,10 +78,7 @@ impl Error {
 
     /// check whether the device error indicates the device is absent
     pub fn is_absent(&self) -> bool {
-        matches!(
-            self.get_errno(),
-            Errno::ENODEV | Errno::ENXIO | Errno::ENOENT
-        )
+        IN_SET!(self.get_errno(), Errno::ENODEV, Errno::ENXIO, Errno::ENOENT)
     }
 
     pub(crate) fn replace_errno(self, from: Errno, to: Errno) -> Self {
