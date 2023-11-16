@@ -64,6 +64,7 @@ pub struct WorkerManager {
 }
 
 /// worker
+#[derive(Debug)]
 pub struct Worker {
     /// worker unique id
     id: u32,

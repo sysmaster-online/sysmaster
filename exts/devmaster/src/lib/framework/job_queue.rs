@@ -22,7 +22,6 @@ use std::{
     cell::RefCell,
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
     collections::VecDeque,
-    fmt::{self, Display},
     rc::{Rc, Weak},
 };
 
@@ -37,20 +36,8 @@ pub enum JobState {
     Running,
 }
 
-impl Display for JobState {
-    ///
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let state = match self {
-            JobState::Undef => "Undef",
-            JobState::Queued => "Queued",
-            JobState::Running => "Running",
-        };
-
-        write!(f, "{}", state)
-    }
-}
-
 /// device job
+#[derive(Debug)]
 pub struct DeviceJob {
     /// internal device
     pub device: Device,
@@ -168,8 +155,6 @@ impl JobQueue {
             gc.close_killer(e);
         }
 
-        // self.job_queue_show_state();
-
         for job in self.jobs.borrow().iter() {
             match job.get_state() {
                 JobState::Queued => {}
@@ -241,19 +226,6 @@ impl JobQueue {
         log::debug!("Job Queue: insert job {}", seqnum);
     }
 
-    // /// cleanup the job queue, if match_state is Undef, cleanup all jobs, otherwise just retain the unmatched jobs
-    // pub(crate) fn job_queue_cleanup(&self, match_state: JobState) {
-    //     self.jobs.borrow_mut().retain_mut(|job| {
-    //         if match_state != JobState::Undef && match_state != job.get_state() {
-    //             return true;
-    //         }
-
-    //         false
-    //     });
-
-    //     log::debug!("Job Queue: cleanup");
-    // }
-
     /// free a job from job queue
     pub(crate) fn job_free(&self, job: &Rc<DeviceJob>) {
         job.job_free();
@@ -287,5 +259,60 @@ impl JobQueue {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.jobs.borrow().is_empty()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::sync::{Arc, RwLock};
+
+    #[test]
+    fn test_job_cmp() {
+        let j1 = DeviceJob::new(
+            Device::from_subsystem_sysname("net", "lo").unwrap(),
+            JobState::Queued,
+            1000,
+        );
+
+        let j2 = DeviceJob::new(
+            Device::from_subsystem_sysname("net", "lo").unwrap(),
+            JobState::Queued,
+            1000,
+        );
+
+        assert_eq!(j1, j2);
+    }
+
+    #[test]
+    fn test_job_queue() {
+        let events = Rc::new(Events::new().unwrap());
+        let cache = Cache::new(vec![], vec![]);
+        let devmaster = Rc::new(RefCell::new(Devmaster {
+            events,
+            worker_manager: None,
+            control_manager: None,
+            monitor: None,
+            job_queue: None,
+            gc: None,
+            cache: Arc::new(RwLock::new(cache)),
+        }));
+
+        let job_queue = JobQueue::new(devmaster);
+
+        /* Test start job when the queue is empty. */
+        job_queue.job_queue_start(None);
+
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        job_queue.job_queue_insert(dev);
+
+        /* Test insert dulplicate jobs with the same seqnum. */
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        dev.set_seqnum_from_string("1000").unwrap();
+        job_queue.job_queue_insert(dev);
+
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        dev.set_seqnum_from_string("1000").unwrap();
+        job_queue.job_queue_insert(dev);
     }
 }

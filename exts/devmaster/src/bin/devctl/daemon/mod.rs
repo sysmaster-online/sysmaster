@@ -71,6 +71,13 @@ mod test {
             std::thread::sleep(std::time::Duration::from_secs(1));
 
             let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+
+            /* Trigger more than the number of workers. */
+            dev.trigger(DeviceAction::Change).unwrap();
+            dev.trigger(DeviceAction::Change).unwrap();
+            dev.trigger(DeviceAction::Change).unwrap();
+            dev.trigger(DeviceAction::Change).unwrap();
+            dev.trigger(DeviceAction::Change).unwrap();
             dev.trigger(DeviceAction::Change).unwrap();
 
             /* Sleep more than 3 seconds to wait for the workers being recycled. */
