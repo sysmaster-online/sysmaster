@@ -832,7 +832,7 @@ impl RuleToken {
                 }
             }
             "CONST" => {
-                if attr.is_none() || matches!(attr.as_ref().unwrap().as_str(), "arch" | "virt") {
+                if attr.is_none() || !matches!(attr.as_ref().unwrap().as_str(), "arch" | "virt") {
                     return Err(Error::RulesLoadError {
                         msg: "Key 'CONST' has invalid attribute.".location(&context),
                     });
