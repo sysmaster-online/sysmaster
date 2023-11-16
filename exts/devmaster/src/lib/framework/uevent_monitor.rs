@@ -12,12 +12,9 @@
 
 //! uevent_monitor
 //!
-use crate::error::*;
 use crate::framework::job_queue::JobQueue;
 use device::device_monitor::{DeviceMonitor, MonitorNetlinkGroup};
 use event::{EventType, Events, Source};
-use nix::errno::Errno;
-use snafu::ResultExt;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
 
@@ -71,31 +68,14 @@ impl Source for UeventMonitor {
     fn dispatch(&self, _: &Events) -> i32 {
         let device = match self.device_monitor.receive_device() {
             Ok(ret) => ret,
-            Err(e) => match e {
-                device::error::Error::Nix {
-                    msg: _,
-                    source: Errno::EAGAIN,
-                } => {
-                    return 0;
-                }
-                device::error::Error::Nix { msg: _, source: _ } => {
-                    log::error!("{}", e);
-                    return 0;
-                }
-                _ => {
-                    return 0;
-                }
-            },
+            Err(e) => {
+                log::error!("Monitor Error: {}", e);
+                return 0;
+            }
         };
 
-        log::debug!(
-            "Monitor: received device {}",
-            device
-                .get_devpath()
-                .context(DeviceSnafu)
-                .log_error("uevent has no devpath")
-                .unwrap_or_default()
-        );
+        /* The devpath is guaranteed to be valid. */
+        log::debug!("Monitor: received device {}", device.get_devpath().unwrap());
 
         self.job_queue.job_queue_insert(device);
         0
