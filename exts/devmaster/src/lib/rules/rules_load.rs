@@ -1725,7 +1725,6 @@ impl RuleToken {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::*;
     use basic::fs_util::touch_file;
     use log::init_log;
     use log::Level;
@@ -1733,32 +1732,25 @@ mod tests {
     use super::*;
     use std::fs::create_dir_all;
     use std::fs::remove_dir_all;
-    use std::{fs, path::Path, thread::JoinHandle};
+    use std::io::Write;
+    use std::panic::catch_unwind;
+    use std::{fs, path::Path};
 
-    fn create_test_rules_dir(dir: &'static str) {
-        assert!(fs::create_dir(dir).is_ok());
-        assert!(fs::write(
-            format!("{}/test.rules", dir),
-            "ACTION == \"change\", SYMLINK += \"test1\"
-ACTION == \"change\", SYMLINK += \"test11\", \\
-SYMLINK += \"test111\"
-ACTION == \"change\", SYMLINK += \"test1111\", \\
-SYMLINK += \"test11111\", \\
-SYMLINK += \"test111111\"",
-        )
-        .is_ok());
+    fn create_tmp_rules(dir: &'static str, file: &str, content: &str) {
+        assert!(fs::create_dir_all(dir).is_ok());
+        assert!(fs::write(format!("{}/{}", dir, file), content,).is_ok());
     }
 
-    fn clear_test_rules_dir(dir: &'static str) {
+    fn clear_tmp_rules(dir: &'static str) {
         if Path::new(dir).exists() {
             assert!(fs::remove_dir_all(dir).is_ok());
         }
     }
 
     #[test]
-    fn test_rules_new() {
+    fn test_load_rules() {
         init_log(
-            "test_rules_new",
+            "test_load_rules",
             Level::Debug,
             vec!["console"],
             "",
@@ -1766,11 +1758,270 @@ SYMLINK += \"test111111\"",
             0,
             false,
         );
-        clear_test_rules_dir("test_rules_new");
-        create_test_rules_dir("test_rules_new");
-        let rules = Rules::load_rules(DEFAULT_RULES_DIRS.to_vec(), ResolveNameTime::Early);
-        println!("{}", rules.read().unwrap());
-        clear_test_rules_dir("test_rules_new");
+        clear_tmp_rules("/tmp/devmaster/rules");
+
+        let legal_rule = vec![
+            "ACTION == \"change\", SYMLINK += \"test1\"", // Test legal rules.
+            "ACTION == \"change\", SYMLINK += \"test11\", \\
+            SYMLINK += \"test111\"", // Test double line tying.
+            "ACTION == \"change\", SYMLINK += \"test1111\", \\
+            SYMLINK += \"test11111\", \\
+            SYMLINK += \"test111111\"", // Test triple line tying.
+            "SYMLINK == \"$hello\"", // Illegal placeholder will throw warning rather than panic.
+            "NAME += \"xxx\"",       // NAME will transfer operator += to =.
+            "NAME == \"$hello\"",    // Illegal placeholder will throw warning rather than panic.
+            "ENV{xxx}:=\"xxx\"",     // ENV will transfer final assignment := to =.
+            "ENV{xxx}=\"$hello\"",   // Illegal placeholder will throw warning rather than panic.
+            "CONST{arch}==\"x86_64\"", // Test legal CONST usage.
+            "CONST{virt}==\"qemu\"", // Test legal CONST usage.
+            "SUBSYSTEM==\"bus\"", // SUBSYSTEM will throw warning if the value is 'bus' or 'class'.
+            "DRIVER==\"xxx\"",    // Test DRIVER usage.
+            /* ATTR will throw warning if the operator is += or :=,
+             * and transfer the operator into =.
+             */
+            "ATTR{xxx}+=\"xxx\"",
+            "ATTR{xxx}:=\"xxx\"",
+            "ATTR{xxx}=\"$hello\"", // Illegal placeholder in value will throw warning rather than panic.
+            /* Test SYSCTL usage. */
+            "SYSCTL{hello}=\"world\"",
+            "SYSCTL{hello}==\"world\"",
+            /* SYSCTL will transfer the += and := operator to =, and trow warning. */
+            "SYSCTL{hello}+=\"world\"",
+            "SYSCTL{hello}:=\"world\"",
+            "SYSCTL{hello}=\"$hello\"", // Illegal placeholder in value will throw warning rather than panic.
+            "ATTRS{device/xxx}==\"xxx\"", // The attribute with prefix of 'device/' will trow warning.
+            "ATTRS{../xxx}==\"xxx\"", // The attribute with prefix of 'device/' will throw warning.
+            "TAGS==\"xxx\"",          // Test TAGS usage.
+            "TEST{777}==\"xx\"",      // Test TEST usage.
+            "TEST{777}==\"$hello\"", // Illegal placeholder in value will throw warning rather than panic.
+            "PROGRAM==\"$hello\"", // Illegal placeholder in value will throw warning rather than panic.
+            "IMPORT{program}==\"$hello\"", // Illegal placeholder in value will throw warning rather than panic.
+            "IMPORT{file}=\"x\"", // IMPORT will throw warning if the operator is not matching or unmatching and transfer it to ==.
+            "IMPORT{program}==\"path_id $kernel\"", // If the program is a built-in command, IMPORT will identify it.
+            /* Test OPTIONS usages. */
+            "OPTIONS+=\"string_escape=none\"",
+            "OPTIONS+=\"db_persist\"",
+            "OPTIONS+=\"log_level=rest\"",
+            "OPTIONS+=\"log_level=10\"",
+            "OWNER+=\"0\"",    // OWNER will transfer += to =, and trow a warning.
+            "GROUP+=\"0\"",    // GROUP will transfer += to =, and trow a warning.
+            "MODE+=\"777\"",   // MODE will transfer += to =, and trow a warning.
+            "MODE=\"$hello\"", // Illegal placeholder in value will throw warning rather than panic.
+            "SECLABEL{x}:=\"$hello\"", // Illegal placeholder in value will throw warning rather than panic.
+        ];
+
+        create_tmp_rules("/tmp/devmaster/rules", "00-test.rules", "");
+
+        for &content in legal_rule.iter() {
+            let mut f = fs::OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .open("/tmp/devmaster/rules/00-test.rules")
+                .unwrap();
+            f.write_all(content.as_bytes()).unwrap();
+
+            let _ = Rules::load_rules(
+                vec!["/tmp/devmaster/rules".to_string()],
+                ResolveNameTime::Early,
+            );
+        }
+
+        clear_tmp_rules("/tmp/devmaster/rules");
+    }
+
+    #[test]
+    fn test_load_rules_panic() {
+        init_log(
+            "test_load_rules_panic",
+            Level::Debug,
+            vec!["console"],
+            "",
+            0,
+            0,
+            false,
+        );
+        clear_tmp_rules("/tmp/devmaster/rules");
+
+        let illegal_rule = vec![
+            "action==\"change\"",       // Error in State::Pre
+            "ACtion==\"change\"",       // Error in State::Key
+            "ENV{!}==\"hello\"",        // Error in State::Attribute
+            "ACTION #= \"hello\"",      // Error in State::PreOp
+            "ACTION =# \"hello\"",      // Error in State::Op
+            "ACTION == hello",          // Error in State::PostOp
+            "ACTION == \"change\"x",    // Error in State::PostValue
+            "ACTION = \"change\"",      // ACTION can not take assign operator.
+            "DEVPATH{xxx} == \"xxx\"",  // DEVPATH can not take attribute.
+            "DEVPATH = \"xxx\"",        // DEVPATH can no take assign operator.
+            "KERNEL{xxx} == \"xxx\"",   // KERNEL can not take attribute.
+            "KERNEL = \"xxx\"",         // KERNEL can not take assign operator.
+            "SYMLINK{xxx} = \"hello\"", // SYMLINK can not take attribute.
+            "NAME{xxx} = \"xxx\"",      // NAME can not take attribute.
+            "NAME -= \"xxx\"",          // NAME can not take removal operator.
+            "NAME=\"%k\"",              // NAME can not take '%k' value.
+            "NAME=\"\"",                // NAME can not take empty value.
+            "ENV=\"xxx\"",              // ENV must take attribute.
+            "ENV{xxx}-=\"xxx\"",        // ENV can not take removal operator.
+            /* ENV with non-match operator can not take the following attributes:
+             *  "ACTION"
+             *  "DEVLINKS"
+             *  "DEVNAME"
+             *  "DEVTYPE"
+             *  "DRIVER"
+             *  "IFINDEX"
+             *  "MAJOR"
+             *  "MINOR"
+             *  "SEQNUM"
+             *  "SUBSYSTEM"
+             *  "TAGS"
+             */
+            "ENV{ACTION}=\"xxx\"",
+            "ENV{DEVLINKS}=\"xxx\"",
+            "ENV{DEVNAME}=\"xxx\"",
+            "ENV{DEVTYPE}=\"xxx\"",
+            "ENV{DRIVER}=\"xxx\"",
+            "ENV{IFINDEX}=\"xxx\"",
+            "ENV{MAJOR}=\"xxx\"",
+            "ENV{MINOR}=\"xxx\"",
+            "ENV{SEQNUM}=\"xxx\"",
+            "ENV{SUBSYSTEM}=\"xxx\"",
+            "ENV{TAGS}=\"xxx\"",
+            "CONST==\"xxx\"",            // CONST must take an attribute.
+            "CONST{xxx}==\"xxx\"",       // CONST can only take "arch" or "virt" attribute.
+            "CONST{virt}=\"qemu\"",      // CONST can not take assignment operator.
+            "TAG{xxx}+=\"xxx\"",         // TAG can not take attribute.
+            "SUBSYSTEM{xxx}==\"block\"", // SUBSYSTEM can not take attribute.
+            "SUBSYSTEM=\"block\"", // SUBSYSTEM can only take matching or unmatching operators.
+            "DRIVER{xxx}==\"xxx\"", // DRIVER can not take attribute.
+            "DRIVER=\"xxx\"",      // DRIVER can only take matching or unmatching operators.
+            "ATTR{$hello}==\"xxx\"", // ATTR can not take illegal attribute.
+            "ATTR{hello}-=\"xxx\"", // ATTR can not take removal operator.
+            /* SYSCTL must take attribute. */
+            "SYSCTL=\"xxx\"",
+            "SYSCTL==\"xxx\"",
+            "SYSCTL{xxx}-=\"xxx\"",  // SYSCTL can not take removal operator.
+            "KERNELS{xxx}==\"xxx\"", // KERNELS can not take attribute.
+            "KERNELS=\"xxx\"",       // KERNELS can only take matching or unmatching operators.
+            "SUBSYSTEMS{xxx}==\"xxx\"", // SUBSYSTEMS can not take attribute.
+            "SUBSYSTEMS=\"xxx\"",    // SUBSYSTEMS can not take assignment operators.
+            "DRIVERS{xxx}=\"xxx\"",  // DRIVERS can not take attribute.
+            "DRIVERS=\"xxx\"",       // DRIVERS can not take assignment operators.
+            "ATTRS==\"xxx\"",        // ATTRS must take an attribute.
+            "ATTRS{xxx}=\"x\"",      // ATTRS can not take assignment operators.
+            "TAGS{xxx}=\"xxx\"",     // TAGS can not take attribute.
+            "TAGS=\"xxx\"",          // TAGS can not take assignment operators.
+            "TEST{777}=\"x\"",       // TEST can not take assignment operators.
+            "PROGRAM{x}==\"x\"",     // PROGRAM can not take attribute.
+            "PROGRAM-=\"x\"",        // PROGRAM can not take removal attribute.
+            "IMPORT==\"x\"",         // IMPORT must take an attribute.
+            "IMPORT{builtin}==\"xxx $kernel\"", // IMPORT{builtin} will panic if the command is not a valid built-in.
+            "IMPORT{x}==\"x\"",                 // IMPORT will panic if the attribute is invalid.
+            "RESULT{x}==\"x\"",                 // RESULT can not take attribute.
+            "RESULT{x}=\"x\"", // RESULT can only take matching or unmatching operator.
+            "OPTIONS{x}+=\"x\"", // OPTIONS can not take attribute.
+            "OPTIONS{x}==\"x\"", // OPTIONS can not take matching or unmatching operator.
+            "OPTIONS{x}-=\"x\"", // OPTIONS can not take removal operator.
+            "OPTIONS+=\"link_priority=x\"", // Invalid number of link priority.
+            "OPTIONS+=\"log_level=xxx\"", // Invalid log_level.
+            "OWNER{x}==\"x\"", // OWNER can not take attribute.
+            "OWNER==\"0\"",    // OWNER can not take matching or unmatching operator.
+            "OWNER-=\"0\"",    // OWNER can not take removal operator.
+            "GROUP==\"0\"",    // OWNER can not take matching or unmatching operator.
+            "GROUP-=\"0\"",    // OWNER can not take removal operator.
+            "MODE{x}=\"777\"", // MODE can not take attribute.
+            "MODE==\"777\"",   // MODE can not take matching or unmatching operator.
+            "MODE-=\"777\"",   // MODE can not take removal operator.
+            "SECLABEL=\"xxx\"", // SECLABEL must take an attribute.
+            "SECLABEL{x}==\"x\"", // SECLABEL can not take matching or unmatching operator.
+            "SECLABEL{x}-=\"x\"", // SECLABEL can not take removal operator.
+            "RUN==\"xxx\"",    // RUN can not take matching or unmatching operator.
+            "RUN-=\"xxx\"",    // RUN can not take removal operator.
+            "RUN{builtin}==\"xxx\"", // RUN will panic if the builtin is invalid.
+            "RUN{xxx}==\"xxx\"", // RUN will panic if the attribute is not builtin or program.
+            "GOTO{xx}=\"xx\"", // GOTO can not take attribute.
+            "GOTO==\"xx\"",    // GOTO can only take assignment operator.
+            "LABEL{x}==\"x\"", // LABEL can not take attribute.
+            "LABEL==\"x\"",    // LABEL can only take assignment operator.
+            "XXX=\"xxx\"",     // Invalid token key.
+        ];
+
+        create_tmp_rules("/tmp/devmaster/rules", "00-test.rules", "");
+
+        for content in illegal_rule.iter() {
+            let mut f = fs::OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .open("/tmp/devmaster/rules/00-test.rules")
+                .unwrap();
+            f.write_all(content.as_bytes()).unwrap();
+
+            assert!(catch_unwind(|| {
+                let _ = Rules::load_rules(
+                    vec!["/tmp/devmaster/rules".to_string()],
+                    ResolveNameTime::Early,
+                );
+            })
+            .is_err());
+        }
+
+        clear_tmp_rules("/tmp/devmaster/rules");
+    }
+
+    #[test]
+    fn test_resolve_name_time() {
+        init_log(
+            "test_load_rules",
+            Level::Debug,
+            vec!["console"],
+            "",
+            0,
+            0,
+            false,
+        );
+        clear_tmp_rules("/tmp/devmaster/rules");
+
+        let legal = vec!["OWNER=\"root\"", "GROUP=\"root\""];
+        let illegal = vec!["OWNER=\"xxxx\"", "GROUP=\"xxxx\""];
+
+        create_tmp_rules("/tmp/devmaster/rules", "00-test.rules", "");
+
+        for &content in legal.iter() {
+            let mut f = fs::OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .open("/tmp/devmaster/rules/00-test.rules")
+                .unwrap();
+            f.write_all(content.as_bytes()).unwrap();
+
+            let _ = Rules::load_rules(
+                vec!["/tmp/devmaster/rules".to_string()],
+                ResolveNameTime::Early,
+            );
+        }
+
+        for &content in illegal.iter() {
+            let mut f = fs::OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .open("/tmp/devmaster/rules/00-test.rules")
+                .unwrap();
+            f.write_all(content.as_bytes()).unwrap();
+
+            let _ = Rules::load_rules(
+                vec!["/tmp/devmaster/rules".to_string()],
+                ResolveNameTime::Late,
+            );
+
+            assert!(catch_unwind(|| {
+                let _ = Rules::load_rules(
+                    vec!["/tmp/devmaster/rules".to_string()],
+                    ResolveNameTime::Early,
+                );
+            })
+            .is_err());
+        }
+
+        clear_tmp_rules("/tmp/devmaster/rules");
     }
 
     #[test]
@@ -1956,34 +2207,6 @@ SYMLINK += \"test111111\"",
     }
 
     #[test]
-    fn test_rules_share_among_threads() {
-        create_test_rules_dir("test_rules_share_among_threads");
-        let rules = Rules::new(
-            vec![
-                "test_rules_new_1".to_string(),
-                "test_rules_new_2".to_string(),
-            ],
-            ResolveNameTime::Early,
-        );
-        let mut handles = Vec::<JoinHandle<()>>::new();
-        (0..5).for_each(|i| {
-            let rules_clone = rules.clone();
-            let handle = std::thread::spawn(move || {
-                println!("thread {}", i);
-                println!("{}", rules_clone);
-            });
-
-            handles.push(handle);
-        });
-
-        for thread in handles {
-            thread.join().unwrap();
-        }
-
-        clear_test_rules_dir("test_rules_share_among_threads");
-    }
-
-    #[test]
     fn test_resolve_user_group() {
         let mut rules = Rules::new(vec![], ResolveNameTime::Early);
         assert!(rules.resolve_user("root").is_ok());
@@ -2124,18 +2347,27 @@ SYMLINK += \"test111111\"",
         touch_file(
             "/tmp/devmaster/rules/02-c.rules",
             false,
-            Some(0o222),
+            Some(0o000),
             None,
             None,
         )
         .unwrap();
 
-        let rules = Rules::new(
+        let rules = Arc::new(RwLock::new(Rules::new(
             vec!["/tmp/devmaster/rules".to_string()],
             ResolveNameTime::Never,
-        );
+        )));
 
-        Rules::parse_rules(Arc::new(RwLock::new(rules)));
+        // Rules::parse_rules(Arc::new(RwLock::new(rules)));
+
+        RuleFile::load_file("/tmp/devmaster/rules/00-a.rules".to_string(), rules.clone());
+
+        if nix::unistd::getuid().as_raw() != 0 {
+            assert!(catch_unwind(|| {
+                RuleFile::load_file("/tmp/devmaster/rules/02-c.rules".to_string(), rules.clone());
+            })
+            .is_err());
+        }
 
         remove_dir_all("/tmp/devmaster").unwrap();
     }
