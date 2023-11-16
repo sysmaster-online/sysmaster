@@ -133,7 +133,10 @@ impl Rules {
 
         match User::from_name(username) {
             Ok(user) => match user {
-                Some(u) => Ok(u),
+                Some(u) => {
+                    self.users.insert(username.to_string(), u.clone());
+                    Ok(u)
+                }
                 None => Err(Error::RulesLoadError {
                     msg: format!("The user name {} has no credential.", username),
                 }),
@@ -152,7 +155,10 @@ impl Rules {
 
         match Group::from_name(groupname) {
             Ok(group) => match group {
-                Some(g) => Ok(g),
+                Some(g) => {
+                    self.groups.insert(groupname.to_string(), g.clone());
+                    Ok(g)
+                }
                 None => Err(Error::RulesLoadError {
                     msg: format!("The group name {} has no credential.", groupname),
                 }),
@@ -1983,14 +1989,15 @@ SYMLINK += \"test111111\"",
     }
 
     #[test]
-    #[ignore]
-    fn test_resolve_user() {
+    fn test_resolve_user_group() {
         let mut rules = Rules::new(vec![], ResolveNameTime::Early);
-        assert!(rules.resolve_user("tss").is_ok());
         assert!(rules.resolve_user("root").is_ok());
-        assert!(rules.users.contains_key("tss"));
         assert!(rules.users.contains_key("root"));
-        assert!(rules.resolve_user("cjy").is_err());
+        assert!(rules.resolve_user("abcdefg").is_err());
+
+        assert!(rules.resolve_group("root").is_ok());
+        assert!(rules.groups.contains_key("root"));
+        assert!(rules.resolve_group("abcdefg").is_err());
     }
 
     #[test]
