@@ -10,8 +10,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use nix::{mount::MsFlags, sys::statfs};
-use std::path::Path;
+use nix::mount::MsFlags;
+use std::{fs, os::unix::fs::MetadataExt, path::Path};
 
 pub fn setup_mount_early() {
     let filesystems = [
@@ -50,18 +50,36 @@ pub fn setup_mount_early() {
 
         if !target.exists() {
             if let Err(e) = std::fs::create_dir(target) {
-                log::warn!("Failed to create mount point {}: {}", target.display(), e);
+                println!("Failed to create mount point {}: {}", target.display(), e);
             }
         }
 
-        if let Err(errno) = statfs::statfs(target) {
-            if errno == nix::errno::Errno::ENODEV {
-                if let Err(e) = nix::mount::mount(source, target, fstype, flags, data) {
-                    log::warn!("Failed to create mount point {}: {}", target.display(), e);
-                }
+        if !is_mount_point(target) {
+            if let Err(e) = nix::mount::mount(source, target, fstype, flags, data) {
+                println!("Failed to mount {}: {}", target.display(), e);
             }
         }
+
+        println!(
+            "Mounting {:?} to {:?} of type {:?} with {:?}",
+            source, target, fstype, flags
+        );
     }
 
-    log::warn!("File systems early mounted successfully.");
+    println!("File systems early mounted successfully.");
+}
+
+fn is_mount_point(path: &Path) -> bool {
+    if let Ok(metadata) = fs::metadata(path) {
+        let dev_id = metadata.dev();
+
+        let root_dev_id = match fs::metadata("/") {
+            Ok(root_metadata) => root_metadata.dev(),
+            Err(_) => return false,
+        };
+
+        dev_id == root_dev_id
+    } else {
+        false
+    }
 }

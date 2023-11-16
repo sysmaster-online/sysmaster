@@ -108,11 +108,11 @@ fn shutdown_init() {
 }
 
 fn main() -> std::io::Result<()> {
-    log::init_log_to_kmsg("sysmaster-init", log::Level::Info);
+    setup_mount_early();
+
+    log::init_log_to_kmsg_console("sysmaster-init", log::Level::Info);
 
     prepare_init();
-
-    setup_mount_early();
 
     reset_all_signal_handlers();
     install_crash_handler();
