@@ -1,0 +1,12 @@
+[Unit]
+Description=Getty on %I
+ConditionPathExists=/dev/tty0
+
+[Service]
+ExecStart=-/sbin/agetty -o '-p -- \\u' --noclear %I
+Type=simple
+Restart=always
+RestartSec=0
+
+[Install]
+WantedBy=getty.target

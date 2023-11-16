@@ -1,0 +1,9 @@
+[Unit]
+Description=Sysmaster Halt
+Documentation=man sysmaster halt
+DefaultDependencies=false
+Requires=sysmaster-halt.service
+After=sysmaster-halt.service
+AllowIsolate=true
+JobTimeoutSec=1800
+JobTimeoutAction=halt-force

@@ -199,7 +199,7 @@ fn generate_command_request(args: Args) -> Option<CommandRequest> {
         }
 
         SubCmd::Shutdown { force } => {
-            CommandRequest::new_syscomm(sys_comm::Action::Shutdown, force)
+            CommandRequest::new_syscomm(sys_comm::Action::Poweroff, force)
         }
 
         SubCmd::Reboot { force } => CommandRequest::new_syscomm(sys_comm::Action::Reboot, force),
@@ -220,8 +220,35 @@ fn generate_command_request(args: Args) -> Option<CommandRequest> {
     Some(command_request)
 }
 
+fn parse_args() -> Args {
+    let mut str_args: Vec<String> = std::env::args().collect();
+
+    if str_args.is_empty() {
+        return Args::parse();
+    }
+
+    let subcmd = match std::path::Path::new(&str_args[0]).file_name() {
+        Some(file_name) => file_name.to_string_lossy().to_string(),
+        None => return Args::parse(),
+    };
+
+    if [
+        "halt".to_string(),
+        "reboot".to_string(),
+        "poweroff".to_string(),
+        "shutdown".to_string(),
+    ]
+    .contains(&subcmd)
+    {
+        str_args.insert(1, subcmd);
+        return Args::parse_from(str_args);
+    }
+
+    Args::parse()
+}
+
 fn main() {
-    let args = Args::parse();
+    let args = parse_args();
 
     let command_request = match generate_command_request(args) {
         None => {

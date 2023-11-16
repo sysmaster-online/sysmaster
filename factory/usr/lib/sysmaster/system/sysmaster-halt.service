@@ -1,0 +1,10 @@
+[Unit]
+Description=Sysmaster Halt
+Documentation=man sysmaster-halt.service
+DefaultDependencies=false
+Requires=shutdown.target
+After=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/sctl halt -f

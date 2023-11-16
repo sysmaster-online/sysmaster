@@ -1,0 +1,10 @@
+[Unit]
+Description=Sysmaster Reboot
+Documentation=man sysmaster-reboot.service
+DefaultDependencies=false
+Requires=shutdown.target
+After=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/sctl reboot -f

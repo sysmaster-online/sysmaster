@@ -1,0 +1,9 @@
+[Unit]
+Description=hostname setup
+
+[Service]
+ExecStart=-/usr/lib/sysmaster/hostname_setup
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

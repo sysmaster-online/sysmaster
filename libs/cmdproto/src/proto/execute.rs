@@ -308,7 +308,7 @@ impl Executer for SysComm {
             return v;
         }
 
-        let ret = if self.force {
+        let ret = if !self.force {
             let unit_name = self.action().to_string() + ".target";
             match manager.start(&unit_name) {
                 Ok(_) => Ok(0),

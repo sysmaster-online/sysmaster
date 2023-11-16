@@ -1,0 +1,9 @@
+[Unit]
+Description=System Poweroff
+Documentation=man sysmaster poweroff
+DefaultDependencies=false
+Requires=sysmaster-poweroff.service
+After=sysmaster-poweroff.service
+AllowIsolate=true
+JobTimeoutSec=1800
+JobTimeoutAction=poweroff-force

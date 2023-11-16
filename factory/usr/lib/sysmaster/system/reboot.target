@@ -1,0 +1,9 @@
+[Unit]
+Description=Sysmaster Reboot
+Documentation=man sysmaster reboot
+DefaultDependencies=false
+Requires=sysmaster-reboot.service
+After=sysmaster-reboot.service
+AllowIsolate=true
+JobTimeoutSec=1800
+JobTimeoutAction=reboot-force

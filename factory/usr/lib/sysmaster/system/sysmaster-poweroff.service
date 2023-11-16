@@ -1,0 +1,10 @@
+[Unit]
+Description=Sysmaster Power Off
+Documentation=man sysmaster-poweroff.service
+DefaultDependencies=false
+Requires=shutdown.target
+After=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/sctl poweroff -f
