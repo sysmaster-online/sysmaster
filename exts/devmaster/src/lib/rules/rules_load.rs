@@ -693,11 +693,6 @@ impl RuleToken {
                         msg: "Key 'SYMLINK' can not carry attribute.".location(&context),
                     });
                 }
-                if op == OperatorType::Remove {
-                    return Err(Error::RulesLoadError {
-                        msg: "Key 'SYMLINK' can not take remove operator.".location(&context),
-                    });
-                }
 
                 if !op_is_match {
                     if let Err(e) = check_value_format(key.as_str(), value.as_str(), false) {
