@@ -1725,10 +1725,13 @@ impl RuleToken {
 #[cfg(test)]
 mod tests {
     use crate::config::*;
+    use basic::fs_util::touch_file;
     use log::init_log;
     use log::Level;
 
     use super::*;
+    use std::fs::create_dir_all;
+    use std::fs::remove_dir_all;
     use std::{fs, path::Path, thread::JoinHandle};
 
     fn create_test_rules_dir(dir: &'static str) {
@@ -2098,5 +2101,40 @@ SYMLINK += \"test111111\"",
             Some("SYSTEMD_READY".to_string())
         );
         assert_eq!(token.read().unwrap().as_ref().unwrap().value, "0");
+    }
+
+    #[test]
+    fn test_parse_rules() {
+        create_dir_all("/tmp/devmaster/rules").unwrap();
+
+        /* Normal rule file. */
+        touch_file(
+            "/tmp/devmaster/rules/00-a.rules",
+            false,
+            Some(0o777),
+            None,
+            None,
+        )
+        .unwrap();
+        /* Skip parsing the file with invalid suffix. */
+        touch_file("/tmp/devmaster/rules/01-b", false, Some(0o777), None, None).unwrap();
+        /* Failed to parse the file as it is not readable. */
+        touch_file(
+            "/tmp/devmaster/rules/02-c.rules",
+            false,
+            Some(0o222),
+            None,
+            None,
+        )
+        .unwrap();
+
+        let rules = Rules::new(
+            vec!["/tmp/devmaster/rules".to_string()],
+            ResolveNameTime::Never,
+        );
+
+        Rules::parse_rules(Arc::new(RwLock::new(rules)));
+
+        remove_dir_all("/tmp/devmaster").unwrap();
     }
 }
