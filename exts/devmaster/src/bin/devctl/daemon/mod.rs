@@ -38,10 +38,10 @@ fn notify(unset_env: bool, msg: String) -> std::io::Result<()> {
     }
 }
 
-pub fn run_daemon() {
+pub fn run_daemon(config_path: &str) {
     let events = Rc::new(Events::new().unwrap());
 
-    let devmaster = Devmaster::new(events);
+    let devmaster = Devmaster::new(config_path, events);
 
     if let Err(e) = notify(false, "READY=1\n".to_string()) {
         log::warn!("Failed to notify pid 1: {}", e);
@@ -50,4 +50,37 @@ pub fn run_daemon() {
     devmaster.as_ref().borrow().run();
 
     devmaster.as_ref().borrow().exit();
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use device::{Device, DeviceAction};
+    use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
+    use std::io::Write;
+
+    #[test]
+    fn test_run_daemon() {
+        /* Require root privilege, skip in ci environment. */
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        if dev.trigger(DeviceAction::Change).is_err() {
+            return;
+        }
+
+        std::thread::spawn(|| {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+
+            let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+            dev.trigger(DeviceAction::Change).unwrap();
+
+            /* Sleep more than 3 seconds to wait for the workers being recycled. */
+            std::thread::sleep(std::time::Duration::from_secs(4));
+
+            let mut stream =
+                std::os::unix::net::UnixStream::connect(CONTROL_MANAGER_LISTEN_ADDR).unwrap();
+            stream.write_all(b"exit ").unwrap();
+        });
+
+        run_daemon("none");
+    }
 }

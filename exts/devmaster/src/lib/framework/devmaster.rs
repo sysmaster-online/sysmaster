@@ -71,10 +71,10 @@ impl Cache {
 
 impl Devmaster {
     /// generate a devmaster object
-    pub fn new(events: Rc<Events>) -> Rc<RefCell<Devmaster>> {
+    pub fn new(config_path: &str, events: Rc<Events>) -> Rc<RefCell<Devmaster>> {
         let config = DevmasterConfig::new();
 
-        config.load(DEFAULT_CONFIG);
+        config.load(config_path);
 
         init_log(
             "devmaster",
@@ -127,6 +127,7 @@ impl Devmaster {
             String::from(CONTROL_MANAGER_LISTEN_ADDR),
             worker_manager.clone(),
             job_queue.clone(),
+            events.clone(),
         ));
         let monitor = Rc::new(UeventMonitor::new(job_queue.clone()));
         let post = Rc::new(GarbageCollect::new(&devmaster));

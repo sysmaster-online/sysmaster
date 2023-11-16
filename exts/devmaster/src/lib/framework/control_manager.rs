@@ -14,7 +14,7 @@
 //!
 use crate::framework::job_queue::JobQueue;
 use crate::framework::worker_manager::WorkerManager;
-use event::Source;
+use event::{Events, Source};
 use nix::unistd::unlink;
 use std::os::unix::net::UnixListener;
 use std::path::Path;
@@ -38,7 +38,7 @@ pub struct ControlManager {
     worker_manager: Weak<WorkerManager>,
     /// reference to job queue
     _job_queue: Weak<JobQueue>,
-    // events: Rc<Events>,
+    events: Rc<Events>,
 }
 
 /// public methods
@@ -48,6 +48,7 @@ impl ControlManager {
         listen_addr: String,
         worker_manager: Rc<WorkerManager>,
         job_queue: Rc<JobQueue>,
+        events: Rc<Events>,
     ) -> ControlManager {
         /*
          * Cleanup remaining socket if it exists.
@@ -67,6 +68,7 @@ impl ControlManager {
             listener,
             worker_manager: Rc::downgrade(&worker_manager),
             _job_queue: Rc::downgrade(&job_queue),
+            events,
         }
     }
 }
@@ -82,6 +84,9 @@ impl ControlManager {
         match cmd_kind {
             "kill" => {
                 self.worker_manager.upgrade().unwrap().kill_workers();
+            }
+            "exit" => {
+                self.events.set_exit();
             }
             _ => {
                 todo!();

@@ -18,6 +18,7 @@ mod subcmds;
 use basic::argv_util::invoked_as;
 use clap::Parser;
 use daemon::run_daemon;
+use libdevmaster::config::devmaster_conf::DEFAULT_CONFIG;
 use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
 use log::init_log_to_console_syslog;
 use log::Level;
@@ -204,6 +205,12 @@ enum SubCmd {
         #[clap(short, long)]
         root: Option<String>,
     },
+    ///
+    #[clap(display_order = 7)]
+    Control {
+        #[clap(short, long)]
+        exit: bool,
+    },
 }
 
 /// subcommand for killing workers
@@ -212,10 +219,19 @@ fn subcommand_kill() {
     stream.write_all(b"kill ").unwrap();
 }
 
+/// subcommand for controlling devmaster
+fn subcommand_control(exit: bool) {
+    let mut stream = UnixStream::connect(CONTROL_MANAGER_LISTEN_ADDR).unwrap();
+
+    if exit {
+        stream.write_all(b"exit ").unwrap();
+    }
+}
+
 fn main() -> Result<()> {
     let argv: Vec<String> = std::env::args().collect();
     if invoked_as(argv, "devmaster") {
-        run_daemon();
+        run_daemon(DEFAULT_CONFIG);
         return Ok(());
     }
 
@@ -300,6 +316,7 @@ fn main() -> Result<()> {
             strict,
             root,
         } => subcommand_hwdb(update, test, path, usr, strict, root),
+        SubCmd::Control { exit } => subcommand_control(exit),
     }
 
     Ok(())
