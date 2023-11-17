@@ -88,6 +88,9 @@ impl ControlManager {
             "exit" => {
                 self.events.set_exit();
             }
+            "ping" => {
+                log::debug!("Received devmaster control message (PING)");
+            }
             _ => {
                 todo!();
             }

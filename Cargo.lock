@@ -490,7 +490,7 @@ dependencies = [
 name = "event"
 version = "0.5.1"
 dependencies = [
- "constants",
+ "basic",
  "libc",
  "libtests",
  "nix 0.24.3",

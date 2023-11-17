@@ -26,6 +26,7 @@ use std::{io::Write, os::unix::net::UnixStream};
 use subcmds::devctl_hwdb::subcommand_hwdb;
 use subcmds::devctl_info::InfoArgs;
 use subcmds::devctl_monitor::subcommand_monitor;
+use subcmds::devctl_settle::SettleArgs;
 use subcmds::devctl_test_builtin::subcommand_test_builtin;
 use subcmds::devctl_trigger::TriggerArgs;
 use subcmds::Result;
@@ -170,8 +171,24 @@ enum SubCmd {
         devices: Vec<String>,
     },
 
-    /// Test builtin command on a device
+    /// Kill all devmaster workers
     #[clap(display_order = 5)]
+    Settle {
+        /// Maximum time to wait for events
+        #[clap(short('t'), long)]
+        timeout: Option<String>,
+
+        /// Stop waiting if file exists
+        #[clap(short('E'), long)]
+        exit_if_exists: Option<String>,
+
+        /// other args
+        #[clap(required = false)]
+        other: Vec<String>,
+    },
+
+    /// Test builtin command on a device
+    #[clap(display_order = 6)]
     TestBuiltin {
         /// device action
         #[clap(short, long)]
@@ -184,7 +201,7 @@ enum SubCmd {
         syspath: String,
     },
     /// Test builtin command on a device
-    #[clap(display_order = 6)]
+    #[clap(display_order = 7)]
     Hwdb {
         /// update the hardware database
         #[clap(short('u'), long)]
@@ -302,6 +319,13 @@ fn main() -> Result<()> {
                 devices,
             )
             .subcommand()
+        }
+        SubCmd::Settle {
+            timeout,
+            exit_if_exists,
+            other,
+        } => {
+            return SettleArgs::new(timeout, exit_if_exists, other).subcommand();
         }
         SubCmd::TestBuiltin {
             action,

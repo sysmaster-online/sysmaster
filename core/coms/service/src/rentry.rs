@@ -33,8 +33,8 @@ use core::exec::{ExecCommand, Rlimit, RuntimeDirectory, StateDirectory, WorkingD
 use core::rel::{ReDb, ReDbRwTxn, ReDbTable, ReliSwitch, Reliability};
 use core::unit::KillMode;
 
+use basic::time_util::USEC_PER_SEC;
 use basic::EXEC_RUNTIME_PREFIX;
-use constants::USEC_PER_SEC;
 
 struct ServiceReDb<K, V>(ReDb<K, V>);
 

@@ -32,6 +32,7 @@ basic = { path = "../../libs/basic", default-features = false, features = [
     "socket",
     "io",
     "argv",
+    "time_util",
 ] }
 blkid_rs = { path = "../../libs/blkid_rs" }
 device = { path = "../../libs/device" }

@@ -66,6 +66,7 @@ full = [
     "random",
     "id128",
     "namespace",
+    "time_util",
 ]
 
 capability = []
@@ -117,3 +118,4 @@ sysfs = ["nix/dir"]
 unistd = ["nix/user"]
 unit_name = []
 uuid = ["bitflags", "random"]
+time_util = []

@@ -13,8 +13,8 @@
 #![allow(non_snake_case)]
 use super::comm::ServiceUnitComm;
 use super::rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
+use basic::time_util::{USEC_INFINITY, USEC_PER_SEC};
 use basic::unit_name::unit_name_to_instance;
-use constants::{USEC_INFINITY, USEC_PER_SEC};
 use core::error::*;
 use core::exec::ExecCommand;
 use core::rel::ReStation;

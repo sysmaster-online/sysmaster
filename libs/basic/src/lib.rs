@@ -81,6 +81,8 @@ pub mod strbuf;
 pub mod string;
 #[cfg(feature = "sysfs")]
 pub mod sysfs;
+#[cfg(feature = "time_util")]
+pub mod time_util;
 #[cfg(feature = "unistd")]
 pub mod unistd;
 #[cfg(feature = "unit_name")]

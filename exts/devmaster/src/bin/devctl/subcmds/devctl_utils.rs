@@ -1,4 +1,5 @@
 use device::Device;
+use nix::unistd::{access, AccessFlags};
 use std::path::PathBuf;
 
 type Result<T> = std::result::Result<T, nix::Error>;
@@ -35,4 +36,17 @@ pub fn find_device(id: &str, prefix: &str) -> Result<Device> {
 /// dbus and device unit is not currently implemented
 fn find_device_from_unit(_unit_name: &str) -> Result<Device> {
     todo!()
+}
+
+/// check if the queue is empty
+pub fn devmaster_queue_is_empty() -> Result<bool> {
+    match access("/run/devmaster/queue", AccessFlags::F_OK) {
+        Ok(()) => Ok(false),
+        Err(err) => {
+            if err == nix::Error::ENOENT {
+                return Ok(true);
+            }
+            Err(err)
+        }
+    }
 }
