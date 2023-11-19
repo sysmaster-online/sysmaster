@@ -13,6 +13,8 @@ basic = { path = "../basic", default-features = false, features = [
     "fd",
     "murmurhash2",
     "uuid",
+    "string",
+    "socket",
 ] }
 event = { path = "../event" }
 log = { path = "../log" }

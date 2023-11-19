@@ -410,7 +410,10 @@ impl Source for TriggerMonitor {
     /// receive device from socket and remove path or uuid from settle_path_or_ids
     fn dispatch(&self, event: &Events) -> i32 {
         let device = match self.device_monitor.receive_device() {
-            Ok(device) => device,
+            Ok(ret) => match ret {
+                Some(device) => device,
+                None => return 0,
+            },
             Err(_) => {
                 return 0;
             }

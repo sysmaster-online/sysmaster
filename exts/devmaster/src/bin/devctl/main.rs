@@ -25,7 +25,7 @@ use log::Level;
 use std::{io::Write, os::unix::net::UnixStream};
 use subcmds::devctl_hwdb::subcommand_hwdb;
 use subcmds::devctl_info::InfoArgs;
-use subcmds::devctl_monitor::subcommand_monitor;
+use subcmds::devctl_monitor::MonitorArgs;
 use subcmds::devctl_settle::SettleArgs;
 use subcmds::devctl_test_builtin::subcommand_test_builtin;
 use subcmds::devctl_trigger::TriggerArgs;
@@ -92,7 +92,35 @@ enum SubCmd {
 
     /// Monitor device events from kernel and userspace
     #[clap(display_order = 2)]
-    Monitor {},
+    Monitor {
+        /// Print the event properties
+        #[clap(short('p'), long)]
+        property: bool,
+
+        /// Print the event properties (alias for -p)
+        #[clap(short('e'), long)]
+        environment: bool,
+
+        /// Print kernel uevents
+        #[clap(short('k'), long)]
+        kernel: bool,
+
+        /// Print events broadcasted from devmaster other applications in userspace
+        #[clap(short('u'), long)]
+        userspace: bool,
+
+        /// Filter events by subsystem
+        #[clap(short('s'), long)]
+        subsystem_match: Option<Vec<String>>,
+
+        /// Filter events by tag
+        #[clap(short('t'), long)]
+        tag_match: Option<Vec<String>>,
+
+        /// other args
+        #[clap(required = false)]
+        _other: Vec<String>,
+    },
 
     /// Kill all devmaster workers
     #[clap(display_order = 3)]
@@ -184,7 +212,7 @@ enum SubCmd {
 
         /// other args
         #[clap(required = false)]
-        other: Vec<String>,
+        _other: Vec<String>,
     },
 
     /// Test builtin command on a device
@@ -280,7 +308,26 @@ fn main() -> Result<()> {
             )
             .subcommand()
         }
-        SubCmd::Monitor {} => subcommand_monitor(),
+        SubCmd::Monitor {
+            property,
+            environment,
+            kernel,
+            userspace,
+            subsystem_match,
+            tag_match,
+            _other,
+        } => {
+            return MonitorArgs::new(
+                property,
+                environment,
+                kernel,
+                userspace,
+                subsystem_match,
+                tag_match,
+                _other,
+            )
+            .subcommand()
+        }
         SubCmd::Kill {} => subcommand_kill(),
         SubCmd::Trigger {
             action,
@@ -323,9 +370,9 @@ fn main() -> Result<()> {
         SubCmd::Settle {
             timeout,
             exit_if_exists,
-            other,
+            _other,
         } => {
-            return SettleArgs::new(timeout, exit_if_exists, other).subcommand();
+            return SettleArgs::new(timeout, exit_if_exists, _other).subcommand();
         }
         SubCmd::TestBuiltin {
             action,

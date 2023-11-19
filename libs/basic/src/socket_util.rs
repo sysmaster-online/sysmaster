@@ -12,6 +12,8 @@
 
 //!
 use crate::error::*;
+use crate::IN_SET;
+use nix::sys::socket::{recv, MsgFlags};
 use nix::{
     errno::Errno,
     sys::socket::{self, sockopt, AddressFamily},
@@ -132,4 +134,71 @@ pub fn set_keepalive_probes(fd: RawFd, v: u32) -> Result<()> {
 /// Set Broadcast state
 pub fn set_broadcast_state(fd: RawFd, v: bool) -> Result<()> {
     socket::setsockopt(fd, sockopt::Broadcast, &v).context(NixSnafu)
+}
+
+/// get the size of data in fd
+pub fn next_datagram_size_fd(fd: RawFd) -> Result<usize> {
+    /* This is a bit like FIONREAD/SIOCINQ, however a bit more powerful. The difference being: recv(MSG_PEEK) will
+     * actually cause the next datagram in the queue to be validated regarding checksums, which FIONREAD doesn't
+     * do. This difference is actually of major importance as we need to be sure that the size returned here
+     * actually matches what we will read with recvmsg() next, as otherwise we might end up allocating a buffer of
+     * the wrong size.
+     */
+
+    let mut buf = Vec::new();
+    match recv(fd, &mut buf, MsgFlags::MSG_PEEK | MsgFlags::MSG_TRUNC) {
+        Ok(len) => {
+            if len != 0 {
+                return Ok(len);
+            }
+        }
+        Err(err) => {
+            if !IN_SET!(err, Errno::EOPNOTSUPP, Errno::EFAULT) {
+                return Err(Error::Nix { source: err });
+            }
+        }
+    }
+
+    /* Some sockets (AF_PACKET) do not support null-sized recv() with MSG_TRUNC set, let's fall back to FIONREAD
+     * for them. Checksums don't matter for raw sockets anyway, hence this should be fine.
+     */
+
+    let k: usize = 0;
+    Errno::clear();
+    if unsafe { libc::ioctl(fd, libc::FIONREAD, &k) } < 0 {
+        return Err(Error::Nix {
+            source: Errno::from_i32(nix::errno::errno()),
+        });
+    }
+
+    Ok(k)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nix::sys::socket::{send, socketpair, AddressFamily, MsgFlags, SockFlag, SockType};
+    use std::fs::{remove_file, File};
+    use std::io::Write;
+    use std::os::unix::io::AsRawFd;
+
+    #[test]
+    fn test_next_datagram_size_fd() {
+        let buf: Vec<u8> = vec![0, 1, 2, 3, 4];
+
+        let mut not_socket_file = File::create("/tmp/test_next_datagram_size_fd").unwrap();
+        not_socket_file.write_all(&buf).unwrap();
+        assert!(next_datagram_size_fd(not_socket_file.as_raw_fd()).is_err());
+        remove_file("/tmp/test_next_datagram_size_fd").unwrap();
+
+        let (fd1, fd2) = socketpair(
+            AddressFamily::Unix,
+            SockType::Stream,
+            None,
+            SockFlag::SOCK_CLOEXEC | SockFlag::SOCK_NONBLOCK,
+        )
+        .unwrap();
+        send(fd1, &buf, MsgFlags::empty()).unwrap();
+        assert_eq!(next_datagram_size_fd(fd2).unwrap(), buf.len());
+    }
 }

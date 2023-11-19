@@ -14,14 +14,14 @@
 //!
 use crate::{device::Device, error::*, utils::*, TAGS_BASE_DIR};
 use bitflags::bitflags;
-use fnmatch_sys::fnmatch;
+//use fnmatch_sys::fnmatch;
+use basic::string::pattern_match;
 use nix::errno::Errno;
 use snafu::ResultExt;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
     iter::Iterator,
-    os::raw::c_char,
     path::Path,
     rc::Rc,
 };
@@ -455,11 +455,11 @@ impl DeviceEnumerator {
 
         for (property_pattern, value_pattern) in self.match_property.borrow().iter() {
             for (property, value) in &device.property_iter() {
-                if !self.pattern_match(property_pattern, property) {
+                if !pattern_match(property_pattern, property, 0) {
                     continue;
                 }
 
-                if self.pattern_match(value_pattern, value) {
+                if pattern_match(value_pattern, value, 0) {
                     return Ok(true);
                 }
             }
@@ -498,57 +498,6 @@ impl DeviceEnumerator {
         )
     }
 
-    /// check whether a device matches parent
-    pub(crate) fn match_parent(&self, device: &Device) -> Result<bool, Error> {
-        if self.match_parent.borrow().is_empty() {
-            return Ok(true);
-        }
-
-        for parent in self.match_parent.borrow().iter() {
-            if device.syspath.borrow().starts_with(parent) {
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
-    }
-
-    /// check whether the sysattrs of a device matches
-    pub(crate) fn match_sysattr(&self, device: &Device) -> Result<bool, Error> {
-        for (sysattr, patterns) in self.match_sysattr.borrow().iter() {
-            if !self.match_sysattr_value(device, sysattr, patterns)? {
-                return Ok(false);
-            }
-        }
-
-        for (sysattr, patterns) in self.not_match_sysattr.borrow().iter() {
-            if self.match_sysattr_value(device, sysattr, patterns)? {
-                return Ok(false);
-            }
-        }
-
-        Ok(true)
-    }
-
-    /// check whether the value of specific sysattr of a device matches
-    pub(crate) fn match_sysattr_value(
-        &self,
-        device: &Device,
-        sysattr: &str,
-        patterns: &str,
-    ) -> Result<bool, Error> {
-        let value = match device.get_sysattr_value(sysattr) {
-            Ok(value) => value,
-            Err(_) => return Ok(false),
-        };
-
-        if patterns.is_empty() {
-            return Ok(true);
-        }
-
-        Ok(self.pattern_match(patterns, &value))
-    }
-
     /// check whether a device matches conditions according to flags
     pub(crate) fn test_matches(
         &self,
@@ -579,7 +528,9 @@ impl DeviceEnumerator {
             }
         }
 
-        if (flags & MatchFlag::PARENT).bits() != 0 && !self.match_parent(device)? {
+        if (flags & MatchFlag::PARENT).bits() != 0
+            && !device.match_parent(&self.match_parent.borrow(), &HashSet::new())
+        {
             return Ok(false);
         }
 
@@ -595,7 +546,10 @@ impl DeviceEnumerator {
             return Ok(false);
         }
 
-        if !self.match_sysattr(device)? {
+        if !device.match_sysattr(
+            &self.match_sysattr.borrow(),
+            &self.not_match_sysattr.borrow(),
+        ) {
             return Ok(false);
         }
 
@@ -1139,20 +1093,6 @@ impl DeviceEnumerator {
         ret
     }
 
-    /// Pattern match based on glob style pattern
-    pub(crate) fn pattern_match(&self, pattern: &str, value: &str) -> bool {
-        let pattern = format!("{}\0", pattern);
-        let value = format!("{}\0", value);
-
-        unsafe {
-            fnmatch(
-                pattern.as_ptr() as *const c_char,
-                value.as_ptr() as *const c_char,
-                0,
-            ) == 0
-        }
-    }
-
     /// if any exclude pattern matches, return false
     /// if include pattern set is empty, return true
     /// if any include pattern matches, return true, else return false
@@ -1163,7 +1103,7 @@ impl DeviceEnumerator {
         value: &str,
     ) -> bool {
         for pattern in exclude_pattern_set.iter() {
-            if self.pattern_match(pattern, value) {
+            if pattern_match(pattern, value, 0) {
                 return false;
             }
         }
@@ -1173,7 +1113,7 @@ impl DeviceEnumerator {
         }
 
         for pattern in include_pattern_set.iter() {
-            if self.pattern_match(pattern, value) {
+            if pattern_match(pattern, value, 0) {
                 return true;
             }
         }
@@ -1184,9 +1124,9 @@ impl DeviceEnumerator {
 
 #[cfg(test)]
 mod tests {
-    use crate::{device_enumerator::DeviceEnumerationType, Device};
-
     use super::{DeviceEnumerator, MatchInitializedType};
+    use crate::{device_enumerator::DeviceEnumerationType, Device};
+    use std::collections::HashSet;
 
     #[test]
     fn test_enumerator_inialize() {
@@ -1240,13 +1180,6 @@ mod tests {
         for i in enumerator.iter() {
             i.borrow().get_devpath().expect("can not get the devpath");
         }
-    }
-
-    #[test]
-    fn test_pattern_match() {
-        let enumerator = DeviceEnumerator::new();
-        assert!(enumerator.pattern_match("hello*", "hello world"));
-        assert!(!enumerator.pattern_match("hello*", "world"));
     }
 
     trait State {
@@ -1343,18 +1276,6 @@ mod tests {
     }
 
     #[test]
-    fn test_match_sysattr() {
-        let mut ert = DeviceEnumerator::new();
-        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
-
-        ert.add_match_sysattr("ifindex", "1", true).unwrap();
-        ert.add_match_sysattr("address", "aa:aa:aa:aa:aa:aa", false)
-            .unwrap();
-
-        assert!(ert.match_sysattr(&dev).unwrap());
-    }
-
-    #[test]
     fn test_match_sysname() {
         let mut ert = DeviceEnumerator::new();
         ert.add_match_sysname("loop*", true).unwrap();
@@ -1383,22 +1304,14 @@ mod tests {
     fn test_match_parent_incremental() {
         let mut ert = DeviceEnumerator::new();
         let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
-        assert!(ert.match_parent(&dev).unwrap());
+        assert!(dev.match_parent(&ert.match_parent.borrow(), &HashSet::new()));
         ert.add_match_parent_incremental(&dev).unwrap();
-        assert!(ert.match_parent(&dev).unwrap());
+        assert!(dev.match_parent(&ert.match_parent.borrow(), &HashSet::new()));
         let dev_1 = Device::from_subsystem_sysname("drivers", "usb:usb").unwrap();
-        assert!(!ert.match_parent(&dev_1).unwrap());
+        assert!(!dev_1.match_parent(&ert.match_parent.borrow(), &HashSet::new()));
 
         ert.set_enumerator_type(DeviceEnumerationType::Devices);
         ert.scan_devices().unwrap();
-    }
-
-    #[test]
-    fn test_match_parent() {
-        let mut ert = DeviceEnumerator::new();
-        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
-        ert.add_match_parent_incremental(&dev).unwrap();
-        assert!(ert.match_parent(&dev).unwrap());
     }
 
     #[test]

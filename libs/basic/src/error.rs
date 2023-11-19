@@ -144,6 +144,11 @@ pub fn errno_is_privilege(source: Errno) -> bool {
     matches!(source, Errno::EACCES | Errno::EPERM)
 }
 
+/// two errno to try again
+pub fn errno_is_transient(source: Errno) -> bool {
+    matches!(source, Errno::EAGAIN | Errno::EINTR)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,5 +168,12 @@ mod tests {
     fn test_errno_is_privilege() {
         assert!(errno_is_privilege(nix::Error::EACCES));
         assert!(errno_is_privilege(nix::Error::EPERM));
+    }
+
+    #[test]
+    fn test_errno_is_transient() {
+        assert!(errno_is_transient(nix::Error::EAGAIN));
+        assert!(errno_is_transient(nix::Error::EINTR));
+        assert!(!errno_is_transient(nix::Error::EACCES));
     }
 }

@@ -64,6 +64,7 @@ nix = { version = "0.24", default-features = false, features = [
     "net",
     "poll",
     "resource",
+    "time",
 ] }
 rtnetlink = "0.8.1"
 serde = { version = "1.0.130", default-features = false }

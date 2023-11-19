@@ -74,6 +74,7 @@ version = "0.5.1"
 dependencies = [
  "bitflags",
  "constants",
+ "fnmatch-sys",
  "libc",
  "log 0.5.1",
  "nix 0.24.3",

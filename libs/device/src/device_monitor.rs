@@ -12,16 +12,18 @@
 
 //! device monitor
 //!
+use crate::{device::Device, error::Error};
+use basic::errno_is_transient;
 use basic::murmurhash2::murmurhash2;
+use basic::socket_util::next_datagram_size_fd;
 use nix::{
     errno::Errno,
     sys::socket::{
         recv, sendmsg, AddressFamily, MsgFlags, NetlinkAddr, SockFlag, SockProtocol, SockType,
     },
 };
+use std::collections::{HashMap, HashSet};
 use std::{io::IoSlice, mem::size_of, os::unix::prelude::RawFd};
-
-use crate::{device::Device, error::Error};
 
 const UDEV_MONITOR_MAGIC: u32 = 0xfeedcafe;
 
@@ -100,6 +102,15 @@ pub struct DeviceMonitor {
     socket: RawFd,
     /// socket address, currently only support netlink
     _sockaddr: NetlinkAddr,
+
+    /// key:subsystem value:devtype
+    subsystem_filter: HashMap<String, String>,
+    tag_filter: HashSet<String>,
+    match_sysattr_filter: HashMap<String, String>,
+    nomatch_sysattr_filter: HashMap<String, String>,
+    match_parent_filter: HashSet<String>,
+    nomatch_parent_filter: HashSet<String>,
+    filter_uptodate: bool,
 }
 
 impl DeviceMonitor {
@@ -122,6 +133,13 @@ impl DeviceMonitor {
         DeviceMonitor {
             socket: sock,
             _sockaddr: sa,
+            subsystem_filter: HashMap::new(),
+            tag_filter: HashSet::new(),
+            match_sysattr_filter: HashMap::new(),
+            nomatch_sysattr_filter: HashMap::new(),
+            match_parent_filter: HashSet::new(),
+            nomatch_parent_filter: HashSet::new(),
+            filter_uptodate: false,
         }
     }
 
@@ -131,8 +149,22 @@ impl DeviceMonitor {
     }
 
     /// receive device
-    pub fn receive_device(&self) -> Result<Device, Error> {
-        let mut buf = vec![0; 1024 * 8];
+    pub fn receive_device(&self) -> Result<Option<Device>, Error> {
+        let n = match next_datagram_size_fd(self.socket) {
+            Ok(n) => n,
+            Err(err) => {
+                let e = Errno::from_i32(err.get_errno());
+                if !errno_is_transient(e) {
+                    log::error!("Failed to get the received message size err:{:?}", err);
+                }
+                return Err(Error::Nix {
+                    msg: "".to_string(),
+                    source: e,
+                });
+            }
+        };
+
+        let mut buf = vec![0; n];
         let n = match recv(self.socket, &mut buf, MsgFlags::empty()) {
             Ok(ret) => ret,
             Err(errno) => {
@@ -153,16 +185,42 @@ impl DeviceMonitor {
 
         let prefix = String::from_utf8(buf[..prefix_split_idx].to_vec()).unwrap();
 
+        let device: Device;
         if prefix.contains("@/") {
-            return Device::from_nulstr(&buf[prefix_split_idx + 1..n]);
+            device = match Device::from_nulstr(&buf[prefix_split_idx + 1..n]) {
+                Ok(device) => device,
+                Err(err) => return Err(err),
+            };
         } else if prefix == "libudev" {
-            return Device::from_nulstr(&buf[40..n]);
+            device = match Device::from_nulstr(&buf[40..n]) {
+                Ok(device) => device,
+                Err(err) => return Err(err),
+            };
+        } else {
+            return Err(Error::Nix {
+                msg: format!("invalid nulstr data ({:?})", buf),
+                source: Errno::EINVAL,
+            });
         }
 
-        Err(Error::Nix {
-            msg: format!("invalid nulstr data ({:?})", buf),
-            source: Errno::EINVAL,
-        })
+        /* Skip device, if it does not pass the current filter */
+        match self.passes_filter(&device) {
+            Ok(flag) => {
+                if !flag {
+                    log::trace!("Received device does not pass filter, ignoring.");
+                    Ok(None)
+                } else {
+                    Ok(Some(device))
+                }
+            }
+            Err(err) => {
+                log::error!(
+                    "Failed to check received device passing filter err:{:?}",
+                    err
+                );
+                Err(err)
+            }
+        }
     }
 
     /// send device
@@ -201,6 +259,107 @@ impl DeviceMonitor {
         sendmsg(self.fd(), &iov, &[], MsgFlags::empty(), Some(&dest)).unwrap();
 
         Ok(())
+    }
+
+    /// add subsystem and devtype match
+    pub fn filter_add_match_subsystem_devtype(
+        &mut self,
+        subsystem: &str,
+        devtype: &str,
+    ) -> Result<(), Error> {
+        if subsystem.is_empty() {
+            return Err(Error::Nix {
+                msg: "subsystem is empty".to_string(),
+                source: Errno::EINVAL,
+            });
+        }
+
+        self.subsystem_filter
+            .insert(subsystem.to_string(), devtype.to_string());
+        self.filter_uptodate = false;
+
+        Ok(())
+    }
+
+    /// add tag match
+    pub fn filter_add_match_tag(&mut self, tag: &str) -> Result<(), Error> {
+        if tag.is_empty() {
+            return Err(Error::Nix {
+                msg: "tag is empty".to_string(),
+                source: Errno::EINVAL,
+            });
+        }
+
+        self.tag_filter.insert(tag.to_string());
+        self.filter_uptodate = false;
+
+        Ok(())
+    }
+
+    fn passes_filter(&self, device: &Device) -> Result<bool, Error> {
+        match self.check_subsystem_filter(device) {
+            Ok(flag) => {
+                if !flag {
+                    return Ok(false);
+                }
+            }
+            Err(err) => return Err(err),
+        }
+
+        if !self.check_tag_filter(device) {
+            return Ok(false);
+        }
+
+        if !device.match_sysattr(&self.match_sysattr_filter, &self.nomatch_sysattr_filter) {
+            return Ok(false);
+        }
+
+        Ok(device.match_parent(&self.match_parent_filter, &self.nomatch_parent_filter))
+    }
+
+    fn check_subsystem_filter(&self, device: &Device) -> Result<bool, Error> {
+        if self.subsystem_filter.is_empty() {
+            return Ok(true);
+        }
+
+        let subsystem = match device.get_subsystem() {
+            Ok(subsystem) => subsystem,
+            Err(err) => return Err(err),
+        };
+
+        let devtype = match device.get_devtype() {
+            Ok(devtype) => devtype,
+            Err(err) => {
+                if err.get_errno() != nix::Error::ENOENT {
+                    return Err(err);
+                } else {
+                    String::from("")
+                }
+            }
+        };
+
+        for (key, value) in &self.subsystem_filter {
+            if key != &subsystem {
+                continue;
+            }
+            if value.is_empty() || value == &devtype {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
+    fn check_tag_filter(&self, device: &Device) -> bool {
+        if self.tag_filter.is_empty() {
+            return true;
+        }
+        for tag in &self.tag_filter {
+            if let Ok(true) = device.has_tag(tag) {
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -249,7 +408,7 @@ mod tests {
 
         ///
         fn dispatch(&self, e: &Events) -> i32 {
-            if let Ok(device) = self.device_monitor.receive_device() {
+            if let Ok(Some(device)) = self.device_monitor.receive_device() {
                 println!("{}", device.get_device_id().unwrap());
             }
             e.set_exit();
@@ -319,5 +478,26 @@ mod tests {
         e.rloop().unwrap();
 
         e.del_source(s.clone()).unwrap();
+    }
+
+    #[test]
+    fn test_filter_add_match_subsystem_devtype() {
+        let mut device_monitor = DeviceMonitor::new(MonitorNetlinkGroup::Userspace, None);
+        assert!(device_monitor
+            .filter_add_match_subsystem_devtype("", "")
+            .is_err());
+        device_monitor
+            .filter_add_match_subsystem_devtype("net", "")
+            .unwrap();
+        device_monitor
+            .filter_add_match_subsystem_devtype("block", "disk")
+            .unwrap();
+    }
+
+    #[test]
+    fn test_filter_add_match_tag() {
+        let mut device_monitor = DeviceMonitor::new(MonitorNetlinkGroup::Userspace, None);
+        assert!(device_monitor.filter_add_match_tag("").is_err());
+        device_monitor.filter_add_match_tag("sysmaster").unwrap();
     }
 }

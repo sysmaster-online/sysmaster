@@ -16,6 +16,7 @@ use crate::utils::readlink_value;
 use crate::{error::*, DeviceAction};
 use basic::fs_util::{chmod, open_temporary, touch_file};
 use basic::parse::{device_path_parse_devnum, parse_devnum, parse_ifindex};
+use basic::string::fnmatch_or_empty;
 use basic::uuid::{randomize, Uuid};
 use libc::{
     dev_t, faccessat, gid_t, mode_t, uid_t, F_OK, S_IFBLK, S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT,
@@ -2723,6 +2724,71 @@ impl Device {
 
         Ok(())
     }
+
+    /// check whether a device matches parent
+    pub fn match_parent(
+        &self,
+        match_parent: &HashSet<String>,
+        nomatch_parent: &HashSet<String>,
+    ) -> bool {
+        let syspath = match self.get_syspath() {
+            Ok(syspath) => syspath,
+            Err(_err) => return false,
+        };
+
+        for syspath_parent in nomatch_parent {
+            if syspath.starts_with(syspath_parent) {
+                return false;
+            }
+        }
+
+        if match_parent.is_empty() {
+            return true;
+        }
+
+        for syspath_parent in match_parent {
+            if syspath.starts_with(syspath_parent) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// check whether the sysattrs of a device matches
+    pub fn match_sysattr(
+        &self,
+        match_sysattr: &HashMap<String, String>,
+        nomatch_sysattr: &HashMap<String, String>,
+    ) -> bool {
+        for (sysattr, patterns) in match_sysattr {
+            if !self.match_sysattr_value(sysattr, patterns) {
+                return false;
+            }
+        }
+
+        for (sysattr, patterns) in nomatch_sysattr {
+            if self.match_sysattr_value(sysattr, patterns) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// check whether the value of specific sysattr of a device matches
+    fn match_sysattr_value(&self, sysattr: &str, patterns: &str) -> bool {
+        let value = match self.get_sysattr_value(sysattr) {
+            Ok(value) => value,
+            Err(_) => return false,
+        };
+
+        if patterns.is_empty() {
+            return true;
+        }
+
+        fnmatch_or_empty(patterns, &value, 0)
+    }
 }
 
 /// iterator wrapper of hash set in refcell
@@ -3462,6 +3528,7 @@ mod tests {
         }
 
         if let Err(e) = LoopDev::inner_process("/tmp/test_update_tag", 1024 * 10, inner_test) {
+            println!("e:{:?}", e);
             assert!(e.is_errno(nix::Error::EACCES) || e.is_errno(nix::Error::EBUSY));
         }
     }
@@ -3825,5 +3892,37 @@ V:100
     #[test]
     fn test_from_devnum_err() {
         assert!(Device::from_devnum('x', 100).is_err());
+    }
+
+    #[test]
+    fn test_match_sysattr() {
+        let mut ert = DeviceEnumerator::new();
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+
+        ert.add_match_sysattr("ifindex", "1", true).unwrap();
+        ert.add_match_sysattr("address", "aa:aa:aa:aa:aa:aa", false)
+            .unwrap();
+
+        assert!(dev.match_sysattr(&ert.match_sysattr.borrow(), &ert.not_match_sysattr.borrow()));
+
+        assert!(dev.match_sysattr(&ert.match_sysattr.borrow(), &HashMap::new()));
+
+        let mut nomatch_sysattr = HashMap::new();
+        nomatch_sysattr.insert("ifindex".to_string(), "1".to_string());
+        assert!(!dev.match_sysattr(&HashMap::new(), &nomatch_sysattr));
+
+        assert!(dev.match_sysattr(&HashMap::new(), &HashMap::new()));
+    }
+
+    #[test]
+    fn test_match_parent() {
+        let mut ert = DeviceEnumerator::new();
+        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        ert.add_match_parent(&dev).unwrap();
+        assert!(dev.match_parent(&ert.match_parent.borrow(), &HashSet::new()));
+
+        let mut nomatch_parent = HashSet::new();
+        nomatch_parent.insert("/sys/devices/virtual/net/lo".to_string());
+        assert!(!dev.match_parent(&HashSet::new(), &nomatch_parent));
     }
 }

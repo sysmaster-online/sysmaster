@@ -67,7 +67,10 @@ impl Source for UeventMonitor {
     /// receive device from socket and insert into job queue
     fn dispatch(&self, _: &Events) -> i32 {
         let device = match self.device_monitor.receive_device() {
-            Ok(ret) => ret,
+            Ok(ret) => match ret {
+                Some(device) => device,
+                None => return 0,
+            },
             Err(e) => {
                 log::error!("Monitor Error: {}", e);
                 return 0;
