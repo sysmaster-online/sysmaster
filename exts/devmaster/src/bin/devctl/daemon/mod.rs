@@ -61,7 +61,10 @@ mod test {
 
     #[test]
     fn test_run_daemon() {
-        /* Require root privilege, skip in ci environment. */
+        /* Require root privilege, skip in ci environment.
+         *
+         * In addition, this test case will fail when devmaster daemon is running.
+         */
         let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
         if dev.trigger(DeviceAction::Change).is_err() {
             return;
@@ -73,9 +76,9 @@ mod test {
             let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
 
             /* Trigger more than the number of workers. */
-            dev.trigger(DeviceAction::Change).unwrap();
-            dev.trigger(DeviceAction::Change).unwrap();
-            dev.trigger(DeviceAction::Change).unwrap();
+            dev.trigger(DeviceAction::Remove).unwrap();
+            dev.trigger(DeviceAction::Add).unwrap();
+            dev.trigger(DeviceAction::Add).unwrap();
             dev.trigger(DeviceAction::Change).unwrap();
             dev.trigger(DeviceAction::Change).unwrap();
             dev.trigger(DeviceAction::Change).unwrap();
