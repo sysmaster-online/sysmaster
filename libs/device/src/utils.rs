@@ -11,12 +11,14 @@
 // See the Mulan PSL v2 for more details.
 
 //! utilities for device operation
-use nix::errno::Errno;
-
 use crate::{error::*, Device};
-use loopdev::*;
-use std::path::PathBuf;
+use nix::errno::Errno;
 use std::{cmp::Ordering, fmt::Debug, fs::DirEntry, path::Path};
+
+#[cfg(feature = "loopdev")]
+use loopdev::*;
+#[cfg(feature = "loopdev")]
+use std::path::PathBuf;
 
 /// compare sound device
 pub(crate) fn sound_device_compare(devpath_a: &str, devpath_b: &str) -> Ordering {
@@ -106,11 +108,13 @@ pub(crate) fn readlink_value<P: AsRef<Path> + Debug>(path: P) -> Result<String, 
 }
 
 /// loop device
+#[cfg(feature = "loopdev")]
 pub struct LoopDev {
     tmpfile: String,
     lodev: LoopDevice,
 }
 
+#[cfg(feature = "loopdev")]
 impl LoopDev {
     /// create a temporate file with specific size
     #[allow(dead_code)]
@@ -194,6 +198,7 @@ impl LoopDev {
     }
 }
 
+#[cfg(feature = "loopdev")]
 impl Drop for LoopDev {
     fn drop(&mut self) {
         let _ = self.lodev.detach();

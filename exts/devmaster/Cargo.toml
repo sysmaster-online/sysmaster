@@ -35,7 +35,7 @@ basic = { path = "../../libs/basic", default-features = false, features = [
     "time_util",
 ] }
 blkid_rs = { path = "../../libs/blkid_rs" }
-device = { path = "../../libs/device" }
+device = { path = "../../libs/device", default-features = false }
 event = { path = "../../libs/event" }
 input_event_codes_rs = { path = "../../libs/input_event_codes_rs" }
 kmod_rs = { path = "../../libs/kmod_rs" }
@@ -79,3 +79,6 @@ fnmatch-sys = "1.0.0"
 
 [build-dependencies]
 basic = { path = "../../libs/basic", features = ["cargo"] }
+
+[dev-dependencies]
+device = { path = "../../libs/device", features = ["loopdev"] }

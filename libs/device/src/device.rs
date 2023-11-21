@@ -2843,16 +2843,17 @@ impl PartialEq for Device {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::OpenOptions;
-    use std::panic::catch_unwind;
-
     use crate::{
         device::*,
         device_enumerator::{DeviceEnumerationType, DeviceEnumerator},
-        utils::LoopDev,
     };
     use basic::IN_SET;
     use libc::S_IFBLK;
+    use std::fs::OpenOptions;
+    use std::panic::catch_unwind;
+
+    #[cfg(feature = "loopdev")]
+    use crate::utils::LoopDev;
 
     fn compare(dev1: &Device, dev2: &Device) -> bool {
         let syspath_1 = dev1.get_syspath().unwrap();

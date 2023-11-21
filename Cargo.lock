@@ -377,6 +377,7 @@ version = "0.5.1"
 dependencies = [
  "basic",
  "bitflags",
+ "device",
  "event",
  "fnmatch-sys",
  "libc",
