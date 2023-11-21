@@ -2390,6 +2390,8 @@ impl Device {
     pub fn shallow_clone(&self) -> Result<Device, Error> {
         let device = Self::default();
 
+        device.set_base_path(self.base_path.borrow().as_str());
+
         let syspath = self.get_syspath()?;
 
         device.set_syspath(&syspath, false)?;
