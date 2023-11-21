@@ -1724,7 +1724,7 @@ impl RuleToken {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use basic::fs_util::touch_file;
     use log::init_log;
     use log::Level;
@@ -1736,7 +1736,7 @@ mod tests {
     use std::panic::catch_unwind;
     use std::{fs, path::Path};
 
-    fn create_tmp_rules(dir: &'static str, file: &str, content: &str, truncate: bool) {
+    pub(crate) fn create_tmp_file(dir: &'static str, file: &str, content: &str, truncate: bool) {
         assert!(fs::create_dir_all(dir).is_ok());
         let s = format!("{}/{}", dir, file);
         let p = Path::new(&s);
@@ -1821,7 +1821,7 @@ mod tests {
         ];
 
         for &content in legal_rule.iter() {
-            create_tmp_rules(
+            create_tmp_file(
                 "/tmp/devmaster/test_load_rules",
                 "00-test.rules",
                 content,
@@ -1954,7 +1954,7 @@ mod tests {
         ];
 
         for content in illegal_rule.iter() {
-            create_tmp_rules(
+            create_tmp_file(
                 "/tmp/devmaster/test_load_rules_panic",
                 "00-test.rules",
                 content,
@@ -1990,7 +1990,7 @@ mod tests {
         let illegal = vec!["OWNER=\"xxxx\"", "GROUP=\"xxxx\""];
 
         for &content in legal.iter() {
-            create_tmp_rules(
+            create_tmp_file(
                 "/tmp/devmaster/test_resolve_name_time",
                 "00-test.rules",
                 content,
@@ -2004,7 +2004,7 @@ mod tests {
         }
 
         for &content in illegal.iter() {
-            create_tmp_rules(
+            create_tmp_file(
                 "/tmp/devmaster/test_resolve_name_time",
                 "00-test.rules",
                 content,
