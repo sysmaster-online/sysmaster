@@ -1736,14 +1736,24 @@ mod tests {
     use std::panic::catch_unwind;
     use std::{fs, path::Path};
 
-    fn create_tmp_rules(dir: &'static str, file: &str, content: &str) {
+    fn create_tmp_rules(dir: &'static str, file: &str, content: &str, truncate: bool) {
         assert!(fs::create_dir_all(dir).is_ok());
-        assert!(fs::write(format!("{}/{}", dir, file), content,).is_ok());
+        let s = format!("{}/{}", dir, file);
+        let p = Path::new(&s);
+        assert!(fs::write(p, content,).is_ok());
+        let mut f = fs::OpenOptions::new()
+            .write(true)
+            .truncate(truncate)
+            .open(p)
+            .unwrap();
+        f.write_all(content.as_bytes()).unwrap();
+        f.flush().unwrap();
+        while !p.exists() {}
     }
 
     fn clear_tmp_rules(dir: &'static str) {
         if Path::new(dir).exists() {
-            assert!(fs::remove_dir_all(dir).is_ok());
+            fs::remove_dir_all(dir).unwrap();
         }
     }
 
@@ -1758,7 +1768,7 @@ mod tests {
             0,
             false,
         );
-        clear_tmp_rules("/tmp/devmaster/rules");
+        clear_tmp_rules("/tmp/devmaster/test_load_rules");
 
         let legal_rule = vec![
             "ACTION == \"change\", SYMLINK += \"test1\"", // Test legal rules.
@@ -1810,23 +1820,21 @@ mod tests {
             "SECLABEL{x}:=\"$hello\"", // Illegal placeholder in value will throw warning rather than panic.
         ];
 
-        create_tmp_rules("/tmp/devmaster/rules", "00-test.rules", "");
-
         for &content in legal_rule.iter() {
-            let mut f = fs::OpenOptions::new()
-                .write(true)
-                .truncate(true)
-                .open("/tmp/devmaster/rules/00-test.rules")
-                .unwrap();
-            f.write_all(content.as_bytes()).unwrap();
+            create_tmp_rules(
+                "/tmp/devmaster/test_load_rules",
+                "00-test.rules",
+                content,
+                true,
+            );
 
             let _ = Rules::load_rules(
-                vec!["/tmp/devmaster/rules".to_string()],
+                vec!["/tmp/devmaster/test_load_rules".to_string()],
                 ResolveNameTime::Early,
             );
         }
 
-        clear_tmp_rules("/tmp/devmaster/rules");
+        clear_tmp_rules("/tmp/devmaster/test_load_rules");
     }
 
     #[test]
@@ -1840,7 +1848,7 @@ mod tests {
             0,
             false,
         );
-        clear_tmp_rules("/tmp/devmaster/rules");
+        clear_tmp_rules("/tmp/devmaster/test_load_rules_panic");
 
         let illegal_rule = vec![
             "action==\"change\"",       // Error in State::Pre
@@ -1945,26 +1953,24 @@ mod tests {
             "XXX=\"xxx\"",     // Invalid token key.
         ];
 
-        create_tmp_rules("/tmp/devmaster/rules", "00-test.rules", "");
-
         for content in illegal_rule.iter() {
-            let mut f = fs::OpenOptions::new()
-                .write(true)
-                .truncate(true)
-                .open("/tmp/devmaster/rules/00-test.rules")
-                .unwrap();
-            f.write_all(content.as_bytes()).unwrap();
+            create_tmp_rules(
+                "/tmp/devmaster/test_load_rules_panic",
+                "00-test.rules",
+                content,
+                true,
+            );
 
             assert!(catch_unwind(|| {
                 let _ = Rules::load_rules(
-                    vec!["/tmp/devmaster/rules".to_string()],
+                    vec!["/tmp/devmaster/test_load_rules_panic".to_string()],
                     ResolveNameTime::Early,
                 );
             })
             .is_err());
         }
 
-        clear_tmp_rules("/tmp/devmaster/rules");
+        clear_tmp_rules("/tmp/devmaster/test_load_rules_panic");
     }
 
     #[test]
@@ -1978,50 +1984,48 @@ mod tests {
             0,
             false,
         );
-        clear_tmp_rules("/tmp/devmaster/rules");
+        clear_tmp_rules("/tmp/devmaster/test_resolve_name_time");
 
         let legal = vec!["OWNER=\"root\"", "GROUP=\"root\""];
         let illegal = vec!["OWNER=\"xxxx\"", "GROUP=\"xxxx\""];
 
-        create_tmp_rules("/tmp/devmaster/rules", "00-test.rules", "");
-
         for &content in legal.iter() {
-            let mut f = fs::OpenOptions::new()
-                .write(true)
-                .truncate(true)
-                .open("/tmp/devmaster/rules/00-test.rules")
-                .unwrap();
-            f.write_all(content.as_bytes()).unwrap();
+            create_tmp_rules(
+                "/tmp/devmaster/test_resolve_name_time",
+                "00-test.rules",
+                content,
+                true,
+            );
 
             let _ = Rules::load_rules(
-                vec!["/tmp/devmaster/rules".to_string()],
+                vec!["/tmp/devmaster/test_resolve_name_time".to_string()],
                 ResolveNameTime::Early,
             );
         }
 
         for &content in illegal.iter() {
-            let mut f = fs::OpenOptions::new()
-                .write(true)
-                .truncate(true)
-                .open("/tmp/devmaster/rules/00-test.rules")
-                .unwrap();
-            f.write_all(content.as_bytes()).unwrap();
+            create_tmp_rules(
+                "/tmp/devmaster/test_resolve_name_time",
+                "00-test.rules",
+                content,
+                true,
+            );
 
             let _ = Rules::load_rules(
-                vec!["/tmp/devmaster/rules".to_string()],
+                vec!["/tmp/devmaster/test_resolve_name_time".to_string()],
                 ResolveNameTime::Late,
             );
 
             assert!(catch_unwind(|| {
                 let _ = Rules::load_rules(
-                    vec!["/tmp/devmaster/rules".to_string()],
+                    vec!["/tmp/devmaster/test_resolve_name_time".to_string()],
                     ResolveNameTime::Early,
                 );
             })
             .is_err());
         }
 
-        clear_tmp_rules("/tmp/devmaster/rules");
+        clear_tmp_rules("/tmp/devmaster/test_resolve_name_time");
     }
 
     #[test]
@@ -2330,11 +2334,11 @@ mod tests {
 
     #[test]
     fn test_parse_rules() {
-        create_dir_all("/tmp/devmaster/rules").unwrap();
+        create_dir_all("/tmp/devmaster/test_parse_rules").unwrap();
 
         /* Normal rule file. */
         touch_file(
-            "/tmp/devmaster/rules/00-a.rules",
+            "/tmp/devmaster/test_parse_rules/00-a.rules",
             false,
             Some(0o777),
             None,
@@ -2342,10 +2346,17 @@ mod tests {
         )
         .unwrap();
         /* Skip parsing the file with invalid suffix. */
-        touch_file("/tmp/devmaster/rules/01-b", false, Some(0o777), None, None).unwrap();
+        touch_file(
+            "/tmp/devmaster/test_parse_rules/01-b",
+            false,
+            Some(0o777),
+            None,
+            None,
+        )
+        .unwrap();
         /* Failed to parse the file as it is not readable. */
         touch_file(
-            "/tmp/devmaster/rules/02-c.rules",
+            "/tmp/devmaster/test_parse_rules/02-c.rules",
             false,
             Some(0o000),
             None,
@@ -2354,21 +2365,25 @@ mod tests {
         .unwrap();
 
         let rules = Arc::new(RwLock::new(Rules::new(
-            vec!["/tmp/devmaster/rules".to_string()],
+            vec!["/tmp/devmaster/test_parse_rules".to_string()],
             ResolveNameTime::Never,
         )));
 
-        // Rules::parse_rules(Arc::new(RwLock::new(rules)));
-
-        RuleFile::load_file("/tmp/devmaster/rules/00-a.rules".to_string(), rules.clone());
+        RuleFile::load_file(
+            "/tmp/devmaster/test_parse_rules/00-a.rules".to_string(),
+            rules.clone(),
+        );
 
         if nix::unistd::getuid().as_raw() != 0 {
             assert!(catch_unwind(|| {
-                RuleFile::load_file("/tmp/devmaster/rules/02-c.rules".to_string(), rules.clone());
+                RuleFile::load_file(
+                    "/tmp/devmaster/test_parse_rules/02-c.rules".to_string(),
+                    rules.clone(),
+                );
             })
             .is_err());
         }
 
-        remove_dir_all("/tmp/devmaster").unwrap();
+        remove_dir_all("/tmp/devmaster/test_parse_rules").unwrap();
     }
 }
