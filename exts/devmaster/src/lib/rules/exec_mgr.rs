@@ -2140,8 +2140,13 @@ impl RuleLine {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::remove_file;
+
     use super::*;
+    use crate::rules::rules_load::tests::create_tmp_file;
     use crate::rules::FormatSubstitutionType;
+    use device::utils::LoopDev;
+    use log::{init_log, Level};
 
     #[test]
     #[ignore]
@@ -2293,5 +2298,917 @@ mod tests {
         assert_eq!(unit.apply_format("$id", false).unwrap(), "");
         assert_eq!(unit.apply_format("$parent", false).unwrap(), "sda");
         assert_eq!(unit.apply_format("$devnode", false).unwrap(), "/dev/sda1");
+    }
+
+    impl ExecuteManager {
+        #[allow(clippy::too_many_arguments)]
+        fn test_apply_one_rule_token(
+            &self,
+            key: &str,
+            attr: &str,
+            op: &str,
+            value: &str,
+            rules: Arc<RwLock<Rules>>,
+            rule_line: Arc<RwLock<Option<RuleLine>>>,
+            device: Rc<RefCell<Device>>,
+        ) -> Result<bool> {
+            let token = RuleToken::parse_token(
+                key.to_string(),
+                if attr.is_empty() {
+                    None
+                } else {
+                    Some(attr.to_string())
+                },
+                op.to_string(),
+                value.to_string(),
+                rules,
+                rule_line,
+            )
+            .unwrap();
+            *self.current_rule_token.borrow_mut() = Arc::new(RwLock::new(Some(token)));
+            self.apply_rule_token(device)
+        }
+    }
+
+    #[test]
+    fn test_apply_rules() {
+        init_log(
+            "test_apply_rules",
+            Level::Debug,
+            vec!["console"],
+            "",
+            0,
+            0,
+            false,
+        );
+
+        let device = Rc::new(RefCell::new(
+            Device::from_subsystem_sysname("net", "lo").unwrap(),
+        ));
+        device.borrow().set_base_path("/tmp/devmaster");
+        let rules = Arc::new(RwLock::new(Rules::new(vec![], ResolveNameTime::Early)));
+        let rule_file = Arc::new(RwLock::new(Some(RuleFile::new("".to_string()))));
+        let rule_line = Arc::new(RwLock::new(Some(RuleLine::new(
+            "".to_string(),
+            0,
+            rule_file,
+        ))));
+        let unit = ExecuteUnit::new(device.clone());
+        let mgr = ExecuteManager::new(Arc::new(RwLock::new(Cache::new(vec![], vec![]))));
+        *mgr.current_unit.borrow_mut() = Some(unit);
+
+        device.borrow().set_action_from_string("change").unwrap();
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "ACTION",
+                "",
+                "==",
+                "change",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        assert!(!mgr
+            .test_apply_one_rule_token(
+                "ACTION",
+                "",
+                "==",
+                "add",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "DEVPATH",
+                "",
+                "==",
+                "*lo",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(!mgr
+            .test_apply_one_rule_token(
+                "ENV",
+                "xxx",
+                "==",
+                "xxx",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        device.borrow().add_tag("xxx", true);
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "TAG",
+                "",
+                "==",
+                "xxx",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "SUBSYSTEM",
+                "",
+                "==",
+                "net",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "TEST",
+                "444",
+                "==",
+                "[net/lo]ifindex",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "TEST",
+                "644",
+                "==",
+                "queues/*/rps_cpus",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "TEST",
+                "444",
+                "==",
+                "ifindex",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "TEST",
+                "",
+                "!=",
+                "asfsdfa",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(!mgr
+            .test_apply_one_rule_token(
+                "TEST",
+                "444",
+                "==",
+                "$attr",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        create_tmp_file(
+            "/tmp",
+            "property",
+            "HELLO=WORLD
+GOOD=LUCK",
+            true,
+        );
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "IMPORT",
+                "file",
+                "==",
+                "/tmp/property",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert_eq!(
+            &device.borrow().get_property_value("HELLO").unwrap(),
+            "WORLD"
+        );
+
+        assert_eq!(&device.borrow().get_property_value("GOOD").unwrap(), "LUCK");
+
+        remove_file("/tmp/property").unwrap();
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "IMPORT",
+                "program",
+                "==",
+                "echo WATER=FLOW",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        assert_eq!(
+            &device.borrow().get_property_value("WATER").unwrap(),
+            "FLOW"
+        );
+
+        create_tmp_file(
+            "/tmp/devmaster/data",
+            &device.borrow().get_device_id().unwrap(),
+            "E:BLACK=PINK",
+            true,
+        );
+        mgr.current_unit
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .clone_device_db()
+            .unwrap();
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "IMPORT",
+                "db",
+                "==",
+                "BLACK",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        assert_eq!(
+            &device.borrow().get_property_value("BLACK").unwrap(),
+            "PINK"
+        );
+        remove_file(&format!(
+            "/tmp/devmaster/data/{}",
+            device.borrow().get_device_id().unwrap()
+        ))
+        .unwrap();
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "IMPORT",
+                "cmdline",
+                "==",
+                "root",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        assert!(!device
+            .borrow()
+            .get_property_value("root")
+            .unwrap()
+            .is_empty());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "IMPORT",
+                "cmdline",
+                "!=",
+                "asdfasdf",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(!mgr
+            .test_apply_one_rule_token(
+                "PROGRAM",
+                "",
+                "==",
+                "echo $attr",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(!mgr
+            .test_apply_one_rule_token(
+                "PROGRAM",
+                "",
+                "==",
+                "cat /tmp/test_nonexist",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(!mgr
+            .test_apply_one_rule_token(
+                "PROGRAM",
+                "",
+                "==",
+                "asdfasdf",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "PROGRAM",
+                "",
+                "==",
+                "echo hello",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "RESULT",
+                "",
+                "==",
+                "hello",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "OPTIONS",
+                "",
+                "+=",
+                "string_escape=none",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "OPTIONS",
+                "",
+                "+=",
+                "string_escape=replace",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "OPTIONS",
+                "",
+                "+=",
+                "db_persist",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "OPTIONS",
+                "",
+                "+=",
+                "db_persist",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "OPTIONS",
+                "",
+                "+=",
+                "link_priority=1",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "OWNER",
+                "",
+                "=",
+                "0",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "GROUP",
+                "",
+                "=",
+                "0",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "MODE",
+                "",
+                "=",
+                "777",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        rules.write().unwrap().resolve_name_time = ResolveNameTime::Late;
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "OWNER",
+                "",
+                "=",
+                "root",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "GROUP",
+                "",
+                "=",
+                "root",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        mgr.test_apply_one_rule_token(
+            "ENV",
+            "mode",
+            "=",
+            "777",
+            rules.clone(),
+            rule_line.clone(),
+            device.clone(),
+        )
+        .unwrap();
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "MODE",
+                "",
+                "=",
+                "$env{mode}",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        rules.write().unwrap().resolve_name_time = ResolveNameTime::Early;
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "OWNER",
+                "",
+                ":=",
+                "0",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "GROUP",
+                "",
+                ":=",
+                "0",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "MODE",
+                "",
+                ":=",
+                "777",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "OWNER",
+                "",
+                "=",
+                "0",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "GROUP",
+                "",
+                "=",
+                "0",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "MODE",
+                "",
+                "=",
+                "777",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "ENV",
+                "BLACK",
+                "=",
+                "YELLOW",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        assert_eq!(
+            &device.borrow().get_property_value("BLACK").unwrap(),
+            "YELLOW"
+        );
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "TAG",
+                "",
+                "+=",
+                "aaa",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        assert!(device.borrow().has_tag("aaa").unwrap());
+        assert!(device.borrow().has_current_tag("aaa").unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "TAG",
+                "",
+                "-=",
+                "aaa",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        assert!(device.borrow().has_tag("aaa").unwrap());
+        assert!(!device.borrow().has_current_tag("aaa").unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "TAG",
+                "",
+                "=",
+                "bbb",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        assert!(!device.borrow().has_tag("aaa").unwrap());
+        assert!(!device.borrow().has_current_tag("aaa").unwrap());
+        assert!(device.borrow().has_tag("bbb").unwrap());
+        assert!(device.borrow().has_current_tag("bbb").unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "NAME",
+                "",
+                ":=",
+                "test",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "NAME",
+                "",
+                "=",
+                "test",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        if mgr
+            .test_apply_one_rule_token(
+                "ATTR",
+                "ifalias",
+                "=",
+                "test",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .is_ok()
+        {
+            assert!(mgr
+                .test_apply_one_rule_token(
+                    "ATTR",
+                    "ifalias",
+                    "==",
+                    "test",
+                    rules.clone(),
+                    rule_line.clone(),
+                    device.clone(),
+                )
+                .unwrap());
+        }
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "RUN",
+                "builtin",
+                "+=",
+                "path_id",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "ENV",
+                "PAPER",
+                "+=",
+                "",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "ENV",
+                "PAPER",
+                "==",
+                "",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "ENV",
+                "PAPER",
+                "=",
+                "",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "ENV",
+                "PAPER",
+                "==",
+                "",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "ENV",
+                "PAPER",
+                "+=",
+                "BOOK",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+        assert_eq!(
+            &device.borrow().get_property_value("PAPER").unwrap(),
+            "BOOK"
+        );
+
+        assert!(!mgr
+            .test_apply_one_rule_token(
+                "IMPORT",
+                "builtin",
+                "==",
+                "path_id $attr",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "TAG",
+                "",
+                "+=",
+                "$env",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "NAME",
+                "",
+                "=",
+                "$env",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "ATTR",
+                "ifalias",
+                "=",
+                "$env",
+                rules.clone(),
+                rule_line.clone(),
+                device.clone(),
+            )
+            .unwrap());
+
+        assert!(mgr
+            .test_apply_one_rule_token(
+                "RUN",
+                "",
+                "+=",
+                "$env",
+                rules.clone(),
+                rule_line.clone(),
+                device,
+            )
+            .unwrap());
+
+        // /* TODO rules */
+        // let rules_c = rules.clone();
+        // let rule_line_c = rule_line.clone();
+        // let device_c = device.clone();
+        // assert!(catch_unwind(move || {
+        //     let _ = mgr.test_apply_one_rule_token(
+        //         "CONST",
+        //         "virt",
+        //         "==",
+        //         "xxx",
+        //         rules_c,
+        //         rule_line_c,
+        //         device_c,
+        //     );
+        // })
+        // .is_err());
+
+        match LoopDev::new("/tmp/test_apply_rules", 1024 * 1024 * 10) {
+            Ok(lo) => {
+                let devpath = lo.get_device_path().unwrap();
+                let dev = Rc::new(RefCell::new(
+                    Device::from_path(devpath.to_str().unwrap()).unwrap(),
+                ));
+                dev.borrow().set_base_path("/tmp/devmaster");
+
+                dev.borrow().add_devlink("/dev/test").unwrap();
+                assert!(mgr
+                    .test_apply_one_rule_token(
+                        "SYMLINK",
+                        "",
+                        "==",
+                        "/dev/test",
+                        rules.clone(),
+                        rule_line.clone(),
+                        dev.clone(),
+                    )
+                    .unwrap());
+                assert!(mgr
+                    .test_apply_one_rule_token(
+                        "SYMLINK",
+                        "",
+                        "!=",
+                        "/dev/xxx",
+                        rules.clone(),
+                        rule_line.clone(),
+                        dev.clone(),
+                    )
+                    .unwrap());
+                assert!(mgr
+                    .test_apply_one_rule_token(
+                        "SYMLINK",
+                        "",
+                        "+=",
+                        "xxx",
+                        rules.clone(),
+                        rule_line.clone(),
+                        dev.clone(),
+                    )
+                    .unwrap());
+                assert!(dev.borrow().has_devlink("/dev/xxx"));
+
+                assert!(mgr
+                    .test_apply_one_rule_token(
+                        "OPTIONS",
+                        "",
+                        "+=",
+                        "watch",
+                        rules.clone(),
+                        rule_line.clone(),
+                        dev.clone(),
+                    )
+                    .unwrap());
+
+                assert!(mgr
+                    .test_apply_one_rule_token(
+                        "OPTIONS",
+                        "",
+                        ":=",
+                        "watch",
+                        rules.clone(),
+                        rule_line.clone(),
+                        dev.clone(),
+                    )
+                    .unwrap());
+
+                assert!(mgr
+                    .test_apply_one_rule_token("OPTIONS", "", "=", "watch", rules, rule_line, dev,)
+                    .unwrap());
+            }
+            Err(e) => {
+                assert!(e.is_errno(nix::Error::EACCES) || e.is_errno(nix::Error::EBUSY));
+            }
+        }
     }
 }
