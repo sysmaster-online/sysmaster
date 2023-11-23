@@ -12,6 +12,7 @@
 
 //! utilities for device operation
 use crate::{error::*, Device};
+use basic::ResultExt;
 use nix::errno::Errno;
 use std::{cmp::Ordering, fmt::Debug, fs::DirEntry, path::Path};
 
@@ -94,6 +95,10 @@ pub(crate) fn relevant_sysfs_subdir(de: &DirEntry) -> bool {
 
 /// chase the symlink and get the file name
 pub(crate) fn readlink_value<P: AsRef<Path> + Debug>(path: P) -> Result<String, Error> {
+    let _ = std::fs::symlink_metadata(&path).context(Io {
+        msg: format!("readlink_value failed: invalid symlink {:?}", path),
+    })?;
+
     let abs_path = match std::fs::canonicalize(path.as_ref()) {
         Ok(ret) => ret,
         Err(e) => {

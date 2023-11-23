@@ -2396,14 +2396,15 @@ impl Device {
 
         device.set_syspath(&syspath, false)?;
 
-        let subsystem = self.get_subsystem()?;
+        /* Some devices, such as /sys/devices/platform, do not have subsystem. */
+        if let Ok(subsystem) = self.get_subsystem() {
+            device.set_subsystem(&subsystem);
 
-        device.set_subsystem(&subsystem);
-
-        if subsystem == "drivers" {
-            device
-                .driver_subsystem
-                .replace(self.driver_subsystem.borrow().clone());
+            if subsystem == "drivers" {
+                device
+                    .driver_subsystem
+                    .replace(self.driver_subsystem.borrow().clone());
+            }
         }
 
         if let Ok(ifindex) = self.get_property_value("IFINDEX") {
@@ -3506,19 +3507,31 @@ mod tests {
 
     #[test]
     fn test_shallow_clone() {
-        #[inline]
-        fn inner_test(dev: &mut Device) -> Result<(), Error> {
-            let s1 = dev.get_syspath().unwrap();
+        /* Enumerator merely collect devices with valid subsystems,
+         * while get_parent method may not, e.g., /sys/devices/platform.
+         */
+        let mut e = DeviceEnumerator::new();
+        e.set_enumerator_type(DeviceEnumerationType::All);
 
-            let dev_clone = dev.shallow_clone().unwrap();
+        for mut dev in e.iter() {
+            let dev_clone = dev.borrow().shallow_clone().unwrap();
+            dev_clone.get_syspath().unwrap();
+            dev_clone.get_subsystem().unwrap();
 
-            assert_eq!(s1, dev_clone.get_syspath().unwrap());
+            loop {
+                let ret = dev.borrow().get_parent();
 
-            Ok(())
-        }
+                if let Ok(parent) = ret {
+                    parent.borrow().get_syspath().unwrap();
+                    if let Err(e) = parent.borrow().get_subsystem() {
+                        assert_eq!(e.get_errno(), Errno::ENOENT);
+                    }
+                    dev = parent;
+                    continue;
+                }
 
-        if let Err(e) = LoopDev::inner_process("/tmp/test_shallow_clone", 1024 * 10, inner_test) {
-            assert!(e.is_errno(nix::Error::EACCES) || e.is_errno(nix::Error::EBUSY));
+                break;
+            }
         }
     }
 
