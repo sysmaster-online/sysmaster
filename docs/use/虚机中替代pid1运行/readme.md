@@ -51,14 +51,14 @@ menuentry 'Boot with sysmaster' --class openeuler --class gnu-linux --class gnu 
           search --no-floppy --fs-uuid --set=root 2a438da5-a305-4682-a45f-5cee6f02c3c6
         fi
         echo    'Loading Linux 5.10.0-60.18.0.50.oe2203.aarch64 ...'
-        linux   /vmlinuz-5.10.0-60.18.0.50.oe2203.aarch64 root=/dev/mapper/openeuler-root rw rd.lvm.lv=openeuler/root rd.lvm.lv=openeuler/swap video=VGA-1:640x480-32@60me console=tty0 crashkernel=1024M,high smmu.bypassdev=0x1000:0x17 smmu.bypassdev=0x1000:0x15 video=efifb:off init=/init
+        linux   /vmlinuz-5.10.0-60.18.0.50.oe2203.aarch64 root=/dev/mapper/openeuler-root rw rd.lvm.lv=openeuler/root rd.lvm.lv=openeuler/swap video=VGA-1:640x480-32@60me console=tty0 crashkernel=1024M,high smmu.bypassdev=0x1000:0x17 smmu.bypassdev=0x1000:0x15 video=efifb:off init=/init plymouth.enable=0
         echo    'Loading initial ramdisk ...'
         initrd  /initrd_withoutsd.img
 }
 ...
 ```
 
-3. 增加启动项时，拷贝一份原有启动项，并做以下四处修改：
+3. 增加启动项时，拷贝一份原有启动项，并做以下几处修改：
 
 - 新增启动项需要避免和原启动项重名，例如上述案例中设置为`Boot with sysmaster`：
 
@@ -69,6 +69,8 @@ menuentry 'Boot with sysmaster'
 - 内核启动参数需要修改`root=/dev/mapper/openeuler-root ro`为`root=/dev/mapper/openeuler-root rw`。因为目前`sysmaster`并未实现在切根后重新挂载根分区的功能，所以小系统中的根分区需要挂载成`rw`。
 
 - 启动参数中需要显示指定一号进程`init=/init`，在安装脚本`install_sysmaster.sh`中，我们会生成`/init`软链接指向`sysmaster-init`，从而避免内核以`systemd`作为1号进程启动。
+
+- 如果环境上安装了plymouth，需要添加`plymouth.enable=0`禁用plymouth，否则plymouth进程会残留到大系统影响用户在虚拟终端正常登录。
 
 - `initrd`项需要对应修改为`initrd  /initrd_withoutsd.img`，此`img`为步骤1生成。
 
