@@ -987,3 +987,258 @@ fn get_subst_type(
     *idx = idx_b;
     Ok(Some((subst, attr)))
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::rules::rules_load::tests::create_tmp_file;
+    use device::utils::*;
+    use nix::sys::stat::{major, minor};
+    use std::cell::RefCell;
+    use std::fs::remove_dir_all;
+    use std::path::Path;
+    use std::rc::Rc;
+
+    #[test]
+    fn test_update_devnode() {
+        if let Err(e) = LoopDev::inner_process(
+            "/tmp/test_update_devnode_tmpfile",
+            1024 * 1024 * 10,
+            |dev| {
+                let dev = Rc::new(RefCell::new(dev.shallow_clone().unwrap()));
+                let id = dev.borrow().get_device_id().unwrap();
+                let devnum = dev.borrow().get_devnum().unwrap();
+                let major_minor = format!("{}:{}", major(devnum), minor(devnum));
+
+                create_tmp_file("/tmp/test_update_devnode/data", &id, "", true);
+
+                dev.borrow().sealed.replace(true);
+                dev.borrow().set_base_path("/tmp/test_update_devnode");
+                dev.borrow().set_devgid("1").unwrap();
+                dev.borrow().set_devuid("1").unwrap();
+                dev.borrow().set_devmode("666").unwrap();
+                dev.borrow().add_devlink("test_update_devnode/bbb").unwrap();
+
+                let mut unit = ExecuteUnitData::new(dev.clone());
+                unit.clone_device_db().unwrap();
+
+                unit.update_devnode(&HashMap::new()).unwrap();
+                /* Record the devlink in db */
+                dev.borrow().update_db().unwrap();
+
+                let p = Path::new("/dev/test_update_devnode/bbb");
+                let p_block_s = format!("/dev/block/{}", major_minor);
+                let prior_p_s = format!("/run/devmaster/links/test_update_devnode\\x2fbbb/{}", id);
+                let prior_p = Path::new(&prior_p_s);
+                assert!(p.exists());
+                assert!(Path::new(&p_block_s).exists());
+                assert!(p
+                    .canonicalize()
+                    .unwrap()
+                    .ends_with(&dev.borrow().get_sysname().unwrap()));
+                let _ = prior_p.symlink_metadata().unwrap(); // Test symlink exists.
+
+                let new_dev = Rc::new(RefCell::new(Device::from_device_id(&id).unwrap()));
+                new_dev.borrow().sealed.replace(true);
+                new_dev.borrow().set_base_path("/tmp/test_update_devnode");
+                new_dev.borrow().set_devgid("0").unwrap();
+                new_dev.borrow().set_devuid("0").unwrap();
+                new_dev.borrow().set_devmode("600").unwrap();
+
+                let mut unit = ExecuteUnitData::new(new_dev);
+                /* See the devlink in db, but it is absent in the current device object.
+                 *
+                 * Then update_devnode method will remove the devlink.
+                 */
+                unit.clone_device_db().unwrap();
+                unit.update_devnode(&HashMap::new()).unwrap();
+
+                assert!(!Path::new("/dev/test_update_devnode/bbb").exists());
+                assert!(Path::new(&p_block_s).exists());
+                let _ = prior_p.symlink_metadata().unwrap_err(); // Test symlink does not exists.
+
+                remove_dir_all("/tmp/test_update_devnode").unwrap();
+
+                /* Non-block devices do not have device nodes, thus update_devnode method will do nothing. */
+                let lo = Rc::new(RefCell::new(
+                    Device::from_subsystem_sysname("net", "lo").unwrap(),
+                ));
+
+                let mut unit = ExecuteUnitData::new(lo);
+                unit.update_devnode(&HashMap::new()).unwrap();
+
+                /* Cover error paths when uid, gid or mode is not set. */
+                let dev = Rc::new(RefCell::new(Device::from_device_id(&id).unwrap()));
+                dev.borrow().sealed.replace(true);
+                dev.borrow().add_devlink("test_update_devnode/xxx").unwrap();
+
+                let mut unit = ExecuteUnitData::new(dev.clone());
+                unit.clone_device_db().unwrap();
+                unit.update_devnode(&HashMap::new()).unwrap();
+
+                let p = Path::new("/dev/test_update_devnode/xxx");
+                let prior_p_s = format!("/run/devmaster/links/test_update_devnode\\x2fxxx/{}", id);
+                assert!(p.exists());
+                assert!(Path::new(&p_block_s).exists());
+                assert!(p
+                    .canonicalize()
+                    .unwrap()
+                    .ends_with(&dev.borrow().get_sysname().unwrap()));
+                let _ = Path::new(&prior_p_s).symlink_metadata().unwrap(); // Test symlink exists.
+
+                cleanup_node(dev).unwrap();
+
+                assert!(!p.exists());
+                assert!(!Path::new(&p_block_s).exists());
+                let _ = Path::new(&prior_p_s).symlink_metadata().unwrap_err(); // Test symlink exists.
+
+                Ok(())
+            },
+        ) {
+            assert!(e.is_errno(nix::Error::EACCES) || e.is_errno(nix::Error::EBUSY));
+        }
+    }
+
+    #[test]
+    fn test_subst_format() {
+        if let Err(e) =
+            LoopDev::inner_process("/tmp/test_subst_format_tmpfile", 1024 * 1024 * 10, |dev| {
+                let dev = Rc::new(RefCell::new(dev.shallow_clone().unwrap()));
+                let mut unit = ExecuteUnitData::new(dev.clone());
+                let devnum = dev.borrow().get_devnum().unwrap();
+                let major_minor = format!("{}:{}", major(devnum), minor(devnum));
+                let sysname = dev.borrow().get_sysname().unwrap();
+
+                assert_eq!(
+                    unit.subst_format(FormatSubstitutionType::Attr, Some("dev".to_string()))
+                        .unwrap(),
+                    major_minor
+                );
+
+                assert_eq!(
+                    unit.subst_format(
+                        FormatSubstitutionType::Attr,
+                        Some(format!("[block/{}]dev", sysname))
+                    )
+                    .unwrap(),
+                    major_minor
+                );
+
+                unit.set_parent(Some(Rc::new(RefCell::new(
+                    Device::from_subsystem_sysname("net", "lo").unwrap(),
+                ))));
+
+                /* Get the sysattr of parent device set in unit. */
+                assert_eq!(
+                    unit.subst_format(FormatSubstitutionType::Attr, Some("ifindex".to_string()))
+                        .unwrap(),
+                    "1".to_string()
+                );
+
+                /* Invalid sysattr will be replaced with empty string. */
+                assert!(unit
+                    .subst_format(
+                        FormatSubstitutionType::Attr,
+                        Some("asdfasdfads".to_string())
+                    )
+                    .unwrap()
+                    .is_empty());
+
+                dev.borrow().add_property("hello", "world").unwrap();
+
+                assert_eq!(
+                    unit.subst_format(FormatSubstitutionType::Env, Some("hello".to_string()))
+                        .unwrap(),
+                    "world".to_string()
+                );
+
+                assert!(unit
+                    .subst_format(FormatSubstitutionType::Env, Some("asdfgasd".to_string()))
+                    .unwrap()
+                    .is_empty());
+
+                assert!(unit
+                    .subst_format(FormatSubstitutionType::Driver, None)
+                    .unwrap()
+                    .is_empty());
+
+                assert_eq!(
+                    unit.subst_format(FormatSubstitutionType::Id, None).unwrap(),
+                    "lo".to_string()
+                );
+
+                let major = unit
+                    .subst_format(FormatSubstitutionType::Major, None)
+                    .unwrap();
+                let minor = unit
+                    .subst_format(FormatSubstitutionType::Minor, None)
+                    .unwrap();
+                assert_eq!(format!("{}:{}", major, minor), major_minor);
+
+                unit.program_result = "hello world test".to_string();
+                assert_eq!(
+                    unit.subst_format(FormatSubstitutionType::Result, None)
+                        .unwrap(),
+                    "hello world test".to_string()
+                );
+                assert_eq!(
+                    unit.subst_format(FormatSubstitutionType::Result, Some("0".to_string()))
+                        .unwrap(),
+                    "hello".to_string()
+                );
+                assert_eq!(
+                    unit.subst_format(FormatSubstitutionType::Result, Some("1+".to_string()))
+                        .unwrap(),
+                    "world test".to_string()
+                );
+                unit.subst_format(FormatSubstitutionType::Result, Some("x".to_string()))
+                    .unwrap_err();
+                unit.subst_format(FormatSubstitutionType::Result, Some("x+".to_string()))
+                    .unwrap_err();
+
+                assert!(unit
+                    .subst_format(FormatSubstitutionType::Result, Some("3+".to_string()))
+                    .unwrap()
+                    .is_empty());
+
+                assert_eq!(
+                    unit.subst_format(FormatSubstitutionType::Name, None)
+                        .unwrap(),
+                    sysname
+                );
+
+                unit.name = "test".to_string();
+                assert_eq!(
+                    unit.subst_format(FormatSubstitutionType::Name, None)
+                        .unwrap(),
+                    "test".to_string(),
+                );
+
+                dev.borrow().add_devlink("test").unwrap();
+                dev.borrow().sealed.replace(true);
+                assert_eq!(
+                    unit.subst_format(FormatSubstitutionType::Links, None)
+                        .unwrap(),
+                    "test".to_string(),
+                );
+
+                unit.subst_format(FormatSubstitutionType::Invalid, None)
+                    .unwrap_err();
+
+                Ok(())
+            })
+        {
+            assert!(e.is_errno(nix::Error::EACCES) || e.is_errno(nix::Error::EBUSY));
+        }
+
+        let dev = Rc::new(RefCell::new(
+            Device::from_subsystem_sysname("net", "lo").unwrap(),
+        ));
+        let unit = ExecuteUnitData::new(dev);
+        assert_eq!(
+            unit.subst_format(FormatSubstitutionType::Name, None)
+                .unwrap(),
+            "lo".to_string()
+        );
+    }
+}
