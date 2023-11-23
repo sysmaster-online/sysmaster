@@ -1737,10 +1737,10 @@ pub(crate) mod tests {
     use std::{fs, path::Path};
 
     pub(crate) fn create_tmp_file(dir: &'static str, file: &str, content: &str, truncate: bool) {
-        assert!(fs::create_dir_all(dir).is_ok());
+        fs::create_dir_all(dir).unwrap();
         let s = format!("{}/{}", dir, file);
         let p = Path::new(&s);
-        assert!(fs::write(p, content,).is_ok());
+        fs::write(p, content).unwrap();
         let mut f = fs::OpenOptions::new()
             .write(true)
             .truncate(truncate)
