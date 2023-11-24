@@ -218,9 +218,12 @@ impl RuleToken {
     #[inline]
     pub(crate) fn get_token_content(&self) -> String {
         if let Some(attribute) = self.get_token_attribute() {
-            format!("{}{{{}}}{}{}", self.r#type, attribute, self.op, self.value)
+            format!(
+                "{}{{{}}}{}\"{}\"",
+                self.r#type, attribute, self.op, self.value
+            )
         } else {
-            format!("{}{}{}", self.r#type, self.op, self.value)
+            format!("{}{}\"{}\"", self.r#type, self.op, self.value)
         }
     }
 }
@@ -316,7 +319,7 @@ impl Display for TokenType {
             Self::MatchParentsDriver => "DRIVERS",
             Self::MatchParentsAttr => "ATTRS",
             Self::MatchParentsTag => "TAGS",
-            Self::MatchResult => "RESULTS",
+            Self::MatchResult => "RESULT",
             Self::MatchTest => "TEST",
             Self::MatchProgram => "PROGRAM",
             Self::MatchImportFile
@@ -567,18 +570,6 @@ bitflags! {
     }
 }
 
-// bitflags! {
-//     /// value matching type
-//     pub(crate) struct MatchType: u8 {
-//         /// match empty string
-//         const EMPTY = 1<<0;
-//         /// use shell glob parttern to match
-//         const PATTERN = 1<<1;
-//         /// match "subsystem", "bus", or "class"
-//         const SUBSYSTEM = 1<<2;
-//     }
-// }
-
 /// match type
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
@@ -743,4 +734,88 @@ pub(crate) enum EscapeType {
     Unset,
     None,
     Replace,
+}
+
+#[cfg(test)]
+mod test {
+    use log::{init_log, Level};
+
+    use super::*;
+    use crate::rules::rules_load::tests::create_tmp_file;
+
+    #[test]
+    fn test_rules_display() {
+        init_log(
+            "test_rules_display",
+            Level::Debug,
+            vec!["console"],
+            "",
+            0,
+            0,
+            false,
+        );
+
+        create_tmp_file(
+            "/tmp/test_rules_display/rules.d",
+            "00-test.rules",
+            "
+ACTION==\"change\"
+DEVPATH==\"xxx\"
+KERNEL==\"xxx\"
+SYMLINK==\"xxx\"
+SYMLINK+=\"xxx\"
+NAME==\"xxx\"
+NAME=\"x\"
+ENV{x}=\"x\"
+ENV{x}==\"x\"
+CONST{virt}==\"x\"
+TAG+=\"x\"
+TAG==\"x\"
+SUBSYSTEM==\"x\"
+DRIVER==\"x\"
+ATTR{x}==\"x\"
+ATTR{x}=\"x\"
+SYSCTL{x}==\"x\"
+SYSCTL{x}=\"x\"
+KERNELS==\"x\"
+SUBSYSTEMS==\"x\"
+DRIVERS==\"x\"
+ATTRS{x}==\"x\"
+TAGS==\"x\"
+RESULT==\"x\"
+TEST==\"x\"
+PROGRAM==\"x\"
+IMPORT{file}==\"x\"
+IMPORT{program}==\"echo hello\"
+IMPORT{builtin}==\"path_id\"
+IMPORT{db}==\"x\"
+IMPORT{cmdline}==\"x\"
+IMPORT{parent}==\"x\"
+OPTIONS+=\"string_escape=none\"
+OPTIONS+=\"string_escape=replace\"
+OPTIONS+=\"db_persist\"
+OPTIONS+=\"watch\"
+OPTIONS+=\"link_priority=10\"
+OPTIONS+=\"log_level=1\"
+OPTIONS+=\"static_node=/dev/sda\"
+SECLABEL{x}+=\"x\"
+RUN{builtin}+=\"path_id\"
+RUN{program}+=\"x\"
+GOTO=\"x\"
+LABEL=\"x\"
+",
+            true,
+        );
+
+        let rule = Arc::new(RwLock::new(Rules::new(
+            vec!["/tmp/test_rules_display/rules.d".to_string()],
+            ResolveNameTime::Late,
+        )));
+
+        Rules::parse_rules(rule.clone());
+
+        println!("{}", rule.read().unwrap());
+
+        std::fs::remove_dir_all("/tmp/test_rules_display").unwrap();
+    }
 }
