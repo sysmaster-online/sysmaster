@@ -60,8 +60,8 @@ pub(super) struct SectionSocket {
     pub ListenStream: Vec<String>,
     #[entry(append)]
     pub ListenDatagram: Vec<String>,
-    #[entry(append)]
-    pub ListenNetlink: Vec<String>,
+    #[entry(default = String::new())]
+    pub ListenNetlink: String,
     #[entry(append)]
     pub ListenSequentialPacket: Vec<String>,
     #[entry(append)]
