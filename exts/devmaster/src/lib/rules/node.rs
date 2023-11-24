@@ -702,10 +702,11 @@ pub(crate) fn cleanup_prior_dir() -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use basic::fs_util::is_symlink;
+    use basic::fs_util::{is_symlink, touch_file};
+    use device::device_enumerator::*;
     use device::utils::LoopDev;
     use nix::unistd::unlink;
-    use std::fs::{self, read_link, remove_dir, remove_dir_all};
+    use std::fs::{self, read_link, remove_dir, remove_dir_all, remove_file};
 
     #[test]
     fn test_update_node() {
@@ -814,6 +815,104 @@ mod test {
             Err(e) => {
                 assert!(e.get_errno() == nix::Error::EACCES);
             }
+        }
+    }
+
+    #[test]
+    fn test_escape_prior_dir() {
+        assert_eq!(&escape_prior_dir("aaa/bbb"), "aaa\\x2fbbb");
+        assert_eq!(&escape_prior_dir("aaa\\bbb"), "aaa\\x5cbbb");
+    }
+
+    #[test]
+    fn test_get_prior_dir() {
+        assert_eq!(
+            get_prior_dir("/../xxx").unwrap_err().get_errno(),
+            nix::Error::EINVAL
+        );
+        assert_eq!(
+            get_prior_dir("xxx").unwrap_err().get_errno(),
+            nix::Error::EINVAL
+        );
+    }
+
+    #[test]
+    fn test_prior_dir_read_one() {
+        if let Err(e) =
+            LoopDev::inner_process("/tmp/test_prior_dir_read_one", 1024 * 1024 * 10, |dev| {
+                let devname = dev.get_devname().unwrap();
+                let id = dev.get_device_id().unwrap();
+
+                create_dir_all("/tmp/test_prior_dir_read_one_dir").unwrap();
+
+                let p = Path::new("/tmp/test_prior_dir_read_one_dir");
+
+                let dir = nix::dir::Dir::open(p, OFlag::O_DIRECTORY, Mode::S_IRWXU).unwrap();
+
+                /* Missing link priority. */
+                symlink(
+                    &format!(":{}", devname),
+                    &format!("/tmp/test_prior_dir_read_one_dir/{}", id),
+                    false,
+                )
+                .unwrap();
+
+                prior_dir_read_one(dir.as_raw_fd(), &id).unwrap_err();
+
+                /* Non-existing device node path. */
+                symlink(
+                    "0:xxx",
+                    &format!("/tmp/test_prior_dir_read_one_dir/{}", id),
+                    false,
+                )
+                .unwrap();
+
+                prior_dir_read_one(dir.as_raw_fd(), &id).unwrap_err();
+
+                remove_dir_all("/tmp/test_prior_dir_read_one_dir").unwrap();
+
+                Ok(())
+            })
+        {
+            assert!(e.is_errno(nix::Error::EACCES) || e.is_errno(nix::Error::EBUSY));
+        }
+    }
+
+    #[test]
+    fn test_node_symlink() {
+        if let Err(e) = LoopDev::inner_process("/tmp/test_node_symlink", 1024 * 1024 * 10, |dev| {
+            let dev = Rc::new(RefCell::new(dev.shallow_clone().unwrap()));
+
+            touch_file(
+                "/tmp/test_node_symlink_link",
+                false,
+                Some(0o777),
+                None,
+                None,
+            )
+            .unwrap();
+
+            /* If the target exists, the symlink will not be created. */
+            node_symlink(dev, "", "/tmp/test_node_symlink_link").unwrap_err();
+
+            remove_file("/tmp/test_node_symlink_link").unwrap();
+
+            Ok(())
+        }) {
+            assert!(e.is_errno(nix::Error::EACCES) || e.is_errno(nix::Error::EBUSY));
+        }
+    }
+
+    #[test]
+    fn test_device_get_symlink_by_devnum() {
+        let mut e = DeviceEnumerator::new();
+        e.set_enumerator_type(DeviceEnumerationType::Devices);
+        e.add_match_subsystem("tty", true).unwrap();
+        e.add_match_subsystem("block", true).unwrap();
+
+        for d in e.iter() {
+            let s = device_get_symlink_by_devnum(d).unwrap();
+            println!("{}", s);
         }
     }
 }
