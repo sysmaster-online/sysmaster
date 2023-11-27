@@ -42,6 +42,10 @@ fn deserialize_pathbuf_vec(s: &str) -> Result<Vec<PathBuf>, core::error::Error> 
     Ok(res)
 }
 
+fn deserialize_netlink_vec(s: &str) -> Result<Vec<String>, core::error::Error> {
+    Ok(vec![s.to_string()])
+}
+
 #[derive(UnitSection, Default, Clone, Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub(super) struct SectionSocket {
@@ -60,8 +64,8 @@ pub(super) struct SectionSocket {
     pub ListenStream: Vec<String>,
     #[entry(append)]
     pub ListenDatagram: Vec<String>,
-    #[entry(default = String::new())]
-    pub ListenNetlink: String,
+    #[entry(append, parser = deserialize_netlink_vec)]
+    pub ListenNetlink: Vec<String>,
     #[entry(append)]
     pub ListenSequentialPacket: Vec<String>,
     #[entry(append)]

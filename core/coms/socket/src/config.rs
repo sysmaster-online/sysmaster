@@ -206,7 +206,7 @@ impl SocketConfig {
         let config = &self.data.borrow().Socket;
         self.parse_sockets(config.ListenStream.as_ref(), ListenItem::Stream)?;
         self.parse_sockets(config.ListenDatagram.as_ref(), ListenItem::Datagram)?;
-        self.parse_sockets(&[config.ListenNetlink.clone()], ListenItem::Netlink)?;
+        self.parse_sockets(config.ListenNetlink.as_ref(), ListenItem::Netlink)?;
         self.parse_sockets(
             config.ListenSequentialPacket.as_ref(),
             ListenItem::SequentialPacket,
