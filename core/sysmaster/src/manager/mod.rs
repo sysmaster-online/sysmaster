@@ -460,6 +460,7 @@ impl Manager {
         }
 
         log::info!("Rebooting...");
+        log::flush!();
         let _ = reboot::reboot(reboot_mode); // make lint happy
     }
 

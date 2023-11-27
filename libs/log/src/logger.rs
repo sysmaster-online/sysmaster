@@ -340,6 +340,9 @@ impl log::Log for FileLogger {
                 if let Err(e) = file.flush() {
                     println!("Failed to flush log file: {}", e);
                 }
+                if let Err(e) = file.sync_all() {
+                    println!("Failed to sync all log file: {}", e);
+                }
             }
             None => {
                 if !get_open_when_needed() {
@@ -605,7 +608,11 @@ impl Log for CombinedLogger {
         }
     }
 
-    fn flush(&self) {}
+    fn flush(&self) {
+        for log in &self.loggers {
+            log.flush();
+        }
+    }
 }
 
 impl CombinedLogger {

@@ -194,6 +194,14 @@ macro_rules! trace {
     )
 }
 
+/// flush output stream
+#[macro_export(local_inner_macros)]
+macro_rules! flush {
+    () => {
+        $crate::inner::__private_api_flush();
+    };
+}
+
 ///
 /* Private, shouldn't be used out of this file. */
 pub fn __private_api_log(
@@ -217,6 +225,20 @@ pub fn __private_api_log(
                     .line(Some(line))
                     .build(),
             );
+        }
+        None => {}
+    }
+}
+
+///
+pub fn __private_api_flush() {
+    if STATE.load(Ordering::SeqCst) != INITIALIZED {
+        return;
+    }
+    let logger = unsafe { &LOGGER_LOCK };
+    match logger {
+        Some(v) => {
+            v.read().unwrap().flush();
         }
         None => {}
     }
