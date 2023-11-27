@@ -3,11 +3,11 @@
 mode="${1:-debug}"
 pwd=$(pwd)
 target_dir=${pwd}/target/${mode}
-units_dir=${pwd}/units
-run_with_vm_dir=${pwd}/tools/run_with_vm
+units_dir=${pwd}/factory/usr/lib/sysmaster/system
+run_with_vm_dir=${0%/*}
 sysmaster_install_target=/usr/lib/sysmaster
 conf_install_target=/etc/sysmaster
-rules_dir=${pwd}/rules
+rules_dir=${pwd}/factory/usr/lib/udev/rules.d
 
 multi_user_target=(dbus.service fstab.service getty.target hostname-setup.service \
 NetworkManager.service sshd.service udev-trigger.service)
@@ -57,7 +57,7 @@ done
 install -Dm444 -t /usr/lib/udev/rules.d ${rules_dir}/99-sysmaster.rules || exit 1
 
 # Install configurations of sysmaster.
-install -Dm0640 -t ${conf_install_target} ${pwd}/config/conf/system.conf || exit 1
+install -Dm0640 -t ${conf_install_target} ${pwd}/factory/etc/sysmaster/system.conf || exit 1
 
 # Create the symbolic linkage '/init' to sysmaster-init.
 ln -sf ${sysmaster_install_target}/init /init
