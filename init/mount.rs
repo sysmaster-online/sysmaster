@@ -78,7 +78,7 @@ fn is_mount_point(path: &Path) -> bool {
             Err(_) => return false,
         };
 
-        dev_id == root_dev_id
+        dev_id != root_dev_id
     } else {
         false
     }
