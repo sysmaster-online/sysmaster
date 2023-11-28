@@ -327,6 +327,8 @@ impl MountMonitorData {
     }
 
     pub fn dispatch_mountinfo(&self) -> Result<()> {
+        // Quick return for now
+        return Ok(());
         // First mark all active mount point we have as dead.
         let mut dead_mount_set: HashSet<String> = HashSet::new();
         let unit_type = Some(UnitType::UnitMount);

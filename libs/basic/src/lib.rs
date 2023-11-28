@@ -124,6 +124,9 @@ pub const EXEC_RUNTIME_PREFIX: &str = "/run";
 /// the default mount command path
 pub const MOUNT_BIN: &str = "/usr/bin/mount";
 
+/// the default umount command path
+pub const UMOUNT_BIN: &str = "/usr/bin/umount";
+
 /// the default swapon path
 pub const SWAP_BIN: &str = "/usr/sbin/swapon";
 

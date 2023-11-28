@@ -11,11 +11,14 @@
 // See the Mulan PSL v2 for more details.
 
 //!  The core logic of the mount subclass
-use basic::MOUNT_BIN;
+use basic::{MOUNT_BIN, UMOUNT_BIN};
 use basic::fs_util::{directory_is_empty, mkdir_p_label};
 use basic::mount_util::filter_options;
+use libc::umount;
+use nix::sys::wait::WaitStatus;
 
 use crate::config::{MountConfig, mount_is_bind};
+use crate::rentry::{MountRe, MountResult};
 use crate::spawn::MountSpawn;
 
 use super::comm::MountUnitComm;
@@ -111,17 +114,16 @@ impl MountMng {
         if !filtered_options.is_empty() {
             mount_command.append_many_argv(vec!["-o", &filtered_options]);
         }
-        log::debug!("(whorwe)enter_mounting: 1 | cmd: {}, args: {:?}", mount_command.path(), mount_command.argv());
 
         if let Err(e) = self.spawn.spawn_cmd(&mount_command) {
             log::error!("Failed to mount {} to {}: {}", &mount_config.Mount.What, &mount_config.Mount.Where, e);
             return;
         }
 
-        self.set_state(MountState::Mounting, false);
+        self.set_state(MountState::Mounting, true);
     }
 
-    pub(super) fn enter_signal(&self) {}
+    pub(super) fn enter_signal(&self, state: MountState, res: MountResult) {}
 
     pub(super) fn enter_dead_or_mounted(&self) {}
 
@@ -133,11 +135,22 @@ impl MountMng {
         self.set_state(MountState::Mounted, notify);
     }
 
-    pub(super) fn enter_unmounting(&self) {}
+    pub(super) fn enter_unmounting(&self) {
+        // retry_umount
+        let mut umount_command = ExecCommand::empty();
+        if let Err(e) = umount_command.set_path(UMOUNT_BIN) {
+            log::error!("Failed to set umount command: {}", e);
+        }
+        let mount_where = self.config.mount_where();
+        umount_command.append_many_argv(vec![&mount_where, "-c"]);
+        if let Err(e) = self.spawn.spawn_cmd(&umount_command) {
+            log::error!("Failed to umount {}: {}", mount_where, e);
+            return;
+        }
+        self.set_state(MountState::Unmounting, true);
+    }
 
     pub(super) fn enter_remounting(&self) {}
-
-    pub(super) fn sigchld_event(&self) {}
 
     pub(super) fn dispatch_timer(&self) {}
 
@@ -169,6 +182,34 @@ impl MountMng {
 
         self.enter_mounting();
         Ok(())
+    }
+
+    pub(super) fn stop_action(&self) -> Result<i32> {
+        let state = self.state();
+        if [MountState::Unmounting, MountState::UnmountingSigkill, MountState::UnmountingSigterm].contains(&state) {
+            return Ok(0);
+        }
+        if [MountState::Mounting, MountState::MountingDone, MountState::Remounting].contains(&state) {
+            self.enter_signal(MountState::UnmountingSigterm, MountResult::Success);
+            return Ok(0);
+        }
+        if state == MountState::RemountingSigterm {
+            self.set_state(MountState::UnmountingSigterm, true);
+            return Ok(0);
+        }
+        if state == MountState::RemountingSigKill {
+            self.set_state(MountState::UnmountingSigkill, true);
+            return Ok(0);
+        }
+        if state == MountState::Mounted {
+            self.enter_unmounting();
+            return Ok(1);
+        }
+        if state == MountState::Cleaning {
+            self.enter_signal(MountState::UnmountingSigkill, MountResult::Success);
+            return Ok(0);
+        }
+        Ok(0)
     }
 
     pub fn get_state(&self) -> String {
@@ -218,6 +259,18 @@ impl MountMng {
 
     pub(super) fn mount_state_to_unit_state(&self) -> UnitActiveState {
         self.state().mount_state_to_unit_state()
+    }
+}
+
+impl MountMng {
+    pub(super) fn sigchld_event(&self, wait_status: WaitStatus) {
+        self.do_sigchld_event(wait_status);
+        // self.db_update();
+    }
+
+    fn do_sigchld_event(&self, wait_status: WaitStatus) {
+        log::info!("Got a mount process sigchld, status: {:?}", wait_status);
+        return;
     }
 }
 

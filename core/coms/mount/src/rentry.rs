@@ -36,6 +36,18 @@ pub(super) enum MountState {
     Cleaning,
 }
 
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
+pub(super) enum MountResult {
+    Success,
+    FailureResources,
+    FailureTimeout,
+    FailureExitCode,
+    FailureSignal,
+    FailureCoreDump,
+    FailureStartLimitHit,
+    FailureProtocol,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct MountReMng {
     state: MountState,

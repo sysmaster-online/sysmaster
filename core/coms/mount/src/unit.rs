@@ -14,6 +14,7 @@
 //! UnitObj,UnitMngUtil, UnitSubClass trait
 
 use crate::config::MountConfig;
+use crate::rentry::{MountState, MountResult};
 
 use super::comm::MountUnitComm;
 use super::mng::MountMng;
@@ -168,6 +169,7 @@ impl SubUnit for MountUnit {
     }
 
     fn stop(&self, _force: bool) -> Result<()> {
+        self.mng.stop_action();
         self.mng.enter_dead(true);
         Ok(())
     }
@@ -176,7 +178,9 @@ impl SubUnit for MountUnit {
 
     fn release_resources(&self) {}
 
-    fn sigchld_events(&self, _wait_status: WaitStatus) {}
+    fn sigchld_events(&self, wait_status: WaitStatus) {
+        // self.sigchld_events(wait_status);
+    }
 
     fn reset_failed(&self) {}
 }
