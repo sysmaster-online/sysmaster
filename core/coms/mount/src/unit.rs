@@ -22,6 +22,7 @@ use core::error::*;
 use core::exec::ExecContext;
 use core::rel::{ReStation, Reliability};
 use core::unit::{SubUnit, UmIf, UnitActiveState, UnitBase, UnitMngUtil};
+use basic::mount_util::mount_point_to_unit_name;
 use nix::sys::wait::WaitStatus;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -121,6 +122,15 @@ impl MountUnit {
 
         Ok(())
     }
+
+    fn mount_verify(&self) -> Result<()> {
+        let mount_where = self.config.mount_where();
+        if !mount_point_to_unit_name(&mount_where).eq(&self.comm.get_owner_id()) {
+            log::error!("Failed to load unit {}: unit name doesn't match Where", self.comm.get_owner_id());
+            return Err(Error::ConfigureError { msg: "unit name doesn't match Where".to_string() });
+        }
+        Ok(())
+    }
 }
 
 impl SubUnit for MountUnit {
@@ -132,7 +142,7 @@ impl SubUnit for MountUnit {
         let unit_name = self.comm.get_owner_id();
         self.config.load(paths, &unit_name, true);
         self.parse()?;
-        Ok(())
+        self.mount_verify()
     }
 
     fn current_active_state(&self) -> UnitActiveState {
@@ -179,7 +189,7 @@ impl SubUnit for MountUnit {
     fn release_resources(&self) {}
 
     fn sigchld_events(&self, wait_status: WaitStatus) {
-        // self.sigchld_events(wait_status);
+        self.mng.sigchld_event(wait_status);
     }
 
     fn reset_failed(&self) {}

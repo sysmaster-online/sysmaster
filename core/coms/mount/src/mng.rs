@@ -265,7 +265,7 @@ impl MountMng {
 impl MountMng {
     pub(super) fn sigchld_event(&self, wait_status: WaitStatus) {
         self.do_sigchld_event(wait_status);
-        // self.db_update();
+        self.db_update();
     }
 
     fn do_sigchld_event(&self, wait_status: WaitStatus) {

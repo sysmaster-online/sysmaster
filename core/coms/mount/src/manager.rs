@@ -17,7 +17,7 @@ use constants::LOG_FILE_PATH;
 
 use super::comm::MountUmComm;
 use super::rentry::{MountRe, MountReFrame};
-use basic::mount_util::MountInfoParser;
+use basic::mount_util::{MountInfoParser, mount_point_to_unit_name};
 use core::error::*;
 use core::rel::{ReStation, ReliLastFrame, Reliability};
 use core::unit::{UmIf, UnitActiveState, UnitManagerObj, UnitMngUtil, UnitType};
@@ -327,8 +327,6 @@ impl MountMonitorData {
     }
 
     pub fn dispatch_mountinfo(&self) -> Result<()> {
-        // Quick return for now
-        return Ok(());
         // First mark all active mount point we have as dead.
         let mut dead_mount_set: HashSet<String> = HashSet::new();
         let unit_type = Some(UnitType::UnitMount);
@@ -391,14 +389,6 @@ fn drain_out(epfd: i32) {
     // drain out all events.
     let mut me_events: Vec<epoll::Event> = vec![epoll::Event::new(epoll::Events::empty(), 0)];
     while epoll::wait(epfd, 0, &mut me_events).unwrap() > 0 {}
-}
-
-fn mount_point_to_unit_name(mount_point: &str) -> String {
-    let mut res = String::from(mount_point).replace('/', "-") + ".mount";
-    if res != "-.mount" {
-        res = String::from(&res[1..])
-    }
-    res
 }
 
 impl UnitMngUtil for MountManager {

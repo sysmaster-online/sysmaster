@@ -314,6 +314,15 @@ impl Iterator for MountInfoParser {
     }
 }
 
+/// return the unit name of a mount point
+pub fn mount_point_to_unit_name(mount_point: &str) -> String {
+    let mut res = String::from(mount_point).replace('/', "-") + ".mount";
+    if res != "-.mount" {
+        res = String::from(&res[1..])
+    }
+    res
+}
+
 /// filter options we don't need, and return the rest
 pub fn filter_options(options: &str, filter_names: Vec<&str>) -> String {
     let mut res = String::new();
