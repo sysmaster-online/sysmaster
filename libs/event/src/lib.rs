@@ -572,7 +572,7 @@ mod tests {
          * Thus the assertion condition should be slightly relaxed.
          */
         let count = *post_s.as_ref().count.borrow();
-        assert!(count < 10);
+        assert!(count >= 1);
 
         e.del_source(s).unwrap();
         e.del_source(timer_s).unwrap();

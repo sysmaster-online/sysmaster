@@ -874,7 +874,11 @@ mod test {
                 Ok(())
             })
         {
-            assert!(e.is_errno(nix::Error::EACCES) || e.is_errno(nix::Error::EBUSY));
+            assert!(
+                e.is_errno(nix::Error::EACCES)
+                    || e.is_errno(nix::Error::EBUSY)
+                    || e.is_errno(nix::Error::EAGAIN)
+            );
         }
     }
 

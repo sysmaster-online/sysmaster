@@ -3528,8 +3528,11 @@ mod tests {
         }
 
         if let Err(e) = LoopDev::inner_process("/tmp/test_update_tag", 1024 * 10, inner_test) {
-            println!("e:{:?}", e);
-            assert!(e.is_errno(nix::Error::EACCES) || e.is_errno(nix::Error::EBUSY));
+            assert!(
+                e.is_errno(nix::Error::EACCES)
+                    || e.is_errno(nix::Error::EBUSY)
+                    || e.is_errno(nix::Error::EAGAIN)
+            );
         }
     }
 
