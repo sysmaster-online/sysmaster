@@ -238,7 +238,7 @@ impl SdHwdb {
     pub fn should_reload(&self) -> bool {
         let mut found: bool = false;
 
-        let duration = Duration::from_secs(self.st.st_mtime as u64);
+        let duration = Duration::new(self.st.st_mtime as u64, self.st.st_mtime_nsec as u32);
         let st_time = UNIX_EPOCH + duration;
         let mut time = st_time;
 
@@ -273,7 +273,7 @@ impl SdHwdb {
     }
 
     /// get value by modalias and key
-    pub fn sd_hwdb_get(&mut self, modalias: String, key: String) -> Result<String> {
+    pub fn get(&mut self, modalias: String, key: String) -> Result<String> {
         if let Err(err) = self.properties_prepare(modalias) {
             return Err(err);
         }
@@ -350,7 +350,7 @@ impl SdHwdb {
                         );
                     }
 
-                    if c != search.as_bytes()[i + p] {
+                    if i + p >= search.len() || c != search.as_bytes()[i + p] {
                         return Ok(());
                     }
                     p += 1;
@@ -774,5 +774,35 @@ impl LineBuf {
 
     fn rem_char(&mut self) {
         self.rem(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_get() {
+        for hwdb_bin in HWDB_BIN_PATHS {
+            if Path::new(hwdb_bin).exists() {
+                let mut hwdb = SdHwdb::new().unwrap();
+                let s = hwdb
+                    .get(
+                        "dmi:bvnLENOVO".to_string(),
+                        "ID_SYSFS_ATTRIBUTE_MODEL".to_string(),
+                    )
+                    .unwrap();
+                assert_eq!(s, "product_version");
+                assert_eq!(
+                    hwdb.get(
+                        "invalid_modalias".to_string(),
+                        "ID_SYSFS_ATTRIBUTE_MODEL".to_string()
+                    ),
+                    Err(Errno::ENOENT)
+                );
+                return;
+            }
+        }
     }
 }

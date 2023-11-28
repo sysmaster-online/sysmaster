@@ -732,10 +732,16 @@ impl HwdbUtil {
         }
 
         match hwdb_bin_dir {
-            Some(dir) => bin_dir += &dir,
-            None => bin_dir += "/etc/devmaster/",
+            Some(dir) => {
+                if bin_dir.is_empty() {
+                    bin_dir = dir;
+                } else {
+                    bin_dir = bin_dir + "/" + &dir;
+                }
+            }
+            None => bin_dir += "/etc/devmaster",
         }
-        let hwdb_bin = bin_dir.clone() + "hwdb.bin";
+        let hwdb_bin = bin_dir.clone() + "/" + "hwdb.bin";
 
         let mut conf_file_dirs: Vec<String> = Vec::new();
         if let Some(p) = path {
@@ -878,25 +884,97 @@ fn node_lookup(node: Rc<RefCell<TrieNode>>, c: u8) -> Option<Rc<RefCell<TrieNode
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::remove_file;
     use std::path::Path;
 
     #[test]
-    fn test_update() {
+    fn test_update_query() {
         for dir in CONF_FILE_DIRS {
             if Path::new(dir).exists() {
+                HwdbUtil::update(None, None, None, false, true).unwrap();
+                let hwdb = SdHwdb::new().unwrap();
+                assert!(!hwdb.should_reload());
                 HwdbUtil::update(None, None, None, false, false).unwrap();
+                assert!(hwdb.should_reload());
+
+                HwdbUtil::query("".to_string(), None).unwrap();
+                HwdbUtil::query(
+                    "evdev:name:TPPS/2 IBM TrackPoint:dmi:bvn111:bvr111:bd111:svnLENOVO:pn111:pvrThinkPadX20A:".to_string(),
+                    None,
+                )
+                .unwrap();
+                HwdbUtil::query("mouse:usb:v3057p0001:".to_string(), None).unwrap();
+                HwdbUtil::query("mouse:usb:v3057p0001:abc".to_string(), None).unwrap();
+                HwdbUtil::query("mouse:usb:v3057p0001:".to_string(), Some("/".to_string()))
+                    .unwrap();
+                assert_eq!(
+                    HwdbUtil::query(
+                        "mouse:usb:v3057p0001:".to_string(),
+                        Some("/tmp".to_string())
+                    ),
+                    Err(Errno::EINVAL)
+                );
+                HwdbUtil::query(
+                    "evdev:atkbd:dmi:bvn*:bvr*:bd*:svn[sS][aA][mM][sS][uU][nN][gG]*:pn*300E[457]*:*".to_string(),
+                    None,
+                )
+                .unwrap();
+                HwdbUtil::query(
+                    "evdev:atkbd:dmi:bvn*:bvr*:bd*:svnSAMSung*:pn*300E457*:*".to_string(),
+                    None,
+                )
+                .unwrap();
+                HwdbUtil::query(
+                    "ieee1394:ven00080007mo00000008sp00000A27ver00000012".to_string(),
+                    None,
+                )
+                .unwrap();
+                HwdbUtil::query(
+                    "ieee1394:ven00080007mo00000008sp00000A27ver0000001".to_string(),
+                    None,
+                )
+                .unwrap();
+                HwdbUtil::query(
+                    "ieee1394:ven00080007mo00000008sp00000A27ver000000123".to_string(),
+                    None,
+                )
+                .unwrap();
+
+                HwdbUtil::update(
+                    None,
+                    None,
+                    Some("/tmp/etc/devmaster".to_string()),
+                    false,
+                    false,
+                )
+                .unwrap();
+                HwdbUtil::query(
+                    "mouse:usb:v3057p0001:".to_string(),
+                    Some("/tmp".to_string()),
+                )
+                .unwrap();
+                remove_file("/tmp/etc/devmaster/hwdb.bin").unwrap();
+
+                HwdbUtil::update(
+                    Some("/tmp".to_string()),
+                    Some("/tmp".to_string()),
+                    Some("/usr/lib/devmaster".to_string()),
+                    false,
+                    false,
+                )
+                .unwrap();
+                remove_file("/tmp/usr/lib/devmaster/hwdb.bin").unwrap();
                 return;
             }
         }
     }
 
     #[test]
-    fn test_query() {
-        for hwdb_bin in HWDB_BIN_PATHS {
-            if Path::new(hwdb_bin).exists() {
-                HwdbUtil::query("mouse:usb:v3057p0001:".to_string(), None).unwrap();
-                return;
-            }
-        }
+    fn test_import_file() {
+        let mut trie = Trie::new();
+        assert_eq!(
+            trie.import_file("invalid_file", 1, true),
+            Err(Errno::EINVAL)
+        );
     }
 }
