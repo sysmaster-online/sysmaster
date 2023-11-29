@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! subcommand for devctl trigger
+//! subcommand for devctl info
 
 use crate::subcmds::devctl_utils;
 use crate::Result;
@@ -78,7 +78,7 @@ impl InfoArgs {
         }
     }
 
-    /// subcommand for hwdb a fake device action, then the kernel will report an uevent
+    /// subcommand for query sysfs or the devmaster database
     pub fn subcommand(&self) -> Result<()> {
         let mut devs = Vec::new();
 

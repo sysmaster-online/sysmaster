@@ -1,8 +1,21 @@
+// Copyright (c) 2022 Huawei Technologies Co.,Ltd. All rights reserved.
+//
+// sysMaster is licensed under Mulan PSL v2.
+// You can use this software according to the terms and conditions of the Mulan
+// PSL v2.
+// You may obtain a copy of Mulan PSL v2 at:
+//         http://license.coscl.org.cn/MulanPSL2
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+// See the Mulan PSL v2 for more details.
+
+//! the utils of devctl
+
+use crate::Result;
 use device::Device;
 use nix::unistd::{access, AccessFlags};
 use std::path::PathBuf;
-
-type Result<T> = std::result::Result<T, nix::Error>;
 
 /// find device by path or unit name
 pub fn find_device(id: &str, prefix: &str) -> Result<Device> {

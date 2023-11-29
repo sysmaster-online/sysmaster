@@ -12,32 +12,65 @@
 
 //! subcommand for devctl trigger
 //!
+use crate::Result;
 use hwdb::HwdbUtil;
 
-/// subcommand for hwdb a fake device action, then the kernel will report an uevent
-pub fn subcommand_hwdb(
+pub struct HwdbArgs {
     update: bool,
     test: Option<String>,
     path: Option<String>,
     usr: bool,
     strict: Option<bool>,
     root: Option<String>,
-) {
-    if !update && test.is_none() {
-        eprintln!("Either --update or --test must be used.");
-        return;
-    }
+}
 
-    if update {
-        let s = strict.unwrap_or(false);
-        if usr {
-            let _ = HwdbUtil::update(path, root, Some("/usr/lib/devmaster/".to_string()), s, true);
-        } else {
-            let _ = HwdbUtil::update(path, root, None, s, true);
+impl HwdbArgs {
+    pub fn new(
+        update: bool,
+        test: Option<String>,
+        path: Option<String>,
+        usr: bool,
+        strict: Option<bool>,
+        root: Option<String>,
+    ) -> Self {
+        HwdbArgs {
+            update,
+            test,
+            path,
+            usr,
+            strict,
+            root,
         }
     }
 
-    if let Some(modalias) = test {
-        let _ = HwdbUtil::query(modalias, None);
+    /// subcommand for update or query the hardware database.
+    pub fn subcommand(&self) -> Result<()> {
+        if !self.update && self.test.is_none() {
+            log::error!("Either --update or --test must be used.");
+            return Err(nix::Error::EINVAL);
+        }
+
+        log::warn!("devctl hwdb is deprecated. Use sysmaster-hwdb instead.");
+
+        if self.update {
+            let s = self.strict.unwrap_or(false);
+            if self.usr {
+                HwdbUtil::update(
+                    self.path.clone(),
+                    self.root.clone(),
+                    Some("/usr/lib/devmaster/".to_string()),
+                    s,
+                    true,
+                )?;
+            } else {
+                HwdbUtil::update(self.path.clone(), self.root.clone(), None, s, true)?;
+            }
+        }
+
+        if let Some(modalias) = &self.test {
+            HwdbUtil::query(modalias.to_string(), None)?;
+        }
+
+        Ok(())
     }
 }

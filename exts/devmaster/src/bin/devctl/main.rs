@@ -23,7 +23,7 @@ use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
 use log::init_log_to_console_syslog;
 use log::Level;
 use std::{io::Write, os::unix::net::UnixStream};
-use subcmds::devctl_hwdb::subcommand_hwdb;
+use subcmds::devctl_hwdb::HwdbArgs;
 use subcmds::devctl_info::InfoArgs;
 use subcmds::devctl_monitor::MonitorArgs;
 use subcmds::devctl_settle::SettleArgs;
@@ -228,7 +228,8 @@ enum SubCmd {
         #[clap(required = true)]
         syspath: String,
     },
-    /// Test builtin command on a device
+    /// The sub-command 'hwdb' is deprecated, and is left for backwards compatibility.
+    /// Please use sysmaster-hwdb instead.
     #[clap(display_order = 7)]
     Hwdb {
         /// update the hardware database
@@ -386,7 +387,7 @@ fn main() -> Result<()> {
             usr,
             strict,
             root,
-        } => subcommand_hwdb(update, test, path, usr, strict, root),
+        } => return HwdbArgs::new(update, test, path, usr, strict, root).subcommand(),
         SubCmd::Control { exit } => subcommand_control(exit),
     }
 
