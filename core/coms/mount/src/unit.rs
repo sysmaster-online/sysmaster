@@ -180,7 +180,7 @@ impl SubUnit for MountUnit {
 
     fn stop(&self, _force: bool) -> Result<()> {
         self.mng.stop_action();
-        self.mng.enter_dead(true);
+        self.mng.enter_dead(MountResult::Success, true);
         Ok(())
     }
 

@@ -33,7 +33,7 @@ pub(super) enum MountState {
     UnmountingSigterm,
     UnmountingSigkill,
     Failed,
-    Cleaning,
+    // Cleaning currently not used
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
