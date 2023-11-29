@@ -1115,7 +1115,7 @@ impl ServiceMng {
     }
 
     fn demand_pid_file(&self) -> Result<()> {
-        let pid_file_inotify = PathIntofy::new(self.config.pid_file().unwrap());
+        let pid_file_inotify = PathInotify::new(self.config.pid_file().unwrap());
 
         self.rd.attach_inotify(Rc::new(pid_file_inotify));
 
@@ -1913,12 +1913,12 @@ impl RunningData {
         *self.mng.borrow_mut() = Rc::downgrade(&mng);
     }
 
-    pub(self) fn attach_inotify(&self, path_inotify: Rc<PathIntofy>) {
+    pub(self) fn attach_inotify(&self, path_inotify: Rc<PathInotify>) {
         path_inotify.attach(self.mng.borrow_mut().clone());
         self.data.borrow_mut().attach_inotify(path_inotify);
     }
 
-    pub(self) fn path_inotify(&self) -> Rc<PathIntofy> {
+    pub(self) fn path_inotify(&self) -> Rc<PathInotify> {
         self.data.borrow().path_inotify()
     }
 
@@ -2071,7 +2071,7 @@ impl RunningData {
 struct Rtdata {
     errno: i32,
     notify_state: NotifyState,
-    path_inotify: Option<Rc<PathIntofy>>,
+    path_inotify: Option<Rc<PathInotify>>,
 
     forbid_restart: bool,
     reset_restarts: bool,
@@ -2118,11 +2118,11 @@ impl Rtdata {
         self.errno
     }
 
-    pub(self) fn attach_inotify(&mut self, path_inotify: Rc<PathIntofy>) {
+    pub(self) fn attach_inotify(&mut self, path_inotify: Rc<PathInotify>) {
         self.path_inotify = Some(path_inotify)
     }
 
-    pub(self) fn path_inotify(&self) -> Rc<PathIntofy> {
+    pub(self) fn path_inotify(&self) -> Rc<PathInotify> {
         self.path_inotify.as_ref().unwrap().clone()
     }
 
@@ -2205,7 +2205,7 @@ enum PathType {
     Modified,
 }
 
-struct PathIntofy {
+struct PathInotify {
     path: PathBuf,
     p_type: PathType,
     inotify: RefCell<RawFd>,
@@ -2213,7 +2213,7 @@ struct PathIntofy {
     mng: RefCell<Weak<ServiceMng>>,
 }
 
-impl fmt::Display for PathIntofy {
+impl fmt::Display for PathInotify {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -2225,9 +2225,9 @@ impl fmt::Display for PathIntofy {
     }
 }
 
-impl PathIntofy {
+impl PathInotify {
     fn new(path: PathBuf) -> Self {
-        PathIntofy {
+        PathInotify {
             path,
             p_type: PathType::Modified,
             inotify: RefCell::new(-1),
@@ -2368,7 +2368,7 @@ impl PathIntofy {
     }
 }
 
-impl Source for PathIntofy {
+impl Source for PathInotify {
     fn fd(&self) -> RawFd {
         *self.inotify.borrow()
     }
