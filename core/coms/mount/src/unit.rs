@@ -14,7 +14,7 @@
 //! UnitObj,UnitMngUtil, UnitSubClass trait
 
 use crate::config::MountConfig;
-use crate::rentry::{MountState, MountResult};
+use crate::rentry::MountResult;
 
 use super::comm::MountUnitComm;
 use super::mng::MountMng;
@@ -172,14 +172,14 @@ impl SubUnit for MountUnit {
             return Ok(());
         }
 
-        self.mng.start_action();
+        self.mng.start_action()?;
         self.mng.enter_mounted(true);
 
         Ok(())
     }
 
     fn stop(&self, _force: bool) -> Result<()> {
-        self.mng.stop_action();
+        self.mng.stop_action()?;
         self.mng.enter_dead(MountResult::Success, true);
         Ok(())
     }
@@ -195,11 +195,32 @@ impl SubUnit for MountUnit {
     fn reset_failed(&self) {}
 
     fn setup_existing_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {
-        log::info!("(whorwe)setup_existing_mount: 1 | unit: {}", self.comm.get_owner_id());
+        if self.config.mount_where().is_empty() {
+            self.config.set_mount_where(mount_where);
+        }
+        self.config.update_mount_parameters(what, options, fstype);
+        self.mng.set_find_in_mountinfo(true);
     }
 
     fn setup_new_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {
-        log::info!("(whorwe)setup_new_mount: 1 | unit: {}", self.comm.get_owner_id());
+        self.config.set_mount_where(mount_where);
+        self.config.update_mount_parameters(what, options, fstype);
+        self.mng.set_find_in_mountinfo(true);
+    }
+
+    fn update_mount_state(&self, state: &str) {
+        match state {
+            "dead" => {
+                self.mng.set_find_in_mountinfo(false);
+                self.mng.enter_dead(MountResult::Success, true);
+            }
+            "mounted" => {
+                if self.mng.find_in_mountinfo() {
+                    self.mng.enter_mounted(true);
+                }
+            }
+            _ => {}
+        }
     }
 }
 

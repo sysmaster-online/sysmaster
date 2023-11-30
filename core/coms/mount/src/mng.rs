@@ -278,11 +278,11 @@ impl MountMng {
         *self.reload_result.borrow_mut() = r
     }
 
-    fn find_in_mountinfo(&self) -> bool {
+    pub fn find_in_mountinfo(&self) -> bool {
         *self.find_in_mountinfo.borrow()
     }
 
-    fn set_find_in_mountinfo(&self, find: bool) {
+    pub fn set_find_in_mountinfo(&self, find: bool) {
         *self.find_in_mountinfo.borrow_mut() = find
     }
 }

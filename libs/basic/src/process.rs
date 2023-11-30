@@ -17,7 +17,6 @@ use nix::errno::errno;
 use nix::errno::Errno;
 use nix::libc::{kill, ESRCH};
 use nix::sys::signal::Signal;
-use nix::sys::wait::WaitStatus;
 use nix::sys::wait::{waitpid, WaitPidFlag};
 use nix::unistd::Pid;
 use procfs::process::Stat;
@@ -253,11 +252,6 @@ fn is_kernel_thread(pid: Pid) -> Result<bool> {
     } else {
         Ok(false)
     }
-}
-
-/// return true if the wait result is ok
-pub fn is_clean_exit(wait_status: WaitStatus) -> bool {
-    false
 }
 
 #[cfg(test)]

@@ -795,6 +795,10 @@ impl Unit {
         self.sub.setup_new_mount(what, mount_where, options, fstype);
     }
 
+    pub(crate) fn update_mount_state(&self, state: &str) {
+        self.sub.update_mount_state(state);
+    }
+
     pub(crate) fn notify_message(
         &self,
         ucred: &UnixCredentials,

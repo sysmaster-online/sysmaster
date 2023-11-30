@@ -402,17 +402,16 @@ impl MountMonitorData {
     }
 
     pub fn dispatch_mountinfo(&self) -> Result<()> {
-        self.load_mountinfo()?;
-        return Ok(());
-        // First mark all active mount point we have as dead.
-        let mut dead_mount_set: HashSet<String> = HashSet::new();
         let unit_type = Some(UnitType::UnitMount);
         for unit in self.comm.um().units_get_all(unit_type).iter() {
-            if self.comm.um().current_active_state(unit) == UnitActiveState::Active {
-                dead_mount_set.insert(String::from(unit));
-            }
+            self.comm.um().update_mount_state(unit, "dead");
         }
-
+        self.load_mountinfo()?;
+        for unit in self.comm.um().units_get_all(unit_type).iter() {
+            self.comm.um().update_mount_state(unit, "mounted");
+        }
+        return Ok(());
+        /*
         // Then start mount point we don't know.
         let mut mountinfo_content = String::new();
         File::open("/proc/self/mountinfo")
@@ -459,6 +458,7 @@ impl MountMonitorData {
             }
         }
         Ok(())
+        */
     }
 }
 

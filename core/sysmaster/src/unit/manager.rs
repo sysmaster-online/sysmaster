@@ -672,14 +672,30 @@ impl UmIf for UnitManager {
 
     /// setup new mount
     fn setup_new_mount(&self, unit_name: &str, what: &str, mount_where: &str, options: &str, fstype: &str) {
+        let mount = match self.load_unitx(unit_name) {
+            None => {
+                log::error!("Failed to load a new mount {}", unit_name);
+                return;
+            }
+            Some(v) => {
+                log::info!("Created a new mount {}", unit_name);
+                v
+            }
+        };
+        mount.setup_new_mount(what, mount_where, options, fstype);
+        mount.set_load_state(UnitLoadState::Loaded);
+    }
+
+    /// update mount state
+    fn update_mount_state(&self, unit_name: &str, state: &str) {
         let mount = match self.units_get(unit_name) {
             None => {
-                log::warn!("Unit {} doesn't exist for now, probably we should load it.", unit_name);
+                log::error!("Failed to update the mount state of {}", unit_name);
                 return;
             }
             Some(v) => v,
         };
-        mount.setup_new_mount(what, mount_where, options, fstype);
+        mount.update_mount_state(state);
     }
 }
 

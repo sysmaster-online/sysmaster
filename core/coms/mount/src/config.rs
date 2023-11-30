@@ -69,6 +69,10 @@ impl MountConfig {
         self.data.borrow().Mount.Where.clone()
     }
 
+    pub(super) fn set_mount_where(&self, mount_where: &str) {
+        (*self.data.borrow_mut()).Mount.Group = mount_where.to_string();
+    }
+
     pub(super) fn mount_what(&self) -> String {
         self.data.borrow().Mount.What.clone()
     }
@@ -95,6 +99,12 @@ impl MountConfig {
             options: self.mount_options(),
             fstype: self.mount_type(),
         }
+    }
+
+    pub(super) fn update_mount_parameters(&self, what: &str, options: &str, fstype: &str) {
+        (*self.data.borrow_mut()).Mount.What = what.to_string();
+        (*self.data.borrow_mut()).Mount.Options = options.to_string();
+        (*self.data.borrow_mut()).Mount.Type = fstype.to_string();
     }
 }
 
