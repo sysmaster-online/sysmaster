@@ -132,12 +132,6 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     }
 
     ///
-    fn set_socket_fd(&self, _fd: i32) {}
-
-    ///
-    fn release_socket_fd(&self, _fd: i32) {}
-
-    ///
     fn trigger(&self, _other: &str) {}
 
     ///Get the the unit state
@@ -166,6 +160,21 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     fn get_perpetual(&self) -> bool {
         false
     }
+
+    // ================ ONLY VALID FOR SERVICE ================
+    ///
+    fn set_socket_fd(&self, _fd: i32) {}
+
+    ///
+    fn release_socket_fd(&self, _fd: i32) {}
+
+
+    // ================ ONLY VALID FOR MOUNT ================
+    ///
+    fn setup_existing_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {}
+
+    ///
+    fn setup_new_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {}
 }
 
 /// the macro for create a sub unit instance with dyn ref of UmIf,
@@ -219,16 +228,13 @@ pub fn unit_name_is_valid(name: &str, flag: UnitNameFlags) -> bool {
         None => return false,
         Some(v) => (v.0, v.1),
     };
-
     let unit_type = match unit_type_from_string(last_name) {
         Err(_) => return false,
         Ok(v) => v,
     };
-
     if unit_type == UnitType::UnitTypeInvalid {
         return false;
     }
-
     match first_name.split_once('@') {
         None => flag.contains(UnitNameFlags::PLAIN),
         Some(v) => {

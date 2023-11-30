@@ -608,6 +608,11 @@ pub fn path_simplify(p: &str) -> Option<String> {
     Some(res)
 }
 
+/// check if the given string is a path
+pub fn is_path(s: &str) -> bool {
+    s.contains('/')
+}
+
 /// check if the given path is abololute path
 pub fn path_is_abosolute(s: &str) -> bool {
     s.starts_with('/')

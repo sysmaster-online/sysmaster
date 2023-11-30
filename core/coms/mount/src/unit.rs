@@ -193,6 +193,14 @@ impl SubUnit for MountUnit {
     }
 
     fn reset_failed(&self) {}
+
+    fn setup_existing_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {
+        log::info!("(whorwe)setup_existing_mount: 1 | unit: {}", self.comm.get_owner_id());
+    }
+
+    fn setup_new_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {
+        log::info!("(whorwe)setup_new_mount: 1 | unit: {}", self.comm.get_owner_id());
+    }
 }
 
 impl UnitMngUtil for MountUnit {

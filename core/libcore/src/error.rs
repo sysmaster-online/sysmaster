@@ -103,6 +103,11 @@ pub enum Error {
         source: Arc<Error>,
     },
 
+    #[snafu(display("Invalid Name: {}", what))]
+    InvalidName {
+        what: String,
+    },
+
     #[snafu(display("ConvertError"))]
     ConvertToSysmaster,
 
@@ -190,6 +195,7 @@ impl From<Error> for nix::Error {
             Error::NotFound { what: _ } => nix::Error::ENOENT,
             Error::Other { msg: _ } => nix::Error::EIO,
             Error::Shared { source: _ } => nix::Error::EIO,
+            Error::InvalidName { what: _ } => nix::Error::EINVAL,
             Error::ConvertToSysmaster => nix::Error::EIO,
             Error::Input => nix::Error::EIO,
             Error::Conflict => nix::Error::EBADR,

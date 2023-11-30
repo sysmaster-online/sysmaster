@@ -205,6 +205,13 @@ pub trait UmIf {
 
     /// release the service's socket fd
     fn service_release_socket_fd(&self, _service_name: &str, _fd: i32) {}
+
+    /* ========== ONLY VALID IN MOUNT ========== */
+    /// setup existing mount
+    fn setup_existing_mount(&self, unit_name: &str, what: &str, mount_where: &str, options: &str, fstype: &str) {}
+
+    /// setup new mount
+    fn setup_new_mount(&self, unit_name: &str, what: &str, mount_where: &str, options: &str, fstype: &str) {}
 }
 
 /// the trait used for attach UnitManager to sub unit

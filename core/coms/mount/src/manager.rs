@@ -12,15 +12,18 @@
 
 #[cfg(feature = "plugin")]
 use crate::base::PLUGIN_NAME;
+use basic::fs_util::is_path;
 #[cfg(feature = "plugin")]
 use constants::LOG_FILE_PATH;
 
 use super::comm::MountUmComm;
 use super::rentry::{MountRe, MountReFrame};
-use basic::mount_util::{MountInfoParser, mount_point_to_unit_name};
+use basic::mount_util::{mount_point_to_unit_name, MountInfoParser};
 use core::error::*;
 use core::rel::{ReStation, ReliLastFrame, Reliability};
-use core::unit::{UmIf, UnitActiveState, UnitManagerObj, UnitMngUtil, UnitType};
+use core::unit::{
+    unit_name_is_valid, UmIf, UnitActiveState, UnitManagerObj, UnitMngUtil, UnitNameFlags, UnitType,
+};
 use event::{EventState, EventType, Events, Source};
 use std::collections::HashSet;
 use std::fs::File;
@@ -326,7 +329,81 @@ impl MountMonitorData {
         }
     }
 
+    pub fn setup_new_mount(
+        &self,
+        unit_name: &str,
+        what: &str,
+        mount_where: &str,
+        options: &str,
+        fstype: &str,
+    ) -> Result<()> {
+        self.comm.um().setup_new_mount(unit_name, what, mount_where, options, fstype);
+        Ok(())
+    }
+
+    pub fn setup_existing_mount(
+        &self,
+        unit_name: &str,
+        what: &str,
+        mount_where: &str,
+        options: &str,
+        fstype: &str,
+    ) -> Result<()> {
+        self.comm.um().setup_existing_mount(unit_name, what, mount_where, options, fstype);
+        Ok(())
+    }
+
+    pub fn setup_mount(
+        &self,
+        what: &str,
+        mount_where: &str,
+        options: &str,
+        fstype: &str,
+    ) -> Result<()> {
+        if fstype == "autofs" {
+            return Ok(());
+        }
+        if !is_path(mount_where) {
+            return Ok(());
+        }
+        let unit_name = mount_point_to_unit_name(mount_where);
+        if !unit_name_is_valid(&unit_name, UnitNameFlags::PLAIN) {
+            return Err(Error::InvalidName {
+                what: "mount point can't convert to unit name".to_string(),
+            });
+        }
+        if self.comm.um().load_unit_success(&unit_name) {
+            self.setup_existing_mount(&unit_name, what, mount_where, options, fstype)?;
+        } else {
+            self.setup_new_mount(&unit_name, what, mount_where, options, fstype)?;
+        }
+        Ok(())
+    }
+
+    pub fn load_mountinfo(&self) -> Result<()> {
+        // Then start mount point we don't know.
+        let mut mountinfo_content = String::new();
+        File::open("/proc/self/mountinfo")
+            .unwrap()
+            .read_to_string(&mut mountinfo_content)
+            .unwrap();
+        let parser = MountInfoParser::new(mountinfo_content);
+        for mount in parser {
+            if let Err(e) = self.setup_mount(
+                &mount.mount_source,
+                &mount.mount_point,
+                &mount.mount_options,
+                &mount.fstype,
+            ) {
+                log::error!("Failed to setup mount {}: {}", mount.mount_point, e);
+            }
+        }
+        Ok(())
+    }
+
     pub fn dispatch_mountinfo(&self) -> Result<()> {
+        self.load_mountinfo()?;
+        return Ok(());
         // First mark all active mount point we have as dead.
         let mut dead_mount_set: HashSet<String> = HashSet::new();
         let unit_type = Some(UnitType::UnitMount);

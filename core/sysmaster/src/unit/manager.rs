@@ -657,6 +657,30 @@ impl UmIf for UnitManager {
         };
         service.release_socket_fd(fd);
     }
+
+    /// setup existing mount
+    fn setup_existing_mount(&self, unit_name: &str, what: &str, mount_where: &str, options: &str, fstype: &str) {
+        let mount = match self.units_get(unit_name) {
+            None => {
+                log::error!("Failed to get unit: {}", unit_name);
+                return;
+            }
+            Some(v) => v,
+        };
+        mount.setup_existing_mount(what, mount_where, options, fstype);
+    }
+
+    /// setup new mount
+    fn setup_new_mount(&self, unit_name: &str, what: &str, mount_where: &str, options: &str, fstype: &str) {
+        let mount = match self.units_get(unit_name) {
+            None => {
+                log::warn!("Unit {} doesn't exist for now, probably we should load it.", unit_name);
+                return;
+            }
+            Some(v) => v,
+        };
+        mount.setup_new_mount(what, mount_where, options, fstype);
+    }
 }
 
 /// the declaration "pub(self)" is for identification only.

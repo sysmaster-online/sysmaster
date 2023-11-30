@@ -787,6 +787,14 @@ impl Unit {
         self.sub.release_socket_fd(fd)
     }
 
+    pub(crate) fn setup_existing_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {
+        self.sub.setup_existing_mount(what, mount_where, options, fstype);
+    }
+
+    pub(crate) fn setup_new_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {
+        self.sub.setup_new_mount(what, mount_where, options, fstype);
+    }
+
     pub(crate) fn notify_message(
         &self,
         ucred: &UnixCredentials,
