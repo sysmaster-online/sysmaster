@@ -17,41 +17,41 @@ Process 1 is at a critical position in the system, responsible for system initia
 
 ## vision
 
-1. Short-term competitiveness: Extreme reliability and system start-up speed 
+1. Short-term competitiveness: Extreme reliability and system start-up speed
 
 - **Never downtime:** Technologies such as external status and savepoint are used to achieve second-level self-healing of faults to ensure that process No. 1 is continuously online and services are not affected
 - **Fast startup:** Deduplication and simplified mirroring are decoupled to optimize the server restart time from 3-5 minutes to 1 minute (5 minutes for competitors)
 
-2. Long-term competitiveness: Improve the O&M efficiency of all-scenario applications and cloud platforms 
+2. Long-term competitiveness: Improve the O&M efficiency of all-scenario applications and cloud platforms
 
 - **All-scenario applications:** Supports scenarios such as cloud-edge-end, unified init, and supports bare metal, virtual machine, and containers
 - **Containerized OS:** kernel+sysMaster = container OS base, which is interconnected with k8s andopenstack to support X times improvement of O&M efficiency in cloud scenarios together with KubeOS
 
-Overall strategy: Focus on the system with the smallest function, adopt the parallel strategy of core self-developed and non-core community solutions, and the strategy of drawer replacement of independent components to achieve systemd self-developed substitution 
+Overall strategy: Focus on the system with the smallest function, adopt the parallel strategy of core self-developed and non-core community solutions, and the strategy of drawer replacement of independent components to achieve systemd self-developed substitution
 
-1. Scenario-by-scenario: Combine different usage scenarios to split the systemd function into multiple layers, and gradually complete the function development, verification, and replacement according to the scenario from easy to difficult. 
+1. Scenario-by-scenario: Combine different usage scenarios to split the systemd function into multiple layers, and gradually complete the function development, verification, and replacement according to the scenario from easy to difficult.
 
-2. Multi-solution: The core functions and components of the non-community alternative are replaced by self-developed and rewritten, and the others are replaced by community software without supply risk. 
+2. Multi-solution: The core functions and components of the non-community alternative are replaced by self-developed and rewritten, and the others are replaced by community software without supply risk.
 
 3. Rhythmic: one core competitiveness a year, to 24 years to complete the exploration of three corecompetitiveness, according to the development - landing - substitution of the three lines of work.
 
 ## sysMaster: A new No. 1 process implementation solution, self-healing of second-level faults, ensuring that the system is online all day
 
-sysMaster aims to improve the traditional init daemon, 1+1+N architecture. 
+sysMaster aims to improve the traditional init daemon, 1+1+N architecture.
 
-- init: The new No. 1 process, with minimalist functions, 1,000 lines of code, and extreme reliability 
+- init: The new No. 1 process, with minimalist functions, 1,000 lines of code, and extreme reliability
 
-- core: undertakes the original core functions of systemd, introduces a reliability framework and plug-in mechanism, and makes it capable of rapid self-healing of crashes, hot upgrades, and flexible assembly 
+- core: undertakes the original core functions of systemd, introduces a reliability framework and plug-in mechanism, and makes it capable of rapid self-healing of crashes, hot upgrades, and flexible assembly
 
-- exts: makes the functions of each component of the original coupling independent, supports the replacement of the corresponding components of the systemd in a drawer style, and supports rhythmic substitution of sub-scenes 
+- exts: makes the functions of each component of the original coupling independent, supports the replacement of the corresponding components of the systemd in a drawer style, and supports rhythmic substitution of sub-scenes
 
 **Strive to build three major competitiveness:**
 
-1. Extremely reliable –** never downtime** 
+1. Extremely reliable –** never downtime**
 
 - Simplified architecture: 1+1+N, simplifying INIT; Non-core functions are provided in a componentized manner
 - Extremely reliable: fault detection + second-level recovery, and the root process is continuously online
-- Memory safety: The memory problem is reduced to 0 and the fault is self-healing 
+- Memory safety: The memory problem is reduced to 0 and the fault is self-healing
 
 2. Extremely lightweight –**fast start-up**
 
@@ -66,7 +66,7 @@ sysMaster aims to improve the traditional init daemon, 1+1+N architecture.
 
 ## construct
 
-First, download the repository code and run the command to pre-install the project dependencies and build the development environment, the project is mainly built on Rust 1.57, and use pre-commit to do the git commit check. 
+First, download the repository code and run the command to pre-install the project dependencies and build the development environment, the project is mainly built on Rust 1.57, and use pre-commit to do the git commit check.
 
 ```
 sh ./build.sh
@@ -133,4 +133,3 @@ As:
   - bin crate: extends/init, sysmaster
   - daemon crate: extends/udevd, extends/logind
 ```
-
