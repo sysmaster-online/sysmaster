@@ -35,7 +35,6 @@ Overall strategy: Focus on the system with the smallest function, adopt the para
 
 3. Rhythmic: one core competitiveness a year, to 24 years to complete the exploration of three corecompetitiveness, according to the development - landing - substitution of the three lines of work.
 
-
 ## sysMaster: A new No. 1 process implementation solution, self-healing of second-level faults, ensuring that the system is online all day
 
 sysMaster aims to improve the traditional init daemon, 1+1+N architecture. 
@@ -134,3 +133,4 @@ As:
   - bin crate: extends/init, sysmaster
   - daemon crate: extends/udevd, extends/logind
 ```
+
