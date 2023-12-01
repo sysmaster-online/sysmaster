@@ -258,13 +258,22 @@ impl Iterator for MountInfoParser {
                     mount_options = s.to_string();
                 }
                 6 => {
-                    optional_fields = s.to_string();
+                    if s == "-" {
+                        // skip 7
+                        index += 1;
+                    } else {
+                        if !optional_fields.is_empty() {
+                            optional_fields += " "
+                        }
+                        optional_fields += s;
+                        // don't know if there are more optional field, try again.
+                        index = 5;
+                    }
                 }
                 7 => {
-                    /* marks the end of the optional fields */
-                    if s != "-" {
-                        return None;
-                    }
+                    // "-" marks the end of the optional fields, we should have skipped 7 when
+                    // (index == 6 && s == "-"), so it's impossible to match this arm.
+                    return None;
                 }
                 8 => {
                     fstype = s.to_string();
@@ -274,7 +283,6 @@ impl Iterator for MountInfoParser {
                 }
                 _ => {}
             }
-
             index += 1;
             cur += 1;
             pre = cur;
