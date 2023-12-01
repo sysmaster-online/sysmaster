@@ -22,7 +22,7 @@ use nix::{
 use libc::{glob, glob_t, GLOB_NOSORT};
 
 use crate::{
-    cmdline, fd_util, fs_util::directory_is_empty, mount_util::is_mount_point, security,
+    cmdline, fd_util, fs_util::directory_is_not_empty, mount_util::is_mount_point, security,
     sysfs::SysFs, unistd,
 };
 
@@ -195,7 +195,7 @@ impl Condition {
     }
 
     fn test_directory_not_empty(&self) -> i8 {
-        !directory_is_empty(Path::new(&self.params)) as i8
+        directory_is_not_empty(Path::new(&self.params)) as i8
     }
 
     fn test_file_is_executable(&self) -> i8 {

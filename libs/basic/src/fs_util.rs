@@ -357,15 +357,25 @@ pub fn mkdir_p_label(path: &Path, mode: u32) -> Result<()> {
 /// mkdir parents with the given label
 pub fn mkdir_parents_label() {}
 
+/// check if the given directory is not empty
+pub fn directory_is_not_empty(path: &Path) -> bool {
+    if path.is_file() {
+        return false;
+    }
+    let mut iter = match path.read_dir() {
+        Err(_) => return false,
+        Ok(v) => v,
+    };
+    iter.next().is_some()
+}
+
 /// check if the given directory is empty
 pub fn directory_is_empty(path: &Path) -> bool {
     if path.is_file() {
         return false;
     }
     let mut iter = match path.read_dir() {
-        Err(_) => {
-            return false;
-        }
+        Err(_) => return false,
         Ok(v) => v,
     };
     iter.next().is_none()
