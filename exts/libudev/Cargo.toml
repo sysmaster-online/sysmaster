@@ -1,0 +1,13 @@
+[package]
+name = "libudev"
+version = "0.5.1"
+edition = "2021"
+
+[lib]
+name = "udev"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+device = { path = "../../libs/device", default-features = false }
+libudev_macro = { path = "../libudev_macro" }

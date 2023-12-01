@@ -1,0 +1,25 @@
+# README
+
+## Build
+
+```shell
+$ make all
+cc -lpthread -L/lib64 -ludev -o ...
+...
+$ ./test_libudev_*
+...
+```
+
+## Clean up
+
+```shell
+$ make clean
+rm -f ...
+```
+
+## Pre-load libudev
+
+```shell
+$ LD_PRELOAD=</path/to/libudev.so> ./test_libudev_*
+...
+```
