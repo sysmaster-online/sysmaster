@@ -14,6 +14,7 @@
 use crate::Error;
 use crate::{error::*, format_proc_fd_path};
 use libc::{fchownat, mode_t, timespec, AT_EMPTY_PATH, S_IFLNK, S_IFMT};
+use nix::unistd::mkdir;
 use nix::{
     fcntl::{open, readlink, renameat, OFlag},
     sys::stat::{fstat, Mode},
@@ -310,6 +311,59 @@ pub fn futimens_opath(fd: RawFd, ts: Option<[timespec; 2]>) -> Result<()> {
     Ok(())
 }
 
+/// mkdir -p with the given directory mode
+pub fn mkdir_p_label(path: &Path, mode: u32) -> Result<()> {
+    let path_str = path.to_string_lossy();
+    if path.exists() && path.is_dir() {
+        if let Err(e) = chmod(&path_str, mode) {
+            log::error!("Failed to chmod of {}: {}", path_str, e);
+            return Err(e);
+        }
+    }
+
+    let simplified_path = match path_simplify(&path_str) {
+        None => {
+            return Err(Error::Invalid { what: format!("Invalid path: {}", path_str) });
+        }
+        Some(v) => v,
+    };
+
+    if !path_is_abosolute(&simplified_path) {
+        return Err(Error::Invalid { what: format!("Invalid Path: {}, only abosolute path is allowed.", path_str)});
+    }
+
+    let mode = Mode::from_bits_truncate(mode);
+    let mut cur_path = PathBuf::from("/");
+    // mkdir -p up to down
+    for e in simplified_path.split('/') {
+        cur_path = cur_path.join(e);
+        if cur_path.exists() {
+            continue;
+        }
+        if let Err(e) = mkdir(&cur_path, mode) {
+            return Err(Error::Nix { source: e })
+        }
+    }
+    Ok(())
+}
+
+/// mkdir parents with the given label
+pub fn mkdir_parents_label() {}
+
+/// check if the given directory is empty
+pub fn directory_is_empty(path: &Path) -> bool {
+    if path.is_file() {
+        return false;
+    }
+    let mut iter = match path.read_dir() {
+        Err(_) => {
+            return false;
+        }
+        Ok(v) => v,
+    };
+    iter.next().is_none()
+}
+
 /// recursively remove parent directories until specific directory
 pub fn remove_dir_until(path: &str, stop: &str) -> Result<()> {
     let path = Path::new(path);
@@ -589,6 +643,13 @@ pub fn parse_absolute_path(s: &str) -> Result<String, Error> {
     };
 
     Ok(path)
+}
+
+pub fn parse_pathbuf(s: &str) -> Result<PathBuf, Error> {
+    let path = parse_absolute_path(s).map_err(|_| Error::Invalid {
+        what: "Invalid PathBuf".to_string(),
+    })?;
+    Ok(PathBuf::from(path))
 }
 
 /// unit lookup path in /etc

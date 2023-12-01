@@ -19,11 +19,11 @@ use super::rentry::{
     NotifyState, ServiceCommand, ServiceRestart, ServiceResult, ServiceState, ServiceType,
 };
 use super::spawn::ServiceSpawn;
-use crate::rentry::{ExitStatus, NotifyAccess, PreserveMode};
+use crate::rentry::{ExitStatus, NotifyAccess};
 use basic::{do_entry_log, fd_util, IN_SET};
 use basic::{fs_util, process};
 use core::error::*;
-use core::exec::{ExecCommand, ExecContext, ExecFlag, ExecFlags};
+use core::exec::{ExecCommand, ExecContext, ExecFlag, ExecFlags, PreserveMode};
 use core::rel::ReStation;
 use core::unit::{KillOperation, UnitActiveState, UnitNotifyFlags};
 use event::{EventState, EventType, Events, Source};

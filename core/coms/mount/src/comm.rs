@@ -72,7 +72,7 @@ impl MountUnitComm {
         self.umcomm.rentry()
     }
 
-    pub(super) fn _um(&self) -> Rc<dyn UmIf> {
+    pub(super) fn um(&self) -> Rc<dyn UmIf> {
         self.umcomm.um()
     }
 }

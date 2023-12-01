@@ -10,10 +10,10 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use core::rel::{ReDb, ReDbRwTxn, ReDbTable, ReliSwitch, Reliability};
-use macros::EnumDisplay;
+use core::{rel::{ReDb, ReDbRwTxn, ReDbTable, ReliSwitch, Reliability}, exec::{WorkingDirectory, StateDirectory, RuntimeDirectory, PreserveMode, Rlimit}};
+use macros::{EnumDisplay, UnitSection};
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
+use std::{rc::Rc, path::PathBuf, collections::HashMap};
 
 const RELI_DB_HMOUNT_MNG: &str = "mntmng";
 const RELI_DB_HMOUNTM_FRAME: &str = "mntm-frame";
@@ -23,7 +23,17 @@ const RELI_LAST_KEY: u32 = 0; // singleton
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, EnumDisplay)]
 pub(super) enum MountState {
     Dead,
+    Mounting,
+    MountingDone,
     Mounted,
+    Remounting,
+    Unmounting,
+    RemountingSigterm,
+    RemountingSigKill,
+    UnmountingSigterm,
+    UnmountingSigkill,
+    Failed,
+    Cleaning,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -136,4 +146,47 @@ impl ReDbTable for MountReDb<u32, MountReFrame> {
     fn switch_set(&self, switch: ReliSwitch) {
         self.0.switch_buffer(switch);
     }
+}
+
+#[derive(UnitSection, Default)]
+#[allow(non_snake_case)]
+pub struct SectionMount {
+    #[entry(default = String::new())]
+    pub What: String,
+    #[entry(default = String::new())]
+    pub Where: String,
+    #[entry(default = String::new())]
+    pub Type: String,
+    #[entry(default = String::new())]
+    pub Options: String,
+    #[entry(default = 0o755)]
+    pub DirectoryMode: u32,
+    #[entry(default = false)]
+    pub ForceUnmount: bool,
+
+    // Exec
+    #[entry(default = String::new())]
+    pub User: String,
+    #[entry(default = String::new())]
+    pub Group: String,
+    #[entry(default = String::from("0022"))]
+    pub UMask: String,
+    #[entry(parser = basic::fs_util::parse_pathbuf)]
+    pub RootDirectory: Option<PathBuf>,
+    #[entry(default = WorkingDirectory::default(), parser = core::exec::parse_working_directory)]
+    pub WorkingDirectory: WorkingDirectory,
+    #[entry(default = StateDirectory::default(), parser = core::exec::parse_state_directory)]
+    pub StateDirectory: StateDirectory,
+    #[entry(default = RuntimeDirectory::default(), parser = core::exec::parse_runtime_directory)]
+    pub RuntimeDirectory: RuntimeDirectory,
+    #[entry(default = PreserveMode::No)]
+    pub RuntimeDirectoryPreserve: PreserveMode,
+    pub LimitCORE: Option<Rlimit>,
+    pub LimitNOFILE: Option<Rlimit>,
+    pub LimitNPROC: Option<Rlimit>,
+    #[entry(parser = core::exec::parse_environment)]
+    pub Environment: Option<HashMap<String, String>>,
+    #[entry(append)]
+    pub EnvironmentFile: Vec<String>,
+    pub SELinuxContext: Option<String>,
 }

@@ -603,12 +603,6 @@ impl Unit {
 
     pub(super) fn load_unit(&self) -> Result<()> {
         self.set_in_load_queue(false);
-        // Mount unit doesn't have config file, set its loadstate to
-        // UnitLoaded directly.
-        if self.unit_type() == UnitType::UnitMount {
-            self.load.set_load_state(UnitLoadState::Loaded);
-            return Ok(());
-        }
         match self.load.load_unit_confs() {
             Ok(_) => {
                 let paths = self.load.get_unit_id_fragment_pathbuf();

@@ -21,7 +21,10 @@ use nix::{
 
 use libc::{glob, glob_t, GLOB_NOSORT};
 
-use crate::{cmdline, fd_util, mount_util::is_mount_point, security, sysfs::SysFs, unistd};
+use crate::{
+    cmdline, fd_util, fs_util::directory_is_empty, mount_util::is_mount_point, security,
+    sysfs::SysFs, unistd,
+};
 
 #[cfg(target_env = "musl")]
 use crate::mount_util::MountInfoParser;
@@ -192,17 +195,7 @@ impl Condition {
     }
 
     fn test_directory_not_empty(&self) -> i8 {
-        let path = Path::new(&self.params);
-        if path.is_file() {
-            return 0;
-        }
-        let mut iter = match path.read_dir() {
-            Err(_) => {
-                return 0;
-            }
-            Ok(v) => v,
-        };
-        iter.next().is_some() as i8
+        !directory_is_empty(&Path::new(&self.params)) as i8
     }
 
     fn test_file_is_executable(&self) -> i8 {

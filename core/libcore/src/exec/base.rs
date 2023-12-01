@@ -11,6 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::error::*;
+use basic::fs_util::{path_simplify, path_name_is_safe, path_length_is_valid, path_is_abosolute};
 use basic::rlimit;
 use bitflags::bitflags;
 use libc::EPERM;
@@ -91,7 +92,7 @@ fn parse_rlimit(limit: &str) -> Result<u64, Error> {
 }
 
 impl FromStr for Rlimit {
-    type Err = Error;
+    type Err = crate::error::Error;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let value: Vec<_> = s.trim().split_terminator(':').collect();
         let soft: u64;
@@ -118,11 +119,78 @@ impl FromStr for Rlimit {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum PreserveMode {
+    No,
+    Yes,
+    Restart,
+}
+
+impl Default for PreserveMode {
+    fn default() -> Self {
+        Self::No
+    }
+}
+
+impl UnitEntry for PreserveMode {
+    type Error = Error;
+
+    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
+        let res = match input.as_ref() {
+            "no" => PreserveMode::No,
+            "yes" => PreserveMode::Yes,
+            "restart" => PreserveMode::Restart,
+            _ => {
+                log::error!(
+                    "Failed to parse RuntimeDirectoryPreserve: {}, assuming no",
+                    input.as_ref()
+                );
+                PreserveMode::No
+            }
+        };
+        Ok(res)
+    }
+}
+
+fn is_valid_exec_directory(s: &str) -> bool {
+    if !path_name_is_safe(s) {
+        return false;
+    }
+    if !path_length_is_valid(s) {
+        return false;
+    }
+    if path_is_abosolute(s) {
+        return false;
+    }
+    true
+}
+
 /// WorkingDirectory of ExecContext
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct WorkingDirectory {
     directory: Option<PathBuf>,
     miss_ok: bool,
+}
+
+pub fn parse_working_directory(s: &str) -> Result<WorkingDirectory, basic::Error> {
+    if s.is_empty() {
+        return Ok(WorkingDirectory::new(None, true));
+    }
+
+    let mut miss_ok = false;
+    if s.starts_with('-') {
+        miss_ok = true;
+    }
+
+    let mut s: String = s.trim_start_matches('-').to_string();
+
+    if s == *"~".to_string() {
+        s = std::env::var("HOME").map_err(|_| basic::Error::Invalid {
+            what: "can't get HOME environment".to_string(),
+        })?;
+    }
+
+    Ok(WorkingDirectory::new(Some(PathBuf::from(&s)), miss_ok))
 }
 
 impl WorkingDirectory {
@@ -148,6 +216,30 @@ pub struct RuntimeDirectory {
     directory: Vec<PathBuf>,
 }
 
+pub fn parse_runtime_directory(s: &str) -> Result<RuntimeDirectory> {
+    let mut res = RuntimeDirectory::default();
+    for d in s.split_terminator(';') {
+        if !is_valid_exec_directory(d) {
+            return Err(Error::ConfigureError {
+                msg: "invalid runtime directory".to_string(),
+            });
+        }
+
+        let path = match path_simplify(d) {
+            None => {
+                return Err(Error::ConfigureError {
+                    msg: "invalid runtime directory".to_string(),
+                });
+            }
+            Some(v) => v,
+        };
+
+        res.add_directory(Path::new("/run").join(path));
+    }
+
+    Ok(res)
+}
+
 impl RuntimeDirectory {
     ///
     pub fn add_directory(&mut self, directory: PathBuf) {
@@ -164,6 +256,31 @@ impl RuntimeDirectory {
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct StateDirectory {
     directory: Vec<PathBuf>,
+}
+
+pub fn parse_state_directory(s: &str) -> Result<StateDirectory> {
+    /* Similar with RuntimeDirectory */
+    let mut res = StateDirectory::default();
+    for d in s.split_terminator(';') {
+        if !is_valid_exec_directory(d) {
+            return Err(Error::ConfigureError {
+                msg: "not valid exec directory".to_string(),
+            });
+        }
+
+        let path = match path_simplify(d) {
+            None => {
+                return Err(Error::ConfigureError {
+                    msg: "not valid exec directory".to_string(),
+                });
+            }
+            Some(v) => v,
+        };
+
+        res.add_directory(Path::new("/var/lib").join(path));
+    }
+
+    Ok(res)
 }
 
 impl StateDirectory {
@@ -199,6 +316,113 @@ impl Default for ExecContext {
     fn default() -> Self {
         ExecContext::new()
     }
+}
+
+pub fn parse_environment(s: &str) -> Result<HashMap<String, String>> {
+    #[derive(PartialEq, Clone, Copy)]
+    enum ParseState {
+        Init,
+        Key,
+        Value,
+        Quotes,
+        BackSlash,
+        WaitSpace,
+        Invalid,
+    }
+
+    let mut state = ParseState::Init;
+    let mut state_before_back_slash = ParseState::Value;
+    let mut key = String::new();
+    let mut value = String::new();
+    let mut res: HashMap<String, String> = HashMap::new();
+    for c in s.chars() {
+        match state {
+            ParseState::Init => {
+                if !key.is_empty() && !value.is_empty() {
+                    res.insert(key, value);
+                }
+                key = String::new();
+                value = String::new();
+                if c.is_ascii_alphanumeric() || c == '_' {
+                    key += &c.to_string();
+                    state = ParseState::Key;
+                } else if c != ' ' {
+                    state = ParseState::Invalid;
+                    break;
+                }
+            }
+            ParseState::Key => {
+                if c.is_ascii_alphanumeric() || c == '_' {
+                    key += &c.to_string();
+                } else if c == '=' {
+                    state = ParseState::Value;
+                } else {
+                    /* F-O=foo */
+                    state = ParseState::Invalid;
+                    break;
+                }
+            }
+            ParseState::Value => {
+                /* FOO="foo bar" */
+                if c == '\"' {
+                    state = ParseState::Quotes;
+                    continue;
+                }
+                /* FOO==\"foo */
+                if c == '\\' {
+                    state = ParseState::BackSlash;
+                    state_before_back_slash = ParseState::Value;
+                    continue;
+                }
+                if c != ' ' {
+                    value += &c.to_string();
+                    continue;
+                }
+                state = ParseState::Init;
+            }
+            ParseState::BackSlash => {
+                /* FOO=\"foo or FOO="\"foo bar" */
+                value += &c.to_string();
+                state = state_before_back_slash;
+            }
+            ParseState::Quotes => {
+                /* We have got the right ", there must a space after. */
+                if c == '\"' {
+                    state = ParseState::WaitSpace;
+                    continue;
+                }
+                if c == '\\' {
+                    state = ParseState::BackSlash;
+                    state_before_back_slash = ParseState::Quotes;
+                    continue;
+                }
+                value += &c.to_string();
+            }
+            ParseState::WaitSpace => {
+                if c != ' ' {
+                    /* FOO="foo bar"x */
+                    state = ParseState::Invalid;
+                    break;
+                } else {
+                    state = ParseState::Init;
+                }
+            }
+            ParseState::Invalid => {
+                break;
+            }
+        }
+    }
+    if state == ParseState::Invalid {
+        log::warn!("Found invalid Environment, breaking");
+        return Ok(res);
+    }
+    if !key.is_empty()
+        && !value.is_empty()
+        && [ParseState::Init, ParseState::WaitSpace, ParseState::Value].contains(&state)
+    {
+        res.insert(key, value);
+    }
+    Ok(res)
 }
 
 impl ExecContext {
@@ -360,7 +584,7 @@ impl ExecContext {
 
     ///
     pub fn set_group(&self, group_str: &str) -> Result<()> {
-        /* add_user should be called before add_group */
+        /* set_user should be called before add_group */
         assert!(self.user().is_some());
 
         /* group is not configured, use the primary group of user */
@@ -687,5 +911,32 @@ mod tests {
         let source5 = "infinity:100";
         let rlimit = Rlimit::from_str(source5);
         assert!(rlimit.is_err());
+    }
+
+    use crate::exec::base::parse_working_directory;
+    use std::path::PathBuf;
+    #[test]
+    fn test_parse_working_directory() {
+        assert_eq!(
+            parse_working_directory("/root").unwrap().directory(),
+            Some(PathBuf::from("/root"))
+        );
+        assert_eq!(
+            parse_working_directory("-/root/foooooooobarrrrrr")
+                .unwrap()
+                .directory(),
+            Some(PathBuf::from("/root/foooooooobarrrrrr"))
+        );
+        assert_eq!(
+            parse_working_directory("--------------/usr/lib")
+                .unwrap()
+                .directory(),
+            Some(PathBuf::from("/usr/lib"))
+        );
+        assert_eq!(
+            parse_working_directory("~").unwrap().directory(),
+            Some(PathBuf::from(std::env::var("HOME").unwrap()))
+        );
+        assert_eq!(parse_working_directory("").unwrap().directory(), None);
     }
 }

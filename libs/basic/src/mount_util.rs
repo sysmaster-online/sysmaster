@@ -314,6 +314,21 @@ impl Iterator for MountInfoParser {
     }
 }
 
+/// filter options we don't need, and return the rest
+pub fn filter_options(options: &str, filter_names: Vec<&str>) -> String {
+    let mut res = String::new();
+    for option in options.split(',') {
+        if filter_names.contains(&option.trim()) {
+            continue;
+        }
+        if !res.is_empty() {
+            res += ","
+        }
+        res += option
+    }
+    res
+}
+
 ///Read the file of filename into the BufReader for later processing
 pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where

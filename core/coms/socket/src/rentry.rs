@@ -29,7 +29,7 @@ const RELI_DB_HSOCKET_MNG: &str = "sockmng";
 const RELI_DB_HSOCKETM_FRAME: &str = "sockm-frame";
 const RELI_LAST_KEY: u32 = 0; // singleton
 
-fn deserialize_pathbuf_vec(s: &str) -> Result<Vec<PathBuf>, core::error::Error> {
+fn parse_pathbuf_vec(s: &str) -> Result<Vec<PathBuf>, core::error::Error> {
     let mut res = Vec::new();
     for v in s.split_ascii_whitespace() {
         let path = basic::fs_util::parse_absolute_path(v).map_err(|_| {
@@ -55,15 +55,15 @@ fn deserialize_netlink_vec(s: &str) -> Result<Vec<String>, core::error::Error> {
 #[derive(UnitSection, Default, Clone, Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub(super) struct SectionSocket {
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecStartPre: Vec<ExecCommand>,
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecStartChown: Vec<ExecCommand>,
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecStartPost: Vec<ExecCommand>,
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecStopPre: Vec<ExecCommand>,
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecStopPost: Vec<ExecCommand>,
 
     #[entry(append)]
@@ -95,7 +95,7 @@ pub(super) struct SectionSocket {
     pub Broadcast: Option<bool>,
     #[entry(default = false)]
     pub RemoveOnStop: bool,
-    #[entry(append, parser = deserialize_pathbuf_vec)]
+    #[entry(append, parser = parse_pathbuf_vec)]
     pub Symlinks: Vec<PathBuf>,
     pub PassSecurity: Option<bool>,
     #[entry(default = 0o666, parser = deserialize_parse_mode)]

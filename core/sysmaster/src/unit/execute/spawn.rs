@@ -65,7 +65,7 @@ impl ExecSpawn {
 
 fn apply_user_and_group(exec_ctx: Rc<ExecContext>, params: &ExecParameters) -> Result<()> {
     let user = match exec_ctx.user() {
-        // ExecParameters.add_user() has already assigned valid user if the configuration is correct
+        // ExecParameters.set_user() has already assigned valid user if the configuration is correct
         None => {
             return Err(Error::InvalidData);
         }

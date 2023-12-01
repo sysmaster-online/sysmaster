@@ -14,13 +14,14 @@
 use crate::monitor::ServiceMonitor;
 
 use basic::fs_util::{
-    parse_absolute_path, path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify,
+    path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify,
 };
 use macros::{EnumDisplay, UnitSection};
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
+use core::exec::PreserveMode;
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
@@ -202,40 +203,7 @@ impl UnitEntry for ExitStatusSet {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum PreserveMode {
-    No,
-    Yes,
-    Restart,
-}
-
-impl Default for PreserveMode {
-    fn default() -> Self {
-        Self::No
-    }
-}
-
-impl UnitEntry for PreserveMode {
-    type Error = core::error::Error;
-
-    fn parse_from_str<S: AsRef<str>>(input: S) -> std::result::Result<Self, Self::Error> {
-        let res = match input.as_ref() {
-            "no" => PreserveMode::No,
-            "yes" => PreserveMode::Yes,
-            "restart" => PreserveMode::Restart,
-            _ => {
-                log::error!(
-                    "Failed to parse RuntimeDirectoryPreserve: {}, assuming no",
-                    input.as_ref()
-                );
-                PreserveMode::No
-            }
-        };
-        Ok(res)
-    }
-}
-
-fn deserialize_pidfile(s: &str) -> Result<PathBuf> {
+fn parse_pidfile(s: &str) -> Result<PathBuf> {
     if !path_name_is_safe(s) {
         return Err(core::error::Error::ConfigureError {
             msg: "PIDFile contains invalid character".to_string(),
@@ -264,129 +232,7 @@ fn deserialize_pidfile(s: &str) -> Result<PathBuf> {
     }
 }
 
-fn deserialize_pathbuf(s: &str) -> Result<PathBuf> {
-    let path = parse_absolute_path(s).map_err(|_| core::error::Error::ConfigureError {
-        msg: "Invalid PathBuf".to_string(),
-    })?;
-    Ok(PathBuf::from(path))
-}
-
-fn parse_working_directory(s: &str) -> Result<WorkingDirectory, basic::Error> {
-    if s.is_empty() {
-        return Ok(WorkingDirectory::new(None, true));
-    }
-
-    let mut miss_ok = false;
-    if s.starts_with('-') {
-        miss_ok = true;
-    }
-
-    let mut s: String = s.trim_start_matches('-').to_string();
-
-    if s == *"~".to_string() {
-        s = std::env::var("HOME").map_err(|_| basic::Error::Invalid {
-            what: "can't get HOME environment".to_string(),
-        })?;
-    }
-
-    Ok(WorkingDirectory::new(Some(PathBuf::from(&s)), miss_ok))
-}
-
-#[cfg(test)]
-mod test {
-    use std::path::PathBuf;
-
-    use crate::rentry::parse_working_directory;
-
-    #[test]
-    fn test_parse_working_directory() {
-        assert_eq!(
-            parse_working_directory("/root").unwrap().directory(),
-            Some(PathBuf::from("/root"))
-        );
-        assert_eq!(
-            parse_working_directory("-/root/foooooooobarrrrrr")
-                .unwrap()
-                .directory(),
-            Some(PathBuf::from("/root/foooooooobarrrrrr"))
-        );
-        assert_eq!(
-            parse_working_directory("--------------/usr/lib")
-                .unwrap()
-                .directory(),
-            Some(PathBuf::from("/usr/lib"))
-        );
-        assert_eq!(
-            parse_working_directory("~").unwrap().directory(),
-            Some(PathBuf::from(std::env::var("HOME").unwrap()))
-        );
-        assert_eq!(parse_working_directory("").unwrap().directory(), None);
-    }
-}
-
-fn is_valid_exec_directory(s: &str) -> bool {
-    if !path_name_is_safe(s) {
-        return false;
-    }
-    if !path_length_is_valid(s) {
-        return false;
-    }
-    if path_is_abosolute(s) {
-        return false;
-    }
-    true
-}
-
-fn deserialize_runtime_directory(s: &str) -> Result<RuntimeDirectory> {
-    let mut res = RuntimeDirectory::default();
-    for d in s.split_terminator(';') {
-        if !is_valid_exec_directory(d) {
-            return Err(Error::ConfigureError {
-                msg: "invalid runtime directory".to_string(),
-            });
-        }
-
-        let path = match path_simplify(d) {
-            None => {
-                return Err(Error::ConfigureError {
-                    msg: "invalid runtime directory".to_string(),
-                });
-            }
-            Some(v) => v,
-        };
-
-        res.add_directory(Path::new("/run").join(path));
-    }
-
-    Ok(res)
-}
-
-fn deserialize_state_directory(s: &str) -> Result<StateDirectory> {
-    /* Similar with RuntimeDirectory */
-    let mut res = StateDirectory::default();
-    for d in s.split_terminator(';') {
-        if !is_valid_exec_directory(d) {
-            return Err(Error::ConfigureError {
-                msg: "not valid exec directory".to_string(),
-            });
-        }
-
-        let path = match path_simplify(d) {
-            None => {
-                return Err(Error::ConfigureError {
-                    msg: "not valid exec directory".to_string(),
-                });
-            }
-            Some(v) => v,
-        };
-
-        res.add_directory(Path::new("/var/lib").join(path));
-    }
-
-    Ok(res)
-}
-
-fn deserialize_timeout(s: &str) -> Result<u64> {
+fn parse_timeout(s: &str) -> Result<u64> {
     let timeout = s.parse::<u64>().unwrap();
     if timeout == 0 {
         return Ok(u64::MAX);
@@ -397,182 +243,77 @@ fn deserialize_timeout(s: &str) -> Result<u64> {
     Ok(timeout * USEC_PER_SEC)
 }
 
-fn parse_environment(s: &str) -> Result<HashMap<String, String>> {
-    #[derive(PartialEq, Clone, Copy)]
-    enum ParseState {
-        Init,
-        Key,
-        Value,
-        Quotes,
-        BackSlash,
-        WaitSpace,
-        Invalid,
-    }
-
-    let mut state = ParseState::Init;
-    let mut state_before_back_slash = ParseState::Value;
-    let mut key = String::new();
-    let mut value = String::new();
-    let mut res: HashMap<String, String> = HashMap::new();
-    for c in s.chars() {
-        match state {
-            ParseState::Init => {
-                if !key.is_empty() && !value.is_empty() {
-                    res.insert(key, value);
-                }
-                key = String::new();
-                value = String::new();
-                if c.is_ascii_alphanumeric() || c == '_' {
-                    key += &c.to_string();
-                    state = ParseState::Key;
-                } else if c != ' ' {
-                    state = ParseState::Invalid;
-                    break;
-                }
-            }
-            ParseState::Key => {
-                if c.is_ascii_alphanumeric() || c == '_' {
-                    key += &c.to_string();
-                } else if c == '=' {
-                    state = ParseState::Value;
-                } else {
-                    /* F-O=foo */
-                    state = ParseState::Invalid;
-                    break;
-                }
-            }
-            ParseState::Value => {
-                /* FOO="foo bar" */
-                if c == '\"' {
-                    state = ParseState::Quotes;
-                    continue;
-                }
-                /* FOO==\"foo */
-                if c == '\\' {
-                    state = ParseState::BackSlash;
-                    state_before_back_slash = ParseState::Value;
-                    continue;
-                }
-                if c != ' ' {
-                    value += &c.to_string();
-                    continue;
-                }
-                state = ParseState::Init;
-            }
-            ParseState::BackSlash => {
-                /* FOO=\"foo or FOO="\"foo bar" */
-                value += &c.to_string();
-                state = state_before_back_slash;
-            }
-            ParseState::Quotes => {
-                /* We have got the right ", there must a space after. */
-                if c == '\"' {
-                    state = ParseState::WaitSpace;
-                    continue;
-                }
-                if c == '\\' {
-                    state = ParseState::BackSlash;
-                    state_before_back_slash = ParseState::Quotes;
-                    continue;
-                }
-                value += &c.to_string();
-            }
-            ParseState::WaitSpace => {
-                if c != ' ' {
-                    /* FOO="foo bar"x */
-                    state = ParseState::Invalid;
-                    break;
-                } else {
-                    state = ParseState::Init;
-                }
-            }
-            ParseState::Invalid => {
-                break;
-            }
-        }
-    }
-    if state == ParseState::Invalid {
-        log::warn!("Found invalid Environment, breaking");
-        return Ok(res);
-    }
-    if !key.is_empty()
-        && !value.is_empty()
-        && [ParseState::Init, ParseState::WaitSpace, ParseState::Value].contains(&state)
-    {
-        res.insert(key, value);
-    }
-    Ok(res)
-}
-
 #[derive(UnitSection, Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SectionService {
     #[entry(default=ServiceType::Simple)]
     pub Type: ServiceType,
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecStart: Vec<ExecCommand>,
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecStartPre: Vec<ExecCommand>,
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecStartPost: Vec<ExecCommand>,
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecStop: Vec<ExecCommand>,
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecStopPost: Vec<ExecCommand>,
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecReload: Vec<ExecCommand>,
-    #[entry(append, parser = core::exec::deserialize_exec_command)]
+    #[entry(append, parser = core::exec::parse_exec_command)]
     pub ExecCondition: Vec<ExecCommand>,
     #[entry(append)]
     pub Sockets: Vec<String>,
     #[entry(default = 0)]
     pub WatchdogSec: u64,
-    #[entry(parser = deserialize_pidfile)]
+    #[entry(parser = parse_pidfile)]
     pub PIDFile: Option<PathBuf>,
     #[entry(default = false)]
     pub RemainAfterExit: bool,
     pub NotifyAccess: Option<NotifyAccess>,
     #[entry(default = false)]
     pub NonBlocking: bool,
-    #[entry(parser = parse_environment)]
-    pub Environment: Option<HashMap<String, String>>,
     #[entry(default = KillMode::ControlGroup)]
     pub KillMode: KillMode,
-    pub SELinuxContext: Option<String>,
-    #[entry(parser = deserialize_pathbuf)]
-    pub RootDirectory: Option<PathBuf>,
-    #[entry(default = WorkingDirectory::default(), parser = parse_working_directory)]
-    pub WorkingDirectory: WorkingDirectory,
-    #[entry(default = StateDirectory::default(), parser = deserialize_state_directory)]
-    pub StateDirectory: StateDirectory,
-    #[entry(default = RuntimeDirectory::default(), parser = deserialize_runtime_directory)]
-    pub RuntimeDirectory: RuntimeDirectory,
-    #[entry(default = PreserveMode::No)]
-    pub RuntimeDirectoryPreserve: PreserveMode,
-    #[entry(default = String::new())]
-    pub User: String,
-    #[entry(default = String::new())]
-    pub Group: String,
-    #[entry(default = String::from("0022"))]
-    pub UMask: String,
     #[entry(default = ServiceRestart::No)]
     pub Restart: ServiceRestart,
     #[entry(default = ExitStatusSet::default())]
     pub RestartPreventExitStatus: ExitStatusSet,
     #[entry(default = 1)]
     pub RestartSec: u64,
-    #[entry(append)]
-    pub EnvironmentFile: Vec<String>,
     #[entry(default = String::from("SIGTERM"))]
     pub KillSignal: String,
-    #[entry(default = 10000000, parser = deserialize_timeout)]
+    #[entry(default = 10000000, parser = parse_timeout)]
     pub TimeoutSec: u64,
-    #[entry(default = 10000000, parser = deserialize_timeout)]
+    #[entry(default = 10000000, parser = parse_timeout)]
     pub TimeoutStartSec: u64,
-    #[entry(default = 10000000, parser = deserialize_timeout)]
+    #[entry(default = 10000000, parser = parse_timeout)]
     pub TimeoutStopSec: u64,
+
+    // Exec
+    #[entry(default = String::new())]
+    pub User: String,
+    #[entry(default = String::new())]
+    pub Group: String,
+    #[entry(default = String::from("0022"))]
+    pub UMask: String,
+    #[entry(parser = basic::fs_util::parse_pathbuf)]
+    pub RootDirectory: Option<PathBuf>,
+    #[entry(default = WorkingDirectory::default(), parser = core::exec::parse_working_directory)]
+    pub WorkingDirectory: WorkingDirectory,
+    #[entry(default = StateDirectory::default(), parser = core::exec::parse_state_directory)]
+    pub StateDirectory: StateDirectory,
+    #[entry(default = RuntimeDirectory::default(), parser = core::exec::parse_runtime_directory)]
+    pub RuntimeDirectory: RuntimeDirectory,
+    #[entry(default = PreserveMode::No)]
+    pub RuntimeDirectoryPreserve: PreserveMode,
     pub LimitCORE: Option<Rlimit>,
     pub LimitNOFILE: Option<Rlimit>,
     pub LimitNPROC: Option<Rlimit>,
+    #[entry(parser = core::exec::parse_environment)]
+    pub Environment: Option<HashMap<String, String>>,
+    #[entry(append)]
+    pub EnvironmentFile: Vec<String>,
+    pub SELinuxContext: Option<String>,
 }
 
 impl SectionService {

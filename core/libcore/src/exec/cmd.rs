@@ -14,6 +14,7 @@ use crate::serialize::DeserializeWith;
 use crate::specifier::{
     unit_string_specifier_escape, unit_strings_specifier_escape, UnitSpecifierData,
 };
+use basic::fs_util::{path_simplify, path_is_abosolute};
 use basic::{fs_util::parse_absolute_path, Error, Result};
 use bitflags::bitflags;
 use serde::{
@@ -62,7 +63,7 @@ impl ExecCommand {
     pub fn empty() -> ExecCommand {
         ExecCommand {
             path: String::new(),
-            argv: vec![String::new()],
+            argv: Vec::new(),
             flags: ExecFlag::EXEC_COMMAND_EMPTY,
         }
     }
@@ -71,10 +72,29 @@ impl ExecCommand {
         self.flags |= flag;
     }
     ///
+    pub fn append_argv(&mut self, argv: &str) {
+        self.argv.push(String::from(argv));
+    }
+    ///
+    pub fn append_many_argv(&mut self, argvs: Vec<&str>) {
+        self.argv.extend(argvs.iter().map(|x| x.to_string()))
+    }
+    ///
     pub fn get_exec_flag(&self) -> ExecFlag {
         self.flags
     }
-
+    ///
+    pub fn set_path(&mut self, path: &str) -> Result<()> {
+        if !path_is_abosolute(path) {
+            return Err(Error::Invalid { what: "ExecCmd path should be absolute".to_string() });
+        }
+        let v = match path_simplify(path) {
+            None => return Err(Error::Invalid { what: "Invalid ExecCmd path".to_string() }),
+            Some(v) => v,
+        };
+        self.path = v;
+        Ok(())
+    }
     /// return the path of the command
     pub fn path(&self) -> &String {
         &self.path
@@ -102,7 +122,7 @@ impl ExecCommand {
 }
 
 ///
-pub fn deserialize_exec_command(s: &str) -> Result<Vec<ExecCommand>> {
+pub fn parse_exec_command(s: &str) -> Result<Vec<ExecCommand>> {
     match parse_exec(s) {
         Ok(v) => Ok(v),
         Err(e) => {

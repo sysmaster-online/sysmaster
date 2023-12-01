@@ -18,6 +18,7 @@ event = { path = "../../../libs/event" }
 log = { path = "../../../libs/log" }
 macros = { path = "../../../libs/macros" }
 constants = { path = "../../../libs/constants", optional = true }
+unit_parser = { path = "../../../libs/unit_parser" }
 
 epoll = "=4.3.1"
 libc = { version = "0.2.*", default-features = false }
@@ -31,6 +32,7 @@ once_cell = { version = "=1.8.0", default-features = false }
 serde = { version = "1.0.130", default-features = false }
 
 [features]
-default = ["noplugin"]
+default = ["noplugin", "linux"]
 noplugin = []
+linux = []
 plugin = ["constants"]

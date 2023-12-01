@@ -1132,6 +1132,7 @@ dependencies = [
  "nix 0.24.3",
  "once_cell",
  "serde",
+ "unit_parser",
 ]
 
 [[package]]
