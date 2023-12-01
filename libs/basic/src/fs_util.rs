@@ -323,13 +323,20 @@ pub fn mkdir_p_label(path: &Path, mode: u32) -> Result<()> {
 
     let simplified_path = match path_simplify(&path_str) {
         None => {
-            return Err(Error::Invalid { what: format!("Invalid path: {}", path_str) });
+            return Err(Error::Invalid {
+                what: format!("Invalid path: {}", path_str),
+            });
         }
         Some(v) => v,
     };
 
     if !path_is_abosolute(&simplified_path) {
-        return Err(Error::Invalid { what: format!("Invalid Path: {}, only abosolute path is allowed.", path_str)});
+        return Err(Error::Invalid {
+            what: format!(
+                "Invalid Path: {}, only abosolute path is allowed.",
+                path_str
+            ),
+        });
     }
 
     let mode = Mode::from_bits_truncate(mode);
@@ -341,7 +348,7 @@ pub fn mkdir_p_label(path: &Path, mode: u32) -> Result<()> {
             continue;
         }
         if let Err(e) = mkdir(&cur_path, mode) {
-            return Err(Error::Nix { source: e })
+            return Err(Error::Nix { source: e });
         }
     }
     Ok(())
@@ -650,6 +657,7 @@ pub fn parse_absolute_path(s: &str) -> Result<String, Error> {
     Ok(path)
 }
 
+///
 pub fn parse_pathbuf(s: &str) -> Result<PathBuf, Error> {
     let path = parse_absolute_path(s).map_err(|_| Error::Invalid {
         what: "Invalid PathBuf".to_string(),

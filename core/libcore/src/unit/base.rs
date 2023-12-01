@@ -168,16 +168,16 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     ///
     fn release_socket_fd(&self, _fd: i32) {}
 
-
     // ================ ONLY VALID FOR MOUNT ================
     ///
-    fn setup_existing_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {}
+    fn setup_existing_mount(&self, _what: &str, _mount_where: &str, _options: &str, _fstype: &str) {
+    }
 
     ///
-    fn setup_new_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {}
+    fn setup_new_mount(&self, _what: &str, _mount_where: &str, _options: &str, _fstype: &str) {}
 
     ///
-    fn update_mount_state(&self, state: &str) {}
+    fn update_mount_state(&self, _state: &str) {}
 }
 
 /// the macro for create a sub unit instance with dyn ref of UmIf,

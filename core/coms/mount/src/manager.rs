@@ -21,11 +21,8 @@ use super::rentry::{MountRe, MountReFrame};
 use basic::mount_util::{mount_point_to_unit_name, MountInfoParser};
 use core::error::*;
 use core::rel::{ReStation, ReliLastFrame, Reliability};
-use core::unit::{
-    unit_name_is_valid, UmIf, UnitActiveState, UnitManagerObj, UnitMngUtil, UnitNameFlags, UnitType,
-};
+use core::unit::{unit_name_is_valid, UmIf, UnitManagerObj, UnitMngUtil, UnitNameFlags, UnitType};
 use event::{EventState, EventType, Events, Source};
-use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -337,7 +334,9 @@ impl MountMonitorData {
         options: &str,
         fstype: &str,
     ) -> Result<()> {
-        self.comm.um().setup_new_mount(unit_name, what, mount_where, options, fstype);
+        self.comm
+            .um()
+            .setup_new_mount(unit_name, what, mount_where, options, fstype);
         Ok(())
     }
 
@@ -349,7 +348,9 @@ impl MountMonitorData {
         options: &str,
         fstype: &str,
     ) -> Result<()> {
-        self.comm.um().setup_existing_mount(unit_name, what, mount_where, options, fstype);
+        self.comm
+            .um()
+            .setup_existing_mount(unit_name, what, mount_where, options, fstype);
         Ok(())
     }
 
@@ -410,55 +411,7 @@ impl MountMonitorData {
         for unit in self.comm.um().units_get_all(unit_type).iter() {
             self.comm.um().update_mount_state(unit, "mounted");
         }
-        return Ok(());
-        /*
-        // Then start mount point we don't know.
-        let mut mountinfo_content = String::new();
-        File::open("/proc/self/mountinfo")
-            .unwrap()
-            .read_to_string(&mut mountinfo_content)
-            .unwrap();
-        let parser = MountInfoParser::new(mountinfo_content);
-        for mount in parser {
-            // pop
-            // We don't process autofs for now, because it is not
-            // .mount but .automount in systemd.
-            if mount.fstype == "autofs" {
-                continue;
-            }
-            let unit_name = mount_point_to_unit_name(&mount.mount_point);
-            if dead_mount_set.contains(unit_name.as_str()) {
-                dead_mount_set.remove(unit_name.as_str());
-            } else if self.comm.um().load_unit_success(unit_name.as_str()) {
-                // record + action
-                self.comm.reli().set_last_unit(&unit_name);
-                let start_ok = self.comm.um().unit_start_directly(&unit_name).is_ok();
-                self.comm.reli().clear_last_unit();
-
-                if start_ok {
-                    log::debug!("{} change to mounted.", unit_name);
-                } else {
-                    log::error!("Failed to start {}", unit_name);
-                }
-            }
-        }
-
-        // Finally stop mount point in dead_mount_set.
-        for unit_name in dead_mount_set.into_iter() {
-            // pop
-            // record + action
-            self.comm.reli().set_last_unit(&unit_name);
-            let ret = self.comm.um().unit_stop(&unit_name, false);
-            self.comm.reli().clear_last_unit();
-
-            if ret.is_ok() {
-                log::debug!("{} change to dead.", unit_name);
-            } else {
-                log::error!("Failed to stop {}.", unit_name);
-            }
-        }
         Ok(())
-        */
     }
 }
 

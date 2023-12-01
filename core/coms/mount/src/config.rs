@@ -13,16 +13,17 @@
 
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
-use basic::Error;
 use unit_parser::prelude::UnitConfig;
 
 use crate::{comm::MountUnitComm, rentry::SectionMount};
 
 #[derive(UnitConfig, Default)]
+#[allow(non_snake_case)]
 pub(super) struct MountConfigData {
     pub Mount: SectionMount,
 }
 
+#[allow(unused)]
 pub(super) struct MountConfig {
     // associated objects
     comm: Rc<MountUnitComm>,
@@ -45,7 +46,7 @@ impl MountConfig {
         }
     }
 
-    pub(super) fn load(&self, paths: Vec<PathBuf>, name: &str, update: bool) {
+    pub(super) fn load(&self, paths: Vec<PathBuf>, name: &str, _update: bool) {
         log::debug!("Loading {} config from: {:?}", name, paths);
         let mount_config = match MountConfigData::load_config(paths, name) {
             Ok(v) => v,
@@ -89,6 +90,7 @@ impl MountConfig {
         self.data.borrow().Mount.DirectoryMode
     }
 
+    #[allow(unused)]
     pub(super) fn force_unmount(&self) -> bool {
         self.data.borrow().Mount.ForceUnmount
     }

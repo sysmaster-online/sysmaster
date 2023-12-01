@@ -195,7 +195,7 @@ impl Condition {
     }
 
     fn test_directory_not_empty(&self) -> i8 {
-        !directory_is_empty(&Path::new(&self.params)) as i8
+        !directory_is_empty(Path::new(&self.params)) as i8
     }
 
     fn test_file_is_executable(&self) -> i8 {

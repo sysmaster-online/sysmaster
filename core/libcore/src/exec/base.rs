@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::error::*;
-use basic::fs_util::{path_simplify, path_name_is_safe, path_length_is_valid, path_is_abosolute};
+use basic::fs_util::{path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify};
 use basic::rlimit;
 use bitflags::bitflags;
 use libc::EPERM;
@@ -120,9 +120,13 @@ impl FromStr for Rlimit {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+///
 pub enum PreserveMode {
+    ///
     No,
+    ///
     Yes,
+    ///
     Restart,
 }
 
@@ -172,6 +176,7 @@ pub struct WorkingDirectory {
     miss_ok: bool,
 }
 
+///
 pub fn parse_working_directory(s: &str) -> Result<WorkingDirectory, basic::Error> {
     if s.is_empty() {
         return Ok(WorkingDirectory::new(None, true));
@@ -216,6 +221,7 @@ pub struct RuntimeDirectory {
     directory: Vec<PathBuf>,
 }
 
+///
 pub fn parse_runtime_directory(s: &str) -> Result<RuntimeDirectory> {
     let mut res = RuntimeDirectory::default();
     for d in s.split_terminator(';') {
@@ -258,6 +264,7 @@ pub struct StateDirectory {
     directory: Vec<PathBuf>,
 }
 
+///
 pub fn parse_state_directory(s: &str) -> Result<StateDirectory> {
     /* Similar with RuntimeDirectory */
     let mut res = StateDirectory::default();
@@ -318,6 +325,7 @@ impl Default for ExecContext {
     }
 }
 
+///
 pub fn parse_environment(s: &str) -> Result<HashMap<String, String>> {
     #[derive(PartialEq, Clone, Copy)]
     enum ParseState {

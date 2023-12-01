@@ -11,12 +11,12 @@
 // See the Mulan PSL v2 for more details.
 
 //!  The core logic of the mount subclass
-use basic::{MOUNT_BIN, UMOUNT_BIN};
 use basic::fs_util::{directory_is_empty, mkdir_p_label};
 use basic::mount_util::filter_options;
+use basic::{MOUNT_BIN, UMOUNT_BIN};
 use nix::sys::wait::WaitStatus;
 
-use crate::config::{MountConfig, mount_is_bind};
+use crate::config::{mount_is_bind, MountConfig};
 use crate::rentry::MountResult;
 use crate::spawn::MountSpawn;
 
@@ -70,7 +70,11 @@ impl ReStation for MountMng {
 }
 
 impl MountMng {
-    pub(super) fn new(commr: &Rc<MountUnitComm>, configr: &Rc<MountConfig>, exec_ctx: &Rc<ExecContext>) -> Self {
+    pub(super) fn new(
+        commr: &Rc<MountUnitComm>,
+        configr: &Rc<MountConfig>,
+        exec_ctx: &Rc<ExecContext>,
+    ) -> Self {
         MountMng {
             comm: Rc::clone(commr),
             state: RefCell::new(MountState::Dead),
@@ -93,20 +97,31 @@ impl MountMng {
 
         let _ = mkdir_p_label(mount_where, directory_mode);
         if !mount_where.exists() || !mount_where.is_dir() {
-            log::error!("Failed to create the mount directory: {}", mount_config.Mount.Where);
+            log::error!(
+                "Failed to create the mount directory: {}",
+                mount_config.Mount.Where
+            );
             return;
         }
         if !directory_is_empty(mount_where) {
-            log::warn!("The mount directory {} is not empty.", mount_config.Mount.Where);
+            log::warn!(
+                "The mount directory {} is not empty.",
+                mount_config.Mount.Where
+            );
         }
 
         let mount_parameters = self.config.mount_parameters();
         if mount_is_bind(&mount_parameters) {
             if let Err(e) = mkdir_p_label(mount_what, directory_mode) {
-                log::error!("Failed to create mount source {}: {}", mount_config.Mount.What, e);
+                log::error!(
+                    "Failed to create mount source {}: {}",
+                    mount_config.Mount.What,
+                    e
+                );
             }
         }
-        let filtered_options = filter_options(&mount_parameters.options, vec!["nofail", "noauto", "auto"]);
+        let filtered_options =
+            filter_options(&mount_parameters.options, vec!["nofail", "noauto", "auto"]);
 
         let mut mount_command = ExecCommand::empty();
         if let Err(e) = mount_command.set_path(MOUNT_BIN) {
@@ -122,18 +137,23 @@ impl MountMng {
         }
         *self.control_command.borrow_mut() = Some(mount_command.clone());
         if let Err(e) = self.spawn.spawn_cmd(&mount_command) {
-            log::error!("Failed to mount {} to {}: {}", &mount_config.Mount.What, &mount_config.Mount.Where, e);
+            log::error!(
+                "Failed to mount {} to {}: {}",
+                &mount_config.Mount.What,
+                &mount_config.Mount.Where,
+                e
+            );
             return;
         }
 
         self.set_state(MountState::Mounting, true);
     }
 
-    pub(super) fn enter_signal(&self, state: MountState, res: MountResult) {}
+    pub(super) fn enter_signal(&self, _state: MountState, _res: MountResult) {}
 
-    pub(super) fn enter_dead_or_mounted(&self, res: MountResult) {}
+    pub(super) fn enter_dead_or_mounted(&self, _res: MountResult) {}
 
-    pub(super) fn enter_dead(&self, res: MountResult, notify: bool) {
+    pub(super) fn enter_dead(&self, _res: MountResult, notify: bool) {
         self.set_state(MountState::Dead, notify);
     }
 
@@ -157,8 +177,10 @@ impl MountMng {
         self.set_state(MountState::Unmounting, true);
     }
 
+    #[allow(unused)]
     pub(super) fn enter_remounting(&self) {}
 
+    #[allow(unused)]
     pub(super) fn dispatch_timer(&self) {}
 
     pub(super) fn start_check(&self) -> Result<bool> {
@@ -192,10 +214,22 @@ impl MountMng {
 
     pub(super) fn stop_action(&self) -> Result<i32> {
         let state = self.state();
-        if [MountState::Unmounting, MountState::UnmountingSigkill, MountState::UnmountingSigterm].contains(&state) {
+        if [
+            MountState::Unmounting,
+            MountState::UnmountingSigkill,
+            MountState::UnmountingSigterm,
+        ]
+        .contains(&state)
+        {
             return Ok(0);
         }
-        if [MountState::Mounting, MountState::MountingDone, MountState::Remounting].contains(&state) {
+        if [
+            MountState::Mounting,
+            MountState::MountingDone,
+            MountState::Remounting,
+        ]
+        .contains(&state)
+        {
             self.enter_signal(MountState::UnmountingSigterm, MountResult::Success);
             return Ok(0);
         }
@@ -298,7 +332,13 @@ impl MountMng {
         let mut f = self.sigchld_result(wait_status);
         let state = self.state();
 
-        if [MountState::Remounting, MountState::RemountingSigKill, MountState::RemountingSigterm].contains(&state) {
+        if [
+            MountState::Remounting,
+            MountState::RemountingSigKill,
+            MountState::RemountingSigterm,
+        ]
+        .contains(&state)
+        {
             self.set_reload_result(f);
         } else if self.result() == MountResult::Success {
             self.set_result(f);
@@ -310,7 +350,10 @@ impl MountMng {
         // mount process has exited, but the mount point is not mounted
         if state == MountState::Mounting {
             if f == MountResult::Success {
-                log::warn!("Mount process of {} has exited, but there is no mount.", self.comm.get_owner_id());
+                log::warn!(
+                    "Mount process of {} has exited, but there is no mount.",
+                    self.comm.get_owner_id()
+                );
                 f = MountResult::FailureProtocol;
             }
             self.enter_dead(f, true);
@@ -323,7 +366,13 @@ impl MountMng {
             return;
         }
 
-        if [MountState::Remounting, MountState::RemountingSigKill, MountState::RemountingSigterm].contains(&state) {
+        if [
+            MountState::Remounting,
+            MountState::RemountingSigKill,
+            MountState::RemountingSigterm,
+        ]
+        .contains(&state)
+        {
             self.enter_dead_or_mounted(MountResult::Success);
             return;
         }
@@ -340,10 +389,7 @@ impl MountMng {
 
         if [MountState::UnmountingSigkill, MountState::UnmountingSigterm].contains(&state) {
             self.enter_dead_or_mounted(f);
-            return;
         }
-
-        return;
     }
 
     fn sigchld_result(&self, wait_status: WaitStatus) -> MountResult {

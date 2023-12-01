@@ -18,11 +18,11 @@ use crate::rentry::MountResult;
 
 use super::comm::MountUnitComm;
 use super::mng::MountMng;
+use basic::mount_util::mount_point_to_unit_name;
 use core::error::*;
 use core::exec::ExecContext;
 use core::rel::{ReStation, Reliability};
 use core::unit::{SubUnit, UmIf, UnitActiveState, UnitBase, UnitMngUtil};
-use basic::mount_util::mount_point_to_unit_name;
 use nix::sys::wait::WaitStatus;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -65,10 +65,10 @@ impl MountUnit {
         let exec_ctx = Rc::new(ExecContext::new());
         let mng = Rc::new(MountMng::new(&comm, &config, &exec_ctx));
         MountUnit {
-            comm: comm.clone(),
-            mng: mng.clone(),
-            config: config.clone(),
-            exec_ctx: exec_ctx.clone(),
+            comm,
+            mng,
+            config,
+            exec_ctx,
         }
     }
 
@@ -126,8 +126,13 @@ impl MountUnit {
     fn mount_verify(&self) -> Result<()> {
         let mount_where = self.config.mount_where();
         if !mount_point_to_unit_name(&mount_where).eq(&self.comm.get_owner_id()) {
-            log::error!("Failed to load unit {}: unit name doesn't match Where", self.comm.get_owner_id());
-            return Err(Error::ConfigureError { msg: "unit name doesn't match Where".to_string() });
+            log::error!(
+                "Failed to load unit {}: unit name doesn't match Where",
+                self.comm.get_owner_id()
+            );
+            return Err(Error::ConfigureError {
+                msg: "unit name doesn't match Where".to_string(),
+            });
         }
         Ok(())
     }

@@ -13,15 +13,13 @@
 #![allow(non_snake_case)]
 use crate::monitor::ServiceMonitor;
 
-use basic::fs_util::{
-    path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify,
-};
+use basic::fs_util::{path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify};
+use core::exec::PreserveMode;
 use macros::{EnumDisplay, UnitSection};
 use nix::sys::signal::Signal;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
-use core::exec::PreserveMode;
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;

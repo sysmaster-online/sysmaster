@@ -12,7 +12,7 @@
 //
 
 use core::error::*;
-use core::exec::{ExecCommand, ExecParameters, ExecContext};
+use core::exec::{ExecCommand, ExecContext, ExecParameters};
 use std::rc::Rc;
 
 use nix::unistd::Pid;

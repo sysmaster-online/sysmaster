@@ -659,7 +659,14 @@ impl UmIf for UnitManager {
     }
 
     /// setup existing mount
-    fn setup_existing_mount(&self, unit_name: &str, what: &str, mount_where: &str, options: &str, fstype: &str) {
+    fn setup_existing_mount(
+        &self,
+        unit_name: &str,
+        what: &str,
+        mount_where: &str,
+        options: &str,
+        fstype: &str,
+    ) {
         let mount = match self.units_get(unit_name) {
             None => {
                 log::error!("Failed to get unit: {}", unit_name);
@@ -671,7 +678,14 @@ impl UmIf for UnitManager {
     }
 
     /// setup new mount
-    fn setup_new_mount(&self, unit_name: &str, what: &str, mount_where: &str, options: &str, fstype: &str) {
+    fn setup_new_mount(
+        &self,
+        unit_name: &str,
+        what: &str,
+        mount_where: &str,
+        options: &str,
+        fstype: &str,
+    ) {
         let mount = match self.load_unitx(unit_name) {
             None => {
                 log::error!("Failed to load a new mount {}", unit_name);

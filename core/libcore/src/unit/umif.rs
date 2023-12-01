@@ -208,13 +208,29 @@ pub trait UmIf {
 
     /* ========== ONLY VALID IN MOUNT ========== */
     /// setup existing mount
-    fn setup_existing_mount(&self, unit_name: &str, what: &str, mount_where: &str, options: &str, fstype: &str) {}
+    fn setup_existing_mount(
+        &self,
+        _unit_name: &str,
+        _what: &str,
+        _mount_where: &str,
+        _options: &str,
+        _fstype: &str,
+    ) {
+    }
 
     /// setup new mount
-    fn setup_new_mount(&self, unit_name: &str, what: &str, mount_where: &str, options: &str, fstype: &str) {}
+    fn setup_new_mount(
+        &self,
+        _unit_name: &str,
+        _what: &str,
+        _mount_where: &str,
+        _options: &str,
+        _fstype: &str,
+    ) {
+    }
 
     /// update mount state
-    fn update_mount_state(&self, unit_name: &str, state: &str) {}
+    fn update_mount_state(&self, _unit_name: &str, _state: &str) {}
 }
 
 /// the trait used for attach UnitManager to sub unit
