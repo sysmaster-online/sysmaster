@@ -19,6 +19,7 @@ use nix::errno::Errno;
 
 /// device action based on kobject from kernel
 #[allow(missing_docs)]
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceAction {
     Add,
