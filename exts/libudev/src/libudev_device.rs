@@ -25,13 +25,32 @@ use std::rc::Rc;
 use crate::libudev::*;
 use libudev_macro::RefUnref;
 
+const ACTION_CNT: usize = 8;
+
+static ACTION_STRING_TABLE: [&str; ACTION_CNT] = [
+    "add\0",
+    "remove\0",
+    "change\0",
+    "move\0",
+    "online\0",
+    "offline\0",
+    "bind\0",
+    "unbind\0",
+];
+
 #[repr(C)]
 #[derive(Debug, Clone, RefUnref)]
 /// udev_device
 pub struct udev_device {
     pub(crate) udev: *mut udev,
     pub(crate) device: Rc<Device>,
+
+    /* Cache CString in udev_device memory. */
     pub(crate) syspath: CString,
+    pub(crate) devnode: CString,
+    pub(crate) devpath: CString,
+    pub(crate) devtype: CString,
+    pub(crate) driver: CString,
 }
 
 impl Drop for udev_device {
@@ -47,7 +66,11 @@ impl udev_device {
         Self {
             udev,
             device: Rc::new(device),
-            syspath: CString::new("").unwrap(),
+            syspath: CString::default(),
+            devnode: CString::default(),
+            devpath: CString::default(),
+            devtype: CString::default(),
+            driver: CString::default(),
         }
     }
 }
@@ -164,17 +187,196 @@ pub extern "C" fn udev_device_get_syspath(
     udev_device_mut.syspath.as_ptr()
 }
 
+#[no_mangle]
+/// udev_device_has_tag
+pub extern "C" fn udev_device_has_tag(
+    udev_device: *mut udev_device,
+    tag: *const ::std::os::raw::c_char,
+) -> ::std::os::raw::c_int {
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    let tag = unsafe { CStr::from_ptr(tag) }.to_str().unwrap();
+
+    match udev_device_mut.device.has_tag(tag) {
+        Ok(true) => 1,
+        _ => 0,
+    }
+}
+
+#[no_mangle]
+/// udev_device_has_current_tag
+pub extern "C" fn udev_device_has_current_tag(
+    udev_device: *mut udev_device,
+    tag: *const ::std::os::raw::c_char,
+) -> ::std::os::raw::c_int {
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    let tag = unsafe { CStr::from_ptr(tag) }.to_str().unwrap();
+
+    match udev_device_mut.device.has_current_tag(tag) {
+        Ok(true) => 1,
+        _ => 0,
+    }
+}
+
+#[no_mangle]
+/// udev_device_get_action
+pub extern "C" fn udev_device_get_action(
+    udev_device: *mut udev_device,
+) -> *const ::std::os::raw::c_char {
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    if let Ok(action) = udev_device_mut.device.get_action() {
+        let ret = ACTION_STRING_TABLE[action as usize];
+        return ret.as_ptr() as *const ::std::os::raw::c_char;
+    }
+
+    std::ptr::null()
+}
+
+#[no_mangle]
+/// udev_device_get_devnode
+pub extern "C" fn udev_device_get_devnode(
+    udev_device: *mut udev_device,
+) -> *const ::std::os::raw::c_char {
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    if !udev_device_mut
+        .devnode
+        .as_c_str()
+        .to_str()
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return udev_device_mut.devnode.as_ptr();
+    }
+
+    if let Ok(devnode) = udev_device_mut.device.get_devname() {
+        udev_device_mut.devnode = CString::new(devnode).unwrap();
+        return udev_device_mut.devnode.as_ptr();
+    }
+
+    std::ptr::null()
+}
+
+#[no_mangle]
+/// udev_device_get_devnum
+pub extern "C" fn udev_device_get_devnum(udev_device: *mut udev_device) -> dev_t {
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    match udev_device_mut.device.get_devnum() {
+        Ok(n) => n,
+        Err(e) => {
+            if !e.is_errno(nix::Error::ENOENT) {
+                errno::set_errno(errno::Errno(e.get_errno() as i32));
+            }
+
+            0
+        }
+    }
+}
+
+#[no_mangle]
+/// udev_device_get_devpath
+pub extern "C" fn udev_device_get_devpath(
+    udev_device: *mut udev_device,
+) -> *const ::std::os::raw::c_char {
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    if !udev_device_mut
+        .devpath
+        .as_c_str()
+        .to_str()
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return udev_device_mut.devpath.as_ptr();
+    }
+
+    match udev_device_mut.device.get_devpath() {
+        Ok(devpath) => {
+            udev_device_mut.devpath = CString::new(devpath).unwrap();
+            udev_device_mut.devpath.as_ptr()
+        }
+        Err(e) => {
+            errno::set_errno(errno::Errno(e.get_errno() as i32));
+            std::ptr::null()
+        }
+    }
+}
+
+#[no_mangle]
+/// udev_device_get_devtype
+pub extern "C" fn udev_device_get_devtype(
+    udev_device: *mut udev_device,
+) -> *const ::std::os::raw::c_char {
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    if !udev_device_mut
+        .devtype
+        .as_c_str()
+        .to_str()
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return udev_device_mut.devtype.as_ptr();
+    }
+
+    match udev_device_mut.device.get_devtype() {
+        Ok(devtype) => {
+            udev_device_mut.devtype = CString::new(devtype).unwrap();
+            udev_device_mut.devtype.as_ptr()
+        }
+        Err(e) => {
+            if !e.is_errno(nix::Error::ENOENT) {
+                errno::set_errno(errno::Errno(e.get_errno() as i32));
+            }
+
+            std::ptr::null()
+        }
+    }
+}
+
+#[no_mangle]
+/// udev_device_get_driver
+pub extern "C" fn udev_device_get_driver(
+    udev_device: *mut udev_device,
+) -> *const ::std::os::raw::c_char {
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    if !udev_device_mut
+        .driver
+        .as_c_str()
+        .to_str()
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return udev_device_mut.driver.as_ptr();
+    }
+
+    match udev_device_mut.device.get_driver() {
+        Ok(driver) => {
+            udev_device_mut.driver = CString::new(driver).unwrap();
+            udev_device_mut.driver.as_ptr()
+        }
+        Err(e) => {
+            errno::set_errno(errno::Errno(e.get_errno() as i32));
+            std::ptr::null()
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use std::cell::RefCell;
+    use std::{cell::RefCell, intrinsics::transmute};
 
     use super::*;
     use device::device_enumerator::*;
 
-    type RCDevice = Rc<RefCell<Device>>;
+    type RD = Rc<RefCell<Device>>;
     pub type Result = std::result::Result<(), device::error::Error>;
 
-    fn test_udev_device_new_from_devnum(device: RCDevice) -> Result {
+    fn test_udev_device_new_from_devnum(device: RD) -> Result {
         let devnum = device.borrow().get_devnum()?;
 
         let t = if &device.borrow().get_subsystem().unwrap() == "block" {
@@ -198,7 +400,7 @@ mod test {
         Ok(())
     }
 
-    fn test_udev_device_new_from_subsystem_sysname(device: RCDevice) -> Result {
+    fn test_udev_device_new_from_subsystem_sysname(device: RD) -> Result {
         let subsystem = device.borrow().get_subsystem().unwrap();
         let sysname = device.borrow().get_sysname().unwrap();
 
@@ -229,7 +431,7 @@ mod test {
         Ok(())
     }
 
-    fn test_udev_device_new_from_device_id(device: RCDevice) -> Result {
+    fn test_udev_device_new_from_device_id(device: RD) -> Result {
         let id = device.borrow().get_device_id().unwrap();
         let c_id = CString::new(id).unwrap();
         let udev_device = udev_device_new_from_device_id(std::ptr::null_mut(), c_id.as_ptr());
@@ -245,7 +447,7 @@ mod test {
         Ok(())
     }
 
-    fn test_udev_device_new_from_syspath(device: RCDevice) -> Result {
+    fn test_udev_device_new_from_syspath(device: RD) -> Result {
         let syspath = device.borrow().get_syspath().unwrap();
         let c_syspath = CString::new(syspath).unwrap();
         let udev_device = udev_device_new_from_syspath(std::ptr::null_mut(), c_syspath.as_ptr());
@@ -258,8 +460,140 @@ mod test {
         Ok(())
     }
 
+    fn from_rd(device: RD) -> *mut udev_device {
+        let id = device.borrow().get_device_id().unwrap();
+        let c_id = CString::new(id).unwrap();
+        udev_device_new_from_device_id(std::ptr::null_mut(), c_id.as_ptr())
+    }
+
+    fn test_udev_device_has_tag(device: RD) -> Result {
+        let _ = device.borrow_mut().read_db_internal(true);
+        device
+            .borrow_mut()
+            .add_tag("test_udev_device_has_tag", true);
+        device.borrow_mut().update_db()?;
+
+        let udev_device = from_rd(device.clone());
+
+        assert!(
+            udev_device_has_tag(
+                udev_device,
+                "test_udev_device_has_tag\0".as_ptr() as *const i8
+            ) > 0
+        );
+
+        assert!(
+            udev_device_has_current_tag(
+                udev_device,
+                "test_udev_device_has_tag\0".as_ptr() as *const i8
+            ) > 0
+        );
+
+        udev_device_unref(udev_device);
+
+        device
+            .borrow_mut()
+            .all_tags
+            .borrow_mut()
+            .remove("test_udev_device_has_tag");
+        device.borrow_mut().remove_tag("test_udev_device_has_tag");
+        device.borrow_mut().update_db()?;
+
+        Ok(())
+    }
+
+    fn test_udev_device_get_action(dev: RD) -> Result {
+        let udev_device = from_rd(dev);
+
+        let udev_device_mut: &mut udev_device = unsafe { transmute(&mut *udev_device) };
+
+        udev_device_mut
+            .device
+            .set_action_from_string("change")
+            .unwrap();
+
+        let ptr = udev_device_get_action(udev_device);
+
+        let action = unsafe { CStr::from_ptr(ptr) };
+
+        assert_eq!(action.to_str().unwrap(), "change");
+
+        udev_device_unref(udev_device);
+
+        Ok(())
+    }
+
+    fn test_udev_device_get_devnode(dev: RD) -> Result {
+        let udev_device = from_rd(dev.clone());
+
+        let devnode = dev.borrow().get_devname()?;
+
+        let ptr = udev_device_get_devnode(udev_device);
+
+        assert_eq!(unsafe { CStr::from_ptr(ptr) }.to_str().unwrap(), &devnode);
+
+        udev_device_unref(udev_device);
+
+        Ok(())
+    }
+
+    fn test_udev_device_get_devnum(dev: RD) -> Result {
+        let udev_device = from_rd(dev.clone());
+
+        let devnum = dev.borrow().get_devnum()?;
+
+        assert_eq!(udev_device_get_devnum(udev_device), devnum);
+
+        Ok(())
+    }
+
+    fn test_udev_device_get_devpath(dev: RD) -> Result {
+        let udev_device = from_rd(dev.clone());
+
+        let devpath = dev.borrow().get_devpath()?;
+
+        assert_eq!(
+            unsafe { CStr::from_ptr(udev_device_get_devpath(udev_device)) }
+                .to_str()
+                .unwrap(),
+            &devpath
+        );
+
+        Ok(())
+    }
+
+    fn test_udev_device_get_devtype(dev: RD) -> Result {
+        let ud = from_rd(dev.clone());
+
+        let devtype = dev.borrow().get_devtype()?;
+
+        assert_eq!(
+            unsafe { CStr::from_ptr(udev_device_get_devtype(ud)) }
+                .to_str()
+                .unwrap(),
+            &devtype
+        );
+
+        Ok(())
+    }
+
+    fn test_udev_device_get_driver(dev: RD) -> Result {
+        let ud = from_rd(dev.clone());
+
+        let driver = dev.borrow().get_driver()?;
+
+        assert_eq!(
+            unsafe { CStr::from_ptr(udev_device_get_driver(ud)) }
+                .to_str()
+                .unwrap(),
+            &driver
+        );
+
+        Ok(())
+    }
+
     #[test]
-    fn test_udev_device_new() {
+    fn test_udev_device_ut() {
         let mut e = DeviceEnumerator::new();
         e.set_enumerator_type(DeviceEnumerationType::All);
 
@@ -268,6 +602,27 @@ mod test {
             let _ = test_udev_device_new_from_devnum(dev.clone());
             let _ = test_udev_device_new_from_subsystem_sysname(dev.clone());
             let _ = test_udev_device_new_from_syspath(dev.clone());
+            let _ = test_udev_device_get_devnode(dev.clone());
+            let _ = test_udev_device_get_devnum(dev.clone());
+            let _ = test_udev_device_get_devpath(dev.clone());
+            let _ = test_udev_device_get_devtype(dev.clone());
+            let _ = test_udev_device_get_driver(dev.clone());
         }
+    }
+
+    #[test]
+    fn test_udev_device_has_tag_ut() {
+        let dev = Rc::new(RefCell::new(
+            Device::from_subsystem_sysname("net", "lo").unwrap(),
+        ));
+        let _ = test_udev_device_has_tag(dev);
+    }
+
+    #[test]
+    fn test_udev_device_get_action_ut() {
+        let dev = Rc::new(RefCell::new(
+            Device::from_subsystem_sysname("net", "lo").unwrap(),
+        ));
+        let _ = test_udev_device_get_action(dev);
     }
 }
