@@ -51,7 +51,6 @@ use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::env::{self};
-use std::fs;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{exit, Command};
@@ -347,13 +346,19 @@ fn remount_sysroot() {
 
     let root_path = "/";
 
-    //check if the '/' has the write permission
-    if let Ok(md) = fs::metadata(root_path) {
-        let permissions = md.permissions();
-        if !permissions.readonly() {
-            return;
-        }
-    };
+    //check if the '/' file system has the write permission
+    use libc::{statvfs, ST_RDONLY};
+    use std::ffi::CString;
+
+    let c_path = CString::new(root_path).unwrap();
+
+    let mut statbuf: statvfs = unsafe { std::mem::zeroed() };
+
+    unsafe { statvfs(c_path.as_ptr(), &mut statbuf) };
+
+    if statbuf.f_flag & ST_RDONLY != 1 {
+        return;
+    }
 
     if let Ok(lines) = read_lines(FSTAB_PATH) {
         for item_raw in lines.flatten() {

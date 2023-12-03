@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use nix::mount::MsFlags;
+use nix::mount::{self, MntFlags, MsFlags};
 use std::{fs, os::unix::fs::MetadataExt, path::Path};
 
 pub fn setup_mount_early() {
@@ -34,7 +34,7 @@ pub fn setup_mount_early() {
             "/dev",
             Some("devtmpfs"),
             MsFlags::MS_NOSUID | MsFlags::MS_STRICTATIME,
-            Some("mode=755,size=4m,nr_inodes=64K"),
+            Some("mode=755,size=4m,nr_inodes=1m"),
         ),
         (
             Some("tmpfs"),
@@ -54,10 +54,16 @@ pub fn setup_mount_early() {
             }
         }
 
-        if !is_mount_point(target) {
-            if let Err(e) = nix::mount::mount(source, target, fstype, flags, data) {
-                println!("Failed to mount {}: {}", target.display(), e);
+        if is_mount_point(target) {
+            // umount first as these filesystemd should be remount
+            if let Err(e) = mount::umount2(target, MntFlags::MNT_DETACH) {
+                println!("umount2 {} failed:{}", target.display(), e);
+                continue;
             }
+        }
+
+        if let Err(e) = nix::mount::mount(source, target, fstype, flags, data) {
+            println!("Failed to mount {}: {}", target.display(), e);
         }
 
         println!(

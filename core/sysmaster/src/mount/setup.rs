@@ -31,7 +31,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const EARLY_MOUNT_NUM: u8 = 3;
+const EARLY_MOUNT_NUM: u8 = 4;
 
 type Callback = fn() -> bool;
 
@@ -61,8 +61,35 @@ lazy_static! {
             source: String::from("devtmpfs"),
             target: String::from("/dev"),
             fs_type: String::from("devtmpfs"),
-            options: Some("mode=755,size=4m,nr_inodes=64K".to_string()),
+            options: Some("mode=755,size=4m,nr_inodes=1m".to_string()),
             flags: MsFlags::MS_NOSUID | MsFlags::MS_STRICTATIME,
+            callback: None,
+            mode: MountMode::MNT_FATAL | MountMode::MNT_IN_CONTAINER,
+        },
+        MountPoint {
+            source: String::from("tmpfs"),
+            target: String::from("/run"),
+            fs_type: String::from("tmpfs"),
+            options: Some("mode=755,size=20%,nr_inodes=800K".to_string()),
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NODEV | MsFlags::MS_STRICTATIME,
+            callback: None,
+            mode: MountMode::MNT_FATAL | MountMode::MNT_IN_CONTAINER,
+        },
+        MountPoint {
+            source: String::from("devpts"),
+            target: String::from("/dev/pts"),
+            fs_type: String::from("devpts"),
+            options: Some("mode=620,gid=5".to_string()),
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC,
+            callback: None,
+            mode: MountMode::MNT_IN_CONTAINER,
+        },
+        MountPoint {
+            source: String::from("tmpfs"),
+            target: String::from("/dev/shm"),
+            fs_type: String::from("tmpfs"),
+            options: Some("mode=1777".to_string()),
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_STRICTATIME,
             callback: None,
             mode: MountMode::MNT_FATAL | MountMode::MNT_IN_CONTAINER,
         },
@@ -387,9 +414,9 @@ pub fn mount_setup_early() -> Result<()> {
     Ok(())
 }
 
-/// mount the point of all the mount_table
+/// mount the point of all the mount_table except the early mount point
 pub fn mount_setup() -> Result<()> {
-    for table in MOUNT_TABLE.iter() {
+    for table in MOUNT_TABLE.iter().skip(EARLY_MOUNT_NUM as usize) {
         table.mount()?;
     }
 
