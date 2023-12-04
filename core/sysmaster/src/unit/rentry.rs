@@ -144,7 +144,7 @@ pub(crate) struct UeConfigUnit {
     //When set to true, the unit will not be stopped when systemctl isolate is executed. For service, target, socket timer and path, the default value is false. For other units, the default value is true
     #[entry(default = false)]
     pub IgnoreOnIsolate: bool,
-    #[entry(default = false)]
+    #[entry(default = true)]
     pub DefaultDependencies: bool,
     #[entry(default = false)]
     pub RefuseManualStart: bool,
