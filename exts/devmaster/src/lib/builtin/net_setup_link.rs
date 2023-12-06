@@ -14,7 +14,6 @@
 //!
 
 use std::{
-    cell::RefCell,
     rc::Rc,
     sync::{Arc, RwLock},
 };
@@ -34,12 +33,12 @@ pub struct NetSetupLink {
 
 struct NetifLink<'a> {
     netif_cfg: &'a NetifConfig,
-    netif: Rc<RefCell<Device>>,
+    netif: Rc<Device>,
     new_name: String,
 }
 
 impl<'a> NetifLink<'a> {
-    fn new(netif_cfg: &'a NetifConfig, netif: Rc<RefCell<Device>>) -> NetifLink<'a> {
+    fn new(netif_cfg: &'a NetifConfig, netif: Rc<Device>) -> NetifLink<'a> {
         NetifLink {
             netif_cfg,
             netif,
@@ -48,16 +47,16 @@ impl<'a> NetifLink<'a> {
     }
 
     fn apply_cfg(&mut self) -> Result<()> {
-        let action = self.netif.borrow().get_action().context(DeviceSnafu)?;
+        let action = self.netif.get_action().context(DeviceSnafu)?;
 
         if ![DeviceAction::Add, DeviceAction::Bind, DeviceAction::Move].contains(&action) {
             log_dev!(
                 debug,
-                &self.netif.borrow(),
+                &self.netif,
                 format!("Skipping to apply .link on '{}' uevent", action)
             );
 
-            self.new_name = self.netif.borrow().get_sysname().context(DeviceSnafu)?;
+            self.new_name = self.netif.get_sysname().context(DeviceSnafu)?;
             return Ok(());
         }
 
@@ -87,11 +86,18 @@ impl<'a> NetifLink<'a> {
                         // todo
                         continue;
                     }
-                    "database" => match self
-                        .netif
-                        .borrow()
-                        .get_property_value("ID_NET_NAME_FROM_DATABASE")
-                    {
+                    "database" => {
+                        match self.netif.get_property_value("ID_NET_NAME_FROM_DATABASE") {
+                            Ok(v) => {
+                                new_name = v;
+                            }
+                            Err(_) => {
+                                continue;
+                            }
+                        }
+                    }
+
+                    "onboard" => match self.netif.get_property_value("ID_NET_NAME_ONBOARD") {
                         Ok(v) => {
                             new_name = v;
                         }
@@ -100,11 +106,7 @@ impl<'a> NetifLink<'a> {
                         }
                     },
 
-                    "onboard" => match self
-                        .netif
-                        .borrow()
-                        .get_property_value("ID_NET_NAME_ONBOARD")
-                    {
+                    "slot" => match self.netif.get_property_value("ID_NET_NAME_SLOT") {
                         Ok(v) => {
                             new_name = v;
                         }
@@ -112,8 +114,7 @@ impl<'a> NetifLink<'a> {
                             continue;
                         }
                     },
-
-                    "slot" => match self.netif.borrow().get_property_value("ID_NET_NAME_SLOT") {
+                    "path" => match self.netif.get_property_value("ID_NET_NAME_PATH") {
                         Ok(v) => {
                             new_name = v;
                         }
@@ -121,15 +122,7 @@ impl<'a> NetifLink<'a> {
                             continue;
                         }
                     },
-                    "path" => match self.netif.borrow().get_property_value("ID_NET_NAME_PATH") {
-                        Ok(v) => {
-                            new_name = v;
-                        }
-                        Err(_) => {
-                            continue;
-                        }
-                    },
-                    "mac" => match self.netif.borrow().get_property_value("ID_NET_NAME_MAC") {
+                    "mac" => match self.netif.get_property_value("ID_NET_NAME_MAC") {
                         Ok(v) => {
                             new_name = v;
                         }
@@ -175,15 +168,11 @@ impl Builtin for NetSetupLink {
             if e.get_errno() == nix::Error::ENODEV {
                 log_dev!(
                     debug,
-                    device.borrow(),
+                    device,
                     "Link vanished while applying network configuration"
                 );
             } else {
-                log_dev!(
-                    warn,
-                    device.borrow(),
-                    "Could not apply network configuration"
-                )
+                log_dev!(warn, device, "Could not apply network configuration")
             }
         }
 

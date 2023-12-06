@@ -15,7 +15,7 @@
 use crate::log_dev;
 use device::Device;
 use snafu::prelude::*;
-use std::{cell::RefCell, ffi::OsString, rc::Rc, str::Utf8Error};
+use std::{ffi::OsString, rc::Rc, str::Utf8Error};
 
 pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -133,9 +133,9 @@ pub(crate) trait Log {
     fn log_dev_error(self, dev: &Device, msg: &str) -> Self;
     fn log_dev_debug(self, dev: &Device, msg: &str) -> Self;
     fn log_dev_info(self, dev: &Device, msg: &str) -> Self;
-    fn log_dev_error_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self;
-    fn log_dev_debug_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self;
-    fn log_dev_info_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self;
+    fn log_dev_error_option(self, dev: Option<Rc<Device>>, msg: &str) -> Self;
+    fn log_dev_debug_option(self, dev: Option<Rc<Device>>, msg: &str) -> Self;
+    fn log_dev_info_option(self, dev: Option<Rc<Device>>, msg: &str) -> Self;
 }
 
 impl<T> Log for std::result::Result<T, Error> {
@@ -175,28 +175,28 @@ impl<T> Log for std::result::Result<T, Error> {
             e
         })
     }
-    fn log_dev_error_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self {
+    fn log_dev_error_option(self, dev: Option<Rc<Device>>, msg: &str) -> Self {
         self.map_err(|e| {
             match dev {
-                Some(d) => log_dev!(error, d.borrow(), format!("{}: {}", msg, e)),
+                Some(d) => log_dev!(error, d, format!("{}: {}", msg, e)),
                 None => log::error!("{}: {}", msg, e),
             }
             e
         })
     }
-    fn log_dev_debug_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self {
+    fn log_dev_debug_option(self, dev: Option<Rc<Device>>, msg: &str) -> Self {
         self.map_err(|e| {
             match dev {
-                Some(d) => log_dev!(debug, d.borrow(), format!("{}: {}", msg, e)),
+                Some(d) => log_dev!(debug, d, format!("{}: {}", msg, e)),
                 None => log::error!("{}: {}", msg, e),
             }
             e
         })
     }
-    fn log_dev_info_option(self, dev: Option<Rc<RefCell<Device>>>, msg: &str) -> Self {
+    fn log_dev_info_option(self, dev: Option<Rc<Device>>, msg: &str) -> Self {
         self.map_err(|e| {
             match dev {
-                Some(d) => log_dev!(info, d.borrow(), format!("{}: {}", msg, e)),
+                Some(d) => log_dev!(info, d, format!("{}: {}", msg, e)),
                 None => log::error!("{}: {}", msg, e),
             }
             e

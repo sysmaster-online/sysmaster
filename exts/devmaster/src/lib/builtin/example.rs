@@ -32,7 +32,7 @@ impl Builtin for Example {
     ) -> Result<bool> {
         let device = exec_unit.get_device();
 
-        let syspath = device.borrow().get_syspath().context(DeviceSnafu)?;
+        let syspath = device.get_syspath().context(DeviceSnafu)?;
 
         self.add_property(device, test, "ID_EXAMPLE_SYSPATH", &syspath)
             .map_err(|_| Error::BuiltinCommandError {
@@ -81,10 +81,7 @@ mod tests {
             let builtin = Example {};
             builtin.cmd(&exec_unit, 0, vec![], true).unwrap();
 
-            device
-                .borrow()
-                .get_property_value("ID_EXAMPLE_SYSPATH")
-                .unwrap();
+            device.get_property_value("ID_EXAMPLE_SYSPATH").unwrap();
         }
     }
 }

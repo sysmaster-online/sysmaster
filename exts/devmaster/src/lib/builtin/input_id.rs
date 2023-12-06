@@ -23,7 +23,6 @@ use input_event_codes;
 use ioctls::{eviocgabs, input_absinfo};
 use libc::input_id;
 use nix::fcntl::OFlag;
-use std::cell::RefCell;
 use std::os::unix::prelude::AsRawFd;
 use std::rc::Rc;
 
@@ -118,7 +117,6 @@ impl Builtin for InputId {
             if pdev
                 .as_ref()
                 .unwrap()
-                .borrow()
                 .get_sysattr_value("capabilities/ev")
                 .is_ok()
             {
@@ -127,7 +125,6 @@ impl Builtin for InputId {
 
             let tmp_dev = match pdev
                 .unwrap()
-                .borrow()
                 .get_parent_with_subsystem_devtype("input", None)
             {
                 Ok(dev) => Option::Some(dev),
@@ -201,7 +198,7 @@ impl Builtin for InputId {
             }
         }
 
-        let sysname = device.borrow().get_sysname().unwrap_or_default();
+        let sysname = device.get_sysname().unwrap_or_default();
 
         if sysname.starts_with("event") {
             self.extract_info(device, test);
@@ -233,16 +230,16 @@ impl Builtin for InputId {
 
     fn add_property(
         &self,
-        device: Rc<RefCell<Device>>,
+        device: Rc<Device>,
         test: bool,
         key: &str,
         value: &str,
     ) -> Result<(), crate::error::Error> {
-        device.borrow().add_property(key, value).map_err(|e| {
-            crate::error::Error::BuiltinCommandError {
+        device
+            .add_property(key, value)
+            .map_err(|e| crate::error::Error::BuiltinCommandError {
                 msg: format!("Failed to add property '{}'='{}': ({})", key, value, e),
-            }
-        })?;
+            })?;
 
         if test {
             println!("{}={}", key, value);
@@ -253,7 +250,7 @@ impl Builtin for InputId {
 }
 
 impl InputId {
-    fn get_input_id(&self, dev: Rc<RefCell<Device>>) -> input_id {
+    fn get_input_id(&self, dev: Rc<Device>) -> input_id {
         let mut id = input_id {
             bustype: u16::default(),
             vendor: u16::default(),
@@ -261,19 +258,19 @@ impl InputId {
             version: u16::default(),
         };
 
-        if let Ok(v) = dev.borrow().get_sysattr_value("id/bustype") {
+        if let Ok(v) = dev.get_sysattr_value("id/bustype") {
             id.bustype = u16::from_str_radix(&v, 16).unwrap();
         }
 
-        if let Ok(v) = dev.borrow().get_sysattr_value("id/vendor") {
+        if let Ok(v) = dev.get_sysattr_value("id/vendor") {
             id.vendor = u16::from_str_radix(&v, 16).unwrap();
         }
 
-        if let Ok(v) = dev.borrow().get_sysattr_value("id/product") {
+        if let Ok(v) = dev.get_sysattr_value("id/product") {
             id.product = u16::from_str_radix(&v, 16).unwrap();
         }
 
-        if let Ok(v) = dev.borrow().get_sysattr_value("id/version") {
+        if let Ok(v) = dev.get_sysattr_value("id/version") {
             id.version = u16::from_str_radix(&v, 16).unwrap();
         }
 
@@ -282,17 +279,17 @@ impl InputId {
 
     fn get_cap_mask(
         &self,
-        dev: Rc<RefCell<Device>>,
+        dev: Rc<Device>,
         attr: &str,
         bitmask_size: usize,
         bitmask: &mut [u64],
         test: bool,
     ) {
-        let text = dev.borrow().get_sysattr_value(attr).unwrap_or_default();
+        let text = dev.get_sysattr_value(attr).unwrap_or_default();
 
         log_dev!(
             debug,
-            dev.borrow(),
+            dev,
             format!("{} raw kernel attribute: {}", attr, text)
         );
 
@@ -301,7 +298,7 @@ impl InputId {
                 Err(_) => {
                     log_dev!(
                         debug,
-                        dev.borrow(),
+                        dev,
                         format!("Ignoring {} block which failed to parse", attr)
                     );
                     continue;
@@ -314,7 +311,7 @@ impl InputId {
             } else {
                 log_dev!(
                     debug,
-                    dev.borrow(),
+                    dev,
                     format!(
                         "Ignoring {} block {:X} which is larger than maximum size",
                         attr, val
@@ -324,7 +321,7 @@ impl InputId {
         }
 
         if test {
-            log_dev!(debug, dev.borrow(), format!("{} decoded bit map:", attr));
+            log_dev!(debug, dev, format!("{} decoded bit map:", attr));
             let mut val = bitmask_size / std::mem::size_of::<u64>();
 
             while val > 0 && bitmask[val - 1] == 0 {
@@ -341,13 +338,13 @@ impl InputId {
                 if std::mem::size_of::<u64>() == 4 {
                     log_dev!(
                         debug,
-                        dev.borrow(),
+                        dev,
                         format!("  bit {:4}: {:08X}", j * bits_per_long!(), bit)
                     );
                 } else {
                     log_dev!(
                         debug,
-                        dev.borrow(),
+                        dev,
                         format!("  bit {:4}: {:016X}", j * bits_per_long!(), bit)
                     );
                 }
@@ -358,7 +355,7 @@ impl InputId {
     #[allow(clippy::too_many_arguments)]
     fn test_pointer(
         &self,
-        dev: Rc<RefCell<Device>>,
+        dev: Rc<Device>,
         id: &input_id,
         bitmasks: &mut Bitmasks,
         test: bool,
@@ -545,7 +542,7 @@ impl InputId {
             }
 
             if num_well_known_keys >= 4 || num_joystick_buttons + num_joystick_axes < 2 {
-                log_dev!(debug, dev.borrow(),
+                log_dev!(debug, dev,
                     format!("Input device has {} joystick buttons and {} axes but also {} keyboard key sets, \
                              assuming this is a keyboard, not a joystick.",
                             num_joystick_buttons, num_joystick_axes, num_well_known_keys));
@@ -555,7 +552,7 @@ impl InputId {
             if has_wheel && has_pad_buttons {
                 log_dev!(
                     debug,
-                    dev.borrow(),
+                    dev,
                     format!(
                         "Input device has {} joystick buttons as well as tablet pad buttons, \
                          assuming this is a tablet pad, not a joystick.",
@@ -611,13 +608,9 @@ impl InputId {
             || is_pointing_stick
     }
 
-    fn test_key(&self, dev: Rc<RefCell<Device>>, bitmasks: &mut Bitmasks, test: bool) -> bool {
+    fn test_key(&self, dev: Rc<Device>, bitmasks: &mut Bitmasks, test: bool) -> bool {
         if test_bit!(input_event_codes::EV_KEY!(), bitmasks.bitmask_ev, false) {
-            log_dev!(
-                debug,
-                dev.borrow(),
-                "test_key: no EV_KEY capability".to_string()
-            );
+            log_dev!(debug, dev, "test_key: no EV_KEY capability".to_string());
             return false;
         }
 
@@ -629,7 +622,7 @@ impl InputId {
                 }
                 log_dev!(
                     debug,
-                    dev.borrow(),
+                    dev,
                     format!(
                         "test_key: checking bit block {} for any keys; found={}",
                         i * bits_per_long!(),
@@ -660,7 +653,7 @@ impl InputId {
                 if test_bit!(i, bitmasks.bitmask_key) && !found {
                     log_dev!(
                         debug,
-                        dev.borrow(),
+                        dev,
                         format!("test_key: Found key {} in high block", i)
                     );
                     found = true;
@@ -688,7 +681,7 @@ impl InputId {
         (absinfo.maximum - absinfo.minimum) / absinfo.resolution
     }
 
-    fn extract_info(&self, dev: Rc<RefCell<Device>>, test: bool) {
+    fn extract_info(&self, dev: Rc<Device>, test: bool) {
         let mut xabsinfo = input_absinfo {
             ..Default::default()
         };
@@ -697,7 +690,6 @@ impl InputId {
         };
 
         let fd = match dev
-            .borrow()
             .open(OFlag::O_RDONLY | OFlag::O_CLOEXEC | OFlag::O_NONBLOCK | OFlag::O_NOCTTY)
         {
             Ok(fd) => fd,
@@ -748,10 +740,7 @@ mod tests {
 
         let mut enumerator = DeviceEnumerator::new();
 
-        for device in enumerator
-            .iter()
-            .filter(|d| d.borrow().get_devpath().is_ok())
-        {
+        for device in enumerator.iter().filter(|d| d.get_devpath().is_ok()) {
             let exec_unit = ExecuteUnit::new(device);
             let builtin = InputId {};
             let _ = builtin.cmd(&exec_unit, 0, vec![], true);

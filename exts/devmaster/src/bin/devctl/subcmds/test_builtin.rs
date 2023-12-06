@@ -18,8 +18,8 @@ use libdevmaster::builtin::{BuiltinCommand, BuiltinManager};
 use libdevmaster::config::devmaster_conf::{DevmasterConfig, DEFAULT_CONFIG};
 use libdevmaster::framework::devmaster::Cache;
 use libdevmaster::rules::exec_unit::ExecuteUnit;
+use std::rc::Rc;
 use std::sync::{Arc, RwLock};
-use std::{cell::RefCell, rc::Rc};
 
 /// test builtin command on processing a device
 /// Commands:
@@ -52,15 +52,12 @@ pub fn subcommand_test_builtin(action: Option<String>, builtin_cmd: String, devi
     let mgr = BuiltinManager::new(cache);
     mgr.init();
 
-    let d = Rc::new(RefCell::new(match Device::from_path(&device) {
+    let d = Rc::new(match Device::from_path(&device) {
         Ok(ret) => ret,
         Err(_) => Device::from_path(&format!("/sys{}", device)).expect("invalid device path."),
-    }));
+    });
 
-    if let Err(e) = d
-        .borrow()
-        .add_property("ACTION", &action.unwrap_or_else(|| "change".to_string()))
-    {
+    if let Err(e) = d.add_property("ACTION", &action.unwrap_or_else(|| "change".to_string())) {
         eprintln!("{:?}", e);
     }
 

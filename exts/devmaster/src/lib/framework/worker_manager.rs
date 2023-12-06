@@ -144,12 +144,12 @@ impl Worker {
                                 .unwrap_or_default()
                         );
 
-                        let device = Rc::new(RefCell::new(device));
+                        let device = Rc::new(device);
                         let _ = execute_mgr.process_device(device.clone());
 
                         log::info!("Worker {}: finished job", id);
 
-                        broadcaster.send_device(&device.borrow(), None).unwrap();
+                        broadcaster.send_device(&device, None).unwrap();
 
                         let mut tcp_stream = UnixStream::connect(listen_addr.as_str())
                             .unwrap_or_else(|error| {

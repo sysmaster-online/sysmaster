@@ -478,18 +478,18 @@ pub extern "C" fn udev_device_get_property_value(
 
 #[cfg(test)]
 mod test {
-    use std::{cell::RefCell, intrinsics::transmute};
+    use std::intrinsics::transmute;
 
     use super::*;
     use device::device_enumerator::*;
 
-    type RD = Rc<RefCell<Device>>;
+    type RD = Rc<Device>;
     pub type Result = std::result::Result<(), device::error::Error>;
 
     fn test_udev_device_new_from_devnum(device: RD) -> Result {
-        let devnum = device.borrow().get_devnum()?;
+        let devnum = device.get_devnum()?;
 
-        let t = if &device.borrow().get_subsystem().unwrap() == "block" {
+        let t = if &device.get_subsystem().unwrap() == "block" {
             'b'
         } else {
             'c'
@@ -500,10 +500,7 @@ mod test {
 
         let syspath = unsafe { CStr::from_ptr(udev_device_get_syspath(raw_udev_device)) };
 
-        assert_eq!(
-            syspath.to_str().unwrap(),
-            &device.borrow().get_syspath().unwrap()
-        );
+        assert_eq!(syspath.to_str().unwrap(), &device.get_syspath().unwrap());
 
         udev_device_unref(raw_udev_device);
 
@@ -511,12 +508,12 @@ mod test {
     }
 
     fn test_udev_device_new_from_subsystem_sysname(device: RD) -> Result {
-        let subsystem = device.borrow().get_subsystem().unwrap();
-        let sysname = device.borrow().get_sysname().unwrap();
+        let subsystem = device.get_subsystem().unwrap();
+        let sysname = device.get_sysname().unwrap();
 
         /* If subsystem is 'drivers', sysname should use '<driver subsystem>:<sysname>'. */
         let name = if subsystem == "drivers" {
-            format!("{}:{}", device.borrow().driver_subsystem.borrow(), sysname)
+            format!("{}:{}", device.driver_subsystem.borrow(), sysname)
         } else {
             sysname
         };
@@ -531,10 +528,7 @@ mod test {
 
         let syspath = unsafe { CStr::from_ptr(udev_device_get_syspath(raw_udev_device)) };
 
-        assert_eq!(
-            syspath.to_str().unwrap(),
-            &device.borrow().get_syspath().unwrap()
-        );
+        assert_eq!(syspath.to_str().unwrap(), &device.get_syspath().unwrap());
 
         udev_device_unref(raw_udev_device);
 
@@ -542,13 +536,13 @@ mod test {
     }
 
     fn test_udev_device_new_from_device_id(device: RD) -> Result {
-        let id = device.borrow().get_device_id().unwrap();
+        let id = device.get_device_id().unwrap();
         let c_id = CString::new(id).unwrap();
         let udev_device = udev_device_new_from_device_id(std::ptr::null_mut(), c_id.as_ptr());
         let syspath = unsafe { CStr::from_ptr(udev_device_get_syspath(udev_device)) };
 
         assert_eq!(
-            device.borrow().get_syspath().unwrap(),
+            device.get_syspath().unwrap(),
             syspath.to_str().unwrap().to_string()
         );
 
@@ -558,7 +552,7 @@ mod test {
     }
 
     fn test_udev_device_new_from_syspath(device: RD) -> Result {
-        let syspath = device.borrow().get_syspath().unwrap();
+        let syspath = device.get_syspath().unwrap();
         let c_syspath = CString::new(syspath).unwrap();
         let udev_device = udev_device_new_from_syspath(std::ptr::null_mut(), c_syspath.as_ptr());
         let ret_syspath = unsafe { CStr::from_ptr(udev_device_get_syspath(udev_device)) };
@@ -571,17 +565,15 @@ mod test {
     }
 
     fn from_rd(device: RD) -> *mut udev_device {
-        let id = device.borrow().get_device_id().unwrap();
+        let id = device.get_device_id().unwrap();
         let c_id = CString::new(id).unwrap();
         udev_device_new_from_device_id(std::ptr::null_mut(), c_id.as_ptr())
     }
 
     fn test_udev_device_has_tag(device: RD) -> Result {
-        let _ = device.borrow_mut().read_db_internal(true);
-        device
-            .borrow_mut()
-            .add_tag("test_udev_device_has_tag", true);
-        device.borrow_mut().update_db()?;
+        let _ = device.read_db_internal(true);
+        device.add_tag("test_udev_device_has_tag", true);
+        device.update_db()?;
 
         let udev_device = from_rd(device.clone());
 
@@ -602,12 +594,11 @@ mod test {
         udev_device_unref(udev_device);
 
         device
-            .borrow_mut()
             .all_tags
             .borrow_mut()
             .remove("test_udev_device_has_tag");
-        device.borrow_mut().remove_tag("test_udev_device_has_tag");
-        device.borrow_mut().update_db()?;
+        device.remove_tag("test_udev_device_has_tag");
+        device.update_db()?;
 
         Ok(())
     }
@@ -636,7 +627,7 @@ mod test {
     fn test_udev_device_get_devnode(dev: RD) -> Result {
         let udev_device = from_rd(dev.clone());
 
-        let devnode = dev.borrow().get_devname()?;
+        let devnode = dev.get_devname()?;
 
         let ptr = udev_device_get_devnode(udev_device);
 
@@ -650,7 +641,7 @@ mod test {
     fn test_udev_device_get_devnum(dev: RD) -> Result {
         let udev_device = from_rd(dev.clone());
 
-        let devnum = dev.borrow().get_devnum()?;
+        let devnum = dev.get_devnum()?;
 
         assert_eq!(udev_device_get_devnum(udev_device), devnum);
 
@@ -660,7 +651,7 @@ mod test {
     fn test_udev_device_get_devpath(dev: RD) -> Result {
         let udev_device = from_rd(dev.clone());
 
-        let devpath = dev.borrow().get_devpath()?;
+        let devpath = dev.get_devpath()?;
 
         assert_eq!(
             unsafe { CStr::from_ptr(udev_device_get_devpath(udev_device)) }
@@ -675,7 +666,7 @@ mod test {
     fn test_udev_device_get_devtype(dev: RD) -> Result {
         let ud = from_rd(dev.clone());
 
-        let devtype = dev.borrow().get_devtype()?;
+        let devtype = dev.get_devtype()?;
 
         assert_eq!(
             unsafe { CStr::from_ptr(udev_device_get_devtype(ud)) }
@@ -690,7 +681,7 @@ mod test {
     fn test_udev_device_get_driver(dev: RD) -> Result {
         let ud = from_rd(dev.clone());
 
-        let driver = dev.borrow().get_driver()?;
+        let driver = dev.get_driver()?;
 
         assert_eq!(
             unsafe { CStr::from_ptr(udev_device_get_driver(ud)) }
@@ -705,7 +696,7 @@ mod test {
     fn test_udev_device_get_sysname(dev: RD) -> Result {
         let ud = from_rd(dev.clone());
 
-        let sysname = dev.borrow().get_sysname()?;
+        let sysname = dev.get_sysname()?;
 
         assert_eq!(
             unsafe { CStr::from_ptr(udev_device_get_sysname(ud)) }
@@ -720,7 +711,7 @@ mod test {
     fn test_udev_device_get_subsystem(dev: RD) -> Result {
         let ud = from_rd(dev.clone());
 
-        let subsystem = dev.borrow().get_subsystem()?;
+        let subsystem = dev.get_subsystem()?;
 
         assert_eq!(
             unsafe { CStr::from_ptr(udev_device_get_subsystem(ud)) }
@@ -787,17 +778,13 @@ mod test {
 
     #[test]
     fn test_udev_device_has_tag_ut() {
-        let dev = Rc::new(RefCell::new(
-            Device::from_subsystem_sysname("net", "lo").unwrap(),
-        ));
+        let dev = Rc::new(Device::from_subsystem_sysname("net", "lo").unwrap());
         let _ = test_udev_device_has_tag(dev);
     }
 
     #[test]
     fn test_udev_device_fake_from_monitor_ut() {
-        let dev = Rc::new(RefCell::new(
-            Device::from_subsystem_sysname("net", "lo").unwrap(),
-        ));
+        let dev = Rc::new(Device::from_subsystem_sysname("net", "lo").unwrap());
         let _ = test_udev_device_get_action(dev.clone());
         let _ = test_udev_device_get_seqnum(dev.clone());
         let _ = test_udev_device_get_property_value(dev);

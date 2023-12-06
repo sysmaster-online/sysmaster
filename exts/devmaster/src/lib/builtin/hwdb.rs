@@ -63,7 +63,7 @@ impl Hwdb {
 
     fn lookup(
         &self,
-        dev: Rc<RefCell<Device>>,
+        dev: Rc<Device>,
         prefix: &Option<String>,
         modalias: String,
         filter: &Option<String>,
@@ -97,7 +97,7 @@ impl Hwdb {
                 }
             }
 
-            if let Err(e) = dev.borrow_mut().add_property(key, value) {
+            if let Err(e) = dev.add_property(key, value) {
                 return Err(e.get_errno());
             }
 
@@ -112,7 +112,7 @@ impl Hwdb {
 
     fn search(
         &self,
-        dev: Rc<RefCell<Device>>,
+        dev: Rc<Device>,
         srcdev: Option<Device>,
         subsystem: &Option<String>,
         prefix: Option<String>,
@@ -123,7 +123,7 @@ impl Hwdb {
         let mut last = false;
         let mut src_dev = match srcdev {
             Some(d) => d,
-            None => dev.borrow_mut().shallow_clone().unwrap(),
+            None => dev.shallow_clone().unwrap(),
         };
 
         loop {
@@ -131,7 +131,7 @@ impl Hwdb {
                 Ok(str_subsystem) => str_subsystem,
                 Err(_) => {
                     src_dev = match src_dev.get_parent() {
-                        Ok(d) => d.borrow_mut().shallow_clone().unwrap(),
+                        Ok(d) => d.shallow_clone().unwrap(),
                         Err(_) => break,
                     };
                     continue;
@@ -142,7 +142,7 @@ impl Hwdb {
             if let Some(str_subsystem) = subsystem {
                 if &dsubsys != str_subsystem {
                     src_dev = match src_dev.get_parent() {
-                        Ok(d) => d.borrow_mut().shallow_clone().unwrap(),
+                        Ok(d) => d.shallow_clone().unwrap(),
                         Err(_) => break,
                     };
                     continue;
@@ -170,7 +170,7 @@ impl Hwdb {
 
             if modalias.is_empty() {
                 src_dev = match src_dev.get_parent() {
-                    Ok(d) => d.borrow_mut().shallow_clone().unwrap(),
+                    Ok(d) => d.shallow_clone().unwrap(),
                     Err(_) => break,
                 };
                 continue;
@@ -189,7 +189,7 @@ impl Hwdb {
             }
 
             src_dev = match src_dev.get_parent() {
-                Ok(d) => d.borrow_mut().shallow_clone().unwrap(),
+                Ok(d) => d.shallow_clone().unwrap(),
                 Err(_) => break,
             };
         }

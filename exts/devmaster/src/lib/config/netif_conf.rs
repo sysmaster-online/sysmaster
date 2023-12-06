@@ -17,7 +17,7 @@ use device::Device;
 use fnmatch_sys::fnmatch;
 use lazy_static::lazy_static;
 use serde::Deserialize;
-use std::{cell::RefCell, os::raw::c_char, path::Path, rc::Rc};
+use std::{os::raw::c_char, path::Path, rc::Rc};
 
 use crate::log_dev;
 
@@ -59,11 +59,11 @@ pub(crate) struct Link {
 }
 
 impl NetifConfigData {
-    pub(crate) fn match_netif(&self, netif: Rc<RefCell<Device>>) -> bool {
+    pub(crate) fn match_netif(&self, netif: Rc<Device>) -> bool {
         if let Some(original_name) = &self.Match.OriginalName {
             let pattern = format!("{}\0", original_name);
 
-            match netif.borrow().get_sysname() {
+            match netif.get_sysname() {
                 Ok(sysname) => {
                     let source = format!("{}\0", sysname);
 
@@ -79,11 +79,7 @@ impl NetifConfigData {
                     }
                 }
                 Err(e) => {
-                    log_dev!(
-                        error,
-                        netif.borrow(),
-                        format!("Failed to get sysname: {}", e)
-                    );
+                    log_dev!(error, netif, format!("Failed to get sysname: {}", e));
                     return false;
                 }
             }
@@ -159,7 +155,7 @@ impl NetifConfigCtx {
         }
     }
 
-    pub(crate) fn get_config(&self, netif: Rc<RefCell<Device>>) -> Option<&NetifConfig> {
+    pub(crate) fn get_config(&self, netif: Rc<Device>) -> Option<&NetifConfig> {
         self.configs
             .iter()
             .find(|&config| config.inner.match_netif(netif.clone()))

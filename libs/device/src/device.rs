@@ -54,7 +54,7 @@ pub struct Device {
     /// inotify handler
     pub watch_handle: RefCell<i32>,
     /// the parent device
-    pub parent: RefCell<Option<Rc<RefCell<Device>>>>,
+    pub parent: RefCell<Option<Rc<Device>>>,
     /// ifindex
     pub ifindex: RefCell<u32>,
     /// device type
@@ -120,7 +120,7 @@ pub struct Device {
     pub database_version: RefCell<u32>,
 
     /// children
-    pub children: RefCell<HashMap<String, Rc<RefCell<Device>>>>,
+    pub children: RefCell<HashMap<String, Rc<Device>>>,
     /// children enumerated
     pub children_enumerated: RefCell<bool>,
 
@@ -650,11 +650,11 @@ impl Device {
     }
 
     /// get the parent of the device
-    pub fn get_parent(&self) -> Result<Rc<RefCell<Device>>, Error> {
+    pub fn get_parent(&self) -> Result<Rc<Device>, Error> {
         if !*self.parent_set.borrow() {
             match Device::new_from_child(self) {
                 Ok(parent) => {
-                    let _ = self.parent.replace(Some(Rc::new(RefCell::new(parent))));
+                    let _ = self.parent.replace(Some(Rc::new(parent)));
                 }
                 Err(e) => {
                     // it is okay if no parent device is found,
@@ -687,27 +687,27 @@ impl Device {
         &self,
         subsystem: &str,
         devtype: Option<&str>,
-    ) -> Result<Rc<RefCell<Device>>, Error> {
+    ) -> Result<Rc<Device>, Error> {
         let mut parent = match self.get_parent() {
             Ok(parent) => parent,
             Err(e) => return Err(e),
         };
 
         loop {
-            let parent_subsystem = parent.borrow_mut().get_subsystem();
+            let parent_subsystem = parent.get_subsystem();
 
             if parent_subsystem.is_ok() && parent_subsystem.unwrap() == subsystem {
                 if devtype.is_none() {
                     break;
                 }
 
-                let parent_devtype = parent.borrow_mut().get_devtype();
+                let parent_devtype = parent.get_devtype();
                 if parent_devtype.is_ok() && parent_devtype.unwrap() == devtype.unwrap() {
                     break;
                 }
             }
 
-            let tmp = parent.borrow_mut().get_parent()?;
+            let tmp = parent.get_parent()?;
             parent = tmp;
         }
 
@@ -2218,15 +2218,15 @@ impl Device {
     /// The parent will try to find the child in its cache firstly. If
     /// it already exists in the cache, directly return it. Otherwise
     /// the child device will be created and be cached.
-    pub fn get_child(&self, child: &str) -> Result<Rc<RefCell<Device>>, Error> {
+    pub fn get_child(&self, child: &str) -> Result<Rc<Device>, Error> {
         if let Some(d) = self.children.borrow().get(child) {
             return Ok(d.clone());
         }
 
-        let dev = Rc::new(RefCell::new(Self::from_syspath(
+        let dev = Rc::new(Self::from_syspath(
             &format!("{}/{}", self.get_syspath()?, child),
             true,
-        )?));
+        )?);
 
         self.children
             .borrow_mut()
@@ -2870,7 +2870,7 @@ impl Device {
     }
 
     /// return the child iterator
-    pub fn child_iter(&self) -> HashMapRefWrapper<String, Rc<RefCell<Device>>> {
+    pub fn child_iter(&self) -> HashMapRefWrapper<String, Rc<Device>> {
         if let Err(e) = self.enumerate_children() {
             log::debug!(
                 "failed to enumerate children of '{}': {}",
@@ -2931,7 +2931,7 @@ mod tests {
     }
 
     /// test a single device
-    fn test_device_one(device: &mut Device) {
+    fn test_device_one(device: Rc<Device>) {
         let syspath = device.get_syspath().unwrap();
         assert!(syspath.starts_with("/sys"));
         let sysname = device.get_sysname().unwrap();
@@ -3236,7 +3236,7 @@ mod tests {
                 std::fs::canonicalize(&format!("{}/{}", &syspath, subdir)).unwrap();
             assert_eq!(
                 canoicalized_path.to_str().unwrap(),
-                &child.borrow().get_syspath().unwrap()
+                &child.get_syspath().unwrap()
             );
         }
 
@@ -3297,8 +3297,8 @@ mod tests {
         let mut enumerator = DeviceEnumerator::new();
         enumerator.set_enumerator_type(DeviceEnumerationType::All);
         for device in enumerator.iter() {
-            device.borrow().set_base_path("/tmp/devmaster");
-            test_device_one(&mut device.as_ref().borrow_mut());
+            device.set_base_path("/tmp/devmaster");
+            test_device_one(device);
         }
     }
 
@@ -3584,16 +3584,16 @@ mod tests {
         e.set_enumerator_type(DeviceEnumerationType::All);
 
         for mut dev in e.iter() {
-            let dev_clone = dev.borrow().shallow_clone().unwrap();
+            let dev_clone = dev.shallow_clone().unwrap();
             dev_clone.get_syspath().unwrap();
             dev_clone.get_subsystem().unwrap();
 
             loop {
-                let ret = dev.borrow().get_parent();
+                let ret = dev.get_parent();
 
                 if let Ok(parent) = ret {
-                    parent.borrow().get_syspath().unwrap();
-                    if let Err(e) = parent.borrow().get_subsystem() {
+                    parent.get_syspath().unwrap();
+                    if let Err(e) = parent.get_subsystem() {
                         assert_eq!(e.get_errno(), Errno::ENOENT);
                     }
                     dev = parent;

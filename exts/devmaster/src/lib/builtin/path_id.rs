@@ -17,7 +17,6 @@ use crate::builtin::Builtin;
 use crate::error::{Error, Result};
 use crate::rules::exec_unit::ExecuteUnit;
 use device::Device;
-use std::cell::RefCell;
 use std::ffi::CString;
 use std::fs::read_dir;
 use std::rc::Rc;
@@ -71,7 +70,7 @@ impl Builtin for PathId {
          * devices do not expose their buses and do not provide a unique
          * and predictable name that way.
          */
-        if let Ok(subsystem) = device.borrow().get_subsystem() {
+        if let Ok(subsystem) = device.get_subsystem() {
             if subsystem == "block" && !supported_transport {
                 return Err(Error::BuiltinCommandError {
                     msg: "block error".to_string(),
@@ -150,7 +149,7 @@ impl PathId {
     #[allow(clippy::ptr_arg)]
     fn compose_path(
         &self,
-        dev: Rc<RefCell<Device>>,
+        dev: Rc<Device>,
         path: &mut String,
         compat_path: &mut String,
         supported_transport: &mut bool,
@@ -158,18 +157,8 @@ impl PathId {
     ) -> Result<bool> {
         let mut parent = Option::Some(dev.clone());
         loop {
-            let subsys = parent
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .get_subsystem()
-                .unwrap_or_default();
-            let mut sysname = parent
-                .as_ref()
-                .unwrap()
-                .borrow()
-                .get_sysname()
-                .unwrap_or_default();
+            let subsys = parent.as_ref().unwrap().get_subsystem().unwrap_or_default();
+            let mut sysname = parent.as_ref().unwrap().get_sysname().unwrap_or_default();
             if !subsys.is_empty() && !sysname.is_empty() {
                 if subsys == "scsi_tape" {
                     self.handle_scsi_tape(parent.as_ref().unwrap().clone(), path);
@@ -250,7 +239,7 @@ impl PathId {
                 break;
             }
 
-            let temp = match parent.as_ref().unwrap().borrow().get_parent() {
+            let temp = match parent.as_ref().unwrap().get_parent() {
                 Ok(res) => Some(res),
                 Err(_) => {
                     break;
@@ -263,8 +252,8 @@ impl PathId {
         Ok(true)
     }
 
-    fn handle_scsi_tape(&self, dev: Rc<RefCell<Device>>, path: &mut String) {
-        let name = match dev.borrow().get_sysname() {
+    fn handle_scsi_tape(&self, dev: Rc<Device>, path: &mut String) {
+        let name = match dev.get_sysname() {
             Ok(name) => name,
             Err(_) => return,
         };
@@ -280,12 +269,12 @@ impl PathId {
 
     fn handle_scsi(
         &self,
-        parent: Rc<RefCell<Device>>,
+        parent: Rc<Device>,
         path: &mut String,
         compat_path: &mut str,
         supported_parent: &mut bool,
-    ) -> Option<Rc<RefCell<Device>>> {
-        let devtype = match parent.borrow().get_devtype() {
+    ) -> Option<Rc<Device>> {
+        let devtype = match parent.get_devtype() {
             Ok(devtype) => devtype,
             Err(_) => return Some(parent.clone()),
         };
@@ -294,14 +283,14 @@ impl PathId {
             return Some(parent);
         }
 
-        let id = parent.borrow().get_sysattr_value("ieee1394_id");
+        let id = parent.get_sysattr_value("ieee1394_id");
         if id.is_ok() {
             self.path_prepend(path, format!("ieee1394-0x{}", id.unwrap()));
             *supported_parent = true;
             return self.skip_subsystem(parent, "scsi");
         }
 
-        let name = match parent.borrow().get_syspath() {
+        let name = match parent.get_syspath() {
             Ok(name) => name,
             Err(_) => return None,
         };
@@ -335,17 +324,15 @@ impl PathId {
 
     fn handle_scsi_fibre_channel(
         &self,
-        parent: Rc<RefCell<Device>>,
+        parent: Rc<Device>,
         path: &mut String,
-    ) -> Option<Rc<RefCell<Device>>> {
-        let targetdev = match parent
-            .borrow()
-            .get_parent_with_subsystem_devtype("scsi", Some("scsi_target"))
+    ) -> Option<Rc<Device>> {
+        let targetdev = match parent.get_parent_with_subsystem_devtype("scsi", Some("scsi_target"))
         {
             Ok(dev) => dev,
             Err(_) => return None,
         };
-        let sysname = match targetdev.borrow().get_sysname() {
+        let sysname = match targetdev.get_sysname() {
             Ok(sysname) => sysname,
             Err(_) => return None,
         };
@@ -365,23 +352,17 @@ impl PathId {
         Some(parent)
     }
 
-    fn handle_scsi_sas(
-        &self,
-        parent: Rc<RefCell<Device>>,
-        path: &mut String,
-    ) -> Option<Rc<RefCell<Device>>> {
-        let targetdev = match parent
-            .borrow()
-            .get_parent_with_subsystem_devtype("scsi", Some("scsi_target"))
+    fn handle_scsi_sas(&self, parent: Rc<Device>, path: &mut String) -> Option<Rc<Device>> {
+        let targetdev = match parent.get_parent_with_subsystem_devtype("scsi", Some("scsi_target"))
         {
             Ok(dev) => dev,
             Err(_) => return None,
         };
-        let target_parent = match targetdev.borrow().get_parent() {
+        let target_parent = match targetdev.get_parent() {
             Ok(dev) => dev,
             Err(_) => return None,
         };
-        let sysname = match target_parent.borrow().get_sysname() {
+        let sysname = match target_parent.get_sysname() {
             Ok(sysname) => sysname,
             Err(_) => return None,
         };
@@ -402,20 +383,16 @@ impl PathId {
         Some(parent)
     }
 
-    fn handle_scsi_iscsi(
-        &self,
-        parent: Rc<RefCell<Device>>,
-        path: &mut String,
-    ) -> Option<Rc<RefCell<Device>>> {
+    fn handle_scsi_iscsi(&self, parent: Rc<Device>, path: &mut String) -> Option<Rc<Device>> {
         let transportdev = parent.clone();
         let mut sysname;
         /* find iscsi session */
         loop {
-            let transportdev = match transportdev.borrow().get_parent() {
+            let transportdev = match transportdev.get_parent() {
                 Ok(dev) => dev,
                 Err(_) => return None,
             };
-            sysname = match transportdev.borrow().get_sysname() {
+            sysname = match transportdev.get_sysname() {
                 Ok(name) => name,
                 Err(_) => return None,
             };
@@ -435,7 +412,7 @@ impl PathId {
             Err(_) => return None,
         };
 
-        let sysnum = match transportdev.borrow().get_sysnum() {
+        let sysnum = match transportdev.get_sysnum() {
             Ok(num) => num,
             Err(_) => return None,
         };
@@ -465,11 +442,11 @@ impl PathId {
 
     fn handle_scsi_ata(
         &self,
-        parent: Rc<RefCell<Device>>,
+        parent: Rc<Device>,
         path: &mut String,
         compat_path: &mut str,
-    ) -> Option<Rc<RefCell<Device>>> {
-        let sysname = match parent.borrow().get_sysname() {
+    ) -> Option<Rc<Device>> {
+        let sysname = match parent.get_sysname() {
             Ok(name) => name,
             Err(_) => return None,
         };
@@ -493,20 +470,17 @@ impl PathId {
             return None;
         }
 
-        let targetdev = match parent
-            .borrow()
-            .get_parent_with_subsystem_devtype("scsi", Some("scsi_host"))
-        {
+        let targetdev = match parent.get_parent_with_subsystem_devtype("scsi", Some("scsi_host")) {
             Ok(dev) => dev,
             Err(_) => return None,
         };
 
-        let target_parent = match targetdev.borrow().get_parent() {
+        let target_parent = match targetdev.get_parent() {
             Ok(dev) => dev,
             Err(_e) => return None,
         };
 
-        let sysname = match target_parent.borrow().get_sysname() {
+        let sysname = match target_parent.get_sysname() {
             Ok(name) => name,
             Err(_) => return None,
         };
@@ -539,24 +513,21 @@ impl PathId {
 
     fn handle_scsi_hyperv(
         &self,
-        parent: Rc<RefCell<Device>>,
+        parent: Rc<Device>,
         path: &mut String,
         giud_str_len: usize,
-    ) -> Option<Rc<RefCell<Device>>> {
-        let hostdev = match parent
-            .borrow()
-            .get_parent_with_subsystem_devtype("scsi", Some("scsi_host"))
-        {
+    ) -> Option<Rc<Device>> {
+        let hostdev = match parent.get_parent_with_subsystem_devtype("scsi", Some("scsi_host")) {
             Ok(dev) => dev,
             Err(_) => return None,
         };
 
-        let vmbusdev = match hostdev.borrow().get_parent() {
+        let vmbusdev = match hostdev.get_parent() {
             Ok(dev) => dev,
             Err(_e) => return None,
         };
 
-        let guid_str = match vmbusdev.borrow().get_sysattr_value("device_id") {
+        let guid_str = match vmbusdev.get_sysattr_value("device_id") {
             Ok(str) => str,
             Err(_e) => return None,
         };
@@ -578,20 +549,13 @@ impl PathId {
         Some(parent)
     }
 
-    fn handle_scsi_default(
-        &self,
-        parent: Rc<RefCell<Device>>,
-        path: &mut String,
-    ) -> Option<Rc<RefCell<Device>>> {
+    fn handle_scsi_default(&self, parent: Rc<Device>, path: &mut String) -> Option<Rc<Device>> {
         let mut basenum = -1;
-        let hostdev = match parent
-            .borrow()
-            .get_parent_with_subsystem_devtype("scsi", Some("scsi_host"))
-        {
+        let hostdev = match parent.get_parent_with_subsystem_devtype("scsi", Some("scsi_host")) {
             Ok(dev) => dev,
             Err(_) => return None,
         };
-        let name = match parent.borrow().get_sysname() {
+        let name = match parent.get_sysname() {
             Ok(name) => name,
             Err(_) => return None,
         };
@@ -633,7 +597,7 @@ impl PathId {
          * this. Manual driver unbind/bind, parallel hotplug/unplug will
          * get into the way of this "I hope it works" logic.
          */
-        let base = match hostdev.borrow().get_syspath() {
+        let base = match hostdev.get_syspath() {
             Ok(base) => base,
             Err(_) => return None,
         };
@@ -695,8 +659,8 @@ impl PathId {
         Some(hostdev)
     }
 
-    fn format_lun_number(&self, dev: Rc<RefCell<Device>>) -> String {
-        let sysnum = match dev.borrow().get_sysnum() {
+    fn format_lun_number(&self, dev: Rc<Device>) -> String {
+        let sysnum = match dev.get_sysnum() {
             Ok(sysnum) => sysnum,
             Err(_) => return String::new(),
         };
@@ -721,12 +685,8 @@ impl PathId {
         path
     }
 
-    fn handle_cciss(
-        &self,
-        parent: Rc<RefCell<Device>>,
-        path: &mut String,
-    ) -> Option<Rc<RefCell<Device>>> {
-        let name = match parent.borrow().get_sysname() {
+    fn handle_cciss(&self, parent: Rc<Device>, path: &mut String) -> Option<Rc<Device>> {
+        let name = match parent.get_sysname() {
             Ok(s) => s,
             Err(_) => return None,
         };
@@ -750,12 +710,8 @@ impl PathId {
         self.skip_subsystem(parent, &name)
     }
 
-    fn handle_usb(
-        &self,
-        parent: Rc<RefCell<Device>>,
-        path: &mut String,
-    ) -> Option<Rc<RefCell<Device>>> {
-        let devtype = match parent.borrow().get_devtype() {
+    fn handle_usb(&self, parent: Rc<Device>, path: &mut String) -> Option<Rc<Device>> {
+        let devtype = match parent.get_devtype() {
             Ok(devtype) => devtype,
             Err(_) => return Some(parent.clone()),
         };
@@ -764,7 +720,7 @@ impl PathId {
             return Some(parent);
         }
 
-        let sysname = match parent.borrow().get_sysname() {
+        let sysname = match parent.get_sysname() {
             Ok(sysname) => sysname,
             Err(_) => return Some(parent.clone()),
         };
@@ -779,12 +735,8 @@ impl PathId {
         self.skip_subsystem(parent, "usb")
     }
 
-    fn handle_bcma(
-        &self,
-        parent: Rc<RefCell<Device>>,
-        path: &mut String,
-    ) -> Option<Rc<RefCell<Device>>> {
-        let sysname = match parent.borrow().get_sysname() {
+    fn handle_bcma(&self, parent: Rc<Device>, path: &mut String) -> Option<Rc<Device>> {
+        let sysname = match parent.get_sysname() {
             Ok(sysname) => sysname,
             Err(_) => return None,
         };
@@ -802,12 +754,8 @@ impl PathId {
         Some(parent)
     }
 
-    fn handle_serio(
-        &self,
-        parent: Rc<RefCell<Device>>,
-        path: &mut String,
-    ) -> Option<Rc<RefCell<Device>>> {
-        let sysnum = match parent.borrow().get_sysnum() {
+    fn handle_serio(&self, parent: Rc<Device>, path: &mut String) -> Option<Rc<Device>> {
+        let sysnum = match parent.get_sysnum() {
             Ok(sysnum) => sysnum,
             Err(_) => return Some(parent.clone()),
         };
@@ -822,12 +770,12 @@ impl PathId {
 
     fn handle_subsys(
         &self,
-        parent: Rc<RefCell<Device>>,
+        parent: Rc<Device>,
         subsys: String,
         path: &mut String,
         sysname: &mut String,
         compat_path: &mut String,
-    ) -> Option<Rc<RefCell<Device>>> {
+    ) -> Option<Rc<Device>> {
         self.path_prepend(path, format!("{}-{}", subsys, sysname));
         if !compat_path.is_empty() {
             self.path_prepend(compat_path, format!("{}-{}", subsys, sysname));
@@ -835,16 +783,12 @@ impl PathId {
         self.skip_subsystem(parent, &subsys)
     }
 
-    fn handle_ap(
-        &self,
-        parent: Rc<RefCell<Device>>,
-        path: &mut String,
-    ) -> Option<Rc<RefCell<Device>>> {
-        let systype = parent.borrow().get_sysattr_value("type");
-        let func = parent.borrow().get_sysattr_value("ap_functions");
+    fn handle_ap(&self, parent: Rc<Device>, path: &mut String) -> Option<Rc<Device>> {
+        let systype = parent.get_sysattr_value("type");
+        let func = parent.get_sysattr_value("ap_functions");
         if systype.is_ok() && func.is_ok() {
             self.path_prepend(path, format!("ap-{}-{}", systype.unwrap(), func.unwrap()));
-        } else if let Ok(sysname) = parent.borrow().get_sysname() {
+        } else if let Ok(sysname) = parent.get_sysname() {
             self.path_prepend(path, format!("ap-{}", sysname));
         }
 
@@ -853,14 +797,14 @@ impl PathId {
 
     fn handle_nvme(
         &self,
-        dev: Rc<RefCell<Device>>,
-        parent: Rc<RefCell<Device>>,
+        dev: Rc<Device>,
+        parent: Rc<Device>,
         path: &mut String,
         compat_path: &mut String,
         supported_parent: &mut bool,
         supported_transport: &mut bool,
-    ) -> Option<Rc<RefCell<Device>>> {
-        if let Ok(nsid) = dev.borrow().get_sysattr_value("nsid") {
+    ) -> Option<Rc<Device>> {
+        if let Ok(nsid) = dev.get_sysattr_value("nsid") {
             self.path_prepend(path, format!("nvme-{}", nsid));
             if !compat_path.is_empty() {
                 self.path_prepend(compat_path, format!("nvme-{}", nsid));
@@ -875,14 +819,14 @@ impl PathId {
 
     fn handle_nvme_subsystem(
         &self,
-        dev: Rc<RefCell<Device>>,
-        parent: Rc<RefCell<Device>>,
+        dev: Rc<Device>,
+        parent: Rc<Device>,
         path: &mut String,
         compat_path: &mut String,
         supported_parent: &mut bool,
         supported_transport: &mut bool,
-    ) -> Result<Option<Rc<RefCell<Device>>>> {
-        if let Ok(nsid) = dev.borrow().get_sysattr_value("nsid") {
+    ) -> Result<Option<Rc<Device>>> {
+        if let Ok(nsid) = dev.get_sysattr_value("nsid") {
             self.path_prepend(path, format!("nvme-{}", nsid));
             if !compat_path.is_empty() {
                 self.path_prepend(compat_path, format!("nvme-{}", nsid));
@@ -898,12 +842,8 @@ impl PathId {
         Ok(Some(parent))
     }
 
-    fn handle_nvme_spi(
-        &self,
-        parent: Rc<RefCell<Device>>,
-        path: &mut String,
-    ) -> Option<Rc<RefCell<Device>>> {
-        let sysnum = match parent.borrow().get_sysnum() {
+    fn handle_nvme_spi(&self, parent: Rc<Device>, path: &mut String) -> Option<Rc<Device>> {
+        let sysnum = match parent.get_sysnum() {
             Ok(sysnum) => sysnum,
             Err(_) => return Some(parent.clone()),
         };
@@ -914,7 +854,7 @@ impl PathId {
         Some(parent)
     }
 
-    fn find_real_nvme_parent(&self, dev: Rc<RefCell<Device>>) -> Result<Rc<RefCell<Device>>> {
+    fn find_real_nvme_parent(&self, dev: Rc<Device>) -> Result<Rc<Device>> {
         /* If the device belongs to "nvme-subsystem" (not to be confused with "nvme"), which happens when
          * NVMe multipathing is enabled in the kernel (/sys/module/nvme_core/parameters/multipath is Y),
          * then the syspath is something like the following:
@@ -922,7 +862,7 @@ impl PathId {
          * Hence, we need to find the 'real parent' in "nvme" subsystem, e.g,
          *   /sys/devices/pci0000:00/0000:00:1c.4/0000:3c:00.0/nvme/nvme0 */
 
-        let sysname = match dev.borrow().get_sysname() {
+        let sysname = match dev.get_sysname() {
             Ok(name) => name,
             Err(_) => {
                 return Err(Error::BuiltinCommandError {
@@ -947,7 +887,7 @@ impl PathId {
         let sysname = &sysname[..sysname.len() - end.len()];
 
         match Device::from_subsystem_sysname("nvme", sysname) {
-            Ok(dev) => Ok(Rc::new(RefCell::new(dev))),
+            Ok(dev) => Ok(Rc::new(dev)),
             Err(e) => Err(Error::BuiltinCommandError {
                 msg: format!("Failed to get_sysname :{:?}", e),
             }),
@@ -962,16 +902,12 @@ impl PathId {
         }
     }
 
-    fn skip_subsystem(
-        &self,
-        device: Rc<RefCell<Device>>,
-        subsys: &str,
-    ) -> Option<Rc<RefCell<Device>>> {
+    fn skip_subsystem(&self, device: Rc<Device>, subsys: &str) -> Option<Rc<Device>> {
         let mut dev = device.clone();
         let mut parent = device;
         #[allow(clippy::while_let_loop)]
         loop {
-            let subsystem = match parent.borrow().get_subsystem() {
+            let subsystem = match parent.get_subsystem() {
                 Ok(str) => str,
                 Err(_e) => break,
             };
@@ -982,7 +918,7 @@ impl PathId {
 
             dev = parent.clone();
 
-            let temp = match parent.borrow().get_parent() {
+            let temp = match parent.get_parent() {
                 Ok(res) => res,
                 Err(_e) => break,
             };

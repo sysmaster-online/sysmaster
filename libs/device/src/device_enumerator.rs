@@ -50,9 +50,9 @@ pub struct DeviceEnumerator {
     /// enumerator type
     pub(crate) etype: RefCell<DeviceEnumerationType>,
     /// key: syspath, value: device
-    pub(crate) devices_by_syspath: RefCell<HashMap<String, Rc<RefCell<Device>>>>,
+    pub(crate) devices_by_syspath: RefCell<HashMap<String, Rc<Device>>>,
     /// sorted device vector
-    pub(crate) devices: RefCell<Vec<Rc<RefCell<Device>>>>,
+    pub(crate) devices: RefCell<Vec<Rc<Device>>>,
 
     /// whether enumerator is up to date
     pub(crate) scan_up_to_date: RefCell<bool>,
@@ -161,7 +161,7 @@ impl DeviceEnumerator {
 }
 
 impl Iterator for DeviceEnumeratorIter<'_> {
-    type Item = Rc<RefCell<Device>>;
+    type Item = Rc<Device>;
 
     /// iterate over the devices or subsystems according to the enumerator type
     fn next(&mut self) -> Option<Self::Item> {
@@ -354,7 +354,7 @@ impl DeviceEnumerator {
             return Ok(());
         }
 
-        let mut devices = Vec::<Rc<RefCell<Device>>>::new();
+        let mut devices = Vec::<Rc<Device>>::new();
         let mut n_sorted = 0;
 
         for prioritized_subsystem in self.prioritized_subsystems.borrow().iter() {
@@ -363,7 +363,7 @@ impl DeviceEnumerator {
                 let m = devices.len();
                 // find a device with the prioritized subsystem
                 for (syspath, device) in self.devices_by_syspath.borrow().iter() {
-                    let subsys = match device.borrow_mut().get_subsystem() {
+                    let subsys = match device.get_subsystem() {
                         Ok(ret) => ret,
                         Err(_) => {
                             continue;
@@ -393,7 +393,7 @@ impl DeviceEnumerator {
                 // remove already sorted devices from the hashmap (self.devices_by_syspath)
                 // avoid get repeated devices from the hashmap later
                 for device in devices.iter().skip(m) {
-                    let syspath = device.borrow().get_syspath()?;
+                    let syspath = device.get_syspath()?;
 
                     self.devices_by_syspath.borrow_mut().remove(&syspath);
                 }
@@ -402,7 +402,7 @@ impl DeviceEnumerator {
                     break;
                 }
             }
-            devices[n_sorted..].sort_by(|a, b| device_compare(&a.borrow(), &b.borrow()));
+            devices[n_sorted..].sort_by(|a, b| device_compare(a, b));
             n_sorted = devices.len();
         }
 
@@ -414,13 +414,12 @@ impl DeviceEnumerator {
         // the sorted devices are removed from the hashmap previously
         // insert them back
         for device in devices[..n_sorted].iter() {
-            self.devices_by_syspath.borrow_mut().insert(
-                device.borrow().get_syspath().unwrap().to_string(),
-                device.clone(),
-            );
+            self.devices_by_syspath
+                .borrow_mut()
+                .insert(device.get_syspath().unwrap().to_string(), device.clone());
         }
 
-        devices[n_sorted..].sort_by(|a, b| device_compare(&a.borrow(), &b.borrow()));
+        devices[n_sorted..].sort_by(|a, b| device_compare(a, b));
         self.devices.replace(devices);
         self.sorted.replace(true);
 
@@ -428,8 +427,8 @@ impl DeviceEnumerator {
     }
 
     /// add device
-    pub(crate) fn add_device(&self, device: Rc<RefCell<Device>>) -> Result<bool, Error> {
-        let syspath = device.borrow().get_syspath()?;
+    pub(crate) fn add_device(&self, device: Rc<Device>) -> Result<bool, Error> {
+        let syspath = device.get_syspath()?;
 
         match self.devices_by_syspath.borrow_mut().insert(syspath, device) {
             Some(_) => {
@@ -448,7 +447,7 @@ impl DeviceEnumerator {
     }
 
     /// check whether a device matches at least one property
-    pub(crate) fn match_property(&self, device: &mut Device) -> Result<bool, Error> {
+    pub(crate) fn match_property(&self, device: Rc<Device>) -> Result<bool, Error> {
         if self.match_property.borrow().is_empty() {
             return Ok(true);
         }
@@ -469,7 +468,7 @@ impl DeviceEnumerator {
     }
 
     /// check whether the tag of a device matches
-    pub(crate) fn match_tag(&self, _device: &Device) -> Result<bool, Error> {
+    pub(crate) fn match_tag(&self, _device: Rc<Device>) -> Result<bool, Error> {
         // todo!("device database is not available for tag");
         Ok(true)
     }
@@ -484,7 +483,7 @@ impl DeviceEnumerator {
     }
 
     /// check whether the initialized state of a device matches
-    pub(crate) fn match_initialized(&self, _device: &Device) -> Result<bool, Error> {
+    pub(crate) fn match_initialized(&self, _device: Rc<Device>) -> Result<bool, Error> {
         // todo!("device database is not available for initialized");
         Ok(true)
     }
@@ -499,11 +498,7 @@ impl DeviceEnumerator {
     }
 
     /// check whether a device matches conditions according to flags
-    pub(crate) fn test_matches(
-        &self,
-        device: &mut Device,
-        flags: MatchFlag,
-    ) -> Result<bool, Error> {
+    pub(crate) fn test_matches(&self, device: Rc<Device>, flags: MatchFlag) -> Result<bool, Error> {
         if (flags & MatchFlag::SYSNAME).bits() != 0 && !self.match_sysname(&device.get_sysname()?) {
             return Ok(false);
         }
@@ -534,15 +529,15 @@ impl DeviceEnumerator {
             return Ok(false);
         }
 
-        if (flags & MatchFlag::TAG).bits() != 0 && !self.match_tag(device)? {
+        if (flags & MatchFlag::TAG).bits() != 0 && !self.match_tag(device.clone())? {
             return Ok(false);
         }
 
-        if !self.match_initialized(device)? {
+        if !self.match_initialized(device.clone())? {
             return Ok(false);
         }
 
-        if !self.match_property(device)? {
+        if !self.match_property(device.clone())? {
             return Ok(false);
         }
 
@@ -559,12 +554,12 @@ impl DeviceEnumerator {
     /// add parent device
     pub(crate) fn add_parent_devices(
         &self,
-        device: Rc<RefCell<Device>>,
+        device: Rc<Device>,
         flags: MatchFlag,
     ) -> Result<(), Error> {
         let mut d = device;
         loop {
-            let parent = match d.borrow_mut().get_parent() {
+            let parent = match d.get_parent() {
                 Ok(ret) => ret.clone(),
                 Err(e) => {
                     // reach the top
@@ -581,11 +576,11 @@ impl DeviceEnumerator {
 
             d = parent.clone();
 
-            if !self.test_matches(&mut parent.borrow_mut(), flags)? {
+            if !self.test_matches(parent.clone(), flags)? {
                 continue;
             }
 
-            if !self.add_device(parent.clone())? {
+            if !self.add_device(parent)? {
                 break;
             }
         }
@@ -649,7 +644,7 @@ impl DeviceEnumerator {
             };
 
             let device = match Device::from_syspath(syspath.to_str().unwrap_or_default(), true) {
-                Ok(ret) => Rc::new(RefCell::new(ret)),
+                Ok(ret) => Rc::new(ret),
                 Err(e) => {
                     if e.get_errno() != nix::errno::Errno::ENODEV {
                         ret = Err(Error::Nix {
@@ -661,10 +656,7 @@ impl DeviceEnumerator {
                 }
             };
 
-            match self.test_matches(
-                &mut device.borrow_mut(),
-                MatchFlag::ALL & !MatchFlag::SYSNAME,
-            ) {
+            match self.test_matches(device.clone(), MatchFlag::ALL & !MatchFlag::SYSNAME) {
                 Ok(true) => {}
                 Ok(false) => {
                     continue;
@@ -799,8 +791,8 @@ impl DeviceEnumerator {
                 continue;
             }
 
-            let mut device = match Device::from_device_id(&file_name) {
-                Ok(device) => device,
+            let device = match Device::from_device_id(&file_name) {
+                Ok(device) => Rc::new(device),
                 Err(e) => {
                     if e.get_errno() != nix::errno::Errno::ENODEV {
                         /* this is necessarily racy, so ignore missing devices */
@@ -811,7 +803,7 @@ impl DeviceEnumerator {
             };
 
             /* Generated from tag, hence not necessary to check tag again. */
-            match self.test_matches(&mut device, MatchFlag::ALL & (!MatchFlag::TAG)) {
+            match self.test_matches(device.clone(), MatchFlag::ALL & (!MatchFlag::TAG)) {
                 Ok(flag) => {
                     if !flag {
                         continue;
@@ -823,7 +815,7 @@ impl DeviceEnumerator {
                 }
             }
 
-            if let Err(e) = self.add_device(Rc::new(RefCell::new(device))) {
+            if let Err(e) = self.add_device(device) {
                 ret = Err(e);
                 continue;
             }
@@ -847,7 +839,7 @@ impl DeviceEnumerator {
     /// parent add child
     pub(crate) fn parent_add_child(&mut self, path: &str, flags: MatchFlag) -> Result<bool, Error> {
         let device = match Device::from_syspath(path, true) {
-            Ok(dev) => Rc::new(RefCell::new(dev)),
+            Ok(dev) => Rc::new(dev),
             Err(err) => {
                 if err.get_errno() == nix::errno::Errno::ENODEV {
                     /* this is necessarily racy, so ignore missing devices */
@@ -857,7 +849,7 @@ impl DeviceEnumerator {
             }
         };
 
-        if !self.test_matches(&mut device.borrow_mut(), flags)? {
+        if !self.test_matches(device.clone(), flags)? {
             return Ok(false);
         }
 
@@ -1126,7 +1118,7 @@ impl DeviceEnumerator {
 mod tests {
     use super::{DeviceEnumerator, MatchInitializedType};
     use crate::{device_enumerator::DeviceEnumerationType, Device};
-    use std::collections::HashSet;
+    use std::{collections::HashSet, rc::Rc};
 
     #[test]
     fn test_enumerator_inialize() {
@@ -1158,7 +1150,7 @@ mod tests {
         enumerator.set_enumerator_type(DeviceEnumerationType::Devices);
 
         for i in enumerator.iter() {
-            i.borrow().get_devpath().unwrap();
+            i.get_devpath().unwrap();
         }
     }
 
@@ -1168,7 +1160,7 @@ mod tests {
         enumerator.set_enumerator_type(DeviceEnumerationType::Subsystems);
 
         for i in enumerator.iter() {
-            i.borrow().get_devpath().expect("can not get the devpath");
+            i.get_devpath().expect("can not get the devpath");
         }
     }
 
@@ -1178,7 +1170,7 @@ mod tests {
         enumerator.set_enumerator_type(DeviceEnumerationType::All);
 
         for i in enumerator.iter() {
-            i.borrow().get_devpath().expect("can not get the devpath");
+            i.get_devpath().expect("can not get the devpath");
         }
     }
 
@@ -1246,7 +1238,7 @@ mod tests {
         };
 
         for dev in ert.iter() {
-            sm.trans(&dev.borrow().get_subsystem().unwrap());
+            sm.trans(&dev.get_subsystem().unwrap());
         }
 
         ert.sort_devices().unwrap();
@@ -1256,12 +1248,12 @@ mod tests {
     fn test_match_property() {
         let mut ert = DeviceEnumerator::new();
 
-        let mut dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        let dev = Rc::new(Device::from_subsystem_sysname("net", "lo").unwrap());
 
         dev.add_property("helloxxx", "worldxxx").unwrap();
 
         ert.add_match_property("hello*", "world*").unwrap();
-        assert!(ert.match_property(&mut dev).unwrap());
+        assert!(ert.match_property(dev).unwrap());
     }
 
     #[test]
@@ -1287,12 +1279,12 @@ mod tests {
     #[test]
     fn test_match_tag() {
         let mut ert = DeviceEnumerator::new();
-        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        let dev = Rc::new(Device::from_subsystem_sysname("net", "lo").unwrap());
         dev.set_base_path("/tmp/devmaster");
         dev.add_tag("devmaster", true);
         dev.update_tag("devmaster", true).unwrap();
         ert.add_match_tag("devmaster").unwrap();
-        assert!(ert.match_tag(&dev).unwrap());
+        assert!(ert.match_tag(dev.clone()).unwrap());
 
         ert.set_enumerator_type(DeviceEnumerationType::Devices);
         ert.scan_devices().unwrap();
@@ -1317,10 +1309,10 @@ mod tests {
     #[test]
     fn test_match_is_initialized() {
         let mut ert = DeviceEnumerator::new();
-        let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
+        let dev = Rc::new(Device::from_subsystem_sysname("net", "lo").unwrap());
         ert.add_match_is_initialized(MatchInitializedType::ALL)
             .unwrap();
-        assert!(ert.match_initialized(&dev).unwrap());
+        assert!(ert.match_initialized(dev).unwrap());
     }
 
     #[test]

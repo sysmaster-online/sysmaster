@@ -263,7 +263,7 @@ impl TriggerArgs {
         let mut uuids = HashSet::new();
         let mut ret = Ok(HashSet::<String>::new());
         for device in enumerator.iter() {
-            let syspath = match device.borrow().get_syspath() {
+            let syspath = match device.get_syspath() {
                 Ok(syspath) => syspath,
                 Err(_) => continue,
             };
@@ -275,7 +275,6 @@ impl TriggerArgs {
             }
 
             let id = match device
-                .borrow()
                 .trigger_with_uuid(action, (self.uuid || self.settle) && uuid_supported != 0)
             {
                 Ok(id) => id,
@@ -288,7 +287,7 @@ impl TriggerArgs {
                         /* If we specified a UUID because of the settling logic, and we got EINVAL this might
                          * be caused by an old kernel which doesn't know the UUID logic (pre-4.13). Let's try
                          * if it works without the UUID logic then. */
-                        if let Err(e) = device.borrow().trigger(action) {
+                        if let Err(e) = device.trigger(action) {
                             if e.get_errno() != nix::Error::EINVAL {
                                 /* dropping the uuid stuff changed the return code,
                                  * hence don't bother next time */

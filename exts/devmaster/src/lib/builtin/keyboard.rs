@@ -21,7 +21,6 @@ use input_event_codes_rs::{get_input_event_key, input_event_codes};
 use ioctls::{eviocgabs, eviocgbit, eviocskeycode, input_absinfo};
 use nix::fcntl::OFlag;
 use snafu::ResultExt;
-use std::cell::RefCell;
 use std::mem;
 use std::os::unix::prelude::AsRawFd;
 use std::rc::Rc;
@@ -63,12 +62,11 @@ impl Keyboard {
         };
     }
 
-    fn force_release(device: Rc<RefCell<Device>>, release: [u32; 1024], release_count: usize) {
+    fn force_release(device: Rc<Device>, release: [u32; 1024], release_count: usize) {
         let atkbd = device
-            .borrow()
             .get_parent_with_subsystem_devtype("serio", None)
             .unwrap();
-        let current = atkbd.borrow().get_sysattr_value("force_release").unwrap();
+        let current = atkbd.get_sysattr_value("force_release").unwrap();
         let mut codes = current;
         for i in release.iter().take(release_count) {
             if !codes.is_empty() {
@@ -76,9 +74,7 @@ impl Keyboard {
             }
             codes += &release[*i as usize].to_string();
         }
-        let _ = atkbd
-            .borrow()
-            .set_sysattr_value("force_release", Some(&codes));
+        let _ = atkbd.set_sysattr_value("force_release", Some(&codes));
     }
 
     unsafe fn eviocsabs(
@@ -124,15 +120,14 @@ impl Keyboard {
         }
     }
 
-    fn set_trackpoint_sensitivity(device: Rc<RefCell<Device>>, value: &str) {
+    fn set_trackpoint_sensitivity(device: Rc<Device>, value: &str) {
         let pdev = device
-            .borrow()
             .get_parent_with_subsystem_devtype("serio", None)
             .unwrap();
         if value.parse::<i32>().unwrap() < 0 || value.parse::<i32>().unwrap() > 255 {
             return;
         }
-        let _ = pdev.borrow().set_sysattr_value("sensitivity", Some(value));
+        let _ = pdev.set_sysattr_value("sensitivity", Some(value));
     }
 }
 
@@ -151,12 +146,11 @@ impl Builtin for Keyboard {
         let mut has_abs = -1;
         let device = exec_unit.get_device();
         let devname = device
-            .borrow()
             .get_devname()
             .context(DeviceSnafu)
-            .log_dev_error(&device.borrow(), "Failed to get devname!")?;
+            .log_dev_error(&device, "Failed to get devname!")?;
 
-        for (key, value) in &device.borrow().property_iter() {
+        for (key, value) in &device.property_iter() {
             // KEYBOARD_KEY_<hex scan code>=<key code identifier>
             if value.starts_with("KEYBOARD_KEY_") {
                 let mut keycode: String = value.to_string();

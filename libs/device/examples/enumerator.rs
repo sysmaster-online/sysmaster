@@ -17,7 +17,7 @@ fn main() {
     let mut enumerator = DeviceEnumerator::new();
 
     for device in enumerator.iter() {
-        println!("{}", device.borrow_mut().get_devpath().unwrap());
-        device.borrow_mut().trigger(DeviceAction::Change).unwrap();
+        println!("{}", device.get_devpath().unwrap());
+        device.trigger(DeviceAction::Change).unwrap();
     }
 }

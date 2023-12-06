@@ -20,7 +20,6 @@ use crate::{
 };
 use device::Device;
 use std::{
-    cell::RefCell,
     collections::HashMap,
     fmt::{self, Display},
     rc::Rc,
@@ -75,13 +74,12 @@ pub trait Builtin {
     /// add property into device
     fn add_property(
         &self,
-        device: Rc<RefCell<Device>>,
+        device: Rc<Device>,
         test: bool,
         key: &str,
         value: &str,
     ) -> Result<(), Error> {
         device
-            .borrow()
             .add_property(key, value)
             .map_err(|e| Error::BuiltinCommandError {
                 msg: format!("Failed to add property '{}'='{}': ({})", key, value, e),

@@ -31,7 +31,6 @@ use blkid_rs::BlkidUsageFlags;
 use clap::Parser;
 use device::Device;
 use nix::fcntl::OFlag;
-use std::cell::RefCell;
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::prelude::AsRawFd;
@@ -92,7 +91,7 @@ macro_rules! op_command_err {
 impl Blkid {
     fn print_property(
         &self,
-        device: Rc<RefCell<Device>>,
+        device: Rc<Device>,
         name: &str,
         value: &str,
         test: bool,
@@ -379,13 +378,11 @@ impl Builtin for Blkid {
     ) -> Result<bool> {
         let device = exec_unit.get_device();
         let subsystem = device
-            .borrow()
             .get_subsystem()
             .map_err(op_command_err!("device get_subsystem error"))?;
 
         if subsystem != *"block" {
             let syspath = device
-                .borrow()
                 .get_syspath()
                 .map_err(op_command_err!("device get_syspath error"))?;
             log::warn!("blkid can only probe block devices, ignoring {}", syspath);
@@ -426,7 +423,6 @@ impl Builtin for Blkid {
         }
 
         let file = device
-            .borrow()
             .open(OFlag::O_CLOEXEC | OFlag::O_RDONLY | OFlag::O_NONBLOCK)
             .map_err(op_command_err!("device open error"))?;
 
@@ -436,7 +432,6 @@ impl Builtin for Blkid {
         self.probe_superblocks(&mut probe)?;
 
         let root_partition = device
-            .borrow()
             .get_property_value("ID_PART_GPT_AUTO_ROOT_UUID")
             .map_or(String::new(), |e| e);
 
@@ -523,7 +518,7 @@ mod test {
             let file_name = String::from(entry.file_name().to_str().unwrap());
             let dev_path = format!("/dev/{}", file_name);
             log::info!("{} device probe:", dev_path);
-            let device = Rc::new(RefCell::new(Device::from_devname(&dev_path).unwrap()));
+            let device = Rc::new(Device::from_devname(&dev_path).unwrap());
             let exec_unit = ExecuteUnit::new(device);
 
             builtin

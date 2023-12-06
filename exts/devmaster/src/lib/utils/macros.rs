@@ -144,7 +144,7 @@ macro_rules! log_dev_option {
     ($level:ident, $dev:expr, $msg:expr) => {
         match $dev {
             Some(d) => {
-                $crate::log_dev!($level, d.borrow(), $msg);
+                $crate::log_dev!($level, d, $msg);
             }
             None => {
                 log::$level!("{}", $msg);

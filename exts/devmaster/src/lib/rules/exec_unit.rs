@@ -47,9 +47,9 @@ pub struct ExecuteUnit {
 }
 
 struct ExecuteUnitData {
-    device: Rc<RefCell<Device>>,
-    parent: Option<Rc<RefCell<Device>>>,
-    device_db_clone: Option<Rc<RefCell<Device>>>,
+    device: Rc<Device>,
+    parent: Option<Rc<Device>>,
+    device_db_clone: Option<Rc<Device>>,
     name: String,
     program_result: String,
     mode: Option<mode_t>,
@@ -73,7 +73,7 @@ struct ExecuteUnitData {
 }
 
 impl ExecuteUnitData {
-    fn new(device: Rc<RefCell<Device>>) -> Self {
+    fn new(device: Rc<Device>) -> Self {
         ExecuteUnitData {
             device,
             parent: None,
@@ -100,11 +100,11 @@ impl ExecuteUnitData {
         }
     }
 
-    fn get_device(&self) -> Rc<RefCell<Device>> {
+    fn get_device(&self) -> Rc<Device> {
         self.device.clone()
     }
 
-    fn get_device_db_clone(&self) -> Rc<RefCell<Device>> {
+    fn get_device_db_clone(&self) -> Rc<Device> {
         debug_assert!(self.device_db_clone.is_some());
 
         self.device_db_clone.clone().unwrap()
@@ -168,28 +168,27 @@ impl ExecuteUnitData {
     }
 
     fn clone_device_db(&mut self) -> Result<()> {
-        self.device_db_clone = Some(Rc::new(RefCell::new(
+        self.device_db_clone = Some(Rc::new(
             self.device
-                .borrow()
                 .clone_with_db()
                 .context(DeviceSnafu)
-                .log_dev_error(&self.device.borrow(), "failed to clone db")?,
-        )));
+                .log_dev_error(&self.device, "failed to clone db")?,
+        ));
 
         Ok(())
     }
 
     fn update_devnode(&mut self, seclabel_list: &HashMap<String, String>) -> Result<()> {
-        if let Err(e) = self.device.borrow().get_devnum() {
+        if let Err(e) = self.device.get_devnum() {
             if e.is_errno(Errno::ENOENT) {
                 return Ok(());
             }
-            log_dev!(error, self.device.borrow(), e);
+            log_dev!(error, self.device, e);
             return Err(Error::Device { source: e });
         }
 
         if self.uid.is_none() {
-            match self.device.borrow().get_devnode_uid() {
+            match self.device.get_devnode_uid() {
                 Ok(uid) => self.uid = Some(uid),
                 Err(e) => {
                     if !e.is_errno(Errno::ENOENT) {
@@ -200,7 +199,7 @@ impl ExecuteUnitData {
         }
 
         if self.gid.is_none() {
-            match self.device.borrow().get_devnode_gid() {
+            match self.device.get_devnode_gid() {
                 Ok(gid) => self.gid = Some(gid),
                 Err(e) => {
                     if !e.is_errno(Errno::ENOENT) {
@@ -211,7 +210,7 @@ impl ExecuteUnitData {
         }
 
         if self.mode.is_none() {
-            match self.device.borrow().get_devnode_mode() {
+            match self.device.get_devnode_mode() {
                 Ok(mode) => self.mode = Some(mode),
                 Err(e) => {
                     if !e.is_errno(Errno::ENOENT) {
@@ -223,7 +222,6 @@ impl ExecuteUnitData {
 
         let apply_mac = self
             .device
-            .borrow()
             .get_action()
             .map(|action| action == DeviceAction::Add)
             .unwrap_or(false);
@@ -241,7 +239,7 @@ impl ExecuteUnitData {
     }
 
     fn rename_netif(&self) -> Result<bool> {
-        let ifindex = match self.device.borrow().get_ifindex().context(DeviceSnafu) {
+        let ifindex = match self.device.get_ifindex().context(DeviceSnafu) {
             Ok(ifindex) => ifindex,
             Err(e) => {
                 if e.get_errno() == nix::Error::ENOENT {
@@ -265,10 +263,10 @@ impl ExecuteUnitData {
             if e.get_errno() == nix::Error::EBUSY {
                 log_dev!(
                     info,
-                    &self.device.borrow(),
+                    &self.device,
                     format!(
                         "Network interface '{}' is busy, cannot rename to '{}'",
-                        self.device.borrow().get_sysname().context(DeviceSnafu)?,
+                        self.device.get_sysname().context(DeviceSnafu)?,
                         self.name.clone(),
                     )
                 );
@@ -280,11 +278,11 @@ impl ExecuteUnitData {
 
         log_dev!(
             info,
-            &self.device.borrow(),
+            &self.device,
             format!(
                 "Network interface '{}' is renamed from '{}' to '{}'",
-                self.device.borrow().get_ifindex().context(DeviceSnafu)?,
-                self.device.borrow().get_sysname().context(DeviceSnafu)?,
+                self.device.get_ifindex().context(DeviceSnafu)?,
+                self.device.get_sysname().context(DeviceSnafu)?,
                 self.name.clone(),
             )
         );
@@ -326,7 +324,7 @@ impl ExecuteUnitData {
     ) -> Result<String> {
         match subst_type {
             FormatSubstitutionType::Devnode => subst_format_map_err_ignore!(
-                self.device.borrow().get_devname(),
+                self.device.get_devname(),
                 "devnode",
                 Errno::ENOENT,
                 String::default()
@@ -343,19 +341,13 @@ impl ExecuteUnitData {
                 // try to read attribute value form path '[<SUBSYSTEM>/[SYSNAME]]<ATTRIBUTE>'
                 let value = if let Ok(v) = resolve_subsystem_kernel(&attr, true) {
                     v
-                } else if let Ok(v) = self.device.borrow().get_sysattr_value(&attr) {
+                } else if let Ok(v) = self.device.get_sysattr_value(&attr) {
                     v
                 } else if self.parent.is_some() {
                     // try to get sysattr upwards
                     // we did not check whether self.parent is equal to self.device
                     // this perhaps will result in problems
-                    if let Ok(v) = self
-                        .parent
-                        .clone()
-                        .unwrap()
-                        .borrow()
-                        .get_sysattr_value(&attr)
-                    {
+                    if let Ok(v) = self.parent.clone().unwrap().get_sysattr_value(&attr) {
                         v
                     } else {
                         return Ok(String::default());
@@ -377,20 +369,18 @@ impl ExecuteUnitData {
                 }
 
                 subst_format_map_err_ignore!(
-                    self.device.borrow().get_property_value(&attribute.unwrap()),
+                    self.device.get_property_value(&attribute.unwrap()),
                     "env",
                     Errno::ENOENT,
                     String::default()
                 )
             }
-            FormatSubstitutionType::Kernel => {
-                Ok(self.device.borrow().get_sysname().unwrap_or_else(|_| {
-                    log::debug!("formatter 'kernel' got empty value.");
-                    "".to_string()
-                }))
-            }
+            FormatSubstitutionType::Kernel => Ok(self.device.get_sysname().unwrap_or_else(|_| {
+                log::debug!("formatter 'kernel' got empty value.");
+                "".to_string()
+            })),
             FormatSubstitutionType::KernelNumber => subst_format_map_err_ignore!(
-                self.device.borrow().get_sysnum(),
+                self.device.get_sysnum(),
                 "number",
                 Errno::ENOENT,
                 String::default()
@@ -401,18 +391,16 @@ impl ExecuteUnitData {
                 }
 
                 subst_format_map_err_ignore!(
-                    self.parent.as_ref().unwrap().borrow().get_driver(),
+                    self.parent.as_ref().unwrap().get_driver(),
                     "driver",
                     Errno::ENOENT,
                     String::default()
                 )
             }
-            FormatSubstitutionType::Devpath => {
-                Ok(self.device.borrow().get_devpath().unwrap_or_else(|_| {
-                    log::debug!("formatter 'devpath' got empty value.");
-                    "".to_string()
-                }))
-            }
+            FormatSubstitutionType::Devpath => Ok(self.device.get_devpath().unwrap_or_else(|_| {
+                log::debug!("formatter 'devpath' got empty value.");
+                "".to_string()
+            })),
             FormatSubstitutionType::Id => {
                 if self.parent.is_none() {
                     return Ok(String::default());
@@ -422,7 +410,6 @@ impl ExecuteUnitData {
                     .parent
                     .as_ref()
                     .unwrap()
-                    .borrow()
                     .get_sysname()
                     .unwrap_or_else(|_| {
                         log::debug!("formatter 'id' got empty value.");
@@ -431,7 +418,7 @@ impl ExecuteUnitData {
             }
             FormatSubstitutionType::Major | FormatSubstitutionType::Minor => {
                 subst_format_map_err_ignore!(
-                    self.device.borrow().get_devnum().map(|n| {
+                    self.device.get_devnum().map(|n| {
                         match subst_type {
                             FormatSubstitutionType::Major => nix::sys::stat::major(n).to_string(),
                             _ => nix::sys::stat::minor(n).to_string(),
@@ -495,7 +482,7 @@ impl ExecuteUnitData {
                 Ok(ret)
             }
             FormatSubstitutionType::Parent => {
-                let parent = match self.device.borrow().get_parent() {
+                let parent = match self.device.get_parent() {
                     Ok(p) => p,
                     Err(e) => {
                         if e.get_errno() == Errno::ENOENT {
@@ -508,17 +495,17 @@ impl ExecuteUnitData {
                         });
                     }
                 };
-                let devname = parent.borrow().get_devname();
+                let devname = parent.get_devname();
                 subst_format_map_err_ignore!(devname, "parent", Errno::ENOENT, String::default())
                     .map(|v| v.trim_start_matches("/dev/").to_string())
             }
             FormatSubstitutionType::Name => {
                 if !self.name.is_empty() {
                     Ok(self.name.clone())
-                } else if let Ok(devname) = self.device.borrow().get_devname() {
+                } else if let Ok(devname) = self.device.get_devname() {
                     Ok(devname.trim_start_matches("/dev/").to_string())
                 } else {
-                    Ok(self.device.borrow().get_sysname().unwrap_or_else(|_| {
+                    Ok(self.device.get_sysname().unwrap_or_else(|_| {
                         log::debug!("formatter 'name' got empty value.");
                         "".to_string()
                     }))
@@ -526,7 +513,7 @@ impl ExecuteUnitData {
             }
             FormatSubstitutionType::Links => {
                 let mut ret = String::new();
-                for link in &self.device.borrow().devlink_iter() {
+                for link in &self.device.devlink_iter() {
                     ret += link.trim_start_matches("/dev/");
                     ret += " ";
                 }
@@ -613,18 +600,18 @@ impl ExecuteUnitData {
         self.mode = mode;
     }
 
-    fn set_parent(&mut self, parent: Option<Rc<RefCell<Device>>>) {
+    fn set_parent(&mut self, parent: Option<Rc<Device>>) {
         self.parent = parent;
     }
 
-    fn get_parent(&self) -> Option<Rc<RefCell<Device>>> {
+    fn get_parent(&self) -> Option<Rc<Device>> {
         self.parent.clone()
     }
 }
 
 impl ExecuteUnit {
     /// create a execute unit based on device object
-    pub fn new(device: Rc<RefCell<Device>>) -> Self {
+    pub fn new(device: Rc<Device>) -> Self {
         ExecuteUnit {
             seclabel_list: RefCell::new(HashMap::new()),
             builtin_run_list: RefCell::new(vec![]),
@@ -653,11 +640,11 @@ impl ExecuteUnit {
             .update_devnode(&self.seclabel_list.borrow())
     }
 
-    pub(crate) fn get_device(&self) -> Rc<RefCell<Device>> {
+    pub(crate) fn get_device(&self) -> Rc<Device> {
         self.inner.borrow().get_device()
     }
 
-    pub(crate) fn get_device_db_clone(&self) -> Rc<RefCell<Device>> {
+    pub(crate) fn get_device_db_clone(&self) -> Rc<Device> {
         self.inner.borrow().get_device_db_clone()
     }
 
@@ -826,11 +813,11 @@ impl ExecuteUnit {
         self.seclabel_list.borrow_mut().clear()
     }
 
-    pub(crate) fn set_parent(&self, parent: Option<Rc<RefCell<Device>>>) {
+    pub(crate) fn set_parent(&self, parent: Option<Rc<Device>>) {
         self.inner.borrow_mut().set_parent(parent)
     }
 
-    pub(crate) fn get_parent(&self) -> Option<Rc<RefCell<Device>>> {
+    pub(crate) fn get_parent(&self) -> Option<Rc<Device>> {
         self.inner.borrow().get_parent()
     }
 }
@@ -994,7 +981,6 @@ mod test {
     use crate::rules::rules_load::tests::create_tmp_file;
     use device::utils::*;
     use nix::sys::stat::{major, minor};
-    use std::cell::RefCell;
     use std::fs::remove_dir_all;
     use std::path::Path;
     use std::rc::Rc;
@@ -1005,26 +991,26 @@ mod test {
             "/tmp/test_update_devnode_tmpfile",
             1024 * 1024 * 10,
             |dev| {
-                let dev = Rc::new(RefCell::new(dev.shallow_clone().unwrap()));
-                let id = dev.borrow().get_device_id().unwrap();
-                let devnum = dev.borrow().get_devnum().unwrap();
+                let dev = Rc::new(dev.shallow_clone().unwrap());
+                let id = dev.get_device_id().unwrap();
+                let devnum = dev.get_devnum().unwrap();
                 let major_minor = format!("{}:{}", major(devnum), minor(devnum));
 
                 create_tmp_file("/tmp/test_update_devnode/data", &id, "", true);
 
-                dev.borrow().sealed.replace(true);
-                dev.borrow().set_base_path("/tmp/test_update_devnode");
-                dev.borrow().set_devgid("1").unwrap();
-                dev.borrow().set_devuid("1").unwrap();
-                dev.borrow().set_devmode("666").unwrap();
-                dev.borrow().add_devlink("test_update_devnode/bbb").unwrap();
+                dev.sealed.replace(true);
+                dev.set_base_path("/tmp/test_update_devnode");
+                dev.set_devgid("1").unwrap();
+                dev.set_devuid("1").unwrap();
+                dev.set_devmode("666").unwrap();
+                dev.add_devlink("test_update_devnode/bbb").unwrap();
 
                 let mut unit = ExecuteUnitData::new(dev.clone());
                 unit.clone_device_db().unwrap();
 
                 unit.update_devnode(&HashMap::new()).unwrap();
                 /* Record the devlink in db */
-                dev.borrow().update_db().unwrap();
+                dev.update_db().unwrap();
 
                 let p = Path::new("/dev/test_update_devnode/bbb");
                 let p_block_s = format!("/dev/block/{}", major_minor);
@@ -1035,15 +1021,15 @@ mod test {
                 assert!(p
                     .canonicalize()
                     .unwrap()
-                    .ends_with(&dev.borrow().get_sysname().unwrap()));
+                    .ends_with(&dev.get_sysname().unwrap()));
                 let _ = prior_p.symlink_metadata().unwrap(); // Test symlink exists.
 
-                let new_dev = Rc::new(RefCell::new(Device::from_device_id(&id).unwrap()));
-                new_dev.borrow().sealed.replace(true);
-                new_dev.borrow().set_base_path("/tmp/test_update_devnode");
-                new_dev.borrow().set_devgid("0").unwrap();
-                new_dev.borrow().set_devuid("0").unwrap();
-                new_dev.borrow().set_devmode("600").unwrap();
+                let new_dev = Rc::new(Device::from_device_id(&id).unwrap());
+                new_dev.sealed.replace(true);
+                new_dev.set_base_path("/tmp/test_update_devnode");
+                new_dev.set_devgid("0").unwrap();
+                new_dev.set_devuid("0").unwrap();
+                new_dev.set_devmode("600").unwrap();
 
                 let mut unit = ExecuteUnitData::new(new_dev);
                 /* See the devlink in db, but it is absent in the current device object.
@@ -1060,17 +1046,15 @@ mod test {
                 remove_dir_all("/tmp/test_update_devnode").unwrap();
 
                 /* Non-block devices do not have device nodes, thus update_devnode method will do nothing. */
-                let lo = Rc::new(RefCell::new(
-                    Device::from_subsystem_sysname("net", "lo").unwrap(),
-                ));
+                let lo = Rc::new(Device::from_subsystem_sysname("net", "lo").unwrap());
 
                 let mut unit = ExecuteUnitData::new(lo);
                 unit.update_devnode(&HashMap::new()).unwrap();
 
                 /* Cover error paths when uid, gid or mode is not set. */
-                let dev = Rc::new(RefCell::new(Device::from_device_id(&id).unwrap()));
-                dev.borrow().sealed.replace(true);
-                dev.borrow().add_devlink("test_update_devnode/xxx").unwrap();
+                let dev = Rc::new(Device::from_device_id(&id).unwrap());
+                dev.sealed.replace(true);
+                dev.add_devlink("test_update_devnode/xxx").unwrap();
 
                 let mut unit = ExecuteUnitData::new(dev.clone());
                 unit.clone_device_db().unwrap();
@@ -1083,7 +1067,7 @@ mod test {
                 assert!(p
                     .canonicalize()
                     .unwrap()
-                    .ends_with(&dev.borrow().get_sysname().unwrap()));
+                    .ends_with(&dev.get_sysname().unwrap()));
                 let _ = Path::new(&prior_p_s).symlink_metadata().unwrap(); // Test symlink exists.
 
                 cleanup_node(dev).unwrap();
@@ -1103,11 +1087,11 @@ mod test {
     fn test_subst_format() {
         if let Err(e) =
             LoopDev::inner_process("/tmp/test_subst_format_tmpfile", 1024 * 1024 * 10, |dev| {
-                let dev = Rc::new(RefCell::new(dev.shallow_clone().unwrap()));
+                let dev = Rc::new(dev.shallow_clone().unwrap());
                 let mut unit = ExecuteUnitData::new(dev.clone());
-                let devnum = dev.borrow().get_devnum().unwrap();
+                let devnum = dev.get_devnum().unwrap();
                 let major_minor = format!("{}:{}", major(devnum), minor(devnum));
-                let sysname = dev.borrow().get_sysname().unwrap();
+                let sysname = dev.get_sysname().unwrap();
 
                 assert_eq!(
                     unit.subst_format(FormatSubstitutionType::Attr, Some("dev".to_string()))
@@ -1124,9 +1108,9 @@ mod test {
                     major_minor
                 );
 
-                unit.set_parent(Some(Rc::new(RefCell::new(
+                unit.set_parent(Some(Rc::new(
                     Device::from_subsystem_sysname("net", "lo").unwrap(),
-                ))));
+                )));
 
                 /* Get the sysattr of parent device set in unit. */
                 assert_eq!(
@@ -1144,7 +1128,7 @@ mod test {
                     .unwrap()
                     .is_empty());
 
-                dev.borrow().add_property("hello", "world").unwrap();
+                dev.add_property("hello", "world").unwrap();
 
                 assert_eq!(
                     unit.subst_format(FormatSubstitutionType::Env, Some("hello".to_string()))
@@ -1214,8 +1198,8 @@ mod test {
                     "test".to_string(),
                 );
 
-                dev.borrow().add_devlink("test").unwrap();
-                dev.borrow().sealed.replace(true);
+                dev.add_devlink("test").unwrap();
+                dev.sealed.replace(true);
                 assert_eq!(
                     unit.subst_format(FormatSubstitutionType::Links, None)
                         .unwrap(),
@@ -1231,9 +1215,7 @@ mod test {
             assert!(e.is_errno(nix::Error::EACCES) || e.is_errno(nix::Error::EBUSY));
         }
 
-        let dev = Rc::new(RefCell::new(
-            Device::from_subsystem_sysname("net", "lo").unwrap(),
-        ));
+        let dev = Rc::new(Device::from_subsystem_sysname("net", "lo").unwrap());
         let unit = ExecuteUnitData::new(dev);
         assert_eq!(
             unit.subst_format(FormatSubstitutionType::Name, None)

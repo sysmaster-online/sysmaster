@@ -86,11 +86,8 @@ impl ExecuteManager {
     }
 
     /// process a device object
-    pub(crate) fn process_device(&self, device: Rc<RefCell<Device>>) -> Result<()> {
-        log::debug!(
-            "{}",
-            device_trace!("Start processing device", device.borrow())
-        );
+    pub(crate) fn process_device(&self, device: Rc<Device>) -> Result<()> {
+        log::debug!("{}", device_trace!("Start processing device", device));
 
         *self.current_unit.borrow_mut() = Some(ExecuteUnit::new(device.clone()));
         // lock whole disk: todo
@@ -105,10 +102,7 @@ impl ExecuteManager {
 
         // begin inotify watch: todo
 
-        log::debug!(
-            "{}",
-            device_trace!("Finish processing device", device.borrow())
-        );
+        log::debug!("{}", device_trace!("Finish processing device", device));
 
         *self.current_unit.borrow_mut() = None;
 
@@ -122,10 +116,9 @@ impl ExecuteManager {
         let device = self.current_unit.borrow().as_ref().unwrap().get_device();
 
         let action = device
-            .borrow()
             .get_action()
             .context(DeviceSnafu)
-            .log_dev_error(&device.borrow(), "not from uevent")?;
+            .log_dev_error(&device, "not from uevent")?;
 
         if action == DeviceAction::Remove {
             return self.execute_rules_on_remove();
@@ -140,7 +133,7 @@ impl ExecuteManager {
             .as_ref()
             .unwrap()
             .clone_device_db()
-            .log_dev_debug(&device.borrow(), "failed to clone with db");
+            .log_dev_debug(&device, "failed to clone with db");
         let device_db_clone = self
             .current_unit
             .borrow()
@@ -149,13 +142,12 @@ impl ExecuteManager {
             .get_device_db_clone();
 
         // copy all tags to cloned device
-        for tag in &device.borrow().tag_iter() {
-            device_db_clone.borrow().add_tag(tag, false);
+        for tag in &device.tag_iter() {
+            device_db_clone.add_tag(tag, false);
         }
 
         // add property to cloned device
         device_db_clone
-            .borrow()
             .add_property("ID_RENAMING", "")
             .map_err(|e| Error::RulesExecuteError {
                 msg: format!("failed to add tag ({})", e),
@@ -171,7 +163,7 @@ impl ExecuteManager {
                 .as_ref()
                 .unwrap()
                 .rename_netif()
-                .log_dev_error(&device.borrow(), "rename ifname failed")?;
+                .log_dev_error(&device, "rename ifname failed")?;
         }
 
         // update devnode
@@ -183,18 +175,17 @@ impl ExecuteManager {
 
         // preserve old, or get new initialization timestamp
         initialize_device_usec(device.clone(), device_db_clone.clone())
-            .log_dev_error(&device.borrow(), "failed to initialize device timestamp")?;
+            .log_dev_error(&device, "failed to initialize device timestamp")?;
 
         // update tags and database
         let _ = device_update_tag(device.clone(), Some(device_db_clone), true);
 
         device
-            .borrow()
             .update_db()
             .context(DeviceSnafu)
             .log_error("failed to update db")?;
 
-        device.borrow().set_is_initialized();
+        device.set_is_initialized();
 
         Ok(())
     }
@@ -206,7 +197,6 @@ impl ExecuteManager {
         let device = self.current_unit.borrow().as_ref().unwrap().get_device();
 
         device
-            .borrow()
             .read_db_internal(true)
             .context(DeviceSnafu)
             .log_error("remove event failed")?;
@@ -219,7 +209,7 @@ impl ExecuteManager {
 
         let ret = self.apply_rules();
 
-        if device.borrow().get_devnum().is_err() {
+        if device.get_devnum().is_err() {
             return ret;
         }
 
@@ -296,15 +286,15 @@ impl ExecuteManager {
 
         let current_unit = self.current_unit.borrow();
         let device = current_unit.as_ref().unwrap().get_device();
-        let action = device.borrow().get_action().context(DeviceSnafu)?;
+        let action = device.get_action().context(DeviceSnafu)?;
         let current_line = self.current_rule_line.borrow().clone();
 
         if action != DeviceAction::Remove {
-            if device.borrow().get_devnum().is_ok() {
+            if device.get_devnum().is_ok() {
                 mask |= RuleLineType::HAS_DEVLINK;
             }
 
-            if device.borrow().get_ifindex().is_ok() {
+            if device.get_ifindex().is_ok() {
                 mask |= RuleLineType::HAS_NAME;
             }
         }
@@ -384,7 +374,7 @@ impl ExecuteManager {
     }
 
     /// apply rule token on device
-    pub(crate) fn apply_rule_token(&self, device: Rc<RefCell<Device>>) -> Result<bool> {
+    pub(crate) fn apply_rule_token(&self, device: Rc<Device>) -> Result<bool> {
         debug_assert!(self.current_unit.borrow().is_some());
         debug_assert!(self.current_rule_token.borrow().read().unwrap().is_some());
         let token = self.current_rule_token.borrow().clone();
@@ -408,10 +398,8 @@ impl ExecuteManager {
         let token_type = token.read().unwrap().as_ref().unwrap().r#type;
         match token_type {
             MatchAction => {
-                let action = execute_err!(
-                    token.read().unwrap().as_ref().unwrap(),
-                    device.borrow().get_action()
-                )?;
+                let action =
+                    execute_err!(token.read().unwrap().as_ref().unwrap(), device.get_action())?;
 
                 Ok(token
                     .read()
@@ -423,7 +411,7 @@ impl ExecuteManager {
             MatchDevpath => {
                 let devpath = execute_err!(
                     token.read().unwrap().as_ref().unwrap(),
-                    device.borrow().get_devpath()
+                    device.get_devpath()
                 )?;
 
                 Ok(token
@@ -436,7 +424,7 @@ impl ExecuteManager {
             MatchKernel | MatchParentsKernel => {
                 let sysname = execute_err!(
                     token.read().unwrap().as_ref().unwrap(),
-                    device.borrow().get_sysname()
+                    device.get_sysname()
                 )?;
 
                 Ok(token
@@ -447,7 +435,7 @@ impl ExecuteManager {
                     .pattern_match(&sysname))
             }
             MatchDevlink => {
-                for devlink in &device.borrow().devlink_iter() {
+                for devlink in &device.devlink_iter() {
                     if token
                         .read()
                         .unwrap()
@@ -471,10 +459,7 @@ impl ExecuteManager {
                 .unwrap()
                 .pattern_match(&current_unit.as_ref().unwrap().get_name())),
             MatchEnv => {
-                let value = match device
-                    .borrow()
-                    .get_property_value(token_attribute.as_ref().unwrap())
-                {
+                let value = match device.get_property_value(token_attribute.as_ref().unwrap()) {
                     Ok(v) => v,
                     Err(e) => {
                         if e.get_errno() != Errno::ENOENT {
@@ -503,7 +488,7 @@ impl ExecuteManager {
                 todo!()
             }
             MatchTag | MatchParentsTag => {
-                for tag in &device.borrow().current_tag_iter() {
+                for tag in &device.current_tag_iter() {
                     if token.read().unwrap().as_ref().unwrap().pattern_match(tag)
                         ^ (token.read().unwrap().as_ref().unwrap().op == OperatorType::Nomatch)
                     {
@@ -518,7 +503,7 @@ impl ExecuteManager {
             MatchSubsystem | MatchParentsSubsystem => {
                 let subsystem = execute_err_ignore_ENOENT!(
                     token.read().unwrap().as_ref().unwrap(),
-                    device.borrow().get_subsystem()
+                    device.get_subsystem()
                 )?;
 
                 Ok(token
@@ -531,7 +516,7 @@ impl ExecuteManager {
             MatchDriver | MatchParentsDriver => {
                 let driver = execute_err_ignore_ENOENT!(
                     token.read().unwrap().as_ref().unwrap(),
-                    device.borrow().get_driver()
+                    device.get_driver()
                 )?;
 
                 Ok(token
@@ -574,7 +559,7 @@ impl ExecuteManager {
                             // only throw out error when getting the syspath of device
                             let syspath = execute_err!(
                                 token.read().unwrap().as_ref().unwrap(),
-                                device.borrow().get_syspath()
+                                device.get_syspath()
                             )
                             .map_err(|e| {
                                 log_rule_token!(
@@ -696,7 +681,7 @@ impl ExecuteManager {
                         Ok((key, value)) => {
                             execute_err!(
                                 token.read().unwrap().as_ref().unwrap(),
-                                device.borrow().add_property(&key, &value)
+                                device.add_property(&key, &value)
                             )?;
                         }
                         Err(e) => {
@@ -765,7 +750,7 @@ impl ExecuteManager {
                         Ok((key, value)) => {
                             execute_err!(
                                 token.read().unwrap().as_ref().unwrap(),
-                                device.borrow().add_property(&key, &value)
+                                device.add_property(&key, &value)
                             )?;
 
                             log_rule_token!(
@@ -881,7 +866,7 @@ impl ExecuteManager {
             MatchImportDb => {
                 let dev_db_clone = current_unit.as_ref().unwrap().get_device_db_clone();
 
-                let val = match dev_db_clone.borrow().get_property_value(&token_value) {
+                let val = match dev_db_clone.get_property_value(&token_value) {
                     Ok(v) => v,
                     Err(e) => {
                         if e.get_errno() == Errno::ENOENT {
@@ -914,7 +899,7 @@ impl ExecuteManager {
 
                 execute_err!(
                     token.read().unwrap().as_ref().unwrap(),
-                    device.borrow().add_property(&token_value, &val)
+                    device.add_property(&token_value, &val)
                 )?;
 
                 Ok(token.read().unwrap().as_ref().unwrap().op == OperatorType::Match)
@@ -943,9 +928,7 @@ impl ExecuteManager {
 
                 execute_err!(
                     token.read().unwrap().as_ref().unwrap(),
-                    device
-                        .borrow()
-                        .add_property(&token_value, if value.is_empty() { "1" } else { value })
+                    device.add_property(&token_value, if value.is_empty() { "1" } else { value })
                 )?;
 
                 Ok(token.read().unwrap().as_ref().unwrap().op == OperatorType::Match)
@@ -971,7 +954,7 @@ impl ExecuteManager {
                     glob_patterns.push(pat);
                 }
 
-                let parent = match device.borrow().get_parent() {
+                let parent = match device.get_parent() {
                     Ok(p) => p,
                     Err(e) => {
                         // do not match if the device has no parent
@@ -994,7 +977,7 @@ impl ExecuteManager {
                     }
                 };
 
-                for (k, v) in &parent.borrow().property_iter() {
+                for (k, v) in &parent.property_iter() {
                     let source = format!("{}\0", k);
 
                     // check whether the key of property matches the
@@ -1026,7 +1009,7 @@ impl ExecuteManager {
 
                     execute_err!(
                         token.read().unwrap().as_ref().unwrap(),
-                        device.borrow().add_property(k, v)
+                        device.add_property(k, v)
                     )?;
                 }
 
@@ -1115,7 +1098,7 @@ impl ExecuteManager {
                 Ok(true)
             }
             AssignOptionsDbPersist => {
-                device.borrow().set_db_persist();
+                device.set_db_persist();
                 log_rule_token!(
                     debug,
                     token.read().unwrap().as_ref().unwrap(),
@@ -1123,7 +1106,7 @@ impl ExecuteManager {
                         "set db '{}' to persistence",
                         execute_err!(
                             token.read().unwrap().as_ref().unwrap(),
-                            device.borrow().get_device_id()
+                            device.get_device_id()
                         )?
                     )
                 );
@@ -1165,7 +1148,7 @@ impl ExecuteManager {
                     token.read().unwrap().as_ref().unwrap(),
                     token_value.parse::<i32>().context(ParseIntSnafu)
                 )?;
-                device.borrow().set_devlink_priority(r);
+                device.set_devlink_priority(r);
                 log_rule_token!(
                     debug,
                     token.read().unwrap().as_ref().unwrap(),
@@ -1455,9 +1438,7 @@ impl ExecuteManager {
                      */
                     execute_err!(
                         token.read().unwrap().as_ref().unwrap(),
-                        device
-                            .borrow()
-                            .add_property(&token_attribute.unwrap(), &token_value)
+                        device.add_property(&token_attribute.unwrap(), &token_value)
                     )?;
                     return Ok(true);
                 }
@@ -1465,9 +1446,8 @@ impl ExecuteManager {
                 let mut value: String = String::new();
 
                 if token.read().unwrap().as_ref().unwrap().op == OperatorType::Add {
-                    if let Ok(old_value) = device
-                        .borrow()
-                        .get_property_value(token_attribute.as_ref().unwrap())
+                    if let Ok(old_value) =
+                        device.get_property_value(token_attribute.as_ref().unwrap())
                     {
                         value.push_str(&old_value);
                         value.push(' ');
@@ -1490,9 +1470,7 @@ impl ExecuteManager {
 
                 execute_err!(
                     token.read().unwrap().as_ref().unwrap(),
-                    device
-                        .borrow()
-                        .add_property(token_attribute.as_ref().unwrap(), &v)
+                    device.add_property(token_attribute.as_ref().unwrap(), &v)
                 )?;
 
                 Ok(true)
@@ -1515,7 +1493,7 @@ impl ExecuteManager {
                 };
 
                 if token.read().unwrap().as_ref().unwrap().op == OperatorType::Assign {
-                    device.borrow().cleanup_tags();
+                    device.cleanup_tags();
                 }
 
                 if value
@@ -1531,9 +1509,9 @@ impl ExecuteManager {
                 }
 
                 if token.read().unwrap().as_ref().unwrap().op == OperatorType::Remove {
-                    device.borrow().remove_tag(&value);
+                    device.remove_tag(&value);
                 } else {
-                    device.borrow().add_tag(&value, true);
+                    device.add_tag(&value, true);
                 }
 
                 Ok(true)
@@ -1547,7 +1525,7 @@ impl ExecuteManager {
                     current_unit.as_ref().unwrap().set_name_final(true);
                 }
 
-                if device.borrow().get_ifindex().is_err() {
+                if device.get_ifindex().is_err() {
                     log_rule_token!(
                         error,
                         token.read().unwrap().as_ref().unwrap(),
@@ -1600,7 +1578,7 @@ impl ExecuteManager {
                     return Ok(true);
                 }
 
-                if device.borrow().get_devnum().is_err() {
+                if device.get_devnum().is_err() {
                     return Ok(true);
                 }
 
@@ -1611,7 +1589,7 @@ impl ExecuteManager {
                 if [OperatorType::Assign, OperatorType::AssignFinal]
                     .contains(&token.read().unwrap().as_ref().unwrap().op)
                 {
-                    device.borrow().cleanup_devlinks();
+                    device.cleanup_devlinks();
                 }
 
                 let value = match current_unit.as_ref().unwrap().apply_format(
@@ -1655,7 +1633,7 @@ impl ExecuteManager {
 
                         execute_err!(
                             token.read().unwrap().as_ref().unwrap(),
-                            device.borrow().add_devlink(&devlink)
+                            device.add_devlink(&devlink)
                         )?;
                     }
                 }
@@ -1670,7 +1648,7 @@ impl ExecuteManager {
                 } else {
                     let syspath = execute_err!(
                         token.read().unwrap().as_ref().unwrap(),
-                        device.borrow().get_syspath()
+                        device.get_syspath()
                     )?;
                     format!("{}/{}", syspath, token_attribute.as_ref().unwrap())
                 };
@@ -1824,7 +1802,7 @@ impl ExecuteManager {
             }
 
             let tmp = current_unit.as_ref().unwrap().get_parent().unwrap();
-            match tmp.borrow().get_parent() {
+            match tmp.get_parent() {
                 Ok(d) => {
                     current_unit.as_ref().unwrap().set_parent(Some(d));
                 }
@@ -1864,7 +1842,7 @@ impl ExecuteManager {
                     Err(e) => {
                         log_dev!(
                             debug,
-                            device.borrow(),
+                            device,
                             format!("Failed to run builtin command '{}': {}", builtin_str, e)
                         );
                         continue;
@@ -1873,7 +1851,7 @@ impl ExecuteManager {
 
                 log_dev!(
                     debug,
-                    device.borrow(),
+                    device,
                     format!("Running builtin command '{}'", builtin_str)
                 );
 
@@ -1886,7 +1864,7 @@ impl ExecuteManager {
                 ) {
                     log_dev!(
                         debug,
-                        &device.borrow(),
+                        &device,
                         format!("Failed to run builtin command '{}': '{}'", builtin_str, e)
                     );
                 }
@@ -1902,11 +1880,7 @@ impl ExecuteManager {
          * todo: redundant string vector clone
          */
         for cmd_str in &current_unit.as_ref().unwrap().program_run_list_iter() {
-            log_dev!(
-                debug,
-                device.borrow(),
-                format!("Running program '{}'", cmd_str)
-            );
+            log_dev!(debug, device, format!("Running program '{}'", cmd_str));
 
             if let Err(e) = spawn(
                 cmd_str,
@@ -1915,7 +1889,7 @@ impl ExecuteManager {
             ) {
                 log_dev!(
                     debug,
-                    device.borrow(),
+                    device,
                     format!("Failed to run program '{}': '{}'", cmd_str, e)
                 );
             }
@@ -1967,56 +1941,59 @@ impl RuleToken {
         (self.op == OperatorType::Nomatch) ^ value_match
     }
 
-    fn attr_match(&self, device: Rc<RefCell<Device>>, unit: &ExecuteUnit) -> Result<bool> {
+    fn attr_match(&self, device: Rc<Device>, unit: &ExecuteUnit) -> Result<bool> {
         debug_assert!(self.attr.is_some());
 
         let attr = self.get_token_attribute().unwrap();
 
-        let val =
-            match self.attr_subst_type {
-                SubstituteType::Plain => {
-                    if let Ok(v) = device.borrow().get_sysattr_value(&attr).map_err(|e| {
-                        Error::RulesExecuteError {
+        let val = match self.attr_subst_type {
+            SubstituteType::Plain => {
+                if let Ok(v) =
+                    device
+                        .get_sysattr_value(&attr)
+                        .map_err(|e| Error::RulesExecuteError {
                             msg: format!("failed to match sysattr: ({})", e),
                             errno: e.get_errno(),
-                        }
-                    }) {
-                        v
-                    } else {
-                        return Ok(false);
-                    }
+                        })
+                {
+                    v
+                } else {
+                    return Ok(false);
                 }
-                SubstituteType::Format => {
-                    let attr_name =
-                        unit.apply_format(&attr, false)
-                            .map_err(|e| Error::RulesExecuteError {
-                                msg: format!("failed to match sysattr: ({})", e),
-                                errno: e.get_errno(),
-                            })?;
-                    if let Ok(v) = device.borrow().get_sysattr_value(&attr_name).map_err(|e| {
-                        Error::RulesExecuteError {
+            }
+            SubstituteType::Format => {
+                let attr_name =
+                    unit.apply_format(&attr, false)
+                        .map_err(|e| Error::RulesExecuteError {
                             msg: format!("failed to match sysattr: ({})", e),
                             errno: e.get_errno(),
-                        }
-                    }) {
-                        v
-                    } else {
-                        return Ok(false);
-                    }
+                        })?;
+                if let Ok(v) =
+                    device
+                        .get_sysattr_value(&attr_name)
+                        .map_err(|e| Error::RulesExecuteError {
+                            msg: format!("failed to match sysattr: ({})", e),
+                            errno: e.get_errno(),
+                        })
+                {
+                    v
+                } else {
+                    return Ok(false);
                 }
-                SubstituteType::Subsys => {
-                    resolve_subsystem_kernel(&attr, true).map_err(|e| Error::RulesExecuteError {
-                        msg: format!("failed to match sysattr: ({})", e),
-                        errno: e.get_errno(),
-                    })?
-                }
-                _ => {
-                    return Err(Error::RulesExecuteError {
-                        msg: "invalid substitute type.".to_string(),
-                        errno: Errno::EINVAL,
-                    })
-                }
-            };
+            }
+            SubstituteType::Subsys => {
+                resolve_subsystem_kernel(&attr, true).map_err(|e| Error::RulesExecuteError {
+                    msg: format!("failed to match sysattr: ({})", e),
+                    errno: e.get_errno(),
+                })?
+            }
+            _ => {
+                return Err(Error::RulesExecuteError {
+                    msg: "invalid substitute type.".to_string(),
+                    errno: Errno::EINVAL,
+                })
+            }
+        };
 
         Ok(self.pattern_match(&val))
     }
@@ -2151,7 +2128,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_subst_format() {
-        let device = Rc::new(RefCell::new(Device::from_path("/dev/sda1").unwrap()));
+        let device = Rc::new(Device::from_path("/dev/sda1").unwrap());
         let unit = ExecuteUnit::new(device);
         println!(
             "{:?}",
@@ -2167,9 +2144,7 @@ mod tests {
             .unwrap()
         );
 
-        let device = Rc::new(RefCell::new(
-            Device::from_subsystem_sysname("net", "lo").unwrap(),
-        ));
+        let device = Rc::new(Device::from_subsystem_sysname("net", "lo").unwrap());
         let unit = ExecuteUnit::new(device);
         println!(
             "{:?}",
@@ -2180,9 +2155,7 @@ mod tests {
 
     #[test]
     fn test_apply_format() {
-        let device = Rc::new(RefCell::new(
-            Device::from_subsystem_sysname("net", "lo").unwrap(),
-        ));
+        let device = Rc::new(Device::from_subsystem_sysname("net", "lo").unwrap());
         let unit = ExecuteUnit::new(device);
         // test long substitution formatter
         // $kernel
@@ -2287,9 +2260,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_apply_format_2() {
-        let device = Rc::new(RefCell::new(
-            Device::from_subsystem_sysname("block", "sda1").unwrap(),
-        ));
+        let device = Rc::new(Device::from_subsystem_sysname("block", "sda1").unwrap());
         let unit = ExecuteUnit::new(device);
         assert_eq!(unit.apply_format("$number", false).unwrap(), "1");
         assert_eq!(unit.apply_format("$major", false).unwrap(), "8");
@@ -2310,7 +2281,7 @@ mod tests {
             value: &str,
             rules: Arc<RwLock<Rules>>,
             rule_line: Arc<RwLock<Option<RuleLine>>>,
-            device: Rc<RefCell<Device>>,
+            device: Rc<Device>,
         ) -> Result<bool> {
             let token = RuleToken::parse_token(
                 key.to_string(),
@@ -2342,10 +2313,8 @@ mod tests {
             false,
         );
 
-        let device = Rc::new(RefCell::new(
-            Device::from_subsystem_sysname("net", "lo").unwrap(),
-        ));
-        device.borrow().set_base_path("/tmp/devmaster");
+        let device = Rc::new(Device::from_subsystem_sysname("net", "lo").unwrap());
+        device.set_base_path("/tmp/devmaster");
         let rules = Arc::new(RwLock::new(Rules::new(vec![], ResolveNameTime::Early)));
         let rule_file = Arc::new(RwLock::new(Some(RuleFile::new("".to_string()))));
         let rule_line = Arc::new(RwLock::new(Some(RuleLine::new(
@@ -2357,7 +2326,7 @@ mod tests {
         let mgr = ExecuteManager::new(Arc::new(RwLock::new(Cache::new(vec![], vec![]))));
         *mgr.current_unit.borrow_mut() = Some(unit);
 
-        device.borrow().set_action_from_string("change").unwrap();
+        device.set_action_from_string("change").unwrap();
         assert!(mgr
             .test_apply_one_rule_token(
                 "ACTION",
@@ -2405,7 +2374,7 @@ mod tests {
             )
             .unwrap());
 
-        device.borrow().add_tag("xxx", true);
+        device.add_tag("xxx", true);
         assert!(mgr
             .test_apply_one_rule_token(
                 "TAG",
@@ -2510,12 +2479,9 @@ GOOD=LUCK",
             )
             .unwrap());
 
-        assert_eq!(
-            &device.borrow().get_property_value("HELLO").unwrap(),
-            "WORLD"
-        );
+        assert_eq!(&device.get_property_value("HELLO").unwrap(), "WORLD");
 
-        assert_eq!(&device.borrow().get_property_value("GOOD").unwrap(), "LUCK");
+        assert_eq!(&device.get_property_value("GOOD").unwrap(), "LUCK");
 
         remove_file("/tmp/property").unwrap();
 
@@ -2530,14 +2496,11 @@ GOOD=LUCK",
                 device.clone(),
             )
             .unwrap());
-        assert_eq!(
-            &device.borrow().get_property_value("WATER").unwrap(),
-            "FLOW"
-        );
+        assert_eq!(&device.get_property_value("WATER").unwrap(), "FLOW");
 
         create_tmp_file(
             "/tmp/devmaster/data",
-            &device.borrow().get_device_id().unwrap(),
+            &device.get_device_id().unwrap(),
             "E:BLACK=PINK",
             true,
         );
@@ -2558,13 +2521,10 @@ GOOD=LUCK",
                 device.clone(),
             )
             .unwrap());
-        assert_eq!(
-            &device.borrow().get_property_value("BLACK").unwrap(),
-            "PINK"
-        );
+        assert_eq!(&device.get_property_value("BLACK").unwrap(), "PINK");
         remove_file(&format!(
             "/tmp/devmaster/data/{}",
-            device.borrow().get_device_id().unwrap()
+            device.get_device_id().unwrap()
         ))
         .unwrap();
 
@@ -2579,11 +2539,7 @@ GOOD=LUCK",
                 device.clone(),
             )
             .unwrap());
-        assert!(!device
-            .borrow()
-            .get_property_value("root")
-            .unwrap()
-            .is_empty());
+        assert!(!device.get_property_value("root").unwrap().is_empty());
 
         assert!(mgr
             .test_apply_one_rule_token(
@@ -2885,10 +2841,7 @@ GOOD=LUCK",
                 device.clone(),
             )
             .unwrap());
-        assert_eq!(
-            &device.borrow().get_property_value("BLACK").unwrap(),
-            "YELLOW"
-        );
+        assert_eq!(&device.get_property_value("BLACK").unwrap(), "YELLOW");
 
         assert!(mgr
             .test_apply_one_rule_token(
@@ -2901,8 +2854,8 @@ GOOD=LUCK",
                 device.clone(),
             )
             .unwrap());
-        assert!(device.borrow().has_tag("aaa").unwrap());
-        assert!(device.borrow().has_current_tag("aaa").unwrap());
+        assert!(device.has_tag("aaa").unwrap());
+        assert!(device.has_current_tag("aaa").unwrap());
 
         assert!(mgr
             .test_apply_one_rule_token(
@@ -2915,8 +2868,8 @@ GOOD=LUCK",
                 device.clone(),
             )
             .unwrap());
-        assert!(device.borrow().has_tag("aaa").unwrap());
-        assert!(!device.borrow().has_current_tag("aaa").unwrap());
+        assert!(device.has_tag("aaa").unwrap());
+        assert!(!device.has_current_tag("aaa").unwrap());
 
         assert!(mgr
             .test_apply_one_rule_token(
@@ -2929,10 +2882,10 @@ GOOD=LUCK",
                 device.clone(),
             )
             .unwrap());
-        assert!(!device.borrow().has_tag("aaa").unwrap());
-        assert!(!device.borrow().has_current_tag("aaa").unwrap());
-        assert!(device.borrow().has_tag("bbb").unwrap());
-        assert!(device.borrow().has_current_tag("bbb").unwrap());
+        assert!(!device.has_tag("aaa").unwrap());
+        assert!(!device.has_current_tag("aaa").unwrap());
+        assert!(device.has_tag("bbb").unwrap());
+        assert!(device.has_current_tag("bbb").unwrap());
 
         assert!(mgr
             .test_apply_one_rule_token(
@@ -3052,10 +3005,7 @@ GOOD=LUCK",
                 device.clone(),
             )
             .unwrap());
-        assert_eq!(
-            &device.borrow().get_property_value("PAPER").unwrap(),
-            "BOOK"
-        );
+        assert_eq!(&device.get_property_value("PAPER").unwrap(), "BOOK");
 
         assert!(!mgr
             .test_apply_one_rule_token(
@@ -3137,12 +3087,10 @@ GOOD=LUCK",
         match LoopDev::new("/tmp/test_apply_rules", 1024 * 1024 * 10) {
             Ok(lo) => {
                 let devpath = lo.get_device_path().unwrap();
-                let dev = Rc::new(RefCell::new(
-                    Device::from_path(devpath.to_str().unwrap()).unwrap(),
-                ));
-                dev.borrow().set_base_path("/tmp/devmaster");
+                let dev = Rc::new(Device::from_path(devpath.to_str().unwrap()).unwrap());
+                dev.set_base_path("/tmp/devmaster");
 
-                dev.borrow().add_devlink("/dev/test").unwrap();
+                dev.add_devlink("/dev/test").unwrap();
                 assert!(mgr
                     .test_apply_one_rule_token(
                         "SYMLINK",
@@ -3176,7 +3124,7 @@ GOOD=LUCK",
                         dev.clone(),
                     )
                     .unwrap());
-                assert!(dev.borrow().has_devlink("/dev/xxx"));
+                assert!(dev.has_devlink("/dev/xxx"));
 
                 assert!(mgr
                     .test_apply_one_rule_token(

@@ -57,7 +57,7 @@ pub(crate) fn spawn(cmd_str: &str, timeout: Duration, unit: &ExecuteUnit) -> Res
         Command::new(&cmd_tokens[0])
     };
 
-    for (key, val) in &dev.borrow().property_iter() {
+    for (key, val) in &dev.property_iter() {
         cmd.env(key, val);
     }
 
@@ -137,7 +137,6 @@ mod tests {
     use device::Device;
     use log::init_log;
     use log::Level;
-    use std::cell::RefCell;
     use std::rc::Rc;
 
     #[test]
@@ -145,7 +144,7 @@ mod tests {
         init_log("test_spawn", Level::Debug, vec!["console"], "", 0, 0, false);
 
         let dev = Device::from_subsystem_sysname("net", "lo").unwrap();
-        let unit = ExecuteUnit::new(Rc::new(RefCell::new(dev)));
+        let unit = ExecuteUnit::new(Rc::new(dev));
 
         println!(
             "{}",

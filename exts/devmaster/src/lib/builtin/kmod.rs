@@ -66,7 +66,6 @@ impl Builtin for Kmod {
 
         if argc == 2 {
             let modalias = device
-                .borrow()
                 .get_property_value("MODALIAS")
                 .map_or(String::new(), |e| e);
 

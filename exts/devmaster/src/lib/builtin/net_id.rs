@@ -23,7 +23,6 @@ use device::Device;
 use libc::{c_char, faccessat, ARPHRD_INFINIBAND, F_OK};
 use nix::errno::errno;
 use snafu::ResultExt;
-use std::cell::RefCell;
 use std::ffi::CString;
 use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::rc::Rc;
@@ -49,7 +48,7 @@ enum HwAddrAssignType {
 struct NetNames {
     r#type: NetNameType,
 
-    pcidev: Rc<RefCell<Device>>,
+    pcidev: Rc<Device>,
     pci_slot: String,
     pci_path: String,
     pci_onboard: String,
@@ -66,7 +65,7 @@ struct NetNames {
 }
 
 impl NetNames {
-    fn new(dev: Rc<RefCell<Device>>) -> Self {
+    fn new(dev: Rc<Device>) -> Self {
         NetNames {
             r#type: NetNameType::default(),
 
@@ -122,7 +121,7 @@ struct LinkInfo {
 }
 
 /// Skip intermediate virtio device
-fn skip_virtio(dev: Rc<RefCell<Device>>) -> Option<Rc<RefCell<Device>>> {
+fn skip_virtio(dev: Rc<Device>) -> Option<Rc<Device>> {
     let mut dev = dev;
 
     /*
@@ -132,7 +131,7 @@ fn skip_virtio(dev: Rc<RefCell<Device>>) -> Option<Rc<RefCell<Device>>> {
      */
     #[allow(clippy::while_let_loop)]
     loop {
-        let subsystem = match dev.borrow().get_subsystem() {
+        let subsystem = match dev.get_subsystem() {
             Ok(s) => s,
             Err(_) => break,
         };
@@ -141,7 +140,7 @@ fn skip_virtio(dev: Rc<RefCell<Device>>) -> Option<Rc<RefCell<Device>>> {
             break;
         }
 
-        let parent = match dev.borrow().get_parent() {
+        let parent = match dev.get_parent() {
             Ok(p) => p,
             Err(_) => return None,
         };
@@ -152,15 +151,15 @@ fn skip_virtio(dev: Rc<RefCell<Device>>) -> Option<Rc<RefCell<Device>>> {
     Some(dev)
 }
 
-fn get_virtfn_info(pcidev: Rc<RefCell<Device>>) -> Result<(Rc<RefCell<Device>>, String)> {
-    let syspath = pcidev.borrow().get_syspath().context(DeviceSnafu)?;
+fn get_virtfn_info(pcidev: Rc<Device>) -> Result<(Rc<Device>, String)> {
+    let syspath = pcidev.get_syspath().context(DeviceSnafu)?;
 
     /* Get physical function's pci device. */
-    let physfn_pcidev = pcidev.borrow().get_child("physfn").context(DeviceSnafu)?;
+    let physfn_pcidev = pcidev.get_child("physfn").context(DeviceSnafu)?;
     let mut suffix = "";
 
     /* Find the virtual function number by finding the right virtfn link. */
-    for (subdir, child) in &physfn_pcidev.borrow().child_iter() {
+    for (subdir, child) in &physfn_pcidev.child_iter() {
         /* Only accepts e.g. virtfn0, virtfn1, and so on. */
         if subdir.starts_with("virtfn") {
             suffix = subdir.trim_start_matches("virtfn");
@@ -169,7 +168,7 @@ fn get_virtfn_info(pcidev: Rc<RefCell<Device>>) -> Result<(Rc<RefCell<Device>>, 
             }
         }
 
-        let child_syspath = match child.borrow().get_syspath() {
+        let child_syspath = match child.get_syspath() {
             Ok(s) => s,
             Err(_) => continue,
         };
@@ -201,34 +200,33 @@ fn is_valid_onboard_index(idx: u32) -> bool {
 }
 
 /// Retrieve on-board index number and label from firmware
-fn dev_pci_onboard(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames) -> Result<()> {
+fn dev_pci_onboard(dev: Rc<Device>, info: &LinkInfo, names: &mut NetNames) -> Result<()> {
     let mut dev_port: u32 = 0;
 
-    let attr = match names.pcidev.borrow().get_sysattr_value("acpi_index") {
+    let attr = match names.pcidev.get_sysattr_value("acpi_index") {
         Ok(v) => {
-            log_dev!(debug, names.pcidev.borrow(), format!("acpi_index={}", v));
+            log_dev!(debug, names.pcidev, format!("acpi_index={}", v));
             v
         }
         Err(_) => {
             let v = names
                 .pcidev
-                .borrow()
                 .get_sysattr_value("index")
                 .context(DeviceSnafu)?;
-            log_dev!(debug, names.pcidev.borrow(), format!("index={}", v));
+            log_dev!(debug, names.pcidev, format!("index={}", v));
             v
         }
     };
 
-    let idx = attr.parse::<u32>().context(ParseIntSnafu).log_dev_debug(
-        &names.pcidev.borrow(),
-        &format!("Failed to parse '{}'", attr),
-    )?;
+    let idx = attr
+        .parse::<u32>()
+        .context(ParseIntSnafu)
+        .log_dev_debug(&names.pcidev, &format!("Failed to parse '{}'", attr))?;
 
     if idx == 0 && !naming_scheme_has(NamingSchemeFlags::ZERO_ACPI_INDEX) {
         log_dev!(
             debug,
-            names.pcidev.borrow(),
+            names.pcidev,
             "Naming scheme does not allow onboard index==0"
         );
         return Err(Error::Nix {
@@ -239,7 +237,7 @@ fn dev_pci_onboard(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNam
     if !is_valid_onboard_index(idx) {
         log_dev!(
             debug,
-            names.pcidev.borrow(),
+            names.pcidev,
             format!("Not a valid onboard index: {}", idx)
         );
         return Err(Error::Nix {
@@ -247,15 +245,15 @@ fn dev_pci_onboard(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNam
         });
     }
 
-    if let Ok(v) = dev.borrow().get_sysattr_value("dev_port") {
+    if let Ok(v) = dev.get_sysattr_value("dev_port") {
         if let Ok(n) = v
             .parse::<u32>()
             .context(ParseIntSnafu)
-            .log_dev_debug(&dev.borrow(), "Failed to parse dev_port, ignoring")
+            .log_dev_debug(&dev, "Failed to parse dev_port, ignoring")
         {
             dev_port = n;
         }
-        log_dev!(debug, dev.borrow(), format!("dev_port={}", dev_port));
+        log_dev!(debug, dev, format!("dev_port={}", dev_port));
     }
 
     names.pci_onboard.push_str(&format!("o{}", idx));
@@ -269,18 +267,18 @@ fn dev_pci_onboard(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNam
 
     log_dev!(
         debug,
-        dev.borrow(),
+        dev,
         format!(
             "Onboard index identifier: index={} phys_port={} dev_port={} >>> {}",
             idx, info.physical_port_name, dev_port, names.pci_onboard
         )
     );
 
-    if let Ok(v) = names.pcidev.borrow().get_sysattr_value("label") {
+    if let Ok(v) = names.pcidev.get_sysattr_value("label") {
         names.pci_onboard_label = v;
         log_dev!(
             debug,
-            dev.borrow(),
+            dev,
             format!("Onboard label from PCI device: {}", names.pci_onboard_label)
         );
     } else {
@@ -291,8 +289,8 @@ fn dev_pci_onboard(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNam
 }
 
 /// Read the 256 bytes PCI configuration space to check the multi-function bit
-fn is_pci_multifunction(dev: Rc<RefCell<Device>>) -> Result<bool> {
-    let syspath = dev.borrow().get_syspath().context(DeviceSnafu)?;
+fn is_pci_multifunction(dev: Rc<Device>) -> Result<bool> {
+    let syspath = dev.get_syspath().context(DeviceSnafu)?;
     let filename = format!("{}/config", syspath);
     let config = std::fs::read(&filename).context(IoSnafu { filename })?;
 
@@ -302,8 +300,8 @@ fn is_pci_multifunction(dev: Rc<RefCell<Device>>) -> Result<bool> {
     Ok(config[PCI_HEADER_TYPE as usize] & PCI_HEADER_TYPE_MULTIFUNC != 0)
 }
 
-fn is_pci_ari_enabled(dev: Rc<RefCell<Device>>) -> bool {
-    let attr = match dev.borrow().get_sysattr_value("ari_enabled") {
+fn is_pci_ari_enabled(dev: Rc<Device>) -> bool {
+    let attr = match dev.get_sysattr_value("ari_enabled") {
         Ok(v) => v,
         Err(_) => return false,
     };
@@ -311,8 +309,8 @@ fn is_pci_ari_enabled(dev: Rc<RefCell<Device>>) -> bool {
     &attr == "1"
 }
 
-fn is_pci_bridge(dev: Rc<RefCell<Device>>) -> bool {
-    let modalias = match dev.borrow().get_sysattr_value("modalias") {
+fn is_pci_bridge(dev: Rc<Device>) -> bool {
+    let modalias = match dev.get_sysattr_value("modalias") {
         Ok(v) => v,
         Err(_) => return false,
     };
@@ -344,17 +342,14 @@ fn is_pci_bridge(dev: Rc<RefCell<Device>>) -> bool {
     };
 
     if pci_subclass == "04" {
-        log_dev!(debug, dev.borrow(), "Device is a PCI bridge");
+        log_dev!(debug, dev, "Device is a PCI bridge");
         return true;
     }
 
     false
 }
 
-fn parse_hotplug_slot_from_function_id(
-    dev: Rc<RefCell<Device>>,
-    slots_dirfd: RawFd,
-) -> Result<Option<u32>> {
+fn parse_hotplug_slot_from_function_id(dev: Rc<Device>, slots_dirfd: RawFd) -> Result<Option<u32>> {
     if !naming_scheme_has(NamingSchemeFlags::SLOT_FUNCTION_ID) {
         return Ok(None);
     }
@@ -368,20 +363,20 @@ fn parse_hotplug_slot_from_function_id(
      * the domain part doesn't belong to the slot name here because there's a 1-to-1 relationship
      * between PCI function and its hotplug slot.
      */
-    let attr = match dev.borrow().get_sysattr_value("function_id") {
+    let attr = match dev.get_sysattr_value("function_id") {
         Ok(v) => v,
         Err(_) => return Ok(None),
     };
 
     let function_id = attr.parse::<u64>().context(ParseIntSnafu).log_dev_debug(
-        &dev.borrow(),
+        &dev,
         &format!("Failed to parse function_id, ignoring '{}'", attr),
     )?;
 
     if function_id > u32::MAX.into() {
         log_dev!(
             debug,
-            dev.borrow(),
+            dev,
             format!("Invalid function id '{}', ignoring", function_id)
         );
 
@@ -393,7 +388,7 @@ fn parse_hotplug_slot_from_function_id(
     if function_id.to_string().len() > 8 {
         log_dev!(
             warn,
-            dev.borrow(),
+            dev,
             format!("function_id '{}' is too long, ignoring", function_id)
         );
         return Err(Error::Nix {
@@ -406,7 +401,7 @@ fn parse_hotplug_slot_from_function_id(
     if unsafe { faccessat(slots_dirfd, filename.as_ptr() as *const c_char, F_OK, 0) } < 0 {
         log_dev!(
             debug,
-            dev.borrow(),
+            dev,
             format!(
                 "Cannot access '{}' under pci slots, ignoring: {}",
                 filename,
@@ -421,15 +416,14 @@ fn parse_hotplug_slot_from_function_id(
     Ok(Some(function_id as u32))
 }
 
-fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames) -> Result<()> {
+fn dev_pci_slot(dev: Rc<Device>, info: &LinkInfo, names: &mut NetNames) -> Result<()> {
     let mut hotplug_slot: u32 = 0;
     let mut dev_port: u32 = 0;
     let sysname = names
         .pcidev
-        .borrow()
         .get_sysname()
         .context(DeviceSnafu)
-        .log_dev_error(&dev.borrow(), "Failed to get sysname")?;
+        .log_dev_error(&dev, "Failed to get sysname")?;
 
     let mut domain: u32 = 0;
     let mut bus: u32 = 0;
@@ -451,7 +445,7 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
     if ret != 4 {
         log_dev!(
             debug,
-            dev.borrow(),
+            dev,
             "Failed to parse slot information from PCI device sysname"
         );
 
@@ -462,7 +456,7 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
 
     log_dev!(
         debug,
-        dev.borrow(),
+        dev,
         format!(
             "Parsing slot information from PCI device sysname '{}'",
             sysname
@@ -478,11 +472,11 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
         func += slot * 8;
     }
     /* kernel provided port index for multiple ports on a single PCI function */
-    if let Ok(attr) = dev.borrow().get_sysattr_value("dev_port") {
-        log_dev!(debug, dev.borrow(), format!("dev_port={}", attr));
+    if let Ok(attr) = dev.get_sysattr_value("dev_port") {
+        log_dev!(debug, dev, format!("dev_port={}", attr));
 
         dev_port = attr.parse::<u32>().context(ParseIntSnafu).log_dev_debug(
-            &dev.borrow(),
+            &dev,
             &format!("Failed to parse attribute dev_port '{}', ignoring", attr),
         )?;
 
@@ -492,11 +486,11 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
          * which thus stays initialized as 0.
          */
         if dev_port == 0 && info.iftype == ARPHRD_INFINIBAND {
-            if let Ok(attr) = dev.borrow().get_sysattr_value("dev_id") {
-                log_dev!(debug, dev.borrow(), format!("dev_id={}", attr));
+            if let Ok(attr) = dev.get_sysattr_value("dev_id") {
+                log_dev!(debug, dev, format!("dev_id={}", attr));
 
                 dev_port = attr.parse::<u32>().context(ParseIntSnafu).log_dev_debug(
-                    &dev.borrow(),
+                    &dev,
                     &format!("Failed to parse attribute dev_id '{}', ignoring", attr),
                 )?;
             }
@@ -524,7 +518,7 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
 
     log_dev!(
         debug,
-        dev.borrow(),
+        dev,
         format!(
             "PCI path identifier: domain={} bus={} slot={} func={} phys_port={} dev_port={} >>> {}",
             domain, bus, slot, func, info.physical_port_name, dev_port, names.pci_path
@@ -556,10 +550,9 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
         }
 
         let sysname = hotplug_slot_dev
-            .borrow()
             .get_sysname()
             .context(DeviceSnafu)
-            .log_dev_debug(&dev.borrow(), "Failed to get sysname")?;
+            .log_dev_debug(&dev, "Failed to get sysname")?;
 
         let read_dir = pci
             .read_dir("slots")
@@ -614,7 +607,7 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
                 {
                     log_dev!(
                         debug,
-                        dev.borrow(),
+                        dev,
                         "Not using slot information because the PCI device associated with the hotplug slot is a bridge and the PCI device has a single function."
                     );
                     return Ok(());
@@ -623,7 +616,7 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
                 if !naming_scheme_has(NamingSchemeFlags::BRIDGE_MULTIFUNCTION_SLOT) {
                     log_dev!(
                         debug,
-                        dev.borrow(),
+                        dev,
                         "Not using slot information because the PCI device is a bridge."
                     );
                     return Ok(());
@@ -636,10 +629,7 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
             break;
         }
 
-        let parent = match hotplug_slot_dev
-            .borrow()
-            .get_parent_with_subsystem_devtype("pci", None)
-        {
+        let parent = match hotplug_slot_dev.get_parent_with_subsystem_devtype("pci", None) {
             Ok(d) => d,
             Err(_) => break,
         };
@@ -666,7 +656,7 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
 
         log_dev!(
             debug,
-            dev.borrow(),
+            dev,
             format!(
                 "Slot identifier: domain={} slot={} func={} phys_port={} dev_port={} >>> {}",
                 domain, hotplug_slot, func, info.physical_port_name, dev_port, names.pci_slot
@@ -677,18 +667,16 @@ fn dev_pci_slot(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames)
     Ok(())
 }
 
-fn names_vio(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
+fn names_vio(dev: Rc<Device>, names: &mut NetNames) -> Result<()> {
     /* Check if our direct parent is a VIO device with no other bus in-between */
-    dev.borrow()
-        .get_parent()
+    dev.get_parent()
         .context(DeviceSnafu)
-        .log_dev_debug(&dev.borrow(), "failed to get parent")?;
+        .log_dev_debug(&dev, "failed to get parent")?;
 
     let subsystem = dev
-        .borrow()
         .get_subsystem()
         .context(DeviceSnafu)
-        .log_dev_debug(&dev.borrow(), "failed to get subsystem")?;
+        .log_dev_debug(&dev, "failed to get subsystem")?;
 
     if "vio" != &subsystem {
         return Err(Error::Nix {
@@ -696,7 +684,7 @@ fn names_vio(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
         });
     }
 
-    log_dev!(debug, dev.borrow(), "Parent device is in the vio subsystem");
+    log_dev!(debug, dev, "Parent device is in the vio subsystem");
 
     /*
      * The devices' $DEVPATH number is tied to (virtual) hardware (slot id
@@ -705,19 +693,14 @@ fn names_vio(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
      * there should only ever be one bus, and then remove leading zeros.
      */
     let syspath = dev
-        .borrow()
         .get_syspath()
         .context(DeviceSnafu)
-        .log_dev_debug(&dev.borrow(), "failed to get syspath")?;
+        .log_dev_debug(&dev, "failed to get syspath")?;
 
     let s = match get_first_path_component(&syspath, "/sys/devices/vio/") {
         Some(s) => s,
         None => {
-            log_dev!(
-                debug,
-                dev.borrow(),
-                "Syspath does not begin with /sys/devices/vio/"
-            );
+            log_dev!(debug, dev, "Syspath does not begin with /sys/devices/vio/");
             return Err(Error::Nix {
                 source: nix::Error::EINVAL,
             });
@@ -727,7 +710,7 @@ fn names_vio(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
     if s.len() != 8 || !str_satisfy(s, |c| c.is_ascii_hexdigit()) {
         log_dev!(
             debug,
-            dev.borrow(),
+            dev,
             "VIO bus ID and slot ID contain non ascii digits."
         );
         return Err(Error::Nix {
@@ -739,7 +722,7 @@ fn names_vio(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
 
     log_dev!(
         debug,
-        dev.borrow(),
+        dev,
         format!("Parsing vio slot information from syspath '{}'", syspath)
     );
 
@@ -747,7 +730,7 @@ fn names_vio(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
     names.r#type = NetNameType::Vio;
     log_dev!(
         debug,
-        dev.borrow(),
+        dev,
         format!(
             "Vio slot identifier: slotid={} >>> {}",
             slotid, names.vio_slot
@@ -759,19 +742,17 @@ fn names_vio(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
 
 const PLATFORM_TEST: &str = "/sys/devices/platform/aaaaBBBB";
 
-fn names_platform(dev: Rc<RefCell<Device>>, names: &mut NetNames, _test: bool) -> Result<()> {
+fn names_platform(dev: Rc<Device>, names: &mut NetNames, _test: bool) -> Result<()> {
     /* Check if our direct parent is a platform device with no other bus in-between */
     let parent = dev
-        .borrow()
         .get_parent()
         .context(DeviceSnafu)
-        .log_dev_debug(&dev.borrow(), "failed to get parent")?;
+        .log_dev_debug(&dev, "failed to get parent")?;
 
     let subsystem = parent
-        .borrow()
         .get_subsystem()
         .context(DeviceSnafu)
-        .log_dev_debug(&parent.borrow(), "failed to get subsystem")?;
+        .log_dev_debug(&parent, "failed to get subsystem")?;
 
     if &subsystem != "platform" {
         return Err(Error::Nix {
@@ -779,22 +760,17 @@ fn names_platform(dev: Rc<RefCell<Device>>, names: &mut NetNames, _test: bool) -
         });
     }
 
-    log_dev!(
-        debug,
-        dev.borrow(),
-        "Parent device is in the platform subsystem"
-    );
+    log_dev!(debug, dev, "Parent device is in the platform subsystem");
 
     let syspath = dev
-        .borrow()
         .get_syspath()
         .context(DeviceSnafu)
-        .log_dev_debug(&dev.borrow(), "failed to get syspath")?;
+        .log_dev_debug(&dev, "failed to get syspath")?;
 
     if syspath.len() < PLATFORM_TEST.len() + 1 {
         log_dev!(
             debug,
-            dev.borrow(),
+            dev,
             format!(
                 "The syspath '{}' is too short for a valid ACPI instance",
                 syspath
@@ -815,7 +791,7 @@ fn names_platform(dev: Rc<RefCell<Device>>, names: &mut NetNames, _test: bool) -
     let s = match get_first_path_component(&syspath, "/sys/devices/platform/") {
         Some(s) => s,
         None => {
-            log_dev!(debug, dev.borrow(), "Failed to get platform ID".to_string());
+            log_dev!(debug, dev, "Failed to get platform ID".to_string());
             return Err(Error::Nix {
                 source: nix::Error::EINVAL,
             });
@@ -840,7 +816,7 @@ fn names_platform(dev: Rc<RefCell<Device>>, names: &mut NetNames, _test: bool) -
     if !str_satisfy(vendor, |c| validchars.contains(c)) {
         log_dev!(
             debug,
-            &dev.borrow(),
+            &dev,
             format!("Platform vendor contains invalid characters: {}", vendor)
         );
         return Err(Error::Nix {
@@ -852,10 +828,10 @@ fn names_platform(dev: Rc<RefCell<Device>>, names: &mut NetNames, _test: bool) -
         vendor.to_ascii_lowercase(),
         u32::from_str_radix(model, 16)
             .context(ParseIntSnafu)
-            .log_dev_debug(&dev.borrow(), &format!("invalid model '{}'", model))?,
+            .log_dev_debug(&dev, &format!("invalid model '{}'", model))?,
         u32::from_str_radix(instance, 16)
             .context(ParseIntSnafu)
-            .log_dev_debug(&dev.borrow(), &format!("invalid instance '{}'", instance))?,
+            .log_dev_debug(&dev, &format!("invalid instance '{}'", instance))?,
     );
 
     names.platform_path = format!("a{}{:x}i{}", vendor, model, instance);
@@ -863,7 +839,7 @@ fn names_platform(dev: Rc<RefCell<Device>>, names: &mut NetNames, _test: bool) -
 
     log_dev!(
         debug,
-        dev.borrow(),
+        dev,
         format!(
             "Platform identifier: vendor={} model={} instance={} >>> {}",
             vendor, model, instance, names.platform_path
@@ -873,15 +849,15 @@ fn names_platform(dev: Rc<RefCell<Device>>, names: &mut NetNames, _test: bool) -
     Ok(())
 }
 
-fn dev_devicetree_onboard(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
+fn dev_devicetree_onboard(dev: Rc<Device>, names: &mut NetNames) -> Result<()> {
     if !naming_scheme_has(NamingSchemeFlags::DEVICETREE_ALIASES) {
         return Ok(());
     }
 
     /* Check if our direct parent has an of_node */
-    let parent = dev.borrow().get_parent().context(DeviceSnafu)?;
-    let ofnode_dev = parent.borrow().get_child("of_node").context(DeviceSnafu)?;
-    let ofnode_syspath = ofnode_dev.borrow().get_syspath().context(DeviceSnafu)?;
+    let parent = dev.get_parent().context(DeviceSnafu)?;
+    let ofnode_dev = parent.get_child("of_node").context(DeviceSnafu)?;
+    let ofnode_syspath = ofnode_dev.get_syspath().context(DeviceSnafu)?;
 
     /* /proc/device-tree should be a symlink to /sys/firmware/devicetree/base. */
     let devicetree_dev = Device::from_path("/proc/device-tree").context(DeviceSnafu)?;
@@ -906,13 +882,13 @@ fn dev_devicetree_onboard(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Res
 
     let aliases_dev = devicetree_dev.get_child("aliases").context(DeviceSnafu)?;
 
-    for alias in &aliases_dev.borrow().sysattr_iter() {
+    for alias in &aliases_dev.sysattr_iter() {
         let alias_index = match alias.strip_prefix("ethernet") {
             Some(suffix) => suffix,
             None => continue,
         };
 
-        let alias_path = match aliases_dev.borrow().get_sysattr_value(alias) {
+        let alias_path = match aliases_dev.get_sysattr_value(alias) {
             Ok(v) => v,
             Err(_) => continue,
         };
@@ -928,18 +904,15 @@ fn dev_devicetree_onboard(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Res
             let i = alias_index
                 .parse::<u32>()
                 .context(ParseIntSnafu)
-                .log_dev_debug(
-                    &dev.borrow(),
-                    &format!("Could not get index of alias '{}'", alias),
-                )?;
+                .log_dev_debug(&dev, &format!("Could not get index of alias '{}'", alias))?;
             (i, "ethernet")
         };
 
         /* ...but make sure we don't have an alias conflict */
-        if i == 0 && aliases_dev.borrow().get_sysattr_value(conflict).is_ok() {
+        if i == 0 && aliases_dev.get_sysattr_value(conflict).is_ok() {
             log_dev!(
                 debug,
-                dev.borrow(),
+                dev,
                 "Ethernet alias conflict: ethernet and ethernet0 both exist"
             );
             return Err(Error::Nix {
@@ -958,8 +931,8 @@ fn dev_devicetree_onboard(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Res
 }
 
 #[allow(clippy::unnecessary_unwrap)]
-fn names_pci(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames) -> Result<()> {
-    let parent = dev.borrow().get_parent().context(DeviceSnafu)?;
+fn names_pci(dev: Rc<Device>, info: &LinkInfo, names: &mut NetNames) -> Result<()> {
+    let parent = dev.get_parent().context(DeviceSnafu)?;
 
     /* Skip virtio subsystem if present */
     let parent = skip_virtio(parent);
@@ -973,7 +946,7 @@ fn names_pci(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames) ->
     let parent = parent.unwrap();
 
     /* Check if our direct parent is a PCI device with no other bus in-between */
-    match parent.borrow().get_subsystem() {
+    match parent.get_subsystem() {
         Ok(s) => {
             if &s == "pci" {
                 names.r#type = NetNameType::Pci;
@@ -982,7 +955,6 @@ fn names_pci(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames) ->
         }
         Err(_) => {
             names.pcidev = dev
-                .borrow()
                 .get_parent_with_subsystem_devtype("pci", None)
                 .context(DeviceSnafu)?;
         }
@@ -1020,28 +992,26 @@ fn names_pci(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames) ->
     Ok(())
 }
 
-fn names_usb(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
+fn names_usb(dev: Rc<Device>, names: &mut NetNames) -> Result<()> {
     let usbdev = dev
-        .borrow()
         .get_parent_with_subsystem_devtype("usb", Some("usb_interface"))
         .context(DeviceSnafu)
         .log_dev_debug(
-            &dev.borrow(),
+            &dev,
             "Failed to get parent with subsystem 'usb' and devtype 'usb_interface'",
         )?;
 
     let sysname = usbdev
-        .borrow()
         .get_sysname()
         .context(DeviceSnafu)
-        .log_dev_debug(&usbdev.borrow(), "Failed to get parent sysname")?;
+        .log_dev_debug(&usbdev, "Failed to get parent sysname")?;
 
     /* Get USB port number chain, configuration, interface */
     let name = sysname.clone();
     let idx_1 = name.find('-').ok_or_else(|| {
         log_dev!(
             debug,
-            usbdev.borrow(),
+            usbdev,
             format!("sysname '{}' does not have '-' as expected", sysname)
         );
         Error::Nix {
@@ -1052,7 +1022,7 @@ fn names_usb(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
     let ports = name.get(idx_1 + 1..).ok_or_else(|| {
         log_dev!(
             debug,
-            usbdev.borrow(),
+            usbdev,
             format!("sysname '{}' does not contain ports", sysname)
         );
         Error::Nix {
@@ -1063,7 +1033,7 @@ fn names_usb(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
     let idx_2 = ports.find(':').ok_or_else(|| {
         log_dev!(
             debug,
-            usbdev.borrow(),
+            usbdev,
             format!("sysname '{}' does not have ':' as expected", sysname)
         );
         Error::Nix {
@@ -1076,7 +1046,7 @@ fn names_usb(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
     let config = name.get(idx_2 + 1..).ok_or_else(|| {
         log_dev!(
             debug,
-            usbdev.borrow(),
+            usbdev,
             format!("sysname '{}' does not contain config", sysname)
         );
         Error::Nix {
@@ -1087,7 +1057,7 @@ fn names_usb(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
     let idx_3 = config.find('.').ok_or_else(|| {
         log_dev!(
             debug,
-            usbdev.borrow(),
+            usbdev,
             format!("sysname '{}' does not have '.' as expected", sysname)
         );
         Error::Nix {
@@ -1101,7 +1071,7 @@ fn names_usb(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
         .ok_or_else(|| {
             log_dev!(
                 debug,
-                usbdev.borrow(),
+                usbdev,
                 format!("sysname '{}' does not contain interface", sysname)
             );
             Error::Nix {
@@ -1125,7 +1095,7 @@ fn names_usb(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
 
     log_dev!(
         debug,
-        dev.borrow(),
+        dev,
         format!(
             "USB name identifier: ports={} config={} interface={} >>> {}",
             ports, config, interf, names.usb_ports
@@ -1137,32 +1107,27 @@ fn names_usb(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
     Ok(())
 }
 
-fn names_bcma(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
+fn names_bcma(dev: Rc<Device>, names: &mut NetNames) -> Result<()> {
     let bcmadev = dev
-        .borrow()
         .get_parent_with_subsystem_devtype("bcma", None)
         .context(DeviceSnafu)
-        .log_dev_debug(&dev.borrow(), "Failed to get parent with subsystem 'bcma'")?;
+        .log_dev_debug(&dev, "Failed to get parent with subsystem 'bcma'")?;
 
     let sysname = bcmadev
-        .borrow()
         .get_sysname()
         .context(DeviceSnafu)
-        .log_dev_debug(&dev.borrow(), "Failed to get bcma device sysname")?;
+        .log_dev_debug(&dev, "Failed to get bcma device sysname")?;
 
     /* Bus num:core num */
     let core = match sysname.find(':') {
         Some(idx) => sysname[idx + 1..]
             .parse::<u8>()
             .context(ParseIntSnafu)
-            .log_dev_debug(
-                &dev.borrow(),
-                &format!("core string is not a number: {}", sysname),
-            )?,
+            .log_dev_debug(&dev, &format!("core string is not a number: {}", sysname))?,
         None => {
             log_dev!(
                 debug,
-                &dev.borrow(),
+                &dev,
                 format!("Failed to get core number: {}", sysname)
             );
             return Err(Error::Nix {
@@ -1173,7 +1138,7 @@ fn names_bcma(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
 
     log_dev!(
         debug,
-        dev.borrow(),
+        dev,
         format!("Parsing bcma device information from sysname '{}'", sysname)
     );
 
@@ -1186,7 +1151,7 @@ fn names_bcma(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
 
     log_dev!(
         debug,
-        dev.borrow(),
+        dev,
         format!(
             "BCMA core identifier: core={} >>> {}",
             core, names.bcma_core
@@ -1196,13 +1161,12 @@ fn names_bcma(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
     Ok(())
 }
 
-fn names_ccw(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
+fn names_ccw(dev: Rc<Device>, names: &mut NetNames) -> Result<()> {
     /* Retrieve the associated CCW device */
     let _ = dev
-        .borrow()
         .get_parent()
         .context(DeviceSnafu)
-        .log_dev_debug(&dev.borrow(), "Failed to get parent")?;
+        .log_dev_debug(&dev, "Failed to get parent")?;
 
     /* Skip virtio subsystem if present */
     let cdev = match skip_virtio(dev.clone()) {
@@ -1215,10 +1179,9 @@ fn names_ccw(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
     };
 
     let subsys = cdev
-        .borrow()
         .get_subsystem()
         .context(DeviceSnafu)
-        .log_dev_debug(&cdev.borrow(), "Failed to get subsystem")?;
+        .log_dev_debug(&cdev, "Failed to get subsystem")?;
 
     /* Network devices are either single or grouped CCW devices */
     if !["ccwgroup", "ccw"].contains(&subsys.as_str()) {
@@ -1227,7 +1190,7 @@ fn names_ccw(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
         });
     }
 
-    log_dev!(debug, dev.borrow(), "Device is CCW");
+    log_dev!(debug, dev, "Device is CCW");
 
     /*
      * Retrieve bus-ID of the CCW device.  The bus-ID uniquely
@@ -1235,10 +1198,9 @@ fn names_ccw(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
      * subsystem.  Note that the bus-ID contains lowercase characters.
      */
     let bus_id = cdev
-        .borrow()
         .get_sysname()
         .context(DeviceSnafu)
-        .log_dev_debug(&cdev.borrow(), "Failed to get sysname")?;
+        .log_dev_debug(&cdev, "Failed to get sysname")?;
 
     /*
      * Check the length of the bus-ID. Rely on the fact that the kernel provides a correct bus-ID;
@@ -1246,7 +1208,7 @@ fn names_ccw(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
      */
     let bus_id_len = bus_id.len();
     if ![8, 9].contains(&bus_id_len) {
-        log_dev!(debug, cdev.borrow(), format!("Invalid bus_id '{}'", bus_id));
+        log_dev!(debug, cdev, format!("Invalid bus_id '{}'", bus_id));
         return Err(Error::Nix {
             source: nix::Error::EINVAL,
         });
@@ -1270,7 +1232,7 @@ fn names_ccw(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
 
     log_dev!(
         debug,
-        dev.borrow(),
+        dev,
         format!(
             "CCW identifier: ccw_busid={} >>> {}",
             bus_id, names.ccw_busid
@@ -1280,7 +1242,7 @@ fn names_ccw(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
     Ok(())
 }
 
-fn names_mac(dev: Rc<RefCell<Device>>, info: &LinkInfo) -> Result<()> {
+fn names_mac(dev: Rc<Device>, info: &LinkInfo) -> Result<()> {
     /*
      * The persistent part of a hardware address of an InfiniBand NIC is 8 bytes long. We cannot
      * fit this much in an iface name.
@@ -1288,11 +1250,7 @@ fn names_mac(dev: Rc<RefCell<Device>>, info: &LinkInfo) -> Result<()> {
      */
 
     if info.iftype == ARPHRD_INFINIBAND {
-        log_dev!(
-            debug,
-            dev.borrow(),
-            "Not generating MAC name for infiniband device"
-        );
+        log_dev!(debug, dev, "Not generating MAC name for infiniband device");
         return Err(Error::Nix {
             source: nix::Error::EOPNOTSUPP,
         });
@@ -1301,7 +1259,7 @@ fn names_mac(dev: Rc<RefCell<Device>>, info: &LinkInfo) -> Result<()> {
     if info.hw_addr.length as u8 != 6 {
         log_dev!(
             debug,
-            dev.borrow(),
+            dev,
             format!(
                 "Not generating MAC name for device with MAC address of length {}",
                 info.hw_addr.length as u8
@@ -1314,20 +1272,19 @@ fn names_mac(dev: Rc<RefCell<Device>>, info: &LinkInfo) -> Result<()> {
 
     /* Check for NET_ADDR_PERM, skip random MAC addresses */
     let s = dev
-        .borrow()
         .get_sysattr_value("addr_assign_type")
         .context(DeviceSnafu)
-        .log_dev_debug(&dev.borrow(), "Failed to read addr_assign_type")?;
+        .log_dev_debug(&dev, "Failed to read addr_assign_type")?;
 
     let i = s
         .parse::<u32>()
         .context(ParseIntSnafu)
-        .log_dev_debug(&dev.borrow(), "Failed to parse addr_assign_type number")?;
+        .log_dev_debug(&dev, "Failed to parse addr_assign_type number")?;
 
     if i != HwAddrAssignType::Permanent as u32 {
         log_dev!(
             debug,
-            dev.borrow(),
+            dev,
             format!("addr_assign_type={}, MAC address is not permant", i)
         );
         return Err(Error::Nix {
@@ -1338,7 +1295,7 @@ fn names_mac(dev: Rc<RefCell<Device>>, info: &LinkInfo) -> Result<()> {
     Ok(())
 }
 
-fn names_netdevsim(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNames) -> Result<()> {
+fn names_netdevsim(dev: Rc<Device>, info: &LinkInfo, names: &mut NetNames) -> Result<()> {
     if !naming_scheme_has(NamingSchemeFlags::NETDEVSIM) {
         return Ok(());
     }
@@ -1350,21 +1307,20 @@ fn names_netdevsim(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNam
     }
 
     let netdevsimdev = dev
-        .borrow()
         .get_parent_with_subsystem_devtype("netdevsim", None)
         .context(DeviceSnafu)?;
 
-    let sysname = netdevsimdev.borrow().get_sysname().context(DeviceSnafu)?;
+    let sysname = netdevsimdev.get_sysname().context(DeviceSnafu)?;
 
     let addr = match sysname.strip_prefix("netdevsim") {
         Some(suffix) => suffix.parse::<u8>().context(ParseIntSnafu).log_dev_debug(
-            &dev.borrow(),
+            &dev,
             &format!("Failed to parse netdevsim address '{}'", sysname),
         )?,
         None => {
             log_dev!(
                 debug,
-                &dev.borrow(),
+                &dev,
                 format!("Netdevsim does not contain address '{}'", sysname)
             );
             return Err(Error::Nix {
@@ -1379,20 +1335,20 @@ fn names_netdevsim(dev: Rc<RefCell<Device>>, info: &LinkInfo, names: &mut NetNam
     Ok(())
 }
 
-fn names_xen(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
+fn names_xen(dev: Rc<Device>, names: &mut NetNames) -> Result<()> {
     if !naming_scheme_has(NamingSchemeFlags::XEN_VIF) {
         return Ok(());
     }
 
     /* Check if our direct parent is a Xen VIF device with no other bus in-between */
-    let parent = dev.borrow().get_parent().context(DeviceSnafu)?;
+    let parent = dev.get_parent().context(DeviceSnafu)?;
 
     /*
      * Do an exact-match on subsystem "xen". This will miss on "xen-backend" on
      * purpose as the VIFs on the backend (dom0) have their own naming scheme
      * which we don't want to affect
      */
-    let subsystem = parent.borrow().get_subsystem().context(DeviceSnafu)?;
+    let subsystem = parent.get_subsystem().context(DeviceSnafu)?;
 
     if "xen" != &subsystem {
         return Err(Error::Nix {
@@ -1401,7 +1357,7 @@ fn names_xen(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
     }
 
     /* Use the vif-n name to extract "n" */
-    let syspath = dev.borrow().get_syspath().context(DeviceSnafu)?;
+    let syspath = dev.get_syspath().context(DeviceSnafu)?;
 
     let p = match syspath.strip_prefix("/sys/devices/") {
         Some(p) => p,
@@ -1446,7 +1402,7 @@ fn names_xen(dev: Rc<RefCell<Device>>, names: &mut NetNames) -> Result<()> {
 }
 
 /// IEEE Organizationally Unique Identifier vendor string
-fn ieee_oui(_dev: Rc<RefCell<Device>>, info: &LinkInfo, _test: bool) -> Result<()> {
+fn ieee_oui(_dev: Rc<Device>, info: &LinkInfo, _test: bool) -> Result<()> {
     if info.hw_addr.length as u8 != 0 {
         return Err(Error::Nix {
             source: nix::Error::EOPNOTSUPP,
@@ -1476,24 +1432,22 @@ fn ieee_oui(_dev: Rc<RefCell<Device>>, info: &LinkInfo, _test: bool) -> Result<(
     todo!("hwdb lookup s")
 }
 
-fn get_link_info(dev: Rc<RefCell<Device>>) -> Result<LinkInfo> {
-    let ifindex = dev.borrow().get_ifindex().context(DeviceSnafu)?;
+fn get_link_info(dev: Rc<Device>) -> Result<LinkInfo> {
+    let ifindex = dev.get_ifindex().context(DeviceSnafu)?;
 
     let iflink = dev
-        .borrow()
         .get_sysattr_value("iflink")
         .context(DeviceSnafu)?
         .parse::<u32>()
         .context(ParseIntSnafu)?;
 
     let iftype = dev
-        .borrow()
         .get_sysattr_value("type")
         .context(DeviceSnafu)?
         .parse::<u16>()
         .context(ParseIntSnafu)?;
 
-    let devtype = match dev.borrow().get_devtype() {
+    let devtype = match dev.get_devtype() {
         Ok(t) => t,
         Err(e) => {
             if !e.is_errno(nix::Error::ENOENT) {
@@ -1504,15 +1458,12 @@ fn get_link_info(dev: Rc<RefCell<Device>>) -> Result<LinkInfo> {
         }
     };
 
-    let physical_port_name = dev
-        .borrow()
-        .get_sysattr_value("phys_port_name")
-        .unwrap_or_default();
+    let physical_port_name = dev.get_sysattr_value("phys_port_name").unwrap_or_default();
 
-    let hw_addr = match dev.borrow().get_sysattr_value("address") {
+    let hw_addr = match dev.get_sysattr_value("address") {
         Ok(s) => parse_hw_addr_full(&s, 0)
             .context(BasicSnafu)
-            .log_dev_debug(&dev.borrow(), "Failed to parse 'address' sysattr, ignoring")?,
+            .log_dev_debug(&dev, "Failed to parse 'address' sysattr, ignoring")?,
         Err(e) => {
             if !e.is_errno(nix::Error::ENOENT) {
                 return Err(Error::Device { source: e });
@@ -1544,7 +1495,7 @@ impl Builtin for NetId {
         test: bool,
     ) -> Result<bool> {
         let dev = exec_unit.get_device();
-        let mut names = NetNames::new(Rc::new(RefCell::new(Device::default())));
+        let mut names = NetNames::new(Rc::new(Device::default()));
         let link_info = get_link_info(dev.clone())?;
 
         /* Skip stacked devices, like VLANs, ... */
@@ -1587,7 +1538,7 @@ impl Builtin for NetId {
             let _ = self.add_property(dev.clone(), test, "ID_NET_NAME_MAC", &s);
             log_dev!(
                 debug,
-                dev.borrow(),
+                dev,
                 format!(
                     "MAC address identifier: hw_addr={} >>> {}",
                     link_info.hw_addr,

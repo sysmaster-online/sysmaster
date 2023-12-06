@@ -13,7 +13,6 @@
 //! common utilities
 
 use std::{
-    cell::RefCell,
     rc::Rc,
     sync::{Arc, RwLock},
 };
@@ -531,44 +530,39 @@ pub(crate) fn get_property_from_string(s: &str) -> Result<(String, String)> {
 }
 
 /// inherit initial timestamp from old device object
-pub(crate) fn initialize_device_usec(
-    dev_new: Rc<RefCell<Device>>,
-    dev_old: Rc<RefCell<Device>>,
-) -> Result<()> {
-    let timestamp = dev_old.borrow().get_usec_initialized().unwrap_or_else(|_| {
+pub(crate) fn initialize_device_usec(dev_new: Rc<Device>, dev_old: Rc<Device>) -> Result<()> {
+    let timestamp = dev_old.get_usec_initialized().unwrap_or_else(|_| {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |v| v.as_secs())
     });
 
-    dev_new.borrow().set_usec_initialized(timestamp);
+    dev_new.set_usec_initialized(timestamp);
 
     Ok(())
 }
 
 /// add new tags and remove deleted tags
 pub(crate) fn device_update_tag(
-    dev_new: Rc<RefCell<Device>>,
-    dev_old: Option<Rc<RefCell<Device>>>,
+    dev_new: Rc<Device>,
+    dev_old: Option<Rc<Device>>,
     add: bool,
 ) -> Result<()> {
     if let Some(dev_old) = dev_old {
-        for tag in &dev_old.borrow().tag_iter() {
-            if let Ok(true) = dev_new.borrow().has_tag(tag) {
+        for tag in &dev_old.tag_iter() {
+            if let Ok(true) = dev_new.has_tag(tag) {
                 continue;
             }
 
             let _ = dev_new
-                .borrow()
                 .update_tag(tag, false)
                 .context(DeviceSnafu)
                 .log_error(&format!("failed to remove old tag '{}'", tag));
         }
     }
 
-    for tag in &dev_new.borrow().tag_iter() {
+    for tag in &dev_new.tag_iter() {
         let _ = dev_new
-            .borrow()
             .update_tag(tag, add)
             .context(DeviceSnafu)
             .log_error(&format!("failed to add new tag '{}'", tag));
@@ -578,18 +572,18 @@ pub(crate) fn device_update_tag(
 }
 
 /// cleanup device database
-pub(crate) fn cleanup_db(dev: Rc<RefCell<Device>>) -> Result<()> {
-    let id = dev.borrow().get_device_id().context(DeviceSnafu)?;
+pub(crate) fn cleanup_db(dev: Rc<Device>) -> Result<()> {
+    let id = dev.get_device_id().context(DeviceSnafu)?;
 
     let db_path = format!("{}{}", DB_BASE_DIR, id);
 
     match unlink(db_path.as_str()) {
-        Ok(_) => log_dev!(debug, dev.borrow(), format!("unlinked '{}'", db_path)),
+        Ok(_) => log_dev!(debug, dev, format!("unlinked '{}'", db_path)),
         Err(e) => {
             if e != nix::Error::ENOENT {
                 log_dev!(
                     error,
-                    dev.borrow(),
+                    dev,
                     format!("failed to unlink '{}' when cleanup db: {}", db_path, e)
                 );
                 return Err(Error::Nix { source: e });

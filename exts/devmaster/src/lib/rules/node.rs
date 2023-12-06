@@ -45,7 +45,6 @@ use nix::sys::stat::{self, fstat, lstat, major, minor, Mode};
 use nix::unistd::unlink;
 use nix::unistd::{symlinkat, unlinkat, Gid, Uid, UnlinkatFlags};
 use snafu::ResultExt;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, read_dir, remove_dir, File};
 use std::io::ErrorKind;
@@ -54,7 +53,7 @@ use std::path::Path;
 use std::rc::Rc;
 
 pub(crate) fn node_apply_permissions(
-    dev: Rc<RefCell<Device>>,
+    dev: Rc<Device>,
     apply_mac: bool,
     mode: Option<mode_t>,
     uid: Option<Uid>,
@@ -62,12 +61,11 @@ pub(crate) fn node_apply_permissions(
     seclabel_list: &HashMap<String, String>,
 ) -> Result<()> {
     let devnode = dev
-        .borrow()
         .get_devname()
         .context(DeviceSnafu)
         .log_error("failed to apply node permissions")?;
 
-    let file = match dev.borrow().open(OFlag::O_PATH | OFlag::O_CLOEXEC) {
+    let file = match dev.open(OFlag::O_PATH | OFlag::O_CLOEXEC) {
         Ok(r) => r,
         Err(e) => {
             if e.is_absent() {
@@ -136,7 +134,7 @@ pub(crate) fn static_node_apply_permissions(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_permission_impl(
-    dev: Option<Rc<RefCell<Device>>>,
+    dev: Option<Rc<Device>>,
     file: File,
     devnode: &str,
     apply_mac: bool,
@@ -197,72 +195,69 @@ pub(crate) fn apply_permission_impl(
     Ok(())
 }
 
-pub(crate) fn update_node(
-    dev_new: Rc<RefCell<Device>>,
-    dev_old: Rc<RefCell<Device>>,
-) -> Result<()> {
-    for devlink in &dev_old.borrow().devlink_iter() {
-        if dev_new.borrow().has_devlink(devlink) {
+pub(crate) fn update_node(dev_new: Rc<Device>, dev_old: Rc<Device>) -> Result<()> {
+    for devlink in &dev_old.devlink_iter() {
+        if dev_new.has_devlink(devlink) {
             continue;
         }
 
         log_dev!(
             debug,
-            dev_new.borrow(),
+            dev_new,
             format!("removing old devlink '{}'", devlink)
         );
 
         let _ = update_symlink(dev_new.clone(), devlink, false).log_dev_error(
-            &dev_new.borrow(),
+            &dev_new,
             &format!("failed to remove old symlink '{}'", devlink),
         );
     }
 
-    for devlink in &dev_new.borrow().devlink_iter() {
+    for devlink in &dev_new.devlink_iter() {
         log_dev!(
             debug,
-            dev_new.borrow(),
+            dev_new,
             format!("updating new devlink '{}'", devlink)
         );
 
         let _ = update_symlink(dev_new.clone(), devlink, true).log_dev_error(
-            &dev_new.borrow(),
+            &dev_new,
             &format!("failed to add new symlink '{}'", devlink),
         );
     }
 
     /* create '/dev/{block, char}/$major:$minor' symlink */
     let target = device_get_symlink_by_devnum(dev_new.clone())
-        .log_dev_error(&dev_new.borrow(), "failed to get devnum symlink")?;
+        .log_dev_error(&dev_new, "failed to get devnum symlink")?;
 
     if let Err(e) = node_symlink(dev_new.clone(), "", &target) {
-        log_dev!(debug, dev_new.borrow(), e);
+        log_dev!(debug, dev_new, e);
     }
 
     Ok(())
 }
 
-pub(crate) fn cleanup_node(dev: Rc<RefCell<Device>>) -> Result<()> {
-    for link in &dev.borrow().devlink_iter() {
+pub(crate) fn cleanup_node(dev: Rc<Device>) -> Result<()> {
+    for link in &dev.devlink_iter() {
         if let Err(e) = update_symlink(dev.clone(), link.as_str(), false) {
             log_dev!(
                 error,
-                dev.borrow(),
+                dev,
                 format!("failed to remove symlink '{}': {}", link, e)
             );
         }
     }
 
     let filename = device_get_symlink_by_devnum(dev.clone())
-        .log_dev_error(&dev.borrow(), "failed to get devnum symlink")?;
+        .log_dev_error(&dev, "failed to get devnum symlink")?;
 
     match unlink(filename.as_str()) {
-        Ok(_) => log_dev!(debug, dev.borrow(), format!("unlinked '{}'", filename)),
+        Ok(_) => log_dev!(debug, dev, format!("unlinked '{}'", filename)),
         Err(e) => {
             if e != nix::Error::ENOENT {
                 log_dev!(
                     error,
-                    dev.borrow(),
+                    dev,
                     format!("failed to unlink '{}' when cleanup node: {}", filename, e)
                 );
             }
@@ -274,7 +269,7 @@ pub(crate) fn cleanup_node(dev: Rc<RefCell<Device>>) -> Result<()> {
 
 /// if 'add' is true, add or update the target device symlink under '/run/devmaster/links/<escaped symlink>',
 /// otherwise delete the old symlink.
-pub(crate) fn update_symlink(dev: Rc<RefCell<Device>>, symlink: &str, add: bool) -> Result<()> {
+pub(crate) fn update_symlink(dev: Rc<Device>, symlink: &str, add: bool) -> Result<()> {
     /*
      * Create link priority directory if it does not exist.
      * The directory is locked until finishing updating device symlink.
@@ -284,7 +279,7 @@ pub(crate) fn update_symlink(dev: Rc<RefCell<Device>>, symlink: &str, add: bool)
     if let Err(e) = ExclusiveFlock::wait_lock(&lock_file) {
         log_dev!(
             error,
-            dev.borrow(),
+            dev,
             format!("failed to lock priority directory for '{}': {}", symlink, e)
         );
     } else {
@@ -310,23 +305,15 @@ pub(crate) fn update_symlink(dev: Rc<RefCell<Device>>, symlink: &str, add: bool)
         };
     }
 
-    log_dev!(
-        debug,
-        dev.borrow(),
-        format!("removing symlink '{}'", symlink)
-    );
+    log_dev!(debug, dev, format!("removing symlink '{}'", symlink));
 
     match unlink(symlink).context(NixSnafu) {
-        Ok(_) => log_dev!(
-            debug,
-            dev.borrow(),
-            format!("unlinked symlink '{}'", symlink)
-        ),
+        Ok(_) => log_dev!(debug, dev, format!("unlinked symlink '{}'", symlink)),
         Err(e) => {
             if e.get_errno() != nix::Error::ENOENT {
                 log_dev!(
                     error,
-                    dev.borrow(),
+                    dev,
                     format!(
                         "failed to unlink '{}' when updating symlink: {}",
                         symlink, e
@@ -422,21 +409,18 @@ pub(crate) fn escape_prior_dir(symlink: &str) -> String {
 }
 
 /// return true if the link priority directory is updated
-pub(crate) fn update_prior_dir(dev: Rc<RefCell<Device>>, dirfd: RawFd, add: bool) -> Result<bool> {
+pub(crate) fn update_prior_dir(dev: Rc<Device>, dirfd: RawFd, add: bool) -> Result<bool> {
     let id = dev
-        .borrow()
         .get_device_id()
         .context(DeviceSnafu)
         .log_error("failed to get device id")?;
 
     if add {
         let devname = dev
-            .borrow()
             .get_devname()
             .context(DeviceSnafu)
             .log_error("failed to get devname")?;
         let priority = dev
-            .borrow()
             .get_devlink_priority()
             .context(DeviceSnafu)
             .log_error("failed to get devlink priority")?;
@@ -448,12 +432,12 @@ pub(crate) fn update_prior_dir(dev: Rc<RefCell<Device>>, dirfd: RawFd, add: bool
             }
         }
         match unlinkat(Some(dirfd), id.as_str(), UnlinkatFlags::NoRemoveDir) {
-            Ok(_) => log_dev!(debug, dev.borrow(), format!("unlinked '{}'", id)),
+            Ok(_) => log_dev!(debug, dev, format!("unlinked '{}'", id)),
             Err(e) => {
                 if e != nix::Error::ENOENT {
                     log_dev!(
                         error,
-                        dev.borrow(),
+                        dev,
                         format!("failed to unlink '{}' when updating prior dir: {}", id, e)
                     );
                 }
@@ -464,7 +448,7 @@ pub(crate) fn update_prior_dir(dev: Rc<RefCell<Device>>, dirfd: RawFd, add: bool
             .log_error("symlinkat failed")?;
     } else {
         match unlinkat(Some(dirfd), id.as_str(), UnlinkatFlags::NoRemoveDir).context(NixSnafu) {
-            Ok(_) => log_dev!(debug, dev.borrow(), format!("unlinked '{}'", id)),
+            Ok(_) => log_dev!(debug, dev, format!("unlinked '{}'", id)),
             Err(e) => {
                 if e.get_errno() == nix::Error::ENOENT {
                     /* unchange */
@@ -472,7 +456,7 @@ pub(crate) fn update_prior_dir(dev: Rc<RefCell<Device>>, dirfd: RawFd, add: bool
                 }
                 log_dev!(
                     error,
-                    dev.borrow(),
+                    dev,
                     format!("failed to unlink '{}' when cleanup prior dir: {}", id, e)
                 );
                 return Err(e);
@@ -515,10 +499,10 @@ fn prior_dir_read_one(dirfd: RawFd, name: &str) -> Result<(i32, String)> {
     Ok((priority, tokens[1].to_string()))
 }
 
-pub(crate) fn device_get_symlink_by_devnum(dev: Rc<RefCell<Device>>) -> Result<String> {
-    let subsystem = dev.borrow().get_subsystem().context(DeviceSnafu)?;
+pub(crate) fn device_get_symlink_by_devnum(dev: Rc<Device>) -> Result<String> {
+    let subsystem = dev.get_subsystem().context(DeviceSnafu)?;
 
-    let devnum = dev.borrow().get_devnum().context(DeviceSnafu)?;
+    let devnum = dev.get_devnum().context(DeviceSnafu)?;
 
     Ok(match subsystem.as_str() {
         "block" => {
@@ -530,10 +514,9 @@ pub(crate) fn device_get_symlink_by_devnum(dev: Rc<RefCell<Device>>) -> Result<S
     })
 }
 
-pub(crate) fn node_symlink(dev: Rc<RefCell<Device>>, devnode: &str, target: &str) -> Result<()> {
+pub(crate) fn node_symlink(dev: Rc<Device>, devnode: &str, target: &str) -> Result<()> {
     let devnode = if devnode.is_empty() {
-        dev.borrow()
-            .get_devname()
+        dev.get_devname()
             .context(DeviceSnafu)
             .log_error("failed to get devname")?
     } else {
@@ -545,7 +528,7 @@ pub(crate) fn node_symlink(dev: Rc<RefCell<Device>>, devnode: &str, target: &str
             if stat.st_mode & S_IFMT != S_IFLNK {
                 log_dev!(
                     error,
-                    dev.borrow(),
+                    dev,
                     format!(
                         "conflicting inode '{}' found, symlink to '{}' will not be created",
                         target, devnode
@@ -559,7 +542,7 @@ pub(crate) fn node_symlink(dev: Rc<RefCell<Device>>, devnode: &str, target: &str
         }
         Err(e) => {
             if e != nix::Error::ENOENT {
-                log_dev!(error, dev.borrow(), format!("failed to lstat '{}'", target));
+                log_dev!(error, dev, format!("failed to lstat '{}'", target));
                 return Err(Error::Nix { source: e });
             }
         }
@@ -570,28 +553,25 @@ pub(crate) fn node_symlink(dev: Rc<RefCell<Device>>, devnode: &str, target: &str
             .context(IoSnafu {
                 filename: target.to_string(),
             })
-            .log_dev_error(&dev.borrow(), "failed to create directory all")?;
+            .log_dev_error(&dev, "failed to create directory all")?;
     }
 
     symlink(&devnode, target, true)
         .context(BasicSnafu)
         .log_dev_error(
-            &dev.borrow(),
+            &dev,
             &format!("failed to create symlink '{}'->'{}'", devnode, target),
         )?;
 
     log_dev!(
         debug,
-        dev.borrow(),
+        dev,
         format!("successfully created symlink '{}' to '{}'", target, devnode)
     );
     Ok(())
 }
 
-pub(crate) fn find_prioritized_devnode(
-    dev: Rc<RefCell<Device>>,
-    dirfd: i32,
-) -> Result<Option<String>> {
+pub(crate) fn find_prioritized_devnode(dev: Rc<Device>, dirfd: i32) -> Result<Option<String>> {
     let mut dir = xopendirat(dirfd, ".", OFlag::O_NOFOLLOW)
         .context(BasicSnafu)
         .log_error(&format!("failed to opendirat '{}'", dirfd))?;
@@ -615,11 +595,7 @@ pub(crate) fn find_prioritized_devnode(
                 }
                 Err(e) => {
                     if e.get_errno() != nix::Error::ENODEV {
-                        log_dev!(
-                            error,
-                            dev.borrow(),
-                            format!("prior_dir_read_one failed: {}", e)
-                        );
+                        log_dev!(error, dev, format!("prior_dir_read_one failed: {}", e));
                     }
                 }
             }
@@ -734,8 +710,8 @@ mod test {
                     unlink(link_path).unwrap();
                 }
 
-                let dev_new_arc = Rc::new(RefCell::new(dev_new));
-                let dev_old_arc = Rc::new(RefCell::new(dev_old));
+                let dev_new_arc = Rc::new(dev_new);
+                let dev_old_arc = Rc::new(dev_old);
 
                 update_node(dev_new_arc.clone(), dev_old_arc.clone()).unwrap();
 
@@ -788,7 +764,7 @@ mod test {
                     Device::from_path(lodev.get_device_path().unwrap().to_str().unwrap()).unwrap();
 
                 dev.add_devlink("test/update_prior_dir").unwrap();
-                let dev_rc = Rc::new(RefCell::new(dev));
+                let dev_rc = Rc::new(dev);
 
                 {
                     match open_prior_dir("/dev/test/update_prior_dir") {
@@ -885,7 +861,7 @@ mod test {
     #[test]
     fn test_node_symlink() {
         if let Err(e) = LoopDev::inner_process("/tmp/test_node_symlink", 1024 * 1024 * 10, |dev| {
-            let dev = Rc::new(RefCell::new(dev.shallow_clone().unwrap()));
+            let dev = Rc::new(dev.shallow_clone().unwrap());
 
             touch_file(
                 "/tmp/test_node_symlink_link",
