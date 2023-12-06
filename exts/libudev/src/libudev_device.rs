@@ -17,6 +17,7 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use device::Device;
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::mem;
 use std::os::linux::raw::dev_t;
@@ -51,6 +52,10 @@ pub struct udev_device {
     pub(crate) devpath: CString,
     pub(crate) devtype: CString,
     pub(crate) driver: CString,
+    pub(crate) sysname: CString,
+    pub(crate) subsystem: CString,
+
+    pub(crate) properties: HashMap<CString, CString>,
 }
 
 impl Drop for udev_device {
@@ -71,6 +76,9 @@ impl udev_device {
             devpath: CString::default(),
             devtype: CString::default(),
             driver: CString::default(),
+            sysname: CString::default(),
+            subsystem: CString::default(),
+            properties: HashMap::default(),
         }
     }
 }
@@ -366,6 +374,108 @@ pub extern "C" fn udev_device_get_driver(
     }
 }
 
+#[no_mangle]
+/// udev_device_get_sysname
+pub extern "C" fn udev_device_get_sysname(
+    udev_device: *mut udev_device,
+) -> *const ::std::os::raw::c_char {
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    if !udev_device_mut
+        .sysname
+        .as_c_str()
+        .to_str()
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return udev_device_mut.sysname.as_ptr();
+    }
+
+    match udev_device_mut.device.get_sysname() {
+        Ok(sysname) => {
+            udev_device_mut.sysname = CString::new(sysname).unwrap();
+            udev_device_mut.sysname.as_ptr()
+        }
+        Err(e) => {
+            errno::set_errno(errno::Errno(e.get_errno() as i32));
+            std::ptr::null()
+        }
+    }
+}
+
+#[no_mangle]
+/// udev_device_get_subsystem
+pub extern "C" fn udev_device_get_subsystem(
+    udev_device: *mut udev_device,
+) -> *const ::std::os::raw::c_char {
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    if !udev_device_mut
+        .subsystem
+        .as_c_str()
+        .to_str()
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return udev_device_mut.subsystem.as_ptr();
+    }
+
+    match udev_device_mut.device.get_subsystem() {
+        Ok(subsystem) => {
+            udev_device_mut.subsystem = CString::new(subsystem).unwrap();
+            udev_device_mut.subsystem.as_ptr()
+        }
+        Err(e) => {
+            errno::set_errno(errno::Errno(e.get_errno() as i32));
+            std::ptr::null()
+        }
+    }
+}
+
+#[no_mangle]
+/// udev_device_get_seqnum
+pub extern "C" fn udev_device_get_seqnum(
+    udev_device: *mut udev_device,
+) -> ::std::os::raw::c_ulonglong {
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    udev_device_mut.device.get_seqnum().unwrap_or_default() as ::std::os::raw::c_ulonglong
+}
+
+#[no_mangle]
+/// udev_device_get_property_value
+pub extern "C" fn udev_device_get_property_value(
+    udev_device: *mut udev_device,
+    key: *const ::std::os::raw::c_char,
+) -> *const ::std::os::raw::c_char {
+    let key = unsafe { CStr::from_ptr(key) }.to_str().unwrap_or_default();
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    if udev_device_mut
+        .properties
+        .contains_key(&CString::new(key).unwrap())
+    {
+        return udev_device_mut
+            .properties
+            .get(&CString::new(key).unwrap())
+            .unwrap()
+            .as_ptr();
+    }
+
+    match udev_device_mut.device.get_property_value(key) {
+        Ok(v) => {
+            let key_c = CString::new(key).unwrap();
+            let value_c = CString::new(v).unwrap();
+            udev_device_mut.properties.insert(key_c.clone(), value_c);
+            udev_device_mut.properties.get(&key_c).unwrap().as_ptr()
+        }
+        Err(e) => {
+            errno::set_errno(errno::Errno(e.get_errno() as i32));
+            std::ptr::null()
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::{cell::RefCell, intrinsics::transmute};
@@ -592,6 +702,69 @@ mod test {
         Ok(())
     }
 
+    fn test_udev_device_get_sysname(dev: RD) -> Result {
+        let ud = from_rd(dev.clone());
+
+        let sysname = dev.borrow().get_sysname()?;
+
+        assert_eq!(
+            unsafe { CStr::from_ptr(udev_device_get_sysname(ud)) }
+                .to_str()
+                .unwrap(),
+            &sysname
+        );
+
+        Ok(())
+    }
+
+    fn test_udev_device_get_subsystem(dev: RD) -> Result {
+        let ud = from_rd(dev.clone());
+
+        let subsystem = dev.borrow().get_subsystem()?;
+
+        assert_eq!(
+            unsafe { CStr::from_ptr(udev_device_get_subsystem(ud)) }
+                .to_str()
+                .unwrap(),
+            &subsystem
+        );
+
+        Ok(())
+    }
+
+    fn test_udev_device_get_seqnum(dev: RD) -> Result {
+        let ud = from_rd(dev);
+
+        let ud_mut: &mut udev_device = unsafe { transmute(&mut *ud) };
+
+        ud_mut.device.set_seqnum(10000);
+
+        assert_eq!(udev_device_get_seqnum(ud), 10000);
+
+        Ok(())
+    }
+
+    fn test_udev_device_get_property_value(dev: RD) -> Result {
+        let ud = from_rd(dev);
+        let ud_mut: &mut udev_device = unsafe { transmute(&mut *ud) };
+        ud_mut.device.sealed.replace(true);
+        ud_mut.device.add_property("hello", "world").unwrap();
+
+        assert_eq!(
+            unsafe {
+                CStr::from_ptr(udev_device_get_property_value(
+                    ud,
+                    "hello\0".as_ptr() as *const i8,
+                ))
+            }
+            .to_str()
+            .unwrap(),
+            "world"
+        );
+
+        Ok(())
+    }
+
     #[test]
     fn test_udev_device_ut() {
         let mut e = DeviceEnumerator::new();
@@ -607,6 +780,8 @@ mod test {
             let _ = test_udev_device_get_devpath(dev.clone());
             let _ = test_udev_device_get_devtype(dev.clone());
             let _ = test_udev_device_get_driver(dev.clone());
+            let _ = test_udev_device_get_sysname(dev.clone());
+            let _ = test_udev_device_get_subsystem(dev.clone());
         }
     }
 
@@ -619,10 +794,12 @@ mod test {
     }
 
     #[test]
-    fn test_udev_device_get_action_ut() {
+    fn test_udev_device_fake_from_monitor_ut() {
         let dev = Rc::new(RefCell::new(
             Device::from_subsystem_sysname("net", "lo").unwrap(),
         ));
-        let _ = test_udev_device_get_action(dev);
+        let _ = test_udev_device_get_action(dev.clone());
+        let _ = test_udev_device_get_seqnum(dev.clone());
+        let _ = test_udev_device_get_property_value(dev);
     }
 }
