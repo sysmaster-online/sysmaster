@@ -244,10 +244,6 @@ impl MountMng {
     }
 
     pub(super) fn enter_mounted(&self, res: MountResult, notify: bool) {
-        log::info!(
-            "(whorwe)enter_mounted: 1 | id: {}",
-            self.comm.get_owner_id()
-        );
         if self.result() == MountResult::Success {
             self.set_result(res);
         }
@@ -276,7 +272,6 @@ impl MountMng {
         self.set_state(MountState::Unmounting, true);
     }
 
-    #[allow(unused)]
     pub(super) fn enter_remounting(&self) {
         self.set_result(MountResult::Success);
         let mount_parameters = self.config.mount_parameters();
@@ -483,6 +478,14 @@ impl MountMng {
             }
         }
         self.set_proc_flags(MountProcFlags::EMPTY);
+    }
+
+    pub fn reset_failed(&self) {
+        if self.state() == MountState::Failed {
+            self.set_state(MountState::Dead, true);
+        }
+        self.set_result(MountResult::Success);
+        self.set_reload_result(MountResult::Success);
     }
 
     pub fn get_state(&self) -> String {

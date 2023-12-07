@@ -189,6 +189,11 @@ impl SubUnit for MountUnit {
         Ok(())
     }
 
+    fn reload(&self) -> Result<()> {
+        self.mng.enter_remounting();
+        Ok(())
+    }
+
     fn kill(&self) {}
 
     fn release_resources(&self) {}
@@ -197,7 +202,9 @@ impl SubUnit for MountUnit {
         self.mng.sigchld_event(wait_status);
     }
 
-    fn reset_failed(&self) {}
+    fn reset_failed(&self) {
+        self.mng.reset_failed()
+    }
 
     fn setup_existing_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {
         if self.config.mount_where().is_empty() {

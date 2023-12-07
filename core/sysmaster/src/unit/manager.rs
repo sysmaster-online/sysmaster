@@ -674,14 +674,6 @@ impl UmIf for UnitManager {
             }
             Some(v) => v,
         };
-        log::info!(
-            "(whorwe)setup_existing_mount: 1 | id: {}, {}-{}-{}-{}",
-            mount.id(),
-            what,
-            mount_where,
-            options,
-            fstype
-        );
         mount.setup_existing_mount(what, mount_where, options, fstype);
         mount.set_load_state(UnitLoadState::Loaded);
     }
