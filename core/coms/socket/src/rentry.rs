@@ -104,6 +104,8 @@ pub(super) struct SectionSocket {
     pub SocketUser: String,
     #[entry(default = String::new())]
     pub SocketGroup: String,
+
+    // Kill
     #[entry(default = KillMode::ControlGroup)]
     pub KillMode: KillMode,
     #[entry(default = String::from("SIGTERM"))]

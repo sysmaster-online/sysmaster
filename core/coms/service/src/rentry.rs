@@ -270,16 +270,12 @@ pub struct SectionService {
     pub NotifyAccess: Option<NotifyAccess>,
     #[entry(default = false)]
     pub NonBlocking: bool,
-    #[entry(default = KillMode::ControlGroup)]
-    pub KillMode: KillMode,
     #[entry(default = ServiceRestart::No)]
     pub Restart: ServiceRestart,
     #[entry(default = ExitStatusSet::default())]
     pub RestartPreventExitStatus: ExitStatusSet,
     #[entry(default = 1)]
     pub RestartSec: u64,
-    #[entry(default = String::from("SIGTERM"))]
-    pub KillSignal: String,
     #[entry(default = 10000000, parser = parse_timeout)]
     pub TimeoutSec: u64,
     #[entry(default = 10000000, parser = parse_timeout)]
@@ -312,6 +308,12 @@ pub struct SectionService {
     #[entry(append)]
     pub EnvironmentFile: Vec<String>,
     pub SELinuxContext: Option<String>,
+
+    // Kill
+    #[entry(default = KillMode::ControlGroup)]
+    pub KillMode: KillMode,
+    #[entry(default = String::from("SIGTERM"))]
+    pub KillSignal: String,
 }
 
 impl SectionService {

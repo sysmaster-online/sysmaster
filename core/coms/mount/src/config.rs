@@ -11,8 +11,11 @@
 // See the Mulan PSL v2 for more details.
 //
 
-use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use core::error::Result;
+use core::unit::KillContext;
+use std::{cell::RefCell, path::PathBuf, rc::Rc, str::FromStr};
 
+use nix::sys::signal::Signal;
 use unit_parser::prelude::UnitConfig;
 
 use crate::{comm::MountUnitComm, rentry::SectionMount};
@@ -30,12 +33,26 @@ pub(super) struct MountConfig {
 
     // owned objects
     data: Rc<RefCell<MountConfigData>>,
+    kill_context: Rc<KillContext>,
+    mount_parameters: RefCell<MountParameters>,
+    mount_parameters_from_mountinfo: RefCell<MountParameters>,
 }
 
+#[derive(Clone)]
 pub(super) struct MountParameters {
     pub what: String,
     pub options: String,
     pub fstype: String,
+}
+
+impl MountParameters {
+    fn empty() -> Self {
+        Self {
+            what: String::new(),
+            options: String::new(),
+            fstype: String::new(),
+        }
+    }
 }
 
 impl MountConfig {
@@ -43,6 +60,9 @@ impl MountConfig {
         MountConfig {
             comm: Rc::clone(commr),
             data: Rc::new(RefCell::new(MountConfigData::default())),
+            kill_context: Rc::new(KillContext::default()),
+            mount_parameters: RefCell::new(MountParameters::empty()),
+            mount_parameters_from_mountinfo: RefCell::new(MountParameters::empty()),
         }
     }
 
@@ -56,7 +76,16 @@ impl MountConfig {
             }
         };
         *self.data.borrow_mut() = mount_config;
+        if let Err(e) = self.parse_kill_context() {
+            log::error!("Failed to parse KillContext for {}: {}", name, e);
+        }
+        self.set_mount_parameters(MountParameters {
+            what: self.mount_what(),
+            options: self.mount_options(),
+            fstype: self.mount_type(),
+        })
 
+        // Todo: reli
         // if update {
         //     self.db_update();
         // }
@@ -96,17 +125,58 @@ impl MountConfig {
     }
 
     pub(super) fn mount_parameters(&self) -> MountParameters {
-        MountParameters {
-            what: self.mount_what(),
-            options: self.mount_options(),
-            fstype: self.mount_type(),
-        }
+        (*self.mount_parameters.borrow()).clone()
     }
 
-    pub(super) fn update_mount_parameters(&self, what: &str, options: &str, fstype: &str) {
-        (*self.data.borrow_mut()).Mount.What = what.to_string();
-        (*self.data.borrow_mut()).Mount.Options = options.to_string();
-        (*self.data.borrow_mut()).Mount.Type = fstype.to_string();
+    pub(super) fn set_mount_parameters(&self, mount_parameters: MountParameters) {
+        *self.mount_parameters.borrow_mut() = mount_parameters
+    }
+
+    pub(super) fn mount_parameters_from_mountinfo(&self) -> MountParameters {
+        (*self.mount_parameters_from_mountinfo.borrow()).clone()
+    }
+
+    pub(super) fn set_mount_parameters_from_mountinfo(&self, mount_parameters: MountParameters) {
+        *self.mount_parameters_from_mountinfo.borrow_mut() = mount_parameters
+    }
+
+    /// update the mount parameters. return true if parameters are updated, return false if
+    /// parameters are not changed
+    pub(super) fn updated_mount_parameters_from_mountinfo(
+        &self,
+        what: &str,
+        options: &str,
+        fstype: &str,
+    ) -> bool {
+        let mut parameter_changed = false;
+        let mut mount_parameters = self.mount_parameters_from_mountinfo();
+        if !mount_parameters.what.eq(what) {
+            mount_parameters.what = what.to_string();
+            parameter_changed = true;
+        }
+        if !mount_parameters.options.eq(options) {
+            mount_parameters.options = options.to_string();
+            parameter_changed = true;
+        }
+        if !mount_parameters.fstype.eq(fstype) {
+            mount_parameters.fstype = fstype.to_string();
+            parameter_changed = true;
+        }
+        self.set_mount_parameters_from_mountinfo(mount_parameters);
+        parameter_changed
+    }
+
+    pub(super) fn kill_context(&self) -> Rc<KillContext> {
+        self.kill_context.clone()
+    }
+
+    pub(super) fn parse_kill_context(&self) -> Result<()> {
+        self.kill_context
+            .set_kill_mode(self.config_data().borrow().Mount.KillMode);
+
+        let signal = Signal::from_str(&self.config_data().borrow().Mount.KillSignal)?;
+        self.kill_context.set_kill_signal(signal);
+        Ok(())
     }
 }
 

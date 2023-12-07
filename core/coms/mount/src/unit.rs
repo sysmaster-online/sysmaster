@@ -14,7 +14,7 @@
 //! UnitObj,UnitMngUtil, UnitSubClass trait
 
 use crate::config::MountConfig;
-use crate::rentry::MountResult;
+use crate::rentry::{MountProcFlags, MountResult, MountState};
 
 use super::comm::MountUnitComm;
 use super::mng::MountMng;
@@ -178,14 +178,12 @@ impl SubUnit for MountUnit {
         }
 
         self.mng.start_action()?;
-        self.mng.enter_mounted(true);
 
         Ok(())
     }
 
     fn stop(&self, _force: bool) -> Result<()> {
         self.mng.stop_action()?;
-        self.mng.enter_dead(MountResult::Success, true);
         Ok(())
     }
 
@@ -203,29 +201,36 @@ impl SubUnit for MountUnit {
         if self.config.mount_where().is_empty() {
             self.config.set_mount_where(mount_where);
         }
-        self.config.update_mount_parameters(what, options, fstype);
+
+        self.mng.append_proc_flags(MountProcFlags::IS_MOUNTED);
+        if self
+            .config
+            .updated_mount_parameters_from_mountinfo(what, options, fstype)
+        {
+            self.mng.append_proc_flags(MountProcFlags::JUST_CHANGED);
+        }
+        if !self.mng.find_in_mountinfo() && self.mng.state() == MountState::Mounting {
+            self.mng.append_proc_flags(MountProcFlags::JUST_MOUNTED);
+        }
         self.mng.set_find_in_mountinfo(true);
+        // Todo: update dependencies.
     }
 
     fn setup_new_mount(&self, what: &str, mount_where: &str, options: &str, fstype: &str) {
         self.config.set_mount_where(mount_where);
-        self.config.update_mount_parameters(what, options, fstype);
+        self.config
+            .updated_mount_parameters_from_mountinfo(what, options, fstype);
+        // Todo: add dependencies.
         self.mng.set_find_in_mountinfo(true);
+        self.mng.set_proc_flags(
+            MountProcFlags::IS_MOUNTED
+                | MountProcFlags::JUST_MOUNTED
+                | MountProcFlags::JUST_CHANGED,
+        );
     }
 
-    fn update_mount_state(&self, state: &str) {
-        match state {
-            "dead" => {
-                self.mng.set_find_in_mountinfo(false);
-                self.mng.enter_dead(MountResult::Success, true);
-            }
-            "mounted" => {
-                if self.mng.find_in_mountinfo() {
-                    self.mng.enter_mounted(true);
-                }
-            }
-            _ => {}
-        }
+    fn update_mount_state_by_mountinfo(&self) {
+        self.mng.update_mount_state_by_mountinfo()
     }
 }
 

@@ -404,12 +404,9 @@ impl MountMonitorData {
 
     pub fn dispatch_mountinfo(&self) -> Result<()> {
         let unit_type = Some(UnitType::UnitMount);
-        for unit in self.comm.um().units_get_all(unit_type).iter() {
-            self.comm.um().update_mount_state(unit, "dead");
-        }
         self.load_mountinfo()?;
         for unit in self.comm.um().units_get_all(unit_type).iter() {
-            self.comm.um().update_mount_state(unit, "mounted");
+            self.comm.um().update_mount_state_by_mountinfo(unit);
         }
         Ok(())
     }

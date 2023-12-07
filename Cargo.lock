@@ -1122,6 +1122,7 @@ name = "mount"
 version = "0.5.1"
 dependencies = [
  "basic",
+ "bitflags",
  "constants",
  "core",
  "epoll",

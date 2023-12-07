@@ -177,7 +177,7 @@ pub trait SubUnit: ReStation + UnitMngUtil {
     fn setup_new_mount(&self, _what: &str, _mount_where: &str, _options: &str, _fstype: &str) {}
 
     ///
-    fn update_mount_state(&self, _state: &str) {}
+    fn update_mount_state_by_mountinfo(&self) {}
 }
 
 /// the macro for create a sub unit instance with dyn ref of UmIf,

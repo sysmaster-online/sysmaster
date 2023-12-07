@@ -10,9 +10,11 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use bitflags::bitflags;
 use core::{
     exec::{PreserveMode, Rlimit, RuntimeDirectory, StateDirectory, WorkingDirectory},
     rel::{ReDb, ReDbRwTxn, ReDbTable, ReliSwitch, Reliability},
+    unit::{KillMode, KillOperation},
 };
 use macros::{EnumDisplay, UnitSection};
 use serde::{Deserialize, Serialize};
@@ -39,6 +41,19 @@ pub(super) enum MountState {
     // Cleaning currently not used
 }
 
+impl MountState {
+    pub fn to_kill_option(self) -> KillOperation {
+        match self {
+            MountState::RemountingSigterm => KillOperation::KillRestart,
+            MountState::UnmountingSigterm => KillOperation::KillTerminate,
+            MountState::RemountingSigKill | MountState::UnmountingSigkill => {
+                KillOperation::KillKill
+            }
+            _ => KillOperation::KillInvalid,
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub(super) enum MountResult {
     Success,
@@ -49,6 +64,20 @@ pub(super) enum MountResult {
     FailureCoreDump,
     FailureStartLimitHit,
     FailureProtocol,
+}
+
+bitflags! {
+    /// Flags set when process /p/s/mountinfo
+    pub struct MountProcFlags: u16 {
+        /// Initial state: empty
+        const EMPTY = 0;
+        /// The mountpoint is mounted
+        const IS_MOUNTED = 1 << 0;
+        /// The mountpoint is just mounted
+        const JUST_MOUNTED = 1 << 1;
+        /// Some mount parameters are changed
+        const JUST_CHANGED = 1 << 2;
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -204,4 +233,10 @@ pub struct SectionMount {
     #[entry(append)]
     pub EnvironmentFile: Vec<String>,
     pub SELinuxContext: Option<String>,
+
+    // Kill
+    #[entry(default = KillMode::ControlGroup)]
+    pub KillMode: KillMode,
+    #[entry(default = String::from("SIGTERM"))]
+    pub KillSignal: String,
 }

@@ -674,7 +674,16 @@ impl UmIf for UnitManager {
             }
             Some(v) => v,
         };
+        log::info!(
+            "(whorwe)setup_existing_mount: 1 | id: {}, {}-{}-{}-{}",
+            mount.id(),
+            what,
+            mount_where,
+            options,
+            fstype
+        );
         mount.setup_existing_mount(what, mount_where, options, fstype);
+        mount.set_load_state(UnitLoadState::Loaded);
     }
 
     /// setup new mount
@@ -701,7 +710,7 @@ impl UmIf for UnitManager {
     }
 
     /// update mount state
-    fn update_mount_state(&self, unit_name: &str, state: &str) {
+    fn update_mount_state_by_mountinfo(&self, unit_name: &str) {
         let mount = match self.units_get(unit_name) {
             None => {
                 log::error!("Failed to update the mount state of {}", unit_name);
@@ -709,7 +718,7 @@ impl UmIf for UnitManager {
             }
             Some(v) => v,
         };
-        mount.update_mount_state(state);
+        mount.update_mount_state_by_mountinfo();
     }
 }
 

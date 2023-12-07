@@ -759,7 +759,7 @@ impl Unit {
         self.load.load_state()
     }
 
-    pub(super) fn set_load_state(&self, state: UnitLoadState) {
+    pub fn set_load_state(&self, state: UnitLoadState) {
         self.load.set_load_state(state)
     }
 
@@ -808,8 +808,8 @@ impl Unit {
         self.sub.setup_new_mount(what, mount_where, options, fstype);
     }
 
-    pub(crate) fn update_mount_state(&self, state: &str) {
-        self.sub.update_mount_state(state);
+    pub(crate) fn update_mount_state_by_mountinfo(&self) {
+        self.sub.update_mount_state_by_mountinfo();
     }
 
     pub(crate) fn notify_message(

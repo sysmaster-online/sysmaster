@@ -230,7 +230,7 @@ pub trait UmIf {
     }
 
     /// update mount state
-    fn update_mount_state(&self, _unit_name: &str, _state: &str) {}
+    fn update_mount_state_by_mountinfo(&self, _unit_name: &str) {}
 }
 
 /// the trait used for attach UnitManager to sub unit
