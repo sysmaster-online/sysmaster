@@ -150,6 +150,7 @@ impl MountMng {
             mount_command.append_many_argv(vec!["-o", &filtered_options]);
         }
         *self.control_command.borrow_mut() = Some(mount_command.clone());
+        self.unwatch_control_pid();
         let control_pid = match self.spawn.spawn_cmd(&mount_command) {
             Err(e) => {
                 log::error!(
@@ -162,8 +163,8 @@ impl MountMng {
             }
             Ok(v) => v,
         };
-        self.set_control_pid(control_pid);
-
+        self.set_control_pid(Some(control_pid));
+        self.watch_control_pid();
         self.set_state(MountState::Mounting, true);
     }
 
@@ -246,7 +247,7 @@ impl MountMng {
     }
 
     pub(super) fn enter_unmounting(&self) {
-        // retry_umount
+        // Todo: retry_umount
         let mut umount_command = ExecCommand::empty();
         if let Err(e) = umount_command.set_path(UMOUNT_BIN) {
             log::error!("Failed to set umount command: {}", e);
@@ -254,6 +255,7 @@ impl MountMng {
         let mount_where = self.config.mount_where();
         umount_command.append_many_argv(vec![&mount_where, "-c"]);
         *self.control_command.borrow_mut() = Some(umount_command.clone());
+        self.unwatch_control_pid();
         let control_pid = match self.spawn.spawn_cmd(&umount_command) {
             Err(e) => {
                 log::error!("Failed to umount {}: {}", mount_where, e);
@@ -261,7 +263,8 @@ impl MountMng {
             }
             Ok(v) => v,
         };
-        self.set_control_pid(control_pid);
+        self.set_control_pid(Some(control_pid));
+        self.watch_control_pid();
         self.set_state(MountState::Unmounting, true);
     }
 
@@ -283,6 +286,8 @@ impl MountMng {
             "-o",
             &options,
         ]);
+        *self.control_command.borrow_mut() = Some(remount_command.clone());
+        self.unwatch_control_pid();
         let control_pid = match self.spawn.spawn_cmd(&remount_command) {
             Err(e) => {
                 log::error!(
@@ -297,14 +302,15 @@ impl MountMng {
             }
             Ok(v) => v,
         };
-        self.set_control_pid(control_pid);
+        self.set_control_pid(Some(control_pid));
+        self.watch_control_pid();
         self.set_state(MountState::Remounting, true);
     }
 
     pub(super) fn cycle_clear(&self) {
         self.set_result(MountResult::Success);
         self.set_reload_result(MountResult::Success);
-        // Todo: exec_command reset
+        *self.control_command.borrow_mut() = None;
     }
 
     #[allow(unused)]
@@ -491,12 +497,29 @@ impl MountMng {
             .contains(MountProcFlags::IS_MOUNTED)
     }
 
-    pub fn set_control_pid(&self, control_pid: Pid) {
-        *self.pid.borrow_mut() = Some(control_pid);
+    pub fn set_control_pid(&self, control_pid: Option<Pid>) {
+        *self.pid.borrow_mut() = control_pid;
     }
 
     pub fn control_pid(&self) -> Option<Pid> {
         self.pid.borrow().clone()
+    }
+
+    pub fn watch_control_pid(&self) {
+        if let Some(pid) = self.control_pid() {
+            if let Some(u) = self.comm.owner() {
+                self.comm.um().child_watch_pid(&u.id(), pid);
+            }
+        }
+    }
+
+    pub fn unwatch_control_pid(&self) {
+        if let Some(pid) = self.control_pid() {
+            if let Some(u) = self.comm.owner() {
+                self.comm.um().child_unwatch_pid(&u.id(), pid)
+            }
+            self.set_control_pid(None);
+        }
     }
 }
 
@@ -510,7 +533,7 @@ impl MountMng {
     }
 
     fn do_sigchld_event(&self, wait_status: WaitStatus) {
-        self.set_control_pid(Pid::from_raw(0));
+        self.set_control_pid(None);
         log::debug!("Got a mount process sigchld, status: {:?}", wait_status);
         let mut f = self.sigchld_result(wait_status);
         let state = self.state();
