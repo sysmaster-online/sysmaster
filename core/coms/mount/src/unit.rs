@@ -14,7 +14,7 @@
 //! UnitObj,UnitMngUtil, UnitSubClass trait
 
 use crate::config::MountConfig;
-use crate::rentry::{MountProcFlags, MountResult, MountState};
+use crate::rentry::{MountProcFlags, MountState};
 
 use super::comm::MountUnitComm;
 use super::mng::MountMng;
@@ -64,6 +64,8 @@ impl MountUnit {
         let config = Rc::new(MountConfig::new(&comm));
         let exec_ctx = Rc::new(ExecContext::new());
         let mng = Rc::new(MountMng::new(&comm, &config, &exec_ctx));
+        mng.attach_spawn(&mng);
+        mng.attach_timer(&mng);
         MountUnit {
             comm,
             mng,

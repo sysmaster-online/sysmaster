@@ -13,7 +13,10 @@
 //!  The core logic of the mount subclass
 use basic::fs_util::{directory_is_empty, mkdir_p_label};
 use basic::mount_util::filter_options;
+use basic::time_util::USEC_PER_SEC;
 use basic::{MOUNT_BIN, UMOUNT_BIN};
+use event::{EventState, Events};
+use event::{EventType, Source};
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
 
@@ -27,7 +30,9 @@ use core::error::*;
 use core::exec::{ExecCommand, ExecContext};
 use core::rel::ReStation;
 use core::unit::{UnitActiveState, UnitNotifyFlags};
+use std::os::unix::prelude::RawFd;
 use std::path::Path;
+use std::rc::Weak;
 use std::{cell::RefCell, rc::Rc};
 
 impl MountState {
@@ -44,7 +49,6 @@ impl MountState {
             | MountState::UnmountingSigkill
             | MountState::UnmountingSigterm => UnitActiveState::DeActivating,
             MountState::Failed => UnitActiveState::Failed,
-            _ => UnitActiveState::Maintenance,
         }
     }
 }
@@ -56,12 +60,14 @@ pub(super) struct MountMng {
     config: Rc<MountConfig>,
     control_command: RefCell<Option<ExecCommand>>,
     spawn: Rc<MountSpawn>,
+    timer: Rc<MountTimer>,
 
     result: RefCell<MountResult>,
     reload_result: RefCell<MountResult>,
     find_in_mountinfo: RefCell<bool>,
     proc_flags: RefCell<MountProcFlags>,
     pid: RefCell<Option<Pid>>,
+    timeout_usec: RefCell<u64>,
 }
 
 impl ReStation for MountMng {
@@ -93,11 +99,13 @@ impl MountMng {
             config: Rc::clone(configr),
             control_command: RefCell::new(None),
             spawn: Rc::new(MountSpawn::new(commr, exec_ctx)),
+            timer: Rc::new(MountTimer::new(u64::MAX)),
             result: RefCell::new(MountResult::Success),
             reload_result: RefCell::new(MountResult::Success),
             find_in_mountinfo: RefCell::new(false),
             proc_flags: RefCell::new(MountProcFlags::EMPTY),
             pid: RefCell::new(None),
+            timeout_usec: RefCell::new(90 * USEC_PER_SEC),
         }
     }
 
@@ -229,9 +237,9 @@ impl MountMng {
         }
         log::info!("Mountpoint {} enter dead", self.comm.get_owner_id());
         if self.result() == MountResult::Success {
-            self.set_state(MountState::Dead, true);
+            self.set_state(MountState::Dead, notify);
         } else {
-            self.set_state(MountState::Failed, true);
+            self.set_state(MountState::Failed, notify);
         }
     }
 
@@ -268,6 +276,7 @@ impl MountMng {
         self.set_state(MountState::Unmounting, true);
     }
 
+    #[allow(unused)]
     pub(super) fn enter_remounting(&self) {
         self.set_result(MountResult::Success);
         let mount_parameters = self.config.mount_parameters();
@@ -313,8 +322,74 @@ impl MountMng {
         *self.control_command.borrow_mut() = None;
     }
 
-    #[allow(unused)]
-    pub(super) fn dispatch_timer(&self) {}
+    pub(super) fn timeout_usec(&self) -> u64 {
+        *self.timeout_usec.borrow()
+    }
+
+    pub(super) fn attach_spawn(&self, mng: &Rc<MountMng>) {
+        self.spawn.attach_mng(mng)
+    }
+
+    pub(super) fn timer(&self) -> Rc<MountTimer> {
+        self.timer.clone()
+    }
+
+    pub(super) fn attach_timer(&self, mng: &Rc<MountMng>) {
+        self.timer.attach_mng(mng)
+    }
+
+    pub(super) fn enable_timer(&self, usec: u64) -> Result<i32> {
+        let events = self.comm.um().events();
+        if usec == u64::MAX {
+            events.del_source(self.timer())?;
+            return Ok(0);
+        }
+        log::debug!("Enable a timer: {}us", usec);
+
+        let timer = self.timer();
+        events.del_source(timer.clone())?;
+
+        timer.set_time(usec);
+        events.add_source(timer.clone())?;
+        events.set_enabled(timer, EventState::OneShot)?;
+
+        Ok(0)
+    }
+
+    pub(super) fn dispatch_timer(&self) -> i32 {
+        log::info!("Dispatch timeout event for {}", self.comm.get_owner_id());
+        match self.state() {
+            MountState::Mounting | MountState::MountingDone => {
+                self.enter_signal(MountState::UnmountingSigterm, MountResult::FailureTimeout);
+            }
+            MountState::Remounting => {
+                self.set_reload_result(MountResult::FailureTimeout);
+                self.enter_signal(MountState::RemountingSigterm, MountResult::Success);
+            }
+            MountState::RemountingSigterm => {
+                self.set_reload_result(MountResult::FailureTimeout);
+                // Todo: check if SendKill is configured to yes
+                self.enter_signal(MountState::RemountingSigKill, MountResult::Success);
+            }
+            MountState::RemountingSigKill => {
+                self.set_reload_result(MountResult::FailureTimeout);
+                self.enter_dead_or_mounted(MountResult::Success);
+            }
+            MountState::Unmounting => {
+                self.enter_signal(MountState::UnmountingSigterm, MountResult::FailureTimeout);
+            }
+            MountState::UnmountingSigterm => {
+                // Todo: check SendKill
+                self.enter_signal(MountState::UnmountingSigkill, MountResult::FailureTimeout);
+            }
+            MountState::UnmountingSigkill => {
+                self.enter_dead_or_mounted(MountResult::FailureTimeout);
+            }
+            // Dead, Mounted, Failed should be impossible here.
+            _ => return -1,
+        }
+        0
+    }
 
     pub(super) fn start_check(&self) -> Result<bool> {
         let ret = self.comm.owner().map_or(false, |u| u.test_start_limit());
@@ -616,6 +691,67 @@ impl MountMng {
             }
             _ => unreachable!(),
         }
+    }
+}
+
+pub(super) struct MountTimer {
+    time: RefCell<u64>,
+    mng: RefCell<Weak<MountMng>>,
+}
+
+impl MountTimer {
+    pub fn new(usec: u64) -> Self {
+        MountTimer {
+            time: RefCell::new(usec),
+            mng: RefCell::new(Weak::new()),
+        }
+    }
+
+    pub(super) fn attach_mng(&self, mng: &Rc<MountMng>) {
+        *self.mng.borrow_mut() = Rc::downgrade(mng)
+    }
+
+    pub(super) fn set_time(&self, usec: u64) {
+        *self.time.borrow_mut() = usec
+    }
+
+    pub(self) fn mng(&self) -> Rc<MountMng> {
+        self.mng.borrow().clone().upgrade().unwrap()
+    }
+
+    fn do_dispatch(&self) -> i32 {
+        self.mng().dispatch_timer()
+    }
+}
+
+impl Source for MountTimer {
+    fn fd(&self) -> RawFd {
+        0
+    }
+
+    fn event_type(&self) -> EventType {
+        EventType::TimerMonotonic
+    }
+
+    fn epoll_event(&self) -> u32 {
+        (libc::EPOLLIN) as u32
+    }
+
+    fn time_relative(&self) -> u64 {
+        *self.time.borrow()
+    }
+
+    fn dispatch(&self, _: &Events) -> i32 {
+        self.do_dispatch()
+    }
+
+    fn priority(&self) -> i8 {
+        0
+    }
+
+    fn token(&self) -> u64 {
+        let data: u64 = unsafe { std::mem::transmute(self) };
+        data
     }
 }
 

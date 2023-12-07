@@ -13,14 +13,17 @@
 
 use core::error::*;
 use core::exec::{ExecCommand, ExecContext, ExecParameters};
-use std::rc::Rc;
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
 
 use nix::unistd::Pid;
 
 use crate::comm::MountUnitComm;
+use crate::mng::MountMng;
 
 pub(crate) struct MountSpawn {
     comm: Rc<MountUnitComm>,
+    mng: RefCell<Weak<MountMng>>,
     exec_ctx: Rc<ExecContext>,
 }
 
@@ -28,11 +31,21 @@ impl MountSpawn {
     pub(super) fn new(comm: &Rc<MountUnitComm>, exec_ctx: &Rc<ExecContext>) -> MountSpawn {
         MountSpawn {
             comm: comm.clone(),
+            mng: RefCell::new(Weak::new()),
             exec_ctx: exec_ctx.clone(),
         }
     }
 
+    pub(super) fn attach_mng(&self, mng: &Rc<MountMng>) {
+        *self.mng.borrow_mut() = Rc::downgrade(mng);
+    }
+
+    pub(super) fn mng(&self) -> Rc<MountMng> {
+        self.mng.borrow().upgrade().unwrap().clone()
+    }
+
     pub(super) fn spawn_cmd(&self, cmdline: &ExecCommand) -> Result<Pid> {
+        let _ = self.mng().enable_timer(self.mng().timeout_usec());
         let mut params = ExecParameters::new();
 
         if let Some(unit) = self.comm.owner() {
