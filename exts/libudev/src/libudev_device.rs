@@ -56,21 +56,24 @@ pub struct udev_device {
     pub(crate) subsystem: CString,
 
     pub(crate) properties: HashMap<CString, CString>,
+
+    pub(crate) parent: *mut udev_device,
 }
 
 impl Drop for udev_device {
     fn drop(&mut self) {
         if !self.udev.is_null() {
             let _ = unsafe { Rc::from_raw(self.udev) };
+            let _ = unsafe { Rc::from_raw(self.parent) };
         }
     }
 }
 
 impl udev_device {
-    fn new(udev: *mut udev, device: Device) -> Self {
+    fn new(udev: *mut udev, device: Rc<Device>) -> Self {
         Self {
             udev,
-            device: Rc::new(device),
+            device,
             syspath: CString::default(),
             devnode: CString::default(),
             devpath: CString::default(),
@@ -79,6 +82,7 @@ impl udev_device {
             sysname: CString::default(),
             subsystem: CString::default(),
             properties: HashMap::default(),
+            parent: std::ptr::null_mut(),
         }
     }
 }
@@ -97,7 +101,7 @@ pub extern "C" fn udev_device_new_from_device_id(
     };
 
     let device = match Device::from_device_id(s) {
-        Ok(d) => d,
+        Ok(d) => Rc::new(d),
         Err(_) => return std::ptr::null_mut(),
     };
 
@@ -112,7 +116,7 @@ pub extern "C" fn udev_device_new_from_devnum(
     devnum: dev_t,
 ) -> *mut udev_device {
     let device = match Device::from_devnum(type_ as u8 as char, devnum) {
-        Ok(d) => d,
+        Ok(d) => Rc::new(d),
         Err(_) => return std::ptr::null_mut(),
     };
 
@@ -133,7 +137,7 @@ pub extern "C" fn udev_device_new_from_subsystem_sysname(
         .to_str()
         .unwrap();
     let device = match Device::from_subsystem_sysname(subsystem, sysname) {
-        Ok(d) => d,
+        Ok(d) => Rc::new(d),
         Err(_) => {
             return std::ptr::null_mut();
         }
@@ -152,7 +156,7 @@ pub extern "C" fn udev_device_new_from_syspath(
         .to_str()
         .unwrap();
     let device = match Device::from_syspath(syspath, true) {
-        Ok(d) => d,
+        Ok(d) => Rc::new(d),
         Err(_) => {
             return std::ptr::null_mut();
         }
@@ -476,6 +480,74 @@ pub extern "C" fn udev_device_get_property_value(
     }
 }
 
+fn device_new_from_parent(child: *mut udev_device) -> *mut udev_device {
+    let ud: &mut udev_device = unsafe { mem::transmute(&mut *child) };
+
+    match ud.device.get_parent() {
+        Ok(p) => Rc::into_raw(Rc::new(udev_device::new(ud.udev, p))) as *mut udev_device,
+        Err(e) => {
+            errno::set_errno(errno::Errno(e.get_errno() as i32));
+            std::ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+/// udev_device_get_parent
+///
+/// return the reference of the innter parent field, thus don't drop it
+pub extern "C" fn udev_device_get_parent(udev_device: *mut udev_device) -> *mut udev_device {
+    let ud: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    if ud.parent.is_null() {
+        ud.parent = device_new_from_parent(udev_device);
+    }
+
+    ud.parent
+}
+
+#[no_mangle]
+/// udev_device_get_parent_with_subsystem_devtype
+pub extern "C" fn udev_device_get_parent_with_subsystem_devtype(
+    udev_device: *mut udev_device,
+    subsystem: *const ::std::os::raw::c_char,
+    devtype: *const ::std::os::raw::c_char,
+) -> *mut udev_device {
+    let ud: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    let subsystem = unsafe { CStr::from_ptr(subsystem).to_str().unwrap_or_default() };
+    let devtype = unsafe { CStr::from_ptr(devtype).to_str().ok() };
+
+    let p = match ud
+        .device
+        .get_parent_with_subsystem_devtype(subsystem, devtype)
+    {
+        Ok(p) => p,
+        Err(e) => {
+            errno::set_errno(errno::Errno(e.get_errno() as i32));
+            return std::ptr::null_mut();
+        }
+    };
+
+    #[allow(clippy::never_loop)]
+    loop {
+        let udev_device = udev_device_get_parent(udev_device);
+
+        if udev_device.is_null() {
+            break;
+        }
+
+        let ud: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+        if ud.device == p {
+            return udev_device;
+        }
+    }
+
+    errno::set_errno(errno::Errno(libc::ENOENT as i32));
+    std::ptr::null_mut()
+}
+
 #[cfg(test)]
 mod test {
     use std::intrinsics::transmute;
@@ -756,6 +828,65 @@ mod test {
         Ok(())
     }
 
+    fn test_udev_device_get_parent(dev: RD) -> Result {
+        if &dev.get_devtype()? != "partition" {
+            return Ok(());
+        }
+
+        let ud = from_rd(dev.clone());
+
+        let p = udev_device_get_parent(ud);
+
+        assert!(!p.is_null());
+
+        let p_rc = dev.get_parent().unwrap();
+
+        assert_eq!(
+            unsafe { CStr::from_ptr(udev_device_get_syspath(p)) }
+                .to_str()
+                .unwrap(),
+            &p_rc.get_syspath().unwrap()
+        );
+
+        Ok(())
+    }
+
+    fn test_udev_device_get_parent_with_subsystem_devtype(dev: RD) -> Result {
+        if &dev.get_devtype()? == "partition" {
+            let p = dev
+                .get_parent_with_subsystem_devtype("block", Some("disk"))
+                .unwrap();
+
+            assert_eq!(&p.get_devtype()?, "disk");
+
+            let ud = from_rd(dev);
+            let pud = udev_device_get_parent_with_subsystem_devtype(
+                ud,
+                "block\0".as_ptr() as *const i8,
+                "disk\0".as_ptr() as *const i8,
+            );
+
+            assert!(!pud.is_null());
+            let ud_mut: &mut udev_device = unsafe { transmute(&mut *ud) };
+            let p1 = ud_mut
+                .device
+                .get_parent_with_subsystem_devtype("block", Some("disk"))
+                .unwrap();
+            let pud_mut: &mut udev_device = unsafe { transmute(&mut *pud) };
+            let p2: Rc<Device> = pud_mut.device.clone();
+
+            // The parent device object of ud should be the device object of pud.
+            let r1 = Rc::into_raw(p1);
+            let r2 = Rc::into_raw(p2);
+            assert_eq!(r1, r2);
+
+            let _ = unsafe { Rc::from_raw(r1) };
+            let _ = unsafe { Rc::from_raw(r2) };
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn test_udev_device_ut() {
         let mut e = DeviceEnumerator::new();
@@ -788,5 +919,17 @@ mod test {
         let _ = test_udev_device_get_action(dev.clone());
         let _ = test_udev_device_get_seqnum(dev.clone());
         let _ = test_udev_device_get_property_value(dev);
+    }
+
+    #[test]
+    fn test_enumerate_block() {
+        let mut e = DeviceEnumerator::new();
+        e.set_enumerator_type(DeviceEnumerationType::Devices);
+        e.add_match_subsystem("block", true).unwrap();
+
+        for dev in e.iter() {
+            let _ = test_udev_device_get_parent_with_subsystem_devtype(dev.clone());
+            let _ = test_udev_device_get_parent(dev.clone());
+        }
     }
 }
