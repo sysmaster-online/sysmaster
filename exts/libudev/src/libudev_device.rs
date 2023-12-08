@@ -548,6 +548,28 @@ pub extern "C" fn udev_device_get_parent_with_subsystem_devtype(
     std::ptr::null_mut()
 }
 
+#[no_mangle]
+/// udev_device_get_is_initialized
+pub extern "C" fn udev_device_get_is_initialized(
+    udev_device: *mut udev_device,
+) -> ::std::os::raw::c_int {
+    let ud: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    match ud.device.get_is_initialized() {
+        Ok(r) => {
+            if r {
+                1
+            } else {
+                0
+            }
+        }
+        Err(e) => {
+            errno::set_errno(errno::Errno(e.get_errno() as i32));
+            0
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::intrinsics::transmute;
@@ -887,6 +909,17 @@ mod test {
         Ok(())
     }
 
+    fn test_udev_device_get_is_initialized(dev: RD) -> Result {
+        let ud = from_rd(dev);
+        let ud_mut: &mut udev_device = unsafe { transmute(&mut *ud) };
+
+        ud_mut.device.set_is_initialized();
+
+        assert!(udev_device_get_is_initialized(ud) > 0);
+
+        Ok(())
+    }
+
     #[test]
     fn test_udev_device_ut() {
         let mut e = DeviceEnumerator::new();
@@ -904,6 +937,7 @@ mod test {
             let _ = test_udev_device_get_driver(dev.clone());
             let _ = test_udev_device_get_sysname(dev.clone());
             let _ = test_udev_device_get_subsystem(dev.clone());
+            let _ = test_udev_device_get_is_initialized(dev.clone());
         }
     }
 
