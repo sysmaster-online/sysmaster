@@ -577,6 +577,7 @@ pub extern "C" fn udev_device_get_is_initialized(
 }
 
 #[no_mangle]
+/// udev_device_get_devlinks_list_entry
 pub extern "C" fn udev_device_get_devlinks_list_entry(
     udev_device: *mut udev_device,
 ) -> *mut udev_list_entry {
