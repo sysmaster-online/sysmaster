@@ -17,3 +17,5 @@ pub mod libudev;
 
 /// libudev_device
 pub mod libudev_device;
+/// libudev_list
+pub mod libudev_list;
