@@ -211,7 +211,6 @@ impl MountMng {
         if ret.unwrap() {
             // enable timer
             self.set_state(state, true);
-            return;
         } else if self.state() == MountState::RemountingSigterm {
             self.enter_signal(MountState::RemountingSigKill, MountResult::Success);
         } else if self.state() == MountState::RemountingSigKill {
@@ -580,7 +579,7 @@ impl MountMng {
     }
 
     pub fn control_pid(&self) -> Option<Pid> {
-        self.pid.borrow().clone()
+        *self.pid.borrow()
     }
 
     pub fn watch_control_pid(&self) {

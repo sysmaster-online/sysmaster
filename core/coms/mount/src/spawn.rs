@@ -41,7 +41,7 @@ impl MountSpawn {
     }
 
     pub(super) fn mng(&self) -> Rc<MountMng> {
-        self.mng.borrow().upgrade().unwrap().clone()
+        self.mng.borrow().upgrade().unwrap()
     }
 
     pub(super) fn spawn_cmd(&self, cmdline: &ExecCommand) -> Result<Pid> {
