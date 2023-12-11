@@ -24,6 +24,7 @@ use std::os::linux::raw::dev_t;
 use std::rc::Rc;
 
 use crate::libudev::*;
+use crate::libudev_list::{udev_list, udev_list_entry};
 use libudev_macro::RefUnref;
 
 const ACTION_CNT: usize = 8;
@@ -57,6 +58,9 @@ pub struct udev_device {
 
     pub(crate) properties: HashMap<CString, CString>,
 
+    pub(crate) devlinks: Rc<udev_list>,
+    pub(crate) devlinks_read: bool,
+
     pub(crate) parent: *mut udev_device,
 }
 
@@ -82,6 +86,8 @@ impl udev_device {
             sysname: CString::default(),
             subsystem: CString::default(),
             properties: HashMap::default(),
+            devlinks: Rc::new(udev_list::new(true)),
+            devlinks_read: false,
             parent: std::ptr::null_mut(),
         }
     }
@@ -570,9 +576,31 @@ pub extern "C" fn udev_device_get_is_initialized(
     }
 }
 
+#[no_mangle]
+pub extern "C" fn udev_device_get_devlinks_list_entry(
+    udev_device: *mut udev_device,
+) -> *mut udev_list_entry {
+    let ud: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    if !ud.devlinks_read {
+        ud.devlinks.cleanup();
+
+        for devlink in &ud.device.devlink_iter() {
+            let devlink_cstr = CString::new(devlink.as_str()).unwrap();
+            ud.devlinks.add_entry(devlink_cstr, CString::default());
+        }
+
+        ud.devlinks_read = true;
+    }
+
+    ud.devlinks.get_entry()
+}
+
 #[cfg(test)]
 mod test {
     use std::intrinsics::transmute;
+
+    use crate::libudev_list::{udev_list_entry_get_name, udev_list_entry_get_next};
 
     use super::*;
     use device::device_enumerator::*;
@@ -920,6 +948,28 @@ mod test {
         Ok(())
     }
 
+    fn test_udev_device_get_devlinks_list_entry(dev: RD) -> Result {
+        dev.read_db_internal(true)?;
+        let ud = from_rd(dev.clone());
+
+        let mut entry = udev_device_get_devlinks_list_entry(ud);
+
+        loop {
+            if entry.is_null() {
+                break;
+            }
+
+            let link_c = unsafe { CStr::from_ptr(udev_list_entry_get_name(entry)) };
+
+            let link = link_c.to_str().unwrap();
+            assert!(dev.has_devlink(link));
+
+            entry = udev_list_entry_get_next(entry);
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn test_udev_device_ut() {
         let mut e = DeviceEnumerator::new();
@@ -964,6 +1014,7 @@ mod test {
         for dev in e.iter() {
             let _ = test_udev_device_get_parent_with_subsystem_devtype(dev.clone());
             let _ = test_udev_device_get_parent(dev.clone());
+            let _ = test_udev_device_get_devlinks_list_entry(dev.clone());
         }
     }
 }
