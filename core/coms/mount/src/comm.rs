@@ -15,6 +15,8 @@
 //! *  Get the attributes of the unit object
 //! *  Call relation: mount_ unit->mount_ mng->mount_ comm
 
+use crate::rentry::SectionMount;
+
 use super::rentry::{MountRe, MountState};
 use core::rel::Reliability;
 use core::unit::{UmIf, UnitBase};
@@ -58,6 +60,16 @@ impl MountUnitComm {
 
     pub(super) fn get_owner_id(&self) -> String {
         self.owner().map_or_else(|| "None".to_string(), |u| u.id())
+    }
+
+    pub(super) fn rentry_conf_insert(&self, mount: &SectionMount) {
+        if let Some(u) = self.owner() {
+            self.rentry().conf_insert(&u.id(), mount)
+        }
+    }
+
+    pub(super) fn rentry_conf_get(&self) -> Option<SectionMount> {
+        self.owner().map(|u| self.rentry().conf_get(&u.id()))?
     }
 
     pub(super) fn rentry_mng_insert(&self, state: MountState) {

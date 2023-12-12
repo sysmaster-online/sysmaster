@@ -10,9 +10,9 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 //
-
-use core::error::Result;
+#![allow(non_snake_case)]
 use core::unit::KillContext;
+use core::{error::Result, rel::ReStation};
 use std::{cell::RefCell, path::PathBuf, rc::Rc, str::FromStr};
 
 use nix::sys::signal::Signal;
@@ -21,9 +21,14 @@ use unit_parser::prelude::UnitConfig;
 use crate::{comm::MountUnitComm, rentry::SectionMount};
 
 #[derive(UnitConfig, Default)]
-#[allow(non_snake_case)]
 pub(super) struct MountConfigData {
     pub Mount: SectionMount,
+}
+
+impl MountConfigData {
+    pub(self) fn new(Mount: SectionMount) -> MountConfigData {
+        MountConfigData { Mount }
+    }
 }
 
 #[allow(unused)]
@@ -36,6 +41,26 @@ pub(super) struct MountConfig {
     kill_context: Rc<KillContext>,
     mount_parameters: RefCell<MountParameters>,
     mount_parameters_from_mountinfo: RefCell<MountParameters>,
+}
+
+impl ReStation for MountConfig {
+    // no input, no compensate
+
+    // data
+    fn db_map(&self, reload: bool) {
+        if reload {
+            return;
+        }
+        if let Some(conf) = self.comm.rentry_conf_get() {
+            self.data.replace(MountConfigData::new(conf));
+        }
+    }
+
+    fn db_insert(&self) {
+        self.comm.rentry_conf_insert(&self.data.borrow().Mount);
+    }
+
+    // reload: no external connections, no entry
 }
 
 #[derive(Clone)]

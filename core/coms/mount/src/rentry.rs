@@ -22,6 +22,7 @@ use std::{collections::HashMap, path::PathBuf, rc::Rc};
 
 const RELI_DB_HMOUNT_MNG: &str = "mntmng";
 const RELI_DB_HMOUNTM_FRAME: &str = "mntm-frame";
+const RELI_DB_HMOUNTM_CONFIG: &str = "mntconf";
 const RELI_LAST_KEY: u32 = 0; // singleton
 
 //Mount contains two states: unmounted Dead and mounted Mounted. The corresponding unit status is inactive and active
@@ -81,6 +82,19 @@ bitflags! {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+struct MountReConf {
+    mount: SectionMount,
+}
+
+impl MountReConf {
+    fn new(mount: &SectionMount) -> MountReConf {
+        MountReConf {
+            mount: mount.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct MountReMng {
     state: MountState,
 }
@@ -99,6 +113,8 @@ pub(super) enum MountReFrame {
 struct MountReDb<K, V>(ReDb<K, V>);
 
 pub(super) struct MountRe {
+    conf: Rc<MountReDb<String, MountReConf>>, // RELI_DB_ESERVICE_CONF; key: unit_id, data: config;
+
     // database: multi-instance(N)
     mng: Rc<MountReDb<String, MountReMng>>, // RELI_DB_HMOUNT_MNG; key: unit_id, data: state;
 
@@ -110,9 +126,20 @@ impl MountRe {
     pub(super) fn new(relir: &Rc<Reliability>) -> MountRe {
         let mng = Rc::new(MountReDb(ReDb::new(relir, RELI_DB_HMOUNT_MNG)));
         let frame = Rc::new(MountReDb(ReDb::new(relir, RELI_DB_HMOUNTM_FRAME)));
-        let rentry = MountRe { mng, frame };
+        let conf = Rc::new(MountReDb(ReDb::new(relir, RELI_DB_HMOUNTM_CONFIG)));
+        let rentry = MountRe { conf, mng, frame };
         rentry.register(relir);
         rentry
+    }
+
+    pub(super) fn conf_insert(&self, unit_id: &str, service: &SectionMount) {
+        let conf = MountReConf::new(service);
+        self.conf.0.insert(unit_id.to_string(), conf);
+    }
+
+    pub(super) fn conf_get(&self, unit_id: &str) -> Option<SectionMount> {
+        let conf = self.conf.0.get(&unit_id.to_string());
+        conf.map(|c| c.mount)
     }
 
     pub(super) fn mng_insert(&self, unit_id: &str, state: MountState) {
@@ -192,7 +219,7 @@ impl ReDbTable for MountReDb<u32, MountReFrame> {
     }
 }
 
-#[derive(UnitSection, Default)]
+#[derive(UnitSection, Default, Clone, Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct SectionMount {
     #[entry(default = String::new())]

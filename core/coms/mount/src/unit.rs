@@ -29,8 +29,8 @@ use std::rc::Rc;
 
 struct MountUnit {
     comm: Rc<MountUnitComm>,
-    mng: Rc<MountMng>,
     config: Rc<MountConfig>,
+    mng: Rc<MountMng>,
     exec_ctx: Rc<ExecContext>,
 }
 
@@ -39,22 +39,25 @@ impl ReStation for MountUnit {
 
     // data
     fn db_map(&self, reload: bool) {
+        self.config.db_map(reload);
+        if !reload {
+            self.parse().unwrap();
+        }
         self.mng.db_map(reload);
     }
 
     fn db_insert(&self) {
+        self.config.db_insert();
         self.mng.db_insert();
     }
 
     // reload: no external connections, entry-only
     fn entry_coldplug(&self) {
-        // rebuild external connections, like: timer, ...
-        // do nothing now
+        self.mng.entry_coldplug();
     }
 
     fn entry_clear(&self) {
-        // release external connection, like: timer, ...
-        // do nothing now
+        self.mng.entry_clear();
     }
 }
 

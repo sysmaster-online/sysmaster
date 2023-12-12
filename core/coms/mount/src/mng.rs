@@ -84,6 +84,20 @@ impl ReStation for MountMng {
         self.comm.rentry_mng_insert(self.state());
     }
 
+    fn entry_coldplug(&self) {
+        if [MountState::Mounting, MountState::Unmounting].contains(&self.state()) {
+            if let Err(e) = self.enable_timer(self.timeout_usec()) {
+                log::error!("Failed to reenable timer: {}", e);
+            }
+        }
+    }
+
+    fn entry_clear(&self) {
+        if let Err(e) = self.disable_timer() {
+            log::error!("Failed to disable timer: {}", e);
+        }
+    }
+
     // reload: no external connections, no entry
 }
 
@@ -347,6 +361,12 @@ impl MountMng {
         events.add_source(timer.clone())?;
         events.set_enabled(timer, EventState::OneShot)?;
 
+        Ok(0)
+    }
+
+    pub(super) fn disable_timer(&self) -> Result<i32> {
+        let events = self.comm.um().events();
+        events.del_source(self.timer())?;
         Ok(0)
     }
 
