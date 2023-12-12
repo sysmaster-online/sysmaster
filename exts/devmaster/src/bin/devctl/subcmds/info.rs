@@ -12,7 +12,7 @@
 
 //! subcommand for devctl info
 
-use crate::subcmds::devctl_utils;
+use crate::subcmds::utils;
 use crate::Result;
 use basic::fd_util::{dot_or_dot_dot, xopendirat};
 use device::{device_enumerator::DeviceEnumerator, Device};
@@ -110,7 +110,7 @@ impl InfoArgs {
 
         let mut r: Result<()> = Ok(());
         for dev in &self.devices {
-            let device = match devctl_utils::find_device(dev, "") {
+            let device = match utils::find_device(dev, "") {
                 Ok(d) => d,
                 Err(e) => {
                     if e == nix::Error::EINVAL {

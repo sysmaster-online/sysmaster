@@ -23,12 +23,12 @@ use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
 use log::init_log_to_console_syslog;
 use log::Level;
 use std::{io::Write, os::unix::net::UnixStream};
-use subcmds::devctl_hwdb::HwdbArgs;
-use subcmds::devctl_info::InfoArgs;
-use subcmds::devctl_monitor::MonitorArgs;
-use subcmds::devctl_settle::SettleArgs;
-use subcmds::devctl_test_builtin::subcommand_test_builtin;
-use subcmds::devctl_trigger::TriggerArgs;
+use subcmds::hwdb::HwdbArgs;
+use subcmds::info::InfoArgs;
+use subcmds::monitor::MonitorArgs;
+use subcmds::settle::SettleArgs;
+use subcmds::test_builtin::subcommand_test_builtin;
+use subcmds::trigger::TriggerArgs;
 use subcmds::Result;
 
 /// parse program arguments
@@ -116,10 +116,6 @@ enum SubCmd {
         /// Filter events by tag
         #[clap(short('t'), long)]
         tag_match: Option<Vec<String>>,
-
-        /// other args
-        #[clap(required = false)]
-        _other: Vec<String>,
     },
 
     /// Kill all devmaster workers
@@ -199,7 +195,7 @@ enum SubCmd {
         devices: Vec<String>,
     },
 
-    /// Kill all devmaster workers
+    /// Wait for pending devmaster events
     #[clap(display_order = 5)]
     Settle {
         /// Maximum time to wait for events
@@ -209,10 +205,6 @@ enum SubCmd {
         /// Stop waiting if file exists
         #[clap(short('E'), long)]
         exit_if_exists: Option<String>,
-
-        /// other args
-        #[clap(required = false)]
-        _other: Vec<String>,
     },
 
     /// Test builtin command on a device
@@ -251,7 +243,7 @@ enum SubCmd {
         #[clap(short, long)]
         root: Option<String>,
     },
-    ///
+    /// Control the devmaster daemon.
     #[clap(display_order = 7)]
     Control {
         #[clap(short, long)]
@@ -316,7 +308,6 @@ fn main() -> Result<()> {
             userspace,
             subsystem_match,
             tag_match,
-            _other,
         } => {
             return MonitorArgs::new(
                 property,
@@ -325,7 +316,6 @@ fn main() -> Result<()> {
                 userspace,
                 subsystem_match,
                 tag_match,
-                _other,
             )
             .subcommand()
         }
@@ -371,9 +361,8 @@ fn main() -> Result<()> {
         SubCmd::Settle {
             timeout,
             exit_if_exists,
-            _other,
         } => {
-            return SettleArgs::new(timeout, exit_if_exists, _other).subcommand();
+            return SettleArgs::new(timeout, exit_if_exists).subcommand();
         }
         SubCmd::TestBuiltin {
             action,

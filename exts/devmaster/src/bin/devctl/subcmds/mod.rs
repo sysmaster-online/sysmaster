@@ -13,12 +13,12 @@
 //! the module of devctl subcommands
 //!
 
-pub(crate) mod devctl_hwdb;
-pub(crate) mod devctl_info;
-pub(crate) mod devctl_monitor;
-pub(crate) mod devctl_settle;
-pub(crate) mod devctl_test_builtin;
-pub(crate) mod devctl_trigger;
-pub(self) mod devctl_utils;
+pub(crate) mod hwdb;
+pub(crate) mod info;
+pub(crate) mod monitor;
+pub(crate) mod settle;
+pub(crate) mod test_builtin;
+pub(crate) mod trigger;
+pub(self) mod utils;
 
 pub(crate) type Result<T> = std::result::Result<T, nix::Error>;

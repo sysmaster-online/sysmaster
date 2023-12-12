@@ -13,7 +13,7 @@
 //! subcommand for devctl settle
 //!
 
-use crate::subcmds::devctl_utils::devmaster_queue_is_empty;
+use crate::subcmds::utils::devmaster_queue_is_empty;
 use crate::Result;
 use basic::time_util::{parse_sec, USEC_INFINITY, USEC_PER_SEC};
 use event::{EventState, EventType, Events, Source};
@@ -29,19 +29,13 @@ use std::rc::Rc;
 pub struct SettleArgs {
     timeout: Option<String>,
     exit_if_exists: Option<String>,
-    _other: Vec<String>,
 }
 
 impl SettleArgs {
-    pub fn new(
-        timeout: Option<String>,
-        exit_if_exists: Option<String>,
-        _other: Vec<String>,
-    ) -> Self {
+    pub fn new(timeout: Option<String>, exit_if_exists: Option<String>) -> Self {
         SettleArgs {
             timeout,
             exit_if_exists,
-            _other,
         }
     }
 

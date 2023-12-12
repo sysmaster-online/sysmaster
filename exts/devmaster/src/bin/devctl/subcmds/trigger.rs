@@ -13,7 +13,7 @@
 //! subcommand for devctl trigger
 //!
 
-use crate::subcmds::devctl_utils::find_device;
+use crate::subcmds::utils::find_device;
 use crate::Result;
 
 use device::device_monitor::{DeviceMonitor, MonitorNetlinkGroup};

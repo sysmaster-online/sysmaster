@@ -157,7 +157,6 @@ pub struct MonitorArgs {
     userspace: bool,
     subsystem_match: Option<Vec<String>>,
     tag_match: Option<Vec<String>>,
-    _other: Vec<String>,
 }
 
 impl MonitorArgs {
@@ -168,7 +167,6 @@ impl MonitorArgs {
         userspace: bool,
         subsystem_match: Option<Vec<String>>,
         tag_match: Option<Vec<String>>,
-        _other: Vec<String>,
     ) -> Self {
         MonitorArgs {
             property,
@@ -177,7 +175,6 @@ impl MonitorArgs {
             userspace,
             subsystem_match,
             tag_match,
-            _other,
         }
     }
 

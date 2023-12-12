@@ -29,9 +29,12 @@ pub fn find_device(id: &str, prefix: &str) -> Result<Device> {
     let mut path = PathBuf::from(id);
 
     if !prefix.is_empty() && !id.starts_with(prefix) {
-        path = PathBuf::from(prefix.to_string() + "/" + id)
-            .canonicalize()
-            .unwrap();
+        path = match PathBuf::from(prefix.to_string() + "/" + id).canonicalize() {
+            Ok(path) => path,
+            Err(err) => {
+                return Err(nix::errno::from_i32(err.raw_os_error().unwrap_or_default()));
+            }
+        };
         if let Ok(device) = Device::from_path(path.to_str().unwrap()) {
             return Ok(device);
         }
