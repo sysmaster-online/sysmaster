@@ -17,5 +17,7 @@ pub mod libudev;
 
 /// libudev_device
 pub mod libudev_device;
+/// libudev_enumerate
+pub mod libudev_enumerate;
 /// libudev_list
 pub mod libudev_list;
