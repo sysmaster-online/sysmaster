@@ -14,3 +14,6 @@ libudev_macro = { path = "../libudev_macro" }
 libc = { default-features = false, version = "0.2.140" }
 nix = { default-features = false, version = "0.24" }
 errno = { version = "0.3.8", default-features = false }
+basic = { path = "../../libs/basic", default-features = false, features = [
+    "socket",
+] }

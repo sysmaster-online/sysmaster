@@ -21,3 +21,5 @@ pub mod libudev_device;
 pub mod libudev_enumerate;
 /// libudev_list
 pub mod libudev_list;
+/// libudev_monitor
+pub mod libudev_monitor;

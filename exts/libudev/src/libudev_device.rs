@@ -74,7 +74,7 @@ impl Drop for udev_device {
 }
 
 impl udev_device {
-    fn new(udev: *mut udev, device: Rc<Device>) -> Self {
+    pub(crate) fn new(udev: *mut udev, device: Rc<Device>) -> Self {
         Self {
             udev,
             device,
