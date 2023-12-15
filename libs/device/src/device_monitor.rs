@@ -16,6 +16,7 @@ use crate::{device::Device, error::Error};
 use basic::errno_is_transient;
 use basic::murmurhash2::murmurhash2;
 use basic::socket_util::next_datagram_size_fd;
+use libc::*;
 use nix::{
     errno::Errno,
     sys::socket::{
@@ -43,6 +44,18 @@ fn string_bloom64(s: &str) -> u64 {
     bits |= 1_u64 << ((hash >> 18) & 63);
 
     bits
+}
+
+#[inline]
+/// Generate a BPF instruction
+fn bpf_inst(ins: &mut Vec<sock_filter>, code: u32, jt: u8, jf: u8, k: u32) {
+    let inst = sock_filter {
+        code: code as u16,
+        jt: jt as u8,
+        jf: jf as u8,
+        k: k as u32,
+    };
+    ins.push(inst);
 }
 
 /// netlink group of device monitor
@@ -101,7 +114,7 @@ pub struct DeviceMonitor {
     /// socket fd
     socket: RawFd,
     /// socket address, currently only support netlink
-    _sockaddr: NetlinkAddr,
+    sockaddr: NetlinkAddr,
 
     /// key:subsystem value:devtype
     subsystem_filter: HashMap<String, String>,
@@ -132,7 +145,7 @@ impl DeviceMonitor {
 
         DeviceMonitor {
             socket: sock,
-            _sockaddr: sa,
+            sockaddr: sa,
             subsystem_filter: HashMap::new(),
             tag_filter: HashSet::new(),
             match_sysattr_filter: HashMap::new(),
@@ -251,7 +264,7 @@ impl DeviceMonitor {
 
         if tag_bloom_bits > 0 {
             header.filter_tag_bloom_hi = ((tag_bloom_bits >> 32) as u32).to_be();
-            header.filter_tag_bloom_lo = ((tag_bloom_bits & 0xffffffff) as u32).to_be();
+            header.filter_tag_bloom_lo = ((tag_bloom_bits & 0xffffffff_u64) as u32).to_be();
         }
 
         let iov = [IoSlice::new(header.to_bytes()), IoSlice::new(&properties)];
@@ -360,6 +373,129 @@ impl DeviceMonitor {
             }
         }
         false
+    }
+
+    /// Call this method to let the socket filter make sense
+    /// whenever filter conditions are updated.
+    pub fn bpf_filter_update(&mut self) -> Result<(), Error> {
+        if self.filter_uptodate {
+            return Ok(());
+        }
+
+        /* No need to filter uevents from kernel. */
+        if self.sockaddr.groups() == MonitorNetlinkGroup::Kernel as u32
+            || (self.subsystem_filter.is_empty() && self.tag_filter.is_empty())
+        {
+            self.filter_uptodate = true;
+            return Ok(());
+        }
+
+        let mut ins: Vec<sock_filter> = Vec::new();
+
+        /* Load magic sense code, the offset of magic is 8 bytes */
+        bpf_inst(&mut ins, BPF_LD | BPF_W | BPF_ABS, 0, 0, 8);
+        /* Jump 1 step if magic matches */
+        bpf_inst(
+            &mut ins,
+            BPF_JMP | BPF_JEQ | BPF_K,
+            1,
+            0,
+            UDEV_MONITOR_MAGIC,
+        );
+        /* Illegal magic, pass the packet */
+        bpf_inst(&mut ins, BPF_RET | BPF_K, 0, 0, 0xffffffff);
+
+        if !self.tag_filter.is_empty() {
+            let mut tag_n = self.tag_filter.len();
+
+            for tag in self.tag_filter.iter() {
+                let tag_bloom_bits = string_bloom64(tag);
+                let hi = (tag_bloom_bits >> 32) as u32;
+                let lo = (tag_bloom_bits & 0xffffffff_u64) as u32;
+                /* Load tag high bloom bits */
+                bpf_inst(&mut ins, BPF_LD | BPF_W | BPF_ABS, 0, 0, 32);
+                /* Bits and */
+                bpf_inst(&mut ins, BPF_ALU | BPF_AND | BPF_K, 0, 0, hi);
+                /* Skip 3 steps to continue matching the next tag */
+                bpf_inst(&mut ins, BPF_JMP | BPF_JEQ | BPF_K, 0, 3, hi);
+
+                /* Load tag low bloom bits */
+                bpf_inst(&mut ins, BPF_LD | BPF_W | BPF_ABS, 0, 0, 36);
+                /* Bits and */
+                bpf_inst(&mut ins, BPF_ALU | BPF_AND | BPF_K, 0, 0, lo);
+
+                tag_n -= 1;
+                /* Skip 3 steps to continue matching the next tag */
+                bpf_inst(
+                    &mut ins,
+                    BPF_JMP | BPF_JEQ | BPF_K,
+                    (1 + (tag_n * 6)) as u8,
+                    0,
+                    lo,
+                );
+            }
+
+            /* No tag matched, drop the packet */
+            bpf_inst(&mut ins, BPF_RET | BPF_K, 0, 0, 0);
+        }
+
+        if !self.subsystem_filter.is_empty() {
+            for (subsystem, devtype) in self.subsystem_filter.iter() {
+                let subsystem_hash = string_hash32(subsystem);
+
+                /* Load subsystem hash */
+                bpf_inst(&mut ins, BPF_LD | BPF_W | BPF_ABS, 0, 0, 24);
+                if devtype.is_empty() {
+                    /* Jump 1 step when subsystem is not matched */
+                    bpf_inst(&mut ins, BPF_JMP | BPF_JEQ | BPF_K, 0, 1, subsystem_hash);
+                } else {
+                    /* Jump 3 steps when subsystem is not matched */
+                    bpf_inst(&mut ins, BPF_JMP | BPF_JEQ | BPF_K, 0, 3, subsystem_hash);
+                    /* Load devtype hash */
+                    bpf_inst(&mut ins, BPF_LD | BPF_W | BPF_ABS, 0, 0, 28);
+                    let devtype_hash = string_hash32(devtype);
+                    /* Jump 1 step when devtype is not matched */
+                    bpf_inst(&mut ins, BPF_JMP | BPF_JEQ | BPF_K, 0, 1, devtype_hash);
+                }
+
+                /* Subsystem matched, pass the packet */
+                bpf_inst(&mut ins, BPF_RET | BPF_K, 0, 0, 0xffffffff);
+            }
+
+            /* Nothing matched, drop the packet */
+            bpf_inst(&mut ins, BPF_RET | BPF_K, 0, 0, 0);
+        }
+
+        /* Pass the packet */
+        bpf_inst(&mut ins, BPF_RET | BPF_K, 0, 0, 0xffffffff);
+
+        let filter = sock_fprog {
+            len: ins.len() as u16,
+            filter: ins.as_ptr() as *mut libc::sock_filter,
+        };
+
+        let r = unsafe {
+            setsockopt(
+                self.socket,
+                SOL_SOCKET,
+                SO_ATTACH_FILTER,
+                &filter as *const sock_fprog as *const _,
+                size_of::<sock_fprog>() as u32,
+            )
+        };
+
+        if r < 0 {
+            return Err(Error::Nix {
+                msg: "failed to set socket filter".to_string(),
+                source: nix::Error::from_i32(
+                    std::io::Error::last_os_error().raw_os_error().unwrap(),
+                ),
+            });
+        }
+
+        self.filter_uptodate = true;
+
+        Ok(())
     }
 }
 
