@@ -35,13 +35,17 @@ void main()
 		struct udev_list_entry *list_entry;
 		struct udev_enumerate *e = udev_enumerate_new(NULL);
 		udev_enumerate_add_match_subsystem(e, "block");
-		udev_enumerate_add_match_property(e, "ID_TYPE", "disk");
+		udev_enumerate_add_match_property(e, "MAJOR", "8");
 		udev_enumerate_add_match_is_initialized(e);
+		struct udev_device *sda = udev_device_new_from_device_id(NULL, "b8:0");
+		udev_enumerate_add_match_parent(e, sda);
+		udev_enumerate_add_match_tag(e, "devmaster");
 		udev_enumerate_scan_devices(e);
 		udev_list_entry_foreach(list_entry, udev_enumerate_get_list_entry(e))
 		{
 			printf("block syspath:      '%s'\n", udev_list_entry_get_name(list_entry));
 		}
 		udev_enumerate_unref(e);
+		udev_device_unref(sda);
 	}
 }
