@@ -25,3 +25,5 @@ pub mod libudev_list;
 pub mod libudev_monitor;
 /// libudev_queue
 pub mod libudev_queue;
+/// libudev_hwdb
+pub mod libudev_hwdb;

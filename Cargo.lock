@@ -1013,6 +1013,7 @@ dependencies = [
  "basic",
  "device",
  "errno 0.3.8",
+ "hwdb",
  "libc",
  "libudev_macro",
  "nix 0.24.3",

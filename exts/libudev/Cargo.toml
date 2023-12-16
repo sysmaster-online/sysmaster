@@ -17,3 +17,4 @@ errno = { version = "0.3.8", default-features = false }
 basic = { path = "../../libs/basic", default-features = false, features = [
     "socket",
 ] }
+hwdb = { path = "../../libs/hwdb", default-features = false }
