@@ -212,6 +212,7 @@ pub extern "C" fn udev_enumerate_add_match_tag(
 }
 
 #[no_mangle]
+/// udev_enumerate_add_match_parent
 pub extern "C" fn udev_enumerate_add_match_parent(
     udev_enumerate: *mut udev_enumerate,
     parent: *mut udev_device,
