@@ -17,7 +17,6 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use device::Device;
-use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::mem;
 use std::os::linux::raw::dev_t;
@@ -56,7 +55,8 @@ pub struct udev_device {
     pub(crate) sysname: CString,
     pub(crate) subsystem: CString,
 
-    pub(crate) properties: HashMap<CString, CString>,
+    pub(crate) properties: Rc<udev_list>,
+    pub(crate) properties_read: bool,
 
     pub(crate) devlinks: Rc<udev_list>,
     pub(crate) devlinks_read: bool,
@@ -85,7 +85,8 @@ impl udev_device {
             driver: CString::default(),
             sysname: CString::default(),
             subsystem: CString::default(),
-            properties: HashMap::default(),
+            properties: Rc::new(udev_list::new(true)),
+            properties_read: false,
             devlinks: Rc::new(udev_list::new(true)),
             devlinks_read: false,
             parent: std::ptr::null_mut(),
@@ -472,32 +473,44 @@ pub extern "C" fn udev_device_get_property_value(
     udev_device: *mut udev_device,
     key: *const ::std::os::raw::c_char,
 ) -> *const ::std::os::raw::c_char {
-    let key = unsafe { CStr::from_ptr(key) }.to_str().unwrap_or_default();
+    let key = unsafe { CStr::from_ptr(key) };
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
-    if udev_device_mut
-        .properties
-        .contains_key(&CString::new(key).unwrap())
-    {
-        return udev_device_mut
-            .properties
-            .get(&CString::new(key).unwrap())
-            .unwrap()
-            .as_ptr();
+    if !udev_device_mut.properties_read {
+        for (k, v) in &udev_device_mut.device.property_iter() {
+            let key = CString::new(k.as_str()).unwrap();
+            let value = CString::new(v.as_str()).unwrap();
+            udev_device_mut.properties.add_entry(key, value);
+        }
+        udev_device_mut.properties_read = true;
     }
 
-    match udev_device_mut.device.get_property_value(key) {
-        Ok(v) => {
-            let key_c = CString::new(key).unwrap();
-            let value_c = CString::new(v).unwrap();
-            udev_device_mut.properties.insert(key_c.clone(), value_c);
-            udev_device_mut.properties.get(&key_c).unwrap().as_ptr()
-        }
-        Err(e) => {
-            errno::set_errno(errno::Errno(e.get_errno() as i32));
+    match udev_device_mut.properties.unique_entries.borrow().get(key) {
+        Some(v) => v.value.as_ptr(),
+        None => {
+            errno::set_errno(errno::Errno(libc::ENODATA as i32));
             std::ptr::null()
         }
     }
+}
+
+#[no_mangle]
+/// udev_device_get_properties_list_entry
+pub extern "C" fn udev_device_get_properties_list_entry(
+    udev_device: *mut udev_device,
+) -> *mut udev_list_entry {
+    let d: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    if !d.properties_read {
+        for (k, v) in &d.device.property_iter() {
+            let key = CString::new(k.as_str()).unwrap();
+            let value = CString::new(v.as_str()).unwrap();
+            d.properties.add_entry(key, value);
+        }
+        d.properties_read = true;
+    }
+
+    d.properties.get_entry()
 }
 
 fn device_new_from_parent(child: *mut udev_device) -> *mut udev_device {
