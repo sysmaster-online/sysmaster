@@ -16,7 +16,7 @@
 
 #include <libudev.h>
 
-/* Run this example, and it will check wether
+/* Run this example, and it will check whether
  * devmaster is running if the libudev is
  * preloaded with that from devmaster.
  *
