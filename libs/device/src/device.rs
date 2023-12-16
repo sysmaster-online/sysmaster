@@ -1708,6 +1708,27 @@ impl Device {
         Result::Ok(device)
     }
 
+    /// generate device object based on the environment properties
+    pub fn from_environment() -> Result<Device, Error> {
+        let device = Device::new();
+        let mut major = String::new();
+        let mut minor = String::new();
+        for (key, value) in std::env::vars() {
+            match key.as_str() {
+                "MINOR" => minor = value.to_string(),
+                "MAJOR" => major = value.to_string(),
+                _ => device.amend_key_value(&key, &value)?,
+            }
+        }
+
+        if !major.is_empty() {
+            device.set_devnum(&major, &minor)?;
+        }
+
+        device.update_properties_bufs()?;
+        device.verify()
+    }
+
     /// set the syspath of Device
     /// constraint: path should start with /sys
     pub fn set_syspath(&self, path: &str, verify: bool) -> Result<(), Error> {
@@ -3927,5 +3948,22 @@ V:100
         let mut nomatch_parent = HashSet::new();
         nomatch_parent.insert("/sys/devices/virtual/net/lo".to_string());
         assert!(!dev.match_parent(&HashSet::new(), &nomatch_parent));
+    }
+
+    #[test]
+    fn test_from_environment() {
+        /* When generating device object from nulstr or environment properties,
+         * the following four properties are required:
+         *
+         * SUBSYSTEM, DEVPATH, SEQNUM, ACTION
+         */
+        std::env::set_var("SUBSYSTEM", "net");
+        let _ = Device::from_environment().unwrap_err();
+        std::env::set_var("DEVPATH", "/devices/virtual/net/lo");
+        let _ = Device::from_environment().unwrap_err();
+        std::env::set_var("SEQNUM", "100");
+        let _ = Device::from_environment().unwrap_err();
+        std::env::set_var("ACTION", "add");
+        let _ = Device::from_environment().unwrap();
     }
 }
