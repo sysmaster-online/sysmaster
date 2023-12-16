@@ -29,21 +29,21 @@ use std::{
 #[derive(Debug, Clone, RefUnref)]
 /// udev_list_entry
 pub struct udev_list_entry {
-    list: Weak<udev_list>,
-    name: CString,
-    value: CString,
+    pub(crate) list: Weak<udev_list>,
+    pub(crate) name: CString,
+    pub(crate) value: CString,
 }
 
 #[repr(C)]
 #[derive(Debug, Clone)]
 /// udev_list_entry
 pub struct udev_list {
-    unique_entries: RefCell<collections::HashMap<CString, Rc<udev_list_entry>>>,
-    entries: RefCell<Vec<Rc<udev_list_entry>>>,
-    idx: RefCell<usize>,
+    pub(crate) unique_entries: RefCell<collections::HashMap<CString, Rc<udev_list_entry>>>,
+    pub(crate) entries: RefCell<Vec<Rc<udev_list_entry>>>,
+    pub(crate) idx: RefCell<usize>,
 
-    unique: bool,
-    up_to_date: RefCell<bool>,
+    pub(crate) unique: bool,
+    pub(crate) up_to_date: RefCell<bool>,
 }
 
 impl udev_list {
