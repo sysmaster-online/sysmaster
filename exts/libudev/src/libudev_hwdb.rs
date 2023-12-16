@@ -40,7 +40,7 @@ pub struct udev_hwdb {
 
 #[no_mangle]
 /// udev_hwdb_new
-pub extern "C" fn udev_hwdb_new(udev: *mut udev) -> *mut udev_hwdb {
+pub extern "C" fn udev_hwdb_new(_udev: *mut udev) -> *mut udev_hwdb {
     let hwdb = match SdHwdb::new() {
         Ok(h) => h,
         Err(e) => {
