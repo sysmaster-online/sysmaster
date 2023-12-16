@@ -172,6 +172,20 @@ pub extern "C" fn udev_device_new_from_syspath(
 }
 
 #[no_mangle]
+/// udev_device_new_from_environment
+pub fn udev_device_new_from_environment(udev: *mut udev) -> *mut udev_device {
+    let device = match Device::from_environment() {
+        Ok(d) => Rc::new(d),
+        Err(e) => {
+            errno::set_errno(errno::Errno(e.get_errno() as i32));
+            return std::ptr::null_mut();
+        }
+    };
+
+    Rc::into_raw(Rc::new(udev_device::new(udev, device))) as *mut _
+}
+
+#[no_mangle]
 /// udev_device_get_syspath
 pub extern "C" fn udev_device_get_syspath(
     udev_device: *mut udev_device,
