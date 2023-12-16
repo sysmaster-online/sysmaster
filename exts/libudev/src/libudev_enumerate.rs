@@ -185,6 +185,14 @@ pub fn udev_enumerate_add_match_is_initialized(
     0
 }
 
+#[no_mangle]
+/// udev_enumerate_get_udev
+pub extern "C" fn udev_enumerate_get_udev(udev_enumerate: *mut udev_enumerate) -> *mut udev {
+    let e: &mut udev_enumerate = unsafe { transmute(&mut *udev_enumerate) };
+
+    e.udev
+}
+
 #[cfg(test)]
 mod tests {
     use device::Device;
