@@ -19,11 +19,11 @@ pub mod libudev;
 pub mod libudev_device;
 /// libudev_enumerate
 pub mod libudev_enumerate;
+/// libudev_hwdb
+pub mod libudev_hwdb;
 /// libudev_list
 pub mod libudev_list;
 /// libudev_monitor
 pub mod libudev_monitor;
 /// libudev_queue
 pub mod libudev_queue;
-/// libudev_hwdb
-pub mod libudev_hwdb;
