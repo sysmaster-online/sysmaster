@@ -107,6 +107,7 @@ impl Eq for udev_list_entry {}
 impl udev_list {
     pub(crate) fn get_entry(self: &udev_list) -> *mut udev_list_entry {
         if self.unique && !*self.up_to_date.borrow() {
+            self.entries.borrow_mut().clear();
             for (_, v) in self.unique_entries.borrow().iter() {
                 self.entries.borrow_mut().push(v.clone());
             }
