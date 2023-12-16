@@ -17,21 +17,23 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use libudev_macro::RefUnref;
+use std::ffi::c_void;
 use std::rc::Rc;
 
 #[repr(C)]
 #[derive(Debug, Clone, RefUnref)]
 /// udev
+///
+/// userdata points to an stored data object, it does not own the lifetime of the object
+/// and might be useful to access from callbacks.
 pub struct udev {
-    _unused: [u8; 0],
+    pub(crate) userdata: *mut c_void,
 }
 
 #[no_mangle]
 /// udev_new
 pub extern "C" fn udev_new() -> *mut udev {
-    std::ptr::null_mut()
-}
-
-impl Drop for udev {
-    fn drop(&mut self) {}
+    Rc::into_raw(Rc::new(udev {
+        userdata: std::ptr::null_mut(),
+    })) as *mut _
 }
