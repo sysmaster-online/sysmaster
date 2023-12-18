@@ -129,4 +129,9 @@ impl Source for AliveTimerData {
         let data: u64 = unsafe { std::mem::transmute(self) };
         data
     }
+
+    fn description(&self) -> String {
+        String::from("AliveTimer")
+    }
+
 }

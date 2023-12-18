@@ -72,6 +72,11 @@ pub trait Source {
 
     /// The code of callback
     fn dispatch(&self, event: &Events) -> i32;
+
+    /// The short description of this source
+    fn description(&self) -> String {
+        String::from("default")
+    }
 }
 
 // for HashSet

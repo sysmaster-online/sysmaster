@@ -771,6 +771,10 @@ impl Source for MountTimer {
         let data: u64 = unsafe { std::mem::transmute(self) };
         data
     }
+
+    fn description(&self) -> String {
+        String::from("MountTimer")
+    }
 }
 
 // #[cfg(test)]

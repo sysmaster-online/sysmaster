@@ -149,6 +149,10 @@ impl Source for JobTimer {
     fn priority(&self) -> i8 {
         0i8
     }
+
+    fn description(&self) -> String {
+        String::from("JobTimer")
+    }
 }
 
 #[derive(Clone)]
