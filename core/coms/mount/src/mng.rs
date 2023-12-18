@@ -85,11 +85,7 @@ impl ReStation for MountMng {
     }
 
     fn entry_coldplug(&self) {
-        if [MountState::Mounting, MountState::Unmounting].contains(&self.state()) {
-            if let Err(e) = self.enable_timer(self.timeout_usec()) {
-                log::error!("Failed to reenable timer: {}", e);
-            }
-        }
+        // nothing to do.
     }
 
     fn entry_clear(&self) {
