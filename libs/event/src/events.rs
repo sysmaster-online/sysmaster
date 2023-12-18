@@ -515,16 +515,19 @@ impl EventsData {
             EventType::TimerRealtimeAlarm,
             EventType::TimerBoottimeAlarm,
         ] {
-            if let Some(next) = self.timer.next(&et) {
-                if self.timer.timerid(&et) >= next {
-                    if !self.flush_timer(&et) {
-                        return false;
-                    }
+            let next = match self.timer.next(&et) {
+                None => continue,
+                Some(v) => v,
+            };
+            if self.timer.timerid(&et) < next {
+                continue;
+            }
+            if !self.flush_timer(&et) {
+                return false;
+            }
 
-                    while let Some(source) = self.timer.pop(&et) {
-                        self.pending_push(source, 0);
-                    }
-                }
+            while let Some(source) = self.timer.pop(&et) {
+                self.pending_push(source, 0);
             }
         }
 
@@ -542,23 +545,26 @@ impl EventsData {
             EventType::TimerBoottimeAlarm,
         ] {
             self.timer.now();
-            if let Some(next) = self.timer.next(&et) {
-                if self.timer.timerid(&et) >= next {
-                    while let Some(source) = self.timer.pop(&et) {
-                        self.pending_push(source, 0);
-                    }
-                    ret = true;
-                } else {
-                    let new_value = self.timer.timer_stored(next);
-                    let mut old_value = MaybeUninit::<libc::itimerspec>::zeroed();
-                    unsafe {
-                        libc::timerfd_settime(
-                            self.timerfd.get(&et).unwrap().as_raw_fd(),
-                            libc::TFD_TIMER_ABSTIME,
-                            &new_value,
-                            old_value.as_mut_ptr(),
-                        );
-                    }
+            let next = match self.timer.next(&et) {
+                None => continue,
+                Some(v) => v,
+            };
+
+            if self.timer.timerid(&et) >= next {
+                while let Some(source) = self.timer.pop(&et) {
+                    self.pending_push(source, 0);
+                }
+                ret = true;
+            } else {
+                let new_value = self.timer.timer_stored(next);
+                let mut old_value = MaybeUninit::<libc::itimerspec>::zeroed();
+                unsafe {
+                    libc::timerfd_settime(
+                        self.timerfd.get(&et).unwrap().as_raw_fd(),
+                        libc::TFD_TIMER_ABSTIME,
+                        &new_value,
+                        old_value.as_mut_ptr(),
+                    );
                 }
             }
         }
