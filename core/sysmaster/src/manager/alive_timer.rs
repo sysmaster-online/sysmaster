@@ -133,5 +133,4 @@ impl Source for AliveTimerData {
     fn description(&self) -> String {
         String::from("AliveTimer")
     }
-
 }
