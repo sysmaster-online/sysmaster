@@ -11,7 +11,6 @@
 // See the Mulan PSL v2 for more details.
 
 use std::{
-    cmp::Ordering,
     collections::{BinaryHeap, HashMap},
     mem,
     rc::Rc,
@@ -212,7 +211,7 @@ impl TimerInner {
         // let v = self.data.;
         let mut tmp = BinaryHeap::<ClockData>::new();
         for clock_data in self.data.iter() {
-            if clock_data.source().cmp(&source) != Ordering::Equal {
+            if !clock_data.source().eq(&source) {
                 tmp.push(clock_data.clone());
             }
         }
