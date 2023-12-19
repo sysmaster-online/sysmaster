@@ -16,9 +16,11 @@
     # sh ./install_rsyslog.sh
     ```
 
+3.执行如下命令，删除步骤2中相关安装动作
+
 > **注意：**
 >
-> `install_rsyslog.sh`安装脚本会覆盖系统中已有的`rsyslog`配置文件，安装前请手动备份`/etc/rsyslog.conf`文件。
+> `install_rsyslog.sh`安装脚本会将环境原有的/etc/rsyslog.conf备份为/etc/rsyslog.conf_ori，并且通过sctl enable syslog创建软连接，使能开机自启动。
 >
 
 ## 部署使用
