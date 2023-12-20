@@ -18,6 +18,7 @@
 use crate::libudev::*;
 use crate::libudev_device::udev_device;
 use device::device_monitor::*;
+use libudev_macro::append_impl;
 use libudev_macro::RefUnref;
 use std::cell::RefCell;
 use std::ffi::CStr;
@@ -39,6 +40,7 @@ impl Drop for udev_monitor {
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_monitor_new_from_netlink
 pub extern "C" fn udev_monitor_new_from_netlink(
     udev: *mut udev,
@@ -65,6 +67,7 @@ pub extern "C" fn udev_monitor_new_from_netlink(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_monitor_enable_receiving
 pub extern "C" fn udev_monitor_enable_receiving(
     udev_monitor: *mut udev_monitor,
@@ -78,6 +81,7 @@ pub extern "C" fn udev_monitor_enable_receiving(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_monitor_filter_add_match_subsystem_devtype
 pub extern "C" fn udev_monitor_filter_add_match_subsystem_devtype(
     udev_monitor: *mut udev_monitor,
@@ -105,6 +109,7 @@ pub extern "C" fn udev_monitor_filter_add_match_subsystem_devtype(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_monitor_filter_add_match_tag
 pub extern "C" fn udev_monitor_filter_add_match_tag(
     udev_monitor: *mut udev_monitor,
@@ -122,6 +127,7 @@ pub extern "C" fn udev_monitor_filter_add_match_tag(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_monitor_get_fd
 pub extern "C" fn udev_monitor_get_fd(udev_monitor: *mut udev_monitor) -> ::std::os::raw::c_int {
     let m: &mut udev_monitor = unsafe { transmute(&mut *udev_monitor) };
@@ -130,6 +136,7 @@ pub extern "C" fn udev_monitor_get_fd(udev_monitor: *mut udev_monitor) -> ::std:
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_monitor_get_udev
 pub extern "C" fn udev_monitor_get_udev(udev_monitor: *mut udev_monitor) -> *mut udev {
     let m: &mut udev_monitor = unsafe { transmute(&mut *udev_monitor) };
@@ -137,6 +144,7 @@ pub extern "C" fn udev_monitor_get_udev(udev_monitor: *mut udev_monitor) -> *mut
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_monitor_receive_device
 pub extern "C" fn udev_monitor_receive_device(udev_monitor: *mut udev_monitor) -> *mut udev_device {
     let m: &mut udev_monitor = unsafe { transmute(&mut *udev_monitor) };
@@ -157,6 +165,7 @@ pub extern "C" fn udev_monitor_receive_device(udev_monitor: *mut udev_monitor) -
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_monitor_set_receive_buffer_size
 pub extern "C" fn udev_monitor_set_receive_buffer_size(
     udev_monitor: *mut udev_monitor,

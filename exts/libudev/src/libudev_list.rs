@@ -15,6 +15,7 @@
 #![allow(deprecated)]
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
+use libudev_macro::append_impl;
 use libudev_macro::RefUnref;
 use std::{
     cell::RefCell,
@@ -130,6 +131,7 @@ impl udev_list {
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_list_entry_get_next
 pub extern "C" fn udev_list_entry_get_next(
     list_entry: *mut udev_list_entry,
@@ -149,6 +151,7 @@ pub extern "C" fn udev_list_entry_get_next(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_list_entry_get_by_name
 pub extern "C" fn udev_list_entry_get_by_name(
     list_entry: *mut udev_list_entry,
@@ -181,6 +184,7 @@ pub extern "C" fn udev_list_entry_get_by_name(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_list_entry_get_name
 pub extern "C" fn udev_list_entry_get_name(
     list_entry: *mut udev_list_entry,
@@ -198,6 +202,7 @@ pub extern "C" fn udev_list_entry_get_name(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_list_entry_get_value
 pub extern "C" fn udev_list_entry_get_value(
     list_entry: *mut udev_list_entry,

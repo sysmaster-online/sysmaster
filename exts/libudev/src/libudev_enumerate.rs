@@ -24,6 +24,7 @@ use crate::libudev::*;
 use crate::libudev_device::udev_device;
 use crate::libudev_list::{udev_list, udev_list_entry};
 use device::device_enumerator::*;
+use libudev_macro::append_impl;
 use libudev_macro::RefUnref;
 
 #[repr(C)]
@@ -46,6 +47,7 @@ impl Drop for udev_enumerate {
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_enumerate_new
 pub extern "C" fn udev_enumerate_new(udev: *mut udev) -> *mut udev_enumerate {
     let mut enumerator = DeviceEnumerator::new();
@@ -63,6 +65,7 @@ pub extern "C" fn udev_enumerate_new(udev: *mut udev) -> *mut udev_enumerate {
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_enumerate_scan_devices
 pub extern "C" fn udev_enumerate_scan_devices(
     udev_enumerate: *mut udev_enumerate,
@@ -76,6 +79,7 @@ pub extern "C" fn udev_enumerate_scan_devices(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_enumerate_get_list_entry
 pub extern "C" fn udev_enumerate_get_list_entry(
     udev_enumerate: *mut udev_enumerate,
@@ -110,6 +114,7 @@ pub extern "C" fn udev_enumerate_get_list_entry(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_enumerate_add_match_subsystem
 pub extern "C" fn udev_enumerate_add_match_subsystem(
     udev_enumerate: *mut udev_enumerate,
@@ -137,6 +142,7 @@ pub extern "C" fn udev_enumerate_add_match_subsystem(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_enumerate_add_match_property
 pub extern "C" fn udev_enumerate_add_match_property(
     udev_enumerate: *mut udev_enumerate,
@@ -166,6 +172,7 @@ pub extern "C" fn udev_enumerate_add_match_property(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_enumerate_add_match_is_initialized
 pub fn udev_enumerate_add_match_is_initialized(
     udev_enumerate: *mut udev_enumerate,
@@ -186,6 +193,7 @@ pub fn udev_enumerate_add_match_is_initialized(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_enumerate_get_udev
 pub extern "C" fn udev_enumerate_get_udev(udev_enumerate: *mut udev_enumerate) -> *mut udev {
     let e: &mut udev_enumerate = unsafe { transmute(&mut *udev_enumerate) };
@@ -194,6 +202,7 @@ pub extern "C" fn udev_enumerate_get_udev(udev_enumerate: *mut udev_enumerate) -
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_enumerate_add_match_tag
 pub extern "C" fn udev_enumerate_add_match_tag(
     udev_enumerate: *mut udev_enumerate,
@@ -211,6 +220,7 @@ pub extern "C" fn udev_enumerate_add_match_tag(
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_enumerate_add_match_parent
 pub extern "C" fn udev_enumerate_add_match_parent(
     udev_enumerate: *mut udev_enumerate,
@@ -233,37 +243,37 @@ pub extern "C" fn udev_enumerate_add_match_parent(
 mod tests {
     use device::Device;
 
-    use crate::libudev_list::{udev_list_entry_get_name, udev_list_entry_get_next};
+    use crate::libudev_list::{udev_list_entry_get_name_impl, udev_list_entry_get_next_impl};
 
     use super::*;
 
     #[test]
     fn test_enumerator() {
-        let e = udev_enumerate_new(std::ptr::null_mut());
+        let e = udev_enumerate_new_impl(std::ptr::null_mut());
 
         assert_eq!(
-            udev_enumerate_add_match_subsystem(e, "block\0".as_ptr() as *const i8),
+            udev_enumerate_add_match_subsystem_impl(e, "block\0".as_ptr() as *const i8),
             0
         );
         assert_eq!(
-            udev_enumerate_add_match_property(
+            udev_enumerate_add_match_property_impl(
                 e,
                 "ID_TYPE\0".as_ptr() as *const i8,
                 "disk\0".as_ptr() as *const i8,
             ),
             0
         );
-        assert_eq!(udev_enumerate_add_match_is_initialized(e), 0);
-        assert_eq!(udev_enumerate_scan_devices(e), 0);
+        assert_eq!(udev_enumerate_add_match_is_initialized_impl(e), 0);
+        assert_eq!(udev_enumerate_scan_devices_impl(e), 0);
 
-        let mut entry = udev_enumerate_get_list_entry(e);
+        let mut entry = udev_enumerate_get_list_entry_impl(e);
 
         loop {
             if entry.is_null() {
                 break;
             }
 
-            let syspath = unsafe { CStr::from_ptr(udev_list_entry_get_name(entry)) };
+            let syspath = unsafe { CStr::from_ptr(udev_list_entry_get_name_impl(entry)) };
 
             let syspath = syspath.to_str().unwrap();
 
@@ -271,7 +281,7 @@ mod tests {
             assert_eq!(&device.get_subsystem().unwrap(), "block");
             assert_eq!(&device.get_property_value("ID_TYPE").unwrap(), "disk");
 
-            entry = udev_list_entry_get_next(entry);
+            entry = udev_list_entry_get_next_impl(entry);
         }
     }
 }

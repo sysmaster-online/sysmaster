@@ -29,8 +29,8 @@ pub fn derive_ref_unref(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     // Used in the quasi-quotation below as `#name`.
     let name = &input.ident;
 
-    let fn_ref = syn::Ident::new(&format!("{}_ref", quote!(#name)), input.span());
-    let fn_unref = syn::Ident::new(&format!("{}_unref", quote!(#name)), input.span());
+    let fn_ref = syn::Ident::new(&format!("{}_ref_impl", quote!(#name)), input.span());
+    let fn_unref = syn::Ident::new(&format!("{}_unref_impl", quote!(#name)), input.span());
 
     let expanded = quote! {
         #[no_mangle]
@@ -64,4 +64,23 @@ pub fn derive_ref_unref(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 
     // Hand the output tokens back to the compiler.
     proc_macro::TokenStream::from(expanded)
+}
+
+#[proc_macro_attribute]
+pub fn append_impl(
+    _attr: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let mut func = parse_macro_input!(item as syn::ItemFn);
+
+    let name = &func.sig.ident;
+    let new_name = format!("{}_impl", name);
+
+    func.sig.ident = syn::Ident::new(&new_name, name.span());
+
+    let output = quote! {
+        #func
+    };
+
+    output.into()
 }

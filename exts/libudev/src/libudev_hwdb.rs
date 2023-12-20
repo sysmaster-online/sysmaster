@@ -16,6 +16,7 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use hwdb::SdHwdb;
+use libudev_macro::append_impl;
 use libudev_macro::RefUnref;
 use std::{
     cell::RefCell,
@@ -38,6 +39,7 @@ pub struct udev_hwdb {
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_hwdb_new
 pub extern "C" fn udev_hwdb_new(_udev: *mut udev) -> *mut udev_hwdb {
     let hwdb = match SdHwdb::new() {
@@ -55,6 +57,7 @@ pub extern "C" fn udev_hwdb_new(_udev: *mut udev) -> *mut udev_hwdb {
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_hwdb_get_properties_list_entry
 pub extern "C" fn udev_hwdb_get_properties_list_entry(
     hwdb: *mut udev_hwdb,
@@ -92,10 +95,10 @@ mod tests {
 
     #[test]
     fn test_udev_hwdb() {
-        let hwdb = udev_hwdb_new(std::ptr::null_mut());
+        let hwdb = udev_hwdb_new_impl(std::ptr::null_mut());
         let mut i = 0;
         loop {
-            let mut list = udev_hwdb_get_properties_list_entry(
+            let mut list = udev_hwdb_get_properties_list_entry_impl(
                 hwdb,
                 "evdev:input:b0003v0458p07081\0".as_ptr() as *const _,
                 0,
@@ -104,18 +107,18 @@ mod tests {
                 if list.is_null() {
                     break;
                 }
-                let name = udev_list_entry_get_name(list);
-                let value = udev_list_entry_get_value(list);
+                let name = udev_list_entry_get_name_impl(list);
+                let value = udev_list_entry_get_value_impl(list);
                 let name = unsafe { CStr::from_ptr(name) };
                 let value = unsafe { CStr::from_ptr(value) };
                 println!("{:?}={:?}", name, value);
-                list = udev_list_entry_get_next(list);
+                list = udev_list_entry_get_next_impl(list);
             }
             i += 1;
             if i == 10 {
                 break;
             }
         }
-        udev_hwdb_unref(hwdb);
+        udev_hwdb_unref_impl(hwdb);
     }
 }

@@ -16,6 +16,7 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use crate::libudev::*;
+use libudev_macro::append_impl;
 use libudev_macro::RefUnref;
 use std::path::Path;
 use std::rc::Rc;
@@ -29,6 +30,7 @@ pub struct udev_queue {
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_queue_new
 pub extern "C" fn udev_queue_new(udev: *mut udev) -> *mut udev_queue {
     Rc::into_raw(Rc::new(udev_queue {
@@ -38,6 +40,7 @@ pub extern "C" fn udev_queue_new(udev: *mut udev) -> *mut udev_queue {
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_queue_get_udev_is_active
 ///
 /// This function detects whether devmaster is running rather than udevd.

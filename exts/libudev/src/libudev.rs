@@ -15,6 +15,7 @@
 #![allow(deprecated)]
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
+use libudev_macro::append_impl;
 use libudev_macro::RefUnref;
 use std::ffi::c_void;
 use std::rc::Rc;
@@ -30,6 +31,7 @@ pub struct udev {
 }
 
 #[no_mangle]
+#[append_impl]
 /// udev_new
 pub extern "C" fn udev_new() -> *mut udev {
     Rc::into_raw(Rc::new(udev {
