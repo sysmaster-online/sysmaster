@@ -32,6 +32,7 @@ use core::exec::{ExecCommand, Rlimit, RuntimeDirectory, StateDirectory, WorkingD
 use core::rel::{ReDb, ReDbRwTxn, ReDbTable, ReliSwitch, Reliability};
 use core::unit::KillMode;
 
+use basic::time_util::USEC_PER_MSEC;
 use basic::time_util::USEC_PER_SEC;
 use basic::EXEC_RUNTIME_PREFIX;
 
@@ -230,15 +231,16 @@ fn parse_pidfile(s: &str) -> Result<PathBuf> {
     }
 }
 
+fn parse_sec(s: &str) -> Result<u64> {
+    basic::time_util::parse_sec(s).context(NixSnafu)
+}
+
 fn parse_timeout(s: &str) -> Result<u64> {
     let timeout = s.parse::<u64>().unwrap();
     if timeout == 0 {
         return Ok(u64::MAX);
     }
-    if timeout >= u64::MAX / USEC_PER_SEC {
-        return Ok(u64::MAX);
-    }
-    Ok(timeout * USEC_PER_SEC)
+    parse_sec(s)
 }
 
 #[derive(UnitSection, Serialize, Deserialize, Debug, Default, Clone)]
@@ -261,7 +263,7 @@ pub struct SectionService {
     pub ExecCondition: Vec<ExecCommand>,
     #[entry(append)]
     pub Sockets: Vec<String>,
-    #[entry(default = 0)]
+    #[entry(default = 0, parser = parse_sec)]
     pub WatchdogSec: u64,
     #[entry(parser = parse_pidfile)]
     pub PIDFile: Option<PathBuf>,
@@ -274,13 +276,13 @@ pub struct SectionService {
     pub Restart: ServiceRestart,
     #[entry(default = ExitStatusSet::default())]
     pub RestartPreventExitStatus: ExitStatusSet,
-    #[entry(default = 1)]
+    #[entry(default = 100 * USEC_PER_MSEC, parser = parse_sec)]
     pub RestartSec: u64,
-    #[entry(default = 10000000, parser = parse_timeout)]
+    #[entry(default = 90 * USEC_PER_SEC, parser = parse_timeout)]
     pub TimeoutSec: u64,
-    #[entry(default = 10000000, parser = parse_timeout)]
+    #[entry(default = 90 * USEC_PER_SEC, parser = parse_timeout)]
     pub TimeoutStartSec: u64,
-    #[entry(default = 10000000, parser = parse_timeout)]
+    #[entry(default = 90 * USEC_PER_SEC, parser = parse_timeout)]
     pub TimeoutStopSec: u64,
 
     // Exec

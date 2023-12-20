@@ -13,7 +13,6 @@
 #![allow(non_snake_case)]
 use super::comm::ServiceUnitComm;
 use super::rentry::{NotifyAccess, SectionService, ServiceCommand, ServiceType};
-use basic::time_util::{USEC_INFINITY, USEC_PER_SEC};
 use basic::unit_name::unit_name_to_instance;
 use core::error::*;
 use core::exec::ExecCommand;
@@ -78,7 +77,6 @@ impl ServiceConfig {
             }
         };
         *self.data.borrow_mut() = service_config;
-        self.data.borrow_mut().verify();
 
         let mut unit_specifier_data = UnitSpecifierData::new();
         unit_specifier_data.instance = unit_name_to_instance(&self.comm.get_owner_id());
@@ -191,19 +189,6 @@ impl ServiceConfigData {
 
     pub(self) fn set_timeout_stop(&mut self, time_out: u64) {
         self.Service.set_timeout_stop(time_out);
-    }
-
-    pub(self) fn verify(&mut self) {
-        if self.Service.WatchdogSec >= USEC_INFINITY / USEC_PER_SEC {
-            self.Service.WatchdogSec = 0;
-        } else {
-            self.Service.WatchdogSec *= USEC_PER_SEC;
-        }
-        if self.Service.RestartSec >= USEC_INFINITY / USEC_PER_SEC {
-            self.Service.RestartSec = USEC_PER_SEC;
-        } else {
-            self.Service.RestartSec *= USEC_PER_SEC;
-        }
     }
 
     pub(self) fn update_with_specifier_escape(&mut self, unit_specifier_data: &UnitSpecifierData) {
