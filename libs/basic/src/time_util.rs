@@ -182,15 +182,15 @@ const TABLE: &[Table] = &[
     },
     Table {
         suffix: "minutes",
-        usec: NSEC_PER_MINUTE,
+        usec: USEC_PER_MINUTE,
     },
     Table {
         suffix: "minute",
-        usec: NSEC_PER_MINUTE,
+        usec: USEC_PER_MINUTE,
     },
     Table {
         suffix: "min",
-        usec: NSEC_PER_MINUTE,
+        usec: USEC_PER_MINUTE,
     },
     Table {
         suffix: "months",
@@ -316,6 +316,9 @@ mod tests {
 
         let u = parse_sec(" .22s ").unwrap();
         assert_eq!(u, 220 * USEC_PER_MSEC);
+
+        let u = parse_sec("0.5min").unwrap();
+        assert_eq!(u, 30 * USEC_PER_SEC);
 
         let u = parse_sec(" .50y ").unwrap();
         assert_eq!(u, USEC_PER_YEAR / 2);
