@@ -18,11 +18,11 @@
 use device::Device;
 use std::ffi::{CStr, CString};
 use std::mem;
-use std::os::linux::raw::dev_t;
+use std::os::{linux::raw::dev_t, raw::c_char};
 use std::rc::Rc;
 
-use crate::libudev::*;
 use crate::libudev_list::{udev_list, udev_list_entry};
+use crate::{assert_return, libudev::*};
 use libudev_macro::append_impl;
 use libudev_macro::RefUnref;
 
@@ -101,7 +101,12 @@ pub extern "C" fn udev_device_new_from_device_id(
     udev: *mut udev,
     id: *const ::std::os::raw::c_char,
 ) -> *mut udev_device {
-    let id = unsafe { CStr::from_ptr(id as *const i8) };
+    assert_return!(!id.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
+    let id = unsafe { CStr::from_ptr(id as *const c_char) };
 
     let s = match id.to_str() {
         Ok(s) => s,
@@ -124,6 +129,11 @@ pub extern "C" fn udev_device_new_from_devnum(
     type_: ::std::os::raw::c_char,
     devnum: dev_t,
 ) -> *mut udev_device {
+    assert_return!(type_ == 'b' as c_char || type_ == 'c' as c_char, {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
     let device = match Device::from_devnum(type_ as u8 as char, devnum) {
         Ok(d) => Rc::new(d),
         Err(_) => return std::ptr::null_mut(),
@@ -140,10 +150,20 @@ pub extern "C" fn udev_device_new_from_subsystem_sysname(
     subsystem: *const ::std::os::raw::c_char,
     sysname: *const ::std::os::raw::c_char,
 ) -> *mut udev_device {
-    let subsystem = unsafe { CStr::from_ptr(subsystem as *const i8) }
+    assert_return!(!subsystem.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
+    assert_return!(!sysname.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
+    let subsystem = unsafe { CStr::from_ptr(subsystem as *const c_char) }
         .to_str()
         .unwrap();
-    let sysname = unsafe { CStr::from_ptr(sysname as *const i8) }
+    let sysname = unsafe { CStr::from_ptr(sysname as *const c_char) }
         .to_str()
         .unwrap();
     let device = match Device::from_subsystem_sysname(subsystem, sysname) {
@@ -163,7 +183,12 @@ pub extern "C" fn udev_device_new_from_syspath(
     udev: *mut udev,
     syspath: *const ::std::os::raw::c_char,
 ) -> *mut udev_device {
-    let syspath = unsafe { CStr::from_ptr(syspath as *const i8) }
+    assert_return!(!syspath.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
+    let syspath = unsafe { CStr::from_ptr(syspath as *const c_char) }
         .to_str()
         .unwrap();
     let device = match Device::from_syspath(syspath, true) {
@@ -197,6 +222,11 @@ pub fn udev_device_new_from_environment(udev: *mut udev) -> *mut udev_device {
 pub extern "C" fn udev_device_get_syspath(
     udev_device: *mut udev_device,
 ) -> *const ::std::os::raw::c_char {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null()
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     if !udev_device_mut
@@ -233,6 +263,11 @@ pub extern "C" fn udev_device_has_tag(
     udev_device: *mut udev_device,
     tag: *const ::std::os::raw::c_char,
 ) -> ::std::os::raw::c_int {
+    assert_return!(!udev_device.is_null() && !tag.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        0
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     let tag = unsafe { CStr::from_ptr(tag) }.to_str().unwrap();
@@ -250,6 +285,11 @@ pub extern "C" fn udev_device_has_current_tag(
     udev_device: *mut udev_device,
     tag: *const ::std::os::raw::c_char,
 ) -> ::std::os::raw::c_int {
+    assert_return!(!udev_device.is_null() && !tag.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        0
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     let tag = unsafe { CStr::from_ptr(tag) }.to_str().unwrap();
@@ -266,6 +306,11 @@ pub extern "C" fn udev_device_has_current_tag(
 pub extern "C" fn udev_device_get_action(
     udev_device: *mut udev_device,
 ) -> *const ::std::os::raw::c_char {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null()
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     if let Ok(action) = udev_device_mut.device.get_action() {
@@ -282,6 +327,11 @@ pub extern "C" fn udev_device_get_action(
 pub extern "C" fn udev_device_get_devnode(
     udev_device: *mut udev_device,
 ) -> *const ::std::os::raw::c_char {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null()
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     if !udev_device_mut
@@ -306,6 +356,11 @@ pub extern "C" fn udev_device_get_devnode(
 #[append_impl]
 /// udev_device_get_devnum
 pub extern "C" fn udev_device_get_devnum(udev_device: *mut udev_device) -> dev_t {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        0
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     match udev_device_mut.device.get_devnum() {
@@ -326,6 +381,11 @@ pub extern "C" fn udev_device_get_devnum(udev_device: *mut udev_device) -> dev_t
 pub extern "C" fn udev_device_get_devpath(
     udev_device: *mut udev_device,
 ) -> *const ::std::os::raw::c_char {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null()
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     if !udev_device_mut
@@ -356,6 +416,11 @@ pub extern "C" fn udev_device_get_devpath(
 pub extern "C" fn udev_device_get_devtype(
     udev_device: *mut udev_device,
 ) -> *const ::std::os::raw::c_char {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null()
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     if !udev_device_mut
@@ -389,6 +454,11 @@ pub extern "C" fn udev_device_get_devtype(
 pub extern "C" fn udev_device_get_driver(
     udev_device: *mut udev_device,
 ) -> *const ::std::os::raw::c_char {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null()
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     if !udev_device_mut
@@ -419,6 +489,11 @@ pub extern "C" fn udev_device_get_driver(
 pub extern "C" fn udev_device_get_sysname(
     udev_device: *mut udev_device,
 ) -> *const ::std::os::raw::c_char {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null()
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     if !udev_device_mut
@@ -449,6 +524,11 @@ pub extern "C" fn udev_device_get_sysname(
 pub extern "C" fn udev_device_get_subsystem(
     udev_device: *mut udev_device,
 ) -> *const ::std::os::raw::c_char {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null()
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     if !udev_device_mut
@@ -479,6 +559,11 @@ pub extern "C" fn udev_device_get_subsystem(
 pub extern "C" fn udev_device_get_seqnum(
     udev_device: *mut udev_device,
 ) -> ::std::os::raw::c_ulonglong {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        0
+    });
+
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     udev_device_mut.device.get_seqnum().unwrap_or_default() as ::std::os::raw::c_ulonglong
@@ -491,6 +576,11 @@ pub extern "C" fn udev_device_get_property_value(
     udev_device: *mut udev_device,
     key: *const ::std::os::raw::c_char,
 ) -> *const ::std::os::raw::c_char {
+    assert_return!(!udev_device.is_null() && !key.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
     let key = unsafe { CStr::from_ptr(key) };
     let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
@@ -518,6 +608,11 @@ pub extern "C" fn udev_device_get_property_value(
 pub extern "C" fn udev_device_get_properties_list_entry(
     udev_device: *mut udev_device,
 ) -> *mut udev_list_entry {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
     let d: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     if !d.properties_read {
@@ -533,6 +628,11 @@ pub extern "C" fn udev_device_get_properties_list_entry(
 }
 
 fn device_new_from_parent(child: *mut udev_device) -> *mut udev_device {
+    assert_return!(!child.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
     let ud: &mut udev_device = unsafe { mem::transmute(&mut *child) };
 
     match ud.device.get_parent() {
@@ -550,6 +650,11 @@ fn device_new_from_parent(child: *mut udev_device) -> *mut udev_device {
 ///
 /// return the reference of the innter parent field, thus don't drop it
 pub extern "C" fn udev_device_get_parent(udev_device: *mut udev_device) -> *mut udev_device {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
     let ud: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     if ud.parent.is_null() {
@@ -567,10 +672,24 @@ pub extern "C" fn udev_device_get_parent_with_subsystem_devtype(
     subsystem: *const ::std::os::raw::c_char,
     devtype: *const ::std::os::raw::c_char,
 ) -> *mut udev_device {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+    assert_return!(!subsystem.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
     let ud: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     let subsystem = unsafe { CStr::from_ptr(subsystem).to_str().unwrap_or_default() };
-    let devtype = unsafe { CStr::from_ptr(devtype).to_str().ok() };
+
+    let devtype = if devtype.is_null() {
+        None
+    } else {
+        unsafe { CStr::from_ptr(devtype).to_str().ok() }
+    };
 
     let p = match ud
         .device
@@ -608,6 +727,11 @@ pub extern "C" fn udev_device_get_parent_with_subsystem_devtype(
 pub extern "C" fn udev_device_get_is_initialized(
     udev_device: *mut udev_device,
 ) -> ::std::os::raw::c_int {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        -libc::EINVAL
+    });
+
     let ud: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     match ud.device.get_is_initialized() {
@@ -631,6 +755,11 @@ pub extern "C" fn udev_device_get_is_initialized(
 pub extern "C" fn udev_device_get_devlinks_list_entry(
     udev_device: *mut udev_device,
 ) -> *mut udev_list_entry {
+    assert_return!(!udev_device.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
     let ud: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
 
     if !ud.devlinks_read {
@@ -649,7 +778,7 @@ pub extern "C" fn udev_device_get_devlinks_list_entry(
 
 #[cfg(test)]
 mod test {
-    use std::intrinsics::transmute;
+    use std::{intrinsics::transmute, os::raw::c_char};
 
     use crate::libudev_list::{udev_list_entry_get_name_impl, udev_list_entry_get_next_impl};
 
@@ -668,8 +797,11 @@ mod test {
             'c'
         };
 
-        let raw_udev_device =
-            udev_device_new_from_devnum_impl(std::ptr::null_mut(), t as ::std::os::raw::c_char, devnum);
+        let raw_udev_device = udev_device_new_from_devnum_impl(
+            std::ptr::null_mut(),
+            t as ::std::os::raw::c_char,
+            devnum,
+        );
 
         let syspath = unsafe { CStr::from_ptr(udev_device_get_syspath_impl(raw_udev_device)) };
 
@@ -727,7 +859,8 @@ mod test {
     fn test_udev_device_new_from_syspath(device: RD) -> Result {
         let syspath = device.get_syspath().unwrap();
         let c_syspath = CString::new(syspath).unwrap();
-        let udev_device = udev_device_new_from_syspath_impl(std::ptr::null_mut(), c_syspath.as_ptr());
+        let udev_device =
+            udev_device_new_from_syspath_impl(std::ptr::null_mut(), c_syspath.as_ptr());
         let ret_syspath = unsafe { CStr::from_ptr(udev_device_get_syspath_impl(udev_device)) };
 
         assert_eq!(c_syspath.to_str().unwrap(), ret_syspath.to_str().unwrap());
@@ -753,14 +886,14 @@ mod test {
         assert!(
             udev_device_has_tag_impl(
                 udev_device,
-                "test_udev_device_has_tag\0".as_ptr() as *const i8
+                "test_udev_device_has_tag\0".as_ptr() as *const c_char
             ) > 0
         );
 
         assert!(
             udev_device_has_current_tag_impl(
                 udev_device,
-                "test_udev_device_has_tag\0".as_ptr() as *const i8
+                "test_udev_device_has_tag\0".as_ptr() as *const c_char
             ) > 0
         );
 
@@ -918,7 +1051,7 @@ mod test {
             unsafe {
                 CStr::from_ptr(udev_device_get_property_value_impl(
                     ud,
-                    "hello\0".as_ptr() as *const i8,
+                    "hello\0".as_ptr() as *const c_char,
                 ))
             }
             .to_str()
@@ -963,8 +1096,8 @@ mod test {
             let ud = from_rd(dev);
             let pud = udev_device_get_parent_with_subsystem_devtype_impl(
                 ud,
-                "block\0".as_ptr() as *const i8,
-                "disk\0".as_ptr() as *const i8,
+                "block\0".as_ptr() as *const c_char,
+                "disk\0".as_ptr() as *const c_char,
             );
 
             assert!(!pud.is_null());

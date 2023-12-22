@@ -25,6 +25,7 @@ use std::{
     rc::Rc,
 };
 
+use crate::assert_return;
 use crate::{
     libudev::udev,
     libudev_list::{udev_list, udev_list_entry},
@@ -64,6 +65,11 @@ pub extern "C" fn udev_hwdb_get_properties_list_entry(
     modalias: *const ::std::os::raw::c_char,
     _flags: ::std::os::raw::c_uint,
 ) -> *mut udev_list_entry {
+    assert_return!(!hwdb.is_null() && !modalias.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
     let h: &mut udev_hwdb = unsafe { transmute(&mut *hwdb) };
 
     h.properties.cleanup();

@@ -15,6 +15,7 @@
 #![allow(deprecated)]
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
+use crate::assert_return;
 use crate::libudev::*;
 use crate::libudev_device::udev_device;
 use device::device_monitor::*;
@@ -46,6 +47,11 @@ pub extern "C" fn udev_monitor_new_from_netlink(
     udev: *mut udev,
     name: *const ::std::os::raw::c_char,
 ) -> *mut udev_monitor {
+    assert_return!(!name.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
     let name = unsafe { CStr::from_ptr(name) }.to_str().unwrap();
 
     let g = match name {
@@ -72,6 +78,8 @@ pub extern "C" fn udev_monitor_new_from_netlink(
 pub extern "C" fn udev_monitor_enable_receiving(
     udev_monitor: *mut udev_monitor,
 ) -> ::std::os::raw::c_int {
+    assert_return!(!udev_monitor.is_null(), -libc::EINVAL);
+
     let m: &mut udev_monitor = unsafe { transmute(&mut *udev_monitor) };
 
     match m.monitor.borrow_mut().bpf_filter_update() {
@@ -88,14 +96,24 @@ pub extern "C" fn udev_monitor_filter_add_match_subsystem_devtype(
     subsystem: *const ::std::os::raw::c_char,
     devtype: *const ::std::os::raw::c_char,
 ) -> ::std::os::raw::c_int {
+    assert_return!(
+        !udev_monitor.is_null() && !subsystem.is_null(),
+        -libc::EINVAL
+    );
+
     let m: &mut udev_monitor = unsafe { transmute(&mut *udev_monitor) };
 
     let subsystem = unsafe { CStr::from_ptr(subsystem) }
         .to_str()
         .unwrap_or_default();
-    let devtype = unsafe { CStr::from_ptr(devtype) }
-        .to_str()
-        .unwrap_or_default();
+
+    let devtype = if devtype.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(devtype) }
+            .to_str()
+            .unwrap_or_default()
+    };
 
     if let Err(e) = m
         .monitor
@@ -115,6 +133,8 @@ pub extern "C" fn udev_monitor_filter_add_match_tag(
     udev_monitor: *mut udev_monitor,
     tag: *const ::std::os::raw::c_char,
 ) -> ::std::os::raw::c_int {
+    assert_return!(!udev_monitor.is_null() && !tag.is_null(), -libc::EINVAL);
+
     let m: &mut udev_monitor = unsafe { transmute(&mut *udev_monitor) };
 
     let tag = unsafe { CStr::from_ptr(tag) }.to_str().unwrap_or_default();
@@ -130,6 +150,8 @@ pub extern "C" fn udev_monitor_filter_add_match_tag(
 #[append_impl]
 /// udev_monitor_get_fd
 pub extern "C" fn udev_monitor_get_fd(udev_monitor: *mut udev_monitor) -> ::std::os::raw::c_int {
+    assert_return!(!udev_monitor.is_null(), -libc::EINVAL);
+
     let m: &mut udev_monitor = unsafe { transmute(&mut *udev_monitor) };
 
     m.monitor.borrow().fd()

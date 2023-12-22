@@ -136,6 +136,10 @@ impl udev_list {
 pub extern "C" fn udev_list_entry_get_next(
     list_entry: *mut udev_list_entry,
 ) -> *mut udev_list_entry {
+    if list_entry.is_null() {
+        return std::ptr::null_mut();
+    }
+
     /* Take the ownership of udev_list_entry */
     let entry = unsafe { Rc::from_raw(list_entry) };
 
@@ -157,7 +161,7 @@ pub extern "C" fn udev_list_entry_get_by_name(
     list_entry: *mut udev_list_entry,
     name: *const ::std::os::raw::c_char,
 ) -> *mut udev_list_entry {
-    if list_entry.is_null() {
+    if list_entry.is_null() || name.is_null() {
         return std::ptr::null_mut();
     }
 

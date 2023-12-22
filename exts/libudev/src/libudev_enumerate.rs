@@ -20,9 +20,9 @@ use std::ffi::{CStr, CString};
 use std::intrinsics::transmute;
 use std::rc::Rc;
 
-use crate::libudev::*;
 use crate::libudev_device::udev_device;
 use crate::libudev_list::{udev_list, udev_list_entry};
+use crate::{assert_return, libudev::*};
 use device::device_enumerator::*;
 use libudev_macro::append_impl;
 use libudev_macro::RefUnref;
@@ -196,6 +196,11 @@ pub fn udev_enumerate_add_match_is_initialized(
 #[append_impl]
 /// udev_enumerate_get_udev
 pub extern "C" fn udev_enumerate_get_udev(udev_enumerate: *mut udev_enumerate) -> *mut udev {
+    assert_return!(!udev_enumerate.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
     let e: &mut udev_enumerate = unsafe { transmute(&mut *udev_enumerate) };
 
     e.udev
@@ -208,6 +213,8 @@ pub extern "C" fn udev_enumerate_add_match_tag(
     udev_enumerate: *mut udev_enumerate,
     tag: *const ::std::os::raw::c_char,
 ) -> ::std::os::raw::c_int {
+    assert_return!(!udev_enumerate.is_null(), -libc::EINVAL);
+
     let e: &mut udev_enumerate = unsafe { transmute(&mut *udev_enumerate) };
     let tag = unsafe { CStr::from_ptr(tag) }.to_str().unwrap();
 
@@ -226,6 +233,12 @@ pub extern "C" fn udev_enumerate_add_match_parent(
     udev_enumerate: *mut udev_enumerate,
     parent: *mut udev_device,
 ) -> ::std::os::raw::c_int {
+    assert_return!(!udev_enumerate.is_null(), -libc::EINVAL);
+
+    if parent.is_null() {
+        return 0;
+    }
+
     let e: &mut udev_enumerate = unsafe { transmute(&mut *udev_enumerate) };
     let p: Rc<udev_device> = unsafe { Rc::from_raw(parent) };
 
