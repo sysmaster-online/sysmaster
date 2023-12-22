@@ -19,6 +19,7 @@
 void main()
 {
     struct udev_monitor *m = udev_monitor_new_from_netlink(NULL, "kernel");
+    udev_monitor_filter_add_match_subsystem_devtype(m, "block", NULL);
     udev_monitor_filter_add_match_subsystem_devtype(m, "block", "partition");
     udev_monitor_enable_receiving(m);
     while (1)
