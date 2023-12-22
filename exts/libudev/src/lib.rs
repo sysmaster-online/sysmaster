@@ -27,3 +27,13 @@ pub mod libudev_list;
 pub mod libudev_monitor;
 /// libudev_queue
 pub mod libudev_queue;
+
+#[macro_export]
+/// if the expression is not true, return specified value
+macro_rules! assert_return {
+    ( $x:expr, $r:expr ) => {
+        if !($x) {
+            return $r;
+        }
+    };
+}
