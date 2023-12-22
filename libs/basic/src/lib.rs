@@ -57,6 +57,8 @@ pub mod network;
 pub mod os_release;
 #[cfg(feature = "parse")]
 pub mod parse;
+#[cfg(feature = "path_util")]
+pub mod path_util;
 #[cfg(feature = "process")]
 pub mod process;
 #[cfg(feature = "random")]

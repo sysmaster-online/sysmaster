@@ -68,6 +68,7 @@ full = [
     "id128",
     "namespace",
     "time_util",
+    "path_util",
 ]
 
 capability = []
@@ -120,3 +121,4 @@ unistd = ["nix/user"]
 unit_name = []
 uuid = ["bitflags", "random"]
 time_util = []
+path_util = []
