@@ -34,12 +34,6 @@ pub struct udev_monitor {
     pub(crate) monitor: Rc<RefCell<DeviceMonitor>>,
 }
 
-impl Drop for udev_monitor {
-    fn drop(&mut self) {
-        let _ = unsafe { Rc::from_raw(self.udev) };
-    }
-}
-
 #[no_mangle]
 #[append_impl]
 /// udev_monitor_new_from_netlink

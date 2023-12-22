@@ -38,14 +38,6 @@ pub struct udev_enumerate {
     pub(crate) enumerator: Rc<RefCell<DeviceEnumerator>>,
 }
 
-impl Drop for udev_enumerate {
-    fn drop(&mut self) {
-        if !self.udev.is_null() {
-            let _ = unsafe { Rc::from_raw(self.udev) };
-        }
-    }
-}
-
 #[no_mangle]
 #[append_impl]
 /// udev_enumerate_new

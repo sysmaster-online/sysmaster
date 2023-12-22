@@ -66,8 +66,7 @@ pub struct udev_device {
 
 impl Drop for udev_device {
     fn drop(&mut self) {
-        if !self.udev.is_null() {
-            let _ = unsafe { Rc::from_raw(self.udev) };
+        if !self.parent.is_null() {
             let _ = unsafe { Rc::from_raw(self.parent) };
         }
     }
