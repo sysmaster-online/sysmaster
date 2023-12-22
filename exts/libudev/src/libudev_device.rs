@@ -782,6 +782,7 @@ pub extern "C" fn udev_device_get_devlinks_list_entry(
 
 #[no_mangle]
 #[append_impl]
+/// udev_device_get_sysattr_value
 pub extern "C" fn udev_device_get_sysattr_value(
     udev_device: *mut udev_device,
     sysattr: *const ::std::os::raw::c_char,

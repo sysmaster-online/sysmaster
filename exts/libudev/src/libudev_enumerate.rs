@@ -269,6 +269,7 @@ pub extern "C" fn udev_enumerate_add_match_parent(
 
 #[no_mangle]
 #[append_impl]
+/// udev_enumerate_add_match_sysattr
 pub extern "C" fn udev_enumerate_add_match_sysattr(
     udev_enumerate: *mut udev_enumerate,
     sysattr: *const ::std::os::raw::c_char,
@@ -303,6 +304,7 @@ pub extern "C" fn udev_enumerate_add_match_sysattr(
 
 #[no_mangle]
 #[append_impl]
+/// udev_enumerate_add_nomatch_sysattr
 pub extern "C" fn udev_enumerate_add_nomatch_sysattr(
     udev_enumerate: *mut udev_enumerate,
     sysattr: *const ::std::os::raw::c_char,
@@ -337,6 +339,7 @@ pub extern "C" fn udev_enumerate_add_nomatch_sysattr(
 
 #[no_mangle]
 #[append_impl]
+/// udev_enumerate_add_nomatch_subsystem
 pub extern "C" fn udev_enumerate_add_nomatch_subsystem(
     udev_enumerate: *mut udev_enumerate,
     subsystem: *const ::std::os::raw::c_char,
