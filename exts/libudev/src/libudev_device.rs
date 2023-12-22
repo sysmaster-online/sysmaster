@@ -61,6 +61,9 @@ pub struct udev_device {
     pub(crate) devlinks: Rc<udev_list>,
     pub(crate) devlinks_read: bool,
 
+    pub(crate) sysattrs: Rc<udev_list>,
+    pub(crate) sysattrs_read: bool,
+
     pub(crate) parent: *mut udev_device,
 }
 
@@ -88,6 +91,8 @@ impl udev_device {
             properties_read: false,
             devlinks: Rc::new(udev_list::new(true)),
             devlinks_read: false,
+            sysattrs: Rc::new(udev_list::new(true)),
+            sysattrs_read: false,
             parent: std::ptr::null_mut(),
         }
     }
@@ -773,6 +778,39 @@ pub extern "C" fn udev_device_get_devlinks_list_entry(
     }
 
     ud.devlinks.get_entry()
+}
+
+#[no_mangle]
+#[append_impl]
+pub extern "C" fn udev_device_get_sysattr_value(
+    udev_device: *mut udev_device,
+    sysattr: *const ::std::os::raw::c_char,
+) -> *const ::std::os::raw::c_char {
+    assert_return!(!udev_device.is_null() && !sysattr.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
+    let sysattr = unsafe { CStr::from_ptr(sysattr) };
+    let udev_device_mut: &mut udev_device = unsafe { mem::transmute(&mut *udev_device) };
+
+    let sysattr_string: String = sysattr.to_str().unwrap().to_string();
+    match udev_device_mut
+        .device
+        .get_sysattr_value(sysattr_string.as_str())
+    {
+        Ok(v) => {
+            let entry = udev_device_mut.sysattrs.add_entry(
+                CString::new(sysattr_string.as_str()).unwrap(),
+                CString::new(v.as_str()).unwrap(),
+            );
+            entry.value.as_ptr()
+        }
+        Err(e) => {
+            errno::set_errno(errno::Errno(e.get_errno() as i32));
+            std::ptr::null()
+        }
+    }
 }
 
 #[cfg(test)]

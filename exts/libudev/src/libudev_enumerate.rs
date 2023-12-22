@@ -278,6 +278,69 @@ pub extern "C" fn udev_enumerate_add_match_sysattr(
     0
 }
 
+#[no_mangle]
+#[append_impl]
+pub extern "C" fn udev_enumerate_add_nomatch_sysattr(
+    udev_enumerate: *mut udev_enumerate,
+    sysattr: *const ::std::os::raw::c_char,
+    value: *const ::std::os::raw::c_char,
+) -> ::std::os::raw::c_int {
+    assert_return!(!udev_enumerate.is_null(), -libc::EINVAL);
+
+    if sysattr.is_null() {
+        return 0;
+    }
+
+    let e: &mut udev_enumerate = unsafe { transmute(&mut *udev_enumerate) };
+
+    let sysattr = unsafe { CStr::from_ptr(sysattr) }.to_str().unwrap();
+    let value = if value.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(value) }.to_str().unwrap()
+    };
+
+    if let Err(e) = e
+        .enumerator
+        .borrow_mut()
+        .add_match_sysattr(sysattr, value, false)
+    {
+        return e.get_errno() as i32;
+    }
+
+    e.up_to_date = false;
+    0
+}
+
+#[no_mangle]
+#[append_impl]
+pub extern "C" fn udev_enumerate_add_nomatch_subsystem(
+    udev_enumerate: *mut udev_enumerate,
+    subsystem: *const ::std::os::raw::c_char,
+) -> ::std::os::raw::c_int {
+    assert_return!(!udev_enumerate.is_null(), -libc::EINVAL);
+
+    if subsystem.is_null() {
+        return 0;
+    }
+
+    let udev_enumerate: &mut udev_enumerate = unsafe { transmute(&mut *udev_enumerate) };
+
+    let subsystem = unsafe { CStr::from_ptr(subsystem) }.to_str().unwrap();
+
+    if let Err(e) = udev_enumerate
+        .enumerator
+        .borrow_mut()
+        .add_match_subsystem(subsystem, false)
+    {
+        return e.get_errno() as i32;
+    }
+
+    udev_enumerate.up_to_date = false;
+
+    0
+}
+
 #[cfg(test)]
 mod tests {
     use device::Device;
