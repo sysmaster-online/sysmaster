@@ -62,6 +62,8 @@ pub extern "C" fn udev_enumerate_new(udev: *mut udev) -> *mut udev_enumerate {
 pub extern "C" fn udev_enumerate_scan_devices(
     udev_enumerate: *mut udev_enumerate,
 ) -> ::std::os::raw::c_int {
+    assert_return!(!udev_enumerate.is_null(), -libc::EINVAL);
+
     let udev_enumerate: &mut udev_enumerate = unsafe { transmute(&mut *udev_enumerate) };
 
     match udev_enumerate.enumerator.borrow_mut().scan_devices() {
@@ -76,6 +78,11 @@ pub extern "C" fn udev_enumerate_scan_devices(
 pub extern "C" fn udev_enumerate_get_list_entry(
     udev_enumerate: *mut udev_enumerate,
 ) -> *mut udev_list_entry {
+    assert_return!(!udev_enumerate.is_null(), {
+        errno::set_errno(errno::Errno(libc::EINVAL));
+        std::ptr::null_mut()
+    });
+
     let udev_enumerate: &mut udev_enumerate = unsafe { transmute(&mut *udev_enumerate) };
 
     if !udev_enumerate.up_to_date {
@@ -112,6 +119,11 @@ pub extern "C" fn udev_enumerate_add_match_subsystem(
     udev_enumerate: *mut udev_enumerate,
     subsystem: *const ::std::os::raw::c_char,
 ) -> ::std::os::raw::c_int {
+    assert_return!(
+        !udev_enumerate.is_null() && !subsystem.is_null(),
+        -libc::EINVAL
+    );
+
     if subsystem.is_null() {
         return 0;
     }
@@ -141,6 +153,11 @@ pub extern "C" fn udev_enumerate_add_match_property(
     property: *const ::std::os::raw::c_char,
     value: *const ::std::os::raw::c_char,
 ) -> ::std::os::raw::c_int {
+    assert_return!(
+        !udev_enumerate.is_null() && !property.is_null(),
+        -libc::EINVAL
+    );
+
     if property.is_null() {
         return 0;
     }
@@ -148,7 +165,11 @@ pub extern "C" fn udev_enumerate_add_match_property(
     let udev_enumerate: &mut udev_enumerate = unsafe { transmute(&mut *udev_enumerate) };
 
     let property = unsafe { CStr::from_ptr(property) }.to_str().unwrap();
-    let value = unsafe { CStr::from_ptr(value) }.to_str().unwrap();
+    let value = if value.is_null() {
+        ""
+    } else {
+        unsafe { CStr::from_ptr(value) }.to_str().unwrap()
+    };
 
     if let Err(e) = udev_enumerate
         .enumerator
@@ -169,6 +190,8 @@ pub extern "C" fn udev_enumerate_add_match_property(
 pub fn udev_enumerate_add_match_is_initialized(
     udev_enumerate: *mut udev_enumerate,
 ) -> ::std::os::raw::c_int {
+    assert_return!(!udev_enumerate.is_null(), -libc::EINVAL);
+
     let udev_enumerate: &mut udev_enumerate = unsafe { transmute(&mut *udev_enumerate) };
 
     if let Err(e) = udev_enumerate
