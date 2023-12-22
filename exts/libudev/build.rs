@@ -48,7 +48,7 @@ fn main() {
         "udev_enumerate_add_match_parent",
         "udev_enumerate_add_match_property",
         "udev_enumerate_add_match_subsystem",
-        // "udev_enumerate_add_match_sysattr",
+        "udev_enumerate_add_match_sysattr",
         // "udev_enumerate_add_match_sysname",
         "udev_enumerate_add_match_tag",
         // "udev_enumerate_add_nomatch_subsystem",
