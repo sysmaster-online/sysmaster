@@ -67,6 +67,7 @@ pub fn derive_ref_unref(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 }
 
 #[proc_macro_attribute]
+/// append _impl to the original function name
 pub fn append_impl(
     _attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
