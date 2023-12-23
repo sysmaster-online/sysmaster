@@ -1007,28 +1007,6 @@ name = "libtests"
 version = "0.5.1"
 
 [[package]]
-name = "libudev"
-version = "0.5.1"
-dependencies = [
- "basic",
- "device",
- "errno 0.3.8",
- "hwdb",
- "libc",
- "libudev_macro",
- "nix 0.24.3",
-]
-
-[[package]]
-name = "libudev_macro"
-version = "0.5.1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.39",
-]
-
-[[package]]
 name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

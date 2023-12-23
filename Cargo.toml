@@ -126,7 +126,7 @@ members = [
   "exts/hostname_setup",
   "exts/hwdb",
   "exts/machine-id-setup",
-  "exts/libudev",
+  # "exts/libudev",
   #internal libraries crates
   "libs/cmdproto",
   #external libraries crates

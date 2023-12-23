@@ -10,8 +10,11 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//! libudev link options
+//! Append libudev.sym version script to link options.
 //!
+//! The 'ld' linker of gcc can not support multiple declarations of version scripts.
+//! Because rustc will append rust native version script, 'ld' is unavailable. Instead,
+//! we should use 'lld' linker of llvm, as it support multiple declarations of version scripts.
 
 fn main() {
     let symbols = [
