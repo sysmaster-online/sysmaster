@@ -82,7 +82,11 @@ const RELI_DB_HMOUNTM_FRAME: &str = "mntm-frame";
 /* target */
 const RELI_DB_HTARGET_MNG: &str = "tarmng";
 
-pub const RELI_HISTORY_MAX_DBS: u32 = 18;
+/* timer */
+const RELI_DB_HTIMER_CONF: &str = "timerconf";
+const RELI_DB_HTIMER_MNG: &str = "timermng";
+
+pub const RELI_HISTORY_MAX_DBS: u32 = 20;
 #[allow(dead_code)]
 static RELI_HISTORY_DB_NAME: [&str; RELI_HISTORY_MAX_DBS as usize] = [
     RELI_DB_HJOB_TRIGGER,
@@ -103,4 +107,6 @@ static RELI_HISTORY_DB_NAME: [&str; RELI_HISTORY_MAX_DBS as usize] = [
     RELI_DB_HMOUNT_MNG,
     RELI_DB_HMOUNTM_FRAME,
     RELI_DB_HTARGET_MNG,
+    RELI_DB_HTIMER_CONF,
+    RELI_DB_HTIMER_MNG,
 ];

@@ -870,6 +870,9 @@ impl ServiceMng {
 
         // todo!()
         // trigger the unit the dependency trigger_by
+        self.comm
+            .um()
+            .trigger_notify(&self.comm.owner().unwrap().id());
 
         let os = service_state_to_unit_state(self.config.service_type(), original_state);
         let ns = service_state_to_unit_state(self.config.service_type(), state);

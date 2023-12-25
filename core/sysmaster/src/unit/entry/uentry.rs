@@ -22,11 +22,13 @@ use crate::unit::data::{DataManager, UnitState};
 use crate::unit::rentry::{UnitLoadState, UnitRe};
 use crate::unit::util::UnitFile;
 use basic::process::{self, my_child};
+use basic::time_util::{now_clockid, UnitTimeStamp};
 use cgroup::{self, CgFlags};
 use core::error::*;
 use core::rel::ReStation;
 use core::unit::{KillContext, KillMode, KillOperation, UnitNotifyFlags};
 use core::unit::{SubUnit, UnitActiveState, UnitBase, UnitType};
+use libc::{CLOCK_MONOTONIC, CLOCK_REALTIME};
 use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
@@ -55,6 +57,7 @@ pub struct Unit {
     sub: Box<dyn SubUnit>,
     merged_into: RefCell<Option<Rc<UnitX>>>,
     in_stop_when_bound_queue: RefCell<bool>,
+    timestamp: Rc<RefCell<UnitTimeStamp>>,
 }
 
 impl PartialEq for Unit {
@@ -185,6 +188,10 @@ impl UnitBase for Unit {
     fn guess_main_pid(&self) -> Result<Pid> {
         self.guess_main_pid()
     }
+
+    fn get_unit_timestamp(&self) -> Rc<RefCell<UnitTimeStamp>> {
+        self.get_unit_timestamp()
+    }
 }
 
 impl Unit {
@@ -211,6 +218,7 @@ impl Unit {
             start_limit: StartLimit::new(),
             merged_into: RefCell::new(None),
             in_stop_when_bound_queue: RefCell::new(false),
+            timestamp: Rc::new(RefCell::new(UnitTimeStamp::default())),
         });
         let owner = Rc::clone(&_u);
         _u.sub.attach_unit(owner);
@@ -298,6 +306,10 @@ impl Unit {
         Rc::clone(&self.conditions)
     }
 
+    pub fn unit_trigger_notify(&self) {
+        self.sub.trigger_notify()
+    }
+
     ///
     pub fn notify(
         &self,
@@ -311,6 +323,23 @@ impl Unit {
                 original_state,
                 new_state
             );
+        }
+
+        let mut unit_timestamp = self.timestamp.borrow_mut();
+
+        unit_timestamp.state_change_timestamp.realtime = now_clockid(CLOCK_REALTIME);
+        unit_timestamp.state_change_timestamp.monotonic = now_clockid(CLOCK_MONOTONIC);
+
+        if original_state.is_inactive_or_failed() && !new_state.is_inactive_or_failed() {
+            unit_timestamp.inactive_exit_timestamp = unit_timestamp.state_change_timestamp;
+        } else if !original_state.is_inactive_or_failed() && new_state.is_inactive_or_failed() {
+            unit_timestamp.inactive_enter_timestamp = unit_timestamp.state_change_timestamp;
+        }
+
+        if !original_state.is_active_or_reloading() && new_state.is_active_or_reloading() {
+            unit_timestamp.active_enter_timestamp = unit_timestamp.state_change_timestamp;
+        } else if original_state.is_active_or_reloading() && !new_state.is_active_or_reloading() {
+            unit_timestamp.active_exit_timestamp = unit_timestamp.state_change_timestamp;
         }
 
         let u_state = UnitState::new(original_state, new_state, flags);
@@ -819,6 +848,10 @@ impl Unit {
         fds: Vec<i32>,
     ) -> Result<()> {
         self.sub.notify_message(ucred, messages, fds)
+    }
+
+    pub fn get_unit_timestamp(&self) -> Rc<RefCell<UnitTimeStamp>> {
+        Rc::clone(&self.timestamp)
     }
 }
 

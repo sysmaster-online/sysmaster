@@ -73,6 +73,7 @@ name = "basic"
 version = "0.5.1"
 dependencies = [
  "bitflags",
+ "chrono",
  "constants",
  "fnmatch-sys",
  "libc",
@@ -1883,6 +1884,7 @@ dependencies = [
  "siphasher",
  "socket",
  "target",
+ "timer",
  "unit_parser",
  "walkdir",
 ]
@@ -1961,6 +1963,23 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.39",
+]
+
+[[package]]
+name = "timer"
+version = "0.5.0"
+dependencies = [
+ "basic",
+ "chrono",
+ "core",
+ "event",
+ "log 0.5.1",
+ "macros",
+ "nix 0.24.3",
+ "once_cell",
+ "rand",
+ "serde",
+ "unit_parser",
 ]
 
 [[package]]

@@ -11,14 +11,23 @@
 // See the Mulan PSL v2 for more details.
 
 //!Parse time
-
+#![allow(missing_docs)]
+use chrono::DateTime;
 use libc::{c_char, strtoll};
+use libc::{
+    clockid_t, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME,
+    CLOCK_REALTIME_ALARM,
+};
 use nix::errno::Errno;
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::mem;
 
 /// USec infinity
 pub const USEC_INFINITY: u64 = u64::MAX;
+
+/// NSec infinity
+pub const NSEC_INFINITY: u64 = u64::MAX;
 
 /// USec per Sec
 pub const USEC_PER_SEC: u64 = 1000000;
@@ -162,6 +171,17 @@ pub fn parse_sec(t: &str) -> Result<u64, Errno> {
     parse_time(t, USEC_PER_SEC)
 }
 
+///parse time string to sec, include calendar string
+pub fn parse_timer(date: &str) -> Result<u64, Errno> {
+    let formats = ["%Y-%m-&d", "%Y-%m-%d %H:%M:%M:%S"];
+    for format in formats {
+        if let Ok(dt) = DateTime::parse_from_str(date, format) {
+            return Ok(dt.timestamp_micros() as u64);
+        }
+    }
+    parse_time(date, USEC_PER_SEC)
+}
+
 struct Table<'a> {
     suffix: &'a str,
     usec: u64,
@@ -291,6 +311,192 @@ fn extract_multiplier(p: &mut &str, multiplier: &mut u64) {
             return;
         }
     }
+}
+
+#[derive(Default, Clone, Copy, Debug)]
+pub struct DualTimestamp {
+    pub realtime: u64,
+    pub monotonic: u64,
+}
+
+#[derive(Clone, Copy, Default)]
+pub struct TripleTimestamp {
+    pub realtime: u64,
+    pub monotonic: u64,
+    pub boottime: u64,
+}
+
+impl TripleTimestamp {
+    pub fn new() -> TripleTimestamp {
+        Self {
+            realtime: 0,
+            monotonic: 0,
+            boottime: 0,
+        }
+    }
+
+    pub fn now(&mut self) -> Self {
+        unsafe {
+            let mut tp = mem::MaybeUninit::zeroed().assume_init();
+            libc::clock_gettime(libc::CLOCK_REALTIME, &mut tp);
+            self.realtime = timespec_load(tp);
+            libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut tp);
+            self.monotonic = timespec_load(tp);
+            libc::clock_gettime(libc::CLOCK_BOOTTIME, &mut tp);
+            self.boottime = timespec_load(tp);
+        }
+        *self
+    }
+}
+
+pub fn timespec_load(ts: libc::timespec) -> u64 {
+    if ts.tv_sec < 0 || ts.tv_nsec < 0 {
+        return USEC_INFINITY;
+    }
+
+    if (ts.tv_sec as u64) > (USEC_INFINITY - ((ts.tv_nsec as u64) / NSEC_PER_SEC) / USEC_PER_SEC) {
+        return USEC_INFINITY;
+    }
+
+    (ts.tv_sec as u64) * USEC_PER_SEC + (ts.tv_nsec as u64) / NSEC_PER_USEC
+}
+
+pub fn timespec_load_nsec(ts: libc::timespec) -> u64 {
+    if ts.tv_sec < 0 || ts.tv_nsec < 0 {
+        return NSEC_INFINITY;
+    }
+
+    if (ts.tv_sec as u64) >= (NSEC_INFINITY - ((ts.tv_nsec as u64) / NSEC_PER_SEC)) {
+        return NSEC_INFINITY;
+    }
+
+    (ts.tv_sec as u64) * NSEC_PER_SEC + (ts.tv_nsec as u64)
+}
+
+pub fn timestamp_is_set(timestamp: u64) -> bool {
+    timestamp > 0 && timestamp != USEC_INFINITY
+}
+
+pub fn duml_timestamp_is_set(dt: DualTimestamp) -> bool {
+    timestamp_is_set(dt.realtime) || timestamp_is_set(dt.monotonic)
+}
+
+pub fn usec_add(a: u64, b: u64) -> u64 {
+    if a > USEC_INFINITY - b {
+        return USEC_INFINITY;
+    }
+
+    a + b
+}
+
+pub fn usec_sub_unsigned(a: u64, b: u64) -> u64 {
+    if a == USEC_INFINITY {
+        return USEC_INFINITY;
+    }
+
+    if a < b {
+        return 0;
+    }
+
+    a - b
+}
+
+pub fn usec_sub_signed(a: u64, b: i64) -> u64 {
+    if b == i64::MIN {
+        return usec_add(a, i64::MAX as u64 + 1);
+    }
+
+    if b < 0 {
+        usec_add(a, -b as u64);
+    }
+
+    usec_sub_unsigned(a, b as u64)
+}
+
+pub fn map_clock_id(c: clockid_t) -> clockid_t {
+    match c {
+        CLOCK_BOOTTIME_ALARM => CLOCK_BOOTTIME,
+        CLOCK_REALTIME_ALARM => CLOCK_REALTIME,
+        _ => c,
+    }
+}
+
+pub fn now_clockid(c: clockid_t) -> u64 {
+    let now = TripleTimestamp::new().now();
+    match c {
+        CLOCK_BOOTTIME | CLOCK_BOOTTIME_ALARM => now.boottime,
+        CLOCK_REALTIME | CLOCK_REALTIME_ALARM => now.realtime,
+        _ => now.monotonic,
+    }
+}
+
+pub fn usec_shift_clock(x: u64, from: clockid_t, to: clockid_t) -> u64 {
+    if x == USEC_INFINITY {
+        return USEC_INFINITY;
+    }
+
+    if map_clock_id(from) == map_clock_id(to) {
+        return x;
+    }
+
+    let a = now_clockid(from);
+    let b = now_clockid(to);
+
+    if x > a {
+        usec_add(b, usec_sub_unsigned(x, a))
+    } else {
+        usec_sub_unsigned(b, usec_sub_unsigned(a, x))
+    }
+}
+
+#[allow(unused_variables)]
+pub fn triple_timestamp_by_clock(ts: TripleTimestamp, clock: clockid_t) -> u64 {
+    match clock {
+        CLOCK_BOOTTIME | CLOCK_BOOTTIME_ALARM => ts.boottime,
+        CLOCK_MONOTONIC => ts.monotonic,
+        CLOCK_REALTIME | CLOCK_REALTIME_ALARM => ts.realtime,
+        _ => USEC_INFINITY,
+    }
+}
+
+#[derive(Default, Clone, Copy, Debug)]
+pub struct UnitTimeStamp {
+    pub inactive_exit_timestamp: DualTimestamp,
+    pub active_enter_timestamp: DualTimestamp,
+    pub active_exit_timestamp: DualTimestamp,
+    pub inactive_enter_timestamp: DualTimestamp,
+    pub state_change_timestamp: DualTimestamp,
+}
+
+fn map_clock_usec_internal(from: u64, from_base: u64, to_base: u64) -> u64 {
+    if from >= from_base {
+        let delta = from - from_base;
+
+        if to_base >= USEC_INFINITY - delta {
+            return USEC_INFINITY;
+        }
+
+        to_base + delta
+    } else {
+        let delta = from_base - from;
+        if to_base <= delta {
+            return 0;
+        }
+
+        to_base - delta
+    }
+}
+
+pub fn map_clock_usec(from: u64, from_clock: clockid_t, to_clock: clockid_t) -> u64 {
+    if map_clock_id(from_clock) == map_clock_id(to_clock) {
+        return from;
+    }
+
+    if from == USEC_INFINITY {
+        return from;
+    }
+
+    map_clock_usec_internal(from, now_clockid(from_clock), now_clockid(to_clock))
 }
 
 #[cfg(test)]

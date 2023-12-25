@@ -114,6 +114,7 @@ pub enum UnitType {
     UnitTarget,
     UnitSocket,
     UnitMount,
+    UnitTimer,
     UnitTypeMax,
     UnitTypeInvalid,
     UnitTypeErrnoMax,
@@ -127,6 +128,7 @@ impl UnitType {
             UnitType::UnitTarget,
             UnitType::UnitSocket,
             UnitType::UnitMount,
+            UnitType::UnitTimer,
         ]
         .iter()
         .copied()
@@ -142,6 +144,7 @@ impl FromStr for UnitType {
             "target" => UnitType::UnitTarget,
             "socket" => UnitType::UnitSocket,
             "mount" => UnitType::UnitMount,
+            "timer" => UnitType::UnitTimer,
             _ => UnitType::UnitTypeInvalid,
         };
         Ok(ret)
@@ -155,6 +158,7 @@ impl From<UnitType> for String {
             UnitType::UnitTarget => "target".into(),
             UnitType::UnitSocket => "socket".into(),
             UnitType::UnitMount => "mount".into(),
+            UnitType::UnitTimer => "timer".into(),
             UnitType::UnitTypeMax => null_str!(""),
             UnitType::UnitTypeInvalid => null_str!(""),
             UnitType::UnitTypeErrnoMax => null_str!(""),
@@ -170,6 +174,7 @@ impl TryFrom<u32> for UnitType {
             1 => Ok(UnitType::UnitTarget),
             2 => Ok(UnitType::UnitSocket),
             3 => Ok(UnitType::UnitMount),
+            4 => Ok(UnitType::UnitTimer),
             v => Err(format!("input {} is invalid", v)),
         }
     }

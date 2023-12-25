@@ -66,6 +66,8 @@ mod noplugin {
     use std::rc::Rc;
     #[cfg(feature = "target")]
     use target::{self};
+    #[cfg(feature = "timer")]
+    use timer::{self};
 
     pub(super) fn create_um_obj(
         unit_type: UnitType,
@@ -82,6 +84,8 @@ mod noplugin {
             UnitType::UnitSocket => socket::__um_obj_create,
             #[cfg(feature = "target")]
             UnitType::UnitTarget => target::__um_obj_create,
+            #[cfg(feature = "timer")]
+            UnitType::UnitTimer => timer::__um_obj_create,
             _ => {
                 return Err(Error::Other {
                     msg: "Component unsupported!".to_string(),
@@ -108,6 +112,8 @@ mod noplugin {
             UnitType::UnitSocket => socket::__subunit_create_with_params,
             #[cfg(feature = "target")]
             UnitType::UnitTarget => target::__subunit_create_with_params,
+            #[cfg(feature = "timer")]
+            UnitType::UnitTimer => timer::__subunit_create_with_params,
             _ => {
                 return Err(Error::Other {
                     msg: "Component unsupported!".to_string(),

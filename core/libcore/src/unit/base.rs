@@ -16,10 +16,12 @@ use super::state::{UnitActiveState, UnitNotifyFlags};
 use super::umif::UnitMngUtil;
 use super::UnitType;
 use crate::error::*;
+use basic::time_util::UnitTimeStamp;
 use bitflags::bitflags;
 use nix::sys::wait::WaitStatus;
 use nix::{sys::socket::UnixCredentials, unistd::Pid};
 use std::any::Any;
+use std::cell::RefCell;
 use std::num::ParseIntError;
 use std::str::FromStr;
 use std::{collections::HashMap, path::PathBuf, rc::Rc};
@@ -70,6 +72,9 @@ pub trait UnitBase {
 
     /// guess main pid from the cgroup path
     fn guess_main_pid(&self) -> Result<Pid>;
+
+    ///
+    fn get_unit_timestamp(&self) -> Rc<RefCell<UnitTimeStamp>>;
 }
 
 ///The trait Defining Shared Behavior of sub unit
@@ -178,6 +183,9 @@ pub trait SubUnit: ReStation + UnitMngUtil {
 
     ///
     fn update_mount_state_by_mountinfo(&self) {}
+
+    ///
+    fn trigger_notify(&self) {}
 }
 
 /// the macro for create a sub unit instance with dyn ref of UmIf,

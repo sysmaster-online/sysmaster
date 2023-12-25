@@ -37,6 +37,7 @@ use crate::utils::table::{TableOp, TableSubscribe};
 use basic::cmdline::get_process_cmdline;
 use basic::fs_util::LookupPaths;
 use basic::show_table::{CellColor, ShowTable};
+use basic::time_util::UnitTimeStamp;
 use basic::{machine, process, rlimit, signal_util};
 use constants::SIG_SWITCH_ROOT_OFFSET;
 use core::error::*;
@@ -555,6 +556,16 @@ impl UmIf for UnitManager {
             .collect::<Vec<_>>()
     }
 
+    fn get_unit_timestamp(&self, unit_name: &str) -> Rc<RefCell<UnitTimeStamp>> {
+        let s_unit = if let Some(unit) = self.db.units_get(unit_name) {
+            unit
+        } else {
+            log::error!("unit [{}] not found!!!!!", unit_name);
+            return Rc::new(RefCell::new(UnitTimeStamp::default()));
+        };
+        s_unit.unit().get_unit_timestamp()
+    }
+
     fn unit_has_default_dependecy(&self, _unit_name: &str) -> bool {
         let s_unit = if let Some(s_unit) = self.db.units_get(_unit_name) {
             s_unit
@@ -711,6 +722,13 @@ impl UmIf for UnitManager {
             Some(v) => v,
         };
         mount.update_mount_state_by_mountinfo();
+    }
+
+    fn trigger_notify(&self, name: &str) {
+        let deps = self.db.dep_gets(name, UnitRelations::UnitTriggeredBy);
+        for dep in deps.iter() {
+            dep.unit_trigger_notify()
+        }
     }
 }
 

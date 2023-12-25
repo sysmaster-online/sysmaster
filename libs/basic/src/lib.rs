@@ -104,6 +104,9 @@ pub const SHUTDOWN_TARGET: &str = "shutdown.target";
 /// the socketc target
 pub const SOCKETS_TARGET: &str = "sockets.target";
 
+/// the timer target
+pub const TIMERS_TARGET: &str = "timers.target";
+
 /// early boot targets
 pub const SYSINIT_TARGET: &str = "sysinit.target";
 /// the basic start target

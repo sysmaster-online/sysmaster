@@ -16,8 +16,10 @@ use crate::error::*;
 use crate::exec::{ExecCommand, ExecContext, ExecParameters};
 use crate::rel::{ReStation, Reliability};
 use crate::unit::{UnitActiveState, UnitType};
+use basic::time_util::UnitTimeStamp;
 use event::Events;
 use nix::unistd::Pid;
+use std::cell::RefCell;
 use std::{path::PathBuf, rc::Rc};
 
 #[cfg(feature = "plugin")]
@@ -231,6 +233,13 @@ pub trait UmIf {
 
     /// update mount state
     fn update_mount_state_by_mountinfo(&self, _unit_name: &str) {}
+
+    /// get unit timestamp data
+    fn get_unit_timestamp(&self, _unit_name: &str) -> Rc<RefCell<UnitTimeStamp>> {
+        Rc::new(RefCell::new(UnitTimeStamp::default()))
+    }
+    /// unit trigger TriggerBy units
+    fn trigger_notify(&self, _name: &str) {}
 }
 
 /// the trait used for attach UnitManager to sub unit
