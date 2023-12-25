@@ -549,7 +549,7 @@ impl Install {
         }
 
         let configer = match UeConfigData::load_config(paths, &unit_install.name()) {
-            Err(unit_parser::error::Error::LoadTemplateError { name: _ }) => {
+            Err(unit_parser::error::Error::LoadTemplateError { path: _ }) => {
                 return Err(Error::LoadError {
                     msg: format!(
                         "can't load a template unit directly: {}",

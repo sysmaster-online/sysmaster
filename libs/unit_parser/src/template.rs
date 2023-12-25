@@ -1,4 +1,6 @@
 //! Functions and interfaces for systemd unit template related stuff.
+use std::path::Path;
+
 use crate::{config::Result, error::Error};
 
 /// Describes the type of a unit file.
@@ -22,7 +24,7 @@ pub(crate) fn unit_type(filename: &str) -> Result<UnitType> {
     let (instance, suffix) = match instance_suffix.split_once('.') {
         None => {
             return Err(Error::InvalidFilenameError {
-                filename: filename.to_string(),
+                path: Path::new(filename).to_path_buf(),
             })
         }
         Some(v) => (v.0, v.1),

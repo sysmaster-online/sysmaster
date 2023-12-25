@@ -37,13 +37,10 @@ pub trait UnitConfig: Sized + Default {
     /// A convenient function that opens the file that needs to be loaded.
     fn __load<S: AsRef<Path>>(path: S, unit_name: &str, res: &mut Self) -> Result<()> {
         let path = path.as_ref();
-        let mut file = File::open(path).context(ReadFileSnafu {
-            path: path.to_string_lossy().to_string(),
-        })?;
+        let mut file = File::open(path).context(ReadFileSnafu { path })?;
         let mut content = String::new();
-        file.read_to_string(&mut content).context(ReadFileSnafu {
-            path: path.to_string_lossy().to_string(),
-        })?;
+        file.read_to_string(&mut content)
+            .context(ReadFileSnafu { path })?;
         let parser = crate::parser::UnitParser::new(content.as_ref(), (unit_name,));
         Self::__parse_unit(parser, res)
     }

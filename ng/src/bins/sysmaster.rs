@@ -13,7 +13,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .build()
         .await?;
 
-    let manager = MANAGER.lock().await;
+    let mut manager = MANAGER.lock().await;
+    manager.load().await?;
     manager.start_loop().await;
     // let manager = MANAGER.lock().await;
     // manager.start_loop().await;

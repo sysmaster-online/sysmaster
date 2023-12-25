@@ -1,6 +1,6 @@
 //! Definitions for all possible errors used in this crate.
 use snafu::Snafu;
-use std::io;
+use std::{io, path::PathBuf};
 
 // TODO: change errors to `log::warn`s to prevent one bad file from stalling the entire loading process
 /// Errors used in crate.
@@ -8,29 +8,29 @@ use std::io;
 #[allow(missing_docs)]
 #[snafu(visibility(pub))]
 pub enum Error {
-    #[snafu(display("{} is not a valid directory.", path))]
-    InvalidDirectoryError { path: String },
+    #[snafu(display("{} is not a valid directory.", path.display()))]
+    InvalidDirectoryError { path: PathBuf },
 
-    #[snafu(display("Failed to read directory {}: {}.", path, source))]
-    ReadDirectoryError { source: io::Error, path: String },
+    #[snafu(display("Failed to read directory {}: {}.", path.display(), source))]
+    ReadDirectoryError { source: io::Error, path: PathBuf },
 
-    #[snafu(display("Cannot load a template unit: {}.", name))]
-    LoadTemplateError { name: String },
+    #[snafu(display("Cannot load a template unit: {}.", path.display()))]
+    LoadTemplateError { path: PathBuf },
 
-    #[snafu(display("{} is not a file.", path))]
-    NotAFileError { path: String },
+    #[snafu(display("{} is not a file.", path.display()))]
+    NotAFileError { path: PathBuf },
 
-    #[snafu(display("Failed to read file {}: {}.", path, source))]
-    ReadFileError { source: io::Error, path: String },
+    #[snafu(display("Failed to read file {}: {}.", path.display(), source))]
+    ReadFileError { source: io::Error, path: PathBuf },
 
     #[snafu(display("Failed to read directory entry: {}.", source))]
     ReadEntryError { source: io::Error },
 
-    #[snafu(display("Unable to read filename for {}.", path))]
-    FilenameUnreadable { path: String },
+    #[snafu(display("Unable to read filename for {}.", path.display()))]
+    FilenameUnreadable { path: PathBuf },
 
-    #[snafu(display("Invalid filename {}.", filename))]
-    InvalidFilenameError { filename: String },
+    #[snafu(display("Invalid filename {}.", path.display()))]
+    InvalidFilenameError { path: PathBuf },
 
     #[snafu(display("Unit file should provide at least one section."))]
     NoSectionError,
@@ -47,8 +47,8 @@ pub enum Error {
     #[snafu(display("Failed to parse {} as the value of entry with key {}.", value, key))]
     ValueParsingError { key: String, value: String },
 
-    #[snafu(display("Failed to find unit {}.", name))]
-    NoUnitFoundError { name: String },
+    #[snafu(display("Failed to find unit {}.", path.display()))]
+    NoUnitFoundError { path: PathBuf },
 
     #[snafu(display("Invalid specifier: {}", specifier))]
     InvalidSpecifierError { specifier: char },

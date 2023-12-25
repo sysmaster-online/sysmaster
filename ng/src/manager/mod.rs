@@ -1,37 +1,32 @@
 pub mod bus;
 pub mod config;
 
-use self::config::Config;
-use crate::{jobs::Jobs, units::Units};
+use self::config::ManagerConfig;
 use once_cell::sync::Lazy;
-use std::{future::pending, io::Error, sync::Arc};
+use std::{future::pending, io::Error};
 use tokio::sync::Mutex;
+use unit_parser::prelude::UnitConfig;
 
 pub struct Manager {
-    config: Config,
-    units: Arc<Mutex<Units>>,
-    jobs: Arc<Mutex<Jobs>>,
+    config: ManagerConfig,
 }
 
 impl Manager {
     pub fn new() -> Self {
         Self {
-            config: Config::new(),
-            units: Arc::new(Mutex::new(Vec::new())),
-            jobs: Arc::new(Mutex::new(Vec::new())),
+            config: ManagerConfig::default(),
         }
     }
 
-    pub async fn units(&self) -> Arc<Mutex<Units>> {
-        self.units.clone()
-    }
-
-    pub async fn jobs(&self) -> Arc<Mutex<Jobs>> {
-        self.jobs.clone()
-    }
+    pub const SYSTEM_CONFIG_FILE: &str = "/etc/sysmaster/system.conf";
     pub async fn load(&mut self) -> Result<(), Error> {
-        self.config.load().await?;
-        println!("load config ok");
+        let paths = vec![Manager::SYSTEM_CONFIG_FILE];
+        if let Ok(cfg) = ManagerConfig::load_config(paths, "system.conf") {
+            println!("load config ok {:?}", cfg);
+
+            self.config = cfg;
+        };
+        println!("load config ok {:?}", self.config);
         Ok(())
     }
 
