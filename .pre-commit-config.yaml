@@ -4,7 +4,7 @@ repos:
     rev: v4.4.0
     hooks:
       - id: check-added-large-files
-        args: ['--maxkb=100']
+        args: ["--maxkb=100"]
       - id: check-symlinks
       - id: check-toml
       - id: end-of-file-fixer
@@ -19,7 +19,7 @@ repos:
       - id: codespell
         name: codespell
         description: Checks for common misspellings in text files.
-        entry: bash -c 'cargo clean;codespell -I ci/codespell_ignore_words -x ci/codespell_ignore_words -S *.rules -S ./vendor* -S ./target*'
+        entry: bash -c 'cargo clean;codespell -I ci/codespell_ignore_words -x ci/codespell_ignore_words -S *.rules -S vendor* -S target*'
         language: system
         pass_filenames: false
         verbose: true
@@ -87,7 +87,6 @@ repos:
         pass_filenames: false
         files: \.(rs|toml)$
         verbose: false
-
 #      - id: cargo-deny
 #        name: cargo deny check
 #        description: Check cargo depencencies
