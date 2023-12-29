@@ -19,7 +19,7 @@ use nix::{
     },
 };
 
-use libc::{glob, glob_t, GLOB_NOSORT};
+use libc::{glob, glob_t, globfree, GLOB_NOSORT};
 
 use crate::{
     cmdline, fd_util, fs_util::directory_is_not_empty, mount_util::is_mount_point, security,
@@ -289,6 +289,7 @@ impl Condition {
             /* use GLOB_NOSORT to speed up. */
             glob(pattern.as_ptr(), GLOB_NOSORT, None, &mut pglob)
         };
+        unsafe { globfree(&mut pglob) };
         (status == 0) as i8
     }
 
