@@ -1,0 +1,13 @@
+[Unit]
+Description=Rsyslog Service
+DefaultDependencies=false
+
+[Service]
+Type=notify
+ExecStart=/usr/sbin/rsyslogd -n -i/var/run/rsyslogd.pid
+ExecStartPost=/bin/bash /usr/bin/timezone_update.sh
+RestartSec=1000000
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,24 @@
+From 14e3aa6f3d3cfaa14fbd0c2135c2096eaded9223 Mon Sep 17 00:00:00 2001
+From: rpm-build <rpm-build>
+Date: Mon, 25 Oct 2021 17:18:44 +0800
+Subject: [PATCH] detect virt
+
+---
+ src/basic/virt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/basic/virt.c b/src/basic/virt.c
+index 335f59d..0ab45f1 100644
+--- a/src/basic/virt.c
++++ b/src/basic/virt.c
+@@ -779,7 +779,7 @@ int running_in_chroot(void) {
+         if (getenv_bool("SYSTEMD_IGNORE_CHROOT") > 0)
+                 return 0;
+
+-        r = files_same("/proc/1/root", "/", 0);
++        r = files_same("/proc/self/root", "/", 0);
+         if (r < 0)
+                 return r;
+
+--
+2.30.0

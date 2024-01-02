@@ -1,0 +1,3 @@
+# Each vtcon keeps its own state of fonts.
+#
+# ACTION=="add", SUBSYSTEM=="vtconsole", KERNEL=="vtcon*", RUN+="/usr/lib/systemd/systemd-vconsole-setup"

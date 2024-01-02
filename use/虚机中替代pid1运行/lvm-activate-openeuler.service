@@ -1,0 +1,9 @@
+[Unit]
+Description=/usr/sbin/lvm vgchange -aay --nohints openeuler
+
+[Service]
+RemainAfterExit=true
+ExecStart=/usr/sbin/lvm vgchange -aay --nohints openeuler
+
+[Install]
+WantedBy=multi-user.target

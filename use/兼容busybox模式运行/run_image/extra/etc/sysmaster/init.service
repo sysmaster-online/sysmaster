@@ -1,0 +1,6 @@
+[Unit]
+Description=init.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/sh /etc/init.d/rcS

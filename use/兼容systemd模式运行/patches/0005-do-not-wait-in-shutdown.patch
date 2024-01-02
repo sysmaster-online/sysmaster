@@ -1,0 +1,28 @@
+From 26ef072231cf0b1489d4e155ed7dc05af69a3d61 Mon Sep 17 00:00:00 2001
+From: rpm-build <rpm-build>
+Date: Tue, 21 Dec 2021 16:12:22 +0800
+Subject: [PATCH] do not wait in shutdown
+
+---
+ src/shutdown/shutdown.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/shutdown/shutdown.c b/src/shutdown/shutdown.c
+index d2b1629..70fd913 100644
+--- a/src/shutdown/shutdown.c
++++ b/src/shutdown/shutdown.c
+@@ -390,10 +390,10 @@ int main(int argc, char *argv[]) {
+         disable_binfmt();
+
+         log_info("Sending SIGTERM to remaining processes...");
+-        broadcast_signal(SIGTERM, true, true, arg_timeout);
++//        broadcast_signal(SIGTERM, true, true, arg_timeout);
+
+         log_info("Sending SIGKILL to remaining processes...");
+-        broadcast_signal(SIGKILL, true, false, arg_timeout);
++//        broadcast_signal(SIGKILL, true, false, arg_timeout);
+
+         need_umount = !in_container;
+         need_swapoff = !in_container;
+--
+2.30.0

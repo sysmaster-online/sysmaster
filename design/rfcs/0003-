@@ -1,0 +1,69 @@
+# 制作极简镜像
+
+# 思路
+构建极简镜像的思路可以分为两个主要步骤：首先，基于源码构建出rpm/deb包；然后，使用Kiwi工具制作出各种精简的镜像。
+
+# 基于源码构建RPM包
+在Linux系统中，RPM（Red Hat Package Manager）包是软件包的标准格式。以rpm为例，你可以使用以下步骤基于源码构建RPM包：
+- 获取源码：首先，你需要获取你想要构建的软件的源码。这通常可以通过下载源码压缩包，或者从版本控制系统（如Git）中获取源码来完成。
+`git clone https://gitee.com/openeuler/sysmaster.git`
+- 配置和构建：进入源码目录，运行脚本配置构建环境， 生成rpm格式的软件。
+`build.sh rpm`
+
+# 使用Kiwi制作精简镜像
+Kiwi是一个基于Python的操作系统映像工具，它可以帮助你创建和维护操作系统映像。以openEuler repo为基础，利用生成的sysmaster.rpm是用kiwi命令来制作镜像。
+
+以下是使用Kiwi制作精简镜像的基本步骤：
+安装Kiwi：首先，你需要在你的系统上安装Kiwi。你可以使用pip来安装：
+```bash
+pip install kiwi
+```
+创建配置文件：Kiwi使用XML配置文件来定义你的映像。以下是一个基本的配置文件示例：
+
+```xml
+<image schemaversion="6.2" name="myimage">
+  <description type="system">
+    <author>Your Name</author>
+    <contact>your@email.com</contact>
+    <specification>My Image</specification>
+  </description>
+  <preferences>
+    <type image="docker" bootloader="grub2">
+      <containerconfig name="my_container" tag="latest"/>
+      <version>1.0.0</version>
+    </type>
+    <version>1.0.0</version>
+    <type filesystem="ext4" fstab-options="defaults" />
+    <type machine="i686" />
+    <type bootloader="grub2">
+      <bootloader name="grub2"/>
+    </type>
+    <type filesystem="btrfs">
+      <btrfs_root_is_snapshot>true</btrfs_root_is_snapshot>
+    </type>
+    <bootsize image="100" />
+    <packmanagers type="zypper">
+      <repository alias="my_repo" path="http://download.opensuse.org/distribution/leap/15.0/repo/oss/" />
+    </packmanagers>
+  </preferences>
+  <users>
+    <user password="linux" pwdformat="plain" home="/home/root" name="root"/>
+  </users>
+  <repository type="rpm-md">
+    <source path="http://download.opensuse.org/distribution/leap/15.0/repo/oss/"/>
+  </repository>
+  <packages>
+    <package name="vim"/>
+    <package name="openssh"/>
+  </packages>
+</image>
+```
+在这个配置文件中，我们定义了一个名为"myimage"的映像，它使用Docker容器，使用GRUB2作为引导加载程序，使用ext4文件系统，并安装了vim和openssh。
+
+创建映像：使用以下命令创建映像：
+bash
+复制
+kiwi-ng --profile myconfig.xml system build --description myimage --target-dir /path/to/output
+这将创建一个名为"myimage"的映像，并将其保存在/path/to/output目录中。
+
+请注意，这只是一个基本的指南，具体的步骤可能会根据你的具体需求和使用的操作系统而变化。

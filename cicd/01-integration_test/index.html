@@ -1,0 +1,2711 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Redesign and Reimplementation of Process1">
+      
+      
+        <meta name="author" content="dev@openeuler.org">
+      
+      
+        <link rel="canonical" href="http://sysmaster.online/cicd/01-integration_test/">
+      
+      
+        <link rel="prev" href="../../contrib/">
+      
+      
+        <link rel="next" href="../02-cargo-fuzz/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.7">
+    
+    
+      
+        <title>测试框架及用例编写 - sysmaster.online</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.4b4a2bd9.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.356b1318.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Ubuntu:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Ubuntu";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="sysmaster.online" class="md-header__button md-logo" aria-label="sysmaster.online" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sysmaster.online
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              测试框架及用例编写
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="分享" aria-label="分享" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91 1.61 0 2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08Z"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://gitee.com/openeuler/sysmaster" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openEuler/sysMaster
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contrib/" class="md-tabs__link">
+        
+  
+    
+  
+  Contrib
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+    
+  
+  Cicd
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../design/00-index_zh/" class="md-tabs__link">
+          
+  
+    
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../man/all/" class="md-tabs__link">
+          
+  
+    
+  
+  Man
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../use/00-sysMaster%E6%9E%84%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8/" class="md-tabs__link">
+          
+  
+    
+  
+  Use
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="sysmaster.online" class="md-nav__button md-logo" aria-label="sysmaster.online" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    sysmaster.online
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://gitee.com/openeuler/sysmaster" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openEuler/sysMaster
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contrib/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contrib
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Cicd
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Cicd
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    测试框架及用例编写
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    测试框架及用例编写
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    概述
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    用例目录结构
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    用例执行
+  </a>
+  
+    <nav class="md-nav" aria-label="用例执行">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    缓存清理
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ignore" class="md-nav__link">
+    ignore标记集成用例
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    测试套执行
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    日志输出
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    用例编写
+  </a>
+  
+    <nav class="md-nav" aria-label="用例编写">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rs" class="md-nav__link">
+    rs文件
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    测试入口脚本
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    框架函数
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    检查脚本
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#faq" class="md-nav__link">
+    FAQ
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    参考资料
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-cargo-fuzz/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cargo-fuzz 介绍
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../build_docker_with_kiwi/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build docker with kiwi
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../build_qemu_with_kiwi/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build qemu with kiwi
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../build_rpm_with_mock/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build rpm with mock
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../build_xz_with_vendor/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build xz with vendor
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    
+  
+  
+    <a href="../tests/devmaster/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Tests
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Design
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Design
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/00-index_zh/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    为什么要开发sysMaster
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/00-sysmaster_0description/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    1号进程的挑战及sysMaster愿景
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/00-sysmaster_architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster架构设计
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design/01-errors_of_sysmaster/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    对错误处理的思考
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../design/cores/01-devel-doc/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Cores
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../design/extends/02-devmaster-architecture/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Extends
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../design/libiraries/01-event/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Libiraries
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../design/rfcs/0001-systemd_parser/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Rfcs
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Man
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Man
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../man/all/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Warnings
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../man/sysmaster.conf/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster 系统配置
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../man/core/exec/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Core
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    
+  
+  
+    <a href="../../man/exts/devmaster/devctl/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Exts
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../man/init/init/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Init
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Use
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Use
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use/00-sysMaster%E6%9E%84%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysMaster 构建和使用
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use/00-systemd2sysmaster/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    systemd向sysmaster迁移
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use/00-%E5%88%B6%E4%BD%9Csysmaster%E4%BD%9C%E4%B8%BA1%E5%8F%B7%E8%BF%9B%E7%A8%8B%E7%9A%84iso%E9%95%9C%E5%83%8F/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    oemake制作sysmaster作为1号进程的iso镜像
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../use/devmaster%E6%9B%BF%E4%BB%A3udev%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Devmaster替代udev运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../use/sysMaster%E7%89%B9%E6%9D%83%E5%AE%B9%E5%99%A8/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    sysMaster特权容器
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../use/sysmaster%E4%B8%8B%E4%BD%BF%E8%83%BDrsyslog/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Sysmaster下使能rsyslog
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../use/%E5%85%BC%E5%AE%B9busybox%E6%A8%A1%E5%BC%8F%E8%BF%90%E8%A1%8C/Readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    兼容busybox模式运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../use/%E5%85%BC%E5%AE%B9systemd%E6%A8%A1%E5%BC%8F%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    兼容systemd模式运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../use/%E5%AE%B9%E5%99%A8%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    容器中替代pid1运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../use/%E8%99%9A%E6%9C%BA%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    虚机中替代pid1运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    概述
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    用例目录结构
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    用例执行
+  </a>
+  
+    <nav class="md-nav" aria-label="用例执行">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    缓存清理
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ignore" class="md-nav__link">
+    ignore标记集成用例
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    测试套执行
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    日志输出
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    用例编写
+  </a>
+  
+    <nav class="md-nav" aria-label="用例编写">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rs" class="md-nav__link">
+    rs文件
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    测试入口脚本
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    框架函数
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    检查脚本
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#faq" class="md-nav__link">
+    FAQ
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    参考资料
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+    <a href="https://gitee.com/-/ide/project/openeuler/sysmaster/edit/master/-/docs/cicd/01-integration_test.md" title="编辑此页" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4v-2m10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1 2.1 2.1Z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="_1">测试框架及用例编写<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<h2 id="_2">概述<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p>本文介绍了<code>tests</code>目录下集成测试用例的目录结构与执行方法，并以<code>docker_example_001</code>、<code>docker_config_test_service_001</code>等用例为案例介绍如何执行、编写集成测试用例。</p>
+<h2 id="_3">用例目录结构<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>不同于单元测试用例，集成用例仅测试对外开放的接口。所有集成测试用例都放置在<code>tests</code>目录下。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="o">[</span>root@openEuler<span class="w"> </span>tests<span class="o">]</span><span class="c1"># tree ./</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>./
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├──<span class="w"> </span>test_frame.sh<span class="w">    </span><span class="c1"># 测试框架</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├──<span class="w"> </span>common<span class="w">    </span><span class="c1"># 公共函数库目录</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│<span class="w">   </span>├──<span class="w"> </span>docker_lib.sh<span class="w">    </span><span class="c1"># 容器场景公共函数</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│<span class="w">   </span>├──<span class="w"> </span>lib.sh<span class="w">    </span><span class="c1"># test_frame.sh所需的变量和公共函数</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│<span class="w">   </span>├──<span class="w"> </span>mod.rs<span class="w">    </span><span class="c1"># run_script函数，测试用例入口函数</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│<span class="w">   </span>└──<span class="w"> </span>util_lib.sh<span class="w">    </span><span class="c1"># 测试脚本（例如check.sh）公共函数</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">|</span><span class="w">   </span>...
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>├──<span class="w"> </span>docker_example.rs<span class="w">    </span><span class="c1"># example测试套定义文件（容器场景）</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>├──<span class="w"> </span>docker_example<span class="w">    </span><span class="c1"># example测试目录（容器场景）</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│<span class="w">   </span>└──<span class="w"> </span>docker_example_001<span class="w">    </span><span class="c1"># example用例（容器场景）</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│<span class="w">       </span>├──<span class="w"> </span>check.sh<span class="w">    </span><span class="c1"># 测试主体，实际的检查脚本</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│<span class="w">       </span>└──<span class="w"> </span>docker_example_001.sh<span class="w">    </span><span class="c1"># 测试用例入口脚本</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="p">|</span><span class="w">   </span>...
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>├──<span class="w"> </span>docker_config_test.rs<span class="w">    </span><span class="c1"># 配置项测试套定义文件（容器场景）</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>├──<span class="w"> </span>docker_config_test<span class="w">    </span><span class="c1"># 配置项测试目录（容器场景），其下文件都是指向config_test目录的软链接</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│<span class="w">   </span>├──<span class="w"> </span>docker_config_test_service_001<span class="w">    </span><span class="c1"># service_001用例（容器场景）</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│<span class="w">   </span>│<span class="w">   </span>├──<span class="w"> </span>check.sh<span class="w"> </span>-&gt;<span class="w"> </span>../../config_test/unit_config_test/service_001/check.sh
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│<span class="w">   </span>│<span class="w">   </span>└──<span class="w"> </span>docker_config_test_service_001.sh<span class="w"> </span>-&gt;<span class="w"> </span>../../config_test/unit_config_test/service_001/service_001.sh
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│<span class="w">   </span>├──<span class="w"> </span>...
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>├──<span class="w"> </span>config_test<span class="w">    </span><span class="c1"># 配置项测试的脚本归档目录（包括单元文件配置项、系统配置项等）</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│<span class="w">   </span>└──<span class="w"> </span>unit_config_test<span class="w">    </span><span class="c1"># 单元文件配置项测试的脚本归档目录</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>│<span class="w">       </span>├──<span class="w"> </span>service_001<span class="w">    </span><span class="c1"># service_001用例脚本归档目录</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>│<span class="w">       </span>│<span class="w">   </span>├──<span class="w"> </span>service_001.sh<span class="w">    </span><span class="c1"># 测试用例入口脚本</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│<span class="w">       </span>│<span class="w">   </span>└──<span class="w"> </span>check.sh<span class="w">    </span><span class="c1"># 测试主体，实际的检查脚本</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│<span class="w">       </span>├──<span class="w"> </span>...
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="p">|</span><span class="w">   </span>...
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>├──<span class="w"> </span>docker_reliable.rs<span class="w">    </span><span class="c1"># 可靠性测试套定义文件（容器场景）</span>
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>├──<span class="w"> </span>docker_reliable<span class="w">    </span><span class="c1"># 可靠性测试目录（容器场景），其下文件都是指向reliable_test目录的软链接</span>
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>│<span class="w">   </span>└──<span class="w"> </span>docker_reliable_random_kill_001<span class="w">    </span><span class="c1"># random_kill_001用例（容器场景）</span>
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>│<span class="w">       </span>├──<span class="w"> </span>check.sh<span class="w"> </span>-&gt;<span class="w"> </span>../../reliable_test/random_kill_001/check.sh
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>│<span class="w">       </span>└──<span class="w"> </span>docker_reliable_random_kill_001.sh<span class="w"> </span>-&gt;<span class="w"> </span>../../reliable_test/random_kill_001/random_kill_001.sh
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>├──<span class="w"> </span>reliable_test<span class="w">    </span><span class="c1"># 可靠性测试的脚本归档目录</span>
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>│<span class="w">   </span>└──<span class="w"> </span>random_kill_001<span class="w">    </span><span class="c1"># random_kill_001用例脚本归档目录</span>
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>│<span class="w">       </span>├──<span class="w"> </span>check.sh<span class="w">    </span><span class="c1"># 测试主体，实际的检查脚本</span>
+<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>│<span class="w">       </span>└──<span class="w"> </span>random_kill_001.sh<span class="w">    </span><span class="c1"># 测试用例入口脚本</span>
+<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="p">|</span><span class="w">   </span>...
+<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>├──<span class="w"> </span>presets
+<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>│<span class="w">   </span>└──<span class="w"> </span>...
+<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>└──<span class="w"> </span>test_units<span class="w">    </span><span class="c1"># 测试所需文件的归档目录</span>
+<a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a><span class="w">    </span>├──<span class="w"> </span>basic.target
+<a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a><span class="w">    </span>├──<span class="w"> </span>...
+<a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a><span class="w">    </span>├──<span class="w"> </span>tests<span class="w">    </span><span class="c1"># 集成测试所需的单元文件归档目录</span>
+<a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a><span class="w">    </span>│<span class="w">   </span>├──<span class="w"> </span>after.service
+<a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a><span class="w">    </span>│<span class="w">   </span>├──<span class="w"> </span>base.service
+<a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a><span class="w">    </span>│<span class="w">   </span>├──<span class="w"> </span>base.socket
+<a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a><span class="w">    </span>│<span class="w">   </span>├──<span class="w"> </span>...
+<a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a><span class="w">    </span>├──<span class="w"> </span>...
+</code></pre></div>
+<p>在本项目中，<code>tests</code>目录下的每个rs文件代表一个用例集合，或者说一个测试套。rs文件命名需要遵循“场景_模块”的规律，“模块”可扩展成“子模块”，例如：“场景_模块_a子模块_b子模块_...”。这样的命名风格不仅方便管理，也便于使用cargo test的原生功能进行用例筛选（具体见[用例执行]章节）。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>├──<span class="w"> </span>docker_example.rs<span class="w">    </span><span class="c1"># 场景：docker，模块后缀：example</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├──<span class="w"> </span>docker_config_test.rs<span class="w">    </span><span class="c1"># 场景：docker，模块后缀：config_test</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├──<span class="w"> </span>vm_config_test.rs<span class="w">    </span><span class="c1"># 场景：vm，模块后缀：config_test</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├──<span class="w"> </span>docker_reliable.rs<span class="w">    </span><span class="c1"># 场景：docker，模块后缀：reliable</span>
+</code></pre></div>
+<p><code>tests</code>目录下的每个rs文件须配套一个同名测试套目录，该目录下是用例的同名子目录，用于存放测试所需的shell脚本等文件。用例执行后生成的详细日志也会存放于此。用例命名须以其所在的rs文件名为前缀，后缀补充用例梗概信息，也可以在最后加上三位数字的编号用以区分。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>├──<span class="w"> </span>docker_config_test.rs
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├──<span class="w"> </span>docker_config_test<span class="w">    </span><span class="c1"># rs文件同名测试套目录</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>│<span class="w">   </span>├──<span class="w"> </span>docker_config_test_condition_001<span class="w">    </span><span class="c1"># 前缀：docker_config_test，用例梗概：condition配置测试，编号：001</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>│<span class="w">   </span>├──<span class="w"> </span>docker_config_test_condition_002<span class="w">    </span><span class="c1"># 前缀：docker_config_test，用例梗概：condition配置测试，编号：002</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│<span class="w">   </span>├──<span class="w"> </span>docker_config_test_dependency_001<span class="w">    </span><span class="c1"># 前缀：docker_config_test，用例梗概：依赖类配置测试，编号：001</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│<span class="w">   </span>├──<span class="w"> </span>docker_config_test_dependency_002<span class="w">    </span><span class="c1"># 前缀：docker_config_test，用例梗概：依赖类配置测试，编号：002</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│<span class="w">   </span>├──<span class="w"> </span>docker_config_test_env_001<span class="w">    </span><span class="c1"># 前缀：docker_config_test，用例梗概：环境变量配置测试，编号：001</span>
+</code></pre></div>
+<p>rs文件中以<code>#[test]</code>关键字定义测试用例。以<code>docker_config_test.rs</code>为例：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="cp">#[test]</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="cp">#[ignore]</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">fn</span> <span class="nf">docker_config_test_dependency_001</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="n">common</span>::<span class="n">run_script</span><span class="p">(</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">        </span><span class="s">&quot;docker_config_test&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">        </span><span class="s">&quot;docker_config_test_dependency_001&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">        </span><span class="s">&quot;1&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="p">);</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">}</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="cp">#[test]</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="cp">#[ignore]</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="k">fn</span> <span class="nf">docker_config_test_dependency_002</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">    </span><span class="n">common</span>::<span class="n">run_script</span><span class="p">(</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">        </span><span class="s">&quot;docker_config_test&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">        </span><span class="s">&quot;docker_config_test_dependency_002&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">        </span><span class="s">&quot;1&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">    </span><span class="p">);</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="p">}</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="cp">#[test]</span>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="cp">#[ignore]</span>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="k">fn</span> <span class="nf">docker_config_test_env_001</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">    </span><span class="n">common</span>::<span class="n">run_script</span><span class="p">(</span><span class="s">&quot;docker_config_test&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;docker_config_test_env_001&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;1&quot;</span><span class="p">);</span>
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="p">}</span>
+</code></pre></div>
+<p>你会注意到有一个<code>tests/common</code>目录，该目录用于存放一些公共函数库，不属于任何一个具体的用例。还有一个<code>test_units</code>目录，用于归档测试所需的单元文件，集成测试所需的单元文件都放置在<code>test_units/tests</code>目录下。</p>
+<h2 id="_4">用例执行<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p>推荐使用cargo工具进行自动化测试。在项目目录下执行以下命令就可以执行测试用例：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>cargo<span class="w"> </span>clean
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>cargo<span class="w"> </span>build<span class="w"> </span>--all
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># 只执行单元用例</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>cargo<span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1"># 只执行集成用例</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--<span class="w"> </span>--ignored<span class="w"> </span>--test-threads<span class="o">=</span><span class="m">1</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1"># 执行所有测试用例</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--<span class="w"> </span>--include-ignored<span class="w"> </span>--test-threads<span class="o">=</span><span class="m">1</span>
+</code></pre></div>
+<h4 id="_5">缓存清理<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h4>
+<p>执行容器场景的用例，每次更新代码后必须清理环境中缓存的<code>sysmaster_base</code>容器镜像，再执行用例，否则被测对象无法更新。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="o">[</span>root@openEuler<span class="w"> </span>tests<span class="o">]</span><span class="c1"># docker images</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>REPOSITORY<span class="w">                               </span>TAG<span class="w">                 </span>IMAGE<span class="w"> </span>ID<span class="w">            </span>CREATED<span class="w">             </span>SIZE
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>sysmaster_base-openeuler-22.03-lts-sp1<span class="w">   </span>latest<span class="w">              </span>0d044cccf14a<span class="w">        </span><span class="m">47</span><span class="w"> </span>hours<span class="w"> </span>ago<span class="w">        </span>461MB
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>openeuler-22.03-lts-sp1<span class="w">                  </span>latest<span class="w">              </span>a0213c9a6ecb<span class="w">        </span><span class="m">3</span><span class="w"> </span>months<span class="w"> </span>ago<span class="w">        </span>191MB
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="o">[</span>root@openEuler<span class="w"> </span>tests<span class="o">]</span><span class="c1"># docker rmi 0d044cccf14a</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>Untagged:<span class="w"> </span>sysmaster_base-openeuler-22.03-lts-sp1:latest
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>Deleted:<span class="w"> </span>sha256:0d044cccf14a33b03f19fb55cb7e5d8160ded6dde957ef657989b0d7b6069dbf
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>Deleted:<span class="w"> </span>sha256:334cc7ee8e6ff60f247fac390c441834f82a4dfa9c7ff912af6453d2c8e301cd
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>Deleted:<span class="w"> </span>sha256:43f31a4a00930231324af564494e6a8df8ea264a841e8cf3434ce5f6939ef3fe
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>Deleted:<span class="w"> </span>sha256:9c69b5de436cdf364f7804cef6c8e83d993763c1d2fac7d56a0a6057a0923541
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>Deleted:<span class="w"> </span>sha256:d42bdece43648694efcf0ce12d18696971188f3aab64910d8cb35b1696c84e4b
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>Deleted:<span class="w"> </span>sha256:15a448c8a65ea6827ab7348bde18f27b8e05afc3e634f9e670828cedb8f1a966
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>Deleted:<span class="w"> </span>sha256:937dfaf6419511399eec93ebac6b4d1a68fb68abf86214381d345be9fc1c11ae
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>Deleted:<span class="w"> </span>sha256:d7402eb5cba4f216aacd24fb189768a1b5658a47c6b9e9320787e497629c3622
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="o">[</span>root@openEuler<span class="w"> </span>tests<span class="o">]</span><span class="c1"># docker images</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>REPOSITORY<span class="w">                </span>TAG<span class="w">                 </span>IMAGE<span class="w"> </span>ID<span class="w">            </span>CREATED<span class="w">             </span>SIZE
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>openeuler-22.03-lts-sp1<span class="w">   </span>latest<span class="w">              </span>a0213c9a6ecb<span class="w">        </span><span class="m">3</span><span class="w"> </span>months<span class="w"> </span>ago<span class="w">        </span>191MB
+</code></pre></div>
+<h4 id="ignore">ignore标记集成用例<a class="headerlink" href="#ignore" title="Permanent link">&para;</a></h4>
+<p>社区ci门禁在容器中运行，所以无法直接在ci门禁中执行容器、虚拟机场景的用例。而ci门禁中会执行<code>cargo test --all</code>，如果不用<code>#[ignored]</code>关键字加以区分，会导致ci门禁中集成用例执行失败。</p>
+<p><code>#[ignore]</code>关键字具体什么含义呢？让我们先来看下官方usage信息：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Test<span class="w"> </span>Attributes:
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="sb">`</span><span class="c1">#[test]`        - Indicates a function is a test to be run. This function</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">                       </span>takes<span class="w"> </span>no<span class="w"> </span>arguments.
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="sb">`</span><span class="c1">#[bench]`       - Indicates a function is a benchmark to be run. This</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">                       </span><span class="k">function</span><span class="w"> </span>takes<span class="w"> </span>one<span class="w"> </span>argument<span class="w"> </span><span class="o">(</span>test::Bencher<span class="o">)</span>.
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">    </span><span class="sb">`</span><span class="c1">#[should_panic]` - This function (also labeled with `#[test]`) will only pass if</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">                        </span>the<span class="w"> </span>code<span class="w"> </span>causes<span class="w"> </span>a<span class="w"> </span>panic<span class="w"> </span><span class="o">(</span>an<span class="w"> </span>assertion<span class="w"> </span>failure<span class="w"> </span>or<span class="w"> </span>panic!<span class="o">)</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">                        </span>A<span class="w"> </span>message<span class="w"> </span>may<span class="w"> </span>be<span class="w"> </span>provided,<span class="w"> </span>which<span class="w"> </span>the<span class="w"> </span>failure<span class="w"> </span>string<span class="w"> </span>must
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">                        </span>contain:<span class="w"> </span><span class="c1">#[should_panic(expected = &quot;foo&quot;)].</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">    </span><span class="sb">`</span><span class="c1">#[ignore]`       - When applied to a function which is already attributed as a</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">                        </span>test,<span class="w"> </span><span class="k">then</span><span class="w"> </span>the<span class="w"> </span><span class="nb">test</span><span class="w"> </span>runner<span class="w"> </span>will<span class="w"> </span>ignore<span class="w"> </span>these<span class="w"> </span>tests<span class="w"> </span>during
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">                        </span>normal<span class="w"> </span><span class="nb">test</span><span class="w"> </span>runs.<span class="w"> </span>Running<span class="w"> </span>with<span class="w"> </span>--ignored<span class="w"> </span>or<span class="w"> </span>--include-ignored<span class="w"> </span>will<span class="w"> </span>run
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">                        </span>these<span class="w"> </span>tests.
+</code></pre></div>
+<p>由此可知，<code>#[ignore]</code>标记的用例默认情况下不会执行，只有<code>cargo test</code>传参<code>--ignored</code> 或 <code>--include-ignored</code>才会执行；前者代表只执行带<code>#[ignore]</code>标记的用例，后者会执行带<code>#[ignore]</code>标记的用例和不带标记的用例。因此，本项目使用<code>#[ignore]</code>标记来跳过ci门禁中的集成用例。</p>
+<h4 id="_6">测试套执行<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h4>
+<p>如果你只想执行单个用例，或者说单个测试套，可以使用cargo自带的用例名称筛选功能：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="o">[</span>root@openEuler<span class="w"> </span>tests<span class="o">]</span><span class="c1"># cargo test --help</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Execute<span class="w"> </span>all<span class="w"> </span>unit<span class="w"> </span>and<span class="w"> </span>integration<span class="w"> </span>tests<span class="w"> </span>and<span class="w"> </span>build<span class="w"> </span>examples<span class="w"> </span>of<span class="w"> </span>a<span class="w"> </span><span class="nb">local</span><span class="w"> </span>package
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>Usage:<span class="w"> </span>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>TESTNAME<span class="o">]</span><span class="w"> </span><span class="o">[</span>--<span class="w"> </span><span class="o">[</span>args<span class="o">]</span>...<span class="o">]</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>Arguments:
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="o">[</span>TESTNAME<span class="o">]</span><span class="w">  </span>If<span class="w"> </span>specified,<span class="w"> </span>only<span class="w"> </span>run<span class="w"> </span>tests<span class="w"> </span>containing<span class="w"> </span>this<span class="w"> </span>string<span class="w"> </span><span class="k">in</span><span class="w"> </span>their<span class="w"> </span>names
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="o">[</span>args<span class="o">]</span>...<span class="w">   </span>Arguments<span class="w"> </span><span class="k">for</span><span class="w"> </span>the<span class="w"> </span><span class="nb">test</span><span class="w"> </span>binary
+</code></pre></div>
+<p>从上述截取的usage信息中我们可以看到，<code>cargo test</code>后面的入参可以直接写用例名<code>[TESTNAME]</code>（只支持单个），或者用例名的子字符串。</p>
+<p>以<code>docker_example_001</code>为例，我们可以直接尝试通过以下方式执行：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># 执行单个用例</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>catgo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>docker_example_001
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># 执行名称包含“docker_example”字符串的用例，即docker_example测试套</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>catgo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>docker_example
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># 执行名称包含“docker”字符串的用例，即所有容器场景的用例</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>catgo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>docker
+</code></pre></div>
+<p>但上述传参方法只支持单个参数，如果你想执行前缀不同的多个测试套，可以参考如下命令：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--test<span class="w"> </span>docker_config_test<span class="w"> </span>--test<span class="w"> </span>docker_example
+</code></pre></div>
+<p>正如上述命令所示，<code>--test</code>选项可以指定测试对象，并且支持多次传参：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="w">     </span>--test<span class="w"> </span><span class="o">[</span>&lt;NAME&gt;<span class="o">]</span><span class="w">           </span>Test<span class="w"> </span>only<span class="w"> </span>the<span class="w"> </span>specified<span class="w"> </span><span class="nb">test</span><span class="w"> </span>target
+</code></pre></div>
+<p>执行效果如下：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Assume that docker_config_test_service_001 and docker_example_001 is the only testcase in their testsuits</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="o">[</span>root@openEuler<span class="w"> </span>tests<span class="o">]</span><span class="c1"># cargo test --test docker_config_test --test docker_example -- --ignored --test-threads=1</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>warning:<span class="w"> </span>/opt/sysmaster/Cargo.toml:<span class="w"> </span><span class="sb">`</span>panic<span class="sb">`</span><span class="w"> </span>setting<span class="w"> </span>is<span class="w"> </span>ignored<span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="sb">`</span>bench<span class="sb">`</span><span class="w"> </span>profile
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>warning:<span class="w"> </span>/opt/sysmaster/Cargo.toml:<span class="w"> </span><span class="sb">`</span>panic<span class="sb">`</span><span class="w"> </span>setting<span class="w"> </span>is<span class="w"> </span>ignored<span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="sb">`</span><span class="nb">test</span><span class="sb">`</span><span class="w"> </span>profile
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">   </span>Compiling<span class="w"> </span>cmdproto<span class="w"> </span>v0.2.0<span class="w"> </span><span class="o">(</span>/opt/sysmaster/libs/cmdproto<span class="o">)</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>warning:<span class="w"> </span>ExitStatus<span class="o">(</span>unix_wait_status<span class="o">(</span><span class="m">0</span><span class="o">))</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">   </span>Compiling<span class="w"> </span>sysmaster<span class="w"> </span>v0.2.2<span class="w"> </span><span class="o">(</span>/opt/sysmaster<span class="o">)</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">    </span>Finished<span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="o">[</span>unoptimized<span class="w"> </span>+<span class="w"> </span>debuginfo<span class="o">]</span><span class="w"> </span>target<span class="o">(</span>s<span class="o">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">5</span>.51s
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">     </span>Running<span class="w"> </span>tests/docker_config_test.rs<span class="w"> </span><span class="o">(</span>/opt/sysmaster/target/debug/deps/docker_config_test-96302cf734a3a312<span class="o">)</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>running<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="nb">test</span><span class="w"> </span>docker_config_test_service_001<span class="w"> </span>...<span class="w"> </span>ok
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="nb">test</span><span class="w"> </span>result:<span class="w"> </span>ok.<span class="w"> </span><span class="m">1</span><span class="w"> </span>passed<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>failed<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>ignored<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>measured<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>filtered<span class="w"> </span>out<span class="p">;</span><span class="w"> </span>finished<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">40</span>.42s
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">     </span>Running<span class="w"> </span>tests/docker_example.rs<span class="w"> </span><span class="o">(</span>/opt/sysmaster/target/debug/deps/docker_example-b995116db87e6729<span class="o">)</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>running<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="nb">test</span><span class="w"> </span>docker_example_001<span class="w"> </span>...<span class="w"> </span>ok
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a>
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="nb">test</span><span class="w"> </span>result:<span class="w"> </span>ok.<span class="w"> </span><span class="m">1</span><span class="w"> </span>passed<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>failed<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>ignored<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>measured<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>filtered<span class="w"> </span>out<span class="p">;</span><span class="w"> </span>finished<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">0</span>.55s
+</code></pre></div>
+<p>你可能注意到上面的命令中，使用了<code>--test-threads</code>选项。默认情况下，cargo会多线程并发执行用例，这会有资源竞争的风险。因此必须在执行集成用例时使用<code>--test-threads=1</code>选项，限制后台线程数量，以达到串行执行的效果：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="w">        </span>--test-threads<span class="w"> </span>n_threads
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">                        </span>Number<span class="w"> </span>of<span class="w"> </span>threads<span class="w"> </span>used<span class="w"> </span><span class="k">for</span><span class="w"> </span>running<span class="w"> </span>tests<span class="w"> </span><span class="k">in</span><span class="w"> </span>parallel
+</code></pre></div>
+<h4 id="_7">日志输出<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h4>
+<p>cargo test执行集成用例会打印用例路径、执行结果、耗时时长等信息。默认情况下，不打印用例成功的日志，只打印失败用例的详细日志（位置可能会有错乱），例如：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="o">[</span>root@openEuler<span class="w"> </span>tests<span class="o">]</span><span class="c1"># cargo test --test docker_config_test --test docker_example -- --ignored --test-threads=1</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>warning:<span class="w"> </span>/opt/sysmaster/Cargo.toml:<span class="w"> </span><span class="sb">`</span>panic<span class="sb">`</span><span class="w"> </span>setting<span class="w"> </span>is<span class="w"> </span>ignored<span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="sb">`</span>bench<span class="sb">`</span><span class="w"> </span>profile
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>warning:<span class="w"> </span>/opt/sysmaster/Cargo.toml:<span class="w"> </span><span class="sb">`</span>panic<span class="sb">`</span><span class="w"> </span>setting<span class="w"> </span>is<span class="w"> </span>ignored<span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="sb">`</span><span class="nb">test</span><span class="sb">`</span><span class="w"> </span>profile
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">   </span>Compiling<span class="w"> </span>cmdproto<span class="w"> </span>v0.2.0<span class="w"> </span><span class="o">(</span>/opt/sysmaster/libs/cmdproto<span class="o">)</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>warning:<span class="w"> </span>ExitStatus<span class="o">(</span>unix_wait_status<span class="o">(</span><span class="m">0</span><span class="o">))</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">   </span>Compiling<span class="w"> </span>sysmaster<span class="w"> </span>v0.2.2<span class="w"> </span><span class="o">(</span>/opt/sysmaster<span class="o">)</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">    </span>Finished<span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="o">[</span>unoptimized<span class="w"> </span>+<span class="w"> </span>debuginfo<span class="o">]</span><span class="w"> </span>target<span class="o">(</span>s<span class="o">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">5</span>.41s
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">     </span>Running<span class="w"> </span>tests/docker_config_test.rs<span class="w"> </span><span class="o">(</span>/opt/sysmaster/target/debug/deps/docker_config_test-96302cf734a3a312<span class="o">)</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>running<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="nb">test</span><span class="w"> </span>docker_config_test_service_001<span class="w"> </span>...<span class="w"> </span>ok
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="nb">test</span><span class="w"> </span>result:<span class="w"> </span>ok.<span class="w"> </span><span class="m">1</span><span class="w"> </span>passed<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>failed<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>ignored<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>measured<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>filtered<span class="w"> </span>out<span class="p">;</span><span class="w"> </span>finished<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">36</span>.18s
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="w">     </span>Running<span class="w"> </span>tests/docker_example.rs<span class="w"> </span><span class="o">(</span>/opt/sysmaster/target/debug/deps/docker_example-b995116db87e6729<span class="o">)</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>running<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="nb">test</span><span class="w"> </span>docker_example_001<span class="w"> </span>...<span class="w"> </span>FAILED
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a>
+<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>failures:
+<a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>
+<a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a>----<span class="w"> </span>docker_example_001<span class="w"> </span>stdout<span class="w"> </span>----
+<a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a><span class="o">[</span><span class="w"> </span>docker_example_001<span class="w"> </span><span class="o">]</span>:<span class="w"> </span><span class="nv">BUILD_PATH</span><span class="o">=</span>/opt/sysmaster<span class="w"> </span><span class="nv">DOCKER_TEST</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>sh<span class="w"> </span>-x<span class="w"> </span>/opt/sysmaster/tests/docker_example/docker_example_001/docker_example_001.sh<span class="w"> </span><span class="p">&amp;</span>&gt;<span class="w"> </span>/opt/sysmaster/tests/docker_example/docker_example_001/docker_example_001.log
+<a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a><span class="o">[</span><span class="w"> </span>docker_example_001<span class="w"> </span><span class="o">]</span>:<span class="w"> </span><span class="nb">exit</span><span class="w"> </span>status:<span class="w"> </span><span class="m">1</span><span class="w">   </span>Detail<span class="w"> </span>Log:
+<a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a>++<span class="w"> </span>basename<span class="w"> </span>/opt/sysmaster/tests/docker_example/docker_example_001/docker_example_001.sh
+<a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a>+<span class="w"> </span><span class="nv">TEST_SCRIPT</span><span class="o">=</span>docker_example_001.sh
+<a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a>++<span class="w"> </span>dirname<span class="w"> </span>/opt/sysmaster/tests/docker_example/docker_example_001/docker_example_001.sh
+<a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a>+<span class="w"> </span><span class="nv">TEST_SCRIPT_PATH</span><span class="o">=</span>/opt/sysmaster/tests/docker_example/docker_example_001
+<a id="__codelineno-13-29" name="__codelineno-13-29" href="#__codelineno-13-29"></a>+<span class="w"> </span><span class="nb">source</span><span class="w"> </span>/opt/sysmaster/tests/test_frame.sh
+<a id="__codelineno-13-30" name="__codelineno-13-30" href="#__codelineno-13-30"></a>++<span class="w"> </span><span class="nv">TEST_PATH</span><span class="o">=</span>/opt/sysmaster/tests
+<a id="__codelineno-13-31" name="__codelineno-13-31" href="#__codelineno-13-31"></a>++<span class="w"> </span><span class="nb">source</span><span class="w"> </span>/opt/sysmaster/tests/common/lib.sh
+<a id="__codelineno-13-32" name="__codelineno-13-32" href="#__codelineno-13-32"></a>+++<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-f<span class="w"> </span>/opt/sysmaster/target/release/sysmaster
+<a id="__codelineno-13-33" name="__codelineno-13-33" href="#__codelineno-13-33"></a>+++<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-f<span class="w"> </span>/opt/sysmaster/target/debug/sysmaster
+<a id="__codelineno-13-34" name="__codelineno-13-34" href="#__codelineno-13-34"></a>+++<span class="w"> </span><span class="nv">MODE</span><span class="o">=</span>debug
+<a id="__codelineno-13-35" name="__codelineno-13-35" href="#__codelineno-13-35"></a>++<span class="w"> </span><span class="nb">source</span><span class="w"> </span>/opt/sysmaster/tests/common/docker_lib.sh
+<a id="__codelineno-13-36" name="__codelineno-13-36" href="#__codelineno-13-36"></a>+++<span class="w"> </span><span class="nv">OS_VER</span><span class="o">=</span>openEuler-22.03-LTS-SP1
+<a id="__codelineno-13-37" name="__codelineno-13-37" href="#__codelineno-13-37"></a>++++<span class="w"> </span>arch
+<a id="__codelineno-13-38" name="__codelineno-13-38" href="#__codelineno-13-38"></a>+++<span class="w"> </span><span class="nv">DOCKER_IMG_URL</span><span class="o">=</span>https://mirrors.nju.edu.cn/openeuler/openEuler-22.03-LTS-SP1/docker_img/x86_64/
+<a id="__codelineno-13-39" name="__codelineno-13-39" href="#__codelineno-13-39"></a>++++<span class="w"> </span>arch
+<a id="__codelineno-13-40" name="__codelineno-13-40" href="#__codelineno-13-40"></a>+++<span class="w"> </span><span class="nv">DOCKER_TAR</span><span class="o">=</span>openEuler-docker.x86_64.tar
+<a id="__codelineno-13-41" name="__codelineno-13-41" href="#__codelineno-13-41"></a>+++<span class="w"> </span><span class="nv">BASE_IMG</span><span class="o">=</span>openeuler-22.03-lts-sp1
+<a id="__codelineno-13-42" name="__codelineno-13-42" href="#__codelineno-13-42"></a>+++<span class="w"> </span><span class="nv">SYSMST_BASE_IMG</span><span class="o">=</span>sysmaster_base-openeuler-22.03-lts-sp1
+<a id="__codelineno-13-43" name="__codelineno-13-43" href="#__codelineno-13-43"></a>++<span class="w"> </span><span class="nb">source</span><span class="w"> </span>/opt/sysmaster/tests/common/util_lib.sh
+<a id="__codelineno-13-44" name="__codelineno-13-44" href="#__codelineno-13-44"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">EXPECT_FAIL</span><span class="o">=</span><span class="m">0</span>
+<a id="__codelineno-13-45" name="__codelineno-13-45" href="#__codelineno-13-45"></a>+++<span class="w"> </span><span class="nv">EXPECT_FAIL</span><span class="o">=</span><span class="m">0</span>
+<a id="__codelineno-13-46" name="__codelineno-13-46" href="#__codelineno-13-46"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">SYSMST_LIB_PATH</span><span class="o">=</span>/usr/lib/sysmaster/system
+<a id="__codelineno-13-47" name="__codelineno-13-47" href="#__codelineno-13-47"></a>+++<span class="w"> </span><span class="nv">SYSMST_LIB_PATH</span><span class="o">=</span>/usr/lib/sysmaster/system
+<a id="__codelineno-13-48" name="__codelineno-13-48" href="#__codelineno-13-48"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">SYSMST_RUN_PATH</span><span class="o">=</span>/run/sysmaster/system
+<a id="__codelineno-13-49" name="__codelineno-13-49" href="#__codelineno-13-49"></a>+++<span class="w"> </span><span class="nv">SYSMST_RUN_PATH</span><span class="o">=</span>/run/sysmaster/system
+<a id="__codelineno-13-50" name="__codelineno-13-50" href="#__codelineno-13-50"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">SYSMST_ETC_PATH</span><span class="o">=</span>/etc/sysmaster/system
+<a id="__codelineno-13-51" name="__codelineno-13-51" href="#__codelineno-13-51"></a>+++<span class="w"> </span><span class="nv">SYSMST_ETC_PATH</span><span class="o">=</span>/etc/sysmaster/system
+<a id="__codelineno-13-52" name="__codelineno-13-52" href="#__codelineno-13-52"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">SYSMST_LOG</span><span class="o">=</span>/opt/sysmaster.log
+<a id="__codelineno-13-53" name="__codelineno-13-53" href="#__codelineno-13-53"></a>+++<span class="w"> </span><span class="nv">SYSMST_LOG</span><span class="o">=</span>/opt/sysmaster.log
+<a id="__codelineno-13-54" name="__codelineno-13-54" href="#__codelineno-13-54"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">RELIAB_SWITCH_PATH</span><span class="o">=</span>/run/sysmaster/reliability
+<a id="__codelineno-13-55" name="__codelineno-13-55" href="#__codelineno-13-55"></a>+++<span class="w"> </span><span class="nv">RELIAB_SWITCH_PATH</span><span class="o">=</span>/run/sysmaster/reliability
+<a id="__codelineno-13-56" name="__codelineno-13-56" href="#__codelineno-13-56"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">RELIAB_SWITCH</span><span class="o">=</span>switch.debug
+<a id="__codelineno-13-57" name="__codelineno-13-57" href="#__codelineno-13-57"></a>+++<span class="w"> </span><span class="nv">RELIAB_SWITCH</span><span class="o">=</span>switch.debug
+<a id="__codelineno-13-58" name="__codelineno-13-58" href="#__codelineno-13-58"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">RELIAB_CLR</span><span class="o">=</span>clear.debug
+<a id="__codelineno-13-59" name="__codelineno-13-59" href="#__codelineno-13-59"></a>+++<span class="w"> </span><span class="nv">RELIAB_CLR</span><span class="o">=</span>clear.debug
+<a id="__codelineno-13-60" name="__codelineno-13-60" href="#__codelineno-13-60"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">init_pid</span><span class="o">=</span>
+<a id="__codelineno-13-61" name="__codelineno-13-61" href="#__codelineno-13-61"></a>+++<span class="w"> </span><span class="nv">init_pid</span><span class="o">=</span>
+<a id="__codelineno-13-62" name="__codelineno-13-62" href="#__codelineno-13-62"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">sysmaster_pid</span><span class="o">=</span>
+<a id="__codelineno-13-63" name="__codelineno-13-63" href="#__codelineno-13-63"></a>+++<span class="w"> </span><span class="nv">sysmaster_pid</span><span class="o">=</span>
+<a id="__codelineno-13-64" name="__codelineno-13-64" href="#__codelineno-13-64"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="s1">&#39;cond_fail_log=Starting failed .* condition test failed&#39;</span>
+<a id="__codelineno-13-65" name="__codelineno-13-65" href="#__codelineno-13-65"></a>+++<span class="w"> </span><span class="nv">cond_fail_log</span><span class="o">=</span><span class="s1">&#39;Starting failed .* condition test failed&#39;</span>
+<a id="__codelineno-13-66" name="__codelineno-13-66" href="#__codelineno-13-66"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="s1">&#39;asst_fail_log=Starting failed .* assert test failed&#39;</span>
+<a id="__codelineno-13-67" name="__codelineno-13-67" href="#__codelineno-13-67"></a>+++<span class="w"> </span><span class="nv">asst_fail_log</span><span class="o">=</span><span class="s1">&#39;Starting failed .* assert test failed&#39;</span>
+<a id="__codelineno-13-68" name="__codelineno-13-68" href="#__codelineno-13-68"></a>+++<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">yum_proxy</span><span class="o">=</span><span class="nv">proxy</span><span class="o">=</span>
+<a id="__codelineno-13-69" name="__codelineno-13-69" href="#__codelineno-13-69"></a>+++<span class="w"> </span><span class="nv">yum_proxy</span><span class="o">=</span><span class="nv">proxy</span><span class="o">=</span>
+<a id="__codelineno-13-70" name="__codelineno-13-70" href="#__codelineno-13-70"></a>++<span class="w"> </span><span class="nb">set</span><span class="w"> </span>+e
+<a id="__codelineno-13-71" name="__codelineno-13-71" href="#__codelineno-13-71"></a>++<span class="w"> </span><span class="nv">TMP_DIR</span><span class="o">=</span>
+<a id="__codelineno-13-72" name="__codelineno-13-72" href="#__codelineno-13-72"></a>+<span class="w"> </span><span class="nb">set</span><span class="w"> </span>+e
+<a id="__codelineno-13-73" name="__codelineno-13-73" href="#__codelineno-13-73"></a>+<span class="w"> </span>runtest
+<a id="__codelineno-13-74" name="__codelineno-13-74" href="#__codelineno-13-74"></a>+<span class="w"> </span><span class="nb">local</span><span class="w"> </span><span class="nv">ret</span><span class="o">=</span><span class="m">1</span>
+<a id="__codelineno-13-75" name="__codelineno-13-75" href="#__codelineno-13-75"></a>+<span class="w"> </span>log_info<span class="w"> </span><span class="s1">&#39;===== cleanup before test =====&#39;</span>
+<a id="__codelineno-13-76" name="__codelineno-13-76" href="#__codelineno-13-76"></a>++<span class="w"> </span>date<span class="w"> </span><span class="s1">&#39;+%F %T&#39;</span>
+<a id="__codelineno-13-77" name="__codelineno-13-77" href="#__codelineno-13-77"></a>+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;[2023-04-13 20:19:29] [  INFO ] ===== cleanup before test =====&#39;</span>
+<a id="__codelineno-13-78" name="__codelineno-13-78" href="#__codelineno-13-78"></a><span class="o">[</span><span class="m">2023</span>-04-13<span class="w"> </span><span class="m">20</span>:19:29<span class="o">]</span><span class="w"> </span><span class="o">[</span><span class="w">  </span>INFO<span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">=====</span><span class="w"> </span>cleanup<span class="w"> </span>before<span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="o">=====</span>
+<a id="__codelineno-13-79" name="__codelineno-13-79" href="#__codelineno-13-79"></a>+<span class="w"> </span>test_cleanup
+<a id="__codelineno-13-80" name="__codelineno-13-80" href="#__codelineno-13-80"></a>+<span class="w"> </span><span class="s1">&#39;[&#39;</span><span class="w"> </span>-n<span class="w"> </span><span class="s1">&#39;&#39;</span><span class="w"> </span><span class="s1">&#39;]&#39;</span>
+<a id="__codelineno-13-81" name="__codelineno-13-81" href="#__codelineno-13-81"></a>+<span class="w"> </span>rm<span class="w"> </span>-rf<span class="w"> </span>/usr/bin/sctl<span class="w"> </span>/usr/lib/sysmaster
+<a id="__codelineno-13-82" name="__codelineno-13-82" href="#__codelineno-13-82"></a>+<span class="w"> </span><span class="s1">&#39;[&#39;</span><span class="w"> </span><span class="nv">1</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="s1">&#39;]&#39;</span>
+<a id="__codelineno-13-83" name="__codelineno-13-83" href="#__codelineno-13-83"></a>+<span class="w"> </span>cleanup_docker
+<a id="__codelineno-13-84" name="__codelineno-13-84" href="#__codelineno-13-84"></a>+<span class="w"> </span>docker<span class="w"> </span>ps<span class="w"> </span>-a
+<a id="__codelineno-13-85" name="__codelineno-13-85" href="#__codelineno-13-85"></a>+<span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span><span class="s1">&#39;CONTAINER ID&#39;</span>
+<a id="__codelineno-13-86" name="__codelineno-13-86" href="#__codelineno-13-86"></a>+<span class="w"> </span>docker<span class="w"> </span>images
+<a id="__codelineno-13-87" name="__codelineno-13-87" href="#__codelineno-13-87"></a>+<span class="w"> </span>grep<span class="w"> </span>-vEw<span class="w"> </span><span class="s1">&#39;IMAGE ID|openeuler-22.03-lts-sp1|sysmaster_base-openeuler-22.03-lts-sp1&#39;</span>
+<a id="__codelineno-13-88" name="__codelineno-13-88" href="#__codelineno-13-88"></a>+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">0</span>
+<a id="__codelineno-13-89" name="__codelineno-13-89" href="#__codelineno-13-89"></a>+<span class="w"> </span>test_setup
+<a id="__codelineno-13-90" name="__codelineno-13-90" href="#__codelineno-13-90"></a>+<span class="w"> </span>setenforce<span class="w"> </span><span class="m">0</span>
+<a id="__codelineno-13-91" name="__codelineno-13-91" href="#__codelineno-13-91"></a>+<span class="w"> </span>install_sysmaster
+<a id="__codelineno-13-92" name="__codelineno-13-92" href="#__codelineno-13-92"></a>+<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-d<span class="w"> </span>/opt/sysmaster/target/install
+<a id="__codelineno-13-93" name="__codelineno-13-93" href="#__codelineno-13-93"></a>+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">0</span>
+<a id="__codelineno-13-94" name="__codelineno-13-94" href="#__codelineno-13-94"></a>+<span class="w"> </span><span class="s1">&#39;[&#39;</span><span class="w"> </span><span class="nv">1</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="s1">&#39;]&#39;</span>
+<a id="__codelineno-13-95" name="__codelineno-13-95" href="#__codelineno-13-95"></a>+<span class="w"> </span>setup_docker
+<a id="__codelineno-13-96" name="__codelineno-13-96" href="#__codelineno-13-96"></a>++<span class="w"> </span>mktemp<span class="w"> </span>-d<span class="w"> </span>/tmp/docker_example_001_XXXX
+<a id="__codelineno-13-97" name="__codelineno-13-97" href="#__codelineno-13-97"></a>+<span class="w"> </span><span class="nv">TMP_DIR</span><span class="o">=</span>/tmp/docker_example_001_3Vx5
+<a id="__codelineno-13-98" name="__codelineno-13-98" href="#__codelineno-13-98"></a>+<span class="w"> </span>which<span class="w"> </span>docker
+<a id="__codelineno-13-99" name="__codelineno-13-99" href="#__codelineno-13-99"></a>/usr/bin/docker
+<a id="__codelineno-13-100" name="__codelineno-13-100" href="#__codelineno-13-100"></a>+<span class="w"> </span>docker<span class="w"> </span>images
+<a id="__codelineno-13-101" name="__codelineno-13-101" href="#__codelineno-13-101"></a>+<span class="w"> </span>grep<span class="w"> </span>sysmaster_base-openeuler-22.03-lts-sp1
+<a id="__codelineno-13-102" name="__codelineno-13-102" href="#__codelineno-13-102"></a>sysmaster_base-openeuler-22.03-lts-sp1<span class="w">   </span>latest<span class="w">              </span>399ae0ff19f9<span class="w">        </span><span class="m">28</span><span class="w"> </span>hours<span class="w"> </span>ago<span class="w">        </span>461MB
+<a id="__codelineno-13-103" name="__codelineno-13-103" href="#__codelineno-13-103"></a>+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">0</span>
+<a id="__codelineno-13-104" name="__codelineno-13-104" href="#__codelineno-13-104"></a>+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">0</span>
+<a id="__codelineno-13-105" name="__codelineno-13-105" href="#__codelineno-13-105"></a>+<span class="w"> </span>log_info<span class="w"> </span><span class="s1">&#39;===== setup before test OK =====&#39;</span>
+<a id="__codelineno-13-106" name="__codelineno-13-106" href="#__codelineno-13-106"></a>++<span class="w"> </span>date<span class="w"> </span><span class="s1">&#39;+%F %T&#39;</span>
+<a id="__codelineno-13-107" name="__codelineno-13-107" href="#__codelineno-13-107"></a>+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;[2023-04-13 20:19:29] [  INFO ] ===== setup before test OK =====&#39;</span>
+<a id="__codelineno-13-108" name="__codelineno-13-108" href="#__codelineno-13-108"></a><span class="o">[</span><span class="m">2023</span>-04-13<span class="w"> </span><span class="m">20</span>:19:29<span class="o">]</span><span class="w"> </span><span class="o">[</span><span class="w">  </span>INFO<span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">=====</span><span class="w"> </span>setup<span class="w"> </span>before<span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="nv">OK</span><span class="w"> </span><span class="o">=====</span>
+<a id="__codelineno-13-109" name="__codelineno-13-109" href="#__codelineno-13-109"></a>++<span class="w"> </span><span class="nb">type</span><span class="w"> </span>-t<span class="w"> </span>test_pre
+<a id="__codelineno-13-110" name="__codelineno-13-110" href="#__codelineno-13-110"></a>+<span class="w"> </span><span class="s1">&#39;[&#39;</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">function</span><span class="w"> </span><span class="s1">&#39;]&#39;</span>
+<a id="__codelineno-13-111" name="__codelineno-13-111" href="#__codelineno-13-111"></a>+<span class="w"> </span>log_info<span class="w"> </span><span class="s1">&#39;===== test_run begin =====&#39;</span>
+<a id="__codelineno-13-112" name="__codelineno-13-112" href="#__codelineno-13-112"></a>++<span class="w"> </span>date<span class="w"> </span><span class="s1">&#39;+%F %T&#39;</span>
+<a id="__codelineno-13-113" name="__codelineno-13-113" href="#__codelineno-13-113"></a>+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;[2023-04-13 20:19:29] [  INFO ] ===== test_run begin =====&#39;</span>
+<a id="__codelineno-13-114" name="__codelineno-13-114" href="#__codelineno-13-114"></a><span class="o">[</span><span class="m">2023</span>-04-13<span class="w"> </span><span class="m">20</span>:19:29<span class="o">]</span><span class="w"> </span><span class="o">[</span><span class="w">  </span>INFO<span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">=====</span><span class="w"> </span>test_run<span class="w"> </span><span class="nv">begin</span><span class="w"> </span><span class="o">=====</span>
+<a id="__codelineno-13-115" name="__codelineno-13-115" href="#__codelineno-13-115"></a>+<span class="w"> </span>test_run
+<a id="__codelineno-13-116" name="__codelineno-13-116" href="#__codelineno-13-116"></a>+<span class="w"> </span><span class="nb">local</span><span class="w"> </span>ret
+<a id="__codelineno-13-117" name="__codelineno-13-117" href="#__codelineno-13-117"></a>+<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/tmp/docker_example_001_3Vx5/opt
+<a id="__codelineno-13-118" name="__codelineno-13-118" href="#__codelineno-13-118"></a>++<span class="w"> </span>realpath<span class="w"> </span>/opt/sysmaster/tests/docker_example/docker_example_001/check.sh
+<a id="__codelineno-13-119" name="__codelineno-13-119" href="#__codelineno-13-119"></a>+<span class="w"> </span>cp<span class="w"> </span>-arf<span class="w"> </span>/opt/sysmaster/tests/docker_example/docker_example_001/check.sh<span class="w"> </span>/tmp/docker_example_001_3Vx5/opt
+<a id="__codelineno-13-120" name="__codelineno-13-120" href="#__codelineno-13-120"></a>+<span class="w"> </span>chmod<span class="w"> </span>-R<span class="w"> </span><span class="m">777</span><span class="w"> </span>/tmp/docker_example_001_3Vx5
+<a id="__codelineno-13-121" name="__codelineno-13-121" href="#__codelineno-13-121"></a>+<span class="w"> </span>docker<span class="w"> </span>run<span class="w"> </span>--privileged<span class="w"> </span>--rm<span class="w"> </span>-v<span class="w"> </span>/tmp/docker_example_001_3Vx5/opt:/opt<span class="w"> </span>sysmaster_base-openeuler-22.03-lts-sp1<span class="w"> </span>sh<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;sh -x /opt/check.sh &amp;&gt; /opt/check.log&#39;</span>
+<a id="__codelineno-13-122" name="__codelineno-13-122" href="#__codelineno-13-122"></a>+<span class="w"> </span><span class="nv">ret</span><span class="o">=</span><span class="m">1</span>
+<a id="__codelineno-13-123" name="__codelineno-13-123" href="#__codelineno-13-123"></a>+<span class="w"> </span>cat<span class="w"> </span>/tmp/docker_example_001_3Vx5/opt/check.log
+<a id="__codelineno-13-124" name="__codelineno-13-124" href="#__codelineno-13-124"></a>+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-13-125" name="__codelineno-13-125" href="#__codelineno-13-125"></a>+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-13-126" name="__codelineno-13-126" href="#__codelineno-13-126"></a>+<span class="w"> </span>log_info<span class="w"> </span><span class="s1">&#39;===== test_run FAILED =====&#39;</span>
+<a id="__codelineno-13-127" name="__codelineno-13-127" href="#__codelineno-13-127"></a>++<span class="w"> </span>date<span class="w"> </span><span class="s1">&#39;+%F %T&#39;</span>
+<a id="__codelineno-13-128" name="__codelineno-13-128" href="#__codelineno-13-128"></a>+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;[2023-04-13 20:19:29] [  INFO ] ===== test_run FAILED =====&#39;</span>
+<a id="__codelineno-13-129" name="__codelineno-13-129" href="#__codelineno-13-129"></a><span class="o">[</span><span class="m">2023</span>-04-13<span class="w"> </span><span class="m">20</span>:19:29<span class="o">]</span><span class="w"> </span><span class="o">[</span><span class="w">  </span>INFO<span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">=====</span><span class="w"> </span>test_run<span class="w"> </span><span class="nv">FAILED</span><span class="w"> </span><span class="o">=====</span>
+<a id="__codelineno-13-130" name="__codelineno-13-130" href="#__codelineno-13-130"></a>+<span class="w"> </span>log_info<span class="w"> </span><span class="s1">&#39;===== cleanup after test =====&#39;</span>
+<a id="__codelineno-13-131" name="__codelineno-13-131" href="#__codelineno-13-131"></a>++<span class="w"> </span>date<span class="w"> </span><span class="s1">&#39;+%F %T&#39;</span>
+<a id="__codelineno-13-132" name="__codelineno-13-132" href="#__codelineno-13-132"></a>+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;[2023-04-13 20:19:29] [  INFO ] ===== cleanup after test =====&#39;</span>
+<a id="__codelineno-13-133" name="__codelineno-13-133" href="#__codelineno-13-133"></a><span class="o">[</span><span class="m">2023</span>-04-13<span class="w"> </span><span class="m">20</span>:19:29<span class="o">]</span><span class="w"> </span><span class="o">[</span><span class="w">  </span>INFO<span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">=====</span><span class="w"> </span>cleanup<span class="w"> </span>after<span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="o">=====</span>
+<a id="__codelineno-13-134" name="__codelineno-13-134" href="#__codelineno-13-134"></a>+<span class="w"> </span>test_cleanup
+<a id="__codelineno-13-135" name="__codelineno-13-135" href="#__codelineno-13-135"></a>+<span class="w"> </span><span class="s1">&#39;[&#39;</span><span class="w"> </span>-n<span class="w"> </span>/tmp/docker_example_001_3Vx5<span class="w"> </span><span class="s1">&#39;]&#39;</span>
+<a id="__codelineno-13-136" name="__codelineno-13-136" href="#__codelineno-13-136"></a>+<span class="w"> </span>rm<span class="w"> </span>-rf<span class="w"> </span>/tmp/docker_example_001_3Vx5
+<a id="__codelineno-13-137" name="__codelineno-13-137" href="#__codelineno-13-137"></a>+<span class="w"> </span>rm<span class="w"> </span>-rf<span class="w"> </span>/usr/bin/sctl<span class="w"> </span>/usr/lib/sysmaster
+<a id="__codelineno-13-138" name="__codelineno-13-138" href="#__codelineno-13-138"></a>+<span class="w"> </span><span class="s1">&#39;[&#39;</span><span class="w"> </span><span class="nv">1</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="s1">&#39;]&#39;</span>
+<a id="__codelineno-13-139" name="__codelineno-13-139" href="#__codelineno-13-139"></a>+<span class="w"> </span>cleanup_docker
+<a id="__codelineno-13-140" name="__codelineno-13-140" href="#__codelineno-13-140"></a>+<span class="w"> </span>docker<span class="w"> </span>ps<span class="w"> </span>-a
+<a id="__codelineno-13-141" name="__codelineno-13-141" href="#__codelineno-13-141"></a>+<span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span><span class="s1">&#39;CONTAINER ID&#39;</span>
+<a id="__codelineno-13-142" name="__codelineno-13-142" href="#__codelineno-13-142"></a>+<span class="w"> </span>docker<span class="w"> </span>images
+<a id="__codelineno-13-143" name="__codelineno-13-143" href="#__codelineno-13-143"></a>+<span class="w"> </span>grep<span class="w"> </span>-vEw<span class="w"> </span><span class="s1">&#39;IMAGE ID|openeuler-22.03-lts-sp1|sysmaster_base-openeuler-22.03-lts-sp1&#39;</span>
+<a id="__codelineno-13-144" name="__codelineno-13-144" href="#__codelineno-13-144"></a>+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">0</span>
+<a id="__codelineno-13-145" name="__codelineno-13-145" href="#__codelineno-13-145"></a>+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-13-146" name="__codelineno-13-146" href="#__codelineno-13-146"></a>thread<span class="w"> </span><span class="s1">&#39;docker_example_001&#39;</span><span class="w"> </span>panicked<span class="w"> </span>at<span class="w"> </span><span class="s1">&#39;assertion failed: status.success()&#39;</span>,<span class="w"> </span>tests/common/mod.rs:40:5
+<a id="__codelineno-13-147" name="__codelineno-13-147" href="#__codelineno-13-147"></a>note:<span class="w"> </span>run<span class="w"> </span>with<span class="w"> </span><span class="sb">`</span><span class="nv">RUST_BACKTRACE</span><span class="o">=</span><span class="m">1</span><span class="sb">`</span><span class="w"> </span>environment<span class="w"> </span>variable<span class="w"> </span>to<span class="w"> </span>display<span class="w"> </span>a<span class="w"> </span>backtrace
+<a id="__codelineno-13-148" name="__codelineno-13-148" href="#__codelineno-13-148"></a>
+<a id="__codelineno-13-149" name="__codelineno-13-149" href="#__codelineno-13-149"></a>
+<a id="__codelineno-13-150" name="__codelineno-13-150" href="#__codelineno-13-150"></a>failures:
+<a id="__codelineno-13-151" name="__codelineno-13-151" href="#__codelineno-13-151"></a><span class="w">    </span>docker_example_001
+<a id="__codelineno-13-152" name="__codelineno-13-152" href="#__codelineno-13-152"></a>
+<a id="__codelineno-13-153" name="__codelineno-13-153" href="#__codelineno-13-153"></a><span class="nb">test</span><span class="w"> </span>result:<span class="w"> </span>FAILED.<span class="w"> </span><span class="m">0</span><span class="w"> </span>passed<span class="p">;</span><span class="w"> </span><span class="m">1</span><span class="w"> </span>failed<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>ignored<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>measured<span class="p">;</span><span class="w"> </span><span class="m">0</span><span class="w"> </span>filtered<span class="w"> </span>out<span class="p">;</span><span class="w"> </span>finished<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">0</span>.54s
+<a id="__codelineno-13-154" name="__codelineno-13-154" href="#__codelineno-13-154"></a>
+<a id="__codelineno-13-155" name="__codelineno-13-155" href="#__codelineno-13-155"></a>error:<span class="w"> </span><span class="nb">test</span><span class="w"> </span>failed,<span class="w"> </span>to<span class="w"> </span>rerun<span class="w"> </span>pass<span class="w"> </span><span class="sb">`</span>--test<span class="w"> </span>docker_example<span class="sb">`</span>
+</code></pre></div>
+<p><code>---- docker_example_001 stdout ----</code>下的信息就是<code>docker_example_001</code>的详细执行日志，它明确告诉我们具体失败的位置。如果你想查看成功用例的详细日志信息，可以尝试<code>--show-output</code>选项：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="w">        </span>--show-output<span class="w">   </span>Show<span class="w"> </span>captured<span class="w"> </span>stdout<span class="w"> </span>of<span class="w"> </span>successful<span class="w"> </span>tests
+</code></pre></div>
+<p>在调试定位的过程中，cargo直接打印在屏幕上的信息很容易丢失。我们可以根据提示找到详细日志的归档位置，即用例入口脚本的同级目录。</p>
+<blockquote>
+<p>注意！每次执行用例都会覆盖上一次的执行日志。</p>
+</blockquote>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="o">[</span><span class="w"> </span>docker_example_001<span class="w"> </span><span class="o">]</span>:<span class="w"> </span><span class="nv">BUILD_PATH</span><span class="o">=</span>/opt/sysmaster<span class="w"> </span><span class="nv">DOCKER_TEST</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>sh<span class="w"> </span>-x<span class="w"> </span>/opt/sysmaster/tests/docker_example/docker_example_001/docker_example_001.sh<span class="w"> </span><span class="p">&amp;</span>&gt;<span class="w"> </span>/opt/sysmaster/tests/docker_example/docker_example_001/docker_example_001.log
+</code></pre></div>
+<p>根据示例中的失败日志，我们可以发现，测试用例实际上是shell脚本的rust封装。用例通过<code>#[test]</code>标记在rs文件中注册函数。cargo通过这些函数执行对应的测试入口脚本。而入口脚本也只是一层封装，实际的测试主体是另一个检查脚本。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>docker_example.rs  ------&gt;  测试套文件
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>      |
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>      |
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>   fn docker_example_001  ------&gt;  #[test]注册函数，即注册用例
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>            |
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>            |
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>      sh -x docker_example_001.sh  ------&gt;  测试入口脚本，与用例同名，对应日志：docker_example_001.log
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>                  |
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>                  |
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>            sh -x check.sh  ------&gt;  测试主体检查脚本
+</code></pre></div>
+<p>你可能会疑问，为什么主体检查脚本外还要再封装一层入口脚本？这是因为sysmaster要支持容器、虚拟机等场景。不同场景的环境准备工作不同，拉起检查脚本的方式也不同，但实际检查的内容却几乎相同。因此，设置入口脚本用于差异化环境准备，检查脚本用于执行共性的测试步骤。</p>
+<h2 id="_8">用例编写<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<p>了解如何执行用例后 ，我们来尝试自己编写一个集成测试用例。首先，回顾一下上文提到的要点：</p>
+<ul>
+<li>rs文件即测试套文件，用于注册测试函数，一个测试函数就是一个测试用例。</li>
+<li>测试套命名遵循“场景_模块”风格，测试用例以测试套名称为前缀。</li>
+<li>测试入口脚本用于环境准备，测试检查脚本才是真正的主体，各脚本需严格分级归档。</li>
+</ul>
+<p>牢记以上三点，让我们从rs文件开始写用例吧。</p>
+<h4 id="rs">rs文件<a class="headerlink" href="#rs" title="Permanent link">&para;</a></h4>
+<p>以容器场景的<code>docker_example.rs</code>为例，首先<code>mod common</code>导入<code>common::run_script</code>函数。<code>fn docker_example_001</code>就是测试函数，也就是cargo识别到的真正用例。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">mod</span> <span class="nn">common</span><span class="p">;</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="cp">#[test]</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="cp">#[ignore]</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="k">fn</span> <span class="nf">docker_example_001</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">    </span><span class="n">common</span>::<span class="n">run_script</span><span class="p">(</span><span class="s">&quot;docker_example&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;docker_example_001&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;1&quot;</span><span class="p">);</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="p">}</span>
+</code></pre></div>
+<p><code>docker_example_001</code>函数中只有一行调用，即<code>run_script</code>，该函数在<code>common/mod.rs</code>中定义。<code>run_script</code>一共有3个字符串类型入参，分别是：</p>
+<ul>
+<li>测试套名称suit</li>
+<li>测试用例名称name</li>
+<li>DOCKER_TEST的值</li>
+</ul>
+<p>前两个入参用于拼接测试入口脚本的路径，即<code>{suit}/{name}/{name}.sh</code>。第三个参数等于1表示是容器场景，测试入口脚本会根据这个变量的值部署环境。</p>
+<h4 id="_9">测试入口脚本<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h4>
+<p>以<code>docker_example/docker_example_001/docker_example_001.sh</code>为例，入口脚本首先需要定义2个全局变量<code>TEST_SCRIPT</code>、<code>TEST_SCRIPT_PATH</code>，这两者是必须的，每个脚本的开头都必须定义，用于获取source路径，可以直接拷贝样例中的定义。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="nv">TEST_SCRIPT</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>basename<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$0</span><span class="s2">&quot;</span><span class="k">)</span><span class="s2">&quot;</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="nv">TEST_SCRIPT_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>dirname<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$0</span><span class="s2">&quot;</span><span class="k">)</span><span class="s2">&quot;</span>
+</code></pre></div>
+<p>接着需要<code>source test_frame.sh</code>，该文件定义了测试框架的几个关键函数，[框架函数]小节再展开介绍。然后，就需要测试人员根据测试场景自行编写<code>test_run</code>函数。</p>
+<p><code>docker_example_001</code>用例是容器场景用例，因此<code>test_run</code>函数需要进行一些环境准备，例如：创建临时目录，将检查脚本<code>check.sh</code>拷贝至临时目录。然后，通过<code>docker run</code>命令挂载临时目录并执行<code>check.sh</code>。最后，记录返回值、打印检查脚本的执行日志。这一系列操作是在容器场景下是通用的，可以直接移植。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="ch">#!/bin/bash</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="c1"># Description: test for example</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="nv">TEST_SCRIPT</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>basename<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$0</span><span class="s2">&quot;</span><span class="k">)</span><span class="s2">&quot;</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="nv">TEST_SCRIPT_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>dirname<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$0</span><span class="s2">&quot;</span><span class="k">)</span><span class="s2">&quot;</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="nb">source</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">BUILD_PATH</span><span class="si">}</span><span class="s2">&quot;</span>/tests/test_frame.sh
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="nb">set</span><span class="w"> </span>+e
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="k">function</span><span class="w"> </span>test_run<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="w">    </span><span class="nb">local</span><span class="w"> </span>ret
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="w">    </span>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>/opt
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a><span class="w">    </span>cp<span class="w"> </span>-arf<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>realpath<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TEST_SCRIPT_PATH</span><span class="si">}</span><span class="s2">&quot;</span>/check.sh<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>/opt
+<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a><span class="w">    </span>chmod<span class="w"> </span>-R<span class="w"> </span><span class="m">777</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a><span class="w">    </span>docker<span class="w"> </span>run<span class="w"> </span>--privileged<span class="w"> </span>--rm<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>/opt:/opt<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SYSMST_BASE_IMG</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span>sh<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;sh -x /opt/check.sh &amp;&gt; /opt/check.log&quot;</span>
+<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a><span class="w">    </span><span class="nv">ret</span><span class="o">=</span><span class="nv">$?</span>
+<a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a><span class="w">    </span>cat<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>/opt/check.log
+<a id="__codelineno-19-18" name="__codelineno-19-18" href="#__codelineno-19-18"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">ret</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-19-19" name="__codelineno-19-19" href="#__codelineno-19-19"></a><span class="o">}</span>
+<a id="__codelineno-19-20" name="__codelineno-19-20" href="#__codelineno-19-20"></a>
+<a id="__codelineno-19-21" name="__codelineno-19-21" href="#__codelineno-19-21"></a>runtest
+</code></pre></div>
+<p>如果是虚拟机场景的用例呢？可以参考<code>docker_config_test_service_001</code>用例的入口脚本：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="o">[</span>root@openEuler<span class="w"> </span>tests<span class="o">]</span><span class="c1"># cat docker_config_test/docker_config_test_service_001/docker_config_test_service_001.sh</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="c1">#!/bin/bash</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="c1"># Description: test for Description/Documentation/RemainAfterExit/DefaultDependencies</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="nv">TEST_SCRIPT</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>basename<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$0</span><span class="s2">&quot;</span><span class="k">)</span><span class="s2">&quot;</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="nv">TEST_SCRIPT_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>dirname<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$0</span><span class="s2">&quot;</span><span class="k">)</span><span class="s2">&quot;</span>
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>
+<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="nb">source</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">BUILD_PATH</span><span class="si">}</span><span class="s2">&quot;</span>/tests/test_frame.sh
+<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="nb">set</span><span class="w"> </span>+e
+<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>
+<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="k">function</span><span class="w"> </span>test_pre<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a><span class="w">    </span><span class="nb">pushd</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TEST_SCRIPT_PATH</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a><span class="w">    </span>rm<span class="w"> </span>-rf<span class="w"> </span>tmp_units
+<a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a><span class="w">    </span>mkdir<span class="w"> </span>tmp_units
+<a id="__codelineno-20-15" name="__codelineno-20-15" href="#__codelineno-20-15"></a><span class="w">    </span>cp<span class="w"> </span>-arf<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TEST_PATH</span><span class="si">}</span><span class="s2">&quot;</span>/test_units/<span class="o">{</span>shutdown.target,sysinit.target<span class="o">}</span><span class="w"> </span>tmp_units
+<a id="__codelineno-20-16" name="__codelineno-20-16" href="#__codelineno-20-16"></a><span class="w">    </span>cp<span class="w"> </span>-arf<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TEST_PATH</span><span class="si">}</span><span class="s2">&quot;</span>/test_units/tests/base.service<span class="w"> </span>tmp_units
+<a id="__codelineno-20-17" name="__codelineno-20-17" href="#__codelineno-20-17"></a><span class="w">    </span><span class="nb">popd</span>
+<a id="__codelineno-20-18" name="__codelineno-20-18" href="#__codelineno-20-18"></a><span class="o">}</span>
+<a id="__codelineno-20-19" name="__codelineno-20-19" href="#__codelineno-20-19"></a>
+<a id="__codelineno-20-20" name="__codelineno-20-20" href="#__codelineno-20-20"></a><span class="k">function</span><span class="w"> </span>test_run<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<a id="__codelineno-20-21" name="__codelineno-20-21" href="#__codelineno-20-21"></a><span class="w">    </span><span class="nb">local</span><span class="w"> </span>ret
+<a id="__codelineno-20-22" name="__codelineno-20-22" href="#__codelineno-20-22"></a>
+<a id="__codelineno-20-23" name="__codelineno-20-23" href="#__codelineno-20-23"></a><span class="w">    </span><span class="nb">pushd</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TEST_SCRIPT_PATH</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-20-24" name="__codelineno-20-24" href="#__codelineno-20-24"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">DOCKER_TEST</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">&#39;1&#39;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<a id="__codelineno-20-25" name="__codelineno-20-25" href="#__codelineno-20-25"></a><span class="w">        </span>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>/opt
+<a id="__codelineno-20-26" name="__codelineno-20-26" href="#__codelineno-20-26"></a><span class="w">        </span>cp<span class="w"> </span>-arf<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>realpath<span class="w"> </span>check.sh<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>/opt
+<a id="__codelineno-20-27" name="__codelineno-20-27" href="#__codelineno-20-27"></a><span class="w">        </span>cp<span class="w"> </span>-arf<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TEST_PATH</span><span class="si">}</span><span class="s2">&quot;</span>/common/util_lib.sh<span class="w"> </span>tmp_units<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>/opt
+<a id="__codelineno-20-28" name="__codelineno-20-28" href="#__codelineno-20-28"></a><span class="w">        </span>chmod<span class="w"> </span>-R<span class="w"> </span><span class="m">777</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-20-29" name="__codelineno-20-29" href="#__codelineno-20-29"></a><span class="w">        </span>docker<span class="w"> </span>run<span class="w"> </span>--privileged<span class="w"> </span>--rm<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>/opt:/opt<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SYSMST_BASE_IMG</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span>sh<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;sh -x /opt/check.sh &amp;&gt; /opt/check.log&quot;</span>
+<a id="__codelineno-20-30" name="__codelineno-20-30" href="#__codelineno-20-30"></a><span class="w">        </span><span class="nv">ret</span><span class="o">=</span><span class="nv">$?</span>
+<a id="__codelineno-20-31" name="__codelineno-20-31" href="#__codelineno-20-31"></a><span class="w">        </span>cat<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>/opt/check.log
+<a id="__codelineno-20-32" name="__codelineno-20-32" href="#__codelineno-20-32"></a><span class="w">        </span>cat<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">&quot;</span>/opt/sysmaster.log
+<a id="__codelineno-20-33" name="__codelineno-20-33" href="#__codelineno-20-33"></a><span class="w">    </span><span class="k">else</span>
+<a id="__codelineno-20-34" name="__codelineno-20-34" href="#__codelineno-20-34"></a><span class="w">        </span>cp<span class="w"> </span>-arf<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TEST_PATH</span><span class="si">}</span><span class="s2">&quot;</span>/common/util_lib.sh<span class="w"> </span>./
+<a id="__codelineno-20-35" name="__codelineno-20-35" href="#__codelineno-20-35"></a><span class="w">        </span>sh<span class="w"> </span>-x<span class="w"> </span>check.sh<span class="w"> </span><span class="p">&amp;</span>&gt;<span class="w"> </span>check.log
+<a id="__codelineno-20-36" name="__codelineno-20-36" href="#__codelineno-20-36"></a><span class="w">        </span><span class="nv">ret</span><span class="o">=</span><span class="nv">$?</span>
+<a id="__codelineno-20-37" name="__codelineno-20-37" href="#__codelineno-20-37"></a><span class="w">        </span>cat<span class="w"> </span>check.log
+<a id="__codelineno-20-38" name="__codelineno-20-38" href="#__codelineno-20-38"></a><span class="w">        </span>cat<span class="w"> </span>sysmaster.log
+<a id="__codelineno-20-39" name="__codelineno-20-39" href="#__codelineno-20-39"></a><span class="w">    </span><span class="k">fi</span>
+<a id="__codelineno-20-40" name="__codelineno-20-40" href="#__codelineno-20-40"></a>
+<a id="__codelineno-20-41" name="__codelineno-20-41" href="#__codelineno-20-41"></a><span class="w">    </span>rm<span class="w"> </span>-rf<span class="w"> </span>tmp_units<span class="w"> </span>check.log
+<a id="__codelineno-20-42" name="__codelineno-20-42" href="#__codelineno-20-42"></a><span class="w">    </span><span class="nb">popd</span>
+<a id="__codelineno-20-43" name="__codelineno-20-43" href="#__codelineno-20-43"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">ret</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-20-44" name="__codelineno-20-44" href="#__codelineno-20-44"></a><span class="o">}</span>
+<a id="__codelineno-20-45" name="__codelineno-20-45" href="#__codelineno-20-45"></a>
+<a id="__codelineno-20-46" name="__codelineno-20-46" href="#__codelineno-20-46"></a>runtest
+</code></pre></div>
+<p>上述入口脚本的<code>test_run</code>含有一个if分支，分支根据<code>DOCKER_TEST</code>变量的值判断场景，并根据不同的场景做一些差异性的环境准备，再以不同的方式拉起<code>check.sh</code>。而一些共性的环境准备工作，可以在<code>test_pre</code>中执行，例如拷贝测试所需的单元文件等。</p>
+<p>另外，有很多用例是多场景通用的，这些用例的入口脚本实际上是一个软链接，例如<code>docker_config_test_service_001.sh</code>：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="o">[</span>root@openEuler<span class="w"> </span>tests<span class="o">]</span><span class="c1"># ll docker_config_test/docker_config_test_service_001/docker_config_test_service_001.sh</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>lrwxrwxrwx.<span class="w"> </span><span class="m">1</span><span class="w"> </span>root<span class="w"> </span>root<span class="w"> </span><span class="m">61</span><span class="w"> </span>Apr<span class="w"> </span><span class="m">11</span><span class="w"> </span><span class="m">17</span>:28<span class="w"> </span>docker_config_test/docker_config_test_service_001/docker_config_test_service_001.sh<span class="w"> </span>-&gt;<span class="w"> </span>../../config_test/unit_config_test/service_001/service_001.sh
+</code></pre></div>
+<p>主体检查脚本同样也可以设置软链接，例如：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="o">[</span>root@openEuler<span class="w"> </span>tests<span class="o">]</span><span class="c1"># ls -l docker_config_test/docker_config_test_service_001/check.sh</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>lrwxrwxrwx.<span class="w"> </span><span class="m">1</span><span class="w"> </span>root<span class="w"> </span>root<span class="w"> </span><span class="m">55</span><span class="w"> </span>Apr<span class="w"> </span><span class="m">14</span><span class="w"> </span><span class="m">14</span>:26<span class="w"> </span>docker_config_test/docker_config_test_service_001/check.sh<span class="w"> </span>-&gt;<span class="w"> </span>../../config_test/unit_config_test/service_001/check.sh
+</code></pre></div>
+<p>在虚拟机场景测试相应的配置时，只需在<code>vm_config_test_service_001</code>目录下新建<code>vm_config_test_service_001.sh</code>、<code>check.sh</code>软链接，分别指向<code>service_001</code>目录下的<code>service_001.sh</code>、<code>check.sh</code>文件。并在注册对应的测试函数时，将第3个入参设置为0，由此便可尽可能地减少冗余代码：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="cp">#[test]</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="cp">#[ignore]</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="k">fn</span> <span class="nf">vm_config_test_service_001</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">    </span><span class="n">common</span>::<span class="n">run_script</span><span class="p">(</span><span class="s">&quot;vm_config_test&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;vm_config_test_service_001&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;0&quot;</span><span class="p">);</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="p">}</span>
+</code></pre></div>
+<h4 id="_10">框架函数<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h4>
+<p>接下来，就让我们了解一下<code>test_frame.sh</code>是如何定义<code>runtest</code>函数的。<code>test_frame.sh</code>位于<code>tests</code>目录下。<code>runtest</code>函数其实非常简单，一共分四个阶段：</p>
+<ul>
+<li>test_cleanup：测试前环境清理，清理失败则用例失败退出。</li>
+<li>test_setup：环境部署，包括构建基础容器镜像等；部署失败则用例失败退出。</li>
+<li>test_run：需要测试人员在入口脚本中自行定义；执行失败则用例失败，但不会立即退出。</li>
+<li>test_cleanup：测试后的环境清理，无论test_run成功与否都会执行，清理失败也不影响用例结果。</li>
+</ul>
+<p>若环境中没有执行过容器场景的用例，<code>test_setup</code>会从openEuler官网下载标准容器镜像并导入，再将sysmaster编译出的二进制和lib库文件拷贝至标准容器镜像，由此构建基础镜像，用作后续测试。若环境中已经执行过容器场景的用例，<code>test_setup</code>检测到可用的基础镜像，就不会再重复构建。</p>
+<blockquote>
+<p>注意！更新代码后，必须手动删除缓存的基础镜像，确保二进制更新。</p>
+</blockquote>
+<p><code>test_setup</code>还会在<code>/tmp</code>目录下创建一个以用例名命名的临时目录，用于存放一些临时文件。</p>
+<p><code>test_cleanup</code>会在测试前后清理环境中的残留容器和镜像，但不会删除归档的基础镜像和标准镜像。值得注意的是，测试后的<code>test_cleanup</code>会删除<code>test_setup</code>创建的<code>/tmp</code>临时目录，测试前的<code>test_cleanup</code>不会。</p>
+<h4 id="_11">检查脚本<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h4>
+<p>检查脚本是测试用例的主体，本项目中大部分检查脚本都以<code>check.sh</code>命名。其中的可以设置多个检查函数，以<code>docker_config_test_service_001</code>为例：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="o">[</span>root@openEuler<span class="w"> </span>tests<span class="o">]</span><span class="c1"># cat docker_config_test/docker_config_test_service_001/check.sh</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="c1">#!/bin/bash</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="nv">work_dir</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>dirname<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$0</span><span class="s2">&quot;</span><span class="k">)</span><span class="s2">&quot;</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="nb">source</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">work_dir</span><span class="si">}</span><span class="s2">&quot;</span>/util_lib.sh
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="nb">set</span><span class="w"> </span>+e
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a><span class="c1"># usage: test Description/Documentation/RemainAfterExit</span>
+<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a><span class="k">function</span><span class="w"> </span>test01<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a><span class="w">    </span>log_info<span class="w"> </span><span class="s2">&quot;===== test01 =====&quot;</span>
+<a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a><span class="w">    </span>cp<span class="w"> </span>-arf<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">work_dir</span><span class="si">}</span><span class="s2">&quot;</span>/tmp_units/base.service<span class="w"> </span><span class="si">${</span><span class="nv">SYSMST_LIB_PATH</span><span class="si">}</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a>
+<a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a><span class="w">    </span><span class="c1"># RemainAfterExit=false</span>
+<a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a><span class="w">    </span>sed<span class="w"> </span>-i<span class="w"> </span><span class="s1">&#39;s/^Description=.*/Description=&quot;this is a test&quot;/&#39;</span><span class="w"> </span><span class="si">${</span><span class="nv">SYSMST_LIB_PATH</span><span class="si">}</span>/base.service
+<a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a><span class="w">    </span>sed<span class="w"> </span>-i<span class="w"> </span><span class="s1">&#39;/Description/ a Documentation=&quot;this is doc&quot;&#39;</span><span class="w"> </span><span class="si">${</span><span class="nv">SYSMST_LIB_PATH</span><span class="si">}</span>/base.service
+<a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a><span class="w">    </span>sed<span class="w"> </span>-i<span class="w"> </span><span class="s1">&#39;/ExecStart/ a RemainAfterExit=false&#39;</span><span class="w"> </span><span class="si">${</span><span class="nv">SYSMST_LIB_PATH</span><span class="si">}</span>/base.service
+<a id="__codelineno-24-18" name="__codelineno-24-18" href="#__codelineno-24-18"></a><span class="w">    </span>sed<span class="w"> </span>-i<span class="w"> </span><span class="s1">&#39;s/sleep 100/sleep 2/&#39;</span><span class="w"> </span><span class="si">${</span><span class="nv">SYSMST_LIB_PATH</span><span class="si">}</span>/base.service
+<a id="__codelineno-24-19" name="__codelineno-24-19" href="#__codelineno-24-19"></a><span class="w">    </span>run_sysmaster<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-24-20" name="__codelineno-24-20" href="#__codelineno-24-20"></a>
+<a id="__codelineno-24-21" name="__codelineno-24-21" href="#__codelineno-24-21"></a><span class="w">    </span>sctl<span class="w"> </span>restart<span class="w"> </span>base
+<a id="__codelineno-24-22" name="__codelineno-24-22" href="#__codelineno-24-22"></a><span class="w">    </span>check_status<span class="w"> </span>base<span class="w"> </span>active<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-24-23" name="__codelineno-24-23" href="#__codelineno-24-23"></a><span class="w">    </span>check_status<span class="w"> </span>base<span class="w"> </span>inactive<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-24-24" name="__codelineno-24-24" href="#__codelineno-24-24"></a><span class="w">    </span><span class="c1"># check Description/Documentation</span>
+<a id="__codelineno-24-25" name="__codelineno-24-25" href="#__codelineno-24-25"></a><span class="w">    </span>sctl<span class="w"> </span>status<span class="w"> </span>base<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;base.service - this is a test&quot;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sctl<span class="w"> </span>status<span class="w"> </span>base<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;Docs: this is doc&quot;</span>
+<a id="__codelineno-24-26" name="__codelineno-24-26" href="#__codelineno-24-26"></a><span class="w">    </span>expect_eq<span class="w"> </span><span class="nv">$?</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span>sctl<span class="w"> </span>status<span class="w"> </span>base
+<a id="__codelineno-24-27" name="__codelineno-24-27" href="#__codelineno-24-27"></a><span class="w">    </span><span class="c1"># clean</span>
+<a id="__codelineno-24-28" name="__codelineno-24-28" href="#__codelineno-24-28"></a><span class="w">    </span>kill_sysmaster
+<a id="__codelineno-24-29" name="__codelineno-24-29" href="#__codelineno-24-29"></a>
+<a id="__codelineno-24-30" name="__codelineno-24-30" href="#__codelineno-24-30"></a><span class="w">    </span><span class="c1"># RemainAfterExit=true</span>
+<a id="__codelineno-24-31" name="__codelineno-24-31" href="#__codelineno-24-31"></a><span class="w">    </span>sed<span class="w"> </span>-i<span class="w"> </span><span class="s1">&#39;/RemainAfterExit/ s/false/true/&#39;</span><span class="w"> </span><span class="si">${</span><span class="nv">SYSMST_LIB_PATH</span><span class="si">}</span>/base.service
+<a id="__codelineno-24-32" name="__codelineno-24-32" href="#__codelineno-24-32"></a><span class="w">    </span>run_sysmaster<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-24-33" name="__codelineno-24-33" href="#__codelineno-24-33"></a>
+<a id="__codelineno-24-34" name="__codelineno-24-34" href="#__codelineno-24-34"></a><span class="w">    </span>sctl<span class="w"> </span>restart<span class="w"> </span>base
+<a id="__codelineno-24-35" name="__codelineno-24-35" href="#__codelineno-24-35"></a><span class="w">    </span>check_status<span class="w"> </span>base<span class="w"> </span>active<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-24-36" name="__codelineno-24-36" href="#__codelineno-24-36"></a><span class="w">    </span>sctl<span class="w"> </span>status<span class="w"> </span>base<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>active<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">&#39;running&#39;</span>
+<a id="__codelineno-24-37" name="__codelineno-24-37" href="#__codelineno-24-37"></a><span class="w">    </span>expect_eq<span class="w"> </span><span class="nv">$?</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span>sctl<span class="w"> </span>status<span class="w"> </span>base
+<a id="__codelineno-24-38" name="__codelineno-24-38" href="#__codelineno-24-38"></a><span class="w">    </span><span class="nv">main_pid</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>get_pids<span class="w"> </span>base<span class="k">)</span><span class="s2">&quot;</span>
+<a id="__codelineno-24-39" name="__codelineno-24-39" href="#__codelineno-24-39"></a><span class="w">    </span>sleep<span class="w"> </span><span class="m">2</span>
+<a id="__codelineno-24-40" name="__codelineno-24-40" href="#__codelineno-24-40"></a><span class="w">    </span>check_status<span class="w"> </span>base<span class="w"> </span>active<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-24-41" name="__codelineno-24-41" href="#__codelineno-24-41"></a><span class="w">    </span>sctl<span class="w"> </span>status<span class="w"> </span>base<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>active<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s1">&#39;exited&#39;</span>
+<a id="__codelineno-24-42" name="__codelineno-24-42" href="#__codelineno-24-42"></a><span class="w">    </span>expect_eq<span class="w"> </span><span class="nv">$?</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span>sctl<span class="w"> </span>status<span class="w"> </span>base
+<a id="__codelineno-24-43" name="__codelineno-24-43" href="#__codelineno-24-43"></a><span class="w">    </span>ps<span class="w"> </span>-elf<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-v<span class="w"> </span>grep<span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">&#39;{print $4}&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-w<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">main_pid</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-24-44" name="__codelineno-24-44" href="#__codelineno-24-44"></a><span class="w">    </span>expect_eq<span class="w"> </span><span class="nv">$?</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="o">||</span><span class="w"> </span>ps<span class="w"> </span>-elf
+<a id="__codelineno-24-45" name="__codelineno-24-45" href="#__codelineno-24-45"></a>
+<a id="__codelineno-24-46" name="__codelineno-24-46" href="#__codelineno-24-46"></a><span class="w">    </span>sctl<span class="w"> </span>stop<span class="w"> </span>base
+<a id="__codelineno-24-47" name="__codelineno-24-47" href="#__codelineno-24-47"></a><span class="w">    </span>check_status<span class="w"> </span>base<span class="w"> </span>inactive<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-24-48" name="__codelineno-24-48" href="#__codelineno-24-48"></a><span class="w">    </span><span class="c1"># clean</span>
+<a id="__codelineno-24-49" name="__codelineno-24-49" href="#__codelineno-24-49"></a><span class="w">    </span>kill_sysmaster
+<a id="__codelineno-24-50" name="__codelineno-24-50" href="#__codelineno-24-50"></a><span class="o">}</span>
+<a id="__codelineno-24-51" name="__codelineno-24-51" href="#__codelineno-24-51"></a>
+<a id="__codelineno-24-52" name="__codelineno-24-52" href="#__codelineno-24-52"></a><span class="c1"># usage: test RemainAfterExit with oneshot service</span>
+<a id="__codelineno-24-53" name="__codelineno-24-53" href="#__codelineno-24-53"></a><span class="k">function</span><span class="w"> </span>test02<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<a id="__codelineno-24-54" name="__codelineno-24-54" href="#__codelineno-24-54"></a><span class="w">    </span>log_info<span class="w"> </span><span class="s2">&quot;===== test02 =====&quot;</span>
+<a id="__codelineno-24-55" name="__codelineno-24-55" href="#__codelineno-24-55"></a><span class="w">    </span>...
+<a id="__codelineno-24-56" name="__codelineno-24-56" href="#__codelineno-24-56"></a><span class="o">}</span>
+<a id="__codelineno-24-57" name="__codelineno-24-57" href="#__codelineno-24-57"></a>
+<a id="__codelineno-24-58" name="__codelineno-24-58" href="#__codelineno-24-58"></a><span class="c1"># usage: test DefaultDependencies</span>
+<a id="__codelineno-24-59" name="__codelineno-24-59" href="#__codelineno-24-59"></a><span class="k">function</span><span class="w"> </span>test03<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<a id="__codelineno-24-60" name="__codelineno-24-60" href="#__codelineno-24-60"></a><span class="w">    </span><span class="nb">local</span><span class="w"> </span><span class="nv">key_log</span><span class="o">=</span><span class="s1">&#39;add default dependencies for target.*&#39;</span>
+<a id="__codelineno-24-61" name="__codelineno-24-61" href="#__codelineno-24-61"></a>
+<a id="__codelineno-24-62" name="__codelineno-24-62" href="#__codelineno-24-62"></a><span class="w">    </span>log_info<span class="w"> </span><span class="s2">&quot;===== test03 =====&quot;</span>
+<a id="__codelineno-24-63" name="__codelineno-24-63" href="#__codelineno-24-63"></a><span class="w">    </span>...
+<a id="__codelineno-24-64" name="__codelineno-24-64" href="#__codelineno-24-64"></a><span class="o">}</span>
+<a id="__codelineno-24-65" name="__codelineno-24-65" href="#__codelineno-24-65"></a>
+<a id="__codelineno-24-66" name="__codelineno-24-66" href="#__codelineno-24-66"></a>test01<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-24-67" name="__codelineno-24-67" href="#__codelineno-24-67"></a>test02<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-24-68" name="__codelineno-24-68" href="#__codelineno-24-68"></a>test03<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-24-69" name="__codelineno-24-69" href="#__codelineno-24-69"></a><span class="nb">exit</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">EXPECT_FAIL</span><span class="si">}</span><span class="s2">&quot;</span>
+</code></pre></div>
+<p>上述检查脚本中一共有3个检查函数：<code>test01</code>、<code>test02</code>、<code>test03</code>。每个检查函数异常返回都会导致脚本直接失败退出，任意一个断言失败也会导致脚本最终非0退出：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>test01<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>test02<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>test03<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="nb">exit</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">EXPECT_FAIL</span><span class="si">}</span><span class="s2">&quot;</span>
+</code></pre></div>
+<p>以<code>test01</code>为例，首先将临时目录下的单元文件<code>base.service</code>拷贝至sysmaster对应目录，并修改其中的配置。然后拉起sysmaster，通过<code>sctl</code>等命令进行测试。<code>expect_eq</code>等断言失败不会直接导致函数退出，而是会将<code>EXPECT_FAIL</code>变量置1，检查脚本最后会根据该变量的值判断用例成功与否。</p>
+<p><code>check_status</code>、<code>log_info</code>等公共函数，以及<code>expect_xxx</code>系列断言函数，都是在<code>common/util_lib.sh</code>中定义的。编写测试用例前可以先熟悉一下现有的公共函数库。</p>
+<p>以上重点介绍了容器场景的测试框架和用例编写，随着测试场景的丰富，后续会跟进补充。</p>
+<h2 id="faq">FAQ<a class="headerlink" href="#faq" title="Permanent link">&para;</a></h2>
+<h2 id="_12">参考资料<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="http://kaisery.github.io/trpl-zh-cn/ch11-00-testing.html">Rust程序设计语言 简体中文版 —— 编写自动化测试</a></li>
+<li><a href="http://course.rs/test/intro.html">Rust语言圣经 —— 自动化测试</a></li>
+</ol>
+
+  <hr>
+<div class="md-source-file">
+  <small>
+    
+      最后更新:
+      <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">November 4, 2023</span>
+      
+        <br>
+        创建日期:
+        <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">October 21, 2022</span>
+      
+    
+  </small>
+</div>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 openEuler sysMaster team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.prune", "navigation.path", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.aecac24b.min.js"></script>
+      
+    
+  </body>
+</html>

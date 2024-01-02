@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<image schemaversion="7.5" name="sysmaster">
+    <description type="system">
+        <author>sysmaster groups</author>
+        <contact>dev@openeuler.org</contact>
+        <specification>kis test build</specification>
+    </description>
+    <preferences>
+        <version>1.0.0</version>
+        <packagemanager>dnf</packagemanager>
+        <rpm-excludedocs>true</rpm-excludedocs>
+        <rpm-check-signatures>false</rpm-check-signatures>
+        <locale>en_US</locale>
+        <keytable>us</keytable>
+        <type image="kis"/>
+    </preferences>
+    <users>
+        <user password="$1$2ggIPMYl$rH6LFdXX7kLaFufWFvHmb0" home="/root" name="root" groups="root"/>
+    </users>
+    <repository type="rpm-md">
+        <source path="https://mirrors.huaweicloud.com/openeuler/openEuler-22.03-LTS-SP1/everything/x86_64/"/>
+    </repository>
+    <repository type="rpm-md" priority="1">
+        <source path="dir:///home/overweight/sysmaster/target/rpms"/>
+    </repository>
+    <packages type="image">
+        <package name="kernel"/>
+        <package name="sysmaster"/>
+        <package name="openssh-server"/>
+        <package name="dracut-kiwi-oem-repart"/>
+        <package name="dracut-kiwi-oem-dump"/>
+    </packages>
+    <packages type="bootstrap">
+        <package name="kernel"/>
+        <package name="filesystem"/>
+        <package name="findutils"/>
+        <package name="shadow"/>
+    </packages>
+    <!-- <packages type="delete">
+        <package name="rpm"/>
+        <package name="pcre2"/>
+        <package name="python"/>
+        <package name="readline"/>
+    </packages>
+    <packages type="uninstall">
+        <package name="rpm"/>
+        <package name="python"/>
+        <package name="readline"/>
+    </packages>
+    -->
+</image>

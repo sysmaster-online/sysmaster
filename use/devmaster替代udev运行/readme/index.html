@@ -1,0 +1,2616 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Redesign and Reimplementation of Process1">
+      
+      
+        <meta name="author" content="dev@openeuler.org">
+      
+      
+        <link rel="canonical" href="http://sysmaster.online/use/devmaster%E6%9B%BF%E4%BB%A3udev%E8%BF%90%E8%A1%8C/readme/">
+      
+      
+        <link rel="prev" href="../../00-%E5%88%B6%E4%BD%9Csysmaster%E4%BD%9C%E4%B8%BA1%E5%8F%B7%E8%BF%9B%E7%A8%8B%E7%9A%84iso%E9%95%9C%E5%83%8F/">
+      
+      
+        <link rel="next" href="../../sysMaster%E7%89%B9%E6%9D%83%E5%AE%B9%E5%99%A8/readme/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.7">
+    
+    
+      
+        <title>使用devmaster替换udev启动 - sysmaster.online</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.4b4a2bd9.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.356b1318.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Ubuntu:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Ubuntu";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#devmasterudev" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="sysmaster.online" class="md-header__button md-logo" aria-label="sysmaster.online" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sysmaster.online
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              使用devmaster替换udev启动
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="分享" aria-label="分享" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91 1.61 0 2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08Z"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://gitee.com/openeuler/sysmaster" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openEuler/sysMaster
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../contrib/" class="md-tabs__link">
+        
+  
+    
+  
+  Contrib
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../cicd/01-integration_test/" class="md-tabs__link">
+          
+  
+    
+  
+  Cicd
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../design/00-index_zh/" class="md-tabs__link">
+          
+  
+    
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../man/all/" class="md-tabs__link">
+          
+  
+    
+  
+  Man
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../00-sysMaster%E6%9E%84%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8/" class="md-tabs__link">
+          
+  
+    
+  
+  Use
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="sysmaster.online" class="md-nav__button md-logo" aria-label="sysmaster.online" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    sysmaster.online
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://gitee.com/openeuler/sysmaster" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openEuler/sysMaster
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../contrib/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contrib
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Cicd
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Cicd
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cicd/01-integration_test/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    测试框架及用例编写
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cicd/02-cargo-fuzz/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cargo-fuzz 介绍
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_docker_with_kiwi/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build docker with kiwi
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_qemu_with_kiwi/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build qemu with kiwi
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_rpm_with_mock/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build rpm with mock
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_xz_with_vendor/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build xz with vendor
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    
+  
+  
+    <a href="../../../cicd/tests/devmaster/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Tests
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Design
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Design
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/00-index_zh/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    为什么要开发sysMaster
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/00-sysmaster_0description/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    1号进程的挑战及sysMaster愿景
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/00-sysmaster_architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster架构设计
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/01-errors_of_sysmaster/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    对错误处理的思考
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/cores/01-devel-doc/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Cores
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/extends/02-devmaster-architecture/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Extends
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/libiraries/01-event/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Libiraries
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/rfcs/0001-systemd_parser/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Rfcs
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Man
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Man
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../man/all/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Warnings
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../man/sysmaster.conf/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster 系统配置
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../man/core/exec/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Core
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    
+  
+  
+    <a href="../../../man/exts/devmaster/devctl/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Exts
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../man/init/init/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Init
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Use
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Use
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00-sysMaster%E6%9E%84%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysMaster 构建和使用
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00-systemd2sysmaster/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    systemd向sysmaster迁移
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00-%E5%88%B6%E4%BD%9Csysmaster%E4%BD%9C%E4%B8%BA1%E5%8F%B7%E8%BF%9B%E7%A8%8B%E7%9A%84iso%E9%95%9C%E5%83%8F/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    oemake制作sysmaster作为1号进程的iso镜像
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6_4" id="__nav_6_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Devmaster替代udev运行
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_4">
+            <span class="md-nav__icon md-icon"></span>
+            Devmaster替代udev运行
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    使用devmaster替换udev启动
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    使用devmaster替换udev启动
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    测试环境
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    安装方法
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    规则清单
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    规则适配差异
+  </a>
+  
+    <nav class="md-nav" aria-label="规则适配差异">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#40-openeulerrules" class="md-nav__link">
+    40-openEuler.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#60-srp_daemonrules" class="md-nav__link">
+    60-srp_daemon.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-multipathrules" class="md-nav__link">
+    62-multipath.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#69-dm-lvmrules" class="md-nav__link">
+    69-dm-lvm.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#98-kexecrules" class="md-nav__link">
+    98-kexec.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#90-vconsolerules" class="md-nav__link">
+    90-vconsole.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#99-systemdrules" class="md-nav__link">
+    99-systemd.rules
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../sysMaster%E7%89%B9%E6%9D%83%E5%AE%B9%E5%99%A8/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    sysMaster特权容器
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../sysmaster%E4%B8%8B%E4%BD%BF%E8%83%BDrsyslog/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Sysmaster下使能rsyslog
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../%E5%85%BC%E5%AE%B9busybox%E6%A8%A1%E5%BC%8F%E8%BF%90%E8%A1%8C/Readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    兼容busybox模式运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../%E5%85%BC%E5%AE%B9systemd%E6%A8%A1%E5%BC%8F%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    兼容systemd模式运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../%E5%AE%B9%E5%99%A8%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    容器中替代pid1运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../%E8%99%9A%E6%9C%BA%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    虚机中替代pid1运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    测试环境
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    安装方法
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    规则清单
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    规则适配差异
+  </a>
+  
+    <nav class="md-nav" aria-label="规则适配差异">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#40-openeulerrules" class="md-nav__link">
+    40-openEuler.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#60-srp_daemonrules" class="md-nav__link">
+    60-srp_daemon.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-multipathrules" class="md-nav__link">
+    62-multipath.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#69-dm-lvmrules" class="md-nav__link">
+    69-dm-lvm.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#98-kexecrules" class="md-nav__link">
+    98-kexec.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#90-vconsolerules" class="md-nav__link">
+    90-vconsole.rules
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#99-systemdrules" class="md-nav__link">
+    99-systemd.rules
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+    <a href="https://gitee.com/-/ide/project/openeuler/sysmaster/edit/master/-/docs/use/devmaster替代udev运行/readme.md" title="编辑此页" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4v-2m10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1 2.1 2.1Z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="devmasterudev">使用devmaster替换udev启动<a class="headerlink" href="#devmasterudev" title="Permanent link">&para;</a></h1>
+<p>使用<code>devmaster</code>替换<code>sysmaster</code>虚拟机启动场景的<code>udev</code>，使得虚拟机启动后可以正常激活逻辑卷、挂载分区、加载网络等等。</p>
+<p>在<code>sysmaster</code>源码根目录下执行如下命令进行安装：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># sh -x tools/run_with_devmaster/install_devmaster.sh [debug|release]</span>
+</code></pre></div>
+<h2 id="_1">测试环境<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<ul>
+<li>测试的虚拟机环境如下：</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># uname -a</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Linux<span class="w"> </span>localhost.localdomain<span class="w"> </span><span class="m">5</span>.10.0-60.18.0.50.oe2203.x86_64<span class="w"> </span><span class="c1">#1 SMP Wed Mar 30 03:12:24 UTC 2022 x86_64 x86_64 x86_64 GNU/Linux</span>
+</code></pre></div>
+<ul>
+<li><code>devmaster</code>的规则直接取自虚拟机环境中的<code>udev</code>规则，在此基础上对<code>sysmaster</code>环境中不支持的规则进行了适配。引用的规则以及适配情况见<code>规则清单</code>和<code>适配差异</code>。</li>
+</ul>
+<h2 id="_2">安装方法<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p>参考<a href="http://127.0.0.1:8000/use/%E8%99%9A%E6%9C%BA%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/"><code>sysmaster</code>虚拟机启动方案</a>搭建启动环境。</p>
+</li>
+<li>
+<p>安装<code>devmaster</code>的二进制以及相关配置文件，在<code>sysmaster</code>源码根目录下执行如下命令：</p>
+</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># sh -x tools/run_with_devmaster/install_devmaster.sh [debug|release]</span>
+</code></pre></div>
+<ol>
+<li>重启系统，选择<code>sysmaster</code>启动项。进入主系统后检查<code>devmaster</code>服务状态和网络连通情况。</li>
+</ol>
+<h2 id="_3">规则清单<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>规则</th>
+<th>包</th>
+<th>是否需要适配</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>01-md-raid-creating.rules</td>
+<td>mdadm-4.1-5.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>10-dm.rules</td>
+<td>device-mapper-1.02.181-4.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td>11-dm-lvm.rules</td>
+<td>lvm2-2.03.14-4.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>4</td>
+<td>11-dm-mpath.rules</td>
+<td>multipath-tools-0.8.7-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>5</td>
+<td>11-dm-parts.rules</td>
+<td>kpartx-0.8.7-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>6</td>
+<td>13-dm-disk.rules</td>
+<td>device-mapper-1.02.181-4.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>7</td>
+<td>40-elevator.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>8</td>
+<td>40-openEuler.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td>是</td>
+</tr>
+<tr>
+<td>9</td>
+<td>50-udev-default.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>10</td>
+<td>60-autosuspend.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>11</td>
+<td>60-block.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>12</td>
+<td>60-cdrom_id.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>13</td>
+<td>60-drm.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>14</td>
+<td>60-evdev.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>15</td>
+<td>60-fido-id.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>16</td>
+<td>60-infiniband.rules</td>
+<td>none package</td>
+<td></td>
+</tr>
+<tr>
+<td>17</td>
+<td>60-input-id.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>18</td>
+<td>60-net.rules</td>
+<td>initscripts-10.12-1.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>19</td>
+<td>60-persistent-alsa.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>20</td>
+<td>60-persistent-input.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>21</td>
+<td>60-persistent-storage.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>22</td>
+<td>60-persistent-storage-tape.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>23</td>
+<td>60-persistent-v4l.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>24</td>
+<td>60-raw.rules</td>
+<td>util-linux-2.37.2-5.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>25</td>
+<td>60-rdma-ndd.rules</td>
+<td>rdma-core-35.1-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>26</td>
+<td>60-rdma-persistent-naming.rules</td>
+<td>rdma-core-35.1-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>27</td>
+<td>60-sensor.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>28</td>
+<td>60-serial.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>29</td>
+<td>60-srp_daemon.rules</td>
+<td>rdma-core-35.1-2.oe2203.x86_64</td>
+<td>是</td>
+</tr>
+<tr>
+<td>30</td>
+<td>62-multipath.rules</td>
+<td>multipath-tools-0.8.7-2.oe2203.x86_64</td>
+<td>是</td>
+</tr>
+<tr>
+<td>31</td>
+<td>63-md-raid-arrays.rules</td>
+<td>mdadm-4.1-5.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>32</td>
+<td>64-btrfs-dm.rules</td>
+<td>btrfs-progs-5.15-1.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>33</td>
+<td>64-btrfs.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>34</td>
+<td>64-md-raid-assembly.rules</td>
+<td>mdadm-4.1-5.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>35</td>
+<td>66-kpartx.rules</td>
+<td>kpartx-0.8.7-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>36</td>
+<td>68-del-part-nodes.rules</td>
+<td>kpartx-0.8.7-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>37</td>
+<td>69-dm-lvm.rules</td>
+<td>lvm2-2.03.14-4.oe2203.x86_64</td>
+<td>是</td>
+</tr>
+<tr>
+<td>38</td>
+<td>69-md-clustered-confirm-device.rules</td>
+<td>mdadm-4.1-5.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>39</td>
+<td>70-camera.rules</td>
+<td>none package</td>
+<td></td>
+</tr>
+<tr>
+<td>40</td>
+<td>70-joystick.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>41</td>
+<td>70-memory.rules</td>
+<td>systemd-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>42</td>
+<td>70-mouse.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>43</td>
+<td>70-power-switch.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>44</td>
+<td>70-touchpad.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>45</td>
+<td>70-uaccess.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>46</td>
+<td>71-seat.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>47</td>
+<td>73-idrac.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>48</td>
+<td>73-seat-late.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>49</td>
+<td>75-net-description.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>50</td>
+<td>75-probe_mtd.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>51</td>
+<td>75-rdma-description.rules</td>
+<td>rdma-core-35.1-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>52</td>
+<td>78-sound-card.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>53</td>
+<td>80-drivers.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>54</td>
+<td>80-net-setup-link.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>55</td>
+<td>80-tpm-udev.rules</td>
+<td>tpm2-tss-3.1.0-1.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>56</td>
+<td>80-udisks2.rules</td>
+<td>udisks2-2.9.4-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>57</td>
+<td>81-net-dhcp.rules</td>
+<td>systemd-249-16.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>58</td>
+<td>84-nm-drivers.rules</td>
+<td>NetworkManager-1.32.12-8.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>59</td>
+<td>85-nm-unmanaged.rules</td>
+<td>NetworkManager-1.32.12-8.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>60</td>
+<td>90-iprutils.rules</td>
+<td>iprutils-2.4.19-1.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>61</td>
+<td>90-iwpmd.rules</td>
+<td>rdma-core-35.1-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>62</td>
+<td>90-nm-thunderbolt.rules</td>
+<td>NetworkManager-1.32.12-8.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>63</td>
+<td>90-rdma-hw-modules.rules</td>
+<td>rdma-core-35.1-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>64</td>
+<td>90-rdma-ulp-modules.rules</td>
+<td>rdma-core-35.1-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>65</td>
+<td>90-rdma-umad.rules</td>
+<td>rdma-core-35.1-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>66</td>
+<td>90-vconsole.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td>是</td>
+</tr>
+<tr>
+<td>67</td>
+<td>91-drm-modeset.rules</td>
+<td>libdrm-2.4.109-2.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>68</td>
+<td>95-dm-notify.rules</td>
+<td>device-mapper-1.02.181-4.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>69</td>
+<td>96-e2scrub.rules</td>
+<td>e2fsprogs-1.46.4-7.oe2203.x86_64</td>
+<td></td>
+</tr>
+<tr>
+<td>70</td>
+<td>98-kexec.rules</td>
+<td>kexec-tools-2.0.23-4.oe2203.x86_64</td>
+<td>是</td>
+</tr>
+<tr>
+<td>71</td>
+<td>99-systemd.rules</td>
+<td>systemd-udev-249-16.oe2203.x86_64</td>
+<td>是</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>systemd</code>相关命令无法在<code>sysmaster</code>启动环境中使用，使用到这些命令的规则需要进行适配。部分适配动作会对功能造成影响，比如注释某条规则。某些适配动作不影响功能，但会产生行为差异，比如规则中调用<code>systemd-run &lt;cmd&gt;</code>命令会生成一个<code>systemd</code>的服务并执行<code>cmd</code>命令，适配后会去除<code>systemd-run</code>前缀，直接由<code>devmaster</code>创建子进程来执行<code>cmd</code>。另外清理了规则中的一些语法告警，比如<code>IMPORT{}</code>类规则使用了赋值操作符等，此类修改不影响规则执行结果。</strong></p>
+<h2 id="_4">规则适配差异<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<h3 id="40-openeulerrules">40-openEuler.rules<a class="headerlink" href="#40-openeulerrules" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># diff tools/run_with_devmaster/rules.d/40-openEuler.rules /lib/udev/rules.d/40-openEuler.rules</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>17c17
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>&lt;<span class="w"> </span><span class="c1"># ACTION==&quot;add&quot;, SUBSYSTEM==&quot;module&quot;, KERNEL==&quot;bridge&quot;, RUN+=&quot;/usr/lib/systemd/systemd-sysctl --prefix=/proc/sys/net/bridge&quot;</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>---
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>&gt;<span class="w"> </span><span class="nv">ACTION</span><span class="o">==</span><span class="s2">&quot;add&quot;</span>,<span class="w"> </span><span class="nv">SUBSYSTEM</span><span class="o">==</span><span class="s2">&quot;module&quot;</span>,<span class="w"> </span><span class="nv">KERNEL</span><span class="o">==</span><span class="s2">&quot;bridge&quot;</span>,<span class="w"> </span><span class="nv">RUN</span><span class="o">+=</span><span class="s2">&quot;/usr/lib/systemd/systemd-sysctl --prefix=/proc/sys/net/bridge&quot;</span>
+</code></pre></div>
+<h3 id="60-srp_daemonrules">60-srp_daemon.rules<a class="headerlink" href="#60-srp_daemonrules" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># diff 60-srp_daemon.rules /lib/udev/rules.d/60-srp_daemon.rules</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>1c1
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>&lt;<span class="w"> </span><span class="c1">#SUBSYSTEM==&quot;infiniband_mad&quot;, KERNEL==&quot;*umad*&quot;, PROGRAM==&quot;/bin/systemctl show srp_daemon -p ActiveState&quot;, RESULT==&quot;ActiveState=active&quot;, ENV{SYSTEMD_WANTS}+=&quot;srp_daemon_port@$attr{ibdev}:$attr{port}.service&quot;</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>---
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>&gt;<span class="w"> </span><span class="nv">SUBSYSTEM</span><span class="o">==</span><span class="s2">&quot;infiniband_mad&quot;</span>,<span class="w"> </span><span class="nv">KERNEL</span><span class="o">==</span><span class="s2">&quot;*umad*&quot;</span>,<span class="w"> </span><span class="nv">PROGRAM</span><span class="o">==</span><span class="s2">&quot;/bin/systemctl show srp_daemon -p ActiveState&quot;</span>,<span class="w"> </span><span class="nv">RESULT</span><span class="o">==</span><span class="s2">&quot;ActiveState=active&quot;</span>,<span class="w"> </span>ENV<span class="o">{</span>SYSTEMD_WANTS<span class="o">}</span>+<span class="o">=</span><span class="s2">&quot;srp_daemon_port@</span><span class="nv">$attr</span><span class="s2">{ibdev}:</span><span class="nv">$attr</span><span class="s2">{port}.service&quot;</span>
+</code></pre></div>
+<h3 id="62-multipathrules">62-multipath.rules<a class="headerlink" href="#62-multipathrules" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># diff 62-multipath.rules /lib/udev/rules.d/62-multipath.rules</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="m">74</span>,75c74
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>&lt;<span class="w"> </span><span class="c1"># RUN+=&quot;/usr/bin/systemd-run --unit=cancel-multipath-wait-$kernel --description &#39;cancel waiting for multipath siblings of $kernel&#39; --no-block --timer-property DefaultDependencies=no --timer-property Conflicts=shutdown.target --timer-property Before=shutdown.target --timer-property AccuracySec=500ms --property DefaultDependencies=no --property Conflicts=shutdown.target --property Before=shutdown.target --property Wants=multipathd.service --property After=multipathd.service --on-active=$env{FIND_MULTIPATHS_WAIT_UNTIL} /usr/bin/udevadm trigger --action=add $sys$devpath&quot;</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>&lt;<span class="w"> </span><span class="nv">RUN</span><span class="o">+=</span><span class="s2">&quot;/usr/bin/devctl trigger --action=add </span><span class="nv">$sys$devpath</span><span class="s2">&quot;</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>---
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>&gt;<span class="w"> </span><span class="nv">RUN</span><span class="o">+=</span><span class="s2">&quot;/usr/bin/systemd-run --unit=cancel-multipath-wait-</span><span class="nv">$kernel</span><span class="s2"> --description &#39;cancel waiting for multipath siblings of </span><span class="nv">$kernel</span><span class="s2">&#39; --no-block --timer-property DefaultDependencies=no --timer-property Conflicts=shutdown.target --timer-property Before=shutdown.target --timer-property AccuracySec=500ms --property DefaultDependencies=no --property Conflicts=shutdown.target --property Before=shutdown.target --property Wants=multipathd.service --property After=multipathd.service --on-active=</span><span class="nv">$env</span><span class="s2">{FIND_MULTIPATHS_WAIT_UNTIL} /usr/bin/udevadm trigger --action=add </span><span class="nv">$sys$devpath</span><span class="s2">&quot;</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="m">85</span>,90c84,89
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>&lt;<span class="w"> </span>IMPORT<span class="o">{</span>db<span class="o">}==</span><span class="s2">&quot;FIND_MULTIPATHS_WAIT_CANCELLED&quot;</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>&lt;<span class="w"> </span><span class="c1"># ENV{FIND_MULTIPATHS_WAIT_CANCELLED}!=&quot;?*&quot;, \</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>&lt;<span class="w"> </span><span class="c1">#     ENV{FIND_MULTIPATHS_WAIT_UNTIL}==&quot;?*&quot;, \</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>&lt;<span class="w"> </span><span class="c1">#     ENV{FIND_MULTIPATHS_WAIT_UNTIL}!=&quot;0&quot;, \</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>&lt;<span class="w"> </span><span class="c1">#     ENV{FIND_MULTIPATHS_WAIT_CANCELLED}=&quot;1&quot;, \</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>&lt;<span class="w"> </span><span class="c1">#     RUN+=&quot;/usr/bin/systemctl stop cancel-multipath-wait-$kernel.timer&quot;</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>---
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>&gt;<span class="w"> </span>IMPORT<span class="o">{</span>db<span class="o">}=</span><span class="s2">&quot;FIND_MULTIPATHS_WAIT_CANCELLED&quot;</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>&gt;<span class="w"> </span>ENV<span class="o">{</span>FIND_MULTIPATHS_WAIT_CANCELLED<span class="o">}</span>!<span class="o">=</span><span class="s2">&quot;?*&quot;</span>,<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>&gt;<span class="w">       </span>ENV<span class="o">{</span>FIND_MULTIPATHS_WAIT_UNTIL<span class="o">}==</span><span class="s2">&quot;?*&quot;</span>,<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>&gt;<span class="w">       </span>ENV<span class="o">{</span>FIND_MULTIPATHS_WAIT_UNTIL<span class="o">}</span>!<span class="o">=</span><span class="s2">&quot;0&quot;</span>,<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>&gt;<span class="w">       </span>ENV<span class="o">{</span>FIND_MULTIPATHS_WAIT_CANCELLED<span class="o">}=</span><span class="s2">&quot;1&quot;</span>,<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>&gt;<span class="w">       </span><span class="nv">RUN</span><span class="o">+=</span><span class="s2">&quot;/usr/bin/systemctl stop cancel-multipath-wait-</span><span class="nv">$kernel</span><span class="s2">.timer&quot;</span>
+</code></pre></div>
+<h3 id="69-dm-lvmrules">69-dm-lvm.rules<a class="headerlink" href="#69-dm-lvmrules" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># diff 69-dm-lvm.rules /lib/udev/rules.d/69-dm-lvm.rules</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="m">82</span>,84c82,83
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>&lt;<span class="w"> </span>IMPORT<span class="o">{</span>program<span class="o">}==</span><span class="s2">&quot;/usr/sbin/lvm pvscan --cache --listvg --checkcomplete --vgonline --udevoutput --journal=output </span><span class="nv">$env</span><span class="s2">{DEVNAME}&quot;</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>&lt;<span class="w"> </span><span class="c1"># ENV{LVM_VG_NAME_COMPLETE}==&quot;?*&quot;, RUN+=&quot;/usr/bin/systemd-run -r --no-block --property DefaultDependencies=no --unit lvm-activate-$env{LVM_VG_NAME_COMPLETE} lvm vgchange -aay --nohints $env{LVM_VG_NAME_COMPLETE}&quot;</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>&lt;<span class="w"> </span>ENV<span class="o">{</span>LVM_VG_NAME_COMPLETE<span class="o">}==</span><span class="s2">&quot;?*&quot;</span>,<span class="w"> </span><span class="nv">RUN</span><span class="o">+=</span><span class="s2">&quot;/usr/sbin/lvm vgchange -aay --nohints </span><span class="nv">$env</span><span class="s2">{LVM_VG_NAME_COMPLETE}&quot;</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>---
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>&gt;<span class="w"> </span>IMPORT<span class="o">{</span>program<span class="o">}=</span><span class="s2">&quot;/usr/sbin/lvm pvscan --cache --listvg --checkcomplete --vgonline --udevoutput --journal=output </span><span class="nv">$env</span><span class="s2">{DEVNAME}&quot;</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>&gt;<span class="w"> </span>ENV<span class="o">{</span>LVM_VG_NAME_COMPLETE<span class="o">}==</span><span class="s2">&quot;?*&quot;</span>,<span class="w"> </span><span class="nv">RUN</span><span class="o">+=</span><span class="s2">&quot;/usr/bin/systemd-run -r --no-block --property DefaultDependencies=no --unit lvm-activate-</span><span class="nv">$env</span><span class="s2">{LVM_VG_NAME_COMPLETE} lvm vgchange -aay --nohints </span><span class="nv">$env</span><span class="s2">{LVM_VG_NAME_COMPLETE}&quot;</span>
+</code></pre></div>
+<h3 id="98-kexecrules">98-kexec.rules<a class="headerlink" href="#98-kexecrules" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># diff 98-kexec.rules /lib/udev/rules.d/98-kexec.rules</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="m">14</span>,16c14
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>&lt;<span class="w"> </span><span class="c1">#RUN+=&quot;/bin/sh -c &#39;/usr/bin/systemctl is-active kdump.service || exit 0; /usr/bin/systemd-run --quiet --no-block /usr/lib/udev/kdump-udev-throttler&#39;&quot;</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>&lt;
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>&lt;<span class="w"> </span><span class="nv">RUN</span><span class="o">+=</span><span class="s2">&quot;/bin/sh -c &#39;/usr/bin/systemctl is-active kdump.service || exit 0; /usr/lib/udev/kdump-udev-throttler&#39;&quot;</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>---
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>&gt;<span class="w"> </span><span class="nv">RUN</span><span class="o">+=</span><span class="s2">&quot;/bin/sh -c &#39;/usr/bin/systemctl is-active kdump.service || exit 0; /usr/bin/systemd-run --quiet --no-block /usr/lib/udev/kdump-udev-throttler&#39;&quot;</span>
+</code></pre></div>
+<h3 id="90-vconsolerules">90-vconsole.rules<a class="headerlink" href="#90-vconsolerules" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># diff tools/run_with_devmaster/rules.d/90-vconsole.rules /lib/udev/rules.d/90-vconsole.rules</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>3c12
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>&lt;<span class="w"> </span><span class="c1"># ACTION==&quot;add&quot;, SUBSYSTEM==&quot;vtconsole&quot;, KERNEL==&quot;vtcon*&quot;, RUN+=&quot;/usr/lib/systemd/systemd-vconsole-setup&quot;</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>---
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>&gt;<span class="w"> </span><span class="nv">ACTION</span><span class="o">==</span><span class="s2">&quot;add&quot;</span>,<span class="w"> </span><span class="nv">SUBSYSTEM</span><span class="o">==</span><span class="s2">&quot;vtconsole&quot;</span>,<span class="w"> </span><span class="nv">KERNEL</span><span class="o">==</span><span class="s2">&quot;vtcon*&quot;</span>,<span class="w"> </span><span class="nv">RUN</span><span class="o">+=</span><span class="s2">&quot;/usr/lib/systemd/systemd-vconsole-setup&quot;</span>
+</code></pre></div>
+<h3 id="99-systemdrules">99-systemd.rules<a class="headerlink" href="#99-systemdrules" title="Permanent link">&para;</a></h3>
+<p><code>99-systemd.rules</code>规则中的所有内容均被注释。</p>
+
+  <hr>
+<div class="md-source-file">
+  <small>
+    
+      最后更新:
+      <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">November 6, 2023</span>
+      
+        <br>
+        创建日期:
+        <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">September 5, 2023</span>
+      
+    
+  </small>
+</div>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 openEuler sysMaster team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.prune", "navigation.path", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.aecac24b.min.js"></script>
+      
+    
+  </body>
+</html>

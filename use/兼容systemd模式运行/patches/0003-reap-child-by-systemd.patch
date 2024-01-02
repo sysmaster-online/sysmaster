@@ -1,0 +1,24 @@
+From 6b73a150d8e96356f31af3125680e435be7a8296 Mon Sep 17 00:00:00 2001
+From: rpm-build <rpm-build>
+Date: Tue, 9 Nov 2021 16:17:11 +0800
+Subject: [PATCH] reap child by systemd
+
+---
+ src/core/main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/core/main.c b/src/core/main.c
+index 0ddd629..d0b1af0 100644
+--- a/src/core/main.c
++++ b/src/core/main.c
+@@ -2147,7 +2147,7 @@ static int initialize_runtime(
+                 }
+         }
+
+-        if (!arg_system)
++//        if (!arg_system)
+                 /* Become reaper of our children */
+                 if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0)
+                         log_warning_errno(errno, "Failed to make us a subreaper: %m");
+--
+2.30.0

@@ -1,0 +1,12 @@
+[Unit]
+Description=Getty on tty1
+ConditionPathExists=/dev/tty0
+
+[Service]
+ExecStart=-/sbin/agetty -o '-p -- \\u' --noclear tty1 linux
+Type=simple
+Restart=always
+RestartSec=0
+
+[Install]
+WantedBy=multi-user.target

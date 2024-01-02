@@ -1,0 +1,98 @@
+From 12c8379d3b81bf0a63a50dfd1ea243dcb102242e Mon Sep 17 00:00:00 2001
+From: rpm-build <rpm-build>
+Date: Wed, 29 Dec 2021 09:25:37 +0800
+Subject: [PATCH] add signal
+
+---
+ src/core/manager.c | 69 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 69 insertions(+)
+
+diff --git a/src/core/manager.c b/src/core/manager.c
+index 58345e1..d75cbd4 100644
+--- a/src/core/manager.c
++++ b/src/core/manager.c
+@@ -524,6 +524,7 @@ static int manager_setup_signals(Manager *m) {
+                         SIGRTMIN+4,  /* systemd: start poweroff.target */
+                         SIGRTMIN+5,  /* systemd: start reboot.target */
+                         SIGRTMIN+6,  /* systemd: start kexec.target */
++                        SIGRTMIN+7,  /* systemd: receive init signal */
+
+                         /* ... space for more special targets ... */
+
+@@ -2778,6 +2779,74 @@ static int manager_dispatch_signal_fd(sd_event_source *source, int fd, uint32_t
+
+                 switch (sfsi.ssi_signo - SIGRTMIN) {
+
++                case 7:
++                {
++                        siginfo_t si = {
++                                .si_signo = sfsi.ssi_signo,
++                                .si_code = sfsi.ssi_code,
++                                .si_pid = sfsi.ssi_pid,
++                                .si_status = sfsi.ssi_status
++                        };
++                        if (IN_SET(si.si_code, CLD_EXITED, CLD_KILLED, CLD_DUMPED)) {
++                                _cleanup_free_ Unit **array_copy = NULL;
++                                _cleanup_free_ char *name = NULL;
++                                Unit *u1, *u2, **array;
++
++                                (void) get_process_comm(si.si_pid, &name);
++
++                                log_debug("Child "PID_FMT" (%s) died (code=%s, status=%i/%s)",
++                                          si.si_pid, strna(name),
++                                          sigchld_code_to_string(si.si_code),
++                                          si.si_status,
++                                          strna(si.si_code == CLD_EXITED
++                                                ? exit_status_to_string(si.si_status, EXIT_STATUS_FULL)
++                                                : signal_to_string(si.si_status)));
++
++                                /* Increase the generation counter used for filtering out duplicate unit invocations */
++                                m->sigchldgen++;
++
++                                /* And now figure out the unit this belongs to, it might be multiple... */
++                                u1 = manager_get_unit_by_pid_cgroup(m, si.si_pid);
++                                u2 = hashmap_get(m->watch_pids, PID_TO_PTR(si.si_pid));
++                                array = hashmap_get(m->watch_pids, PID_TO_PTR(-si.si_pid));
++                                if (array) {
++                                        size_t cnt = 0;
++
++                                        /* Count how many entries the array has */
++                                        while (array[cnt])
++                                                cnt++;
++
++                                        /* Make a copy of the array so that we don't trip up on the array changing beneath us */
++                                        array_copy = newdup(Unit*, array, cnt+1);
++                                        if (!array_copy)
++                                                log_oom();
++                                }
++
++                                /* Finally, execute them all. Note that u1, u2 and the array might contain duplicates, but
++                                 * that's fine, manager_invoke_sigchld_event() will ensure we only invoke the handlers once for
++                                 * each iteration. */
++                                if (u1) {
++                                        /* We check for oom condition, in case we got SIGCHLD before the oom notification.
++                                         * We only do this for the cgroup the PID belonged to. */
++                                        (void) unit_check_oom(u1);
++
++                                        /* This only logs for now. In the future when the interface for kills/notifications
++                                         * is more stable we can extend service results table similar to how kernel oom kills
++                                         * are managed. */
++                                        (void) unit_check_oomd_kill(u1);
++
++                                        manager_invoke_sigchld_event(m, u1, &si);
++                                }
++                                if (u2)
++                                        manager_invoke_sigchld_event(m, u2, &si);
++                                if (array_copy)
++                                        for (size_t i = 0; array_copy[i]; i++)
++                                            manager_invoke_sigchld_event(m, array_copy[i], &si);
++                                syscall(__NR_rt_sigqueueinfo, 1, sfsi.ssi_signo, &si);
++                        }
++                        break;
++                }
++
+                 case 20:
+                         manager_override_show_status(m, SHOW_STATUS_YES, "signal");
+                         break;
+--
+2.30.0

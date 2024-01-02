@@ -1,0 +1,2680 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Redesign and Reimplementation of Process1">
+      
+      
+        <meta name="author" content="dev@openeuler.org">
+      
+      
+        <link rel="canonical" href="http://sysmaster.online/man/core/unit/">
+      
+      
+        <link rel="prev" href="../socket/">
+      
+      
+        <link rel="next" href="../../exts/devmaster/devctl/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.7">
+    
+    
+      
+        <title>Unit 配置 - sysmaster.online</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.4b4a2bd9.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.356b1318.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Ubuntu:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Ubuntu";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#unit" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="sysmaster.online" class="md-header__button md-logo" aria-label="sysmaster.online" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sysmaster.online
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Unit 配置
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="分享" aria-label="分享" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91 1.61 0 2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08Z"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://gitee.com/openeuler/sysmaster" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openEuler/sysMaster
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../contrib/" class="md-tabs__link">
+        
+  
+    
+  
+  Contrib
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../cicd/01-integration_test/" class="md-tabs__link">
+          
+  
+    
+  
+  Cicd
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../design/00-index_zh/" class="md-tabs__link">
+          
+  
+    
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../all/" class="md-tabs__link">
+          
+  
+    
+  
+  Man
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../use/00-sysMaster%E6%9E%84%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8/" class="md-tabs__link">
+          
+  
+    
+  
+  Use
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="sysmaster.online" class="md-nav__button md-logo" aria-label="sysmaster.online" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    sysmaster.online
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://gitee.com/openeuler/sysmaster" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openEuler/sysMaster
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../contrib/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contrib
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Cicd
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Cicd
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cicd/01-integration_test/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    测试框架及用例编写
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cicd/02-cargo-fuzz/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cargo-fuzz 介绍
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_docker_with_kiwi/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build docker with kiwi
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_qemu_with_kiwi/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build qemu with kiwi
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_rpm_with_mock/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build rpm with mock
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_xz_with_vendor/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build xz with vendor
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    
+  
+  
+    <a href="../../../cicd/tests/devmaster/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Tests
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Design
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Design
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/00-index_zh/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    为什么要开发sysMaster
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/00-sysmaster_0description/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    1号进程的挑战及sysMaster愿景
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/00-sysmaster_architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster架构设计
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/01-errors_of_sysmaster/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    对错误处理的思考
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/cores/01-devel-doc/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Cores
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/extends/02-devmaster-architecture/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Extends
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/libiraries/01-event/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Libiraries
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/rfcs/0001-systemd_parser/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Rfcs
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Man
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Man
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../all/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Warnings
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sysmaster.conf/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster 系统配置
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Core
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            Core
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exec/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    命令执行环境
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sctl/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sctl 命令
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../service/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Service 配置
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../signal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster的信号处理
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../socket/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Socket 配置
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Unit 配置
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Unit 配置
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unit_1" class="md-nav__link">
+    Unit描述
+  </a>
+  
+    <nav class="md-nav" aria-label="Unit描述">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#description" class="md-nav__link">
+    Description
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    Documentation
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    条件动作
+  </a>
+  
+    <nav class="md-nav" aria-label="条件动作">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#successactionfailureaction" class="md-nav__link">
+    SuccessAction/FailureAction
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#startlimitaction" class="md-nav__link">
+    StartLimitAction
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#startlimitinterval" class="md-nav__link">
+    StartLimitInterval
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#startlimitburst" class="md-nav__link">
+    StartLimitBurst
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobtimeoutactionjobtimeoutsec" class="md-nav__link">
+    JobTimeoutAction，JobTimeoutSec
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    顺序和依赖
+  </a>
+  
+    <nav class="md-nav" aria-label="顺序和依赖">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#afterbefore" class="md-nav__link">
+    After/Before
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wantsrequiresrequisitepartofbindstoconflicts" class="md-nav__link">
+    Wants/Requires/Requisite/PartOf/BindsTo/Conflicts
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#onfailureonsuccess" class="md-nav__link">
+    OnFailure/OnSuccess
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#defaultdependencies" class="md-nav__link">
+    DefaultDependencies
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    启动检查
+  </a>
+  
+    <nav class="md-nav" aria-label="启动检查">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conditionacpower" class="md-nav__link">
+    ConditionACPower
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditioncapability" class="md-nav__link">
+    ConditionCapability
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditiondirectorynotempty" class="md-nav__link">
+    ConditionDirectoryNotEmpty
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionfileisexecutable" class="md-nav__link">
+    ConditionFileIsExecutable
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionfirstboot" class="md-nav__link">
+    ConditionFirstBoot
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionkernelcommandline" class="md-nav__link">
+    ConditionKernelCommandLine
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathexists" class="md-nav__link">
+    ConditionPathExists
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathexistsglob" class="md-nav__link">
+    ConditionPathExistsGlob
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathisdirectory" class="md-nav__link">
+    ConditionPathIsDirectory
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathismountpoint" class="md-nav__link">
+    ConditionPathIsMountPoint
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathisreadwrite" class="md-nav__link">
+    ConditionPathIsReadWrite
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathissymboliclink" class="md-nav__link">
+    ConditionPathIsSymbolicLink
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionsecurity" class="md-nav__link">
+    ConditionSecurity
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionuser" class="md-nav__link">
+    ConditionUser
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    其他配置
+  </a>
+  
+    <nav class="md-nav" aria-label="其他配置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#refusemanualstartrefusemanualstop" class="md-nav__link">
+    RefuseManualStart/RefuseManualStop
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    
+  
+  
+    <a href="../../exts/devmaster/devctl/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Exts
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../init/init/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Init
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Use
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Use
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../use/00-sysMaster%E6%9E%84%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysMaster 构建和使用
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../use/00-systemd2sysmaster/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    systemd向sysmaster迁移
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../use/00-%E5%88%B6%E4%BD%9Csysmaster%E4%BD%9C%E4%B8%BA1%E5%8F%B7%E8%BF%9B%E7%A8%8B%E7%9A%84iso%E9%95%9C%E5%83%8F/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    oemake制作sysmaster作为1号进程的iso镜像
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/devmaster%E6%9B%BF%E4%BB%A3udev%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Devmaster替代udev运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/sysMaster%E7%89%B9%E6%9D%83%E5%AE%B9%E5%99%A8/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    sysMaster特权容器
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/sysmaster%E4%B8%8B%E4%BD%BF%E8%83%BDrsyslog/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Sysmaster下使能rsyslog
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/%E5%85%BC%E5%AE%B9busybox%E6%A8%A1%E5%BC%8F%E8%BF%90%E8%A1%8C/Readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    兼容busybox模式运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/%E5%85%BC%E5%AE%B9systemd%E6%A8%A1%E5%BC%8F%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    兼容systemd模式运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/%E5%AE%B9%E5%99%A8%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    容器中替代pid1运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/%E8%99%9A%E6%9C%BA%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    虚机中替代pid1运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unit_1" class="md-nav__link">
+    Unit描述
+  </a>
+  
+    <nav class="md-nav" aria-label="Unit描述">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#description" class="md-nav__link">
+    Description
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    Documentation
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    条件动作
+  </a>
+  
+    <nav class="md-nav" aria-label="条件动作">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#successactionfailureaction" class="md-nav__link">
+    SuccessAction/FailureAction
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#startlimitaction" class="md-nav__link">
+    StartLimitAction
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#startlimitinterval" class="md-nav__link">
+    StartLimitInterval
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#startlimitburst" class="md-nav__link">
+    StartLimitBurst
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobtimeoutactionjobtimeoutsec" class="md-nav__link">
+    JobTimeoutAction，JobTimeoutSec
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    顺序和依赖
+  </a>
+  
+    <nav class="md-nav" aria-label="顺序和依赖">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#afterbefore" class="md-nav__link">
+    After/Before
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wantsrequiresrequisitepartofbindstoconflicts" class="md-nav__link">
+    Wants/Requires/Requisite/PartOf/BindsTo/Conflicts
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#onfailureonsuccess" class="md-nav__link">
+    OnFailure/OnSuccess
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#defaultdependencies" class="md-nav__link">
+    DefaultDependencies
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    启动检查
+  </a>
+  
+    <nav class="md-nav" aria-label="启动检查">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conditionacpower" class="md-nav__link">
+    ConditionACPower
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditioncapability" class="md-nav__link">
+    ConditionCapability
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditiondirectorynotempty" class="md-nav__link">
+    ConditionDirectoryNotEmpty
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionfileisexecutable" class="md-nav__link">
+    ConditionFileIsExecutable
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionfirstboot" class="md-nav__link">
+    ConditionFirstBoot
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionkernelcommandline" class="md-nav__link">
+    ConditionKernelCommandLine
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathexists" class="md-nav__link">
+    ConditionPathExists
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathexistsglob" class="md-nav__link">
+    ConditionPathExistsGlob
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathisdirectory" class="md-nav__link">
+    ConditionPathIsDirectory
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathismountpoint" class="md-nav__link">
+    ConditionPathIsMountPoint
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathisreadwrite" class="md-nav__link">
+    ConditionPathIsReadWrite
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionpathissymboliclink" class="md-nav__link">
+    ConditionPathIsSymbolicLink
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionsecurity" class="md-nav__link">
+    ConditionSecurity
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditionuser" class="md-nav__link">
+    ConditionUser
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    其他配置
+  </a>
+  
+    <nav class="md-nav" aria-label="其他配置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#refusemanualstartrefusemanualstop" class="md-nav__link">
+    RefuseManualStart/RefuseManualStop
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+    <a href="https://gitee.com/-/ide/project/openeuler/sysmaster/edit/master/-/docs/man/core/unit.md" title="编辑此页" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4v-2m10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1 2.1 2.1Z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="unit">Unit 配置<a class="headerlink" href="#unit" title="Permanent link">&para;</a></h1>
+<h2 id="unit_1">Unit描述<a class="headerlink" href="#unit_1" title="Permanent link">&para;</a></h2>
+<h3 id="description">Description<a class="headerlink" href="#description" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>允许配置为一个字符串，说明该unit的主要功能。</p>
+<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>允许配置为一个字符串，说明该unit的文档链接。</p>
+<h2 id="_1">条件动作<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<p>sysmaster兼容systemd的SuccessAction、FailureAction、StartLimitAction等配置。这些配置允许某个unit的状态发生变更时修改操作系统的状态，例如重启、关机或退出。</p>
+<h3 id="successactionfailureaction">SuccessAction/FailureAction<a class="headerlink" href="#successactionfailureaction" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>配置当unit结束（SuccessAction）或进入失败状态（FailureAction）时采取的动作。可以配置的值包括： <code>"none"</code>，<code>"reboot"</code>，<code>"reboot-force"</code>，<code>"reboot-immediate"</code>，<code>"poweroff"</code>，<code>"poweroff-force"</code>，<code>"poweroff-immediate"</code>，<code>"exit"</code>和<code>"exit-force"</code>。</p>
+<p>当配置为<code>none</code>时，不触发任何动作，所有unit的默认值为<code>"none"</code>。<code>"reboot"</code>，<code>"poweroff"</code>，<code>"exit"</code>会分别触发<code>reboot.target</code>，<code>poweroff.target</code>，<code>exit.target</code>，与正常的系统重启、关机、退出流程一致。<code>"reboot-force"</code>，<code>"poweroff-force"</code>，<code>"exit-force"</code>会分别触发sysmaster以相应的状态退出，强行杀死服务及相关进程。<code>"reboot-immediate"</code>，<code>"poweroff-immediate"</code>会分别触发系统立即重启、关机，直接调用<a href="https://man7.org/linux/man-pages/man2/reboot.2.html">reboot(2)</a>。</p>
+<h3 id="startlimitaction">StartLimitAction<a class="headerlink" href="#startlimitaction" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>配置当unit触发启动限制时采取的动作。配置的值与采取的动作与<code>SuccessAction</code>、<code>FailureAction</code>一致。</p>
+<p>触发启动限制指：sysmaster最多允许单个unit在<code>StartLimitInterval</code>时间内启动<code>StartLimitBurst</code>次。</p>
+<h3 id="startlimitinterval">StartLimitInterval<a class="headerlink" href="#startlimitinterval" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：数值</li>
+</ul>
+<p>限制启动的时间区间, 单位为秒， 默认值为10秒。</p>
+<h3 id="startlimitburst">StartLimitBurst<a class="headerlink" href="#startlimitburst" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：数值</li>
+</ul>
+<p>单位时间内最多的启动次数， 默认值为5。 只要<code>StartLimitInterval</code>与<code>StartLimitBurst</code>其中一项配置为0时不启动限速。</p>
+<h3 id="jobtimeoutactionjobtimeoutsec">JobTimeoutAction，JobTimeoutSec<a class="headerlink" href="#jobtimeoutactionjobtimeoutsec" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p><code>JobTimeoutAction</code>配置unit的job运行超时时采取的动作，配置的值与采取的动作与<code>SuccessAction</code>、<code>FailureAction</code>一致。</p>
+<p><code>JobTimeoutSec</code>配置unit的job运行超时时间，单位是<code>秒</code>。systemd禁用<code>JobTimeoutSec</code>的配置为<code>"infinity"</code>，sysmaster与之不同，禁用<code>JobTimeoutSec</code>需要配置为<code>"0"</code>。</p>
+<h2 id="_2">顺序和依赖<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p>sysmaster支持配置单元之间的顺序及依赖关系，可以配置的值为<code>;</code>分隔的单元。如<code>After="foo.service;bar.target"</code>。需要注意：</p>
+<ol>
+<li>单元之间不允许有多余的空格</li>
+<li>仅支持通过<code>;</code>分隔，与systemd的空格分隔存在差异</li>
+<li>不支持systemd同一配置项配置多次的场景，如:
+    After="foo.service"
+    After="bar.service"</li>
+</ol>
+<h3 id="afterbefore">After/Before<a class="headerlink" href="#afterbefore" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p><code>After</code>和<code>Before</code>能够配置同时启动的单元的先后顺序。如<code>foo.service</code>配置了<code>After="bar.service" Wants="bar.service"</code>，<code>foo.service</code>将在<code>bar.service</code>启动完成后启动。需要注意：</p>
+<ol>
+<li><code>After</code>和<code>Before</code>仅确定启动的先后顺序，不自动添加依赖。在上面的例子中如果没有配置<code>Wants="bar.service"</code>，<code>foo.service</code>也能正常启动，且不会自动拉起<code>bar.service</code>。</li>
+<li>后序单元不关注前序单元的启动结果，这意味着在上面的例子中，即使<code>bar.service</code>启动失败，<code>foo.service</code>依旧能正常拉起。</li>
+</ol>
+<p><code>After</code>和<code>Before</code>的依赖相反。在关机阶段，依赖反转。</p>
+<h3 id="wantsrequiresrequisitepartofbindstoconflicts">Wants/Requires/Requisite/PartOf/BindsTo/Conflicts<a class="headerlink" href="#wantsrequiresrequisitepartofbindstoconflicts" title="Permanent link">&para;</a></h3>
+<p>这些配置项均用于配置单元之间的依赖，以<code>foo.service</code>配置<code>Wants/Requisite...="bar.service"</code>为例详细说明。</p>
+<p><code>Wants</code>：配置一个单元对另一个单元的依赖。在启动<code>foo.service</code>时，将自动拉起<code>bar.service</code>。但是<code>bar.service</code>的启动结果不影响<code>foo.service</code>。</p>
+<p><code>Requires</code>：与<code>Wants</code>类似，区别在于如果<code>bar.service</code>启动失败，<code>foo.service</code>也同时进入失败状态。重启或关闭<code>bar.service</code>会传递到<code>foo.service</code>，使<code>foo.service</code>跟随重启或关闭。</p>
+<p><code>Requisite</code>：与<code>Requires</code>类似，区别在于启动<code>foo.service</code>时，如果<code>bar.service</code>还未启动成功，那么<code>foo.service</code>会直接失败。<strong>注意：<code>Requisite</code>必须与<code>After</code>配合使用，否则启动<code>bar.service</code>不检查<code>foo.service</code>，这与systemd行为一致。</strong></p>
+<p><code>PartOf</code>：与<code>Requires</code>类似，区别在于依赖仅影响单元的重启或关闭。</p>
+<p><code>BindsTo</code>：与<code>Requires</code>类似，但依赖更强，当<code>bar.service</code>的状态突然发生变化时，<code>foo.service</code>会跟随立即变化。</p>
+<p><code>Conflicts</code>：<code>foo.service</code>与<code>bar.service</code>的状态相反。启动<code>foo.service</code>将关闭<code>bar.service</code>，启动<code>bar.service</code>会关闭<code>foo.service</code>。</p>
+<p><code>Wants</code>和<code>Requires</code>除了支持通过<code>.service/.target/.socket</code>等单元配置文件配置，也允许在<code>/etc/sysmaster/system/</code>或<code>/usr/lib/sysmaster/system/</code>目录下创建<code>单元名.wants/单元名.requires</code>目录，并在里面添加指向依赖单元的软链接。例如为了给<code>foo.service</code>配置<code>Wants="bar.service"</code>，可以创建<code>/etc/sysmaster/system/foo.service.wants</code>目录，并在该目录内创建<code>bar.service -&gt; /etc/sysmaster/system/bar.service</code>的软链接。</p>
+<h3 id="onfailureonsuccess">OnFailure/OnSuccess<a class="headerlink" href="#onfailureonsuccess" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p><code>OnFailure</code>：配置当一个unit启动失败或成功结束后，对其他服务的影响。以<code>foo.service</code>配置<code>OnFailure/OnSuccess="bar.service"</code>为例，当<code>foo.service</code>启动失败或成功结束后，将自动拉起<code>bar.service</code>。拉起<code>bar.service</code>会生成一个Start类型的job,该job的模式可配置为<code>fail</code>， <code>replace</code>，<code>replace-irreversibly</code>，<code>isolate</code>，<code>flush</code>，<code>ignore-dependencies</code>或<code>ignore-requirements</code>。</p>
+<h3 id="defaultdependencies">DefaultDependencies<a class="headerlink" href="#defaultdependencies" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：布尔值</li>
+</ul>
+<p><code>DefaultDependencies</code>配置是否为单元添加缺省依赖，默认值为<code>true</code>。缺省依赖如下：</p>
+<ol>
+<li>所有类型的单元统一添加<code>Conflict="shutdown.target"</code>，<code>Before="shutdown.target"</code>。</li>
+<li>针对不同类型的单元，额外添加以下依赖</li>
+</ol>
+<blockquote>
+<ul>
+<li>对<code>.service</code>，添加<code>Requires="sysinit.target"</code>，<code>After="sysinit.target"</code>，<code>After="basic.target"</code>。</li>
+<li>对<code>.socket</code>，添加<code>Requires="sysinit.target"</code>，<code>After="sysinit.target"</code>，<code>After="socket.target"</code>。</li>
+<li>对<code>.target</code>，对target配置的<code>Requires=</code>、<code>Wants=</code>补全<code>After=</code>。</li>
+</ul>
+</blockquote>
+<h2 id="_3">启动检查<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>sysmaster支持配置<code>Condition...</code>和<code>Assert...</code>进行启动检查，当条件不满足时，停止启动流程。所有配置均支持通过在值前面添加<code>!</code>反转检查结果。</p>
+<h3 id="conditionacpower">ConditionACPower<a class="headerlink" href="#conditionacpower" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：可选的布尔值</li>
+</ul>
+<p>检查操作系统是否连接交流电源。可以配置为<code>false</code>，<code>true</code>。配置为<code>true</code>时，当操作系统至少一个接口连接了交流电，或者无法确定是否有连接时，检查通过。配置为<code>false</code>时，当成功检查到所有接口都没有连接交流电时，检查通过。如果不配置，跳过该检查。配置为其他的值，会导致解析失败。</p>
+<h3 id="conditioncapability">ConditionCapability<a class="headerlink" href="#conditioncapability" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>检测sysmaster是否支持给定的权能，允许配置引号括起来的权能名称，如<code>"CAP_CHOWN"</code>。该配置仅允许配置一个权能。通过读取<code>/proc/self/status/</code>的<code>CapBnd</code>检查sysmaster的权能组（Capability Set），如果包含指定的权能，那么检查通过；否则，检查失败。</p>
+<h3 id="conditiondirectorynotempty">ConditionDirectoryNotEmpty<a class="headerlink" href="#conditiondirectorynotempty" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>检查配置的绝对路径目录是否非空，如果为软链接，则判断软链接指向的目录。如果目录非空，检查通过；否则，检查失败。</p>
+<h3 id="conditionfileisexecutable">ConditionFileIsExecutable<a class="headerlink" href="#conditionfileisexecutable" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>检查配置的绝对路径文件是否可执行，如果为软链接，则判断软链接指向的文件。如果可执行，检查通过；否则，检查失败。</p>
+<h3 id="conditionfirstboot">ConditionFirstBoot<a class="headerlink" href="#conditionfirstboot" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：可选的布尔值</li>
+</ul>
+<p>检测系统是否首次启动，可配置为<code>false</code>、<code>true</code>。用于系统出厂后(或者恢复出厂设置之后)，首次开机时执行必要的初始化操作。该选项将会检测<code>/run/sysmaster/first-boot</code>文件是否存在。若文件存在，则表明系统首次启动，反之，则表明系统非首次启动。如果在内核命令行上指定了<code>sysmaster.condition-first-boot=</code>选项（采用布尔值），它将优先于<code>/run/sysmaster/first-boot</code>文件是否存在的检查结果。</p>
+<h3 id="conditionkernelcommandline">ConditionKernelCommandLine<a class="headerlink" href="#conditionkernelcommandline" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>检查内核命令行是否配置给定的内容。该选项仅允许配置 <strong>一个</strong> 单词或者<code>=</code>分隔的键值对，例如：<code>"ro"</code>，<code>"crashkernel=512M"</code>。配置为单词时，检查内核命令行是否包含
+该单词或作为键值对的键。配置为键值对时，将检查是否存在完全一致的键值对。内核命令行仅支持读取<code>/proc/cmdline</code>。</p>
+<h3 id="conditionpathexists">ConditionPathExists<a class="headerlink" href="#conditionpathexists" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>检查文件是否存在。只有<code>ConditionPathExists=</code>后配置的绝对路径存在时，检查通过，启动流程正常；如果配置的绝对路径不存在，则检查失败，停止单元的启动流程。</p>
+<h3 id="conditionpathexistsglob">ConditionPathExistsGlob<a class="headerlink" href="#conditionpathexistsglob" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>与<code>ConditionPathExists</code>类似，区别在于<code>ConditionPathExistsGlob</code>支持通配符。</p>
+<h3 id="conditionpathisdirectory">ConditionPathIsDirectory<a class="headerlink" href="#conditionpathisdirectory" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>检查<code>ConditionPathIsDirectory=</code>后配置的绝对路径是否为目录，如果是，检查通过；否则检查失败。</p>
+<h3 id="conditionpathismountpoint">ConditionPathIsMountPoint<a class="headerlink" href="#conditionpathismountpoint" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>检查<code>ConditionPathIsMountPoint=</code>后配置的绝对路径是否为挂载点目录，如果是软链接，则检查软链接指向的目录。该配置仅支持<code>kernel &gt; 4.11</code>版本。如果是挂载点目录，检查通过；否则，检查失败。</p>
+<h3 id="conditionpathisreadwrite">ConditionPathIsReadWrite<a class="headerlink" href="#conditionpathisreadwrite" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>与<code>ConditionPathExists</code>类似，检查配置的绝对路径所属的文件系统是否为可读可写。</p>
+<h3 id="conditionpathissymboliclink">ConditionPathIsSymbolicLink<a class="headerlink" href="#conditionpathissymboliclink" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>检查<code>ConditionPathIsSymbolicLink=</code>后配置的绝对路径是否为软链接，如果是软链接，检查通过；否则检查失败。</p>
+<h3 id="conditionsecurity">ConditionSecurity<a class="headerlink" href="#conditionsecurity" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p><code>ConditionSecurity</code>可以用于检查系统是否支持给定的安全技术。当前支持的值包括：<code>"selinux"</code>，<code>"apparmor"</code>，<code>"tomoyo"</code>，<code>"ima"</code>，<code>"smack"</code>，<code>"audit"</code>，<code>"uefi-secureboot"</code>和<code>"tpm2"</code>。 <strong>注意：</strong> 检查<code>"selinux"</code>需要在编译时通过 <code>--features "selinux"</code> 开启 <code>"selinux"</code> feature。</p>
+<h3 id="conditionuser">ConditionUser<a class="headerlink" href="#conditionuser" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>检测sysmaster是否以给定的用户身份运行。参数可以是数字形式的"UID"、字符串形式的UNIX用户名或者特殊值<code>"@system"</code>(表示属于系统用户范围内)。如果不配置，默认跳过该检查。</p>
+<h2 id="_4">其他配置<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<h3 id="refusemanualstartrefusemanualstop">RefuseManualStart/RefuseManualStop<a class="headerlink" href="#refusemanualstartrefusemanualstop" title="Permanent link">&para;</a></h3>
+<ul>
+<li>类型：布尔值</li>
+</ul>
+<p><code>RefuseManualStart</code>/<code>RefuseManualStop</code>：配置单元是否拒绝通过<code>sctl start/stop</code>的形式手动启动/关闭。默认配置为<code>false</code>，即允许手动启动/关闭。该配置不影响通过依赖关系解析启动/关闭服务。</p>
+
+  <hr>
+<div class="md-source-file">
+  <small>
+    
+      最后更新:
+      <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">November 4, 2023</span>
+      
+        <br>
+        创建日期:
+        <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">February 8, 2023</span>
+      
+    
+  </small>
+</div>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 openEuler sysMaster team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.prune", "navigation.path", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.aecac24b.min.js"></script>
+      
+    
+  </body>
+</html>

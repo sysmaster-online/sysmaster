@@ -1,0 +1,8 @@
+[Unit]
+Description=automount fstab device
+
+[Service]
+ExecStart=/usr/lib/sysmaster/fstab
+
+[Install]
+WantedBy=multi-user.target

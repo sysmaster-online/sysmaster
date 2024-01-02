@@ -1,0 +1,3 @@
+[Unit]
+Description=Basic System
+Wants=init.service

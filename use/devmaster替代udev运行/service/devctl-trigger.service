@@ -1,0 +1,12 @@
+[Unit]
+DefaultDependencies=false
+After=devmaster.service
+Requires=devmaster.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/devctl trigger --type subsystems --action add ; /usr/bin/devctl trigger --type devices --action add
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

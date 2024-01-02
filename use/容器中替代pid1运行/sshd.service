@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenSSH server daemon
+Documentation=man:sshd(8) man:sshd_config(5)
+After=sshd-keygen.target
+Wants=sshd-keygen.target
+
+[Service]
+Type=notify
+EnvironmentFile=-/etc/sysconfig/sshd
+ExecStart=/usr/sbin/sshd -D $OPTIONS
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=42
+
+[Install]
+WantedBy=multi-user.target

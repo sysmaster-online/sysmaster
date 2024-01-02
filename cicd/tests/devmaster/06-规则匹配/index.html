@@ -1,0 +1,6043 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Redesign and Reimplementation of Process1">
+      
+      
+        <meta name="author" content="dev@openeuler.org">
+      
+      
+        <link rel="canonical" href="http://sysmaster.online/cicd/tests/devmaster/06-%E8%A7%84%E5%88%99%E5%8C%B9%E9%85%8D/">
+      
+      
+        <link rel="prev" href="../05-%E8%A7%84%E5%88%99%E5%8A%A0%E8%BD%BD/">
+      
+      
+        <link rel="next" href="../07-%E8%A7%84%E5%88%99%E8%B5%8B%E5%80%BC/">
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.7">
+    
+    
+      
+        <title>06 规则匹配 - sysmaster.online</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.4b4a2bd9.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.356b1318.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Ubuntu:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Ubuntu";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#06" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../../.." title="sysmaster.online" class="md-header__button md-logo" aria-label="sysmaster.online" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sysmaster.online
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              06 规则匹配
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="分享" aria-label="分享" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91 1.61 0 2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08Z"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://gitee.com/openeuler/sysmaster" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openEuler/sysMaster
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../contrib/" class="md-tabs__link">
+        
+  
+    
+  
+  Contrib
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../../01-integration_test/" class="md-tabs__link">
+          
+  
+    
+  
+  Cicd
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../design/00-index_zh/" class="md-tabs__link">
+          
+  
+    
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../man/all/" class="md-tabs__link">
+          
+  
+    
+  
+  Man
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../use/00-sysMaster%E6%9E%84%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8/" class="md-tabs__link">
+          
+  
+    
+  
+  Use
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="sysmaster.online" class="md-nav__button md-logo" aria-label="sysmaster.online" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    sysmaster.online
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://gitee.com/openeuler/sysmaster" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openEuler/sysMaster
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../contrib/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contrib
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Cicd
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Cicd
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../01-integration_test/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    测试框架及用例编写
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../02-cargo-fuzz/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cargo-fuzz 介绍
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../build_docker_with_kiwi/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build docker with kiwi
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../build_qemu_with_kiwi/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build qemu with kiwi
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../build_rpm_with_mock/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build rpm with mock
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../build_xz_with_vendor/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build xz with vendor
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_7" id="__nav_3_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Tests
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            Tests
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_1" checked>
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Devmaster
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_7_1" id="__nav_3_7_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            Devmaster
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-devctl_test-builtin/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    01 客户端命令 devctl test-builtin
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-devctl_trigger/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    02 客户端命令 devctl trigger
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-devctl_monitor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    03 客户端命令 devctl monitor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-%E9%85%8D%E7%BD%AE%E7%AE%A1%E7%90%86/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    04 配置管理
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-%E8%A7%84%E5%88%99%E5%8A%A0%E8%BD%BD/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    05 规则加载
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    06 规则匹配
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    06 规则匹配
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    特性描述
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    特性约束
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    子场景 1
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 1">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    子场景 2
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    子场景 3
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 3">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    子场景 4
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 4">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    子场景 5
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 5">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    子场景 6
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 6">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_34" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_35" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_36" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_37" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_38" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    子场景 7
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 7">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_39" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_40" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_41" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_42" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_43" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_44" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8" class="md-nav__link">
+    子场景 8
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 8">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_45" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_46" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_47" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_48" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_49" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_50" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    子场景 9
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 9">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_51" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_52" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_53" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_54" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_55" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_56" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    子场景 10
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 10">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_57" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_58" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_59" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_60" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_61" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_62" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    子场景 11
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 11">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_63" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_64" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_65" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_66" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_67" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_68" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    子场景 12
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 12">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_69" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_70" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_71" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_72" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_73" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_74" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13" class="md-nav__link">
+    子场景 13
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 13">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_75" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_76" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_77" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_78" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_79" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_80" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14" class="md-nav__link">
+    子场景 14
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 14">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_81" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_82" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_83" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_84" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_85" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_86" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_87" class="md-nav__link">
+    子场景
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_88" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_89" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_90" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_91" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_92" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_93" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16" class="md-nav__link">
+    子场景 16
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 16">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_94" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_95" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_96" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_97" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_98" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_99" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17" class="md-nav__link">
+    子场景 17
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 17">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_100" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_101" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_102" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_103" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_104" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_105" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18" class="md-nav__link">
+    子场景 18
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 18">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_106" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_107" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_108" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_109" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_110" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_111" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#19" class="md-nav__link">
+    子场景 19
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 19">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_112" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_113" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_114" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_115" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_116" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_117" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#20" class="md-nav__link">
+    子场景 20
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 20">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_118" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_119" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_120" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_121" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_122" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_123" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#21" class="md-nav__link">
+    子场景 21
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 21">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_124" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_125" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_126" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_127" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_128" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_129" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#22" class="md-nav__link">
+    子场景 22
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 22">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_130" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_131" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_132" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_133" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_134" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_135" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#23" class="md-nav__link">
+    子场景 23
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 23">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_136" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_137" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_138" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_139" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_140" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_141" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#24" class="md-nav__link">
+    子场景 24
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 24">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_142" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_143" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_144" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_145" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_146" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_147" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-%E8%A7%84%E5%88%99%E8%B5%8B%E5%80%BC/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    07 规则赋值
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-%E8%A7%84%E5%88%99%E8%B7%B3%E8%BD%AC/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    08 跳转规则
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-%E5%8D%A0%E4%BD%8D%E7%AC%A6%E6%A0%BC%E5%BC%8F%E5%8C%96/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    09 占位符格式化
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-builtin_blkid/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    10 内置命令 blkid
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-builtin_input_id/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    11 内置命令 input_id
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-builtin_keyboard/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    12 内置命令 keyboard
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-builtin_kmod/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    13 内置命令 kmod
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-builtin_net_id/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    14 内置命令 net_id
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-builtin_net_setup_link/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    15 内置命令 net_setup_link
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-builtin_path_id/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    16 内置命令 path_id
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-builtin_usb_id/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    17 内置命令 usb_id
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-%E6%95%B0%E6%8D%AE%E5%BA%93%E6%9B%B4%E6%96%B0/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    18 数据库更新
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../19-%E6%97%B6%E9%97%B4%E6%88%B3%E6%9B%B4%E6%96%B0/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    19 时间戳更新
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../20-%E8%BD%AF%E9%93%BE%E6%8E%A5%E6%9B%B4%E6%96%B0/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    20 软链接更新
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../21-%E6%A0%87%E7%AD%BE%E6%9B%B4%E6%96%B0/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    21 标签更新
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../22-remove%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    22 remove事件处理
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../23-%E7%BD%91%E5%8D%A1%E9%87%8D%E5%91%BD%E5%90%8D/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    23 网卡重命名
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../24-%E7%A9%BA%E9%97%B2worker%E7%BA%BF%E7%A8%8B%E5%9B%9E%E6%94%B6/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    24 空闲worker线程回收
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../sysmaster/99-sysMaster_test/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Sysmaster
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Design
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Design
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../design/00-index_zh/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    为什么要开发sysMaster
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../design/00-sysmaster_0description/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    1号进程的挑战及sysMaster愿景
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../design/00-sysmaster_architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster架构设计
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../design/01-errors_of_sysmaster/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    对错误处理的思考
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../design/cores/01-devel-doc/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Cores
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../design/extends/02-devmaster-architecture/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Extends
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../design/libiraries/01-event/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Libiraries
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../design/rfcs/0001-systemd_parser/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Rfcs
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Man
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Man
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../man/all/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Warnings
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../man/sysmaster.conf/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster 系统配置
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../man/core/exec/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Core
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    
+  
+  
+    <a href="../../../../man/exts/devmaster/devctl/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Exts
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../man/init/init/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Init
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Use
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Use
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../use/00-sysMaster%E6%9E%84%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysMaster 构建和使用
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../use/00-systemd2sysmaster/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    systemd向sysmaster迁移
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../use/00-%E5%88%B6%E4%BD%9Csysmaster%E4%BD%9C%E4%B8%BA1%E5%8F%B7%E8%BF%9B%E7%A8%8B%E7%9A%84iso%E9%95%9C%E5%83%8F/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    oemake制作sysmaster作为1号进程的iso镜像
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../use/devmaster%E6%9B%BF%E4%BB%A3udev%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Devmaster替代udev运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../use/sysMaster%E7%89%B9%E6%9D%83%E5%AE%B9%E5%99%A8/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    sysMaster特权容器
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../use/sysmaster%E4%B8%8B%E4%BD%BF%E8%83%BDrsyslog/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Sysmaster下使能rsyslog
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../use/%E5%85%BC%E5%AE%B9busybox%E6%A8%A1%E5%BC%8F%E8%BF%90%E8%A1%8C/Readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    兼容busybox模式运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../use/%E5%85%BC%E5%AE%B9systemd%E6%A8%A1%E5%BC%8F%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    兼容systemd模式运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../use/%E5%AE%B9%E5%99%A8%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    容器中替代pid1运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../../use/%E8%99%9A%E6%9C%BA%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    虚机中替代pid1运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    特性描述
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    特性约束
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    子场景 1
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 1">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    子场景 2
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    子场景 3
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 3">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    子场景 4
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 4">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    子场景 5
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 5">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6" class="md-nav__link">
+    子场景 6
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 6">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_34" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_35" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_36" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_37" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_38" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    子场景 7
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 7">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_39" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_40" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_41" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_42" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_43" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_44" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8" class="md-nav__link">
+    子场景 8
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 8">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_45" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_46" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_47" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_48" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_49" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_50" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    子场景 9
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 9">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_51" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_52" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_53" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_54" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_55" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_56" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    子场景 10
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 10">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_57" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_58" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_59" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_60" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_61" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_62" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    子场景 11
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 11">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_63" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_64" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_65" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_66" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_67" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_68" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    子场景 12
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 12">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_69" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_70" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_71" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_72" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_73" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_74" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13" class="md-nav__link">
+    子场景 13
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 13">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_75" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_76" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_77" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_78" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_79" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_80" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14" class="md-nav__link">
+    子场景 14
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 14">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_81" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_82" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_83" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_84" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_85" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_86" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_87" class="md-nav__link">
+    子场景
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_88" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_89" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_90" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_91" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_92" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_93" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16" class="md-nav__link">
+    子场景 16
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 16">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_94" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_95" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_96" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_97" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_98" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_99" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17" class="md-nav__link">
+    子场景 17
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 17">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_100" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_101" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_102" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_103" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_104" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_105" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18" class="md-nav__link">
+    子场景 18
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 18">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_106" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_107" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_108" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_109" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_110" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_111" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#19" class="md-nav__link">
+    子场景 19
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 19">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_112" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_113" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_114" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_115" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_116" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_117" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#20" class="md-nav__link">
+    子场景 20
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 20">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_118" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_119" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_120" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_121" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_122" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_123" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#21" class="md-nav__link">
+    子场景 21
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 21">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_124" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_125" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_126" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_127" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_128" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_129" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#22" class="md-nav__link">
+    子场景 22
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 22">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_130" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_131" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_132" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_133" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_134" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_135" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#23" class="md-nav__link">
+    子场景 23
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 23">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_136" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_137" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_138" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_139" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_140" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_141" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#24" class="md-nav__link">
+    子场景 24
+  </a>
+  
+    <nav class="md-nav" aria-label="子场景 24">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_142" class="md-nav__link">
+    备注
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_143" class="md-nav__link">
+    准备工作
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_144" class="md-nav__link">
+    测试步骤
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_145" class="md-nav__link">
+    结果验证
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_146" class="md-nav__link">
+    测试结束
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_147" class="md-nav__link">
+    测试场景约束
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+    <a href="https://gitee.com/-/ide/project/openeuler/sysmaster/edit/master/-/docs/cicd/tests/devmaster/06-规则匹配.md" title="编辑此页" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4v-2m10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1 2.1 2.1Z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="06">06 规则匹配<a class="headerlink" href="#06" title="Permanent link">&para;</a></h1>
+<h2 id="_1">特性描述<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<p>19种匹配规则，支持类shell模式匹配或正则表达式匹配</p>
+<h2 id="_2">特性约束<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p>规则行中需要包含至少GOTO、PROGRAM、IMPORT类token之一，否则在规则执行过程中会跳过该规则行。</p>
+<h2 id="1">子场景 1<a class="headerlink" href="#1" title="Permanent link">&para;</a></h2>
+<p>ACTION规则匹配功能测试，针对add、change和move事件，每种事件生成对应的软链接。</p>
+<h3 id="_3">备注<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_4">准备工作<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ACTION==&quot;add&quot;, SYMLINK+=&quot;action_add&quot;
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>ACTION==&quot;change&quot;, SYMLINK+=&quot;action_change&quot;
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>ACTION==&quot;move&quot;, SYMLINK+=&quot;action_move&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<p>创建回环设备：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># dd if=/dev/zero of=loop.img bs=1M count=100
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a># loopnum=$(losetup -f)
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a># losetup $loopnum loop.img
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a># mkfs.ext4 $loopnum
+</code></pre></div></p>
+<h3 id="_5">测试步骤<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>触发回环设备的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a># devctl trigger $loopnum --action=add
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a># devctl trigger $loopnum --action=change
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a># devctl trigger $loopnum --action=move
+</code></pre></div></p>
+<h3 id="_6">结果验证<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p>查看/dev目录下是否生成指向$loop0设备的action_*软链接：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a># ll /dev/action*
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>lrwxrwxrwx 1 root root 5 Aug  5 17:29 /dev/action_add -&gt; $loop0
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>lrwxrwxrwx 1 root root 5 Aug  5 17:29 /dev/action_change -&gt; $loop0
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>lrwxrwxrwx 1 root root 5 Aug  5 17:29 /dev/action_move -&gt; $loop0
+</code></pre></div></p>
+<h3 id="_7">测试结束<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<p>回收回环设备
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a># losetup -d $loopnum
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a># rm -f loop.img
+</code></pre></div></p>
+<p>删除软链接残留：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a># rm -rf /dev/action_*
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_8">测试场景约束<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="2">子场景 2<a class="headerlink" href="#2" title="Permanent link">&para;</a></h2>
+<p>DEVPATH规则匹配功能测试，如果设备事件的devpath以$loopnum为后缀，则创建match_devpath软链接。</p>
+<h3 id="_9">备注<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_10">准备工作<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>DEVPATH==&quot;*$loopnum&quot;, SYMLINK+=&quot;match_devpath&quot;
+</code></pre></div></p>
+<p>创建回环设备：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a># dd if=/dev/zero of=loop.img bs=1M count=100
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a># loopnum=$(losetup -f)
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a># losetup $loopnum loop.img
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a># mkfs.ext4 $loopnum
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_11">测试步骤<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
+<p>触发$loopnum块设备的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a># devctl trigger /dev/$loopnum
+</code></pre></div></p>
+<h3 id="_12">结果验证<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
+<p>查看/dev目录下是否生成指向/dev/$loopnum设备的match_devpath软链接：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a># ll /dev/match*
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>lrwxrwxrwx 1 root root 3 Aug  5 17:39 /dev/match_devpath -&gt; $loopnum
+</code></pre></div></p>
+<h3 id="_13">测试结束<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
+<p>删除软链接残留：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a># rm -f /dev/match_devpath
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_14">测试场景约束<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="3">子场景 3<a class="headerlink" href="#3" title="Permanent link">&para;</a></h2>
+<p>KERNEL规则匹配的功能测试，如果设备的内核名等于lo，则创建/tmp/match_kernel临时文件。</p>
+<h3 id="_15">备注<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_16">准备工作<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>KERNEL==&quot;$loopnum&quot;, PROGRAM==&quot;/bin/touch /tmp/match_kernel&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_17">测试步骤<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
+<p>触发sda块设备的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a># devctl trigger /dev/$loopnum
+</code></pre></div></p>
+<h3 id="_18">结果验证<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
+<p>查看match_kernel是否生成：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a># ll /tmp/match_kernel
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>-rw-r--r-- 1 root root 0 Aug  5 17:49 /tmp/match_kernel
+</code></pre></div></p>
+<h3 id="_19">测试结束<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h3>
+<p>删除临时文件：/tmp/match_kernel
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a># rm -f /tmp/match_kernel
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_20">测试场景约束<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="4">子场景 4<a class="headerlink" href="#4" title="Permanent link">&para;</a></h2>
+<p>NAME规则匹配和赋值的功能测试，首先给网卡设备命名为test，然后匹配网卡名是否是test，如果是的话创建/tmp/match_name临时文件。</p>
+<h3 id="_21">备注<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_22">准备工作<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>NAME=&quot;test&quot;
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>NAME==&quot;test&quot;, PROGRAM==&quot;/bin/touch /tmp/match_name&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_23">测试步骤<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
+<p>触发虚拟网卡lo的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a># devctl trigger /sys/class/net/lo
+</code></pre></div></p>
+<h3 id="_24">结果验证<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
+<p>查看/tmp目录下是否生成match_name文件：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a># ll /tmp/match*
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>-rw-r--r-- 1 root root 0 Aug  5 18:06 /tmp/match_name
+</code></pre></div>
+<h3 id="_25">测试结束<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h3>
+<p>删除临时文件
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a># rm -f /tmp/match_name
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_26">测试场景约束<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="5">子场景 5<a class="headerlink" href="#5" title="Permanent link">&para;</a></h2>
+<p>SUBSYSTEM规则匹配的功能测试。如果设备的子系统是块设备，则创建软链接/dev/match_subsystem指向该设备。</p>
+<h3 id="_27">备注<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_28">准备工作<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>SUBSYSTEM==&quot;block&quot;, SYMLINK+=&quot;match_subsystem&quot;
+</code></pre></div></p>
+<p>创建回环块设备/dev/$loopnum</p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_29">测试步骤<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h3>
+<p>触发回环块设备/dev/$loopnum的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a># devctl trigger /dev/$loopnum
+</code></pre></div></p>
+<h3 id="_30">结果验证<a class="headerlink" href="#_30" title="Permanent link">&para;</a></h3>
+<p>查看/dev目录下是否生成指向/dev/$loopnum的match_subsystem软链接：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a># ll /dev/match*
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>lrwxrwxrwx 1 root root 3 Aug  5 18:14 /dev/match_subsystem -&gt; $loopnum
+</code></pre></div></p>
+<h3 id="_31">测试结束<a class="headerlink" href="#_31" title="Permanent link">&para;</a></h3>
+<p>删除临时软链接
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a># rm -rf /dev/match_subsystem
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_32">测试场景约束<a class="headerlink" href="#_32" title="Permanent link">&para;</a></h3>
+<p>NAME规则仅作用于网卡设备事件</p>
+<h2 id="6">子场景 6<a class="headerlink" href="#6" title="Permanent link">&para;</a></h2>
+<p>SYMLINK规则匹配和赋值的功能测试。先给设备添加软链接symlink_1，再检查设备的软链接中是否包含symlink_1，如果包含的话，添加软链接symlink_2。</p>
+<h3 id="_33">备注<a class="headerlink" href="#_33" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_34">准备工作<a class="headerlink" href="#_34" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>SYMLINK=&quot;symlink_1&quot;
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>SYMLINK==&quot;*symlink_1*&quot;, SYMLINK+=&quot;symlink_2&quot;
+</code></pre></div></p>
+<p>创建回环设备/dev/$loopnum</p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_35">测试步骤<a class="headerlink" href="#_35" title="Permanent link">&para;</a></h3>
+<p>触发块设备/dev/sda的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a># devctl trigger /dev/$loopnum
+</code></pre></div></p>
+<h3 id="_36">结果验证<a class="headerlink" href="#_36" title="Permanent link">&para;</a></h3>
+<p>查看/dev目录下是否生成指向/dev/$loopnum的symlink_*软链接：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a># ll /dev/symlink*
+<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>lrwxrwxrwx 1 root root 3 Aug  5 18:14 /dev/symlink_1 -&gt; $loopnum
+<a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>lrwxrwxrwx 1 root root 3 Aug  5 18:14 /dev/symlink_2 -&gt; $loopnum
+</code></pre></div></p>
+<h3 id="_37">测试结束<a class="headerlink" href="#_37" title="Permanent link">&para;</a></h3>
+<p>删除临时软链接
+<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a># rm -rf /dev/symlink_1 /dev/symlink_2
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_38">测试场景约束<a class="headerlink" href="#_38" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="7">子场景 7<a class="headerlink" href="#7" title="Permanent link">&para;</a></h2>
+<p>DRIVER规则匹配的功能测试。如果设备的driver属性为processor，则创建/tmp/match_driver临时文件。</p>
+<h3 id="_39">备注<a class="headerlink" href="#_39" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_40">准备工作<a class="headerlink" href="#_40" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>DRIVER==&quot;processor&quot;, PROGRAM+=&quot;/bin/touch /tmp/match_driver&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_41">测试步骤<a class="headerlink" href="#_41" title="Permanent link">&para;</a></h3>
+<p>触发/sys/devices/system/cpu/cpu0的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a># devctl trigger /sys/devices/system/cpu/cpu0
+</code></pre></div></p>
+<h3 id="_42">结果验证<a class="headerlink" href="#_42" title="Permanent link">&para;</a></h3>
+<p>查看临时文件/tmp/match_driver是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a># ll /tmp/match_driver
+<a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>-rw-r--r-- 1 root root 0 Aug  5 21:21 /tmp/match_driver
+</code></pre></div></p>
+<h3 id="_43">测试结束<a class="headerlink" href="#_43" title="Permanent link">&para;</a></h3>
+<p>删除临时文件
+<div class="highlight"><pre><span></span><code><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a># rm -f /tmp/match_driver
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_44">测试场景约束<a class="headerlink" href="#_44" title="Permanent link">&para;</a></h3>
+<p>环境中存在多核cpu，其中包含cpu0</p>
+<h2 id="8">子场景 8<a class="headerlink" href="#8" title="Permanent link">&para;</a></h2>
+<p>ATTR规则匹配的功能测试。判断sda的ro属性是否为0，若为0则创建/dev/match_attr软链接</p>
+<h3 id="_45">备注<a class="headerlink" href="#_45" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_46">准备工作<a class="headerlink" href="#_46" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>ATTR{ro}==&quot;0&quot;, SYMLINK+=&quot;match_attr&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_47">测试步骤<a class="headerlink" href="#_47" title="Permanent link">&para;</a></h3>
+<p>触发块设备/dev/sda1的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a># devctl trigger /dev/sda1
+</code></pre></div></p>
+<h3 id="_48">结果验证<a class="headerlink" href="#_48" title="Permanent link">&para;</a></h3>
+<p>查看match_attr软链接是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a># ll /dev/match_attr
+<a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a>lrwxrwxrwx. 1 root root 4  8月 10 15:13 /dev/match_attr -&gt; sda1
+</code></pre></div></p>
+<h3 id="_49">测试结束<a class="headerlink" href="#_49" title="Permanent link">&para;</a></h3>
+<p>删除临时软链接
+<div class="highlight"><pre><span></span><code><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a># rm -f /dev/match_attr
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_50">测试场景约束<a class="headerlink" href="#_50" title="Permanent link">&para;</a></h3>
+<p>系统中存在sda1分区块设备，sda1的ro属性为0。</p>
+<h2 id="9">子场景 9<a class="headerlink" href="#9" title="Permanent link">&para;</a></h2>
+<p>ENV规则匹配和赋值的功能测试。首先给设备赋予ID_TEST=test环境变量，然后检查ID_TEST环境变量的值是否是test，如果是则创建/tmp/match_env临时文件。</p>
+<h3 id="_51">备注<a class="headerlink" href="#_51" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_52">准备工作<a class="headerlink" href="#_52" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>ENV{ID_TEST}=&quot;test&quot;
+<a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a>ENV{ID_TEST}==&quot;test&quot;, PROGRAM+=&quot;/bin/touch /tmp/match_env&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_53">测试步骤<a class="headerlink" href="#_53" title="Permanent link">&para;</a></h3>
+<p>触发任意设备的uevent事件，比如/sys/class/net/lo：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a># devctl trigger /sys/class/net/lo
+</code></pre></div></p>
+<h3 id="_54">结果验证<a class="headerlink" href="#_54" title="Permanent link">&para;</a></h3>
+<p>查看临时文件/tmp/match_env是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a># ll /tmp/match_env
+<a id="__codelineno-63-2" name="__codelineno-63-2" href="#__codelineno-63-2"></a>-rw-r--r-- 1 root root 0 Aug  5 22:26 /tmp/match_env
+</code></pre></div></p>
+<h3 id="_55">测试结束<a class="headerlink" href="#_55" title="Permanent link">&para;</a></h3>
+<p>删除临时文件
+<div class="highlight"><pre><span></span><code><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a># rm -f /tmp/match_env
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_56">测试场景约束<a class="headerlink" href="#_56" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="10">子场景 10<a class="headerlink" href="#10" title="Permanent link">&para;</a></h2>
+<p>TAG规则匹配和赋值的功能测试。首先给设备赋予test标签，然后检查设备是否携带test标签，如果是则创建/tmp/match_tag临时文件。</p>
+<h3 id="_57">备注<a class="headerlink" href="#_57" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_58">准备工作<a class="headerlink" href="#_58" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a>TAG+=&quot;test&quot;
+<a id="__codelineno-67-2" name="__codelineno-67-2" href="#__codelineno-67-2"></a>TAG==&quot;test&quot;, PROGRAM+=&quot;/bin/touch /tmp/match_tag&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_59">测试步骤<a class="headerlink" href="#_59" title="Permanent link">&para;</a></h3>
+<p>触发任意设备的uevent事件，比如/sys/class/net/lo：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a># devctl trigger /sys/class/net/lo
+</code></pre></div></p>
+<h3 id="_60">结果验证<a class="headerlink" href="#_60" title="Permanent link">&para;</a></h3>
+<p>查看临时文件/tmp/match_tag是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-70-1" name="__codelineno-70-1" href="#__codelineno-70-1"></a># ll /tmp/match_tag
+<a id="__codelineno-70-2" name="__codelineno-70-2" href="#__codelineno-70-2"></a>-rw-r--r-- 1 root root 0 Aug  5 22:52 /tmp/match_tag
+</code></pre></div></p>
+<p>查看/run/devmaster/tags目录下是否存在test子目录，且test子目录中包含n1文件（回环网卡设备/sys/class/net/lo的设备id）：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-71-1" name="__codelineno-71-1" href="#__codelineno-71-1"></a># ll /run/devmaster/tags/test/
+<a id="__codelineno-71-2" name="__codelineno-71-2" href="#__codelineno-71-2"></a>total 0
+<a id="__codelineno-71-3" name="__codelineno-71-3" href="#__codelineno-71-3"></a>-r--r--r-- 1 root root 0 Aug  5 22:52 n1
+</code></pre></div></p>
+<h3 id="_61">测试结束<a class="headerlink" href="#_61" title="Permanent link">&para;</a></h3>
+<p>删除临时文件
+<div class="highlight"><pre><span></span><code><a id="__codelineno-72-1" name="__codelineno-72-1" href="#__codelineno-72-1"></a># rm -f /tmp/match_tag
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-73-1" name="__codelineno-73-1" href="#__codelineno-73-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_62">测试场景约束<a class="headerlink" href="#_62" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="11">子场景 11<a class="headerlink" href="#11" title="Permanent link">&para;</a></h2>
+<p>TEST规则匹配的功能测试。如果存在/tmp/test_file则创建/dev/match_test2软链接；若其权限为0660，则创建/dev/match_test软链接。</p>
+<h3 id="_63">备注<a class="headerlink" href="#_63" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_64">准备工作<a class="headerlink" href="#_64" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-74-1" name="__codelineno-74-1" href="#__codelineno-74-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-75-1" name="__codelineno-75-1" href="#__codelineno-75-1"></a>TEST{0660}==&quot;/tmp/file&quot;, SYMLINK+=&quot;match_test&quot;
+<a id="__codelineno-75-2" name="__codelineno-75-2" href="#__codelineno-75-2"></a>TEST==&quot;/tmp/file&quot;, SYMLINK+=&quot;match_test2&quot;
+</code></pre></div></p>
+<p>创建权限为0660的文件 /tmp/test_file</p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-76-1" name="__codelineno-76-1" href="#__codelineno-76-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_65">测试步骤<a class="headerlink" href="#_65" title="Permanent link">&para;</a></h3>
+<p>触发块设备/dev/sda1的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-77-1" name="__codelineno-77-1" href="#__codelineno-77-1"></a># devctl trigger /dev/sda1
+</code></pre></div></p>
+<h3 id="_66">结果验证<a class="headerlink" href="#_66" title="Permanent link">&para;</a></h3>
+<p>查看match_test软链接是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-78-1" name="__codelineno-78-1" href="#__codelineno-78-1"></a># ll /dev/match_test*
+<a id="__codelineno-78-2" name="__codelineno-78-2" href="#__codelineno-78-2"></a>lrwxrwxrwx. 1 root root 4  8月 10 15:13 /dev/match_test -&gt; sda1
+<a id="__codelineno-78-3" name="__codelineno-78-3" href="#__codelineno-78-3"></a>lrwxrwxrwx. 1 root root 4  8月 10 15:13 /dev/match_test2 -&gt; sda1
+</code></pre></div></p>
+<h3 id="_67">测试结束<a class="headerlink" href="#_67" title="Permanent link">&para;</a></h3>
+<p>删除临时软链接
+<div class="highlight"><pre><span></span><code><a id="__codelineno-79-1" name="__codelineno-79-1" href="#__codelineno-79-1"></a># rm -f /dev/match_test*
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-80-1" name="__codelineno-80-1" href="#__codelineno-80-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<p>删除文件
+<div class="highlight"><pre><span></span><code><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a># rm -f /tmp/test_file
+</code></pre></div></p>
+<h3 id="_68">测试场景约束<a class="headerlink" href="#_68" title="Permanent link">&para;</a></h3>
+<p>系统中存在sda1分区块设备</p>
+<h2 id="12">子场景 12<a class="headerlink" href="#12" title="Permanent link">&para;</a></h2>
+<p>PROGRAM匹配规则的功能测试。首先执行PROGRAM=="/bin/echo hello world"规则，规则中声明的命令运行成功，PROGRAM规则成功匹配，创建/dev/match_program软链接。然后执行PROGRAM!="/bin/cat none"规则，由于none文件不存在，cat命令返回非零值，PROGRAM!=规则由于使用了不等于操作符，在命令返回非零值时规则判断为真，因此创建/dev/nomatch_program软链接。</p>
+<h3 id="_69">备注<a class="headerlink" href="#_69" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_70">准备工作<a class="headerlink" href="#_70" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-82-1" name="__codelineno-82-1" href="#__codelineno-82-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-83-1" name="__codelineno-83-1" href="#__codelineno-83-1"></a>PROGRAM==&quot;/bin/echo hello world&quot;， SYMLINK+=&quot;match_program&quot;
+<a id="__codelineno-83-2" name="__codelineno-83-2" href="#__codelineno-83-2"></a>PROGRAM!=&quot;/bin/cat none&quot;, SYMLINK+=&quot;nomatch_program&quot;
+</code></pre></div></p>
+<p>创建回环块设备/dev/$loopnum</p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-84-1" name="__codelineno-84-1" href="#__codelineno-84-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_71">测试步骤<a class="headerlink" href="#_71" title="Permanent link">&para;</a></h3>
+<p>触发回环块设备的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-85-1" name="__codelineno-85-1" href="#__codelineno-85-1"></a># devctl trigger /dev/$loopnum
+</code></pre></div></p>
+<h3 id="_72">结果验证<a class="headerlink" href="#_72" title="Permanent link">&para;</a></h3>
+<p>查看软链接是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-86-1" name="__codelineno-86-1" href="#__codelineno-86-1"></a># ll /dev/*match_program
+<a id="__codelineno-86-2" name="__codelineno-86-2" href="#__codelineno-86-2"></a>lrwxrwxrwx 1 root root 5 Aug  6 00:27 /dev/match_program -&gt; $loopnum
+<a id="__codelineno-86-3" name="__codelineno-86-3" href="#__codelineno-86-3"></a>lrwxrwxrwx 1 root root 5 Aug  6 00:27 /dev/nomatch_program -&gt; $loopnum
+</code></pre></div></p>
+<h3 id="_73">测试结束<a class="headerlink" href="#_73" title="Permanent link">&para;</a></h3>
+<p>删除devmaster数据残留
+<div class="highlight"><pre><span></span><code><a id="__codelineno-87-1" name="__codelineno-87-1" href="#__codelineno-87-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<p>删除软链接
+<div class="highlight"><pre><span></span><code><a id="__codelineno-88-1" name="__codelineno-88-1" href="#__codelineno-88-1"></a># rm -rf /dev/*match_program
+</code></pre></div></p>
+<h3 id="_74">测试场景约束<a class="headerlink" href="#_74" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="13">子场景 13<a class="headerlink" href="#13" title="Permanent link">&para;</a></h2>
+<p>RESULT匹配规则的功能测试。首先使用PROGRAM规则执行/bin/echo hello world命令，devmaster捕获hello world标准输出，并用于下一次RESULT规则匹配。RESULT匹配规则中检查最近的PROGRAM规则中执行命令的标准输出内容是否为hello world，如果是，则创建/tmp/match_result临时文件。</p>
+<h3 id="_75">备注<a class="headerlink" href="#_75" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_76">准备工作<a class="headerlink" href="#_76" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-89-1" name="__codelineno-89-1" href="#__codelineno-89-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-90-1" name="__codelineno-90-1" href="#__codelineno-90-1"></a>PROGRAM==&quot;/bin/echo hello world&quot;
+<a id="__codelineno-90-2" name="__codelineno-90-2" href="#__codelineno-90-2"></a>RESULT==&quot;hello world&quot;, PROGRAM==&quot;/bin/touch /tmp/match_result&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-91-1" name="__codelineno-91-1" href="#__codelineno-91-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_77">测试步骤<a class="headerlink" href="#_77" title="Permanent link">&para;</a></h3>
+<p>触发任意设备的uevent事件，比如/sys/class/net/lo：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-92-1" name="__codelineno-92-1" href="#__codelineno-92-1"></a># devctl trigger /sys/class/net/lo
+</code></pre></div></p>
+<h3 id="_78">结果验证<a class="headerlink" href="#_78" title="Permanent link">&para;</a></h3>
+<p>查看临时文件/tmp/match_result是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-93-1" name="__codelineno-93-1" href="#__codelineno-93-1"></a># ll /tmp/match_result
+<a id="__codelineno-93-2" name="__codelineno-93-2" href="#__codelineno-93-2"></a>-rw-r--r-- 1 root root 0 Aug  5 23:53 /tmp/match_result
+</code></pre></div></p>
+<h3 id="_79">测试结束<a class="headerlink" href="#_79" title="Permanent link">&para;</a></h3>
+<p>删除devmaster数据残留
+<div class="highlight"><pre><span></span><code><a id="__codelineno-94-1" name="__codelineno-94-1" href="#__codelineno-94-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<p>删除临时文件
+<div class="highlight"><pre><span></span><code><a id="__codelineno-95-1" name="__codelineno-95-1" href="#__codelineno-95-1"></a># rm -f /tmp/match_result
+</code></pre></div></p>
+<h3 id="_80">测试场景约束<a class="headerlink" href="#_80" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="14">子场景 14<a class="headerlink" href="#14" title="Permanent link">&para;</a></h2>
+<p>IMPORT{program}规则测试。首先使用IMPORT{program}=="/bin/echo hello=world"规则，获取hello=world环境变量并导入到设备中，然后使用ENV{hello}规则检查hello变量的值是否是world，如果是则创建/tmp/match_import_program临时文件。</p>
+<h3 id="_81">备注<a class="headerlink" href="#_81" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_82">准备工作<a class="headerlink" href="#_82" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-96-1" name="__codelineno-96-1" href="#__codelineno-96-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-97-1" name="__codelineno-97-1" href="#__codelineno-97-1"></a>IMPORT{program}==&quot;/bin/echo hello=world&quot;
+<a id="__codelineno-97-2" name="__codelineno-97-2" href="#__codelineno-97-2"></a>ENV{hello}==&quot;world&quot;, PROGRAM==&quot;/bin/touch /tmp/match_import_program&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-98-1" name="__codelineno-98-1" href="#__codelineno-98-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_83">测试步骤<a class="headerlink" href="#_83" title="Permanent link">&para;</a></h3>
+<p>触发回环虚拟网卡的uevent事件
+<div class="highlight"><pre><span></span><code><a id="__codelineno-99-1" name="__codelineno-99-1" href="#__codelineno-99-1"></a># devctl trigger /sys/class/net/lo
+</code></pre></div></p>
+<h3 id="_84">结果验证<a class="headerlink" href="#_84" title="Permanent link">&para;</a></h3>
+<p>/tmp/match_import_program已创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-100-1" name="__codelineno-100-1" href="#__codelineno-100-1"></a># ll /tmp/match_import_program
+<a id="__codelineno-100-2" name="__codelineno-100-2" href="#__codelineno-100-2"></a>-rw-r--r-- 1 root root 0 Aug  6 02:02 /tmp/match_import_program
+</code></pre></div></p>
+<p>数据库中包含hello=world环境变量：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-101-1" name="__codelineno-101-1" href="#__codelineno-101-1"></a># cat /run/devmaster/data/n1
+<a id="__codelineno-101-2" name="__codelineno-101-2" href="#__codelineno-101-2"></a>I:1691258446
+<a id="__codelineno-101-3" name="__codelineno-101-3" href="#__codelineno-101-3"></a>E:hello=world
+</code></pre></div></p>
+<h3 id="_85">测试结束<a class="headerlink" href="#_85" title="Permanent link">&para;</a></h3>
+<p>删除devmaster数据残留
+<div class="highlight"><pre><span></span><code><a id="__codelineno-102-1" name="__codelineno-102-1" href="#__codelineno-102-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<p>删除临时文件
+<div class="highlight"><pre><span></span><code><a id="__codelineno-103-1" name="__codelineno-103-1" href="#__codelineno-103-1"></a># rm -f /tmp/match_import_program
+</code></pre></div></p>
+<h3 id="_86">测试场景约束<a class="headerlink" href="#_86" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="_87">子场景<a class="headerlink" href="#_87" title="Permanent link">&para;</a></h2>
+<p>IMPORT{builtin}规则测试。使用IMPORT{builtin}=="path_id"规则，获取PCI总线上注册设备的ID_PATH等环境变量。</p>
+<h3 id="_88">备注<a class="headerlink" href="#_88" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_89">准备工作<a class="headerlink" href="#_89" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-104-1" name="__codelineno-104-1" href="#__codelineno-104-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-105-1" name="__codelineno-105-1" href="#__codelineno-105-1"></a>IMPORT{builtin}==&quot;path_id&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-106-1" name="__codelineno-106-1" href="#__codelineno-106-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_90">测试步骤<a class="headerlink" href="#_90" title="Permanent link">&para;</a></h3>
+<p>触发PCI总线上注册设备的uevent事件
+<div class="highlight"><pre><span></span><code><a id="__codelineno-107-1" name="__codelineno-107-1" href="#__codelineno-107-1"></a># devctl trigger /sys/devices/pci0000\:00/0000\:00\:00.0
+</code></pre></div></p>
+<h3 id="_91">结果验证<a class="headerlink" href="#_91" title="Permanent link">&para;</a></h3>
+<p>数据库中包含ID_PATH等环境变量：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-108-1" name="__codelineno-108-1" href="#__codelineno-108-1"></a># cat /run/devmaster/data/+pci\:0000\:00\:00.0
+<a id="__codelineno-108-2" name="__codelineno-108-2" href="#__codelineno-108-2"></a>I:1691260364
+<a id="__codelineno-108-3" name="__codelineno-108-3" href="#__codelineno-108-3"></a>E:ID_PATH=pci-0000:00:00.0
+<a id="__codelineno-108-4" name="__codelineno-108-4" href="#__codelineno-108-4"></a>E:ID_PATH_TAG=pci-0000_00_00_0
+</code></pre></div></p>
+<h3 id="_92">测试结束<a class="headerlink" href="#_92" title="Permanent link">&para;</a></h3>
+<p>删除devmaster数据残留
+<div class="highlight"><pre><span></span><code><a id="__codelineno-109-1" name="__codelineno-109-1" href="#__codelineno-109-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_93">测试场景约束<a class="headerlink" href="#_93" title="Permanent link">&para;</a></h3>
+<p>环境中包含PCI总线pci0000\:00，且总线上注册了/sys/devices/pci0000\:00/0000\:00\:00.0设备</p>
+<h2 id="16">子场景 16<a class="headerlink" href="#16" title="Permanent link">&para;</a></h2>
+<p>IMPORT{file}规则测试。使用IMPORT{file}规则，从某个文件中获取满足key=value形式的键值文本行，并导入到设备数据库中。</p>
+<h3 id="_94">备注<a class="headerlink" href="#_94" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_95">准备工作<a class="headerlink" href="#_95" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-110-1" name="__codelineno-110-1" href="#__codelineno-110-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-111-1" name="__codelineno-111-1" href="#__codelineno-111-1"></a>IMPORT{file}==&quot;/tmp/import_file&quot;
+</code></pre></div></p>
+<p>创建临时文件：/tmp/import_file
+<div class="highlight"><pre><span></span><code><a id="__codelineno-112-1" name="__codelineno-112-1" href="#__codelineno-112-1"></a># echo hello=world &gt;&gt; /tmp/import_file
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-113-1" name="__codelineno-113-1" href="#__codelineno-113-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_96">测试步骤<a class="headerlink" href="#_96" title="Permanent link">&para;</a></h3>
+<p>触发虚拟回环网卡的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-114-1" name="__codelineno-114-1" href="#__codelineno-114-1"></a># devctl trigger /sys/class/net/lo
+</code></pre></div></p>
+<h3 id="_97">结果验证<a class="headerlink" href="#_97" title="Permanent link">&para;</a></h3>
+<p>数据库中包含hello=world环境变量：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-115-1" name="__codelineno-115-1" href="#__codelineno-115-1"></a># cat /run/devmaster/data/n1
+<a id="__codelineno-115-2" name="__codelineno-115-2" href="#__codelineno-115-2"></a>I:1691261151
+<a id="__codelineno-115-3" name="__codelineno-115-3" href="#__codelineno-115-3"></a>E:hello=world
+</code></pre></div></p>
+<h3 id="_98">测试结束<a class="headerlink" href="#_98" title="Permanent link">&para;</a></h3>
+<p>删除devmaster数据残留
+<div class="highlight"><pre><span></span><code><a id="__codelineno-116-1" name="__codelineno-116-1" href="#__codelineno-116-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<p>删除临时文件
+<div class="highlight"><pre><span></span><code><a id="__codelineno-117-1" name="__codelineno-117-1" href="#__codelineno-117-1"></a># rm -f /tmp/import_file
+</code></pre></div></p>
+<h3 id="_99">测试场景约束<a class="headerlink" href="#_99" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="17">子场景 17<a class="headerlink" href="#17" title="Permanent link">&para;</a></h2>
+<p>IMPORT{db}规则测试。使用IMPORT{db}规则，从设备原来的数据库中获取某个环境变量，并导入到新的数据库中，老数据库中剩余的环境变量则被抛弃。</p>
+<h3 id="_100">备注<a class="headerlink" href="#_100" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_101">准备工作<a class="headerlink" href="#_101" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-118-1" name="__codelineno-118-1" href="#__codelineno-118-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-119-1" name="__codelineno-119-1" href="#__codelineno-119-1"></a>IMPORT{db}==&quot;name&quot;
+</code></pre></div></p>
+<p>构造虚拟回环网卡的数据库内容
+<div class="highlight"><pre><span></span><code><a id="__codelineno-120-1" name="__codelineno-120-1" href="#__codelineno-120-1"></a># echo &quot;E:name=jonny
+<a id="__codelineno-120-2" name="__codelineno-120-2" href="#__codelineno-120-2"></a>&gt; E:hello=world&quot; &gt; /run/devmaster/data/n1
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-121-1" name="__codelineno-121-1" href="#__codelineno-121-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_102">测试步骤<a class="headerlink" href="#_102" title="Permanent link">&para;</a></h3>
+<p>触发虚拟回环网卡的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-122-1" name="__codelineno-122-1" href="#__codelineno-122-1"></a># devctl trigger /sys/class/net/lo
+</code></pre></div></p>
+<h3 id="_103">结果验证<a class="headerlink" href="#_103" title="Permanent link">&para;</a></h3>
+<p>数据库中包含name=jonny环境变量，无hello=world环境变量：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-123-1" name="__codelineno-123-1" href="#__codelineno-123-1"></a># cat /run/devmaster/data/n1
+<a id="__codelineno-123-2" name="__codelineno-123-2" href="#__codelineno-123-2"></a>I:1691261973
+<a id="__codelineno-123-3" name="__codelineno-123-3" href="#__codelineno-123-3"></a>E:name=jonny
+</code></pre></div></p>
+<h3 id="_104">测试结束<a class="headerlink" href="#_104" title="Permanent link">&para;</a></h3>
+<p>删除devmaster数据残留
+<div class="highlight"><pre><span></span><code><a id="__codelineno-124-1" name="__codelineno-124-1" href="#__codelineno-124-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_105">测试场景约束<a class="headerlink" href="#_105" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h2 id="18">子场景 18<a class="headerlink" href="#18" title="Permanent link">&para;</a></h2>
+<p>IMPORT{cmdline}规则测试。使用IMPORT{cmdline}规则，系统的启动参数/proc/cmdline中获取配置项，并导入到数据库的环境变量中。</p>
+<h3 id="_106">备注<a class="headerlink" href="#_106" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_107">准备工作<a class="headerlink" href="#_107" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-125-1" name="__codelineno-125-1" href="#__codelineno-125-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-126-1" name="__codelineno-126-1" href="#__codelineno-126-1"></a>IMPORT{cmdline}==&quot;root&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-127-1" name="__codelineno-127-1" href="#__codelineno-127-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_108">测试步骤<a class="headerlink" href="#_108" title="Permanent link">&para;</a></h3>
+<p>触发虚拟回环网卡的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-128-1" name="__codelineno-128-1" href="#__codelineno-128-1"></a># devctl trigger /sys/class/net/lo
+</code></pre></div></p>
+<h3 id="_109">结果验证<a class="headerlink" href="#_109" title="Permanent link">&para;</a></h3>
+<p>数据库中包含root环境变量：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-129-1" name="__codelineno-129-1" href="#__codelineno-129-1"></a># cat /run/devmaster/data/n1
+<a id="__codelineno-129-2" name="__codelineno-129-2" href="#__codelineno-129-2"></a>I:1691261973
+<a id="__codelineno-129-3" name="__codelineno-129-3" href="#__codelineno-129-3"></a>E:root=/dev/mapper/openeuler-root
+</code></pre></div></p>
+<h3 id="_110">测试结束<a class="headerlink" href="#_110" title="Permanent link">&para;</a></h3>
+<p>删除devmaster数据残留
+<div class="highlight"><pre><span></span><code><a id="__codelineno-130-1" name="__codelineno-130-1" href="#__codelineno-130-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_111">测试场景约束<a class="headerlink" href="#_111" title="Permanent link">&para;</a></h3>
+<p>系统启动参数中配置了root选项</p>
+<h2 id="19">子场景 19<a class="headerlink" href="#19" title="Permanent link">&para;</a></h2>
+<p>IMPORT{parent}规则测试。使用IMPORT{parent}规则，从直接父设备的数据库中获取某个环境变量，并导入到自己的数据库中。</p>
+<h3 id="_112">备注<a class="headerlink" href="#_112" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_113">准备工作<a class="headerlink" href="#_113" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-131-1" name="__codelineno-131-1" href="#__codelineno-131-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-132-1" name="__codelineno-132-1" href="#__codelineno-132-1"></a>KERNEL==&quot;sda&quot;, IMPORT{builtin}==&quot;path_id&quot;
+<a id="__codelineno-132-2" name="__codelineno-132-2" href="#__codelineno-132-2"></a>KERNEL==&quot;sda1&quot;, IMPORT{parent}==&quot;ID_PATH&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-133-1" name="__codelineno-133-1" href="#__codelineno-133-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_114">测试步骤<a class="headerlink" href="#_114" title="Permanent link">&para;</a></h3>
+<p>依此触发块设备sda和sda的分区设备sda1的事件，两次触发动作间保留一定的时隙：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-134-1" name="__codelineno-134-1" href="#__codelineno-134-1"></a># devctl trigger /dev/sda
+<a id="__codelineno-134-2" name="__codelineno-134-2" href="#__codelineno-134-2"></a># sleep 1
+<a id="__codelineno-134-3" name="__codelineno-134-3" href="#__codelineno-134-3"></a># devctl trigger /dev/sda1
+</code></pre></div></p>
+<h3 id="_115">结果验证<a class="headerlink" href="#_115" title="Permanent link">&para;</a></h3>
+<p>sda1的数据库中包含ID_PATH环境变量，其值和sda一致：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-135-1" name="__codelineno-135-1" href="#__codelineno-135-1"></a># cat /run/devmaster/data/b8\:1
+<a id="__codelineno-135-2" name="__codelineno-135-2" href="#__codelineno-135-2"></a>I:1691263274
+<a id="__codelineno-135-3" name="__codelineno-135-3" href="#__codelineno-135-3"></a>E:ID_PATH=pci-0000:00:10.0
+<a id="__codelineno-135-4" name="__codelineno-135-4" href="#__codelineno-135-4"></a># cat /run/devmaster/data/b8\:0
+<a id="__codelineno-135-5" name="__codelineno-135-5" href="#__codelineno-135-5"></a>I:1691263270
+<a id="__codelineno-135-6" name="__codelineno-135-6" href="#__codelineno-135-6"></a>E:ID_PATH_TAG=pci-0000_00_10_0
+<a id="__codelineno-135-7" name="__codelineno-135-7" href="#__codelineno-135-7"></a>E:ID_PATH=pci-0000:00:10.0
+</code></pre></div></p>
+<h3 id="_116">测试结束<a class="headerlink" href="#_116" title="Permanent link">&para;</a></h3>
+<p>删除devmaster数据残留
+<div class="highlight"><pre><span></span><code><a id="__codelineno-136-1" name="__codelineno-136-1" href="#__codelineno-136-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_117">测试场景约束<a class="headerlink" href="#_117" title="Permanent link">&para;</a></h3>
+<p>环境中存在块设备sda，且sda拥有分区sda1。</p>
+<h2 id="20">子场景 20<a class="headerlink" href="#20" title="Permanent link">&para;</a></h2>
+<p>KERNELS匹配规则的功能测试。KERNELS规则会匹配设备自身和所有父设备的内核名，如果找到任一满足匹配的父设备，则匹配为真。首先使用KERNELS规则匹配sda1设备自身的内核名sda1，匹配成功后创建/dev/match_kernel1软链接；然后匹配sda1的一级父设备的内核名sda，匹配成功则创建/dev/match_kernel2软链接；最后匹配与sda1二级父设备的内核名2:0:0:0并创建/dev/match_kernel3软链接</p>
+<h3 id="_118">备注<a class="headerlink" href="#_118" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_119">准备工作<a class="headerlink" href="#_119" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-137-1" name="__codelineno-137-1" href="#__codelineno-137-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-138-1" name="__codelineno-138-1" href="#__codelineno-138-1"></a>KERNELS==&quot;sda1&quot;, SYMLINK+=&quot;match_kernel1&quot;
+<a id="__codelineno-138-2" name="__codelineno-138-2" href="#__codelineno-138-2"></a>KERNELS==&quot;sda&quot;,SYMLINK+=&quot;match_kernel2&quot;
+<a id="__codelineno-138-3" name="__codelineno-138-3" href="#__codelineno-138-3"></a>KERNELS==&quot;2:0:0:0&quot;,SYMLINK+=&quot;match_kernel3&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-139-1" name="__codelineno-139-1" href="#__codelineno-139-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_120">测试步骤<a class="headerlink" href="#_120" title="Permanent link">&para;</a></h3>
+<p>触发块设备/dev/sda1的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-140-1" name="__codelineno-140-1" href="#__codelineno-140-1"></a># devctl trigger /dev/sda1
+</code></pre></div></p>
+<h3 id="_121">结果验证<a class="headerlink" href="#_121" title="Permanent link">&para;</a></h3>
+<p>查看match_kernel软链接是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-141-1" name="__codelineno-141-1" href="#__codelineno-141-1"></a># ll /dev/match_kernel*
+<a id="__codelineno-141-2" name="__codelineno-141-2" href="#__codelineno-141-2"></a>lrwxrwxrwx. 1 root root 4  8月 10 15:13 /dev/match_kernel1 -&gt; sda1
+<a id="__codelineno-141-3" name="__codelineno-141-3" href="#__codelineno-141-3"></a>lrwxrwxrwx. 1 root root 4  8月 10 15:13 /dev/match_kernel2 -&gt; sda1
+<a id="__codelineno-141-4" name="__codelineno-141-4" href="#__codelineno-141-4"></a>lrwxrwxrwx. 1 root root 4  8月 10 15:13 /dev/match_kernel3 -&gt; sda1
+</code></pre></div></p>
+<h3 id="_122">测试结束<a class="headerlink" href="#_122" title="Permanent link">&para;</a></h3>
+<p>删除临时软链接
+<div class="highlight"><pre><span></span><code><a id="__codelineno-142-1" name="__codelineno-142-1" href="#__codelineno-142-1"></a># rm -f /dev/match_kernel*
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-143-1" name="__codelineno-143-1" href="#__codelineno-143-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_123">测试场景约束<a class="headerlink" href="#_123" title="Permanent link">&para;</a></h3>
+<p>环境中存在块设备sda，sda拥有分区sda1，sda注册在pci总线的2:0:0:0插槽上。</p>
+<h2 id="21">子场景 21<a class="headerlink" href="#21" title="Permanent link">&para;</a></h2>
+<p>SUBSYSTEMS匹配规则的功能测试。规则文件中写的SUBSYSTEM属性与sda1的subsystem相等，则创建/dev/match_subsystem1软链接；与sda1一级父设备subsystems相等，则创建/dev/match_subsystem2软链接；与sda1二级父设备subsystems相等，则创建/dev/match_subsystem3软链接</p>
+<h3 id="_124">备注<a class="headerlink" href="#_124" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_125">准备工作<a class="headerlink" href="#_125" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-144-1" name="__codelineno-144-1" href="#__codelineno-144-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-145-1" name="__codelineno-145-1" href="#__codelineno-145-1"></a>SUBSYSTEMS==&quot;block&quot;, SYMLINK+=&quot;match_subsystem1&quot;
+<a id="__codelineno-145-2" name="__codelineno-145-2" href="#__codelineno-145-2"></a>SUBSYSTEMS==&quot;block&quot;,SYMLINK+=&quot;match_subsystem2&quot;
+<a id="__codelineno-145-3" name="__codelineno-145-3" href="#__codelineno-145-3"></a>SUBSYSTEMS==&quot;scsi&quot;,SYMLINK+=&quot;match_subsystem3&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-146-1" name="__codelineno-146-1" href="#__codelineno-146-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_126">测试步骤<a class="headerlink" href="#_126" title="Permanent link">&para;</a></h3>
+<p>触发块设备/dev/sda1的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-147-1" name="__codelineno-147-1" href="#__codelineno-147-1"></a># devctl trigger /dev/sda1
+</code></pre></div></p>
+<h3 id="_127">结果验证<a class="headerlink" href="#_127" title="Permanent link">&para;</a></h3>
+<p>查看match_subsystem软链接是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-148-1" name="__codelineno-148-1" href="#__codelineno-148-1"></a># ll /dev/match_subsystem*
+<a id="__codelineno-148-2" name="__codelineno-148-2" href="#__codelineno-148-2"></a>lrwxrwxrwx. 1 root root 4  8月 10 15:13 /dev/match_subsystem1 -&gt; sda1
+<a id="__codelineno-148-3" name="__codelineno-148-3" href="#__codelineno-148-3"></a>lrwxrwxrwx. 1 root root 4  8月 10 15:13 /dev/match_subsystem2 -&gt; sda1
+</code></pre></div></p>
+<h3 id="_128">测试结束<a class="headerlink" href="#_128" title="Permanent link">&para;</a></h3>
+<p>删除临时软链接
+<div class="highlight"><pre><span></span><code><a id="__codelineno-149-1" name="__codelineno-149-1" href="#__codelineno-149-1"></a># rm -f /dev/match_subsystem*
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-150-1" name="__codelineno-150-1" href="#__codelineno-150-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_129">测试场景约束<a class="headerlink" href="#_129" title="Permanent link">&para;</a></h3>
+<p>环境中存在块设备sda，sda拥有分区sda1。</p>
+<h2 id="22">子场景 22<a class="headerlink" href="#22" title="Permanent link">&para;</a></h2>
+<p>DRIVERS匹配规则的功能测试。DRIVERS规则会递归匹配所有父设备的driver属性，匹配成功后创建/dev/match_driver1和/dev/match_driver2软链接</p>
+<h3 id="_130">备注<a class="headerlink" href="#_130" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_131">准备工作<a class="headerlink" href="#_131" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-151-1" name="__codelineno-151-1" href="#__codelineno-151-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-152-1" name="__codelineno-152-1" href="#__codelineno-152-1"></a>DRIVERS==&quot;sd&quot;, SYMLINK+=&quot;match_driver1&quot;
+<a id="__codelineno-152-2" name="__codelineno-152-2" href="#__codelineno-152-2"></a>DRIVERS==&quot;mptspi&quot;,SYMLINK+=&quot;match_driver2&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-153-1" name="__codelineno-153-1" href="#__codelineno-153-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_132">测试步骤<a class="headerlink" href="#_132" title="Permanent link">&para;</a></h3>
+<p>触发块设备/dev/sda1的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-154-1" name="__codelineno-154-1" href="#__codelineno-154-1"></a># devctl trigger /dev/sda1
+</code></pre></div></p>
+<h3 id="_133">结果验证<a class="headerlink" href="#_133" title="Permanent link">&para;</a></h3>
+<p>查看match_driver软链接是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-155-1" name="__codelineno-155-1" href="#__codelineno-155-1"></a># ll /dev/match_driver*
+<a id="__codelineno-155-2" name="__codelineno-155-2" href="#__codelineno-155-2"></a>lrwxrwxrwx. 1 root root 4  8月 10 14:59 /dev/match_driver1 -&gt; sda2
+<a id="__codelineno-155-3" name="__codelineno-155-3" href="#__codelineno-155-3"></a>lrwxrwxrwx. 1 root root 4  8月 10 14:59 /dev/match_driver2 -&gt; sda2
+</code></pre></div></p>
+<h3 id="_134">测试结束<a class="headerlink" href="#_134" title="Permanent link">&para;</a></h3>
+<p>删除临时软链接
+<div class="highlight"><pre><span></span><code><a id="__codelineno-156-1" name="__codelineno-156-1" href="#__codelineno-156-1"></a># rm -f /dev/match_driver*
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-157-1" name="__codelineno-157-1" href="#__codelineno-157-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_135">测试场景约束<a class="headerlink" href="#_135" title="Permanent link">&para;</a></h3>
+<p>环境中存在块设备sda，sda拥有分区sda1。sda1自身或者父设备的driver属性为sd或者mptspi。</p>
+<h2 id="23">子场景 23<a class="headerlink" href="#23" title="Permanent link">&para;</a></h2>
+<p>ATTRS匹配的功能测试。规则文件中ATTRS{ro}与sda1的ro属性相等时，创建/dev/match_attrs1软链接；ATTR{queue/iostats}与sda1一级父设备的queue/iostats相等时，创建/dev/match_attrs2软链接；ATTR{scsi_level}与sda1二级父设备的scsi_level相等时，创建/dev/match_attrs3软链接</p>
+<h3 id="_136">备注<a class="headerlink" href="#_136" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_137">准备工作<a class="headerlink" href="#_137" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-158-1" name="__codelineno-158-1" href="#__codelineno-158-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-159-1" name="__codelineno-159-1" href="#__codelineno-159-1"></a>ATTRS{ro}==&quot;0&quot;, SYMLINK+=&quot;match_attrs1&quot;
+<a id="__codelineno-159-2" name="__codelineno-159-2" href="#__codelineno-159-2"></a>ATTRS{queue/iostats}==&quot;1&quot;, SYMLINK+=&quot;match_attrs1&quot;
+<a id="__codelineno-159-3" name="__codelineno-159-3" href="#__codelineno-159-3"></a>ATTRS{scsi_level}==&quot;3&quot;, SYMLINK+=&quot;match_attrs1&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-160-1" name="__codelineno-160-1" href="#__codelineno-160-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_138">测试步骤<a class="headerlink" href="#_138" title="Permanent link">&para;</a></h3>
+<p>触发块设备/dev/sda1的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-161-1" name="__codelineno-161-1" href="#__codelineno-161-1"></a># devctl trigger /dev/sda1
+</code></pre></div></p>
+<h3 id="_139">结果验证<a class="headerlink" href="#_139" title="Permanent link">&para;</a></h3>
+<p>查看match_attrs软链接是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-162-1" name="__codelineno-162-1" href="#__codelineno-162-1"></a># ll /dev/match_attrs*
+<a id="__codelineno-162-2" name="__codelineno-162-2" href="#__codelineno-162-2"></a>lrwxrwxrwx. 1 root root 4  8月 10 16:02 /dev/match_attrs1 -&gt; sda1
+<a id="__codelineno-162-3" name="__codelineno-162-3" href="#__codelineno-162-3"></a>lrwxrwxrwx. 1 root root 4  8月 10 16:02 /dev/match_attrs2 -&gt; sda1
+<a id="__codelineno-162-4" name="__codelineno-162-4" href="#__codelineno-162-4"></a>lrwxrwxrwx. 1 root root 4  8月 10 16:02 /dev/match_attrs3 -&gt; sda1
+</code></pre></div></p>
+<h3 id="_140">测试结束<a class="headerlink" href="#_140" title="Permanent link">&para;</a></h3>
+<p>删除临时软链接
+<div class="highlight"><pre><span></span><code><a id="__codelineno-163-1" name="__codelineno-163-1" href="#__codelineno-163-1"></a># rm -f /dev/match_attrs*
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-164-1" name="__codelineno-164-1" href="#__codelineno-164-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_141">测试场景约束<a class="headerlink" href="#_141" title="Permanent link">&para;</a></h3>
+<p>环境中存在块设备sda，sda拥有分区sda1。sda1自身或者父设备存在ro为0的属性、queue/iostats为1的属性和scsi_level为3的属性。</p>
+<h2 id="24">子场景 24<a class="headerlink" href="#24" title="Permanent link">&para;</a></h2>
+<p>TAGS匹配的功能测试。分别为sda1、其一级父设备、二级父设备设置标签，使用TAGS匹配这些标签，若标签存在，则创建对应的/dev/match_tags*软链接</p>
+<h3 id="_142">备注<a class="headerlink" href="#_142" title="Permanent link">&para;</a></h3>
+<p>无</p>
+<h3 id="_143">准备工作<a class="headerlink" href="#_143" title="Permanent link">&para;</a></h3>
+<p>创建配置文件：/etc/devmaster/config.toml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-165-1" name="__codelineno-165-1" href="#__codelineno-165-1"></a>rules_d = [&quot;/tmp/1/rules.d&quot;]
+</code></pre></div></p>
+<p>创建规则文件：/tmp/1/rules.d/00-test.rules
+<div class="highlight"><pre><span></span><code><a id="__codelineno-166-1" name="__codelineno-166-1" href="#__codelineno-166-1"></a>KERNELS=&quot;sda1&quot;, TAG+=&quot;d0&quot;
+<a id="__codelineno-166-2" name="__codelineno-166-2" href="#__codelineno-166-2"></a>KERNELS=&quot;sda&quot;, TAG+=&quot;d1&quot;
+<a id="__codelineno-166-3" name="__codelineno-166-3" href="#__codelineno-166-3"></a>KERNELS=&quot;2:0:0:0&quot;, TAG+=&quot;d2&quot;
+<a id="__codelineno-166-4" name="__codelineno-166-4" href="#__codelineno-166-4"></a>
+<a id="__codelineno-166-5" name="__codelineno-166-5" href="#__codelineno-166-5"></a>TAGS==&quot;d0&quot;,SYMLINK+=&quot;match_tags0&quot;
+<a id="__codelineno-166-6" name="__codelineno-166-6" href="#__codelineno-166-6"></a>TAGS==&quot;d1&quot;,SYMLINK+=&quot;match_tags1&quot;
+<a id="__codelineno-166-7" name="__codelineno-166-7" href="#__codelineno-166-7"></a>TAGS==&quot;d2&quot;,SYMLINK+=&quot;match_tags2&quot;
+</code></pre></div></p>
+<p>启动devmaster
+<div class="highlight"><pre><span></span><code><a id="__codelineno-167-1" name="__codelineno-167-1" href="#__codelineno-167-1"></a># devmaster &amp;&gt; log.txt &amp;
+</code></pre></div></p>
+<h3 id="_144">测试步骤<a class="headerlink" href="#_144" title="Permanent link">&para;</a></h3>
+<p>触发块设备/dev/sda1的uevent事件：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-168-1" name="__codelineno-168-1" href="#__codelineno-168-1"></a># devctl trigger /dev/sda1
+</code></pre></div></p>
+<h3 id="_145">结果验证<a class="headerlink" href="#_145" title="Permanent link">&para;</a></h3>
+<p>查看match_tags软链接是否创建：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-169-1" name="__codelineno-169-1" href="#__codelineno-169-1"></a># ll /dev/match_tags*
+<a id="__codelineno-169-2" name="__codelineno-169-2" href="#__codelineno-169-2"></a>lrwxrwxrwx. 1 root root 4  8月 10 17:25 /dev/match_tags0 -&gt; sda1
+<a id="__codelineno-169-3" name="__codelineno-169-3" href="#__codelineno-169-3"></a>lrwxrwxrwx. 1 root root 4  8月 10 17:25 /dev/match_tags1 -&gt; sda1
+<a id="__codelineno-169-4" name="__codelineno-169-4" href="#__codelineno-169-4"></a>lrwxrwxrwx. 1 root root 4  8月 10 17:25 /dev/match_tags2 -&gt; sda1
+</code></pre></div></p>
+<h3 id="_146">测试结束<a class="headerlink" href="#_146" title="Permanent link">&para;</a></h3>
+<p>删除临时软链接
+<div class="highlight"><pre><span></span><code><a id="__codelineno-170-1" name="__codelineno-170-1" href="#__codelineno-170-1"></a># rm -f /dev/match_tags*
+</code></pre></div></p>
+<p>清理devmaster残留数据
+<div class="highlight"><pre><span></span><code><a id="__codelineno-171-1" name="__codelineno-171-1" href="#__codelineno-171-1"></a># rm -rf /run/devmaster/*
+</code></pre></div></p>
+<h3 id="_147">测试场景约束<a class="headerlink" href="#_147" title="Permanent link">&para;</a></h3>
+<p>环境中存在块设备sda，sda拥有分区sda1，sda注册在pci总线的2:0:0:0插槽上。</p>
+
+  <hr>
+<div class="md-source-file">
+  <small>
+    
+      最后更新:
+      <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">November 4, 2023</span>
+      
+        <br>
+        创建日期:
+        <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">August 23, 2023</span>
+      
+    
+  </small>
+</div>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 openEuler sysMaster team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.prune", "navigation.path", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.aecac24b.min.js"></script>
+      
+    
+  </body>
+</html>

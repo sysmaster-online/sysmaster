@@ -1,0 +1,14 @@
+[Unit]
+DefaultDependencies=false
+After=devmaster-simu-udev.service
+Requires=devmaster-simu-udev.service
+
+[Service]
+Type=notify
+Restart=always
+RestartSec=0
+ExecStart=/usr/lib/devmaster/devmaster
+KillMode=process
+
+[Install]
+WantedBy=sysinit.target

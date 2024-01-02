@@ -1,0 +1,125 @@
+From 5d16d1b3ab9013d65906bbaef74164759577ab64 Mon Sep 17 00:00:00 2001
+From: rpm-build <rpm-build>
+Date: Fri, 5 Nov 2021 10:44:49 +0800
+Subject: [PATCH] fake pid1 by env
+
+---
+ src/basic/process-util.c | 52 ++++++++++++++++++++++++++++++++++++++--
+ src/basic/process-util.h |  4 ++++
+ src/core/execute.c       |  6 ++++-
+ 3 files changed, 59 insertions(+), 3 deletions(-)
+
+diff --git a/src/basic/process-util.c b/src/basic/process-util.c
+index 7d4301e..b33813d 100644
+--- a/src/basic/process-util.c
++++ b/src/basic/process-util.c
+@@ -1147,7 +1147,7 @@ pid_t getpid_cached(void) {
+         case CACHED_PID_UNSET: { /* Not initialized yet, then do so now */
+                 pid_t new_pid;
+
+-                new_pid = raw_getpid();
++                new_pid = getpid();
+
+                 if (!installed) {
+                         /* __register_atfork() either returns 0 or -ENOMEM, in its glibc implementation. Since it's
+@@ -1168,7 +1168,7 @@ pid_t getpid_cached(void) {
+         }
+
+         case CACHED_PID_BUSY: /* Somebody else is currently initializing */
+-                return raw_getpid();
++                return getpid();
+
+         default: /* Properly initialized */
+                 return current_value;
+@@ -1646,3 +1646,51 @@ static const char* const sched_policy_table[] = {
+ };
+
+ DEFINE_STRING_TABLE_LOOKUP_WITH_FALLBACK(sched_policy, int, INT_MAX);
++
++static pid_t systemd_pid = CACHED_PID_UNSET;
++
++pid_t getpid()
++{
++        pid_t pid;
++
++        pid = syscall(__NR_getpid);
++        if (systemd_pid == CACHED_PID_UNSET) {
++                const char *e = getenv("SYSTEMD_MAINPID");
++                pid_t p;
++
++                if (!e) goto out;
++                if (parse_pid(e, &p) < 0) {
++                        goto out;
++                }
++                systemd_pid = p;
++        }
++
++        if (pid == 1 || pid == systemd_pid)
++                return 1;
++out:
++        return pid;
++}
++
++pid_t getppid()
++{
++        static pid_t ppid;
++
++        ppid = syscall(__NR_getppid);
++        if (ppid <= 1) return ppid;
++
++        if (systemd_pid == CACHED_PID_UNSET) {
++                const char *e = getenv("SYSTEMD_MAINPID");
++                pid_t p;
++
++                if (!e) goto out;
++                if (parse_pid(e, &p) < 0) {
++                        goto out;
++                }
++                systemd_pid = p;
++        }
++
++        if (ppid == systemd_pid)
++                return 1;
++out:
++        return ppid;
++}
+\ No newline at end of file
+diff --git a/src/basic/process-util.h b/src/basic/process-util.h
+index ddce7bd..b9293de 100644
+--- a/src/basic/process-util.h
++++ b/src/basic/process-util.h
+@@ -202,3 +202,7 @@ int pidfd_get_pid(int fd, pid_t *ret);
+ int setpriority_closest(int priority);
+
+ bool invoked_as(char *argv[], const char *token);
++
++pid_t getpid();
++
++pid_t getppid();
+\ No newline at end of file
+diff --git a/src/core/execute.c b/src/core/execute.c
+index 35aea2f..9f46e28 100644
+--- a/src/core/execute.c
++++ b/src/core/execute.c
+@@ -1795,7 +1795,7 @@ static int build_environment(
+         assert(p);
+         assert(ret);
+
+-#define N_ENV_VARS 17
++#define N_ENV_VARS 18
+         our_env = new0(char*, N_ENV_VARS + _EXEC_DIRECTORY_TYPE_MAX);
+         if (!our_env)
+                 return -ENOMEM;
+@@ -1956,6 +1956,10 @@ static int build_environment(
+
+         our_env[n_env++] = x;
+
++        if (asprintf(&x, "SYSTEMD_MAINPID=%s", getenv("SYSTEMD_MAINPID")) < 0)
++                return -ENOMEM;
++        our_env[n_env++] = x;
++
+         our_env[n_env++] = NULL;
+         assert(n_env <= N_ENV_VARS + _EXEC_DIRECTORY_TYPE_MAX);
+ #undef N_ENV_VARS
+--
+2.30.0

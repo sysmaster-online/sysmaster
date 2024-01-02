@@ -1,0 +1,7 @@
+[Unit]
+DefaultDependencies=false
+
+[Service]
+Type=simple
+RemainAfterExit=true
+ExecStart=-/bin/bash /lib/devmaster/simulate_udev.sh

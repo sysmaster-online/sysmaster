@@ -1,0 +1,2459 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Redesign and Reimplementation of Process1">
+      
+      
+        <meta name="author" content="dev@openeuler.org">
+      
+      
+        <link rel="canonical" href="http://sysmaster.online/man/core/service/">
+      
+      
+        <link rel="prev" href="../sctl/">
+      
+      
+        <link rel="next" href="../signal/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.7">
+    
+    
+      
+        <title>Service 配置 - sysmaster.online</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.4b4a2bd9.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.356b1318.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Ubuntu:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Ubuntu";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#service" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../.." title="sysmaster.online" class="md-header__button md-logo" aria-label="sysmaster.online" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sysmaster.online
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Service 配置
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="分享" aria-label="分享" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91 1.61 0 2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08Z"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://gitee.com/openeuler/sysmaster" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openEuler/sysMaster
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../contrib/" class="md-tabs__link">
+        
+  
+    
+  
+  Contrib
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../cicd/01-integration_test/" class="md-tabs__link">
+          
+  
+    
+  
+  Cicd
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../design/00-index_zh/" class="md-tabs__link">
+          
+  
+    
+  
+  Design
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../all/" class="md-tabs__link">
+          
+  
+    
+  
+  Man
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../use/00-sysMaster%E6%9E%84%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8/" class="md-tabs__link">
+          
+  
+    
+  
+  Use
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="sysmaster.online" class="md-nav__button md-logo" aria-label="sysmaster.online" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    sysmaster.online
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://gitee.com/openeuler/sysmaster" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openEuler/sysMaster
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../contrib/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contrib
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Cicd
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Cicd
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cicd/01-integration_test/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    测试框架及用例编写
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cicd/02-cargo-fuzz/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cargo-fuzz 介绍
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_docker_with_kiwi/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build docker with kiwi
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_qemu_with_kiwi/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build qemu with kiwi
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_rpm_with_mock/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build rpm with mock
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../cicd/build_xz_with_vendor/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Build xz with vendor
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    
+  
+  
+    <a href="../../../cicd/tests/devmaster/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Tests
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Design
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Design
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/00-index_zh/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    为什么要开发sysMaster
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/00-sysmaster_0description/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    1号进程的挑战及sysMaster愿景
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/00-sysmaster_architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster架构设计
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/01-errors_of_sysmaster/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    对错误处理的思考
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/cores/01-devel-doc/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Cores
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/extends/02-devmaster-architecture/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Extends
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/libiraries/01-event/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Libiraries
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../design/rfcs/0001-systemd_parser/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Rfcs
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Man
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Man
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../all/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Warnings
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../sysmaster.conf/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster 系统配置
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Core
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            Core
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exec/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    命令执行环境
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sctl/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sctl 命令
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Service 配置
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Service 配置
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#type" class="md-nav__link">
+    Type
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execconditionexecstartpreexecstartexecstopexecstartpost" class="md-nav__link">
+    ExecCondition、ExecStartPre、ExecStart、ExecStop、ExecStartPost
+  </a>
+  
+    <nav class="md-nav" aria-label="ExecCondition、ExecStartPre、ExecStart、ExecStop、ExecStartPost">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execstart" class="md-nav__link">
+    ExecStart配置的限制
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pidfile" class="md-nav__link">
+    PIDFile
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remainafterexit" class="md-nav__link">
+    RemainAfterExit
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nonblocking" class="md-nav__link">
+    NonBlocking
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notifyaccess" class="md-nav__link">
+    NotifyAccess
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sockets" class="md-nav__link">
+    Sockets
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#killmode" class="md-nav__link">
+    KillMode
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#watchdogsec" class="md-nav__link">
+    WatchdogSec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restart" class="md-nav__link">
+    Restart
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restartsec" class="md-nav__link">
+    RestartSec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restartpreventexitstatus" class="md-nav__link">
+    RestartPreventExitStatus
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execreload" class="md-nav__link">
+    ExecReload
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment" class="md-nav__link">
+    Environment
+  </a>
+  
+    <nav class="md-nav" aria-label="Environment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    注意：
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environmentfile" class="md-nav__link">
+    EnvironmentFile
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#killsignal" class="md-nav__link">
+    KillSignal
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timeoutsec" class="md-nav__link">
+    TimeoutSec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timeoutstartsec" class="md-nav__link">
+    TimeoutStartSec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timeoutstopsec" class="md-nav__link">
+    TimeoutStopSec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitcorelimitnofilelimitnproc" class="md-nav__link">
+    LimitCORE、LimitNOFILE、LimitNPROC
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../signal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysmaster的信号处理
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../socket/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Socket 配置
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Unit 配置
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    
+  
+  
+    <a href="../../exts/devmaster/devctl/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Exts
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../init/init/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Init
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Use
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Use
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../use/00-sysMaster%E6%9E%84%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    sysMaster 构建和使用
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../use/00-systemd2sysmaster/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    systemd向sysmaster迁移
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../use/00-%E5%88%B6%E4%BD%9Csysmaster%E4%BD%9C%E4%B8%BA1%E5%8F%B7%E8%BF%9B%E7%A8%8B%E7%9A%84iso%E9%95%9C%E5%83%8F/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    oemake制作sysmaster作为1号进程的iso镜像
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/devmaster%E6%9B%BF%E4%BB%A3udev%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Devmaster替代udev运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/sysMaster%E7%89%B9%E6%9D%83%E5%AE%B9%E5%99%A8/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    sysMaster特权容器
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/sysmaster%E4%B8%8B%E4%BD%BF%E8%83%BDrsyslog/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    Sysmaster下使能rsyslog
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/%E5%85%BC%E5%AE%B9busybox%E6%A8%A1%E5%BC%8F%E8%BF%90%E8%A1%8C/Readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    兼容busybox模式运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/%E5%85%BC%E5%AE%B9systemd%E6%A8%A1%E5%BC%8F%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    兼容systemd模式运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/%E5%AE%B9%E5%99%A8%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    容器中替代pid1运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+    <a href="../../../use/%E8%99%9A%E6%9C%BA%E4%B8%AD%E6%9B%BF%E4%BB%A3pid1%E8%BF%90%E8%A1%8C/readme/" class="md-nav__link">
+      
+  
+  <span class="md-ellipsis">
+    虚机中替代pid1运行
+  </span>
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#type" class="md-nav__link">
+    Type
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execconditionexecstartpreexecstartexecstopexecstartpost" class="md-nav__link">
+    ExecCondition、ExecStartPre、ExecStart、ExecStop、ExecStartPost
+  </a>
+  
+    <nav class="md-nav" aria-label="ExecCondition、ExecStartPre、ExecStart、ExecStop、ExecStartPost">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execstart" class="md-nav__link">
+    ExecStart配置的限制
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pidfile" class="md-nav__link">
+    PIDFile
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remainafterexit" class="md-nav__link">
+    RemainAfterExit
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nonblocking" class="md-nav__link">
+    NonBlocking
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notifyaccess" class="md-nav__link">
+    NotifyAccess
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sockets" class="md-nav__link">
+    Sockets
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#killmode" class="md-nav__link">
+    KillMode
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#watchdogsec" class="md-nav__link">
+    WatchdogSec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restart" class="md-nav__link">
+    Restart
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restartsec" class="md-nav__link">
+    RestartSec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restartpreventexitstatus" class="md-nav__link">
+    RestartPreventExitStatus
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execreload" class="md-nav__link">
+    ExecReload
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment" class="md-nav__link">
+    Environment
+  </a>
+  
+    <nav class="md-nav" aria-label="Environment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    注意：
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environmentfile" class="md-nav__link">
+    EnvironmentFile
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#killsignal" class="md-nav__link">
+    KillSignal
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timeoutsec" class="md-nav__link">
+    TimeoutSec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timeoutstartsec" class="md-nav__link">
+    TimeoutStartSec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timeoutstopsec" class="md-nav__link">
+    TimeoutStopSec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitcorelimitnofilelimitnproc" class="md-nav__link">
+    LimitCORE、LimitNOFILE、LimitNPROC
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+    <a href="https://gitee.com/-/ide/project/openeuler/sysmaster/edit/master/-/docs/man/core/service.md" title="编辑此页" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4v-2m10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1 2.1 2.1Z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="service">Service 配置<a class="headerlink" href="#service" title="Permanent link">&para;</a></h1>
+<h2 id="type">Type<a class="headerlink" href="#type" title="Permanent link">&para;</a></h2>
+<p>service服务的类型，当前支持<code>simple</code>、<code>forking</code>、<code>oneshot</code>、<code>notify</code>，默认值为<code>simple</code>。</p>
+<p><code>simple</code>： 拉起service服务时，当执行fork成功即认为服务启动成功。</p>
+<p><code>forking</code>： 代表ExecStart的进程会调用fork系统调用，此时父进程退出之后认为该服务启动成功。此时建议配置PIDFile选项，通过该选项获取主服务进程的pid。</p>
+<p><code>oneshot</code>： 主服务进程退出之后即认为服务启动完成，此服务类型需同时设置<code>RemainAfterExit</code>，允许配置多条命令，通常用于短时间运行的服务。</p>
+<p><code>notify</code>： 此服务需要主进程通过sd_notify发送通知消息，当前支持的notify消息包括<code>MAINPID=</code>、<code>ERRNO=</code>、<code>STOPPING=1</code>、<code>WATCHDOG=</code>、<code>WATCHDOG_USEC</code>。</p>
+<div class="highlight"><pre><span></span><code>`MAINPID=`：通过此消息接受主服务进程的pid。
+`ERRNO=`：接受主服务进程的错误码。
+`STOPPING=1`：当参数为1时，且当前服务在Running状态则停止当前服务。
+`WATCHDOG=`：当参数为1时，则启动watchdog的定时器，当参数为trigger时，则服务进程StopWatchdog状态。
+</code></pre></div>
+<h2 id="execconditionexecstartpreexecstartexecstopexecstartpost">ExecCondition、ExecStartPre、ExecStart、ExecStop、ExecStartPost<a class="headerlink" href="#execconditionexecstartpreexecstartexecstopexecstartpost" title="Permanent link">&para;</a></h2>
+<ul>
+<li>类型：字符串</li>
+</ul>
+<p>服务在不同的启动阶段执行的命令，多条命令使用<code>;</code>分隔。<code>ExecStart</code>是Service唯一必须配置的选项，用于配置Service需要执行的命令。</p>
+<p><strong>注意：</strong> 为了避免<code>;</code>解析为命令参数，<code>;</code>作为分隔符使用时需要在前后添加空格。例如：</p>
+<table>
+<thead>
+<tr>
+<th>配置的命令</th>
+<th>解析结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ExecStart="/bin/echo foo; /bin/echo bar"</td>
+<td>命令路径：/bin/echo，命令参数："foo;", "/bin/echo", "bar"，执行结果：打印"foo; /bin/echo bar"</td>
+</tr>
+<tr>
+<td>ExecStart="/bin/echo foo;/bin/echo bar"</td>
+<td>命令路径：/bin/echo，命令参数："foo;/bin/echo", "bar"，执行结果：打印"foo;/bin/echo bar"</td>
+</tr>
+<tr>
+<td>ExecStart="/bin/echo foo ; /bin/echo bar"</td>
+<td>解析为两条命令。</br> 命令1路径：/bin/echo，命令1参数："foo"，命令1执行结果：打印"foo"。</br> 命令2路径：/bin/echo，命令2参数："bar"，命令2执行结果：打印"bar"</td>
+</tr>
+</tbody>
+</table>
+<h3 id="execstart">ExecStart配置的限制<a class="headerlink" href="#execstart" title="Permanent link">&para;</a></h3>
+<ol>
+<li>配置的命令必须为绝对路径</li>
+<li>除非服务的类型配置为<code>OneShot</code>，否则只允许配置一条命令</li>
+<li>命令的绝对路径前支持添加前缀：<code>-</code>（暂不支持其他systemd支持的前缀，如<code>@</code>，<code>:</code>)。前缀<code>-</code>的含义是，即使后面列出的命令执行失败也当作成功处理。</li>
+<li>当前不支持命令行中的环境变量展开，即与systemd添加<code>:</code>前缀的行为一致。即同时配置<code>Environment={name="test"}, ExecStart="/bin/echo $name"</code>，sysMaster输出为"$name"，而systemd输出为"test"。如果systemd的服务配置文件修改为"ExecStart=:/bin/echo <span class="arithmatex">\(name"，则输出也为"\)</span>name"。</li>
+</ol>
+<h2 id="pidfile">PIDFile<a class="headerlink" href="#pidfile" title="Permanent link">&para;</a></h2>
+<p>当Type类型为<code>forking</code>时使用，用于获取主服务进程的pid。</p>
+<h2 id="remainafterexit">RemainAfterExit<a class="headerlink" href="#remainafterexit" title="Permanent link">&para;</a></h2>
+<p>支持的值为true或false, 当配置为true时，当主服务进程退出时，服务状态仍然为active状态。</p>
+<h2 id="nonblocking">NonBlocking<a class="headerlink" href="#nonblocking" title="Permanent link">&para;</a></h2>
+<ul>
+<li>类型：布尔值</li>
+</ul>
+<p>该配置仅对socket激活的服务有效，设置从socket继承的文件描述符的O_NONBLOCK标志位。默认值为<code>false</code>。</p>
+<h2 id="notifyaccess">NotifyAccess<a class="headerlink" href="#notifyaccess" title="Permanent link">&para;</a></h2>
+<p>配置类型为字符串，支持<code>none</code>、<code>main</code>，当Type为Notify时默认值为<code>main</code>。当前功能未实现。</p>
+<h2 id="sockets">Sockets<a class="headerlink" href="#sockets" title="Permanent link">&para;</a></h2>
+<p>配置类型为字符串，当需要配置多个时以；号隔开，表示该服务需要从socket继承套接子。</p>
+<h2 id="killmode">KillMode<a class="headerlink" href="#killmode" title="Permanent link">&para;</a></h2>
+<p>当需要停止服务进程时，杀死服务进程的方法，取值范围如下： <code>control-group</code>、<code>process</code>、<code>mixed</code>，默认值为<code>control-group</code>。</p>
+<div class="highlight"><pre><span></span><code>`control-group`: 表示杀死该服务的cgroup内的所有进程。
+`process`: 仅杀死主进程。
+`mixed`:  表示只向该服务的cgroup内的进程发送SigKill信号。
+</code></pre></div>
+<h2 id="watchdogsec">WatchdogSec<a class="headerlink" href="#watchdogsec" title="Permanent link">&para;</a></h2>
+<p>配置软件狗的定时时间，时间单位为秒，当值大于0时，启用软件狗，应用通过发送notify消息喂狗，定时时间内收到"WATCHDOG=1"消息代表应用正常，收到“WATCHDOG=trigger"消息停止应用，收到“WATCHDOG_USEC=15”消息表示将定时时间修改为15秒。</p>
+<h2 id="restart">Restart<a class="headerlink" href="#restart" title="Permanent link">&para;</a></h2>
+<p>配置在服务退出或终止时，是否重新启动服务，可以配置为<code>no</code>,<code>on-success</code>，<code>on-failure</code>，<code>on-watchdog</code>, <code>on-abnormal</code>, <code>on-abort</code>, <code>always</code>, 默认值为<code>no</code>。</p>
+<div class="highlight"><pre><span></span><code>`no`: 代表服务启动失败时，不重新启动服务。
+`on-success`: 当服务正常退出时重新启动服务。正常退出码有两种情况: 1、退出码为0。 2、其他符合预期的退出码或信号。
+`on-failure`: 当服务非正常退出时重新启动服务。非正常退出码 1、退出码非0。 2、非预期的信号或超时导致服务退出等。
+`on-watchdog`: 当watchdog超时导致进程退出时重新启动服务。
+`on-abnormal`: 当服务超时或接收到异常的退出信号时候，重新启动服务。
+`on-abort`: 当服务因未捕获的异常退出时重新拉起服务。
+`always`: 无论服务因何原因退出都重新拉起服务。
+</code></pre></div>
+<h2 id="restartsec">RestartSec<a class="headerlink" href="#restartsec" title="Permanent link">&para;</a></h2>
+<ul>
+<li>类型：数值</li>
+</ul>
+<p>当服务退出时，间隔多长时间重新拉起服务，配置为正整数，单位为微秒。</p>
+<h2 id="restartpreventexitstatus">RestartPreventExitStatus<a class="headerlink" href="#restartpreventexitstatus" title="Permanent link">&para;</a></h2>
+<p>配置进程的退出码或信号，当服务进程的退出码或信号符合此选项时不重新拉起服务，此时忽略Restart的配置。可以配置为整数或信号名，中间以空格分开默，默认为空字符串。
+如RestartPreventExitStatus=“1 2 SIGKILL”，当前信号仅支持以SIG开头的信号。</p>
+<h2 id="execreload">ExecReload<a class="headerlink" href="#execreload" title="Permanent link">&para;</a></h2>
+<p>主要用于服务重新加载配置文件等操作，配置格式如<code>ExecStart</code>，可以配置为空，当服务active状态时，才会生效。</p>
+<h2 id="environment">Environment<a class="headerlink" href="#environment" title="Permanent link">&para;</a></h2>
+<p>配置进程的环境变量，每个环境变量采用<code>Key=Value</code>键值对的格式，多个环境变量通过空格分隔，例如：<code>Environment=FOO=foo BAR=bar</code>。</p>
+<p>支持使用双引号包裹<code>Value</code>，这常用于<code>Value</code>内包含空格的场景，例如：<code>Environment=FOO="foo foo" BAR="bar bar"</code>。如果<code>Value</code>包含<code>"</code>，可以使用反斜杠转义，例如：<code>Environment=FOO=\"foo</code>。</p>
+<p>合法的<code>Key</code>仅支持大小写字母、阿拉伯数字及下划线<code>_</code>。</p>
+<h3 id="_1">注意：<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h3>
+<ol>
+<li>环境变量不会默认在命令行中展开，和systemd在ExecXXX字段显式配置<code>:</code>的行为一致。</li>
+<li>当解析到非法的键值对时，sysmaster将停止解析，使用当前已解析到的合法值。</li>
+</ol>
+<h2 id="environmentfile">EnvironmentFile<a class="headerlink" href="#environmentfile" title="Permanent link">&para;</a></h2>
+<p>设置环境变量的文件读取路径，只支持绝对路径，配置多个路径时以<code>;</code>隔开，如果路径以<code>-</code>开头，则忽略该文件，文件中的内容格式为<code>key=value</code>，若为空行或以#开头则忽略该行。</p>
+<h2 id="killsignal">KillSignal<a class="headerlink" href="#killsignal" title="Permanent link">&para;</a></h2>
+<p>设置杀死进程的第一步使用的信号, 配置类型为字符串。默认值为<code>SIGTERM</code>信号。</p>
+<h2 id="timeoutsec">TimeoutSec<a class="headerlink" href="#timeoutsec" title="Permanent link">&para;</a></h2>
+<p>服务启动或停止时的超时时间，单位为秒，取值范围为0~u64::MAX, 当值为0或u64::Max时，不启动定时器。当<code>TimeoutSec</code>的值不为0且<code>TimeoutStartSec</code>或<code>TimeoutStopSec</code>值为0时，则将<code>TimeoutStartSec</code>或<code>TimeoutStopSec</code>的值更新为<code>TimeoutSec</code>选项的</p>
+<h2 id="timeoutstartsec">TimeoutStartSec<a class="headerlink" href="#timeoutstartsec" title="Permanent link">&para;</a></h2>
+<p>服务启动时的超时时间，单位为秒，取值范围为0~u64::MAX, 当值为0或u64::Max时，不启动定时器。当执行<code>Condition</code>、<code>StartPre</code>、<code>Start</code>、<code>StartPost</code>、<code>Reload</code>命令时的超时时间。</p>
+<h2 id="timeoutstopsec">TimeoutStopSec<a class="headerlink" href="#timeoutstopsec" title="Permanent link">&para;</a></h2>
+<p>服务停止时的超时时间，单位为秒，取值范围为0~u64::MAX, 当值为0或u64::Max时，不启动定时器。当执行<code>Stop</code>、<code>StopPost</code>命令时的超时时间。</p>
+<h2 id="limitcorelimitnofilelimitnproc">LimitCORE、LimitNOFILE、LimitNPROC<a class="headerlink" href="#limitcorelimitnofilelimitnproc" title="Permanent link">&para;</a></h2>
+<p>设置进程的资源限制，参考<a href="https://www.man7.org/linux/man-pages/man2/setrlimit.2.html">setrlimit(2)</a>，配置类型为字符串。</p>
+<p>当前支持两种格式，(1) 不包括<code>':'</code>的当个字符串，此时soft、hard设置为同一个值，(2) 使用<code>':'</code>分割的两个字符串，soft为<code>:</code>前的值， hard为<code>:</code>后的值。</p>
+<p>单个值只支持配置为数值型或“infinity”字符串，配置为“infinity”时资源限制设置为<code>ulimit</code>。</p>
+
+  <hr>
+<div class="md-source-file">
+  <small>
+    
+      最后更新:
+      <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">November 4, 2023</span>
+      
+        <br>
+        创建日期:
+        <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">March 2, 2023</span>
+      
+    
+  </small>
+</div>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 openEuler sysMaster team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.prune", "navigation.path", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.aecac24b.min.js"></script>
+      
+    
+  </body>
+</html>

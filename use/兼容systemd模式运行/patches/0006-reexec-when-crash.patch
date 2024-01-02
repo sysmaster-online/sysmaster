@@ -1,0 +1,94 @@
+From f6db04bb96b9600dfd36afdb3323c2bb80424993 Mon Sep 17 00:00:00 2001
+From: rpm-build <rpm-build>
+Date: Tue, 28 Dec 2021 11:17:07 +0800
+Subject: [PATCH] reexec when crash
+
+---
+ src/core/main.c | 44 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
+
+diff --git a/src/core/main.c b/src/core/main.c
+index d0b1af0..e53b225 100644
+--- a/src/core/main.c
++++ b/src/core/main.c
+@@ -104,6 +104,7 @@ static enum {
+ } arg_action = ACTION_RUN;
+
+ static const char *arg_bus_introspect = NULL;
++static Manager *g_m = NULL;
+
+ /* Those variables are initialized to 0 automatically, so we avoid uninitialized memory access.  Real
+  * defaults are assigned in reset_arguments() below. */
+@@ -194,14 +195,31 @@ static int manager_find_user_config_paths(char ***ret_files, char ***ret_dirs) {
+         return 0;
+ }
+
++static int prepare_reexecute(
++                Manager *m,
++                FILE **ret_f,
++                FDSet **ret_fds,
++                bool switching_root);
++
++static void do_reexecute(
++                int argc,
++                char *argv[],
++                const struct rlimit *saved_rlimit_nofile,
++                const struct rlimit *saved_rlimit_memlock,
++                FDSet *fds,
++                const char *switch_root_dir,
++                const char *switch_root_init,
++                const char **ret_error_message);
++
+ _noreturn_ static void freeze_or_exit_or_reboot(void) {
+
+         /* If we are running in a container, let's prefer exiting, after all we can propagate an exit code to
+-         * the container manager, and thus inform it that something went wrong. */
++         * the container manager, and thus inform it that something went wrong.
+         if (detect_container() > 0) {
+                 log_emergency("Exiting PID 1...");
+                 _exit(EXIT_EXCEPTION);
+         }
++        */
+
+         if (arg_crash_reboot) {
+                 log_notice("Rebooting in 10s...");
+@@ -212,6 +230,28 @@ _noreturn_ static void freeze_or_exit_or_reboot(void) {
+                 log_emergency_errno(errno, "Failed to reboot: %m");
+         }
+
++        if(g_m && getpid_cached() == 1){
++                _cleanup_fdset_free_ FDSet *fds = NULL;
++                struct rlimit saved_rlimit_nofile = RLIMIT_MAKE_CONST(0),
++                saved_rlimit_memlock = RLIMIT_MAKE_CONST(RLIM_INFINITY);
++                const char *error_message = NULL;
++
++                log_emergency("Recover systemd from crash");
++                g_m->objective = MANAGER_REEXECUTE;
++                prepare_reexecute(g_m, &arg_serialization, &fds, false);
++                pager_close();
++                g_m = manager_free(g_m);
++                mac_selinux_finish();
++                do_reexecute(saved_argc, saved_argv,
++                             &saved_rlimit_nofile,
++                             &saved_rlimit_memlock,
++                             fds,
++                             NULL,
++                             NULL,
++                             &error_message);
++                log_emergency("Fail to reexecute after crash");
++        }
++
+         log_emergency("Freezing execution.");
+         freeze();
+ }
+@@ -2846,6 +2886,8 @@ int main(int argc, char *argv[]) {
+                 goto finish;
+         }
+
++        g_m = m;
++
+         m->timestamps[MANAGER_TIMESTAMP_KERNEL] = kernel_timestamp;
+         m->timestamps[MANAGER_TIMESTAMP_INITRD] = initrd_timestamp;
+         m->timestamps[MANAGER_TIMESTAMP_USERSPACE] = userspace_timestamp;
+--
+2.30.0
