@@ -16,6 +16,8 @@
 //! Because rustc will append rust native version script, 'ld' is unavailable. Instead,
 //! we should use 'lld' linker of llvm, as it support multiple declarations of version scripts.
 
+use std::env;
+
 fn main() {
     let symbols = [
         "udev_device_get_action",
@@ -112,8 +114,12 @@ fn main() {
         // "udev_device_get_current_tags_list_entry",
     ];
 
+    let current_dir = env::current_dir().unwrap();
     println!("cargo:rustc-cdylib-link-arg=-fuse-ld=lld");
-    println!("cargo:rustc-link-arg=-Wl,--version-script=/root/sysmaster/exts/libudev/libudev.sym");
+    println!(
+        "cargo:rustc-link-arg=-Wl,--version-script={}/libudev.sym",
+        current_dir.display()
+    );
 
     for s in symbols {
         println!("cargo:rustc-link-arg=-Wl,--defsym={}={}_impl", s, s);
