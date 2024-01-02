@@ -41,7 +41,7 @@ fn main() {
         // "udev_device_get_udev",
         // "udev_device_get_usec_since_initialized",
         "udev_device_has_tag",
-        // "udev_device_new_from_devnum",
+        "udev_device_new_from_devnum",
         "udev_device_new_from_environment",
         "udev_device_new_from_subsystem_sysname",
         "udev_device_new_from_syspath",
