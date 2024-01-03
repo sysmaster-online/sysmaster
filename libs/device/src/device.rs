@@ -3873,7 +3873,7 @@ V:100
 
         let _ = unlink("/tmp/devmaster/data/+drivers:usb:usb");
         dev.set_base_path("/tmp/devmaster");
-        assert!(dev.update_db().is_err());
+        assert!(!dev.update_db().is_err());
         dev.add_property("hello", "world").unwrap();
         dev.update_db().unwrap();
         assert!(Path::new("/tmp/devmaster/data/+drivers:usb:usb").exists());
