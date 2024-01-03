@@ -1458,9 +1458,14 @@ impl Device {
         let db_path = format!("{}/{}/{}", self.base_path.borrow(), DB_BASE_DIR, id);
 
         if !has_info && *self.devnum.borrow() == 0 && *self.ifindex.borrow() == 0 {
-            unlink(db_path.as_str()).context(Nix {
+            if let Err(e) = unlink(db_path.as_str()).context(Nix {
                 msg: format!("update_db failed: can't unlink db '{}'", db_path),
-            })?;
+            }) {
+                if e.get_errno() != nix::errno::Errno::ENOENT {
+                    return Err(e);
+                }
+            }
+
             return Ok(());
         }
 
