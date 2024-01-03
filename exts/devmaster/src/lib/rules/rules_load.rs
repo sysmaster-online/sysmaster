@@ -23,6 +23,7 @@ use basic::IN_SET;
 use nix::unistd::{Group, User};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 
 trait Location {
     fn location(&self, context: &(u32, String, String)) -> String;
@@ -62,14 +63,14 @@ impl Rules {
     /// enumerate and parse all rule files under rule directories
     pub(crate) fn parse_rules(rules: Arc<RwLock<Rules>>) {
         let dirs = rules.as_ref().read().unwrap().dirs.clone();
+
+        let mut files: Vec<PathBuf> = vec![];
         for dir in dirs {
             let dir_path = std::path::Path::new(&dir);
             if !dir_path.exists() || !dir_path.is_dir() {
                 log::warn!("Rule directory {} is invalid.", dir);
                 continue;
             }
-
-            let mut files: Vec<String> = vec![];
 
             for file in dir_path.read_dir().unwrap() {
                 if file.is_err() {
@@ -81,19 +82,28 @@ impl Rules {
                     continue;
                 }
                 let buf = file.unwrap().path();
-                let de = buf.as_os_str().to_str().unwrap();
-                if !de.ends_with(".rules") {
-                    log::warn!("Ignore file not ending with rules: {}", de);
+                if !buf
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_str()
+                    .unwrap_or_default()
+                    .ends_with(".rules")
+                {
+                    log::warn!("Ignore file not ending with .rules: {:?}", buf);
                     continue;
                 }
-                files.push(de.to_string());
+                files.push(buf);
             }
+        }
 
-            files.sort();
+        files.sort_by(|a, b| {
+            a.file_name()
+                .unwrap_or_default()
+                .cmp(b.file_name().unwrap_or_default())
+        });
 
-            for f in files {
-                Self::parse_file(rules.clone(), f);
-            }
+        for f in files {
+            Self::parse_file(rules.clone(), f.to_str().unwrap().to_string());
         }
     }
 
