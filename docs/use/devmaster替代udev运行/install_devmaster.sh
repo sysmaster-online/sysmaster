@@ -9,7 +9,6 @@ tools=(ata_id)
 
 run_with_devmaster=${0%/*}
 service_dir=${run_with_devmaster}/service
-lib_rules_dir=${run_with_devmaster}/rules.d
 
 etc_dir=exts/devmaster/config
 etc_rules_dir=${etc_dir}/rules.d
@@ -38,9 +37,6 @@ done
 install -Dm0640 -t ${etc_conf_install_dir} ${etc_dir}/config.toml || exit 1
 install -Dm0640 -t ${etc_netconf_install_dir} ${etc_netconf_dir}/*.link || exit 1
 install -Dm0640 -t ${etc_rules_install_dir} ${etc_rules_dir}/*.rules || exit 1
-
-# Install rules under /lib/devmaster.
-install -Dm0640 -t ${lib_rules_install_dir} ${lib_rules_dir}/*.rules || exit 1
 
 # Install services.
 install -Dm0640 -t ${service_install_dir} ${service_dir}/*.service || exit 1
