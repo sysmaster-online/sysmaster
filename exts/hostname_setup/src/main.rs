@@ -38,32 +38,30 @@ impl Hostname {
     }
 
     fn from_cmdline() -> Option<Hostname> {
-        let systemd_hostname = match cmdline::cmdline_get_value(SYSTEMD_HOSTNAME_KEY) {
-            Err(e) => {
+        let mut hostname = match cmdline::Cmdline::default().get_param(SYSTEMD_HOSTNAME_KEY) {
+            None => {
                 log::warn!(
-                    "Failed to get proc cmdline by key {}: {}",
-                    SYSTEMD_HOSTNAME_KEY,
-                    e
+                    "Failed to get proc cmdline by key {}.",
+                    SYSTEMD_HOSTNAME_KEY
                 );
-                None
+                "".to_string()
             }
-            Ok(hostname) => hostname,
+            Some(h) => h,
         };
 
-        systemd_hostname.map_or_else(
-            || match cmdline::cmdline_get_value(SYSMASTER_HOSTNAME_KEY) {
-                Err(e) => {
+        if hostname.is_empty() {
+            hostname = match cmdline::Cmdline::default().get_param(SYSMASTER_HOSTNAME_KEY) {
+                None => {
                     log::warn!(
-                        "Failed to get proc cmdline by key {}: {}",
-                        SYSMASTER_HOSTNAME_KEY,
-                        e
+                        "Failed to get proc cmdline by key {}.",
+                        SYSMASTER_HOSTNAME_KEY
                     );
-                    None
+                    "".to_string()
                 }
-                Ok(hostname) => hostname.and_then(|hostname| Hostname::from_string(&hostname)),
-            },
-            |hostname| Hostname::from_string(&hostname),
-        )
+                Some(h) => h,
+            };
+        }
+        Hostname::from_string(&hostname)
     }
 
     fn from_etc_hostname() -> Option<Self> {

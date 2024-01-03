@@ -30,7 +30,7 @@
 //!
 //!  Set the trigger precision of the timer
 //!
-//!  OnActiveSec、 OnBootSec、 OnStartupSec、 OnUnitActiveSec、 OnUnitInactiveSec
+//!  OnActiveSec,OnBootSec,OnStartupSec,OnUnitActiveSec,OnUnitInactiveSec
 //!
 //!  Defines a monotone timer relative to a period of time after a specific point in time
 //!

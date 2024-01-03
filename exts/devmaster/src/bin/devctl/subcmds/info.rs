@@ -14,7 +14,7 @@
 
 use crate::subcmds::utils;
 use crate::Result;
-use basic::fd_util::{dot_or_dot_dot, xopendirat};
+use basic::fd::{dot_or_dot_dot, xopendirat};
 use device::{device_enumerator::DeviceEnumerator, Device};
 use nix::dir::Dir;
 use nix::fcntl::{AtFlags, OFlag};

@@ -13,7 +13,7 @@
 //! job queue
 //!
 use crate::{error::*, framework::*};
-use basic::fs_util::touch_file;
+use basic::fs::touch_file;
 use device::device::Device;
 use event::Events;
 use nix::unistd::unlink;

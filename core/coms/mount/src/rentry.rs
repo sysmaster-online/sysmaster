@@ -242,7 +242,7 @@ pub struct SectionMount {
     pub Group: String,
     #[entry(default = String::from("0022"))]
     pub UMask: String,
-    #[entry(parser = basic::fs_util::parse_pathbuf)]
+    #[entry(parser = basic::fs::parse_pathbuf)]
     pub RootDirectory: Option<PathBuf>,
     #[entry(default = WorkingDirectory::default(), parser = core::exec::parse_working_directory)]
     pub WorkingDirectory: WorkingDirectory,

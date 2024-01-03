@@ -1725,7 +1725,7 @@ impl RuleToken {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use basic::fs_util::touch_file;
+    use basic::fs::touch_file;
     use log::init_log;
     use log::Level;
 

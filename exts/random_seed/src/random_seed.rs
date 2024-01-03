@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use basic::io_util::loop_read;
+use basic::io::loop_read;
 use nix::ioctl_write_ptr;
 use std::alloc::{alloc, dealloc, Layout};
 use std::ffi::CString;

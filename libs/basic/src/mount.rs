@@ -20,7 +20,7 @@ use std::{
 
 use crate::{
     error::*,
-    fs_util::{chase_symlink, is_symlink},
+    fs::{chase_symlink, is_symlink},
 };
 use nix::{
     fcntl::AtFlags,

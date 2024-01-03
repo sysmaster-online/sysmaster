@@ -256,6 +256,7 @@ impl ShowTable {
         }
         self.lines.push(line);
     }
+
     /// Set all cells's alignment to left
     pub fn set_all_cell_align_left(&mut self) {
         for i in 0..self.lines.len() {
@@ -264,6 +265,7 @@ impl ShowTable {
             }
         }
     }
+
     /// Set all cell's alignment to right
     pub fn set_all_cell_align_right(&mut self) {
         for i in 0..self.lines.len() {
@@ -272,6 +274,7 @@ impl ShowTable {
             }
         }
     }
+
     /// Set all cells' alignment to center
     pub fn set_all_cell_align_center(&mut self) {
         for i in 0..self.lines.len() {
@@ -280,12 +283,14 @@ impl ShowTable {
             }
         }
     }
+
     /// Set a certain row's alignment
     pub fn set_one_row_align(&mut self, i: usize, align: CellAlign) {
         for j in 0..self.lines[i].cells.len() {
             self.lines[i].cells[j].align = align;
         }
     }
+
     /// Set current row's alignment
     ///
     /// This is useful when one add a new line, and wants to change its format immediately.
@@ -299,16 +304,19 @@ impl ShowTable {
             self.lines[total_line - 1].cells[j].align = align;
         }
     }
+
     /// Set a certain column's alignment
     pub fn set_one_col_align(&mut self, j: usize, align: CellAlign) {
         for i in 0..self.lines.len() {
             self.lines[i].cells[j].align = align;
         }
     }
+
     /// Set a cell's alignment
     pub fn set_one_cell_align(&mut self, i: usize, j: usize, align: CellAlign) {
         self.lines[i].cells[j].align = align;
     }
+
     /// Set all cells' split space
     pub fn set_all_cell_space(&mut self, left_space: bool, right_space: bool) {
         for i in 0..self.lines.len() {
@@ -318,6 +326,7 @@ impl ShowTable {
             }
         }
     }
+
     /// Set one row's split space
     pub fn set_one_row_space(&mut self, i: usize, left_space: bool, right_space: bool) {
         for j in 0..self.lines[i].cells.len() {
@@ -325,6 +334,7 @@ impl ShowTable {
             self.lines[i].cells[j].right_space = right_space;
         }
     }
+
     /// Set one column's split space
     pub fn set_one_col_space(&mut self, j: usize, left_space: bool, right_space: bool) {
         for i in 0..self.lines.len() {
@@ -332,11 +342,13 @@ impl ShowTable {
             self.lines[i].cells[j].right_space = right_space;
         }
     }
+
     /// Set one cell's split space
     pub fn set_one_cell_space(&mut self, i: usize, j: usize, left_space: bool, right_space: bool) {
         self.lines[i].cells[j].left_space = left_space;
         self.lines[i].cells[j].right_space = right_space;
     }
+
     /// Set all cells' underline
     pub fn set_all_cell_underline(&mut self, use_underline: bool) {
         for i in 0..self.lines.len() {
@@ -345,12 +357,14 @@ impl ShowTable {
             }
         }
     }
+
     /// Set one row's underline
     pub fn set_one_row_underline(&mut self, i: usize, use_underline: bool) {
         for j in 0..self.lines[i].cells.len() {
             self.lines[i].cells[j].underline = use_underline;
         }
     }
+
     /// Set the current row's underline
     pub fn set_current_row_underline(&mut self, use_underline: bool) {
         let total_line = self.lines.len();
@@ -362,16 +376,19 @@ impl ShowTable {
             self.lines[total_line - 1].cells[j].underline = use_underline;
         }
     }
+
     /// Set one column's underline
     pub fn set_one_col_underline(&mut self, j: usize, use_underline: bool) {
         for i in 0..self.lines.len() {
             self.lines[i].cells[j].underline = use_underline;
         }
     }
+
     /// Set one cell's underline
     pub fn set_one_cell_underline(&mut self, i: usize, j: usize, use_underline: bool) {
         self.lines[i].cells[j].underline = use_underline;
     }
+
     /// Set all cells' color
     pub fn set_all_cell_color(&mut self, color: CellColor) {
         for i in 0..self.lines.len() {
@@ -380,12 +397,14 @@ impl ShowTable {
             }
         }
     }
+
     /// Set one row's color
     pub fn set_one_row_color(&mut self, i: usize, color: CellColor) {
         for j in 0..self.lines[i].cells.len() {
             self.lines[i].cells[j].color = color;
         }
     }
+
     /// Set current row's color
     pub fn set_current_row_color(&mut self, color: CellColor) {
         let total_line = self.lines.len();
@@ -397,12 +416,14 @@ impl ShowTable {
             self.lines[total_line - 1].cells[j].color = color;
         }
     }
+
     /// Set one column's color
     pub fn set_one_col_color(&mut self, j: usize, color: CellColor) {
         for i in 0..self.lines.len() {
             self.lines[i].cells[j].color = color;
         }
     }
+
     /// Set one cell's color
     pub fn set_one_cell_color(&mut self, i: usize, j: usize, color: CellColor) {
         self.lines[i].cells[j].color = color;

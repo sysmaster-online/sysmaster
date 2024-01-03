@@ -16,7 +16,7 @@ use super::comm::ServiceUnitComm;
 use super::config::ServiceConfig;
 use super::pid::ServicePid;
 use super::rentry::ServiceType;
-use basic::fd_util;
+use basic::fd;
 use core::error::*;
 use core::exec::{ExecCommand, ExecContext, ExecFlags, ExecParameters};
 use nix::unistd::Pid;
@@ -141,7 +141,7 @@ impl ServiceSpawn {
     }
 
     pub(super) fn release_socket_fd(&self, fd: i32) {
-        fd_util::close(fd);
+        fd::close(fd);
         *self.socket_fd.borrow_mut() = -1;
     }
 }

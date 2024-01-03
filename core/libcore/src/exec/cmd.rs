@@ -14,8 +14,8 @@ use crate::serialize::DeserializeWith;
 use crate::specifier::{
     unit_string_specifier_escape, unit_strings_specifier_escape, UnitSpecifierData,
 };
-use basic::fs_util::{path_is_abosolute, path_simplify};
-use basic::{fs_util::parse_absolute_path, Error, Result};
+use basic::fs::{path_is_abosolute, path_simplify};
+use basic::{fs::parse_absolute_path, Error, Result};
 use bitflags::bitflags;
 use serde::{
     de::{self, Unexpected},

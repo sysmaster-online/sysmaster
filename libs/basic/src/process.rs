@@ -10,9 +10,9 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//!
+//! process functions
 use crate::error::*;
-use crate::fs_util;
+use crate::fs;
 use nix::errno::errno;
 use nix::errno::Errno;
 use nix::libc::{kill, ESRCH};
@@ -28,7 +28,17 @@ use std::time::{Duration, SystemTime};
 const PROCESS_FLAG_POS: usize = 8;
 const PF_KTHREAD: u64 = 0x00200000;
 
+/// The `process_state` function in Rust reads the state of a process from the `/proc` filesystem and
+/// returns the first character of the process state.
 ///
+/// Arguments:
+///
+/// * `pid`: The `pid` parameter is of type `Pid`, which represents a process ID. It is used to identify
+/// a specific process for which we want to retrieve the process state.
+///
+/// Returns:
+///
+/// The function `process_state` returns a `Result<char>`.
 pub fn process_state(pid: Pid) -> Result<char> {
     if pid == Pid::from_raw(0) || pid == nix::unistd::getpid() {
         return Ok('R');
@@ -36,7 +46,7 @@ pub fn process_state(pid: Pid) -> Result<char> {
 
     let proc_file = format!("/proc/{:?}/stat", pid.as_raw());
     let stat_path = Path::new(&proc_file);
-    let first_line = fs_util::read_first_line(stat_path)?;
+    let first_line = fs::read_first_line(stat_path)?;
     let stat: Vec<String> = first_line
         .split_whitespace()
         .map(|s| s.to_string())
@@ -58,7 +68,16 @@ pub fn process_state(pid: Pid) -> Result<char> {
     Ok(p_stat[0])
 }
 
+/// The `alive` function in Rust checks if a process with a given PID is alive or not.
 ///
+/// Arguments:
+///
+/// * `pid`: The `pid` parameter in the `alive` function is of type `Pid`. It represents the process ID
+/// of a process.
+///
+/// Returns:
+///
+/// a boolean value.
 pub fn alive(pid: Pid) -> bool {
     if pid < Pid::from_raw(0) {
         return false;
@@ -83,7 +102,15 @@ pub fn alive(pid: Pid) -> bool {
     true
 }
 
+/// The function `valid_pid` checks if a given process ID (`pid`) is valid or not.
 ///
+/// Arguments:
+///
+/// * `pid`: The `pid` parameter is of type `Pid`.
+///
+/// Returns:
+///
+/// a boolean value.
 pub fn valid_pid(pid: Pid) -> bool {
     if pid <= Pid::from_raw(0) {
         return false;
@@ -92,7 +119,20 @@ pub fn valid_pid(pid: Pid) -> bool {
     true
 }
 
+/// The function `kill_all_pids` in Rust iterates through the `/proc` directory and kills all processes
+/// by sending a specified signal, returning a set of the killed process IDs.
 ///
+/// Arguments:
+///
+/// * `signal`: The `signal` parameter is an integer representing the signal that will be sent to each
+/// process. Signals are used in Unix-like operating systems to communicate with processes and can be
+/// used for various purposes such as terminating a process, interrupting a process, or requesting a
+/// process to reload its configuration.
+///
+/// Returns:
+///
+/// The function `kill_all_pids` returns a `HashSet` containing the PIDs (Process IDs) of the processes
+/// that were killed.
 pub fn kill_all_pids(signal: i32) -> HashSet<i32> {
     let mut pids: HashSet<i32> = HashSet::new();
     let proc_path = Path::new("/proc");
@@ -123,7 +163,18 @@ pub fn kill_all_pids(signal: i32) -> HashSet<i32> {
     pids
 }
 
+/// The `wait_pids` function waits for a set of process IDs to be killed either by the kernel or by
+/// sending a signal, with a specified timeout.
 ///
+/// Arguments:
+///
+/// * `pids`: A HashSet of process IDs (pids) that need to be waited for.
+/// * `timeout`: The `timeout` parameter is the maximum amount of time (in microseconds) to wait for the
+/// processes to be killed.
+///
+/// Returns:
+///
+/// The function `wait_pids` returns a `HashSet<i32>`.
 pub fn wait_pids(mut pids: HashSet<i32>, timeout: u64) -> HashSet<i32> {
     let now = SystemTime::now();
     let until = now + Duration::from_micros(timeout);
@@ -234,7 +285,7 @@ fn is_kernel_thread(pid: Pid) -> Result<bool> {
         });
     }
 
-    let first_line = fs_util::read_first_line(Path::new(&format!("/proc/{}/stat", pid.as_raw())))?;
+    let first_line = fs::read_first_line(Path::new(&format!("/proc/{}/stat", pid.as_raw())))?;
     let stat: Vec<String> = first_line
         .split_whitespace()
         .map(|s| s.to_string())

@@ -40,7 +40,7 @@ use crate::manager::config::ManagerConfig;
 use crate::manager::signals::EVENT_SIGNALS;
 use crate::manager::{Action, Manager, Mode, MANAGER_ARGS_SIZE_MAX};
 use crate::mount::setup;
-use basic::{machine, machine::Machine, mount_util::read_lines, FSTAB_PATH, MOUNT_BIN};
+use basic::{machine, machine::Machine, mount::read_lines, FSTAB_PATH, MOUNT_BIN};
 use clap::Parser;
 use constants::LOG_FILE_PATH;
 use core::error::*;

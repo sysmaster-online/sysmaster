@@ -25,7 +25,7 @@ pub(crate) mod signals;
 use self::config::ManagerConfig;
 use crate::unit::UnitManagerX;
 use alive_timer::AliveTimer;
-use basic::fs_util::LookupPaths;
+use basic::fs::LookupPaths;
 use basic::process::{self};
 use basic::{CGROUP_SYSMASTER, MULTI_USER_TARGET};
 use cgroup::CgController;
@@ -488,7 +488,7 @@ impl Manager {
     fn run_generators(&self) {
         let paths = vec!["/usr/lib/sysmaster/system-generators"];
 
-        if let Err(err) = basic::exec_util::execute_directories(paths) {
+        if let Err(err) = basic::exec::execute_directories(paths) {
             log::error!("run generators err: {}", err);
         }
     }

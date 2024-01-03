@@ -10,8 +10,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use basic::fs_util::{self, is_symlink};
-use basic::{do_entry_log, socket_util};
+use basic::do_entry_log;
+use basic::fs::{self, is_symlink};
 use cmdproto::proto::execute::ExecuterAction;
 use cmdproto::proto::ProstServerStream;
 use core::rel::{ReliLastFrame, Reliability};
@@ -41,7 +41,7 @@ where
         let sctl_socket_path = Path::new(SCTL_SOCKET);
         let run_sysmaster = sctl_socket_path.parent().unwrap();
         if run_sysmaster.exists() {
-            let _ = fs_util::chmod("/run/sysmaster", 0o755);
+            let _ = fs::chmod("/run/sysmaster", 0o755);
         }
         /* remove the old socket if it exists */
         if sctl_socket_path.exists() && !is_symlink(sctl_socket_path) {
@@ -56,7 +56,7 @@ where
         )
         .unwrap();
         /* set SO_PASSCRED, we need it to check whether sctl is running under root */
-        socket_util::set_pass_cred(socket_fd, true).unwrap();
+        basic::socket::set_pass_cred(socket_fd, true).unwrap();
         /* create the socket with mode 666 */
         let old_mask = stat::umask(stat::Mode::from_bits_truncate(!0o666));
         match socket::bind(socket_fd, &sctl_socket_addr) {
@@ -97,7 +97,7 @@ where
             Ok(_) => (),
             Err(e) => log::error!("Commands failed: {:?}", e),
         }
-        basic::fd_util::close(client);
+        basic::fd::close(client);
         0
     }
 }

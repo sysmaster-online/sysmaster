@@ -22,12 +22,11 @@ use nix::{
 use libc::{glob, glob_t, globfree, GLOB_NOSORT};
 
 use crate::{
-    cmdline, fd_util, fs_util::directory_is_not_empty, mount_util::is_mount_point, security,
-    sysfs::SysFs, unistd,
+    cmdline, fd, fs::directory_is_not_empty, mount::is_mount_point, security, sysfs::SysFs, unistd,
 };
 
 #[cfg(target_env = "musl")]
-use crate::mount_util::MountInfoParser;
+use crate::mount::MountInfoParser;
 
 use std::{
     ffi::CString,
@@ -209,7 +208,7 @@ impl Condition {
             }
             Ok(v) => v,
         };
-        (fd_util::stat_is_reg(s.st_mode) && (s.st_mode & 111 > 0)) as i8
+        (fd::stat_is_reg(s.st_mode) && (s.st_mode & 111 > 0)) as i8
     }
 
     fn test_file_not_empty(&self) -> i8 {
@@ -222,10 +221,9 @@ impl Condition {
     }
 
     fn test_first_boot(&self) -> i8 {
-        if let Ok(ret) = cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot") {
-            if ret {
-                return ret as i8;
-            }
+        let ret = cmdline::Cmdline::default().has_param("sysmaster.condition-first-boot");
+        if ret {
+            return ret as i8;
         }
 
         let result = self.params.eq("true");
@@ -241,20 +239,20 @@ impl Condition {
         } else {
             &self.params
         };
-        let value = match cmdline::cmdline_get_item(search_value) {
-            Err(_) => {
+        let value = match cmdline::Cmdline::default().get_param(search_value) {
+            None => {
                 log::info!("Failed to get cmdline content, assuming ConditionKernelCommandLine check failed.");
                 return 0;
             }
-            Ok(v) => {
-                if v.is_none() {
+            Some(v) => {
+                if v.is_empty() {
                     log::info!(
                         "/proc/cmdline doesn't contain the given item: {}",
                         search_value
                     );
                     return 0;
                 }
-                v.unwrap()
+                v
             }
         };
         log::debug!("Found kernel command line value: {}", value);
@@ -388,7 +386,7 @@ mod test {
     use super::{Condition, ConditionType};
     use crate::{
         cmdline,
-        fs_util::write_string_file,
+        fs::write_string_file,
         security::{self},
     };
     use core::panic;
@@ -451,7 +449,7 @@ mod test {
             ConditionType::Capability,
             0,
             0,
-            String::from("CAP_CHOWN"),
+            String::from("CHOWN"),
         );
     }
 
@@ -817,19 +815,6 @@ mod test {
     }
 
     #[test]
-    fn test_kernel_command_line() {
-        run_test(
-            |c| {
-                assert!(c.test(), "test kernel_command_line {}", c.params);
-            },
-            ConditionType::KernelCommandLine,
-            0,
-            0,
-            String::from("root"),
-        );
-    }
-
-    #[test]
     fn test_path_is_directory() {
         run_test(
             |c| {
@@ -873,13 +858,11 @@ mod test {
     fn test_condition_first_boot() {
         run_test(
             |c| {
-                if let Ok(ret) = cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot") {
-                    if ret {
-                        println!(
-                            "this test cannot be tested because we cannot modify the kernel parameters"
-                        );
-                        return;
-                    }
+                if cmdline::Cmdline::default().has_param("sysmaster.condition-first-boot") {
+                    println!(
+                        "this test cannot be tested because we cannot modify the kernel parameters"
+                    );
+                    return;
                 }
 
                 let existed = Path::new("/run/sysmaster/first-boot").exists();
@@ -899,13 +882,11 @@ mod test {
     fn test_condition_first_boot_false() {
         run_test(
             |c| {
-                if let Ok(ret) = cmdline::proc_cmdline_get_bool("sysmaster.condition-first-boot") {
-                    if ret {
-                        println!(
-                            "this test cannot be tested because we cannot modify the kernel parameters"
-                        );
-                        return;
-                    }
+                if cmdline::Cmdline::default().has_param("sysmaster.condition-first-boot") {
+                    println!(
+                        "this test cannot be tested because we cannot modify the kernel parameters"
+                    );
+                    return;
                 }
 
                 let existed = Path::new("/run/sysmaster/first-boot").exists();

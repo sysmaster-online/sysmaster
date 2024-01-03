@@ -22,7 +22,7 @@ features = [
     "security",
     "mount",
     "machine",
-    "exec_util",
+    "exec",
     "unit_name",
 ]
 optional = false

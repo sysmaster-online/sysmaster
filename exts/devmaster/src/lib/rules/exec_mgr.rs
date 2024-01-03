@@ -26,10 +26,7 @@ use crate::{
     rules::*,
     utils::{commons::*, spawn::*},
 };
-use basic::{
-    cmdline::cmdline_get_item, fs_util::write_string_file, naming_scheme::*, parse::parse_mode,
-    unistd::*,
-};
+use basic::{fs::write_string_file, naming_scheme::*, parse::parse_mode, unistd::*};
 use device::{Device, DeviceAction};
 use fnmatch_sys::fnmatch;
 use libc::{gid_t, mode_t, uid_t};
@@ -905,17 +902,8 @@ impl ExecuteManager {
                 Ok(token.read().unwrap().as_ref().unwrap().op == OperatorType::Match)
             }
             MatchImportCmdline => {
-                let s = cmdline_get_item(&token_value).map_err(|e| {
-                    log_rule_token!(error, token.read().unwrap().as_ref().unwrap(), e);
-                    Error::RulesExecuteError {
-                        msg: format!(
-                            "Apply '{}' failed: {}",
-                            token.read().unwrap().as_ref().unwrap(),
-                            e
-                        ),
-                        errno: Errno::EINVAL,
-                    }
-                })?;
+                let cmdline = basic::cmdline::Cmdline::default();
+                let s = cmdline.get_param(&token_value);
 
                 if s.is_none() {
                     return Ok(token.read().unwrap().as_ref().unwrap().op == OperatorType::Nomatch);

@@ -13,7 +13,7 @@
 //!
 
 use basic::{
-    id128_util,
+    id128,
     machine::{self, machine_id_setup},
 };
 use nix::{Error, Result};
@@ -48,9 +48,9 @@ fn main() -> Result<()> {
     if args.contains(&String::from("--commit")) {
         let etc_machine_id = "/etc/machine-id".to_string();
         machine::machine_id_commit()?;
-        id = match id128_util::id128_read_by_path(
+        id = match id128::id128_read_by_path(
             Path::new(&etc_machine_id),
-            id128_util::Id128FormatFlag::ID128_FORMAT_PLAIN,
+            id128::Id128FormatFlag::ID128_FORMAT_PLAIN,
         ) {
             Ok(id) => id,
             Err(e) => {

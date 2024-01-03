@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//!
+//! id128 functions
 use bitflags::bitflags;
 use nix::{errno::Errno, fcntl, fcntl::OFlag, sys::stat::Mode, unistd};
 use rand::Rng;
@@ -205,7 +205,18 @@ pub fn id128_write(p: &Path, f_sync: &bool, id128: &str, f: Id128FormatFlag) -> 
     Ok(())
 }
 
+/// The function generates a random string of hexadecimal characters and converts it to a UUID format if
+/// specified.
 ///
+/// Arguments:
+///
+/// * `f`: The parameter `f` is of type `Id128FormatFlag`, which is an enum representing the formatting
+/// options for the generated ID. It is used to determine whether the generated ID should be in UUID
+/// format or not.
+///
+/// Returns:
+///
+/// a `nix::Result<String>`.
 pub fn id128_randomize(f: Id128FormatFlag) -> nix::Result<String> {
     let mut rng = rand::thread_rng();
     let mut ret: String = String::new();

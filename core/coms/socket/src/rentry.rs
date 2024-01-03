@@ -32,11 +32,10 @@ const RELI_LAST_KEY: u32 = 0; // singleton
 fn parse_pathbuf_vec(s: &str) -> Result<Vec<PathBuf>, core::error::Error> {
     let mut res = Vec::new();
     for v in s.split_ascii_whitespace() {
-        let path = basic::fs_util::parse_absolute_path(v).map_err(|_| {
-            core::error::Error::ConfigureError {
+        let path =
+            basic::fs::parse_absolute_path(v).map_err(|_| core::error::Error::ConfigureError {
                 msg: "Invalid PathBuf".to_string(),
-            }
-        })?;
+            })?;
         res.push(PathBuf::from(path));
     }
     Ok(res)

@@ -11,9 +11,9 @@
 // See the Mulan PSL v2 for more details.
 
 //!  The core logic of the mount subclass
-use basic::fs_util::{directory_is_empty, mkdir_p_label};
-use basic::mount_util::filter_options;
-use basic::time_util::USEC_PER_SEC;
+use basic::fs::{directory_is_empty, mkdir_p_label};
+use basic::mount::filter_options;
+use basic::time::USEC_PER_SEC;
 use basic::{MOUNT_BIN, UMOUNT_BIN};
 use event::{EventState, Events};
 use event::{EventType, Source};

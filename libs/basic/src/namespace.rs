@@ -58,6 +58,13 @@ pub fn detach_mount_namespace() -> Result<()> {
     )
 }
 
+/// The function `reset_uid_gid` resets the user and group IDs to root (0) in Rust.
+///
+/// Returns:
+///
+/// The function `reset_uid_gid()` returns a `Result` type. If the function executes successfully, it
+/// returns `Ok(())`, indicating that there was no error. If there is an error during execution, it
+/// returns `Err(Errno::EIO)`, indicating an input/output error.
 fn reset_uid_gid() -> Result<()> {
     match fs::read("/proc/self/setgroups") {
         Ok(s) => {
@@ -80,6 +87,19 @@ fn reset_uid_gid() -> Result<()> {
 }
 
 ///
+/// The function `namespace_enter` enters a namespace specified by a file descriptor and clone flags,
+/// and then resets the user and group IDs.
+///
+/// Arguments:
+///
+/// * `fd`: A reference to a RawFd, which is a file descriptor.
+/// * `f`: The parameter `f` is of type `sched::CloneFlags`. It is used to specify the behavior of the
+/// `setns` function. `sched::CloneFlags` is an enum that represents various flags that can be passed to
+/// the `setns` function.
+///
+/// Returns:
+///
+/// a `Result<()>`.
 pub fn namespace_enter(fd: &RawFd, f: sched::CloneFlags) -> Result<()> {
     sched::setns(*fd, f)?;
     reset_uid_gid()

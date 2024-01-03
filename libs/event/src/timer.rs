@@ -17,7 +17,7 @@ use std::{
 };
 
 use crate::{EventType, Source};
-use basic::time_util::{NSEC_PER_SEC, NSEC_PER_USEC, USEC_INFINITY, USEC_PER_SEC};
+use basic::time::{NSEC_PER_SEC, NSEC_PER_USEC, USEC_INFINITY, USEC_PER_SEC};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Timestamp {

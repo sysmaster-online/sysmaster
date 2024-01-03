@@ -116,9 +116,9 @@ impl Display for NamingScheme {
 
 /// get the naming scheme according to cmdline and environment variables
 pub fn naming_scheme() -> NamingScheme {
-    let cmdline_value = cmdline::cmdline_get_value("net.naming-scheme")
-        .unwrap_or(None)
-        .unwrap_or_default();
+    let cmdline_value = cmdline::Cmdline::default()
+        .get_param("net.naming-scheme")
+        .unwrap_or_else(|| "".to_string());
 
     /*
      * Environment variable 'NET_NAMING_SCHEME' is prior to cmdline parameter 'net.naming-scheme',
@@ -150,7 +150,7 @@ pub fn naming_scheme() -> NamingScheme {
 
 /// check whether the naming scheme is enabled
 pub fn naming_scheme_enabled() -> bool {
-    if let Ok(Some(v)) = cmdline::cmdline_get_value("net.ifnames") {
+    if let Some(v) = cmdline::Cmdline::default().get_param("net.ifnames") {
         if ["0", "false"].contains(&v.as_str()) {
             return false;
         }
@@ -182,9 +182,8 @@ mod tests {
         env::set_var("NET_NAMING_SCHEME", "0");
         assert_eq!(naming_scheme(), NamingScheme::V000);
 
-        let cmdline_value = cmdline::cmdline_get_value("net.naming-scheme")
-            .unwrap_or(None)
-            .unwrap_or_default();
+        let cmdline = cmdline::Cmdline::default();
+        let cmdline_value = cmdline.get_param("net.naming-scheme").unwrap_or_default();
 
         let scheme = cmdline_value
             .parse::<NamingScheme>()
@@ -202,7 +201,7 @@ mod tests {
     #[test]
     fn test_naming_scheme_enabled() {
         let ret = naming_scheme_enabled();
-        if let Ok(Some(v)) = cmdline::cmdline_get_value("net.ifnames") {
+        if let Some(v) = cmdline::Cmdline::default().get_param("net.ifnames") {
             if ["0", "false"].contains(&v.as_str()) {
                 assert!(!ret);
             } else {

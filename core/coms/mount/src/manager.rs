@@ -12,13 +12,13 @@
 
 #[cfg(feature = "plugin")]
 use crate::base::PLUGIN_NAME;
-use basic::fs_util::is_path;
+use basic::fs::is_path;
 #[cfg(feature = "plugin")]
 use constants::LOG_FILE_PATH;
 
 use super::comm::MountUmComm;
 use super::rentry::{MountRe, MountReFrame};
-use basic::mount_util::{mount_point_to_unit_name, MountInfoParser};
+use basic::mount::{mount_point_to_unit_name, MountInfoParser};
 use core::error::*;
 use core::rel::{ReStation, ReliLastFrame, Reliability};
 use core::unit::{unit_name_is_valid, UmIf, UnitManagerObj, UnitMngUtil, UnitNameFlags, UnitType};

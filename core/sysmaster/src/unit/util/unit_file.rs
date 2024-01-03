@@ -10,9 +10,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use basic::fs_util;
-use basic::fs_util::is_symlink;
-use basic::fs_util::LookupPaths;
+use basic::fs::is_symlink;
+use basic::fs::LookupPaths;
 use core::unit::unit_name_is_valid;
 use core::unit::UnitNameFlags;
 use siphasher::sip::SipHasher24;
@@ -177,7 +176,7 @@ impl UnitFileData {
             }
 
             let file_name = de.file_name().unwrap().to_string_lossy().to_string();
-            let target_path = match fs_util::chase_symlink(&de) {
+            let target_path = match basic::fs::chase_symlink(&de) {
                 Err(e) => {
                     log::debug!("Failed to get the symlink of {:?}: {}, ignoring.", de, e);
                     continue;

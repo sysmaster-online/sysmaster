@@ -19,7 +19,7 @@
 //! # limit
 //! 1. The current device only supports configuration as full directory or UUID.
 
-use basic::mount_util::{is_mount_point, is_swap};
+use basic::mount::{is_mount_point, is_swap};
 use basic::{FSTAB_PATH, MOUNT_BIN, SWAP_BIN};
 use inotify::{EventMask, Inotify, WatchMask};
 use std::collections::HashSet;

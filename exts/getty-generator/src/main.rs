@@ -387,7 +387,7 @@ fn create_getty(tty_type: &str, tty: &str) -> io::Result<()> {
 }
 
 fn concat_from_symlink(file_name: &str) -> String {
-    basic::fs_util::LIB_SYSTEM_PATH.to_string() + "/" + file_name
+    basic::fs::LIB_SYSTEM_PATH.to_string() + "/" + file_name
 }
 
 fn concat_to_symlink(file_name: &str) -> String {

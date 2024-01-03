@@ -19,7 +19,7 @@ use super::runtime::UnitRT;
 use super::util::UnitFile;
 use super::util::{self};
 use crate::utils::table::{TableOp, TableSubscribe};
-use basic::fs_util::LookupPaths;
+use basic::fs::LookupPaths;
 use core::unit::{unit_name_is_valid, UnitNameFlags, UnitType};
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};

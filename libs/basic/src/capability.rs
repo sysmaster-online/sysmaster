@@ -10,141 +10,141 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//!
+//! Capability functions
 
 /// from <linux/capability.h>
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
 #[allow(non_camel_case_types)]
 #[repr(u8)]
 pub enum Capability {
-    /// `CAP_CHOWN` (from POSIX)
-    CAP_CHOWN = 0,
-    /// `CAP_DAC_OVERRIDE` (from POSIX)
-    CAP_DAC_OVERRIDE = 1,
-    /// `CAP_DAC_READ_SEARCH` (from POSIX)
-    CAP_DAC_READ_SEARCH = 2,
-    /// `CAP_FOWNER` (from POSIX)
-    CAP_FOWNER = 3,
-    /// `CAP_FSETID` (from POSIX)
-    CAP_FSETID = 4,
-    /// `CAP_KILL` (from POSIX)
-    CAP_KILL = 5,
-    /// `CAP_SETGID` (from POSIX)
-    CAP_SETGID = 6,
-    /// `CAP_SETUID` (from POSIX)
-    CAP_SETUID = 7,
-    /// `CAP_SETPCAP` (from Linux)
-    CAP_SETPCAP = 8,
+    /// `CHOWN` (from POSIX)
+    CHOWN = 0,
+    /// `DAC_OVERRIDE` (from POSIX)
+    DAC_OVERRIDE = 1,
+    /// `DAC_READ_SEARCH` (from POSIX)
+    DAC_READ_SEARCH = 2,
+    /// `FOWNER` (from POSIX)
+    FOWNER = 3,
+    /// `FSETID` (from POSIX)
+    FSETID = 4,
+    /// `KILL` (from POSIX)
+    KILL = 5,
+    /// `SETGID` (from POSIX)
+    SETGID = 6,
+    /// `SETUID` (from POSIX)
+    SETUID = 7,
+    /// `SETPCAP` (from Linux)
+    SETPCAP = 8,
     ///
-    CAP_LINUX_IMMUTABLE = 9,
+    LINUX_IMMUTABLE = 9,
     ///
-    CAP_NET_BIND_SERVICE = 10,
+    NET_BIND_SERVICE = 10,
     ///
-    CAP_NET_BROADCAST = 11,
+    NET_BROADCAST = 11,
     ///
-    CAP_NET_ADMIN = 12,
+    NET_ADMIN = 12,
     ///
-    CAP_NET_RAW = 13,
+    NET_RAW = 13,
     ///
-    CAP_IPC_LOCK = 14,
+    IPC_LOCK = 14,
     ///
-    CAP_IPC_OWNER = 15,
-    /// `CAP_SYS_MODULE` (from Linux)
-    CAP_SYS_MODULE = 16,
-    /// `CAP_SYS_RAWIO` (from Linux)
-    CAP_SYS_RAWIO = 17,
-    /// `CAP_SYS_CHROOT` (from Linux)
-    CAP_SYS_CHROOT = 18,
-    /// `CAP_SYS_PTRACE` (from Linux)
-    CAP_SYS_PTRACE = 19,
-    /// `CAP_SYS_PACCT` (from Linux)
-    CAP_SYS_PACCT = 20,
-    /// `CAP_SYS_ADMIN` (from Linux)
-    CAP_SYS_ADMIN = 21,
-    /// `CAP_SYS_BOOT` (from Linux)
-    CAP_SYS_BOOT = 22,
-    /// `CAP_SYS_NICE` (from Linux)
-    CAP_SYS_NICE = 23,
-    /// `CAP_SYS_RESOURCE` (from Linux)
-    CAP_SYS_RESOURCE = 24,
-    /// `CAP_SYS_TIME` (from Linux)
-    CAP_SYS_TIME = 25,
-    /// `CAP_SYS_TTY_CONFIG` (from Linux)
-    CAP_SYS_TTY_CONFIG = 26,
-    /// `CAP_SYS_MKNOD` (from Linux, >= 2.4)
-    CAP_MKNOD = 27,
-    /// `CAP_LEASE` (from Linux, >= 2.4)
-    CAP_LEASE = 28,
+    IPC_OWNER = 15,
+    /// `SYS_MODULE` (from Linux)
+    SYS_MODULE = 16,
+    /// `SYS_RAWIO` (from Linux)
+    SYS_RAWIO = 17,
+    /// `SYS_CHROOT` (from Linux)
+    SYS_CHROOT = 18,
+    /// `SYS_PTRACE` (from Linux)
+    SYS_PTRACE = 19,
+    /// `SYS_PACCT` (from Linux)
+    SYS_PACCT = 20,
+    /// `SYS_ADMIN` (from Linux)
+    SYS_ADMIN = 21,
+    /// `SYS_BOOT` (from Linux)
+    SYS_BOOT = 22,
+    /// `SYS_NICE` (from Linux)
+    SYS_NICE = 23,
+    /// `SYS_RESOURCE` (from Linux)
+    SYS_RESOURCE = 24,
+    /// `SYS_TIME` (from Linux)
+    SYS_TIME = 25,
+    /// `SYS_TTY_CONFIG` (from Linux)
+    SYS_TTY_CONFIG = 26,
+    /// `SYS_MKNOD` (from Linux, >= 2.4)
+    MKNOD = 27,
+    /// `LEASE` (from Linux, >= 2.4)
+    LEASE = 28,
     ///
-    CAP_AUDIT_WRITE = 29,
-    /// `CAP_AUDIT_CONTROL` (from Linux, >= 2.6.11)
-    CAP_AUDIT_CONTROL = 30,
+    AUDIT_WRITE = 29,
+    /// `AUDIT_CONTROL` (from Linux, >= 2.6.11)
+    AUDIT_CONTROL = 30,
     ///
-    CAP_SETFCAP = 31,
+    SETFCAP = 31,
     ///
-    CAP_MAC_OVERRIDE = 32,
+    MAC_OVERRIDE = 32,
     ///
-    CAP_MAC_ADMIN = 33,
-    /// `CAP_SYSLOG` (from Linux, >= 2.6.37)
-    CAP_SYSLOG = 34,
-    /// `CAP_WAKE_ALARM` (from Linux, >= 3.0)
-    CAP_WAKE_ALARM = 35,
+    MAC_ADMIN = 33,
+    /// `SYSLOG` (from Linux, >= 2.6.37)
+    SYSLOG = 34,
+    /// `WAKE_ALARM` (from Linux, >= 3.0)
+    WAKE_ALARM = 35,
     ///
-    CAP_BLOCK_SUSPEND = 36,
-    /// `CAP_AUDIT_READ` (from Linux, >= 3.16).
-    CAP_AUDIT_READ = 37,
-    /// `CAP_PERFMON` (from Linux, >= 5.8).
-    CAP_PERFMON = 38,
-    /// `CAP_BPF` (from Linux, >= 5.8).
-    CAP_BPF = 39,
-    /// `CAP_CHECKPOINT_RESTORE` (from Linux, >= 5.9).
-    CAP_CHECKPOINT_RESTORE = 40,
+    BLOCK_SUSPEND = 36,
+    /// `AUDIT_READ` (from Linux, >= 3.16).
+    AUDIT_READ = 37,
+    /// `PERFMON` (from Linux, >= 5.8).
+    PERFMON = 38,
+    /// `BPF` (from Linux, >= 5.8).
+    BPF = 39,
+    /// `CHECKPOINT_RESTORE` (from Linux, >= 5.9).
+    CHECKPOINT_RESTORE = 40,
 }
 
 impl std::fmt::Display for Capability {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let name = match *self {
-            Capability::CAP_CHOWN => "CAP_CHOWN",
-            Capability::CAP_DAC_OVERRIDE => "CAP_DAC_OVERRIDE",
-            Capability::CAP_DAC_READ_SEARCH => "CAP_DAC_READ_SEARCH",
-            Capability::CAP_FOWNER => "CAP_FOWNER",
-            Capability::CAP_FSETID => "CAP_FSETID",
-            Capability::CAP_KILL => "CAP_KILL",
-            Capability::CAP_SETGID => "CAP_SETGID",
-            Capability::CAP_SETUID => "CAP_SETUID",
-            Capability::CAP_SETPCAP => "CAP_SETPCAP",
-            Capability::CAP_LINUX_IMMUTABLE => "CAP_LINUX_IMMUTABLE",
-            Capability::CAP_NET_BIND_SERVICE => "CAP_NET_BIND_SERVICE",
-            Capability::CAP_NET_BROADCAST => "CAP_NET_BROADCAST",
-            Capability::CAP_NET_ADMIN => "CAP_NET_ADMIN",
-            Capability::CAP_NET_RAW => "CAP_NET_RAW",
-            Capability::CAP_IPC_LOCK => "CAP_IPC_LOCK",
-            Capability::CAP_IPC_OWNER => "CAP_IPC_OWNER",
-            Capability::CAP_SYS_MODULE => "CAP_SYS_MODULE",
-            Capability::CAP_SYS_RAWIO => "CAP_SYS_RAWIO",
-            Capability::CAP_SYS_CHROOT => "CAP_SYS_CHROOT",
-            Capability::CAP_SYS_PTRACE => "CAP_SYS_PTRACE",
-            Capability::CAP_SYS_PACCT => "CAP_SYS_PACCT",
-            Capability::CAP_SYS_ADMIN => "CAP_SYS_ADMIN",
-            Capability::CAP_SYS_BOOT => "CAP_SYS_BOOT",
-            Capability::CAP_SYS_NICE => "CAP_SYS_NICE",
-            Capability::CAP_SYS_RESOURCE => "CAP_SYS_RESOURCE",
-            Capability::CAP_SYS_TIME => "CAP_SYS_TIME",
-            Capability::CAP_SYS_TTY_CONFIG => "CAP_SYS_TTY_CONFIG",
-            Capability::CAP_MKNOD => "CAP_MKNOD",
-            Capability::CAP_LEASE => "CAP_LEASE",
-            Capability::CAP_AUDIT_WRITE => "CAP_AUDIT_WRITE",
-            Capability::CAP_AUDIT_CONTROL => "CAP_AUDIT_CONTROL",
-            Capability::CAP_SETFCAP => "CAP_SETFCAP",
-            Capability::CAP_MAC_OVERRIDE => "CAP_MAC_OVERRIDE",
-            Capability::CAP_MAC_ADMIN => "CAP_MAC_ADMIN",
-            Capability::CAP_SYSLOG => "CAP_SYSLOG",
-            Capability::CAP_WAKE_ALARM => "CAP_WAKE_ALARM",
-            Capability::CAP_BLOCK_SUSPEND => "CAP_BLOCK_SUSPEND",
-            Capability::CAP_AUDIT_READ => "CAP_AUDIT_READ",
-            Capability::CAP_PERFMON => "CAP_PERFMON",
-            Capability::CAP_BPF => "CAP_BPF",
-            Capability::CAP_CHECKPOINT_RESTORE => "CAP_CHECKPOINT_RESTORE",
+            Capability::CHOWN => "CHOWN",
+            Capability::DAC_OVERRIDE => "DAC_OVERRIDE",
+            Capability::DAC_READ_SEARCH => "DAC_READ_SEARCH",
+            Capability::FOWNER => "FOWNER",
+            Capability::FSETID => "FSETID",
+            Capability::KILL => "KILL",
+            Capability::SETGID => "SETGID",
+            Capability::SETUID => "SETUID",
+            Capability::SETPCAP => "SETPCAP",
+            Capability::LINUX_IMMUTABLE => "LINUX_IMMUTABLE",
+            Capability::NET_BIND_SERVICE => "NET_BIND_SERVICE",
+            Capability::NET_BROADCAST => "NET_BROADCAST",
+            Capability::NET_ADMIN => "NET_ADMIN",
+            Capability::NET_RAW => "NET_RAW",
+            Capability::IPC_LOCK => "IPC_LOCK",
+            Capability::IPC_OWNER => "IPC_OWNER",
+            Capability::SYS_MODULE => "SYS_MODULE",
+            Capability::SYS_RAWIO => "SYS_RAWIO",
+            Capability::SYS_CHROOT => "SYS_CHROOT",
+            Capability::SYS_PTRACE => "SYS_PTRACE",
+            Capability::SYS_PACCT => "SYS_PACCT",
+            Capability::SYS_ADMIN => "SYS_ADMIN",
+            Capability::SYS_BOOT => "SYS_BOOT",
+            Capability::SYS_NICE => "SYS_NICE",
+            Capability::SYS_RESOURCE => "SYS_RESOURCE",
+            Capability::SYS_TIME => "SYS_TIME",
+            Capability::SYS_TTY_CONFIG => "SYS_TTY_CONFIG",
+            Capability::MKNOD => "MKNOD",
+            Capability::LEASE => "LEASE",
+            Capability::AUDIT_WRITE => "AUDIT_WRITE",
+            Capability::AUDIT_CONTROL => "AUDIT_CONTROL",
+            Capability::SETFCAP => "SETFCAP",
+            Capability::MAC_OVERRIDE => "MAC_OVERRIDE",
+            Capability::MAC_ADMIN => "MAC_ADMIN",
+            Capability::SYSLOG => "SYSLOG",
+            Capability::WAKE_ALARM => "WAKE_ALARM",
+            Capability::BLOCK_SUSPEND => "BLOCK_SUSPEND",
+            Capability::AUDIT_READ => "AUDIT_READ",
+            Capability::PERFMON => "PERFMON",
+            Capability::BPF => "BPF",
+            Capability::CHECKPOINT_RESTORE => "CHECKPOINT_RESTORE",
         };
         write!(f, "{}", name)
     }
@@ -155,47 +155,47 @@ impl std::str::FromStr for Capability {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "CAP_CHOWN" => Ok(Capability::CAP_CHOWN),
-            "CAP_DAC_OVERRIDE" => Ok(Capability::CAP_DAC_OVERRIDE),
-            "CAP_DAC_READ_SEARCH" => Ok(Capability::CAP_DAC_READ_SEARCH),
-            "CAP_FOWNER" => Ok(Capability::CAP_FOWNER),
-            "CAP_FSETID" => Ok(Capability::CAP_FSETID),
-            "CAP_KILL" => Ok(Capability::CAP_KILL),
-            "CAP_SETGID" => Ok(Capability::CAP_SETGID),
-            "CAP_SETUID" => Ok(Capability::CAP_SETUID),
-            "CAP_SETPCAP" => Ok(Capability::CAP_SETPCAP),
-            "CAP_LINUX_IMMUTABLE" => Ok(Capability::CAP_LINUX_IMMUTABLE),
-            "CAP_NET_BIND_SERVICE" => Ok(Capability::CAP_NET_BIND_SERVICE),
-            "CAP_NET_BROADCAST" => Ok(Capability::CAP_NET_BROADCAST),
-            "CAP_NET_ADMIN" => Ok(Capability::CAP_NET_ADMIN),
-            "CAP_NET_RAW" => Ok(Capability::CAP_NET_RAW),
-            "CAP_IPC_LOCK" => Ok(Capability::CAP_IPC_LOCK),
-            "CAP_IPC_OWNER" => Ok(Capability::CAP_IPC_OWNER),
-            "CAP_SYS_MODULE" => Ok(Capability::CAP_SYS_MODULE),
-            "CAP_SYS_RAWIO" => Ok(Capability::CAP_SYS_RAWIO),
-            "CAP_SYS_CHROOT" => Ok(Capability::CAP_SYS_CHROOT),
-            "CAP_SYS_PTRACE" => Ok(Capability::CAP_SYS_PTRACE),
-            "CAP_SYS_PACCT" => Ok(Capability::CAP_SYS_PACCT),
-            "CAP_SYS_ADMIN" => Ok(Capability::CAP_SYS_ADMIN),
-            "CAP_SYS_BOOT" => Ok(Capability::CAP_SYS_BOOT),
-            "CAP_SYS_NICE" => Ok(Capability::CAP_SYS_NICE),
-            "CAP_SYS_RESOURCE" => Ok(Capability::CAP_SYS_RESOURCE),
-            "CAP_SYS_TIME" => Ok(Capability::CAP_SYS_TIME),
-            "CAP_SYS_TTY_CONFIG" => Ok(Capability::CAP_SYS_TTY_CONFIG),
-            "CAP_MKNOD" => Ok(Capability::CAP_MKNOD),
-            "CAP_LEASE" => Ok(Capability::CAP_LEASE),
-            "CAP_AUDIT_WRITE" => Ok(Capability::CAP_AUDIT_WRITE),
-            "CAP_AUDIT_CONTROL" => Ok(Capability::CAP_AUDIT_CONTROL),
-            "CAP_SETFCAP" => Ok(Capability::CAP_SETFCAP),
-            "CAP_MAC_OVERRIDE" => Ok(Capability::CAP_MAC_OVERRIDE),
-            "CAP_MAC_ADMIN" => Ok(Capability::CAP_MAC_ADMIN),
-            "CAP_SYSLOG" => Ok(Capability::CAP_SYSLOG),
-            "CAP_WAKE_ALARM" => Ok(Capability::CAP_WAKE_ALARM),
-            "CAP_BLOCK_SUSPEND" => Ok(Capability::CAP_BLOCK_SUSPEND),
-            "CAP_AUDIT_READ" => Ok(Capability::CAP_AUDIT_READ),
-            "CAP_PERFMON" => Ok(Capability::CAP_PERFMON),
-            "CAP_BPF" => Ok(Capability::CAP_BPF),
-            "CAP_CHECKPOINT_RESTORE" => Ok(Capability::CAP_CHECKPOINT_RESTORE),
+            "CHOWN" => Ok(Capability::CHOWN),
+            "DAC_OVERRIDE" => Ok(Capability::DAC_OVERRIDE),
+            "DAC_READ_SEARCH" => Ok(Capability::DAC_READ_SEARCH),
+            "FOWNER" => Ok(Capability::FOWNER),
+            "FSETID" => Ok(Capability::FSETID),
+            "KILL" => Ok(Capability::KILL),
+            "SETGID" => Ok(Capability::SETGID),
+            "SETUID" => Ok(Capability::SETUID),
+            "SETPCAP" => Ok(Capability::SETPCAP),
+            "LINUX_IMMUTABLE" => Ok(Capability::LINUX_IMMUTABLE),
+            "NET_BIND_SERVICE" => Ok(Capability::NET_BIND_SERVICE),
+            "NET_BROADCAST" => Ok(Capability::NET_BROADCAST),
+            "NET_ADMIN" => Ok(Capability::NET_ADMIN),
+            "NET_RAW" => Ok(Capability::NET_RAW),
+            "IPC_LOCK" => Ok(Capability::IPC_LOCK),
+            "IPC_OWNER" => Ok(Capability::IPC_OWNER),
+            "SYS_MODULE" => Ok(Capability::SYS_MODULE),
+            "SYS_RAWIO" => Ok(Capability::SYS_RAWIO),
+            "SYS_CHROOT" => Ok(Capability::SYS_CHROOT),
+            "SYS_PTRACE" => Ok(Capability::SYS_PTRACE),
+            "SYS_PACCT" => Ok(Capability::SYS_PACCT),
+            "SYS_ADMIN" => Ok(Capability::SYS_ADMIN),
+            "SYS_BOOT" => Ok(Capability::SYS_BOOT),
+            "SYS_NICE" => Ok(Capability::SYS_NICE),
+            "SYS_RESOURCE" => Ok(Capability::SYS_RESOURCE),
+            "SYS_TIME" => Ok(Capability::SYS_TIME),
+            "SYS_TTY_CONFIG" => Ok(Capability::SYS_TTY_CONFIG),
+            "MKNOD" => Ok(Capability::MKNOD),
+            "LEASE" => Ok(Capability::LEASE),
+            "AUDIT_WRITE" => Ok(Capability::AUDIT_WRITE),
+            "AUDIT_CONTROL" => Ok(Capability::AUDIT_CONTROL),
+            "SETFCAP" => Ok(Capability::SETFCAP),
+            "MAC_OVERRIDE" => Ok(Capability::MAC_OVERRIDE),
+            "MAC_ADMIN" => Ok(Capability::MAC_ADMIN),
+            "SYSLOG" => Ok(Capability::SYSLOG),
+            "WAKE_ALARM" => Ok(Capability::WAKE_ALARM),
+            "BLOCK_SUSPEND" => Ok(Capability::BLOCK_SUSPEND),
+            "AUDIT_READ" => Ok(Capability::AUDIT_READ),
+            "PERFMON" => Ok(Capability::PERFMON),
+            "BPF" => Ok(Capability::BPF),
+            "CHECKPOINT_RESTORE" => Ok(Capability::CHECKPOINT_RESTORE),
             _ => Err(crate::Error::Caps {
                 what: format!("invalid capability: {}", s),
             }),
@@ -204,13 +204,41 @@ impl std::str::FromStr for Capability {
 }
 
 impl Capability {
+    /// The `bitmask` function returns a bitmask where the bit at the position of `self` is set to 1 and
+    /// all other bits are set to 0.
     ///
+    /// Returns:
+    ///
+    /// The bitmask function returns a u64 value, which is the result of shifting 1u64 to the left by
+    /// the value of *self as u8.
     pub fn bitmask(&self) -> u64 {
         1u64 << (*self as u8)
     }
 
+    /// The function returns the index of a value as an unsigned 8-bit integer.
     ///
+    /// Returns:
+    ///
+    /// The index of the object, converted to an unsigned 8-bit integer.
     pub fn index(&self) -> u8 {
         *self as u8
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bitmask_test() {
+        let vec = Capability::WAKE_ALARM;
+
+        assert_eq!(vec.bitmask(), 1 << 35);
+    }
+
+    #[test]
+    fn index_test() {
+        let vec = Capability::WAKE_ALARM;
+
+        assert_eq!(vec.index(), 35);
     }
 }

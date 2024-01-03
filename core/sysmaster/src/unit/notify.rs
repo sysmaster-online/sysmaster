@@ -14,7 +14,7 @@ use super::datastore::UnitDb;
 use super::entry::UnitX;
 use super::rentry::UnitRe;
 use crate::job::JobManager;
-use basic::{fd_util, socket_util};
+use basic::fd;
 use core::error::*;
 use core::rel::{ReStation, ReliLastFrame, Reliability};
 use event::{EventState, EventType, Events, Source};
@@ -181,7 +181,7 @@ impl Notify {
             return Err(e);
         }
         socket::setsockopt(fd, sockopt::PassCred, &true)?;
-        if let Err(e) = socket_util::set_receive_buffer(fd, 1024 * 1014 * 8) {
+        if let Err(e) = basic::socket::set_receive_buffer(fd, 1024 * 1014 * 8) {
             log::error!("Failed to set the notify socket receive buffer: {}", e);
         }
 
@@ -294,7 +294,7 @@ fn notify_peek_pid(fd: RawFd, flags: MsgFlags) -> Result<libc::pid_t> {
     // get message information
     let (received_cred, received_fds) = notify_trans_recvmsg(&msgs);
     for fd in received_fds.iter() {
-        fd_util::close(*fd);
+        fd::close(*fd);
     }
 
     // check

@@ -171,7 +171,7 @@ impl Uuid {
 pub fn randomize() -> Result<Uuid, nix::Error> {
     let mut id = Uuid::new();
 
-    crate::random_util::random_bytes(&mut id.0);
+    crate::random::random_bytes(&mut id.0);
 
     /* Turn this into a valid v4 UUID, to be nice. Note that we
      * only guarantee this for newly generated UUIDs, not for

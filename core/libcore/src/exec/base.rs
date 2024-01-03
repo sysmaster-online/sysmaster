@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::error::*;
-use basic::fs_util::{path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify};
+use basic::fs::{path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify};
 use basic::rlimit;
 use bitflags::bitflags;
 use libc::EPERM;

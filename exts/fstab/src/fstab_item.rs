@@ -12,7 +12,7 @@
 
 //! fstab_item encapsulates six fields and status of /etc/fstab.
 
-use basic::mount_util::read_lines;
+use basic::mount::read_lines;
 
 /// FSTabItem structure
 pub struct FSTabItem {

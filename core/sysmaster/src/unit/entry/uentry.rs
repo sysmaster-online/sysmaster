@@ -22,7 +22,7 @@ use crate::unit::data::{DataManager, UnitState};
 use crate::unit::rentry::{UnitLoadState, UnitRe};
 use crate::unit::util::UnitFile;
 use basic::process::{self, my_child};
-use basic::time_util::{now_clockid, UnitTimeStamp};
+use basic::time::{now_clockid, UnitTimeStamp};
 use cgroup::{self, CgFlags};
 use core::error::*;
 use core::rel::ReStation;
@@ -861,7 +861,7 @@ mod tests {
     use crate::manager::RELI_HISTORY_MAX_DBS;
     use crate::unit::rentry::UnitRe;
     use crate::unit::test::test_utils::UmIfD;
-    use basic::fs_util::LookupPaths;
+    use basic::fs::LookupPaths;
     use core::rel::{ReliConf, Reliability};
     use core::unit::UnitType;
     use std::rc::Rc;

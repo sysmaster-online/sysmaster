@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 #![allow(non_snake_case)]
-use basic::time_util::{parse_timer, USEC_INFINITY};
+use basic::time::{parse_timer, USEC_INFINITY};
 use core::rel::{ReDb, ReDbRwTxn, ReDbTable, ReliSwitch, Reliability};
 use macros::{EnumDisplay, UnitSection};
 use serde::{Deserialize, Serialize};

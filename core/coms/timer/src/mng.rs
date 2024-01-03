@@ -16,9 +16,9 @@ use crate::{
     rentry::{TimerBase, TimerResult, TimerState},
 };
 use basic::{
-    fs_util::touch_file,
+    fs::touch_file,
     machine::Machine,
-    time_util::{
+    time::{
         duml_timestamp_is_set, now_clockid, timespec_load, triple_timestamp_by_clock, usec_add,
         usec_shift_clock, DualTimestamp, TripleTimestamp, USEC_INFINITY,
     },

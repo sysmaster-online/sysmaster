@@ -21,6 +21,12 @@ use nix::{
 use std::{os::unix::prelude::RawFd, path::Path};
 
 ///
+/// The function checks if IPv6 is supported by checking the existence of the "/proc/net/if_inet6" file.
+///
+/// Returns:
+///
+/// a boolean value. If the file "/proc/net/if_inet6" exists, it will return true. Otherwise, it will
+/// return false.
 pub fn ipv6_is_supported() -> bool {
     let inet6 = Path::new("/proc/net/if_inet6");
 
@@ -32,6 +38,21 @@ pub fn ipv6_is_supported() -> bool {
 }
 
 ///
+/// The function `set_pkginfo` sets the packet information option for a given socket file descriptor and
+/// address family.
+///
+/// Arguments:
+///
+/// * `fd`: The `fd` parameter is of type `RawFd`, which represents a raw file descriptor. It is used to
+/// identify the socket on which the option is to be set.
+/// * `family`: The `family` parameter is of type `AddressFamily` and represents the address family of
+/// the socket. It can have one of the following values:
+/// * `v`: The parameter `v` is a boolean value that determines whether to enable or disable a specific
+/// socket option.
+///
+/// Returns:
+///
+/// The function `set_pkginfo` returns a `Result` type.
 pub fn set_pkginfo(fd: RawFd, family: AddressFamily, v: bool) -> Result<()> {
     match family {
         socket::AddressFamily::Inet => {
@@ -47,11 +68,40 @@ pub fn set_pkginfo(fd: RawFd, family: AddressFamily, v: bool) -> Result<()> {
 }
 
 ///
+/// The function `set_pass_cred` sets the `PassCred` socket option for a given file descriptor.
+///
+/// Arguments:
+///
+/// * `fd`: The `fd` parameter is of type `RawFd`, which represents a raw file descriptor. It is
+/// typically used to refer to a socket or file descriptor in Unix-like systems.
+/// * `v`: The parameter `v` is a boolean value that determines whether or not to enable the passing of
+/// credentials on a socket. If `v` is `true`, it enables the passing of credentials, and if `v` is
+/// `false`, it disables the passing of credentials.
+///
+/// Returns:
+///
+/// The function `set_pass_cred` returns a `Result` type.
 pub fn set_pass_cred(fd: RawFd, v: bool) -> Result<()> {
     socket::setsockopt(fd, sockopt::PassCred, &v).context(NixSnafu)
 }
 
 ///
+/// The function sets the receive buffer size for a socket and checks if the size was set successfully.
+///
+/// Arguments:
+///
+/// * `fd`: fd is the file descriptor of the socket. It is used to identify the socket on which the
+/// operation will be performed.
+/// * `v`: The parameter `v` represents the desired size of the receive buffer. It is of type `usize`,
+/// which means it should be a non-negative integer value. The function checks if `v` is greater than
+/// the maximum value that can be represented by `isize` (a signed integer type)
+///
+/// Returns:
+///
+/// The function `set_receive_buffer` returns a `Result` type. If the operation is successful, it
+/// returns `Ok(())`, indicating that no error occurred. If there is an error, it returns `Err(Error)`,
+/// where `Error` is an enum type that represents different kinds of errors that can occur during the
+/// operation.
 pub fn set_receive_buffer(fd: RawFd, v: usize) -> Result<()> {
     /* Type of value is usize, so the v should smaller than the half of the value
      *  as the value = 2 * n.
@@ -82,6 +132,22 @@ pub fn set_receive_buffer(fd: RawFd, v: usize) -> Result<()> {
 }
 
 ///
+/// The function `set_send_buffer` sets the send buffer size for a given file descriptor in Rust, with
+/// error handling for exceeding the maximum value.
+///
+/// Arguments:
+///
+/// * `fd`: The parameter `fd` is of type `RawFd`, which is a platform-specific integer representing a
+/// file descriptor. In this case, it is likely referring to a socket file descriptor.
+/// * `v`: The parameter `v` represents the desired size of the send buffer. It should be smaller than
+/// half of the maximum value of `usize`, which is `(std::isize::MAX) as usize`.
+///
+/// Returns:
+///
+/// The function `set_send_buffer` returns a `Result` type. If the operation is successful, it returns
+/// `Ok(())`, indicating that there was no error. If there is an error, it returns `Err(Error)`, where
+/// `Error` is an enum type that represents different kinds of errors that can occur during the
+/// operation.
 pub fn set_send_buffer(fd: RawFd, v: usize) -> Result<()> {
     /* Type of value is usize, so the v should smaller than the half of the value
      *  as the value = 2 * n.

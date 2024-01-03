@@ -34,11 +34,10 @@ use crate::manager::pre_install::{Install, PresetMode};
 use crate::manager::State;
 use crate::unit::data::{DataManager, UnitState};
 use crate::utils::table::{TableOp, TableSubscribe};
-use basic::cmdline::get_process_cmdline;
-use basic::fs_util::LookupPaths;
+use basic::fs::LookupPaths;
 use basic::show_table::{CellColor, ShowTable};
-use basic::time_util::UnitTimeStamp;
-use basic::{machine, process, rlimit, signal_util};
+use basic::time::UnitTimeStamp;
+use basic::{machine, process, rlimit, signal};
 use constants::SIG_SWITCH_ROOT_OFFSET;
 use core::error::*;
 use core::exec::ExecParameters;
@@ -208,9 +207,9 @@ impl UnitManagerX {
 
     pub(crate) fn mask_unit(&self, unit_file: &str) -> Result<()> {
         log::info!("Masking unit {}.", unit_file);
-        let link_name_path = std::path::Path::new(basic::fs_util::ETC_SYSTEM_PATH).join(unit_file);
+        let link_name_path = std::path::Path::new(basic::fs::ETC_SYSTEM_PATH).join(unit_file);
         let target_path = std::path::Path::new("/dev/null");
-        basic::fs_util::symlink(
+        basic::fs::symlink(
             target_path.to_str().unwrap(),
             link_name_path.to_str().unwrap(),
             false,
@@ -220,7 +219,7 @@ impl UnitManagerX {
 
     pub(crate) fn unmask_unit(&self, unit_file: &str) -> Result<()> {
         log::info!("Unmasking unit {}.", unit_file);
-        let link_name_path = std::path::Path::new(basic::fs_util::ETC_SYSTEM_PATH).join(unit_file);
+        let link_name_path = std::path::Path::new(basic::fs::ETC_SYSTEM_PATH).join(unit_file);
         if !link_name_path.exists() {
             return Ok(());
         }
@@ -275,8 +274,8 @@ impl UnitManagerX {
                 })?;
             }
 
-            signal_util::reset_all_signal_handlers();
-            signal_util::reset_signal_mask();
+            signal::reset_all_signal_handlers();
+            signal::reset_signal_mask();
             rlimit::rlimit_nofile_safe();
             let res = unsafe { libc::kill(getppid(), libc::SIGRTMIN() + SIG_SWITCH_ROOT_OFFSET) };
             if res == 0 {
@@ -960,7 +959,7 @@ impl UnitManager {
             }
             res += &pid.to_string();
             res += " ";
-            res += get_process_cmdline(pid).as_str();
+            res += &basic::cmdline::Cmdline::new(*pid).get_cmdline();
         }
         res
     }

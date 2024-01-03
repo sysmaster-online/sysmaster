@@ -18,7 +18,7 @@ use crate::{
     config::{SocketConfig, SocketPortConf},
     rentry::PortType,
 };
-use basic::{fd_util, io_util, socket_util};
+use basic::{fd, io};
 use nix::unistd::{Gid, Uid};
 use nix::{
     errno::Errno,
@@ -142,7 +142,7 @@ impl SocketPort {
             }
         }
 
-        fd_util::close(fd);
+        fd::close(fd);
         log::debug!("Successfully closed socket {}", self.p_conf.listen());
         self.set_fd(INVALID_FD);
     }
@@ -159,7 +159,7 @@ impl SocketPort {
     pub(super) fn flush_accept(&self) -> Result<()> {
         if let Ok(true) = socket::getsockopt(self.fd(), sockopt::AcceptConn) {
             for _i in 1..1024 {
-                let events = match io_util::wait_for_events(self.fd(), PollFlags::POLLIN, 0) {
+                let events = match io::wait_for_events(self.fd(), PollFlags::POLLIN, 0) {
                     Err(e) => {
                         if let basic::Error::Nix {
                             source: Errno::EINTR,
@@ -189,7 +189,7 @@ impl SocketPort {
                     }
                     Ok(v) => v,
                 };
-                fd_util::close(cfd);
+                fd::close(cfd);
             }
         }
         Ok(())
@@ -197,7 +197,7 @@ impl SocketPort {
 
     pub(super) fn flush_fd(&self) {
         loop {
-            let v = io_util::wait_for_events(self.fd(), PollFlags::POLLIN, 0).unwrap_or(0);
+            let v = io::wait_for_events(self.fd(), PollFlags::POLLIN, 0).unwrap_or(0);
             if v == 0 {
                 return;
             };
@@ -214,37 +214,37 @@ impl SocketPort {
 
     pub(super) fn apply_sock_opt(&self, fd: RawFd) {
         if let Some(v) = self.config.config_data().borrow().Socket.PassPacketInfo {
-            if let Err(e) = socket_util::set_pkginfo(fd, self.family(), v) {
+            if let Err(e) = basic::socket::set_pkginfo(fd, self.family(), v) {
                 log::warn!("set socket pkginfo errno: {}", e);
             }
         }
 
         if let Some(v) = self.config.config_data().borrow().Socket.PassCredentials {
-            if let Err(e) = socket_util::set_pass_cred(fd, v) {
+            if let Err(e) = basic::socket::set_pass_cred(fd, v) {
                 log::warn!("set socket pass cred errno: {}", e);
             }
         }
 
         if let Some(v) = self.config.config_data().borrow().Socket.ReceiveBuffer {
-            if let Err(e) = socket_util::set_receive_buffer(fd, v as usize) {
+            if let Err(e) = basic::socket::set_receive_buffer(fd, v as usize) {
                 log::warn!("set socket receive buffer errno: {}", e);
             }
         }
 
         if let Some(v) = self.config.config_data().borrow().Socket.SendBuffer {
-            if let Err(e) = socket_util::set_send_buffer(fd, v as usize) {
+            if let Err(e) = basic::socket::set_send_buffer(fd, v as usize) {
                 log::warn!("set socket send buffer errno: {}", e);
             }
         }
 
         if let Some(v) = self.config.config_data().borrow().Socket.KeepAlive {
-            if let Err(e) = socket_util::set_keepalive_state(fd, v) {
+            if let Err(e) = basic::socket::set_keepalive_state(fd, v) {
                 log::warn!("set keepalive state errno: {}", e);
             }
         }
 
         if let Some(v) = self.config.config_data().borrow().Socket.KeepAliveTimeSec {
-            if let Err(e) = socket_util::set_keepalive_timesec(fd, v) {
+            if let Err(e) = basic::socket::set_keepalive_timesec(fd, v) {
                 log::warn!("set keepalive time errno: {}", e);
             }
         }
@@ -256,19 +256,19 @@ impl SocketPort {
             .Socket
             .KeepAliveIntervalSec
         {
-            if let Err(e) = socket_util::set_keepalive_intervalsec(fd, v) {
+            if let Err(e) = basic::socket::set_keepalive_intervalsec(fd, v) {
                 log::warn!("set keepalive interval errno: {}", e);
             }
         }
 
         if let Some(v) = self.config.config_data().borrow().Socket.KeepAliveProbes {
-            if let Err(e) = socket_util::set_keepalive_probes(fd, v) {
+            if let Err(e) = basic::socket::set_keepalive_probes(fd, v) {
                 log::warn!("set keepalive probe count errno: {}", e);
             }
         }
 
         if let Some(v) = self.config.config_data().borrow().Socket.Broadcast {
-            if let Err(e) = socket_util::set_broadcast_state(fd, v) {
+            if let Err(e) = basic::socket::set_broadcast_state(fd, v) {
                 log::warn!("set broadcast state errno: {}", e);
             }
         }
@@ -299,7 +299,7 @@ impl SocketPort {
         let target = self.listen();
         for symlink in &config.borrow().Socket.Symlinks {
             let symlink_str = symlink.to_str().unwrap();
-            if let Err(e) = basic::fs_util::symlink(target, symlink_str, false) {
+            if let Err(e) = basic::fs::symlink(target, symlink_str, false) {
                 let unit_name = match self.comm.owner() {
                     None => "null".to_string(),
                     Some(v) => v.id().to_string(),

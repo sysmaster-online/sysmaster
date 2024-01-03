@@ -12,7 +12,7 @@
 
 //! mount the cgroup systems
 use basic::machine::Machine;
-use basic::{cmdline, machine, mount_util};
+use basic::{cmdline, machine, mount};
 use bitflags::bitflags;
 use cgroup::{self, CgController, CgType, CG_BASE_DIR};
 use core::error::*;
@@ -377,7 +377,7 @@ impl MountPoint {
     }
 
     fn invalid_mount_point(&self, flags: AtFlags) -> Result<bool> {
-        if basic::fs_util::path_equal(&self.target, "/") {
+        if basic::fs::path_equal(&self.target, "/") {
             return Ok(true);
         }
 
@@ -385,7 +385,7 @@ impl MountPoint {
         // symlink
 
         let path = Path::new(&self.target);
-        let file = basic::fs_util::open_parent(
+        let file = basic::fs::open_parent(
             path,
             OFlag::O_PATH | OFlag::O_CLOEXEC,
             Mode::from_bits(0).unwrap(),
@@ -393,11 +393,8 @@ impl MountPoint {
 
         let last_file_name = path.file_name().unwrap_or_default();
 
-        let ret = mount_util::mount_point_fd_valid(
-            file.as_raw_fd(),
-            last_file_name.to_str().unwrap(),
-            flags,
-        )?;
+        let ret =
+            mount::mount_point_fd_valid(file.as_raw_fd(), last_file_name.to_str().unwrap(), flags)?;
 
         Ok(ret)
     }
@@ -521,7 +518,7 @@ fn pair_controller(controller: &str) -> Option<String> {
 fn symlink_controller(source: String, alias: String) -> Result<()> {
     let target_path = Path::new(CG_BASE_DIR).join(alias);
     let target = target_path.to_str().unwrap();
-    match basic::fs_util::symlink(&source, target, false) {
+    match basic::fs::symlink(&source, target, false) {
         Ok(()) => Ok(()),
         Err(basic::Error::Nix {
             source: Errno::EEXIST,
@@ -539,22 +536,17 @@ fn symlink_controller(source: String, alias: String) -> Result<()> {
 }
 
 fn cg_unified_wanted() -> bool {
-    let cg_ver = cgroup::cg_type();
-
-    if let Ok(v) = cg_ver {
+    if let Ok(v) = cgroup::cg_type() {
         return v == CgType::UnifiedV2;
     }
 
-    let ret = cmdline::proc_cmdline_get_bool("sysmaster.unified_cgroup_hierarchy");
-    if let Ok(v) = ret {
-        return v;
+    if basic::cmdline::Cmdline::default().has_param("systemd.unified_cgroup_hierarchy") {
+        return true;
     }
 
-    let ret = cmdline::cmdline_get_value("cgroup_no_v1");
-    if let Ok(v) = ret {
-        if v.is_some() && v.unwrap() == "all" {
-            return true;
-        }
+    let v = cmdline::Cmdline::default().get_param("cgroup_no_v1");
+    if v.is_some() && v.unwrap() == "all" {
+        return true;
     }
 
     false
@@ -579,10 +571,5 @@ fn cg_unifiedv1_wanted() -> bool {
         }
     }
 
-    let ret = cmdline::proc_cmdline_get_bool("sysmaster.unified_v1_controller");
-    if let Ok(v) = ret {
-        return v;
-    }
-
-    false
+    cmdline::Cmdline::default().has_param("systemd.unified_v1_controller")
 }

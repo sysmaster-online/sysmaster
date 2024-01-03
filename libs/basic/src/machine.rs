@@ -12,9 +12,8 @@
 
 //!
 use crate::{
-    fs_util,
-    id128_util::{self, Id128FormatFlag},
-    mount_util, namespace_util,
+    id128::{self, Id128FormatFlag},
+    namespace,
 };
 use libc::syncfs;
 use log;
@@ -357,17 +356,17 @@ pub fn machine_id_commit() -> Result<()> {
 
     sync();
 
-    if !mount_util::is_mount_point(etc_machine_id) {
+    if !crate::mount::is_mount_point(etc_machine_id) {
         log::debug!("{:?} is not a mount point. Nothing to do.", etc_machine_id);
         return Ok(());
     }
 
-    if !fs_util::check_filesystem(etc_machine_id, statfs::FsType(libc::TMPFS_MAGIC as FsTypeT)) {
+    if !crate::fs::check_filesystem(etc_machine_id, statfs::FsType(libc::TMPFS_MAGIC as FsTypeT)) {
         log::error!("{:?} is not on a temporary file system.", etc_machine_id);
         return Err(nix::Error::EROFS);
     }
 
-    match id128_util::id128_read_by_path(etc_machine_id, Id128FormatFlag::ID128_FORMAT_PLAIN) {
+    match id128::id128_read_by_path(etc_machine_id, Id128FormatFlag::ID128_FORMAT_PLAIN) {
         Ok(id128_string) => id128 = id128_string,
         Err(e) => {
             log::error!(
@@ -379,23 +378,23 @@ pub fn machine_id_commit() -> Result<()> {
         }
     }
 
-    mnt_fd = namespace_util::namespace_open(&Pid::from_raw(0), Path::new(&"mnt".to_string()))?;
+    mnt_fd = namespace::namespace_open(&Pid::from_raw(0), Path::new(&"mnt".to_string()))?;
 
-    namespace_util::detach_mount_namespace()?;
+    namespace::detach_mount_namespace()?;
 
     if let Err(e) = mount::umount2(etc_machine_id, mount::MntFlags::from_bits(0).unwrap()) {
         log::error!("Failed to umount {:?}:{}", etc_machine_id, e);
         return Err(e);
     }
 
-    id128_util::id128_write(
+    id128::id128_write(
         etc_machine_id,
         &true,
         &id128,
         Id128FormatFlag::ID128_FORMAT_PLAIN,
     )?;
 
-    namespace_util::namespace_enter(&mnt_fd, sched::CloneFlags::CLONE_NEWNS)?;
+    namespace::namespace_enter(&mnt_fd, sched::CloneFlags::CLONE_NEWNS)?;
 
     mount::umount2(etc_machine_id, mount::MntFlags::MNT_DETACH)
 }
@@ -404,7 +403,7 @@ fn generate_machine_id() -> Result<String> {
     let dbus_machine_id = Path::new("/var/lib/dbus/machine-id");
 
     if let Ok(id128) =
-        id128_util::id128_read_by_path(dbus_machine_id, Id128FormatFlag::ID128_FORMAT_PLAIN)
+        id128::id128_read_by_path(dbus_machine_id, Id128FormatFlag::ID128_FORMAT_PLAIN)
     {
         log::info!("Initializing machine ID from D-Bus machine ID (/var/lib/dbus/machine-id).");
         return Ok(id128);
@@ -412,7 +411,7 @@ fn generate_machine_id() -> Result<String> {
 
     if process::id() == 1 {
         if let Ok(id128) = env::var("container_uuid") {
-            if id128_util::id128_is_valid(&id128.clone().into_bytes()) {
+            if id128::id128_is_valid(&id128.clone().into_bytes()) {
                 log::info!(
                     "Initializing machine ID from container UUID (process 1's container_uuid)."
                 );
@@ -427,17 +426,17 @@ fn generate_machine_id() -> Result<String> {
             let idplain: String = id128.chars().take(32).collect();
             let idrfc: String = id128.chars().take(36).collect();
 
-            if id128_util::id128_is_valid(&idplain.clone().into_bytes()) {
+            if id128::id128_is_valid(&idplain.clone().into_bytes()) {
                 log::info!("Initializing machine ID from environ's container UUID (/proc/1/environ's container_uuid).");
                 return Ok(idplain);
-            } else if id128_util::id128_is_valid(&idrfc.clone().into_bytes()) {
+            } else if id128::id128_is_valid(&idrfc.clone().into_bytes()) {
                 log::info!("Initializing machine ID from environ's container UUID (/proc/1/environ's container_uuid).");
                 return Ok(idrfc);
             }
         }
     }
 
-    match id128_util::id128_read_by_path(
+    match id128::id128_read_by_path(
         Path::new("/sys/class/dmi/id/product_uuid"),
         Id128FormatFlag::ID128_FORMAT_UUID,
     ) {
@@ -447,7 +446,7 @@ fn generate_machine_id() -> Result<String> {
         }
         Err(e) => {
             if e.kind() == ErrorKind::NotFound {
-                if let Ok(id128) = id128_util::id128_read_by_path(
+                if let Ok(id128) = id128::id128_read_by_path(
                     Path::new("/proc/device-tree/vm,uuid"),
                     Id128FormatFlag::ID128_FORMAT_UUID,
                 ) {
@@ -459,7 +458,7 @@ fn generate_machine_id() -> Result<String> {
     }
 
     log::info!("Initializing machine ID from random generator.");
-    id128_util::id128_randomize(Id128FormatFlag::ID128_FORMAT_PLAIN)
+    id128::id128_randomize(Id128FormatFlag::ID128_FORMAT_PLAIN)
 }
 
 ///
@@ -511,7 +510,7 @@ Booting up is supported only when:
 
     if machine_id.is_empty() {
         if let Ok(id128) =
-            id128_util::id128_read_by_path(etc_machine_id, Id128FormatFlag::ID128_FORMAT_PLAIN)
+            id128::id128_read_by_path(etc_machine_id, Id128FormatFlag::ID128_FORMAT_PLAIN)
         {
             return Ok(id128);
         }
@@ -527,7 +526,7 @@ Booting up is supported only when:
                 return Err(e);
             }
         } else {
-            id128_util::id128_write(
+            id128::id128_write(
                 etc_machine_id,
                 &true,
                 &ret_id128,
@@ -545,7 +544,7 @@ Booting up is supported only when:
         umask(Mode::from_bits_truncate(0o0022)).bits() | SFlag::S_IFMT.bits(),
     );
     while saved_umask.contains(SFlag::S_IFMT) {
-        id128_util::id128_write(
+        id128::id128_write(
             run_machine_id,
             &false,
             &ret_id128,

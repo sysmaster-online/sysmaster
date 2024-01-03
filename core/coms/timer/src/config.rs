@@ -14,7 +14,7 @@ use crate::{
     comm::TimerUnitComm,
     rentry::{CalendarSpec, SectionTimer, TimerBase, TimerValue},
 };
-use basic::time_util::USEC_INFINITY;
+use basic::time::USEC_INFINITY;
 use core::error::*;
 use core::rel::ReStation;
 use std::{cell::RefCell, path::PathBuf, rc::Rc};

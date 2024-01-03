@@ -15,7 +15,7 @@
 
 use crate::subcmds::utils::devmaster_queue_is_empty;
 use crate::Result;
-use basic::time_util::{parse_sec, USEC_INFINITY, USEC_PER_SEC};
+use basic::time::{parse_sec, USEC_INFINITY, USEC_PER_SEC};
 use event::{EventState, EventType, Events, Source};
 use libdevmaster::framework::control_manager::CONTROL_MANAGER_LISTEN_ADDR;
 use nix::sys::inotify::AddWatchFlags;

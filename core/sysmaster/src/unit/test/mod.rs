@@ -22,7 +22,7 @@ pub(crate) mod test_utils {
             util::{self, UnitFile},
         },
     };
-    use basic::fs_util::LookupPaths;
+    use basic::fs::LookupPaths;
     use core::rel::Reliability;
     use core::unit::UmIf;
     pub(crate) struct UmIfD;

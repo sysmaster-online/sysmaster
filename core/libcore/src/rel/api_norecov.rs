@@ -25,7 +25,7 @@ use super::{
     ReStationKind,
 };
 use crate::error::*;
-use crate::utils::fd as fd_util;
+use crate::utils::fd;
 use heed::Env;
 use std::rc::Rc;
 use std::{cell::RefCell, fmt};
@@ -136,7 +136,7 @@ impl Reliability {
     /// set the fd's 'cloexec' flag and record it
     pub fn fd_cloexec(&self, fd: i32, cloexec: bool) -> Result<()> {
         // just set the fd's 'cloexec' flag
-        fd_util::fd_cloexec(fd, cloexec).context(NixSnafu)?;
+        basic::fd::fd_cloexec(fd, cloexec).context(NixSnafu)?;
         Ok(())
     }
 

@@ -14,7 +14,7 @@
 //!
 
 use crate::Result;
-use basic::socket_util::set_receive_buffer;
+use basic::socket::set_receive_buffer;
 use device::{device_monitor::DeviceMonitor, device_monitor::MonitorNetlinkGroup};
 use event::{EventState, EventType, Events, Source};
 use nix::errno::Errno;

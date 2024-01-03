@@ -10,140 +10,210 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//!
-use crate::config;
-use crate::error::*;
+//! Cmdline functions
 use nix::unistd::Pid;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::Path;
+use std::io::Read;
 
-fn cmdline_content() -> Result<String> {
-    let mut file = File::open("/proc/cmdline").context(IoSnafu)?;
-
-    let mut buf = String::new();
-    match file.read_to_string(&mut buf) {
-        Ok(s) => s,
-        Err(e) => {
-            return Err(Error::Io { source: e });
-        }
-    };
-    Ok(buf)
+/// The `Cmdline` struct represents a command line with parameters and their corresponding values.
+///
+/// Properties:
+///
+/// * `params`: The `params` property is a `HashMap` that stores key-value pairs. The keys are of type
+/// `String`, and the values are of type `Option<String>`. The `Option` type allows for the possibility
+/// of a value being present (`Some`) or absent (`None`).
+#[derive(Debug)]
+pub struct Cmdline {
+    params: HashMap<String, Option<String>>,
+    cmdline: String,
 }
 
-/// read the content from /proc/cmdline and return the value depend the key
-pub fn cmdline_get_value(key: &str) -> Result<Option<String>, Error> {
-    let buf = cmdline_content()?;
+impl Cmdline {
+    /// The function `read_cmdline` reads a file at a given path, extracts key-value pairs from its
+    /// contents, and returns them as a HashMap.
+    ///
+    /// Arguments:
+    ///
+    /// * `path`: A string representing the path to the file that needs to be read.
+    /// * `cmdline`: A mutable reference to a String that will be updated with the contents of the file
+    /// at the specified path.
+    ///
+    /// Returns:
+    ///
+    /// The function `read_cmdline` returns a `HashMap<String, Option<String>>`.
+    fn read_cmdline(path: String, cmdline: &mut String) -> HashMap<String, Option<String>> {
+        let mut params = HashMap::new();
+        if let Ok(mut file) = File::open(path) {
+            let mut data = String::new();
+            if file.read_to_string(&mut data).is_ok() {
+                *cmdline = data.clone();
+                for item in data.split_whitespace() {
+                    let mut parts = item.splitn(2, '=');
+                    let key = parts.next().unwrap_or_default().to_string();
+                    let value = parts.next().map(|v| v.to_string());
+                    params.insert(key, value);
+                }
+            }
+        }
+        params
+    }
 
-    let cmdline: Vec<&str> = buf.split_whitespace().collect();
+    /// The function `get_cmdline` returns a clone of the `cmdline` string.
+    ///
+    /// Returns:
+    ///
+    /// A String is being returned.
+    pub fn get_cmdline(&self) -> String {
+        self.cmdline.clone()
+    }
 
-    for cmd in cmdline.iter() {
-        if let Some(k_val) = cmd.split_once('=') {
-            if k_val.0 == key {
-                return Ok(Some(k_val.1.to_string()));
+    /// The code defines a struct `Cmdline` with methods to read command line parameters from a process
+    /// and check if a parameter exists.
+    ///
+    /// Arguments:
+    ///
+    /// * `pid`: The `pid` parameter represents the process ID (PID) of a running process. It is used to
+    /// identify a specific process in the system.
+    ///
+    /// Returns:
+    ///
+    /// In the `new` function, a new instance of the `Cmdline` struct is being returned.
+    pub fn new(pid: Pid) -> Self {
+        let cmdfile = format!("/proc/{}/cmdline", pid);
+        let mut cmdline = String::new();
+        let params = Self::read_cmdline(cmdfile, &mut cmdline);
+
+        Cmdline { params, cmdline }
+    }
+
+    /// The `get_param` function retrieves a parameter value from a map and returns it as an
+    /// `Option<String>`.
+    ///
+    /// Arguments:
+    ///
+    /// * `key`: The `key` parameter is a reference to a string that represents the key for which you
+    /// want to retrieve a value from the `params` map.
+    ///
+    /// Returns:
+    ///
+    /// The function `get_param` returns an `Option<String>`.
+    pub fn get_param(&self, key: &str) -> Option<String> {
+        self.params.get(key).map(|v| v.clone().unwrap_or_default())
+    }
+
+    /// The function `has_param` checks if a given key exists in a map called `params`.
+    ///
+    /// Arguments:
+    ///
+    /// * `key`: The `key` parameter is of type `&str`, which means it is a reference to a string slice.
+    ///
+    /// Returns:
+    ///
+    /// The `has_param` function returns a boolean value indicating whether the given `key` is present in
+    /// the `params` map.
+    pub fn has_param(&self, key: &str) -> bool {
+        self.params.contains_key(key)
+    }
+
+    /// The function `cmdline_item` parses a key-value pair and inserts the values into a
+    /// HashSet if the key is "module_blacklist".
+    ///
+    /// Arguments:
+    ///
+    /// * `key`: The key parameter is a String that represents the key of a key-value pair in a command
+    /// line item.
+    /// * `value`: The value parameter is a string that represents the value associated with the key in the
+    /// proc cmdline file.
+    /// * `data`: A mutable reference to a HashSet of strings.
+    pub fn cmdline_item(key: String, value: String, data: &mut HashSet<String>) {
+        if key.eq("module_blacklist") {
+            if value.is_empty() {
+                return;
+            }
+
+            let k: Vec<&str> = value.split(',').collect();
+
+            for i in k {
+                data.insert(i.to_string());
             }
         }
     }
 
-    Ok(None)
-}
-
-/// read the content from /proc/cmdline and return specified item
-///-
-/// take `crashkernel=512M ro` for example, given `crashkernel` will
-/// return `crashkernel=512M`, given `ro` will return `ro`, given
-/// `foo` will return None.
-pub fn cmdline_get_item(item: &str) -> Result<Option<String>, Error> {
-    let buf = cmdline_content()?;
-    let pair_item = item.to_string() + "=";
-    let cmdline: Vec<&str> = buf.split_whitespace().collect();
-
-    for cmd in cmdline.iter() {
-        if cmd.starts_with(&pair_item) || cmd.eq(&item) {
-            return Ok(Some(cmd.to_string()));
-        }
-    }
-
-    Ok(None)
-}
-
-/// read the content from /proc/cmdline and return the bool value depend the key
-pub fn proc_cmdline_get_bool(key: &str) -> Result<bool, Error> {
-    let val = cmdline_get_value(key)?;
-
-    if val.is_none() {
-        return Ok(false);
-    }
-
-    let r = config::parse_boolean(&val.unwrap())?;
-
-    Ok(r)
-}
-
-/// parse cmdline item, insert module_blacklist's value to data
-pub fn parse_proc_cmdline_item(key: String, value: String, data: &mut HashSet<String>) {
-    if key.eq("module_blacklist") {
-        if value.is_empty() {
+    /// The `parse` function reads the contents of the `/proc/cmdline` file, splits it into key-value
+    /// pairs, and calls a provided function to parse and store the values.
+    ///
+    /// Arguments:
+    ///
+    /// * `parse_item`: The `parse_item` parameter is a closure that takes three arguments: a `String`
+    /// representing a key, a `String` representing a value, and a mutable reference to `T` (the type of
+    /// `data`). The closure is responsible for parsing the key-value pair and updating the `data
+    /// * `data`: A mutable reference to the data structure that will be populated with the parsed
+    /// key-value pairs.
+    pub fn parse<F, T>(parse_item: F, data: &mut T)
+    where
+        F: Fn(String, String, &mut T),
+    {
+        let mut cmdline = String::new();
+        let line = Self::read_cmdline("/proc/cmdline".to_string(), &mut cmdline);
+        if line.is_empty() {
+            log::info!("/proc/cmdline is empty!");
             return;
         }
 
-        let k: Vec<&str> = value.split(',').collect();
-
-        for i in k {
-            data.insert(i.to_string());
+        for i in cmdline.split(' ') {
+            let parts = i.split_once('=');
+            if let Some((key, value)) = parts {
+                parse_item(key.to_string(), value.to_string(), data);
+            }
         }
     }
 }
 
-/// parse /proc/cmdline, Distinguish between key and value based on '='
-pub fn proc_cmdline_parse<F, T>(parse_item: F, data: &mut T)
-where
-    F: Fn(String, String, &mut T),
-{
-    let line = read_file(Path::new("/proc/cmdline"));
-    if line.is_empty() {
-        log::info!("/proc/1/cmdline is empty!");
-        return;
-    }
+impl Default for Cmdline {
+    fn default() -> Self {
+        let mut cmdline = String::new();
+        let params = Self::read_cmdline("/proc/cmdline".to_string(), &mut cmdline);
 
-    let v: Vec<&str> = line.split(' ').collect();
-    for i in &v {
-        let key = match i.to_string().split('=').next() {
-            None => continue,
-            Some(k) => k.to_string(),
-        };
-        let value = match i.to_string().split('=').nth(1) {
-            None => continue,
-            Some(v) => v.to_string(),
-        };
-        parse_item(key, value, data);
+        Cmdline { params, cmdline }
     }
 }
 
-/// read /proc/PID/cmdline and return
-pub fn get_process_cmdline(pid: &Pid) -> String {
-    let pid_str = pid.to_string();
-    read_file(&Path::new("/proc").join(pid_str).join("cmdline"))
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn read_file(path: &Path) -> String {
-    let cmdline_path = path;
-    let file = match File::open(cmdline_path) {
-        Ok(file) => file,
-        Err(_) => {
-            return String::from("");
-        }
-    };
-    let buf_reader = BufReader::new(file);
-    let mut cmdline_content = String::new();
-    for byte in buf_reader.bytes() {
-        let b = match byte {
-            Ok(b) => b,
-            Err(_) => break,
-        };
-        let b = if b != 0 { b as char } else { ' ' };
-        cmdline_content += &b.to_string();
+    #[test]
+    fn test_cmdline_new() {
+        let cmdline = Cmdline::default();
+        println!("{:?}", cmdline);
+        assert!(cmdline.has_param("root"));
+        assert!(cmdline.get_param("root").is_some());
     }
-    cmdline_content
+    #[test]
+    fn test_get_cmdline() {
+        let mut cmdline = String::new();
+        let params = Cmdline::read_cmdline("/proc/cmdline".to_string(), &mut cmdline);
+        let cmdline_str = cmdline.clone();
+        let cmdline = Cmdline { params, cmdline };
+        assert_eq!(cmdline.get_cmdline(), cmdline_str);
+    }
+
+    #[test]
+    fn test_get_param() {
+        let mut cmdline = String::new();
+        let params = Cmdline::read_cmdline("/proc/cmdline".to_string(), &mut cmdline);
+        let cmdline = Cmdline { params, cmdline };
+        assert!(!cmdline.get_param("argv0").is_some());
+    }
+
+    #[test]
+    fn test_has_param() {
+        let mut cmdline = String::new();
+        let params = Cmdline::read_cmdline("/proc/cmdline".to_string(), &mut cmdline);
+        let cmdline = Cmdline { params, cmdline };
+        assert!(!cmdline.has_param("argv0"));
+        assert!(!cmdline.has_param("not_a_key"));
+    }
 }

@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//!
+//! fd functions
 use crate::error::*;
 use libc::off_t;
 use nix::{
@@ -33,7 +33,19 @@ pub fn stat_is_char(st_mode: u32) -> bool {
     st_mode & SFlag::S_IFMT.bits() & SFlag::S_IFCHR.bits() > 0
 }
 
+/// The function `fd_nonblock` sets the non-blocking flag on a file descriptor in Rust.
 ///
+/// Arguments:
+///
+/// * `fd`: The `fd` parameter is of type `RawFd`, which is typically an integer representing a file
+/// descriptor. It is used to identify an open file or socket.
+/// * `nonblock`: A boolean value indicating whether the file descriptor should be set to non-blocking
+/// mode or not. If `nonblock` is `true`, the file descriptor will be set to non-blocking mode. If
+/// `nonblock` is `false`, the file descriptor will be set to blocking mode.
+///
+/// Returns:
+///
+/// a `Result<()>`.
 pub fn fd_nonblock(fd: RawFd, nonblock: bool) -> Result<()> {
     assert!(fd >= 0);
 
@@ -54,7 +66,19 @@ pub fn fd_nonblock(fd: RawFd, nonblock: bool) -> Result<()> {
     Ok(())
 }
 
+/// The `fd_cloexec` function sets the `FD_CLOEXEC` flag on a file descriptor in Rust.
 ///
+/// Arguments:
+///
+/// * `fd`: The `fd` parameter is of type `RawFd`, which represents a raw file descriptor. It is an
+/// integer value that identifies an open file or socket.
+/// * `cloexec`: The `cloexec` parameter is a boolean value that determines whether the file descriptor
+/// should be set with the `FD_CLOEXEC` flag or not. If `cloexec` is `true`, the `FD_CLOEXEC` flag will
+/// be set on the file descriptor, indicating that it should
+///
+/// Returns:
+///
+/// a `Result<()>`.
 pub fn fd_cloexec(fd: RawFd, cloexec: bool) -> Result<()> {
     assert!(fd >= 0);
 
@@ -72,7 +96,17 @@ pub fn fd_cloexec(fd: RawFd, cloexec: bool) -> Result<()> {
     Ok(())
 }
 
+/// The function `fd_is_cloexec` checks if a file descriptor has the `FD_CLOEXEC` flag set.
 ///
+/// Arguments:
+///
+/// * `fd`: The parameter `fd` is of type `RawFd`, which is typically an integer representing a file
+/// descriptor. A file descriptor is a unique identifier that is used to access files, sockets, or other
+/// I/O resources in an operating system.
+///
+/// Returns:
+///
+/// The function `fd_is_cloexec` returns a boolean value.
 pub fn fd_is_cloexec(fd: RawFd) -> bool {
     assert!(fd >= 0);
 
@@ -81,7 +115,12 @@ pub fn fd_is_cloexec(fd: RawFd) -> bool {
     fd_flag.contains(FdFlag::FD_CLOEXEC)
 }
 
+/// The function `close` closes a file descriptor and logs a warning if it fails.
 ///
+/// Arguments:
+///
+/// * `fd`: The parameter `fd` is of type `RawFd`, which is typically an integer representing a file
+/// descriptor.
 pub fn close(fd: RawFd) {
     if let Err(e) = nix::unistd::close(fd) {
         log::warn!("close fd {} failed, errno: {}", fd, e);
@@ -113,7 +152,7 @@ pub fn fd_reopen(fd: RawFd, oflags: OFlag) -> Result<File> {
                 return Err(Error::Nix { source: e });
             }
 
-            if !crate::stat_util::proc_mounted().map_err(|_| Error::Nix {
+            if !crate::stat::proc_mounted().map_err(|_| Error::Nix {
                 source: Errno::ENOENT,
             })? {
                 // if /proc/ is not mounted, this function can not work
@@ -194,7 +233,7 @@ pub fn dot_or_dot_dot(name: &str) -> bool {
 }
 #[cfg(test)]
 mod tests {
-    use crate::fd_util::{stat_is_char, stat_is_reg};
+    use crate::fd::{stat_is_char, stat_is_reg};
     use nix::{
         fcntl::{open, OFlag},
         sys::stat::{fstat, Mode},

@@ -10,11 +10,21 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//!
-
+//! Arguments functions
 use std::path::Path;
 
+/// The function checks if the first argument in the command line contains a specific token.
 ///
+/// Arguments:
+///
+/// * `argv`: A vector of strings representing command line arguments passed to the program. The first
+/// element of the vector is expected to be the name of the executable file.
+/// * `token`: The `token` parameter is a string that represents a token or keyword that we want to
+/// check for in the file name.
+///
+/// Returns:
+///
+/// a boolean value.
 pub fn invoked_as(argv: Vec<String>, token: &str) -> bool {
     if argv.is_empty() || token.is_empty() {
         return false;
@@ -31,7 +41,7 @@ pub fn invoked_as(argv: Vec<String>, token: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::argv_util::invoked_as;
+    use crate::argv::invoked_as;
     #[test]
     fn test_invoked_as() {
         let argv = vec!["/a/bb////aabbcc".to_string()];

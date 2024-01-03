@@ -1,4 +1,4 @@
-use basic::{fd_util, unistd::timespec_load};
+use basic::{fd, unistd::timespec_load};
 use constants::INVALID_FD;
 use glob::Pattern;
 use linked_hash_map::LinkedHashMap;
@@ -674,7 +674,7 @@ fn hwdb_new(path: &str) -> Result<SdHwdb> {
         log::error!("File{:?} is too short", hwdb_path);
         return Err(Errno::EIO);
     }
-    if fd_util::file_offset_beyond_memory_size(hwdb_st.st_size) {
+    if fd::file_offset_beyond_memory_size(hwdb_st.st_size) {
         log::error!("File {:?} is too long", hwdb_path);
         return Err(Errno::EFBIG);
     }

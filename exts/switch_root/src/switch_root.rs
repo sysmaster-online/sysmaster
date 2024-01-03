@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use basic::{machine, mount_util::MountInfoParser, IN_SET};
+use basic::{machine, mount::MountInfoParser, IN_SET};
 use nix::{
     dir::Type,
     errno::Errno,

@@ -16,7 +16,7 @@
 use super::comm::SocketUnitComm;
 use super::rentry::{PortType, SectionSocket, SocketCommand};
 use crate::base::NetlinkProtocol;
-use basic::{fd_util, socket_util};
+use basic::fd;
 use core::error::*;
 use core::exec::ExecCommand;
 use core::rel::ReStation;
@@ -427,7 +427,7 @@ impl SocketPortConf {
             Ok(v) => v,
         };
         let st = fstat(fd)?;
-        if !fd_util::stat_is_reg(st.st_mode) && !fd_util::stat_is_char(st.st_mode) {
+        if !fd::stat_is_reg(st.st_mode) && !fd::stat_is_char(st.st_mode) {
             return Err(Errno::EEXIST);
         }
         Ok(fd)
@@ -630,7 +630,7 @@ fn parse_socket_address(item: &str, socket_type: SockType) -> Result<SocketAddre
             return Err("invalid port number".to_string().into());
         }
 
-        if socket_util::ipv6_is_supported() {
+        if basic::socket::ipv6_is_supported() {
             let addr = SockaddrIn6::from(SocketAddrV6::new(
                 Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0),
                 port,

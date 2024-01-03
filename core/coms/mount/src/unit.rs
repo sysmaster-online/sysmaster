@@ -18,7 +18,7 @@ use crate::rentry::{MountProcFlags, MountState};
 
 use super::comm::MountUnitComm;
 use super::mng::MountMng;
-use basic::mount_util::mount_point_to_unit_name;
+use basic::mount::mount_point_to_unit_name;
 use core::error::*;
 use core::exec::ExecContext;
 use core::rel::{ReStation, Reliability};

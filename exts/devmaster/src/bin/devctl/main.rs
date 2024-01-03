@@ -15,7 +15,7 @@
 #![allow(deprecated)]
 mod daemon;
 mod subcmds;
-use basic::argv_util::invoked_as;
+use basic::argv::invoked_as;
 use clap::Parser;
 use daemon::run_daemon;
 use libdevmaster::config::devmaster_conf::DEFAULT_CONFIG;

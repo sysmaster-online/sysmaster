@@ -16,7 +16,7 @@ use super::state::{UnitActiveState, UnitNotifyFlags};
 use super::umif::UnitMngUtil;
 use super::UnitType;
 use crate::error::*;
-use basic::time_util::UnitTimeStamp;
+use basic::time::UnitTimeStamp;
 use bitflags::bitflags;
 use nix::sys::wait::WaitStatus;
 use nix::{sys::socket::UnixCredentials, unistd::Pid};

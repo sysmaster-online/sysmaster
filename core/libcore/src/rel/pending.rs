@@ -12,7 +12,7 @@
 
 use super::base::RELI_INTERNAL_DB_PFD;
 use crate::error::*;
-use crate::utils::fd as fd_util;
+use crate::utils::fd;
 use heed::types::{OwnedType, SerdeBincode};
 use heed::{Database, Env};
 use serde::{Deserialize, Serialize};
@@ -68,7 +68,7 @@ impl ReliPending {
         let iter = db.iter(&rtxn).unwrap();
         for entry in iter {
             let (fd, _) = entry.unwrap();
-            fd_util::close(fd);
+            fd::close(fd);
         }
 
         // clear data
@@ -100,7 +100,7 @@ impl ReliPending {
         self.fd_add(fd, ReliPState::Retaining);
 
         // action
-        let ret = fd_util::fd_cloexec(fd, false).context(NixSnafu);
+        let ret = fd::fd_cloexec(fd, false).context(NixSnafu);
         if ret.is_err() {
             self.fd_del(fd);
             return ret;
@@ -115,7 +115,7 @@ impl ReliPending {
 
     fn fd_remove(&self, fd: i32) -> Result<()> {
         // close-on-exec
-        if fd_util::fd_is_cloexec(fd) {
+        if fd::fd_is_cloexec(fd) {
             // debug
             self.fd_del(fd);
             return Ok(());
@@ -125,7 +125,7 @@ impl ReliPending {
         self.fd_add(fd, ReliPState::Removing);
 
         // action
-        let ret = fd_util::fd_cloexec(fd, true).context(NixSnafu);
+        let ret = fd::fd_cloexec(fd, true).context(NixSnafu);
         if ret.is_err() {
             self.fd_del(fd);
             return ret;

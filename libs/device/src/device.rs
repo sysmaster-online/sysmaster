@@ -14,7 +14,7 @@
 //!
 use crate::utils::readlink_value;
 use crate::{error::*, DeviceAction};
-use basic::fs_util::{chmod, open_temporary, touch_file};
+use basic::fs::{chmod, open_temporary, touch_file};
 use basic::parse::{device_path_parse_devnum, parse_devnum, parse_ifindex};
 use basic::string::fnmatch_or_empty;
 use basic::uuid::{randomize, Uuid};
@@ -1221,7 +1221,7 @@ impl Device {
             }
         }
 
-        let file2 = basic::fd_util::fd_reopen(file.as_raw_fd(), oflags).context(Basic {
+        let file2 = basic::fd::fd_reopen(file.as_raw_fd(), oflags).context(Basic {
             msg: format!("failed to open {}", file.as_raw_fd()),
         })?;
 
@@ -1229,7 +1229,7 @@ impl Device {
             return Ok(file2);
         }
 
-        let q = basic::fd_util::fd_get_diskseq(file2.as_raw_fd()).context(Basic {
+        let q = basic::fd::fd_get_diskseq(file2.as_raw_fd()).context(Basic {
             msg: format!("failed to get diskseq on fd {}", file2.as_raw_fd()),
         })?;
 

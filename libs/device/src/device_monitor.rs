@@ -15,7 +15,7 @@
 use crate::{device::Device, error::Error};
 use basic::errno_is_transient;
 use basic::murmurhash2::murmurhash2;
-use basic::socket_util::next_datagram_size_fd;
+use basic::socket::next_datagram_size_fd;
 use libc::*;
 use nix::{
     errno::Errno,

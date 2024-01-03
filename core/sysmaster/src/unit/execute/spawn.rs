@@ -11,7 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use super::super::entry::Unit;
-use basic::fd_util;
+use basic::fd;
 use core::error::*;
 use core::exec::{ExecCommand, ExecContext, ExecFlags, ExecParameters, WorkingDirectory};
 use nix::fcntl::FcntlArg;
@@ -369,7 +369,7 @@ fn close_all_fds(fds: &[i32]) -> bool {
             continue;
         }
 
-        fd_util::close(fd);
+        fd::close(fd);
     }
     true
 }
@@ -389,7 +389,7 @@ fn shift_fds(fds: &mut [i32]) -> bool {
                 Ok(v) => v,
             };
 
-            fd_util::close(fds[i as usize]);
+            fd::close(fds[i as usize]);
 
             fds[i as usize] = nfd;
 
@@ -411,11 +411,11 @@ fn shift_fds(fds: &mut [i32]) -> bool {
 
 fn flags_fds(fds: &mut Vec<i32>, nonblock: bool) -> bool {
     for fd in fds {
-        if fd_util::fd_nonblock(*fd, nonblock).is_err() {
+        if fd::fd_nonblock(*fd, nonblock).is_err() {
             return false;
         }
 
-        if fd_util::fd_cloexec(*fd, false).is_err() {
+        if fd::fd_cloexec(*fd, false).is_err() {
             return false;
         }
     }

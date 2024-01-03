@@ -245,8 +245,8 @@ impl LibKmod {
                         Err(e) => {
                             if e == nix::Error::EPERM {
                                 if !denylisy_parsed {
-                                    cmdline::proc_cmdline_parse(
-                                        cmdline::parse_proc_cmdline_item,
+                                    cmdline::Cmdline::parse(
+                                        cmdline::Cmdline::cmdline_item,
                                         &mut denylist,
                                     );
                                     denylisy_parsed = true;

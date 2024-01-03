@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//!
+//! Cargo functions
 use crate::error::*;
 use std::env;
 
@@ -79,5 +79,12 @@ mod tests {
     #[test]
     fn test_build_libblkid() {
         build_libblkid();
+    }
+
+    #[test]
+    fn env_path_test() {
+        let result = env_path().unwrap();
+
+        println!("{:?}", result);
     }
 }

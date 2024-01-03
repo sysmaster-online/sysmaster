@@ -64,12 +64,12 @@ full = [
     "unit_name",
     "strbuf",
     "argv",
-    "exec_util",
+    "exec",
     "random",
     "id128",
     "namespace",
-    "time_util",
-    "path_util",
+    "time",
+    "path",
 ]
 
 capability = []
@@ -90,7 +90,7 @@ argv = []
 config = []
 cpu = []
 disk = []
-exec_util = []
+exec = []
 fd = ["stat", "nix/ioctl", "nix/socket"]
 file = []
 fs = ["pathdiff", "rand", "nix/fs", "nix/user"]
@@ -121,5 +121,5 @@ sysfs = ["nix/dir"]
 unistd = ["nix/user"]
 unit_name = []
 uuid = ["bitflags", "random"]
-time_util = []
-path_util = []
+time = []
+path = []

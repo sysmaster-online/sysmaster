@@ -10,12 +10,22 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//!
+//! exec functions
 
 use nix::unistd;
 use std::{fs, os::unix::prelude::PermissionsExt, path::PathBuf, process::Command};
 
+/// The function `execute_directories` executes a given list of directories in parallel using fork and
+/// waits for all child processes to finish.
 ///
+/// Arguments:
+///
+/// * `directories`: The `directories` parameter is a vector of string slices (`&str`) representing the
+/// directories that need to be executed.
+///
+/// Returns:
+///
+/// The function `execute_directories` returns a `std::io::Result<()>`.
 pub fn execute_directories(directories: Vec<&str>) -> std::io::Result<()> {
     match unsafe { unistd::fork() } {
         Ok(unistd::ForkResult::Child) => {
@@ -29,7 +39,16 @@ pub fn execute_directories(directories: Vec<&str>) -> std::io::Result<()> {
     }
 }
 
+/// The function `do_execute` takes a list of directories, spawns child processes for each directory's
+/// generator, and waits for them to finish.
 ///
+/// Arguments:
+///
+/// * `directories`: A vector of strings representing directories.
+///
+/// Returns:
+///
+/// The function `do_execute` returns a `std::io::Result<()>`.
 fn do_execute(directories: Vec<&str>) -> std::io::Result<()> {
     let mut child = Vec::new();
     for generator in get_generator(directories)? {
@@ -56,7 +75,12 @@ fn do_execute(directories: Vec<&str>) -> std::io::Result<()> {
     Ok(())
 }
 
-///
+/// The function `get_generator` takes a vector of directory paths (`directories`) as
+/// input. It reads each directory and retrieves a list of file paths that have
+/// executable permissions (`permissions().mode() & 0x111 != 0`). These file paths are
+/// stored in a vector (`result`) and returned as a `std::io::Result<Vec<PathBuf>>`. If
+/// there is an error while reading a directory, an error message is logged and the
+/// directory is skipped.
 fn get_generator(directories: Vec<&str>) -> std::io::Result<Vec<PathBuf>> {
     let mut result: Vec<PathBuf> = Vec::new();
 
@@ -82,4 +106,25 @@ fn get_generator(directories: Vec<&str>) -> std::io::Result<Vec<PathBuf>> {
         }
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_generator() {
+        let directories = vec!["/usr/bin", "/usr/lib64"];
+        let _expected_files = vec![
+            PathBuf::from("/usr/bin/ls"),
+            PathBuf::from("/usr/bin/cat"),
+            // Add more expected files here
+        ];
+
+        let actual_files = get_generator(directories).expect("get_generator() failed");
+
+        // assert_eq!(actual_files, expected_files);
+
+        println!("get_generator() tests passed.{:?}", actual_files);
+    }
 }

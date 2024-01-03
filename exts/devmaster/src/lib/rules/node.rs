@@ -33,9 +33,9 @@
 //! directory, the directory will be removed.
 
 use crate::{error::*, log_dev, log_dev_option};
-use basic::fs_util::{chmod, path_simplify};
-use basic::fs_util::{fchmod_and_chown, futimens_opath, symlink};
-use basic::{fd_util::xopendirat, fs_util::remove_dir_until};
+use basic::fs::{chmod, path_simplify};
+use basic::fs::{fchmod_and_chown, futimens_opath, symlink};
+use basic::{fd::xopendirat, fs::remove_dir_until};
 use cluFlock::ExclusiveFlock;
 use device::Device;
 use libc::{mode_t, S_IFBLK, S_IFCHR, S_IFLNK, S_IFMT};
@@ -678,7 +678,7 @@ pub(crate) fn cleanup_prior_dir() -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use basic::fs_util::{is_symlink, touch_file};
+    use basic::fs::{is_symlink, touch_file};
     use device::device_enumerator::*;
     use device::utils::LoopDev;
     use nix::unistd::unlink;

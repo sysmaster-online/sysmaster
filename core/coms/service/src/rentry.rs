@@ -13,7 +13,7 @@
 #![allow(non_snake_case)]
 use crate::monitor::ServiceMonitor;
 
-use basic::fs_util::{path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify};
+use basic::fs::{path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify};
 use core::exec::PreserveMode;
 use macros::{EnumDisplay, UnitSection};
 use nix::sys::signal::Signal;
@@ -32,8 +32,8 @@ use core::exec::{ExecCommand, Rlimit, RuntimeDirectory, StateDirectory, WorkingD
 use core::rel::{ReDb, ReDbRwTxn, ReDbTable, ReliSwitch, Reliability};
 use core::unit::KillMode;
 
-use basic::time_util::USEC_PER_MSEC;
-use basic::time_util::USEC_PER_SEC;
+use basic::time::USEC_PER_MSEC;
+use basic::time::USEC_PER_SEC;
 use basic::EXEC_RUNTIME_PREFIX;
 
 struct ServiceReDb<K, V>(ReDb<K, V>);
@@ -232,7 +232,7 @@ fn parse_pidfile(s: &str) -> Result<PathBuf> {
 }
 
 fn parse_sec(s: &str) -> Result<u64> {
-    basic::time_util::parse_sec(s).context(NixSnafu)
+    basic::time::parse_sec(s).context(NixSnafu)
 }
 
 fn parse_timeout(s: &str) -> Result<u64> {
@@ -292,7 +292,7 @@ pub struct SectionService {
     pub Group: String,
     #[entry(default = String::from("0022"))]
     pub UMask: String,
-    #[entry(parser = basic::fs_util::parse_pathbuf)]
+    #[entry(parser = basic::fs::parse_pathbuf)]
     pub RootDirectory: Option<PathBuf>,
     #[entry(default = WorkingDirectory::default(), parser = core::exec::parse_working_directory)]
     pub WorkingDirectory: WorkingDirectory,

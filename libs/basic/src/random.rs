@@ -10,7 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-//!
+//! Random functions
 
 /// Get random data from getrandom() or '/dev/urandom'
 pub fn random_bytes(data: &mut [u8]) {
@@ -64,7 +64,7 @@ pub fn random_bytes(data: &mut [u8]) {
             log::error!("Failed to open /dev/urandom, err:{}", err);
         }
         Ok(mut file) => {
-            let _ = crate::io_util::loop_read_exact(&mut file, data);
+            let _ = crate::io::loop_read_exact(&mut file, data);
         }
     };
 }
