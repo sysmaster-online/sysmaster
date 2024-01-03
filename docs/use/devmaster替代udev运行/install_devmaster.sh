@@ -14,6 +14,8 @@ etc_dir=exts/devmaster/config
 etc_rules_dir=${etc_dir}/rules.d
 etc_netconf_dir=${etc_dir}/network.d
 
+dracut_modules=exts/devmaster/dracut_modules/95devmaster
+
 etc_conf_install_dir=/etc/devmaster
 etc_netconf_install_dir=${etc_conf_install_dir}/network.d
 etc_rules_install_dir=${etc_conf_install_dir}/rules.d
@@ -47,5 +49,8 @@ ln -sf ${service_install_dir}/devctl-trigger.service ${multi_user_target_dir}/de
 # Disable udev rules if they exists
 test -f ${sysinit_target_dir}/udevd.service && unlink ${sysinit_target_dir}/udevd.service
 test -f ${multi_user_target_dir}/udev-trigger.service && unlink ${multi_user_target_dir}/udev-trigger.service
+
+# Install dracut module of devmaster
+install -Dm0755 -t /lib/dracut/modules.d/95devmaster ${dracut_modules}/* || exit 1
 
 sync

@@ -8,7 +8,8 @@ etc_netconf_install_dir=${etc_conf_install_dir}/network.d
 etc_rules_install_dir=${etc_conf_install_dir}/rules.d
 
 lib_devmaster_dir=/lib/devmaster
-lib_rules_install_dir=${lib_devmaster_dir}/rules.d
+
+dracut_modules=/lib/dracut/modules.d/95devmaster
 
 service_install_dir=/lib/sysmaster/system
 sysinit_target_dir=/etc/sysmaster/system/sysinit.target.wants
@@ -21,6 +22,6 @@ done
 unlink ${sysinit_target_dir}/devmaster.service
 unlink ${multi_user_target_dir}/devctl-trigger.service
 
-rm -rf ${lib_devmaster_dir} ${etc_conf_install_dir}
+rm -rf ${lib_devmaster_dir} ${etc_conf_install_dir} ${dracut_modules}
 
 sync
