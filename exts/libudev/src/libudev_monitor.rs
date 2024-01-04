@@ -189,7 +189,7 @@ pub extern "C" fn udev_monitor_set_receive_buffer_size(
 ) -> ::std::os::raw::c_int {
     let m: &mut udev_monitor = unsafe { transmute(&mut *udev_monitor) };
 
-    if let Err(e) = basic::socket_util::set_receive_buffer(m.monitor.borrow().fd(), size as usize) {
+    if let Err(e) = basic::socket::set_receive_buffer(m.monitor.borrow().fd(), size as usize) {
         return e.get_errno() as i32;
     }
 
