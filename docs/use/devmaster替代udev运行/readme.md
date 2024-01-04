@@ -34,5 +34,5 @@ Linux localhost.localdomain 5.10.0-60.18.0.50.oe2203.x86_64 #1 SMP Wed Mar 30 03
 devmaster提供了dracut模块，用于制作initramfs时替换默认的udev组件。安装devmaster后，执行以下命令制作initramfs：
 
 ```shell
-# dracut -f --omit "systemd systemd-initrd systemd-networkd dracut-systemd rngd dbus-daemon dbus network-manager rngd plymouth" --add "devmaster"
+# dracut -f --omit "systemd systemd-initrd systemd-networkd dracut-systemd rngd dbus-daemon dbus network-manager plymouth" --add "devmaster"
 ```
