@@ -2,7 +2,7 @@
 
 check() {
     require_binaries devctl || return 1
-    return 0
+    return 255
 }
 
 # called by dracut
