@@ -9,7 +9,7 @@ etc_rules_install_dir=${etc_conf_install_dir}/rules.d
 
 lib_devmaster_dir=/lib/devmaster
 
-dracut_modules=/lib/dracut/modules.d/95devmaster
+dracut_modules=/lib/dracut/modules.d/98devmaster
 
 service_install_dir=/lib/sysmaster/system
 sysinit_target_dir=/etc/sysmaster/system/sysinit.target.wants

@@ -7,6 +7,11 @@ check() {
 
 # called by dracut
 install() {
+    rm -f "${initdir}${systemdutildir}"/systemd-udevd \
+        "${initdir}"/bin/udevadm \
+        "${initdir}"/sbin/udevd \
+        "${initdir}"/"${udevdir}"/udevd
+
     inst_script "$moddir/init.sh" "/init"
 
     inst_multiple devctl
