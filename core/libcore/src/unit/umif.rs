@@ -44,7 +44,7 @@ pub trait UmIf {
         false
     }
     /// check the unit s_u_name and t_u_name have atom relation
-    fn unit_has_dependecy(
+    fn unit_has_dependency(
         &self,
         _s_u_name: &str,
         _atom: UnitRelationAtom,
@@ -154,6 +154,16 @@ pub trait UmIf {
 
     /// call the exec spawn to start the child service
     fn trigger_unit(&self, _lunit: &str) {}
+
+    /// get trigger by id
+    fn unit_get_trigger(&self, _id: &str) -> String {
+        String::new()
+    }
+
+    /// Tests whether the unit to trigger is loaded
+    fn test_trigger_loaded(&self, _id: &str) -> bool {
+        false
+    }
 
     /// call the exec spawn to start the child service
     fn exec_spawn(

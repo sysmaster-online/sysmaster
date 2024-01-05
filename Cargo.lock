@@ -1339,6 +1339,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
 
 [[package]]
+name = "path"
+version = "0.5.1"
+dependencies = [
+ "basic",
+ "constants",
+ "core",
+ "event",
+ "libc",
+ "log 0.5.1",
+ "macros",
+ "nix 0.24.3",
+ "once_cell",
+ "serde",
+ "unit_parser",
+]
+
+[[package]]
 name = "pathdiff"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1878,6 +1895,7 @@ dependencies = [
  "mount",
  "nix 0.24.3",
  "once_cell",
+ "path",
  "regex",
  "serde",
  "service",

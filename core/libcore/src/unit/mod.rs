@@ -12,13 +12,15 @@
 
 //!
 pub use base::{unit_name_is_valid, SubUnit, UnitBase, UnitNameFlags};
-pub use deps::{UnitDependencyMask, UnitRelationAtom, UnitRelations, UnitType};
+pub use deps::{unit_name_to_type, UnitDependencyMask, UnitRelationAtom, UnitRelations, UnitType};
 pub use kill::{KillContext, KillMode, KillOperation};
+pub use path_spec::{PathSpec, PathType};
 pub use state::{UnitActiveState, UnitNotifyFlags, UnitStatus};
 pub use umif::{UmIf, UnitManagerObj, UnitMngUtil};
 
 mod base;
 mod deps;
 mod kill;
+mod path_spec;
 mod state;
 mod umif;

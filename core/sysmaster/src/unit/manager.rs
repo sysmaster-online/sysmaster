@@ -314,13 +314,17 @@ pub struct UnitManager {
 }
 
 impl UmIf for UnitManager {
-    /// check the unit s_u_name and t_u_name have atom relation
-    fn unit_has_dependecy(&self, s_u_name: &str, atom: UnitRelationAtom, t_u_name: &str) -> bool {
+    /// check the unit s_u_name and t_u_name have atom relation. If 't_u_name' is empty checks if the unit has any dependency of that atom.
+    fn unit_has_dependency(&self, s_u_name: &str, atom: UnitRelationAtom, t_u_name: &str) -> bool {
         let s_unit = if let Some(s_unit) = self.db.units_get(s_u_name) {
             s_unit
         } else {
             return false;
         };
+
+        if t_u_name.is_empty() {
+            return true;
+        }
 
         let t_unit = if let Some(unit) = self.db.units_get(t_u_name) {
             unit
@@ -475,6 +479,41 @@ impl UmIf for UnitManager {
     ///
     fn trigger_unit(&self, lunit: &str) {
         self.jm.trigger_unit(lunit)
+    }
+
+    /// get trigger by id
+    fn unit_get_trigger(&self, id: &str) -> String {
+        let deps = self.get_dependency_list(id, UnitRelationAtom::UnitAtomTriggers);
+
+        if !deps.is_empty() {
+            return deps[0].clone();
+        }
+
+        String::new()
+    }
+
+    /// Tests whether the unit to trigger is loaded
+    fn test_trigger_loaded(&self, id: &str) -> bool {
+        let trigger = self.unit_get_trigger(id);
+        if trigger.is_empty() {
+            log::error!("{} Refusing to start, no unit to trigger.", id);
+            return false;
+        }
+
+        match self.rentry.load_get(&trigger) {
+            Some(state) => {
+                if state == UnitLoadState::Loaded {
+                    return true;
+                }
+                log::error!(
+                    "{} Refusing to start, unit {} to trigger not loaded.",
+                    id,
+                    trigger,
+                );
+                false
+            }
+            None => true,
+        }
     }
 
     /// call the exec spawn to start the child service

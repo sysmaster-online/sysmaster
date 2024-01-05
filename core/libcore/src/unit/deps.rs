@@ -115,6 +115,7 @@ pub enum UnitType {
     UnitSocket,
     UnitMount,
     UnitTimer,
+    UnitPath,
     UnitTypeMax,
     UnitTypeInvalid,
     UnitTypeErrnoMax,
@@ -129,6 +130,7 @@ impl UnitType {
             UnitType::UnitSocket,
             UnitType::UnitMount,
             UnitType::UnitTimer,
+            UnitType::UnitPath,
         ]
         .iter()
         .copied()
@@ -145,6 +147,7 @@ impl FromStr for UnitType {
             "socket" => UnitType::UnitSocket,
             "mount" => UnitType::UnitMount,
             "timer" => UnitType::UnitTimer,
+            "path" => UnitType::UnitPath,
             _ => UnitType::UnitTypeInvalid,
         };
         Ok(ret)
@@ -159,6 +162,7 @@ impl From<UnitType> for String {
             UnitType::UnitSocket => "socket".into(),
             UnitType::UnitMount => "mount".into(),
             UnitType::UnitTimer => "timer".into(),
+            UnitType::UnitPath => "path".into(),
             UnitType::UnitTypeMax => null_str!(""),
             UnitType::UnitTypeInvalid => null_str!(""),
             UnitType::UnitTypeErrnoMax => null_str!(""),
@@ -175,7 +179,17 @@ impl TryFrom<u32> for UnitType {
             2 => Ok(UnitType::UnitSocket),
             3 => Ok(UnitType::UnitMount),
             4 => Ok(UnitType::UnitTimer),
+            5 => Ok(UnitType::UnitPath),
             v => Err(format!("input {} is invalid", v)),
         }
     }
+}
+
+/// parse UnitType by unit_name
+pub fn unit_name_to_type(unit_name: &str) -> UnitType {
+    let words: Vec<&str> = unit_name.split('.').collect();
+    if words.is_empty() {
+        return UnitType::UnitTypeInvalid;
+    }
+    UnitType::from_str(words[words.len() - 1]).unwrap_or(UnitType::UnitTypeInvalid)
 }

@@ -823,6 +823,13 @@ bitflags! {
     }
 }
 
+/// parse file mode bits
+pub fn parse_mode(s: &str) -> Result<u32, Error> {
+    u32::from_str_radix(s, 8).map_err(|_| Error::ConfigureError {
+        msg: format!("Invalid SocketMode: {}", s),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -946,5 +953,17 @@ mod tests {
             Some(PathBuf::from(std::env::var("HOME").unwrap()))
         );
         assert_eq!(parse_working_directory("").unwrap().directory(), None);
+    }
+
+    use super::parse_mode;
+    #[test]
+    fn test_parse_mode() {
+        assert_eq!(parse_mode("777").unwrap(), 0o777);
+        assert_eq!(parse_mode("644").unwrap(), 0o644);
+        assert!(parse_mode("-777").is_err());
+        assert!(parse_mode("787").is_err());
+        assert!(parse_mode("777aa").is_err());
+        assert!(parse_mode("aaaaa").is_err());
+        assert!(parse_mode("777 aa").is_err());
     }
 }

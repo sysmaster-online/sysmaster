@@ -59,6 +59,8 @@ mod noplugin {
     use core::unit::{SubUnit, UnitManagerObj, UnitType};
     #[cfg(feature = "mount")]
     use mount::{self};
+    #[cfg(feature = "path")]
+    use path::{self};
     #[cfg(feature = "service")]
     use service::{self};
     #[cfg(feature = "socket")]
@@ -86,6 +88,8 @@ mod noplugin {
             UnitType::UnitTarget => target::__um_obj_create,
             #[cfg(feature = "timer")]
             UnitType::UnitTimer => timer::__um_obj_create,
+            #[cfg(feature = "path")]
+            UnitType::UnitPath => path::__um_obj_create,
             _ => {
                 return Err(Error::Other {
                     msg: "Component unsupported!".to_string(),
@@ -114,6 +118,8 @@ mod noplugin {
             UnitType::UnitTarget => target::__subunit_create_with_params,
             #[cfg(feature = "timer")]
             UnitType::UnitTimer => timer::__subunit_create_with_params,
+            #[cfg(feature = "path")]
+            UnitType::UnitPath => path::__subunit_create_with_params,
             _ => {
                 return Err(Error::Other {
                     msg: "Component unsupported!".to_string(),

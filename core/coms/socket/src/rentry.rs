@@ -41,12 +41,6 @@ fn parse_pathbuf_vec(s: &str) -> Result<Vec<PathBuf>, core::error::Error> {
     Ok(res)
 }
 
-fn deserialize_parse_mode(s: &str) -> Result<u32, core::error::Error> {
-    u32::from_str_radix(s, 8).map_err(|_| core::error::Error::ConfigureError {
-        msg: format!("Invalid SocketMode: {}", s),
-    })
-}
-
 fn deserialize_netlink_vec(s: &str) -> Result<Vec<String>, core::error::Error> {
     Ok(vec![s.to_string()])
 }
@@ -97,7 +91,7 @@ pub(super) struct SectionSocket {
     #[entry(append, parser = parse_pathbuf_vec)]
     pub Symlinks: Vec<PathBuf>,
     pub PassSecurity: Option<bool>,
-    #[entry(default = 0o666, parser = deserialize_parse_mode)]
+    #[entry(default = 0o666, parser = core::exec::parse_mode)]
     pub SocketMode: u32,
     #[entry(default = String::new())]
     pub SocketUser: String,
@@ -413,22 +407,5 @@ impl ReDbTable for SocketReDb<u32, SocketReFrame> {
 
     fn switch_set(&self, switch: ReliSwitch) {
         self.0.switch_buffer(switch);
-    }
-}
-
-#[cfg(test)]
-
-mod test {
-    use super::deserialize_parse_mode;
-
-    #[test]
-    fn test_deserialize_parse_mode() {
-        assert_eq!(deserialize_parse_mode("777").unwrap(), 0o777);
-        assert_eq!(deserialize_parse_mode("644").unwrap(), 0o644);
-        assert!(deserialize_parse_mode("-777").is_err());
-        assert!(deserialize_parse_mode("787").is_err());
-        assert!(deserialize_parse_mode("777aa").is_err());
-        assert!(deserialize_parse_mode("aaaaa").is_err());
-        assert!(deserialize_parse_mode("777 aa").is_err());
     }
 }

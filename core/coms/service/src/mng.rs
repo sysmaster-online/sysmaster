@@ -10,8 +10,6 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use crate::monitor::ServiceMonitor;
-
 use super::comm::ServiceUnitComm;
 use super::config::ServiceConfig;
 use super::pid::ServicePid;
@@ -19,18 +17,18 @@ use super::rentry::{
     NotifyState, ServiceCommand, ServiceRestart, ServiceResult, ServiceState, ServiceType,
 };
 use super::spawn::ServiceSpawn;
+use crate::monitor::ServiceMonitor;
 use crate::rentry::{ExitStatus, NotifyAccess};
-use basic::{do_entry_log, fd, IN_SET};
+use basic::{do_entry_log, IN_SET};
 use basic::{fs, process};
 use core::error::*;
 use core::exec::{ExecCommand, ExecContext, ExecFlag, ExecFlags, PreserveMode};
 use core::rel::ReStation;
 use core::unit::{KillOperation, UnitActiveState, UnitNotifyFlags};
+use core::unit::{PathSpec, PathType};
 use event::{EventState, EventType, Events, Source};
 use log::Level;
-use nix::errno::Errno;
 use nix::libc;
-use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, WatchDescriptor};
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
 use nix::sys::wait::WaitStatus;
@@ -38,13 +36,9 @@ use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
-use std::os::unix::prelude::AsRawFd;
-use std::rc::Rc;
-use std::{
-    os::unix::prelude::{FromRawFd, RawFd},
-    path::PathBuf,
-    rc::Weak,
-};
+use std::os::unix::prelude::RawFd;
+use std::path::PathBuf;
+use std::rc::{Rc, Weak};
 
 pub(super) struct ServiceMng {
     // associated objects
@@ -1118,7 +1112,8 @@ impl ServiceMng {
     }
 
     fn demand_pid_file(&self) -> Result<()> {
-        let pid_file_inotify = PathInotify::new(self.config.pid_file().unwrap());
+        let pid_file_inotify =
+            PathInotify::new(self.config.pid_file().unwrap(), PathType::Modified);
 
         self.rd.attach_inotify(Rc::new(pid_file_inotify));
 
@@ -1128,7 +1123,7 @@ impl ServiceMng {
     fn watch_pid_file(&self) -> Result<()> {
         let pid_file_inotify = self.rd.path_inotify();
         log::debug!("watch pid file: {}", pid_file_inotify);
-        match pid_file_inotify.add_watch_path() {
+        match pid_file_inotify.watch() {
             Ok(_) => {
                 let events = self.comm.um().events();
                 let source = Rc::clone(&pid_file_inotify);
@@ -1144,8 +1139,8 @@ impl ServiceMng {
 
             Err(e) => {
                 log::debug!(
-                    "failed to add watch for pid file {:?}, err: {}",
-                    pid_file_inotify.path,
+                    "failed to add watch for pid file {}, err: {}",
+                    pid_file_inotify,
                     e
                 );
                 self.unwatch_pid_file();
@@ -2202,39 +2197,21 @@ impl Rtdata {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone, Hash)]
-enum PathType {
-    Changed,
-    Modified,
-}
-
 struct PathInotify {
-    path: PathBuf,
-    p_type: PathType,
-    inotify: RefCell<RawFd>,
-    wd: RefCell<Option<WatchDescriptor>>,
+    spec: PathSpec,
     mng: RefCell<Weak<ServiceMng>>,
 }
 
 impl fmt::Display for PathInotify {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "path: {:?}, path type: {:?}, inotify fd: {}",
-            self.path,
-            self.p_type,
-            *self.inotify.borrow()
-        )
+        write!(f, "{}", self.spec)
     }
 }
 
 impl PathInotify {
-    fn new(path: PathBuf) -> Self {
+    fn new(path: PathBuf, p_type: PathType) -> Self {
         PathInotify {
-            path,
-            p_type: PathType::Modified,
-            inotify: RefCell::new(-1),
-            wd: RefCell::new(None),
+            spec: PathSpec::new(path, p_type),
             mng: RefCell::new(Weak::new()),
         }
     }
@@ -2244,102 +2221,12 @@ impl PathInotify {
         *self.mng.borrow_mut() = mng;
     }
 
-    fn add_watch_path(&self) -> Result<bool> {
-        self.unwatch();
-
-        let inotify = Inotify::init(InitFlags::all()).map_err(|_e| Error::Other {
-            msg: "create initofy fd err".to_string(),
-        })?;
-        *self.inotify.borrow_mut() = inotify.as_raw_fd();
-
-        let ansters = self.path.as_path().ancestors();
-        let mut primary: bool = true;
-        let mut flags: AddWatchFlags;
-
-        let mut exist = false;
-        for anster in ansters {
-            flags = if primary {
-                AddWatchFlags::IN_DELETE_SELF
-                    | AddWatchFlags::IN_MOVE_SELF
-                    | AddWatchFlags::IN_ATTRIB
-                    | AddWatchFlags::IN_CLOSE_WRITE
-                    | AddWatchFlags::IN_CREATE
-                    | AddWatchFlags::IN_DELETE
-                    | AddWatchFlags::IN_MOVED_FROM
-                    | AddWatchFlags::IN_MOVED_TO
-                    | AddWatchFlags::IN_MODIFY
-            } else {
-                AddWatchFlags::IN_DELETE_SELF
-                    | AddWatchFlags::IN_MOVE_SELF
-                    | AddWatchFlags::IN_ATTRIB
-                    | AddWatchFlags::IN_CREATE
-                    | AddWatchFlags::IN_MOVED_TO
-            };
-
-            log::debug!(
-                "inotify fd is: {}, flags is: {:?}, path: {:?}",
-                *self.inotify.borrow(),
-                flags,
-                anster
-            );
-
-            match inotify.add_watch(anster, flags) {
-                Ok(wd) => {
-                    if primary {
-                        *self.wd.borrow_mut() = Some(wd);
-                    }
-
-                    exist = true;
-                    break;
-                }
-                Err(err) => {
-                    log::error!("watch on path {:?} error: {:?}", anster, err);
-                }
-            }
-
-            primary = false;
-        }
-
-        if !exist {
-            return Err(Error::Other {
-                msg: "watch on any of the ancestor failed".to_string(),
-            });
-        }
-
-        Ok(true)
+    fn watch(&self) -> Result<()> {
+        self.spec.watch()
     }
 
     fn unwatch(&self) {
-        fd::close(*self.inotify.borrow());
-        *self.inotify.borrow_mut() = -1;
-    }
-
-    fn read_fd_event(&self) -> Result<bool> {
-        let inotify = unsafe { Inotify::from_raw_fd(*self.inotify.borrow_mut()) };
-        let events = match inotify.read_events() {
-            Ok(events) => events,
-            Err(e) => {
-                if e == Errno::EAGAIN || e == Errno::EINTR {
-                    return Ok(false);
-                }
-
-                return Err(Error::Other {
-                    msg: "read evnets from inotify error".to_string(),
-                });
-            }
-        };
-
-        if IN_SET!(self.p_type, PathType::Changed, PathType::Modified) {
-            for event in events {
-                if let Some(ref wd) = *self.wd.borrow() {
-                    if event.wd == *wd {
-                        return Ok(true);
-                    }
-                }
-            }
-        }
-
-        Ok(false)
+        self.spec.unwatch()
     }
 
     pub(self) fn mng(&self) -> Rc<ServiceMng> {
@@ -2347,8 +2234,8 @@ impl PathInotify {
     }
 
     fn do_dispatch(&self) -> i32 {
-        log::debug!("dispatch inotify pid file: {:?}", self.path);
-        match self.read_fd_event() {
+        log::debug!("dispatch inotify pid file: {:?}", self.spec.path());
+        match self.spec.read_fd_event() {
             Ok(_) => {
                 if let Ok(_v) = self.mng().retry_pid_file() {
                     return 0;
@@ -2373,7 +2260,7 @@ impl PathInotify {
 
 impl Source for PathInotify {
     fn fd(&self) -> RawFd {
-        *self.inotify.borrow()
+        self.spec.inotify_fd()
     }
 
     fn event_type(&self) -> EventType {

@@ -358,15 +358,19 @@ pub fn mkdir_p_label(path: &Path, mode: u32) -> Result<()> {
 pub fn mkdir_parents_label() {}
 
 /// check if the given directory is not empty
-pub fn directory_is_not_empty(path: &Path) -> bool {
+pub fn directory_is_not_empty(path: &Path) -> Result<bool> {
     if path.is_file() {
-        return false;
+        return Ok(false);
     }
     let mut iter = match path.read_dir() {
-        Err(_) => return false,
+        Err(err) => {
+            return Err(Error::Nix {
+                source: nix::Error::from_i32(err.raw_os_error().unwrap_or_default()),
+            })
+        }
         Ok(v) => v,
     };
-    iter.next().is_some()
+    Ok(iter.next().is_some())
 }
 
 /// check if the given directory is empty

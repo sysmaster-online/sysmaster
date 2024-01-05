@@ -86,7 +86,11 @@ const RELI_DB_HTARGET_MNG: &str = "tarmng";
 const RELI_DB_HTIMER_CONF: &str = "timerconf";
 const RELI_DB_HTIMER_MNG: &str = "timermng";
 
-pub const RELI_HISTORY_MAX_DBS: u32 = 20;
+/* path */
+const RELI_DB_HPATH_CONF: &str = "pathconf";
+const RELI_DB_HPATH_MNG: &str = "pathmng";
+
+pub const RELI_HISTORY_MAX_DBS: u32 = 22;
 #[allow(dead_code)]
 static RELI_HISTORY_DB_NAME: [&str; RELI_HISTORY_MAX_DBS as usize] = [
     RELI_DB_HJOB_TRIGGER,
@@ -109,4 +113,6 @@ static RELI_HISTORY_DB_NAME: [&str; RELI_HISTORY_MAX_DBS as usize] = [
     RELI_DB_HTARGET_MNG,
     RELI_DB_HTIMER_CONF,
     RELI_DB_HTIMER_MNG,
+    RELI_DB_HPATH_CONF,
+    RELI_DB_HPATH_MNG,
 ];

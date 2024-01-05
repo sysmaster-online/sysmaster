@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 # internal libraries
 basic = { path = "../../libs/basic", default-features = false, features = [
+    "fd",
     "fs",
     "rlimit",
     "show_table",

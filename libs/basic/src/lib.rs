@@ -33,6 +33,8 @@ pub mod exec;
 pub mod fd;
 #[cfg(feature = "fs")]
 pub mod fs;
+#[cfg(feature = "glob")]
+pub mod glob;
 #[cfg(feature = "host")]
 pub mod host;
 #[cfg(feature = "id128")]
@@ -103,9 +105,10 @@ pub const DEFAULT_TARGET: &str = "default.target";
 pub const SHUTDOWN_TARGET: &str = "shutdown.target";
 /// the socketc target
 pub const SOCKETS_TARGET: &str = "sockets.target";
-
 /// the timer target
 pub const TIMERS_TARGET: &str = "timers.target";
+/// the path target
+pub const PATHS_TARGET: &str = "paths.target";
 
 /// early boot targets
 pub const SYSINIT_TARGET: &str = "sysinit.target";

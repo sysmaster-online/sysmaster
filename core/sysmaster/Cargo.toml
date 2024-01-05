@@ -141,8 +141,13 @@ path = "../coms/timer"
 optional = true
 default-features = false
 
+[dependencies.path]
+path = "../coms/path"
+optional = true
+default-features = false
+
 [features]
-default = ["linux", "noplugin", "mount", "socket", "service", "target", "timer"]
+default = ["linux", "noplugin", "mount", "socket", "service", "target", "timer", "path"]
 hongmeng = []
 linux = []
 noplugin = []
