@@ -3,43 +3,77 @@ set -e
 arch=$(uname -m)
 vendor="openeuler-22.03LTS_SP1"
 force=false
-
-# 处理参数
-while [[ $# -gt 0 ]]
+mode="release"
+while IFS='=' read -r key value
 do
-    key="$1"
-    case $key in
-        --force)
-        force=true
-        shift # 移除参数
-        ;;
-        *)
-        if [ $# -ne 1 ]; then
-            echo "More than one argument supplied, not supported"
-            echo "./build_rpm.sh [openeuler-22.03LTS_SP1]"
-            exit 1
-        else
-            vendor=$1
-        fi
-        shift # 移除参数
-        ;;
-    esac
-done
+    if [[ $key == "ID" ]]; then
+        ID=$value
+    elif [[ $key == "VERSION_ID" ]]; then
+        VERSION_ID=$value
+    fi
+done < "/etc/os-release"
+
+# Concatenate the values
+vendor="${ID}-${VERSION_ID}"
 
 # 获取当前脚本的目录
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 ROOTDIR=$SCRIPT_DIR
-
 # 递归向上查找包含 Cargo.toml 文件的目录
 while [ ! -f "$ROOTDIR/Cargo.lock" ] && [ "$ROOTDIR" != "/" ]; do
     ROOTDIR=$(dirname "$ROOTDIR")
 done
+
+# 处理参数
+TEMP=`getopt -o fv:m:h --long force,vendor:,mode:,help -n 'build_rpm.sh' -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
+eval set -- "$TEMP"
+while true ; do
+    case "$1" in
+        -f|--force)
+            force=true
+            shift
+            ;;
+        -v|--vendor)
+            vendor="$2"
+            shift 2
+            ;;
+        -m|--mode)
+            mode="$2"
+            shift 2
+            ;;
+        -h|--help)
+            echo "Usage: $0 [options]"
+            echo "Options:"
+            echo "  -f, --force      强制执行, 跳过源码打包"
+            echo "  -m, --mode       设置模式,默认为release,可选值为debug"
+            echo "  --vendor         设置供应商,默认为/etc/os-release中$ID-$VERSION_ID,vendor支持的配置在/etc/mock目录下"
+            echo "  --help           显示帮助"
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            echo "Unsupported option $1!"
+            exit 1
+            ;;
+    esac
+done
+
+real_vendor=
+if [[ "$vendor" != *"openeuler"* ]]; then
+    configdir=""
+fi
+
 
 pushd $ROOTDIR
 version_line=$(grep -Eo '^version = "[0-9]+\.[0-9]+\.[0-9]+"' ./Cargo.toml)
 version=$(echo "$version_line" | awk -F'"' '{print $2}')
 
 TARGETDIR=$ROOTDIR/target/rpms
+# 利用cargo vendor构建源码包
 if [ "$force" = false ]; then
     rm -rf $TARGETDIR
     mkdir -p $TARGETDIR
@@ -96,16 +130,43 @@ if [ "$force" = false ]; then
         rm -rf sysmaster-$version
     popd > /dev/null 2>&1
 fi
-set +e
+
 # 构建srpm
 sudo dnf install -y mock rpm-build createrepo
-sudo groupadd mock
-sudo usermod -a -G mock $(who | awk '{print $1}' | sort -u)
+sudo groupadd mock | true
+sudo usermod -a -G mock $(who | awk '{print $1}' | sort -u) | true
 cp -a $SCRIPT_DIR/* $TARGETDIR
-mock -r $vendor-$arch --configdir $TARGETDIR --no-clean --isolation simple --buildsrpm --spec $TARGETDIR/sysmaster.spec  --sources=$TARGETDIR/sysmaster-$version.tar.xz --resultdir $TARGETDIR
+
+if [ "$mode" = "debug" ]; then
+    pushd $TARGETDIR
+    echo "Mode is set to debug"
+    sed -i 's/target\/release/target\/debug/g' sysmaster.spec
+    sed -i 's/--profile release/--profile dev/g' sysmaster.spec
+    popd
+fi
+
+configdir="--configdir $TARGETDIR"
+if [[ "$vendor" != *"openeuler"* ]]; then
+    configdir=""
+fi
+mock -r $vendor-$arch $configdir --no-clean --isolation simple --buildsrpm --spec $TARGETDIR/sysmaster.spec  --sources=$TARGETDIR/sysmaster-$version.tar.xz --resultdir $TARGETDIR
 
 # rebuild构建rpms, 结果输出到target/rpms目录下
 srpms=$(ls $TARGETDIR/sysmaster-*.src.rpm)
-mock -r $vendor-$arch --configdir $TARGETDIR --no-clean --isolation simple --rebuild  $srpms --resultdir $TARGETDIR
+mock -r $vendor-$arch $configdir --no-clean --isolation simple --rebuild  $srpms --resultdir $TARGETDIR
 createrepo_c $TARGETDIR
 popd
+
+file_path="/etc/yum.repos.d/sysmaster.repo"
+
+# Create the file
+sudo touch $file_path
+
+# Write the content to the file
+sudo echo "[sysmaster]" >> $file_path
+sudo echo "name=My sysMaster Repository" >> $file_path
+sudo echo "baseurl=$TARGETDIR" >> $file_path
+sudo echo "enabled=1" >> $file_path
+sudo echo "gpgcheck=0" >> $file_path
+
+echo "---sysmaster repo created at $file_path, you can use `yum install sysmaster` to install it---"

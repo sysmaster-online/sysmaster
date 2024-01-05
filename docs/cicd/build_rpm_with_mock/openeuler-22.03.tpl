@@ -35,11 +35,4 @@ metalink=https://mirrors.openeuler.org/metalink?repo=$releasever/everything&arch
 enabled=1
 gpgcheck=0
 gpgkey=file:///usr/share/distribution-gpg-keys/openeuler/RPM-GPG-KEY-openEuler-EulerMaker
-
-[update]
-name=update
-metalink=https://mirrors.openeuler.org/metalink?repo=$releasever/update&arch=$basearch
-enabled=1
-gpgcheck=0
-gpgkey=file:///usr/share/distribution-gpg-keys/openeuler/RPM-GPG-KEY-openEuler-EulerMaker
 """
