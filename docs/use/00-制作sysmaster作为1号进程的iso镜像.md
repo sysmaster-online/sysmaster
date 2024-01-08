@@ -32,7 +32,24 @@ mkdir iso
 mount openEuler-22.03-LTS-SP2-everything-aarch64-dvd.iso iso
 ```
 
-3、定制sysmaster软件包，在sysmaster的spec脚本中编写posttrans脚本
+3、定制sysmaster软件包，在sysmaster的spec文件进行定制修改
+
+3.1、在%install中新增安装95devmaster/init.sh和95devmaster/module-setup.sh文件：
+
+```
+mkdir -p %{buildroot}/usr/lib/dracut/modules.d/95devmaster
+install -Dm0755 -t %{buildroot}/usr/lib/dracut/modules.d/95devmaster exts/devmaster/dracut_modules/95devmaster/init.sh
+install -Dm0755 -t %{buildroot}/usr/lib/dracut/modules.d/95devmaster exts/devmaster/dracut_modules/95devmaster/module-setup.sh
+```
+
+3.2、在%files -n devmaster中打包95devmaster/init.sh和95devmaster/module-setup.sh文件
+
+```
+%dir /usr/lib/dracut/modules.d/95devmaster
+/usr/lib/dracut/modules.d/95devmaster/*
+```
+
+3.3、编写posttrans脚本：
 
 ```
 %posttrans
@@ -41,8 +58,8 @@ if [ -L "/usr/sbin/init" ]; then
 fi
 ln -s /usr/lib/sysmaster/init /usr/sbin/init
 
-#iso安装所有包之后会重做小系统，删除这些目录，确保重做的小系统不包含systemd相关信息，等效于重新执行了：dracut -f --omit "systemd systemd-initrd systemd-networkd dracut-systemd" /boot/initramfs-`uname -r`.img命令
-rm -rf /usr/lib/dracut/modules.d/00systemd /usr/lib/dracut/modules.d/01systemd-initrd /usr/lib/dracut/modules.d/01systemd-networkd /usr/lib/dracut/modules.d/98dracut-systemd
+#iso安装所有包之后会重做小系统，删除这些目录，确保重做的小系统不包含systemd相关信息，等效于重新执行了：dracut -f --omit "systemd systemd-initrd systemd-networkd dracut-systemd rngd dbus-daemon dbus network-manager plymouth" /boot/initramfs-`uname -r`.img命令
+rm -rf /usr/lib/dracut/modules.d/00systemd /usr/lib/dracut/modules.d/01systemd-initrd /usr/lib/dracut/modules.d/01systemd-networkd /usr/lib/dracut/modules.d/98dracut-systemd /usr/lib/dracut/modules.d/06rngd /usr/lib/dracut/modules.d/06dbus-daemon /usr/lib/dracut/modules.d/09dbus /usr/lib/dracut/modules.d/35network-manager /usr/lib/dracut/modules.d/50plymouth
 ```
 
 4、将编译出来的sysmaster和devmaster包下载下来保存在/root/repo目录
