@@ -455,7 +455,7 @@ impl Plugin {
         &self,
         unit_type: UnitType,
         um: Rc<dyn UmIf>,
-    ) -> Result<Rc<dyn SubUnit>> {
+    ) -> Result<Box<dyn SubUnit>> {
         type FnType = fn(um: Rc<dyn UmIf>) -> *mut dyn SubUnit;
 
         let dy_lib = match self.get_lib(unit_type) {
@@ -484,8 +484,8 @@ impl Plugin {
         };
 
         log::debug!("create unit obj with params");
-        let rced_raw = fun(um.clone());
-        Ok(unsafe { Rc::from_raw(rced_raw) })
+        let boxed_raw = fun(um.clone());
+        Ok(unsafe { Box::from_raw(boxed_raw) })
     }
     /// Create a  obj for subclasses of unit manager
     /// each sub unit manager need reference of declare_umobj_plugin

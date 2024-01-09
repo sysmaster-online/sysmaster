@@ -11,16 +11,17 @@
 // See the Mulan PSL v2 for more details.
 //
 #![allow(non_snake_case)]
-use core::exec::ExecCommand;
+use core::exec::{parse_mode, ExecCommand};
 use core::rel::{ReDb, ReDbRwTxn, ReDbTable, ReliSwitch, Reliability};
 use core::unit::KillMode;
+use core::Error;
 use macros::EnumDisplay;
 use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
 use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
 use std::rc::Rc;
-use unit_parser::prelude::UnitSection;
+use unit_parser::prelude::{UnitEntry, UnitSection};
 
 struct SocketReDb<K, V>(ReDb<K, V>);
 
@@ -103,6 +104,78 @@ pub(super) struct SectionSocket {
     pub KillMode: KillMode,
     #[entry(default = String::from("SIGTERM"))]
     pub KillSignal: String,
+}
+
+impl SectionSocket {
+    pub(super) fn set_property(
+        &mut self,
+        key: &str,
+        value: &str,
+    ) -> Result<(), core::error::Error> {
+        match key {
+            "ExecStartPre" => self.ExecStartPre = core::exec::parse_exec_command(value)?,
+            "ExecStartPost" => self.ExecStartPost = core::exec::parse_exec_command(value)?,
+            "ExecStopPre" => self.ExecStopPre = core::exec::parse_exec_command(value)?,
+            "ExecStopPost" => self.ExecStopPost = core::exec::parse_exec_command(value)?,
+            "ListenStream" => {
+                self.ListenStream = value
+                    .split_whitespace()
+                    .map(|str| str.to_string())
+                    .collect()
+            }
+            "ListenDatagram" => {
+                self.ListenDatagram = value
+                    .split_whitespace()
+                    .map(|str| str.to_string())
+                    .collect()
+            }
+            "ListenNetlink" => self.ListenNetlink = deserialize_netlink_vec(value)?,
+            "ListenSequentialPacket" => {
+                self.ListenSequentialPacket = value
+                    .split_whitespace()
+                    .map(|str| str.to_string())
+                    .collect()
+            }
+            "ListenFIFO" => {
+                self.ListenFIFO = value
+                    .split_whitespace()
+                    .map(|str| str.to_string())
+                    .collect()
+            }
+            "ListenSpecial" => {
+                self.ListenSpecial = value
+                    .split_whitespace()
+                    .map(|str| str.to_string())
+                    .collect()
+            }
+            "Accept" => self.Accept = basic::config::parse_boolean(value)?,
+            "FlushPending" => self.FlushPending = basic::config::parse_boolean(value)?,
+            "ReceiveBuffer" => self.ReceiveBuffer = Some(value.parse::<u64>()?),
+            "SendBuffer" => self.SendBuffer = Some(value.parse::<u64>()?),
+            "PassCredentials" => self.PassCredentials = Some(basic::config::parse_boolean(value)?),
+            "PassPacketInfo" => self.PassPacketInfo = Some(basic::config::parse_boolean(value)?),
+            "KeepAlive" => self.KeepAlive = Some(basic::config::parse_boolean(value)?),
+            "KeepAliveTimeSec" => self.KeepAliveTimeSec = Some(value.parse::<u32>()?),
+            "KeepAliveIntervalSec" => self.KeepAliveIntervalSec = Some(value.parse::<u32>()?),
+            "KeepAliveProbes" => self.KeepAliveProbes = Some(value.parse::<u32>()?),
+            "Broadcast" => self.Broadcast = Some(basic::config::parse_boolean(value)?),
+            "RemoveOnStop" => self.RemoveOnStop = basic::config::parse_boolean(value)?,
+            "Symlinks" => self.Symlinks = parse_pathbuf_vec(value)?,
+            "PassSecurity" => self.PassSecurity = Some(basic::config::parse_boolean(value)?),
+            "SocketMode" => self.SocketMode = parse_mode(value)?,
+            "SocketUser" => self.SocketUser = value.to_string(),
+            "SocketGroup" => self.SocketGroup = value.to_string(),
+            //kill context
+            "KillMode" => self.KillMode = KillMode::parse_from_str(value)?,
+            "KillSignal" => self.KillSignal = value.to_string(),
+            str_key => {
+                return Err(Error::NotFound {
+                    what: format!("set property:{}", str_key),
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

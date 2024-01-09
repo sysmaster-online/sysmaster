@@ -17,7 +17,7 @@ use constants::LOG_FILE_PATH;
 
 use super::comm::PathUmComm;
 use core::rel::{ReStation, Reliability};
-use core::unit::{UmIf, UnitManagerObj, UnitMngUtil};
+use core::unit::{UmIf, UnitManagerObj, UnitMngUtil, UnitType};
 use std::rc::Rc;
 use std::sync::Arc;
 struct PathManager {
@@ -35,7 +35,13 @@ impl PathManager {
 }
 
 impl UnitManagerObj for PathManager {
-    // nothing to customize
+    fn private_section(&self, _unit_type: UnitType) -> String {
+        "Path".into()
+    }
+
+    fn can_transient(&self, _unit_type: UnitType) -> bool {
+        true
+    }
 }
 
 impl ReStation for PathManager {

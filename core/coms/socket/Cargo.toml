@@ -14,6 +14,7 @@ basic = { path = "../../../libs/basic", default-features = false, features = [
     "io",
     "fd",
     "socket",
+    "config",
 ] }
 constants = { path = "../../../libs/constants" }
 core = { path = "../../libcore", default-features = false }

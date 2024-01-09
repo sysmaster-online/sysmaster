@@ -58,6 +58,10 @@ impl TimerConfigData {
     pub(self) fn new(Timer: SectionTimer) -> TimerConfigData {
         TimerConfigData { Timer }
     }
+
+    pub(self) fn set_property(&mut self, key: &str, value: &str) -> Result<(), core::error::Error> {
+        self.Timer.set_property(key, value)
+    }
 }
 
 pub struct TimerConfig {
@@ -242,5 +246,11 @@ impl TimerConfig {
         if let Some(u) = self.comm.owner() {
             self.timerunitref.borrow_mut().set_ref(u.id(), target)
         };
+    }
+
+    pub(super) fn set_property(&self, key: &str, value: &str) -> Result<(), core::error::Error> {
+        let ret = self.data.borrow_mut().set_property(key, value);
+        self.db_update();
+        ret
     }
 }

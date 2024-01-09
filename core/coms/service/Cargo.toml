@@ -16,6 +16,7 @@ basic = { path = "../../../libs/basic", default-features = false, features = [
     "fd",
     "unit_name",
     "time",
+    "config",
 ] }
 cgroup = { path = "../../../libs/cgroup", default-features = false }
 constants = { path = "../../../libs/constants" }

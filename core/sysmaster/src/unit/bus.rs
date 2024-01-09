@@ -15,7 +15,8 @@ use super::entry::UnitX;
 use super::rentry::{self, UnitLoadState};
 use super::submanager::UnitSubManagers;
 use super::uload::UnitLoad;
-use basic::fs_util::RUN_TRANSIENT_PATH;
+use basic::fs::RUN_TRANSIENT_PATH;
+use cmdproto::proto::transient_unit_comm::UnitProperty;
 use core::error::*;
 use core::rel::Reliability;
 use core::unit::{self, UnitType, UnitWriteFlags};
@@ -50,7 +51,7 @@ impl UnitBus {
 
     pub(super) fn transient_unit_from_message(
         &self,
-        properties: &[(&str, &str)],
+        properties: &[UnitProperty],
         name: &str,
     ) -> Result<Rc<UnitX>> {
         let unit_type = rentry::unit_name_to_type(name);
@@ -94,7 +95,7 @@ impl UnitBus {
         !exist
     }
 
-    fn unit_make_transient(&self, unit: &Rc<UnitX>, properties: &[(&str, &str)]) -> Result<()> {
+    fn unit_make_transient(&self, unit: &Rc<UnitX>, properties: &[UnitProperty]) -> Result<()> {
         self.reli.set_last_unit(&unit.id());
         let ret = self.unit_make_transient_body(unit, properties);
         self.reli.clear_last_unit();
@@ -107,7 +108,7 @@ impl UnitBus {
     fn unit_make_transient_body(
         &self,
         unit: &Rc<UnitX>,
-        properties: &[(&str, &str)],
+        properties: &[UnitProperty],
     ) -> Result<()> {
         let name = unit.id();
         let path = get_transient_file_path(&name);
@@ -122,11 +123,11 @@ impl UnitBus {
     fn unit_set_properties(
         &self,
         unit: &Rc<UnitX>,
-        properties: &[(&str, &str)],
+        properties: &[UnitProperty],
         flags: UnitWriteFlags,
     ) -> Result<()> {
         for property in properties {
-            self.unit_set_property(unit, property.0, property.1, flags)?;
+            self.unit_set_property(unit, &property.key, &property.value, flags)?;
         }
 
         Ok(())
@@ -195,8 +196,8 @@ impl UnitBus {
             | "OnSuccess" | "Before" | "After" | "Conflicts" => {
                 self.unit_write_property(unit, &ps, key, value, flags, false)
             }
-            _ => Err(Error::NotFound {
-                what: "set transient property".to_string(),
+            str_key => Err(Error::NotFound {
+                what: format!("set transient property:{}", str_key),
             }),
         }
     }
@@ -211,8 +212,8 @@ impl UnitBus {
         let ps = self.sms.private_section(unit.unit_type());
         match key {
             "Description" => self.unit_write_property(unit, &ps, key, value, flags, true),
-            _ => Err(Error::NotFound {
-                what: "set live property".to_string(),
+            str_key => Err(Error::NotFound {
+                what: format!("set live property:{}", str_key),
             }),
         }
     }

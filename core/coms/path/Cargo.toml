@@ -13,6 +13,7 @@ name = "path"
 basic = { path = "../../../libs/basic", default-features = false, features = [
     "mount",
     "glob",
+    "config",
 ] }
 core = { path = "../../libcore", default-features = false }
 event = { path = "../../../libs/event" }

@@ -17,6 +17,8 @@ message CommandRequest {
     SysComm  syscomm = 5;
     //switch root commands
     SwitchRootComm srcomm = 6;
+    //transient unit commands
+    TransientUnitComm trancomm = 7;
   }
 }
 
@@ -92,4 +94,20 @@ message SysComm {
 
 message SwitchRootComm {
     repeated string init = 1;
+}
+
+
+message TransientUnitComm {
+  message UnitProperty {
+    string key = 1;
+    string value = 2;
+  }
+
+  message UnitConfig {
+    string unitName = 1;
+    repeated UnitProperty unit_properties = 2;
+  }
+  string job_mode = 1;
+  UnitConfig unit_config = 2;
+  repeated UnitConfig aux_units = 3;
 }

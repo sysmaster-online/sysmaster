@@ -222,11 +222,11 @@ macro_rules! declare_unitobj_plugin_with_param {
         #[cfg_attr(feature = "plugin", no_mangle)]
         pub fn __subunit_create_with_params(
             um: Rc<dyn $crate::unit::UmIf>,
-        ) -> *const dyn $crate::unit::SubUnit {
+        ) -> *mut dyn $crate::unit::SubUnit {
             let construcotr: fn(um: Rc<dyn $crate::unit::UmIf>) -> $unit_type = $constructor;
             let obj = construcotr(um);
-            let rced: Rc<dyn $crate::unit::SubUnit> = Rc::new(obj);
-            Rc::into_raw(rced)
+            let boxed: Box<dyn $crate::unit::SubUnit> = Box::new(obj);
+            Box::into_raw(boxed)
         }
     };
 }

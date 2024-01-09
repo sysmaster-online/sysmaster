@@ -30,6 +30,10 @@ impl PathConfigData {
     pub(self) fn new(Path: SectionPath) -> PathConfigData {
         PathConfigData { Path }
     }
+
+    pub(self) fn set_property(&mut self, key: &str, value: &str) -> Result<(), core::error::Error> {
+        self.Path.set_property(key, value)
+    }
 }
 
 pub(super) struct PathConfig {
@@ -93,5 +97,11 @@ impl PathConfig {
 
     pub(super) fn config_data(&self) -> Rc<RefCell<PathConfigData>> {
         self.data.clone()
+    }
+
+    pub(super) fn set_property(&self, key: &str, value: &str) -> Result<()> {
+        let ret = self.data.borrow_mut().set_property(key, value);
+        self.db_update();
+        ret
     }
 }

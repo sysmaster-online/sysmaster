@@ -11,6 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use crate::{
+    bus::TimerBus,
     comm::TimerUnitComm,
     config::TimerConfig,
     load::TimerLoad,
@@ -29,6 +30,7 @@ struct TimerUnit {
     config: Rc<TimerConfig>,
     mng: Rc<TimerMng>,
     load: TimerLoad,
+    bus: TimerBus,
 }
 
 impl ReStation for TimerUnit {
@@ -110,6 +112,15 @@ impl SubUnit for TimerUnit {
     fn trigger_notify(&self) {
         self.mng.trigger_notify()
     }
+
+    fn unit_set_property(
+        &self,
+        key: &str,
+        value: &str,
+        flags: core::unit::UnitWriteFlags,
+    ) -> Result<()> {
+        self.bus.unit_set_property(key, value, flags)
+    }
 }
 
 impl UnitMngUtil for TimerUnit {
@@ -136,6 +147,7 @@ impl TimerUnit {
             config: Rc::clone(&config),
             mng: Rc::clone(&mng),
             load: TimerLoad::new(&config, &comm),
+            bus: TimerBus::new(&comm, &config),
         }
     }
 

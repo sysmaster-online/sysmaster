@@ -27,6 +27,8 @@ pub mod config;
 pub mod cpu;
 #[cfg(feature = "disk")]
 pub mod disk;
+#[cfg(feature = "env")]
+pub mod env;
 #[cfg(feature = "exec")]
 pub mod exec;
 #[cfg(feature = "fd")]

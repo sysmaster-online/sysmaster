@@ -13,6 +13,7 @@
 #![allow(non_snake_case)]
 use crate::monitor::ServiceMonitor;
 
+use basic::fs::parse_pathbuf;
 use basic::fs::{path_is_abosolute, path_length_is_valid, path_name_is_safe, path_simplify};
 use core::exec::PreserveMode;
 use macros::{EnumDisplay, UnitSection};
@@ -339,6 +340,10 @@ impl SectionService {
         match key {
             "RemainAfterExit" => self.RemainAfterExit = basic::config::parse_boolean(value)?,
             "Type" => self.Type = ServiceType::parse_from_str(value)?,
+            "RestartSec" => self.RestartSec = value.parse::<u64>()?,
+            "TimeoutSec" => self.TimeoutSec = parse_timeout(value)?,
+            "TimeoutStartSec" => self.TimeoutStartSec = parse_timeout(value)?,
+            "TimeoutStopSec" => self.TimeoutStopSec = parse_timeout(value)?,
             "NotifyAccess" => self.NotifyAccess = Some(NotifyAccess::parse_from_str(value)?),
             "PIDFile" => self.PIDFile = Some(parse_pidfile(value)?),
             "Restart" => self.Restart = ServiceRestart::parse_from_str(value)?,
@@ -352,9 +357,39 @@ impl SectionService {
             "ExecStopPost" => self.ExecStopPost = core::exec::parse_exec_command(value)?,
             "ExecReload" => self.ExecReload = core::exec::parse_exec_command(value)?,
             "ExecCondition" => self.ExecCondition = core::exec::parse_exec_command(value)?,
-            _ => {
+            //exec context
+            "User" => self.User = value.to_string(),
+            "Group" => self.User = value.to_string(),
+            "RootDirectory" => self.RootDirectory = Some(parse_pathbuf(value)?),
+            "NonBlocking" => self.NonBlocking = basic::config::parse_boolean(value)?,
+            "RuntimeDirectoryPreserve" => {
+                self.RuntimeDirectoryPreserve = PreserveMode::parse_from_str(value)?
+            }
+            "UMask" => self.UMask = value.to_string(),
+            "SELinuxContext" => self.SELinuxContext = Some(value.to_string()),
+            "WorkingDirectory" => {
+                self.WorkingDirectory = core::exec::parse_working_directory(value)?
+            }
+            "Environment" => self.Environment = Some(core::exec::parse_environment(value)?),
+            "EnvironmentFile" => {
+                self.EnvironmentFile = value
+                    .split_whitespace()
+                    .map(|str| str.to_string())
+                    .collect()
+            }
+            "RuntimeDirectory" => {
+                self.RuntimeDirectory = core::exec::parse_runtime_directory(value)?
+            }
+            "StateDirectory" => self.StateDirectory = core::exec::parse_state_directory(value)?,
+            "LimitCORE" => self.LimitCORE = Some(Rlimit::parse_from_str(value)?),
+            "LimitNOFILE" => self.LimitNOFILE = Some(Rlimit::parse_from_str(value)?),
+            "LimitNPROC" => self.LimitNPROC = Some(Rlimit::parse_from_str(value)?),
+            //kill context
+            "KillMode" => self.KillMode = KillMode::parse_from_str(value)?,
+            "KillSignal" => self.KillSignal = value.to_string(),
+            str_key => {
                 return Err(Error::NotFound {
-                    what: "set property".to_string(),
+                    what: format!("set property:{}", str_key),
                 })
             }
         };

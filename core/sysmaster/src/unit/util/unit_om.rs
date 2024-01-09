@@ -20,7 +20,7 @@ pub(crate) fn create_um_obj(
 pub(crate) fn create_subunit_with_um(
     unit_type: UnitType,
     um: Rc<dyn UmIf>,
-) -> Result<Rc<dyn SubUnit>> {
+) -> Result<Box<dyn SubUnit>> {
     #[cfg(feature = "noplugin")]
     return noplugin::create_subunit_with_um(unit_type, um);
     #[cfg(feature = "plugin")]
@@ -47,7 +47,7 @@ mod plugin {
     pub(super) fn create_subunit_with_um(
         unit_type: UnitType,
         um: Rc<dyn UmIf>,
-    ) -> Result<Rc<dyn SubUnit>> {
+    ) -> Result<Box<dyn SubUnit>> {
         Plugin::get_instance().create_subunit_with_um(unit_type, um)
     }
 }
@@ -106,7 +106,7 @@ mod noplugin {
     pub(super) fn create_subunit_with_um(
         unit_type: UnitType,
         um: Rc<dyn UmIf>,
-    ) -> Result<Rc<dyn SubUnit>> {
+    ) -> Result<Box<dyn SubUnit>> {
         let fun = match unit_type {
             #[cfg(feature = "mount")]
             UnitType::UnitMount => mount::__subunit_create_with_params,
@@ -127,6 +127,6 @@ mod noplugin {
             }
         };
         let boxed_raw = fun(um.clone());
-        Ok(unsafe { Rc::from_raw(boxed_raw) })
+        Ok(unsafe { Box::from_raw(boxed_raw) })
     }
 }

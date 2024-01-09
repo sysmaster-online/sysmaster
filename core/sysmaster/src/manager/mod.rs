@@ -31,6 +31,7 @@ use basic::{CGROUP_SYSMASTER, MULTI_USER_TARGET};
 use cgroup::CgController;
 use cgroup::{cg_create_and_attach, CgFlags};
 use cmdproto::proto::execute::ExecuterAction;
+use cmdproto::proto::transient_unit_comm::UnitConfig;
 use commands::Commands;
 use core::error::*;
 use core::rel::{ReliConf, ReliLastFrame, Reliability};
@@ -188,6 +189,16 @@ impl ExecuterAction for CommandActionMgr {
 
     fn switch_root(&self, init: &[String]) -> Result<(), Self::Error> {
         self.um.switch_root(init)
+    }
+
+    fn start_transient_unit(
+        &self,
+        job_mode: &str,
+        unit_config: &UnitConfig,
+        aux_units: &[UnitConfig],
+    ) -> Result<(), Self::Error> {
+        self.um
+            .start_transient_unit(job_mode, unit_config, aux_units)
     }
 }
 

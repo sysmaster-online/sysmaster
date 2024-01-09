@@ -71,6 +71,7 @@ full = [
     "time",
     "path",
     "glob",
+    "env",
 ]
 
 capability = []
@@ -125,3 +126,4 @@ uuid = ["bitflags", "random"]
 time = []
 path = []
 glob = []
+env = []

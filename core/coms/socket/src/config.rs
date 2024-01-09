@@ -287,6 +287,12 @@ impl SocketConfig {
         self.kill_context.set_kill_signal(signal);
         Ok(())
     }
+
+    pub(super) fn set_property(&self, key: &str, value: &str) -> Result<()> {
+        let ret = self.data.borrow_mut().set_property(key, value);
+        self.db_update();
+        ret
+    }
 }
 
 #[derive(PartialEq)]
@@ -319,6 +325,10 @@ impl SocketConfigData {
             res.push_back(v)
         }
         Some(res)
+    }
+
+    pub(self) fn set_property(&mut self, key: &str, value: &str) -> Result<()> {
+        self.Socket.set_property(key, value)
     }
 }
 

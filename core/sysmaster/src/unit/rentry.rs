@@ -301,9 +301,9 @@ impl UeConfigUnit {
             "After" => self.After = vec_str_2_string(value),
             "Conflicts" => self.Conflicts = vec_str_2_string(value),
             "Description" => self.Description = value.to_string(),
-            _ => {
+            str_key => {
                 return Err(Error::NotFound {
-                    what: "set property".to_string(),
+                    what: format!("set property:{}", str_key),
                 })
             }
         };

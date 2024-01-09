@@ -2,7 +2,7 @@
 #[rustfmt::skip]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CommandRequest {
-    #[prost(oneof="command_request::RequestData", tags="1, 2, 3, 4, 5, 6")]
+    #[prost(oneof="command_request::RequestData", tags="1, 2, 3, 4, 5, 6, 7")]
     pub request_data: ::core::option::Option<command_request::RequestData>,
 }
 /// Nested message and enum types in `CommandRequest`.
@@ -28,6 +28,9 @@ pub mod command_request {
         ///switch root commands
         #[prost(message, tag="6")]
         Srcomm(super::SwitchRootComm),
+        ///transient unit commands
+        #[prost(message, tag="7")]
+        Trancomm(super::TransientUnitComm),
     }
 }
 /// Command Response from server
@@ -153,4 +156,33 @@ pub mod sys_comm {
 pub struct SwitchRootComm {
     #[prost(string, repeated, tag="1")]
     pub init: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[rustfmt::skip]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TransientUnitComm {
+    #[prost(string, tag="1")]
+    pub job_mode: ::prost::alloc::string::String,
+    #[prost(message, optional, tag="2")]
+    pub unit_config: ::core::option::Option<transient_unit_comm::UnitConfig>,
+    #[prost(message, repeated, tag="3")]
+    pub aux_units: ::prost::alloc::vec::Vec<transient_unit_comm::UnitConfig>,
+}
+/// Nested message and enum types in `TransientUnitComm`.
+pub mod transient_unit_comm {
+    #[rustfmt::skip]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct UnitProperty {
+        #[prost(string, tag="1")]
+        pub key: ::prost::alloc::string::String,
+        #[prost(string, tag="2")]
+        pub value: ::prost::alloc::string::String,
+    }
+    #[rustfmt::skip]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct UnitConfig {
+        #[prost(string, tag="1")]
+        pub unit_name: ::prost::alloc::string::String,
+        #[prost(message, repeated, tag="2")]
+        pub unit_properties: ::prost::alloc::vec::Vec<UnitProperty>,
+    }
 }

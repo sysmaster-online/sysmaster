@@ -88,6 +88,7 @@ pub use {manager::__um_obj_create, unit::__subunit_create_with_params};
 // {socket_mng | socket_load} -> socket_unit -> socket_manager
 
 mod base;
+mod bus;
 mod comm;
 mod config;
 mod load;

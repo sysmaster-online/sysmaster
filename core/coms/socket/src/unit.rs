@@ -15,6 +15,7 @@
 //! Trait UnitMngUtil is used to attach the Unitmanager to the sub unit.
 //! Trait UnitSubClass implement the convert from sub unit to UnitObj.
 
+use crate::bus::SocketBus;
 use crate::mng::SocketMngPort;
 use crate::port::SocketPort;
 use crate::rentry::SocketState;
@@ -22,7 +23,7 @@ use crate::{comm::SocketUnitComm, config::SocketConfig, load::SocketLoad, mng::S
 use core::error::*;
 use core::exec::ExecContext;
 use core::rel::{ReStation, Reliability};
-use core::unit::{SubUnit, UmIf, UnitActiveState, UnitBase, UnitMngUtil};
+use core::unit::{SubUnit, UmIf, UnitActiveState, UnitBase, UnitMngUtil, UnitWriteFlags};
 use nix::sys::wait::WaitStatus;
 use std::any::Any;
 use std::{path::PathBuf, rc::Rc};
@@ -33,6 +34,7 @@ struct SocketUnit {
     config: Rc<SocketConfig>,
     mng: Rc<SocketMng>,
     load: SocketLoad,
+    bus: SocketBus,
 }
 
 impl ReStation for SocketUnit {
@@ -162,6 +164,10 @@ impl SubUnit for SocketUnit {
         self.comm.attach_unit(unit);
         self.db_insert();
     }
+
+    fn unit_set_property(&self, key: &str, value: &str, flags: UnitWriteFlags) -> Result<()> {
+        self.bus.unit_set_property(key, value, flags)
+    }
 }
 
 // attach the UnitManager for weak reference
@@ -178,13 +184,18 @@ impl UnitMngUtil for SocketUnit {
 impl SocketUnit {
     fn new(_um: Rc<dyn UmIf>) -> SocketUnit {
         let context = Rc::new(ExecContext::new());
-        let _comm = Rc::new(SocketUnitComm::new());
-        let _config = Rc::new(SocketConfig::new(&_comm));
+        let comm = Rc::new(SocketUnitComm::new());
+        let config = Rc::new(SocketConfig::new(&comm));
         SocketUnit {
-            comm: Rc::clone(&_comm),
-            config: Rc::clone(&_config),
-            mng: Rc::new(SocketMng::new(&_comm, &_config, &context)),
-            load: SocketLoad::new(&_config, &_comm),
+            comm: Rc::clone(&comm),
+            config: Rc::clone(&config),
+            mng: Rc::new(SocketMng::new(
+                &Rc::clone(&comm),
+                &Rc::clone(&config),
+                &Rc::clone(&context),
+            )),
+            load: SocketLoad::new(&Rc::clone(&config), &Rc::clone(&comm)),
+            bus: SocketBus::new(&comm, &config),
         }
     }
 

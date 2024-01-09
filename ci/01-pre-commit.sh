@@ -28,7 +28,7 @@ cargo check || exit 1
 for rustlist in `git diff origin/master --name-only | grep \.rs$  | grep -v "/examples/" | tr '\n' ' '`
 do
     # Allow libblkid/mod.rs and input_event_codes_rs to use, because they are auto generated.
-    if [[ $rustlist =~ "libblkid/mod.rs" ]] || [[ $rustlist =~ "input_event_codes_rs" ]]; then
+    if [[ $rustlist =~ "libblkid/mod.rs" ]] || [[ $rustlist =~ "input_event_codes_rs" ]]|| [[ $rustlist =~ "proto/abi.rs" ]]; then
         continue
     fi
     # do not use global #!allow, exclude non_snake_case

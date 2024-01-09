@@ -43,6 +43,7 @@ pub use {manager::__um_obj_create, unit::__subunit_create_with_params};
 // base -> rentry -> {comm | config}
 // mng -> unit -> manager
 mod base;
+mod bus;
 mod comm;
 mod config;
 mod manager;

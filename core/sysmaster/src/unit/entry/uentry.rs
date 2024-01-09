@@ -50,12 +50,12 @@ pub struct Unit {
     base: Rc<UeBase>,
 
     config: Rc<UeConfig>,
-    load: Rc<UeLoad>,
+    load: UeLoad,
     child: UeChild,
     cgroup: UeCgroup,
     conditions: Rc<UeCondition>,
     start_limit: StartLimit,
-    sub: Rc<dyn SubUnit>,
+    sub: Box<dyn SubUnit>,
     merged_into: RefCell<Option<Rc<UnitX>>>,
     in_stop_when_bound_queue: RefCell<bool>,
     timestamp: Rc<RefCell<UnitTimeStamp>>,
@@ -228,7 +228,7 @@ impl Unit {
         dmr: &Rc<DataManager>,
         rentryr: &Rc<UnitRe>,
         filer: &Rc<UnitFile>,
-        subr: &Rc<dyn SubUnit>,
+        sub: Box<dyn SubUnit>,
     ) -> Rc<Unit> {
         let _base = Rc::new(UeBase::new(rentryr, String::from(name), unit_type));
         let _config = Rc::new(UeConfig::new(&_base));
@@ -237,11 +237,11 @@ impl Unit {
             dm: Rc::clone(dmr),
             base: Rc::clone(&_base),
             config: Rc::clone(&_config),
-            load: Rc::clone(&_load),
+            load: UeLoad::new(dmr, filer, &_base, &_config),
             child: UeChild::new(&_base),
             cgroup: UeCgroup::new(&_base),
             conditions: Rc::new(UeCondition::new()),
-            sub: Rc::clone(subr),
+            sub,
             start_limit: StartLimit::new(),
             merged_into: RefCell::new(None),
             in_stop_when_bound_queue: RefCell::new(false),
@@ -956,7 +956,7 @@ mod tests {
             &Rc::new(dm),
             &rentry,
             &Rc::new(unit_file),
-            &sub_obj,
+            sub_obj,
         )
     }
 

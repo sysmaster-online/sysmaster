@@ -1,0 +1,21 @@
+[package]
+name = "sysmaster-run"
+version = "0.5.1"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nix = { version = "0.24", default-features = false }
+log = { path = "../../libs/log", default-features = false }
+clap = { version = "3.1.8", features = [
+    "derive",
+    "std",
+], default-features = false }
+constants = { path = "../../libs/constants" }
+cmdproto = { path = "../../libs/cmdproto" }
+basic = { path = "../../libs/basic", default-features = false, features = [
+    "env",
+    "id128",
+] }
+core = { path = "../../core/libcore", default-features = false }

@@ -10,22 +10,22 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use super::comm::ServiceUnitComm;
-use super::config::ServiceConfig;
+use super::comm::TimerUnitComm;
+use super::config::TimerConfig;
 use core::error::*;
 use core::unit::{self, UnitWriteFlags};
 use std::rc::Rc;
 
-pub struct ServiceBus {
+pub struct TimerBus {
     // associated objects
-    comm: Rc<ServiceUnitComm>,
-    config: Rc<ServiceConfig>,
+    comm: Rc<TimerUnitComm>,
+    config: Rc<TimerConfig>,
     // owned objects
 }
 
-impl ServiceBus {
-    pub(super) fn new(commr: &Rc<ServiceUnitComm>, configr: &Rc<ServiceConfig>) -> ServiceBus {
-        ServiceBus {
+impl TimerBus {
+    pub(super) fn new(commr: &Rc<TimerUnitComm>, configr: &Rc<TimerConfig>) -> TimerBus {
+        TimerBus {
             comm: Rc::clone(commr),
             config: Rc::clone(configr),
         }
@@ -64,16 +64,12 @@ impl ServiceBus {
     ) -> Result<()> {
         let real_flags = flags | UnitWriteFlags::PRIVATE;
         match key {
-            "RemainAfterExit"
-            | "Type"
-            | "NotifyAccess"
-            | "PIDFile"
-            | "Restart"
-            | "RestartPreventExitStatus" => self.unit_write_property(key, value, real_flags, false),
-            "ExecStart" | "ExecStartPre" | "ExecStartPost" | "ExecStop" | "ExecStopPost"
-            | "ExecReload" | "ExecCondition" => {
+            "AccuracySec" | "RandomizedDelaySec" | "WakeSystem" | "Persistent"
+            | "RemainAfterElapse" | "OnActiveSec" | "OnBootSec" | "OnStartupSec"
+            | "OnUnitActiveSec" | "OnUnitInactiveSec" | "OnCalendar" => {
                 self.unit_write_property(key, value, real_flags, false)
             }
+            "Unit" => self.unit_write_property(key, value, real_flags, false),
             str_key => Err(Error::NotFound {
                 what: format!("set transient property:{}", str_key),
             }),
@@ -83,47 +79,25 @@ impl ServiceBus {
     fn exec_set_transient_property(
         &self,
         key: &str,
-        value: &str,
-        flags: UnitWriteFlags,
+        _value: &str,
+        _flags: UnitWriteFlags,
     ) -> Result<()> {
-        let real_flags = flags | UnitWriteFlags::PRIVATE;
-        match key {
-            "User"
-            | "Group"
-            | "RootDirectory"
-            | "NonBlocking"
-            | "RuntimeDirectoryPreserve"
-            | "UMask"
-            | "SELinuxContext"
-            | "WorkingDirectory"
-            | "Environment"
-            | "EnvironmentFile"
-            | "RuntimeDirectory"
-            | "StateDirectory"
-            | "ExecReload"
-            | "ExecCondition" => self.unit_write_property(key, value, real_flags, false),
-            "LimitCORE" | "LimitNOFILE" | "LimitNPROC" => {
-                self.unit_write_property(key, value, real_flags, false)
-            }
-            str_key => Err(Error::NotFound {
-                what: format!("set exec property:{}", str_key),
-            }),
-        }
+        // not supported now
+        Err(Error::NotFound {
+            what: format!("set exec property:{}", key),
+        })
     }
 
     fn kill_set_transient_property(
         &self,
         key: &str,
-        value: &str,
-        flags: UnitWriteFlags,
+        _value: &str,
+        _flags: UnitWriteFlags,
     ) -> Result<()> {
-        let real_flags = flags | UnitWriteFlags::PRIVATE;
-        match key {
-            "KillMode" | "KillSignal" => self.unit_write_property(key, value, real_flags, false),
-            str_key => Err(Error::NotFound {
-                what: format!("set kill property:{}", str_key),
-            }),
-        }
+        // not supported now
+        Err(Error::NotFound {
+            what: format!("set kill property:{}", key),
+        })
     }
 
     fn cgroup_set_transient_property(

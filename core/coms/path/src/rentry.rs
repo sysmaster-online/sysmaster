@@ -11,10 +11,12 @@
 // See the Mulan PSL v2 for more details.
 //
 #![allow(non_snake_case)]
+use basic::config::parse_boolean;
 use basic::time::USEC_INFINITY;
 use core::exec::parse_mode;
 use core::rel::{ReDb, ReDbRwTxn, ReDbTable, ReliSwitch, Reliability};
 use core::unit::PathType;
+use core::Error;
 use macros::{EnumDisplay, UnitSection};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -25,15 +27,15 @@ const RELI_DB_HPATH_MNG: &str = "pathmng";
 
 #[derive(UnitSection, Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SectionPath {
-    #[entry(append)]
+    #[entry(append, parser = parse_pathbuf_vec)]
     pub PathExists: Vec<PathBuf>,
-    #[entry(append)]
+    #[entry(append, parser = parse_pathbuf_vec)]
     pub PathExistsGlob: Vec<PathBuf>,
-    #[entry(append)]
+    #[entry(append, parser = parse_pathbuf_vec)]
     pub PathChanged: Vec<PathBuf>,
-    #[entry(append)]
+    #[entry(append, parser = parse_pathbuf_vec)]
     pub PathModified: Vec<PathBuf>,
-    #[entry(append)]
+    #[entry(append, parser = parse_pathbuf_vec)]
     pub DirectoryNotEmpty: Vec<PathBuf>,
     #[entry(default = String::new())]
     pub Unit: String,
@@ -49,6 +51,46 @@ pub struct SectionPath {
     /// TODO: TriggerLimitBurst=
     #[entry(default = u32::MAX)]
     pub TriggerLimitBurst: u32,
+}
+
+fn parse_pathbuf_vec(s: &str) -> Result<Vec<PathBuf>, core::error::Error> {
+    let mut res = Vec::new();
+    for v in s.split_ascii_whitespace() {
+        let path =
+            basic::fs::parse_absolute_path(v).map_err(|_| core::error::Error::ConfigureError {
+                msg: "Invalid PathBuf".to_string(),
+            })?;
+        res.push(PathBuf::from(path));
+    }
+    Ok(res)
+}
+
+impl SectionPath {
+    pub(super) fn set_property(
+        &mut self,
+        key: &str,
+        value: &str,
+    ) -> Result<(), core::error::Error> {
+        match key {
+            "Unit" => self.Unit = value.to_string(),
+            "MakeDirectory" => self.MakeDirectory = parse_boolean(value)?,
+            "DirectoryMode" => self.DirectoryMode = parse_mode(value)?,
+            "TriggerLimitBurst" => self.TriggerLimitBurst = value.parse::<u32>()?,
+            "TriggerLimitIntervalSec" => self.TriggerLimitIntervalSec = value.parse::<u64>()?,
+            //Paths
+            "PathExists" => self.PathExists = parse_pathbuf_vec(value)?,
+            "PathExistsGlob" => self.PathExistsGlob = parse_pathbuf_vec(value)?,
+            "PathChanged" => self.PathChanged = parse_pathbuf_vec(value)?,
+            "PathModified" => self.PathModified = parse_pathbuf_vec(value)?,
+            "DirectoryNotEmpty" => self.DirectoryNotEmpty = parse_pathbuf_vec(value)?,
+            str_key => {
+                return Err(Error::NotFound {
+                    what: format!("set timer property:{}", str_key),
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, EnumDisplay)]

@@ -12,8 +12,8 @@
 
 //! Convert the command request into the corresponding execution action
 use super::{
-    mngr_comm, sys_comm, unit_comm, CommandRequest, CommandResponse, MngrComm, RequestData,
-    SwitchRootComm, SysComm, UnitComm, UnitFile,
+    mngr_comm, sys_comm, transient_unit_comm, unit_comm, CommandRequest, CommandResponse, MngrComm,
+    RequestData, SwitchRootComm, SysComm, TransientUnitComm, UnitComm, UnitFile,
 };
 
 use crate::error::*;
@@ -75,6 +75,13 @@ pub trait ExecuterAction {
     fn daemon_reexec(&self);
     /// switch root
     fn switch_root(&self, init: &[String]) -> Result<(), Self::Error>;
+    /// transient unit
+    fn start_transient_unit(
+        &self,
+        job_mode: &str,
+        unit_config: &transient_unit_comm::UnitConfig,
+        aux_units: &[transient_unit_comm::UnitConfig],
+    ) -> Result<(), Self::Error>;
 }
 
 /// Depending on the type of request
@@ -103,6 +110,7 @@ where
         Some(RequestData::Syscomm(param)) => param.execute(manager, Some(call_back), cred),
         Some(RequestData::Ufile(param)) => param.execute(manager, Some(call_back), cred),
         Some(RequestData::Srcomm(param)) => param.execute(manager, None, cred),
+        Some(RequestData::Trancomm(param)) => param.execute(manager, None, cred),
         _ => CommandResponse::default(),
     }
 }
@@ -431,6 +439,44 @@ impl Executer for SwitchRootComm {
                 status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
                 error_code: e.into() as u32,
                 message: String::from("error."),
+            },
+        }
+    }
+}
+
+impl Executer for TransientUnitComm {
+    fn execute(
+        self,
+        manager: Rc<impl ExecuterAction>,
+        _call_back: Option<fn(&str) -> String>,
+        cred: Option<UnixCredentials>,
+    ) -> CommandResponse {
+        if let Some(v) = response_if_credential_dissatisfied(cred, false) {
+            return v;
+        }
+
+        if self.unit_config.is_none() {
+            return CommandResponse {
+                status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                error_code: 1,
+                message: String::from("error."),
+            };
+        }
+
+        match manager.start_transient_unit(
+            &self.job_mode,
+            &self.unit_config.unwrap(),
+            &self.aux_units,
+        ) {
+            Ok(_) => CommandResponse {
+                status: StatusCode::OK.as_u16() as _,
+                error_code: 0,
+                ..Default::default()
+            },
+            Err(e) => CommandResponse {
+                status: StatusCode::INTERNAL_SERVER_ERROR.as_u16() as _,
+                message: e.to_string(),
+                error_code: e.into() as u32,
             },
         }
     }

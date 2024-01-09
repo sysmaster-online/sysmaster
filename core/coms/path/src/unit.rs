@@ -15,6 +15,7 @@
 
 use super::comm::PathUnitComm;
 use super::mng::PathMng;
+use crate::bus::PathBus;
 use crate::config::PathConfig;
 use crate::mng::PathInotify;
 use crate::rentry::PathState;
@@ -37,6 +38,7 @@ struct PathUnit {
     comm: Rc<PathUnitComm>,
     mng: Rc<PathMng>,
     config: Rc<PathConfig>,
+    bus: PathBus,
 }
 
 impl ReStation for PathUnit {
@@ -70,12 +72,13 @@ impl ReStation for PathUnit {
 
 impl PathUnit {
     fn new(_um: Rc<dyn UmIf>) -> PathUnit {
-        let _comm = Rc::new(PathUnitComm::new());
-        let _config = Rc::new(PathConfig::new(&_comm));
+        let comm = Rc::new(PathUnitComm::new());
+        let config = Rc::new(PathConfig::new(&comm));
         PathUnit {
-            comm: Rc::clone(&_comm),
-            mng: Rc::new(PathMng::new(&_comm, &_config)),
-            config: Rc::clone(&_config),
+            comm: Rc::clone(&comm),
+            mng: Rc::new(PathMng::new(&comm, &config)),
+            config: Rc::clone(&config),
+            bus: PathBus::new(&comm, &config),
         }
     }
 
@@ -349,6 +352,15 @@ impl SubUnit for PathUnit {
 
     fn reset_failed(&self) {
         self.mng.reset_failed()
+    }
+
+    fn unit_set_property(
+        &self,
+        key: &str,
+        value: &str,
+        flags: core::unit::UnitWriteFlags,
+    ) -> Result<()> {
+        self.bus.unit_set_property(key, value, flags)
     }
 }
 

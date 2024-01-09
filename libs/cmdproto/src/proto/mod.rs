@@ -70,6 +70,21 @@ impl CommandRequest {
             request_data: Some(RequestData::Srcomm(SwitchRootComm { init })),
         }
     }
+
+    /// Create a new command request for start transient unit
+    pub fn new_transient_unit_comm(
+        job_mode: &str,
+        unit_config: &transient_unit_comm::UnitConfig,
+        aux_units: &[transient_unit_comm::UnitConfig],
+    ) -> Self {
+        Self {
+            request_data: Some(RequestData::Trancomm(TransientUnitComm {
+                job_mode: job_mode.to_string(),
+                unit_config: Some(unit_config.clone()),
+                aux_units: aux_units.to_vec(),
+            })),
+        }
+    }
 }
 
 impl fmt::Display for sys_comm::Action {

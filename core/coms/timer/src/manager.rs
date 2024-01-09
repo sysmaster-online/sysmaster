@@ -35,7 +35,13 @@ impl TimerManager {
 }
 
 impl UnitManagerObj for TimerManager {
-    // nothing to customize
+    fn private_section(&self, _unit_type: core::unit::UnitType) -> String {
+        "Timer".into()
+    }
+
+    fn can_transient(&self, _unit_type: core::unit::UnitType) -> bool {
+        true
+    }
 }
 
 impl ReStation for TimerManager {

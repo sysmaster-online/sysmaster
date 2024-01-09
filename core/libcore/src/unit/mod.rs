@@ -12,9 +12,9 @@
 
 //!
 pub use base::{unit_name_is_valid, SubUnit, UnitBase, UnitNameFlags};
-pub use deps::{unit_name_to_type, 
-    unit_write_flags_is_noop, UnitDependencyMask, UnitRelationAtom, UnitRelations, UnitType,
-    UnitWriteFlags,
+pub use deps::{
+    unit_name_to_type, unit_write_flags_is_noop, UnitDependencyMask, UnitRelationAtom,
+    UnitRelations, UnitType, UnitWriteFlags,
 };
 pub use kill::{KillContext, KillMode, KillOperation};
 pub use path_spec::{PathSpec, PathType};

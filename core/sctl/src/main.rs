@@ -21,7 +21,7 @@ use cmdproto::{
         mngr_comm, unit_file, ProstClientStream,
     },
 };
-use constants::SCTL_SOCKET;
+use constants::PRIVATE_SOCKET;
 use std::process::exit;
 use std::{io::Write, os::unix::net::UnixStream};
 
@@ -258,7 +258,7 @@ fn main() {
         Some(v) => v,
     };
 
-    let stream = match UnixStream::connect(SCTL_SOCKET) {
+    let stream = match UnixStream::connect(PRIVATE_SOCKET) {
         Err(e) => {
             eprintln!("Failed to connect to sysmaster: {}", e);
             exit(e.raw_os_error().unwrap());

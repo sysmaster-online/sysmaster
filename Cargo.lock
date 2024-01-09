@@ -1918,6 +1918,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sysmaster-run"
+version = "0.5.1"
+dependencies = [
+ "basic",
+ "clap",
+ "cmdproto",
+ "constants",
+ "core",
+ "log 0.5.1",
+ "nix 0.24.3",
+]
+
+[[package]]
 name = "sysmonitor"
 version = "0.5.1"
 dependencies = [

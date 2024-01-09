@@ -63,9 +63,9 @@ impl UnitX {
         filer: &Rc<UnitFile>,
         unit_type: UnitType,
         name: &str,
-        subclass: Rc<dyn SubUnit>,
+        subclass: Box<dyn SubUnit>,
     ) -> UnitX {
-        let unit = Unit::new(unit_type, name, dmr, rentryr, filer, &subclass);
+        let unit = Unit::new(unit_type, name, dmr, rentryr, filer, subclass);
         UnitX(unit)
     }
 

@@ -21,7 +21,7 @@ use std::os::unix::io::RawFd;
 use std::path::Path;
 use std::{os::unix::prelude::AsRawFd, rc::Rc};
 
-use constants::SCTL_SOCKET;
+use constants::PRIVATE_SOCKET;
 
 pub(super) struct Commands<T> {
     // associated objects
@@ -38,7 +38,7 @@ where
 {
     pub(super) fn new(relir: &Rc<Reliability>, comm_action: T) -> Self {
         /* The socket is used to communicate with sctl, panic if any of the following steps fail. */
-        let sctl_socket_path = Path::new(SCTL_SOCKET);
+        let sctl_socket_path = Path::new(PRIVATE_SOCKET);
         let run_sysmaster = sctl_socket_path.parent().unwrap();
         if run_sysmaster.exists() {
             let _ = fs::chmod("/run/sysmaster", 0o755);
@@ -47,7 +47,7 @@ where
         if sctl_socket_path.exists() && !is_symlink(sctl_socket_path) {
             do_entry_log!(std::fs::remove_file, sctl_socket_path, "remove");
         }
-        let sctl_socket_addr = socket::UnixAddr::new(Path::new(SCTL_SOCKET)).unwrap();
+        let sctl_socket_addr = socket::UnixAddr::new(Path::new(PRIVATE_SOCKET)).unwrap();
         let socket_fd = socket::socket(
             socket::AddressFamily::Unix,
             socket::SockType::Stream,
@@ -150,7 +150,7 @@ mod tests {
     use cmdproto::error::Result;
     use cmdproto::proto::{execute::ExecuterAction, unit_comm};
     use cmdproto::proto::{CommandRequest, ProstClientStream};
-    use constants::SCTL_SOCKET;
+    use constants::PRIVATE_SOCKET;
     use core::rel::{ReliConf, Reliability};
     use event::{EventState, Events};
     use nix::unistd;
@@ -236,6 +236,15 @@ mod tests {
         fn switch_root(&self, _init: &[String]) -> Result<(), Self::Error> {
             Ok(())
         }
+
+        fn start_transient_unit(
+            &self,
+            _job_mode: &str,
+            _unit_config: &cmdproto::proto::transient_unit_comm::UnitConfig,
+            _aux_units: &[cmdproto::proto::transient_unit_comm::UnitConfig],
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
     }
 
     #[test]
@@ -295,7 +304,7 @@ mod tests {
             unistd::close(pipe_sync.0).unwrap();
 
             /* 1. Start a service as root. */
-            let stream = UnixStream::connect(SCTL_SOCKET).unwrap();
+            let stream = UnixStream::connect(PRIVATE_SOCKET).unwrap();
             let mut client = ProstClientStream::new(stream);
 
             let req = CommandRequest::new_unitcomm(
@@ -311,7 +320,7 @@ mod tests {
             }
             /* 2. Start a service as an unprivileged user. */
             let _ = nix::unistd::setuid(nix::unistd::Uid::from_raw(1000));
-            let stream = UnixStream::connect(SCTL_SOCKET).unwrap();
+            let stream = UnixStream::connect(PRIVATE_SOCKET).unwrap();
             let mut client = ProstClientStream::new(stream);
 
             let req = CommandRequest::new_unitcomm(
@@ -351,7 +360,7 @@ mod tests {
             /* Wait until the main thread are ready to process our request. */
             let mut test_ok = mutex_child.lock().unwrap();
             /* 1. Start a service as root. */
-            let stream = UnixStream::connect(SCTL_SOCKET).unwrap();
+            let stream = UnixStream::connect(PRIVATE_SOCKET).unwrap();
             let mut client = ProstClientStream::new(stream);
 
             let req = CommandRequest::new_unitcomm(

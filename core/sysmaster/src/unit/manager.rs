@@ -40,6 +40,7 @@ use basic::fs::LookupPaths;
 use basic::show_table::{CellColor, ShowTable};
 use basic::time::UnitTimeStamp;
 use basic::{machine, process, rlimit, signal};
+use cmdproto::proto::transient_unit_comm::UnitConfig;
 use constants::SIG_SWITCH_ROOT_OFFSET;
 use core::error::*;
 use core::exec::ExecParameters;
@@ -293,6 +294,16 @@ impl UnitManagerX {
             })
         }
     }
+
+    pub(crate) fn start_transient_unit(
+        &self,
+        job_mode: &str,
+        unit_config: &UnitConfig,
+        aux_units: &[UnitConfig],
+    ) -> Result<()> {
+        self.data
+            .start_transient_unit(job_mode, unit_config, aux_units)
+    }
 }
 
 /// the struct for manager the unit instance
@@ -504,7 +515,7 @@ impl UmIf for UnitManager {
 
         match self.rentry.load_get(&trigger) {
             Some(state) => {
-                if state == UnitLoadState::Loaded {
+                if state.0 == UnitLoadState::Loaded {
                     return true;
                 }
                 log::error!(
@@ -981,12 +992,11 @@ impl UnitManager {
         }
     }
 
-    #[allow(dead_code)]
     pub(self) fn start_transient_unit(
         &self,
-        properties: &[(&str, &str)],
-        name: &str,
         job_mode_str: &str,
+        unit_config: &UnitConfig,
+        aux_units: &[UnitConfig],
     ) -> Result<()> {
         let job_mode = JobMode::from_str(job_mode_str);
         if let Err(e) = job_mode {
@@ -994,15 +1004,25 @@ impl UnitManager {
             return Err(Error::InvalidData);
         }
 
-        let unit = self.bus.transient_unit_from_message(properties, name);
-        if let Err(e) = unit {
-            log::info!("Failed to get transient unit with err: {}", e);
-            return Err(e);
+        let unit = self
+            .bus
+            .transient_unit_from_message(&unit_config.unit_properties, &unit_config.unit_name)
+            .map_err(|e| {
+                log::info!("Failed to get transient unit with err: {}", e);
+                e
+            })?;
+
+        for unit_config in aux_units {
+            self.bus
+                .transient_unit_from_message(&unit_config.unit_properties, &unit_config.unit_name)
+                .map_err(|e| {
+                    log::info!("Failed to get transient aux unit with err: {}", e);
+                    e
+                })?;
         }
 
-        let u = unit.unwrap();
         self.jm.exec(
-            &JobConf::new(&u, JobKind::Start),
+            &JobConf::new(&unit, JobKind::Start),
             job_mode.unwrap(),
             &mut JobAffect::new(false),
         )?;

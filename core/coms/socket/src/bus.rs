@@ -10,22 +10,22 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use super::comm::ServiceUnitComm;
-use super::config::ServiceConfig;
+use super::comm::SocketUnitComm;
+use super::config::SocketConfig;
 use core::error::*;
 use core::unit::{self, UnitWriteFlags};
 use std::rc::Rc;
 
-pub struct ServiceBus {
+pub struct SocketBus {
     // associated objects
-    comm: Rc<ServiceUnitComm>,
-    config: Rc<ServiceConfig>,
+    comm: Rc<SocketUnitComm>,
+    config: Rc<SocketConfig>,
     // owned objects
 }
 
-impl ServiceBus {
-    pub(super) fn new(commr: &Rc<ServiceUnitComm>, configr: &Rc<ServiceConfig>) -> ServiceBus {
-        ServiceBus {
+impl SocketBus {
+    pub(super) fn new(commr: &Rc<SocketUnitComm>, configr: &Rc<SocketConfig>) -> SocketBus {
+        SocketBus {
             comm: Rc::clone(commr),
             config: Rc::clone(configr),
         }
@@ -64,14 +64,30 @@ impl ServiceBus {
     ) -> Result<()> {
         let real_flags = flags | UnitWriteFlags::PRIVATE;
         match key {
-            "RemainAfterExit"
-            | "Type"
-            | "NotifyAccess"
-            | "PIDFile"
-            | "Restart"
-            | "RestartPreventExitStatus" => self.unit_write_property(key, value, real_flags, false),
-            "ExecStart" | "ExecStartPre" | "ExecStartPost" | "ExecStop" | "ExecStopPost"
-            | "ExecReload" | "ExecCondition" => {
+            "Accept"
+            | "FlushPending"
+            | "KeepAlive"
+            | "Broadcast"
+            | "PassCredentials"
+            | "PassPacketInfo"
+            | "PassSecurity"
+            | "RemoveOnStop"
+            | "KeepAliveProbes"
+            | "SocketMode"
+            | "KeepAliveTimeSec"
+            | "KeepAliveIntervalSec"
+            | "SocketUser"
+            | "SocketGroup"
+            | "ReceiveBuffer"
+            | "SendBuffer"
+            | "Symlinks"
+            | "ListenStream"
+            | "ListenDatagram"
+            | "ListenNetlink"
+            | "ListenSequentialPacket"
+            | "ListenFIFO"
+            | "ListenSpecial" => self.unit_write_property(key, value, real_flags, false),
+            "ExecStartPre" | "ExecStartPost" | "ExecStopPre" | "ExecStopPost" => {
                 self.unit_write_property(key, value, real_flags, false)
             }
             str_key => Err(Error::NotFound {
@@ -83,32 +99,13 @@ impl ServiceBus {
     fn exec_set_transient_property(
         &self,
         key: &str,
-        value: &str,
-        flags: UnitWriteFlags,
+        _value: &str,
+        _flags: UnitWriteFlags,
     ) -> Result<()> {
-        let real_flags = flags | UnitWriteFlags::PRIVATE;
-        match key {
-            "User"
-            | "Group"
-            | "RootDirectory"
-            | "NonBlocking"
-            | "RuntimeDirectoryPreserve"
-            | "UMask"
-            | "SELinuxContext"
-            | "WorkingDirectory"
-            | "Environment"
-            | "EnvironmentFile"
-            | "RuntimeDirectory"
-            | "StateDirectory"
-            | "ExecReload"
-            | "ExecCondition" => self.unit_write_property(key, value, real_flags, false),
-            "LimitCORE" | "LimitNOFILE" | "LimitNPROC" => {
-                self.unit_write_property(key, value, real_flags, false)
-            }
-            str_key => Err(Error::NotFound {
-                what: format!("set exec property:{}", str_key),
-            }),
-        }
+        // not supported now
+        Err(Error::NotFound {
+            what: format!("set exec property:{}", key),
+        })
     }
 
     fn kill_set_transient_property(

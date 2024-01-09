@@ -63,6 +63,7 @@ pub use {manager::__um_obj_create, unit::__subunit_create_with_params};
 // timer_mng -> timer_unit -> timer_manager
 
 mod base;
+mod bus;
 mod comm;
 mod config;
 mod load;
