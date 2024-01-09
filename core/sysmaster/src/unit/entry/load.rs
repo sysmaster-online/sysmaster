@@ -15,10 +15,13 @@ use super::config::UeConfig;
 use crate::unit::data::{DataManager, UnitDepConf};
 use crate::unit::rentry::{UnitLoadState, UnitRePps};
 use crate::unit::util::UnitFile;
+use basic::do_entry_log;
 use core::error::*;
 use core::rel::ReStation;
 use core::unit::UnitRelations;
 use std::cell::RefCell;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -31,9 +34,16 @@ pub(super) struct UeLoad {
     config: Rc<UeConfig>,
 
     // owned objects
+    /* constant after loading */
+    transient: RefCell<bool>,
+    paths: RefCell<Vec<PathBuf>>,
+    /* changes with stages */
     load_state: RefCell<UnitLoadState>,
     in_load_queue: RefCell<bool>,
     in_target_dep_queue: RefCell<bool>,
+    /* temporarily present during loading stage */
+    transient_file: RefCell<Option<PathBuf>>,
+    last_section_private: RefCell<i8>, // <0, nothing has been wrote; 0, in [Unit] section; >0, in [unit type-specific] section
 }
 
 impl ReStation for UeLoad {
@@ -44,13 +54,25 @@ impl ReStation for UeLoad {
         if reload {
             return;
         }
-        if let Some(load_state) = self.base.rentry_load_get() {
+        if let Some((load_state, transient, paths, transient_file, last_section_private)) =
+            self.base.rentry_load_get()
+        {
             *self.load_state.borrow_mut() = load_state;
+            *self.transient.borrow_mut() = transient;
+            *self.paths.borrow_mut() = paths;
+            *self.transient_file.borrow_mut() = transient_file;
+            *self.last_section_private.borrow_mut() = last_section_private;
         }
     }
 
     fn db_insert(&self) {
-        self.base.rentry_load_insert(*self.load_state.borrow());
+        self.base.rentry_load_insert(
+            *self.load_state.borrow(),
+            *self.transient.borrow(),
+            self.paths.borrow().clone(),
+            self.transient_file.borrow().clone(),
+            *self.last_section_private.borrow(),
+        );
     }
 
     // reload: no external connections, no entry
@@ -68,9 +90,13 @@ impl UeLoad {
             file: Rc::clone(filer),
             base: Rc::clone(baser),
             config: Rc::clone(config),
+            transient: RefCell::new(false),
+            paths: RefCell::new(Vec::new()),
             load_state: RefCell::new(UnitLoadState::Stub),
             in_load_queue: RefCell::new(false),
             in_target_dep_queue: RefCell::new(false),
+            transient_file: RefCell::new(None),
+            last_section_private: RefCell::new(-1),
         };
         load.db_insert();
         let flags = UnitRePps::QUEUE_LOAD | UnitRePps::QUEUE_TARGET_DEPS;
@@ -137,6 +163,7 @@ impl UeLoad {
         self.config
             .load_fragment_and_dropin(self.file.as_ref(), &self.base.id())?;
         self.parse();
+        self.set_paths(self.file.get_unit_id_fragment_pathbuf(&self.base.id()));
         Ok(())
     }
 
@@ -151,6 +178,80 @@ impl UeLoad {
 
     pub(super) fn in_target_dep_queue(&self) -> bool {
         *self.in_target_dep_queue.borrow()
+    }
+
+    pub(super) fn paths(&self) -> Vec<PathBuf> {
+        self.paths.borrow().clone()
+    }
+
+    pub(super) fn transient(&self) -> bool {
+        *self.transient.borrow()
+    }
+
+    pub(super) fn transient_file(&self) -> Option<PathBuf> {
+        self.transient_file.borrow().clone()
+    }
+
+    pub(super) fn last_section_private(&self) -> i8 {
+        *self.last_section_private.borrow()
+    }
+
+    pub(super) fn set_last_section_private(&self, lsp: i8) {
+        *self.last_section_private.borrow_mut() = lsp;
+        self.db_update();
+    }
+
+    pub(super) fn make_transient(&self, path: Option<PathBuf>) {
+        // paths = fragment only
+        let mut paths = Vec::new();
+        if let Some(p) = path.clone() {
+            paths.push(p);
+        }
+
+        self.set_transient_file(path);
+        self.set_paths(paths);
+        self.set_load_state(UnitLoadState::Stub);
+        self.set_transient(true);
+    }
+
+    pub(super) fn finalize_transient(&self) -> Result<()> {
+        if let Some(tf) = self.transient_file() {
+            let mut file = OpenOptions::new().write(true).open(tf).context(IoSnafu)?;
+            file.flush().context(IoSnafu)?;
+            self.set_transient_file(None);
+        }
+
+        Ok(())
+    }
+
+    pub(super) fn remove_transient(&self) {
+        if !self.transient() {
+            return;
+        }
+
+        let mut paths = self.paths();
+        if paths.is_empty() {
+            return;
+        }
+
+        // fragment
+        let fragment = paths.remove(0);
+        do_entry_log!(fs::remove_file, fragment, "remove");
+    }
+
+    fn set_paths(&self, paths: Vec<PathBuf>) {
+        *self.paths.borrow_mut() = paths;
+        self.db_update();
+    }
+
+    fn set_transient(&self, transient: bool) {
+        *self.transient.borrow_mut() = transient;
+        self.db_update();
+    }
+
+    fn set_transient_file(&self, path: Option<PathBuf>) {
+        *self.transient_file.borrow_mut() = path;
+        self.db_update();
     }
 
     fn parse(&self) {

@@ -32,7 +32,7 @@
 //!   sysmaster refers to systemd. The preliminary plan includes 9 types of units. The naming rule of each type of configuration file is *. XXX. XXX refers to the specific unit type, such as service, slice, target, etc.
 //!  The following modules are included.
 //!  u_entry: The interface abstract entity of unit, which is the parent class of all units, can implement the SubUnit trait object
-//!  uf_interface: The interface is an internally managed entity object that encapsulates the Unit. Only UnitX objects can be seen in sysmaster, but the Unit cannot be seen. The Unit is isolated
+//!  unitx: The interface is an internally managed entity object that encapsulates the Unit. Only UnitX objects can be seen in sysmaster, but the Unit cannot be seen. The Unit is isolated
 //!  uu_load: Encapsulates Unitload Status
 //!  uu_child: The child maintains the parent and child processes associated with the unit. The child services associated with the unit may start the child processes. Therefore, it is necessary to maintain the processes associated with the unit.
 //!  uu_cgroup: cgroup related configurations
@@ -45,10 +45,11 @@ pub(crate) use unitx::UnitX;
 // pub(super) use uu_config::UnitConfigItem;
 
 // dependency:
-// uu_condition ->
-// uu_base -> {uu_config | uu_cgroup} -> {uu_load | uu_child} ->
-// u_interface->u_entry -> {uf_interface}
+// condition ->
+// base -> {config | cgroup} -> {load | child | ratelimit} ->
+// {bus -> uentry} -> {unitx}
 mod base;
+mod bus;
 mod cgroup;
 mod child;
 mod condition;

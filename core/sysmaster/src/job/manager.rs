@@ -204,7 +204,9 @@ impl JobManager {
     }
 
     pub(crate) fn has_job(&self, unit: &Rc<UnitX>) -> bool {
-        !self.data.jobs.get_suspends(unit).is_empty()
+        let trigger = self.data.jobs.get_trigger_info(unit).is_some();
+        let suspend = !self.data.jobs.get_suspends(unit).is_empty();
+        trigger || suspend
     }
 
     pub(crate) fn has_stop_job(&self, unit: &Rc<UnitX>) -> bool {

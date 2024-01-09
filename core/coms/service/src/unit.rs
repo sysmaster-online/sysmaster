@@ -12,6 +12,7 @@
 
 use crate::rentry::ServiceRestart;
 
+use super::bus::ServiceBus;
 use super::comm::ServiceUnitComm;
 use super::config::ServiceConfig;
 use super::mng::RunningData;
@@ -22,6 +23,7 @@ use core::error::*;
 use core::rel::{ReStation, Reliability};
 use core::unit::{
     SubUnit, UmIf, UnitActiveState, UnitBase, UnitDependencyMask, UnitMngUtil, UnitRelations,
+    UnitWriteFlags,
 };
 use nix::sys::signal::Signal;
 use nix::sys::socket::UnixCredentials;
@@ -38,6 +40,7 @@ struct ServiceUnit {
     config: Rc<ServiceConfig>,
     mng: Rc<ServiceMng>,
     exec_ctx: Rc<ExecContext>,
+    bus: ServiceBus,
 }
 
 impl ReStation for ServiceUnit {
@@ -187,6 +190,10 @@ impl SubUnit for ServiceUnit {
     fn release_socket_fd(&self, fd: i32) {
         self.mng.release_socket_fd(fd);
     }
+
+    fn unit_set_property(&self, key: &str, value: &str, flags: UnitWriteFlags) -> Result<()> {
+        self.bus.unit_set_property(key, value, flags)
+    }
 }
 
 impl UnitMngUtil for ServiceUnit {
@@ -213,6 +220,7 @@ impl ServiceUnit {
             config: Rc::clone(&config),
             mng: Rc::clone(&_mng),
             exec_ctx: Rc::clone(&context),
+            bus: ServiceBus::new(&comm, &config),
         }
     }
 

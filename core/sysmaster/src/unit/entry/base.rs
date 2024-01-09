@@ -70,11 +70,28 @@ impl UeBase {
         self.unit_type
     }
 
-    pub(super) fn rentry_load_insert(&self, load_state: UnitLoadState) {
-        self.rentry.load_insert(&self.id.borrow(), load_state);
+    pub(super) fn rentry_load_insert(
+        &self,
+        load_state: UnitLoadState,
+        transient: bool,
+        paths: Vec<PathBuf>,
+        transient_file: Option<PathBuf>,
+        last_section_private: i8,
+    ) {
+        self.rentry.load_insert(
+            &self.id.borrow(),
+            load_state,
+            transient,
+            paths,
+            transient_file,
+            last_section_private,
+        );
     }
 
-    pub(super) fn rentry_load_get(&self) -> Option<UnitLoadState> {
+    #[allow(clippy::type_complexity)]
+    pub(super) fn rentry_load_get(
+        &self,
+    ) -> Option<(UnitLoadState, bool, Vec<PathBuf>, Option<PathBuf>, i8)> {
         self.rentry.load_get(&self.id.borrow())
     }
 

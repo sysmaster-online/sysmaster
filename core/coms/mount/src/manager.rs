@@ -81,7 +81,15 @@ impl ReStation for MountManager {
     }
 }
 
-impl UnitManagerObj for MountManager {}
+impl UnitManagerObj for MountManager {
+    fn private_section(&self, _unit_type: UnitType) -> String {
+        "Mount".into()
+    }
+
+    fn can_transient(&self, _unit_type: UnitType) -> bool {
+        true
+    }
+}
 
 // the declaration "pub(self)" is for identification only.
 impl MountManager {

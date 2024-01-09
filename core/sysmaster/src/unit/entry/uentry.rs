@@ -11,6 +11,7 @@
 // See the Mulan PSL v2 for more details.
 
 use super::base::UeBase;
+use super::bus::UeBus;
 use super::cgroup::UeCgroup;
 use super::child::UeChild;
 use super::condition::{assert_keys::*, condition_keys::*, UeCondition};
@@ -26,7 +27,7 @@ use basic::time::{now_clockid, UnitTimeStamp};
 use cgroup::{self, CgFlags};
 use core::error::*;
 use core::rel::ReStation;
-use core::unit::{KillContext, KillMode, KillOperation, UnitNotifyFlags};
+use core::unit::{KillContext, KillMode, KillOperation, UnitNotifyFlags, UnitWriteFlags};
 use core::unit::{SubUnit, UnitActiveState, UnitBase, UnitType};
 use libc::{CLOCK_MONOTONIC, CLOCK_REALTIME};
 use nix::sys::socket::UnixCredentials;
@@ -49,15 +50,16 @@ pub struct Unit {
     base: Rc<UeBase>,
 
     config: Rc<UeConfig>,
-    load: UeLoad,
+    load: Rc<UeLoad>,
     child: UeChild,
     cgroup: UeCgroup,
     conditions: Rc<UeCondition>,
     start_limit: StartLimit,
-    sub: Box<dyn SubUnit>,
+    sub: Rc<dyn SubUnit>,
     merged_into: RefCell<Option<Rc<UnitX>>>,
     in_stop_when_bound_queue: RefCell<bool>,
     timestamp: Rc<RefCell<UnitTimeStamp>>,
+    bus: UeBus,
 }
 
 impl PartialEq for Unit {
@@ -133,6 +135,10 @@ impl UnitBase for Unit {
         self.id()
     }
 
+    fn unit_type(&self) -> UnitType {
+        self.unit_type()
+    }
+
     /*fn get_dependency_list(&self, _unit_name: &str, _atom: libcore::unit::UnitRelationAtom) -> Vec<Rc<Self>> {
         todo!()
     }*/
@@ -192,6 +198,26 @@ impl UnitBase for Unit {
     fn get_unit_timestamp(&self) -> Rc<RefCell<UnitTimeStamp>> {
         self.get_unit_timestamp()
     }
+
+    fn is_load_stub(&self) -> bool {
+        self.load.load_state() == UnitLoadState::Stub
+    }
+
+    fn transient(&self) -> bool {
+        self.load.transient()
+    }
+
+    fn transient_file(&self) -> Option<PathBuf> {
+        self.load.transient_file()
+    }
+
+    fn last_section_private(&self) -> i8 {
+        self.load.last_section_private()
+    }
+
+    fn set_last_section_private(&self, lsp: i8) {
+        self.load.set_last_section_private(lsp);
+    }
 }
 
 impl Unit {
@@ -202,23 +228,25 @@ impl Unit {
         dmr: &Rc<DataManager>,
         rentryr: &Rc<UnitRe>,
         filer: &Rc<UnitFile>,
-        sub: Box<dyn SubUnit>,
+        subr: &Rc<dyn SubUnit>,
     ) -> Rc<Unit> {
         let _base = Rc::new(UeBase::new(rentryr, String::from(name), unit_type));
         let _config = Rc::new(UeConfig::new(&_base));
+        let _load = Rc::new(UeLoad::new(dmr, filer, &_base, &_config));
         let _u = Rc::new(Unit {
             dm: Rc::clone(dmr),
             base: Rc::clone(&_base),
             config: Rc::clone(&_config),
-            load: UeLoad::new(dmr, filer, &_base, &_config),
+            load: Rc::clone(&_load),
             child: UeChild::new(&_base),
             cgroup: UeCgroup::new(&_base),
             conditions: Rc::new(UeCondition::new()),
-            sub,
+            sub: Rc::clone(subr),
             start_limit: StartLimit::new(),
             merged_into: RefCell::new(None),
             in_stop_when_bound_queue: RefCell::new(false),
             timestamp: Rc::new(RefCell::new(UnitTimeStamp::default())),
+            bus: UeBus::new(&_config),
         });
         let owner = Rc::clone(&_u);
         _u.sub.attach_unit(owner);
@@ -632,6 +660,7 @@ impl Unit {
 
     pub(super) fn load_unit(&self) -> Result<()> {
         self.set_in_load_queue(false);
+        self.load.finalize_transient()?;
         match self.load.load_unit_confs() {
             Ok(_) => {
                 let paths = self.load.get_unit_id_fragment_pathbuf();
@@ -788,8 +817,24 @@ impl Unit {
         self.load.load_state()
     }
 
+    pub(super) fn load_paths(&self) -> Vec<PathBuf> {
+        self.load.paths()
+    }
+
+    pub(super) fn transient(&self) -> bool {
+        self.load.transient()
+    }
+
     pub fn set_load_state(&self, state: UnitLoadState) {
         self.load.set_load_state(state)
+    }
+
+    pub(super) fn make_transient(&self, path: Option<PathBuf>) {
+        self.load.make_transient(path)
+    }
+
+    pub(super) fn remove_transient(&self) {
+        self.load.remove_transient()
     }
 
     pub(super) fn child_add_pids(&self, pid: Pid) {
@@ -853,6 +898,19 @@ impl Unit {
     pub fn get_unit_timestamp(&self) -> Rc<RefCell<UnitTimeStamp>> {
         Rc::clone(&self.timestamp)
     }
+
+    pub(crate) fn set_sub_property(
+        &self,
+        key: &str,
+        value: &str,
+        flags: UnitWriteFlags,
+    ) -> Result<()> {
+        self.sub.unit_set_property(key, value, flags)
+    }
+
+    pub(crate) fn set_property(&self, key: &str, value: &str) -> Result<()> {
+        self.bus.set_property(key, value)
+    }
 }
 
 #[cfg(test)]
@@ -898,7 +956,7 @@ mod tests {
             &Rc::new(dm),
             &rentry,
             &Rc::new(unit_file),
-            sub_obj,
+            &sub_obj,
         )
     }
 

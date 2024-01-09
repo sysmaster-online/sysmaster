@@ -57,10 +57,11 @@ pub enum UnitErrno {
 
 // dependency:
 // rentry -> data -> base -> {util} ->
-// entry -> {datastore -> runtime} -> job ->
-// {execute | sigchld | notify} -> manager(uload)
+// entry -> {datastore -> runtime} -> job -> submanager
+// {execute | sigchld | notify} -> {bus -> manager(uload)}
 
 mod base;
+mod bus;
 mod data;
 mod datastore;
 mod entry;
@@ -70,6 +71,7 @@ mod notify;
 mod rentry;
 mod runtime;
 mod sigchld;
+mod submanager;
 #[cfg(test)]
 mod test;
 mod uload;

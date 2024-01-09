@@ -50,6 +50,10 @@ impl UnitLoad {
         self.data.load_unit(name)
     }
 
+    pub(super) fn load_update(&self, unit: &Rc<UnitX>) {
+        self.data.load_update(unit);
+    }
+
     pub(super) fn set_um(&self, um: &Rc<UnitManager>) {
         self.data.set_um(um);
     }
@@ -151,6 +155,11 @@ impl UnitLoadData {
             }
         }
         Some(u)
+    }
+
+    pub(self) fn load_update(&self, unit: &Rc<UnitX>) {
+        self.rt.push_load_queue(Rc::clone(unit));
+        self.rt.dispatch_load_queue();
     }
 
     pub(self) fn set_um(&self, um: &Rc<UnitManager>) {

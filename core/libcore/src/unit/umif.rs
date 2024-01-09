@@ -211,6 +211,11 @@ pub trait UmIf {
         Ok(())
     }
 
+    ///
+    fn private_section(&self, _unit_type: UnitType) -> String {
+        null_str!("")
+    }
+
     /* ========== ONLY VALID IN SERVICE ========== */
     /// set the service's socket fd
     fn service_set_socket_fd(&self, _service_name: &str, _fd: i32) {}
@@ -271,6 +276,14 @@ pub trait UnitManagerObj: UnitMngUtil + ReStation {
     }
     ///
     fn shutdown(&self) {}
+    ///
+    fn private_section(&self, _unit_type: UnitType) -> String {
+        null_str!("")
+    }
+    ///
+    fn can_transient(&self, _unit_type: UnitType) -> bool {
+        false
+    }
 }
 
 /// the macro for create a sub unit-manager instance

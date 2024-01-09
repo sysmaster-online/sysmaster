@@ -20,6 +20,7 @@
 ///                      ---->rentry
 ///
 use super::super::job::{JobAffect, JobConf, JobKind, JobManager};
+use super::bus::UnitBus;
 use super::datastore::UnitDb;
 use super::entry::{StartLimitResult, Unit, UnitEmergencyAction, UnitX};
 use super::execute::ExecSpawn;
@@ -27,6 +28,7 @@ use super::notify::NotifyManager;
 use super::rentry::{JobMode, UnitLoadState, UnitRe};
 use super::runtime::UnitRT;
 use super::sigchld::Sigchld;
+use super::submanager::UnitSubManagers;
 use super::uload::UnitLoad;
 use crate::job::JobResult;
 use crate::manager::config::ManagerConfig;
@@ -59,7 +61,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
-use unit_submanager::UnitSubManagers;
+
 //#[derive(Debug)]
 pub(crate) struct UnitManagerX {
     dm: Rc<DataManager>,
@@ -304,13 +306,13 @@ pub struct UnitManager {
     rentry: Rc<UnitRe>,
     db: Rc<UnitDb>,
     rt: Rc<UnitRT>,
-    load: UnitLoad,
+    load: Rc<UnitLoad>,
     jm: Rc<JobManager>,
     exec: ExecSpawn,
     sigchld: Sigchld,
     notify: NotifyManager,
-    sms: UnitSubManagers,
-    manager_config: Rc<RefCell<ManagerConfig>>,
+    sms: Rc<UnitSubManagers>,
+    bus: UnitBus,
 }
 
 impl UmIf for UnitManager {
@@ -689,6 +691,10 @@ impl UmIf for UnitManager {
         Ok(())
     }
 
+    fn private_section(&self, unit_type: UnitType) -> String {
+        self.sms.private_section(unit_type)
+    }
+
     /// set the service's socket fd
     fn service_set_socket_fd(&self, service_name: &str, fd: i32) {
         let service = match self.units_get(service_name) {
@@ -975,6 +981,35 @@ impl UnitManager {
         }
     }
 
+    #[allow(dead_code)]
+    pub(self) fn start_transient_unit(
+        &self,
+        properties: &[(&str, &str)],
+        name: &str,
+        job_mode_str: &str,
+    ) -> Result<()> {
+        let job_mode = JobMode::from_str(job_mode_str);
+        if let Err(e) = job_mode {
+            log::info!("Failed to parse job mode{}, err: {}", job_mode_str, e);
+            return Err(Error::InvalidData);
+        }
+
+        let unit = self.bus.transient_unit_from_message(properties, name);
+        if let Err(e) = unit {
+            log::info!("Failed to get transient unit with err: {}", e);
+            return Err(e);
+        }
+
+        let u = unit.unwrap();
+        self.jm.exec(
+            &JobConf::new(&u, JobKind::Start),
+            job_mode.unwrap(),
+            &mut JobAffect::new(false),
+        )?;
+
+        Ok(())
+    }
+
     fn get_unit_cgroup_path(&self, unit: Rc<Unit>) -> String {
         let res = match unit.cg_path().to_str() {
             Some(res) => res.to_string(),
@@ -1076,27 +1111,39 @@ impl UnitManager {
         state: Rc<RefCell<State>>,
         manager_config: Rc<RefCell<ManagerConfig>>,
     ) -> Rc<UnitManager> {
+        let log_target = manager_config.borrow().LogTarget.clone();
+        let log_file_size = manager_config.borrow().LogFileSize;
+        let log_file_num = manager_config.borrow().LogFileNumber;
+
         let _rentry = Rc::new(UnitRe::new(relir));
         let _db = Rc::new(UnitDb::new(&_rentry));
         let _rt = Rc::new(UnitRT::new(relir, &_rentry, &_db));
+        let _load = Rc::new(UnitLoad::new(dmr, &_rentry, &_db, &_rt, lookup_path));
         let _jm = Rc::new(JobManager::new(eventr, relir, &_db, dmr));
+        let _sms = Rc::new(UnitSubManagers::new(
+            relir,
+            &log_target,
+            log_file_size,
+            log_file_num,
+        ));
         let um = Rc::new(UnitManager {
             events: Rc::clone(eventr),
             reli: Rc::clone(relir),
+            state,
             rentry: Rc::clone(&_rentry),
-            load: UnitLoad::new(dmr, &_rentry, &_db, &_rt, lookup_path),
             db: Rc::clone(&_db),
             rt: Rc::clone(&_rt),
+            load: Rc::clone(&_load),
             jm: Rc::clone(&_jm),
             exec: ExecSpawn::new(),
             sigchld: Sigchld::new(eventr, relir, &_db, &_jm),
             notify: NotifyManager::new(eventr, relir, &_rentry, &_db, &_jm),
-            sms: UnitSubManagers::new(relir),
-            state,
-            manager_config,
+            sms: Rc::clone(&_sms),
+            bus: UnitBus::new(relir, &_load, &_jm, &_sms),
         });
         um.load.set_um(&um);
-        um.sms.set_um(&um);
+        let umif = Rc::clone(&um);
+        um.sms.set_um(umif);
         um
     }
 
@@ -1211,16 +1258,14 @@ impl UnitManager {
 
     fn remove_job_result(&self, _source: &str) {}
 
-    fn get_log_target(&self) -> String {
-        self.manager_config.borrow().LogTarget.clone()
-    }
+    fn make_unit_consistent(&self, lunit: Option<&String>) {
+        if lunit.is_none() {
+            return;
+        }
 
-    fn get_log_file_size(&self) -> u32 {
-        self.manager_config.borrow().LogFileSize
-    }
-
-    fn get_log_file_number(&self) -> u32 {
-        self.manager_config.borrow().LogFileNumber
+        if let Some(unit) = self.db.units_get(lunit.unwrap()) {
+            unit.remove_transient();
+        }
     }
 }
 
@@ -1273,6 +1318,7 @@ impl ReStation for UnitManager {
                 ReliLastFrame::CgEvent => todo!(),
                 ReliLastFrame::Notify => self.notify.do_compensate_last(lframe, lunit),
                 ReliLastFrame::SubManager => self.sms.do_compensate_last(lframe, lunit),
+                ReliLastFrame::CmdOp => self.make_unit_consistent(lunit),
                 _ => {} // not concerned, do nothing
             };
         }
@@ -1379,152 +1425,6 @@ impl ReStation for UnitManager {
     /// the method of translate to UnitObj
     fn into_unitobj(self: Box<Self>) -> Box<dyn SubUnit>;
 }*/
-
-mod unit_submanager {
-    use crate::unit::util::{self};
-
-    use super::UnitManager;
-    use core::rel::Reliability;
-    use core::unit::{UnitManagerObj, UnitType};
-    use std::cell::RefCell;
-    use std::collections::HashMap;
-    use std::convert::TryFrom;
-    use std::rc::{Rc, Weak};
-
-    #[allow(dead_code)]
-    pub(super) struct UnitSubManagers {
-        reli: Rc<Reliability>,
-        um: RefCell<Weak<UnitManager>>,
-        db: RefCell<HashMap<UnitType, Box<dyn UnitManagerObj>>>,
-    }
-
-    impl UnitSubManagers {
-        pub(super) fn new(relir: &Rc<Reliability>) -> UnitSubManagers {
-            UnitSubManagers {
-                reli: Rc::clone(relir),
-                um: RefCell::new(Weak::new()),
-                db: RefCell::new(HashMap::new()),
-            }
-        }
-
-        pub(super) fn set_um(&self, um: &Rc<UnitManager>) {
-            // update um
-            self.um.replace(Rc::downgrade(um));
-
-            // fill all unit-types
-            for ut in 0..UnitType::UnitTypeMax as u32 {
-                self.add_sub(UnitType::try_from(ut).ok().unwrap());
-            }
-        }
-
-        pub(super) fn enumerate(&self) {
-            for (_, sub) in self.db.borrow().iter() {
-                sub.enumerate();
-            }
-        }
-
-        pub(super) fn input_rebuild(&self) {
-            for (_, sub) in self.db.borrow().iter() {
-                sub.input_rebuild();
-            }
-        }
-
-        pub(super) fn db_map(&self, reload: bool) {
-            for (_, sub) in self.db.borrow().iter() {
-                sub.db_map(reload);
-            }
-        }
-
-        pub(super) fn db_insert(&self) {
-            for (_, sub) in self.db.borrow().iter() {
-                sub.db_insert();
-            }
-        }
-
-        pub(super) fn db_compensate_last(
-            &self,
-            lframe: (u32, Option<u32>, Option<u32>),
-            lunit: Option<&String>,
-        ) {
-            let utype = self.last_unittype(lframe);
-            if utype.is_none() || lunit.is_none() {
-                return;
-            }
-
-            let unit_type = utype.unwrap();
-            if let Some(sub) = self.db.borrow().get(&unit_type) {
-                sub.db_compensate_last(lframe, lunit);
-            }
-        }
-
-        pub(super) fn do_compensate_last(
-            &self,
-            lframe: (u32, Option<u32>, Option<u32>),
-            lunit: Option<&String>,
-        ) {
-            let utype = self.last_unittype(lframe);
-            if utype.is_none() || lunit.is_none() {
-                return;
-            }
-
-            let unit_type = utype.unwrap();
-            if let Some(sub) = self.db.borrow().get(&unit_type) {
-                sub.do_compensate_last(lframe, lunit);
-            }
-        }
-
-        fn add_sub(&self, unit_type: UnitType) {
-            assert!(!self.db.borrow().contains_key(&unit_type));
-
-            let sub = self.new_sub(unit_type);
-            if let Some(s) = sub {
-                self.db.borrow_mut().insert(unit_type, s);
-            }
-        }
-
-        fn new_sub(&self, unit_type: UnitType) -> Option<Box<dyn UnitManagerObj>> {
-            let um = self.um();
-            log::info!(
-                "Creating UnitManagerObj for {:?} by __um_obj_create()",
-                unit_type
-            );
-            let sub = match util::create_um_obj(
-                unit_type,
-                &um.get_log_target(),
-                um.get_log_file_size(),
-                um.get_log_file_number(),
-            ) {
-                Err(_) => {
-                    log::info!("__um_obj_create() of {:?} is not found", unit_type);
-                    return None;
-                }
-                Ok(v) => v,
-            };
-
-            let reli = um.reliability();
-            sub.attach_um(um);
-            sub.attach_reli(reli);
-            Some(sub)
-        }
-
-        fn last_unittype(&self, lframe: (u32, Option<u32>, Option<u32>)) -> Option<UnitType> {
-            let (_, utype, _) = lframe;
-            utype?;
-
-            let ut = utype.unwrap();
-            if ut > UnitType::UnitTypeMax as u32 {
-                // error
-                return None;
-            }
-
-            Some(UnitType::try_from(ut).ok().unwrap())
-        }
-
-        fn um(&self) -> Rc<UnitManager> {
-            self.um.clone().into_inner().upgrade().unwrap()
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

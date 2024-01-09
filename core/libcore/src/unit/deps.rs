@@ -10,6 +10,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, num::ParseIntError, str::FromStr};
 
@@ -192,4 +193,21 @@ pub fn unit_name_to_type(unit_name: &str) -> UnitType {
         return UnitType::UnitTypeInvalid;
     }
     UnitType::from_str(words[words.len() - 1]).unwrap_or(UnitType::UnitTypeInvalid)
+}
+
+bitflags! {
+    /// flags used when writing files
+    pub struct UnitWriteFlags: u8 {
+        /// runtime file
+        const RUNTIME = 1 << 0;
+        /// persistent file
+        const PERSISTENT = 1 << 1;
+        /// sub-unit type section in file
+        const PRIVATE = 1 << 2;
+    }
+}
+
+///
+pub fn unit_write_flags_is_noop(flags: UnitWriteFlags) -> bool {
+    !flags.intersects(UnitWriteFlags::RUNTIME | UnitWriteFlags::PERSISTENT)
 }

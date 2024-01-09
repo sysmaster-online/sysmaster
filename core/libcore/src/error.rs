@@ -75,6 +75,11 @@ pub enum Error {
         source: std::io::Error,
     },
 
+    #[snafu(display("FmtError(libcore)"))]
+    Fmt {
+        source: std::fmt::Error,
+    },
+
     #[snafu(display("NixError(libcore)"))]
     Nix {
         source: nix::Error,
@@ -189,6 +194,7 @@ impl From<Error> for nix::Error {
             Error::Var { source: _ } => nix::Error::EINVAL,
             Error::Util { source: _ } => nix::Error::EINVAL,
             Error::Io { source: _ } => nix::Error::EIO,
+            Error::Fmt { source: _ } => nix::Error::EIO,
             Error::Nix { source } => source,
             Error::Heed { source: _ } => nix::Error::EIO,
             Error::InvalidData => nix::Error::EINVAL,

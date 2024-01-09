@@ -679,6 +679,8 @@ pub fn parse_pathbuf(s: &str) -> Result<PathBuf, Error> {
     Ok(PathBuf::from(path))
 }
 
+/// unit transient path in /run
+pub const RUN_TRANSIENT_PATH: &str = "/run/sysmaster/transient";
 /// unit lookup path in /etc
 pub const ETC_SYSTEM_PATH: &str = "/etc/sysmaster/system";
 /// unit lookup path in /run
@@ -721,6 +723,7 @@ impl LookupPaths {
 
     /// init lookup paths
     pub fn init_lookup_paths(&mut self) {
+        self.search_path.push(RUN_TRANSIENT_PATH.to_string());
         self.search_path.push(ETC_SYSTEM_PATH.to_string());
         self.search_path.push(RUN_SYSTEM_PATH.to_string());
         self.search_path.push(LIB_SYSTEM_PATH.to_string());
@@ -897,6 +900,7 @@ mod tests {
         assert_eq!(
             lp.search_path,
             vec![
+                "/run/sysmaster/transient",
                 "/etc/sysmaster/system",
                 "/run/sysmaster/system",
                 "/usr/lib/sysmaster/system"

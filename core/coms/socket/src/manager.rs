@@ -18,7 +18,7 @@ use constants::LOG_FILE_PATH;
 use super::comm::SocketUmComm;
 use super::rentry::SocketReFrame;
 use core::rel::{ReStation, Reliability};
-use core::unit::{UmIf, UnitManagerObj, UnitMngUtil};
+use core::unit::{UmIf, UnitManagerObj, UnitMngUtil, UnitType};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -37,7 +37,13 @@ impl SocketManager {
 }
 
 impl UnitManagerObj for SocketManager {
-    // nothing to customize
+    fn private_section(&self, _unit_type: UnitType) -> String {
+        "Socket".into()
+    }
+
+    fn can_transient(&self, _unit_type: UnitType) -> bool {
+        true
+    }
 }
 
 impl ReStation for SocketManager {

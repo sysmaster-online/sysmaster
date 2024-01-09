@@ -158,15 +158,19 @@ impl Plugin {
         let mut ret: String = String::with_capacity(256);
         #[cfg(test)]
         let lib_path_devel = {
-            let devel_path = |out_dir: &str| {
-                if out_dir.contains("build") {
-                    let _tmp: Vec<_> = out_dir.split("build").collect();
-                    String::from(_tmp[0])
+            let devel_path = |out_dir: Option<&str>| {
+                if let Some(outdir) = out_dir {
+                    if outdir.contains("build") {
+                        let _tmp: Vec<_> = outdir.split("build").collect();
+                        String::from(_tmp[0])
+                    } else {
+                        outdir.to_string()
+                    }
                 } else {
-                    out_dir.to_string()
+                    String::new()
                 }
             };
-            devel_path(env!("OUT_DIR"))
+            devel_path(option_env!("OUT_DIR"))
         };
 
         #[cfg(not(test))]
@@ -451,7 +455,7 @@ impl Plugin {
         &self,
         unit_type: UnitType,
         um: Rc<dyn UmIf>,
-    ) -> Result<Box<dyn SubUnit>> {
+    ) -> Result<Rc<dyn SubUnit>> {
         type FnType = fn(um: Rc<dyn UmIf>) -> *mut dyn SubUnit;
 
         let dy_lib = match self.get_lib(unit_type) {
@@ -480,8 +484,8 @@ impl Plugin {
         };
 
         log::debug!("create unit obj with params");
-        let boxed_raw = fun(um.clone());
-        Ok(unsafe { Box::from_raw(boxed_raw) })
+        let rced_raw = fun(um.clone());
+        Ok(unsafe { Rc::from_raw(rced_raw) })
     }
     /// Create a  obj for subclasses of unit manager
     /// each sub unit manager need reference of declare_umobj_plugin
@@ -575,6 +579,7 @@ mod tests {
 
     fn init_test() -> Arc<Plugin> {
         log::init_log(
+            "test_plugin",
             log::Level::Trace,
             vec!["console", "syslog"],
             "",
@@ -589,8 +594,8 @@ mod tests {
     fn test_plugin_load_library() {
         let t_p = init_test();
         let mf = env!("CARGO_MANIFEST_DIR");
-        let out_dir = env!("OUT_DIR");
-        log::info!("{},{}", out_dir, mf);
+        let out_dir = option_env!("OUT_DIR");
+        log::info!("{:?},{}", out_dir, mf);
         for key in (*t_p.load_libs.read().unwrap()).keys() {
             // let service_unit = u_box.as_any().downcast_ref::<ServiceUnit>().unwrap();
             // assert_eq!(service_unit.get_unit_name(),"");

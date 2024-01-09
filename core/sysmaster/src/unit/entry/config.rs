@@ -195,6 +195,12 @@ impl UeConfig {
     pub(crate) fn config_data(&self) -> Rc<RefCell<UeConfigData>> {
         self.data.clone()
     }
+
+    pub(crate) fn set_property(&self, key: &str, value: &str) -> Result<()> {
+        let ret = self.data.borrow_mut().set_property(key, value);
+        self.db_update();
+        ret
+    }
 }
 
 #[derive(UnitConfig, Default, Debug)]
@@ -244,6 +250,14 @@ impl UeConfigData {
         {
             self.Unit.After = ret;
         }
+    }
+
+    pub(self) fn set_property(&mut self, key: &str, value: &str) -> Result<()> {
+        let mut ret = self.Unit.set_property(key, value);
+        if let Err(Error::NotFound { what: _ }) = ret {
+            ret = self.Install.set_property(key, value);
+        }
+        ret
     }
 }
 

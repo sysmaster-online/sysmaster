@@ -17,7 +17,7 @@ use constants::LOG_FILE_PATH;
 
 use super::comm::ServiceUmComm;
 use core::rel::{ReStation, Reliability};
-use core::unit::{UmIf, UnitManagerObj, UnitMngUtil};
+use core::unit::{UmIf, UnitManagerObj, UnitMngUtil, UnitType};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -36,7 +36,13 @@ impl ServiceManager {
 }
 
 impl UnitManagerObj for ServiceManager {
-    // nothing to customize
+    fn private_section(&self, _unit_type: UnitType) -> String {
+        "Service".into()
+    }
+
+    fn can_transient(&self, _unit_type: UnitType) -> bool {
+        true
+    }
 }
 
 impl ReStation for ServiceManager {

@@ -20,9 +20,10 @@ use crate::unit::util::UnitFile;
 use basic::IN_SET;
 use core::error::*;
 use core::rel::ReStation;
-use core::unit::{SubUnit, UnitActiveState, UnitRelations, UnitType};
+use core::unit::{self, SubUnit, UnitActiveState, UnitRelations, UnitType, UnitWriteFlags};
 use nix::sys::wait::WaitStatus;
 use nix::unistd::Pid;
+use std::fmt::Arguments;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -62,9 +63,9 @@ impl UnitX {
         filer: &Rc<UnitFile>,
         unit_type: UnitType,
         name: &str,
-        subclass: Box<dyn SubUnit>,
+        subclass: Rc<dyn SubUnit>,
     ) -> UnitX {
-        let unit = Unit::new(unit_type, name, dmr, rentryr, filer, subclass);
+        let unit = Unit::new(unit_type, name, dmr, rentryr, filer, &subclass);
         UnitX(unit)
     }
 
@@ -246,8 +247,24 @@ impl UnitX {
         self.0.load_state()
     }
 
+    pub(crate) fn load_paths(&self) -> Vec<PathBuf> {
+        self.0.load_paths()
+    }
+
+    pub(crate) fn transient(&self) -> bool {
+        self.0.transient()
+    }
+
     pub(crate) fn set_load_state(&self, state: UnitLoadState) {
         self.0.set_load_state(state)
+    }
+
+    pub(crate) fn make_transient(&self, path: Option<PathBuf>) {
+        self.0.make_transient(path)
+    }
+
+    pub(crate) fn remove_transient(&self) {
+        self.0.remove_transient()
     }
 
     pub(crate) fn unit_type(&self) -> UnitType {
@@ -272,6 +289,30 @@ impl UnitX {
 
     pub(crate) fn child_remove_pids(&self, pid: Pid) {
         self.0.child_remove_pids(pid);
+    }
+
+    pub(crate) fn set_sub_property(
+        &self,
+        key: &str,
+        value: &str,
+        flags: UnitWriteFlags,
+    ) -> Result<()> {
+        self.0.set_sub_property(key, value, flags)
+    }
+
+    pub(crate) fn set_property(&self, key: &str, value: &str) -> Result<()> {
+        self.0.set_property(key, value)
+    }
+
+    pub(crate) fn write_settingf(
+        &self,
+        ps: &str,
+        flags: UnitWriteFlags,
+        name: &str,
+        args: Arguments<'_>,
+    ) -> Result<()> {
+        let unit = self.unit();
+        unit::unit_write_settingf(unit, ps, flags, name, args)
     }
 
     pub(crate) fn unit(&self) -> Rc<Unit> {

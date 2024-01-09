@@ -137,6 +137,12 @@ impl ServiceConfig {
     pub(super) fn pid_file(&self) -> Option<PathBuf> {
         self.data.borrow().Service.PIDFile.clone()
     }
+
+    pub(super) fn set_property(&self, key: &str, value: &str) -> Result<()> {
+        let ret = self.data.borrow_mut().set_property(key, value);
+        self.db_update();
+        ret
+    }
 }
 
 fn specifier_escape_exec_command(
@@ -197,6 +203,10 @@ impl ServiceConfigData {
             LONG_LINE_MAX,
             unit_specifier_data,
         );
+    }
+
+    pub(self) fn set_property(&mut self, key: &str, value: &str) -> Result<()> {
+        self.Service.set_property(key, value)
     }
 }
 

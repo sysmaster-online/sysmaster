@@ -74,11 +74,12 @@ compile_error!("feature plugin and noplugin cannot be enabled at the same time")
 pub use {manager::__um_obj_create, unit::__subunit_create_with_params};
 
 // dependency:
-// service_base -> service_rentry -> {service_comm | service_config}
-// {service_pid | service_spawn} ->
-// {service_mng} ->
-// {service_monitor} -> service_unit -> service_manager
+// base -> rentry -> {comm | config}
+// {pid | spawn} ->
+// {mng} ->
+// {monitor} -> {bus -> unit} -> manager
 mod base;
+mod bus;
 mod comm;
 mod config;
 mod manager;

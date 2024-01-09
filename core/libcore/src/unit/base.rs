@@ -11,10 +11,10 @@
 // See the Mulan PSL v2 for more details.
 
 use super::super::rel::ReStation;
+use super::deps::{UnitType, UnitWriteFlags};
 use super::kill::{KillContext, KillOperation};
 use super::state::{UnitActiveState, UnitNotifyFlags};
 use super::umif::UnitMngUtil;
-use super::UnitType;
 use crate::error::*;
 use basic::time::UnitTimeStamp;
 use bitflags::bitflags;
@@ -33,6 +33,8 @@ use std::{collections::HashMap, path::PathBuf, rc::Rc};
 pub trait UnitBase {
     ///
     fn id(&self) -> String;
+    ///
+    fn unit_type(&self) -> UnitType;
     ///
     fn test_start_limit(&self) -> bool;
     ///
@@ -72,6 +74,21 @@ pub trait UnitBase {
 
     /// guess main pid from the cgroup path
     fn guess_main_pid(&self) -> Result<Pid>;
+
+    ///
+    fn is_load_stub(&self) -> bool;
+
+    ///
+    fn transient(&self) -> bool;
+
+    ///
+    fn transient_file(&self) -> Option<PathBuf>;
+
+    ///
+    fn last_section_private(&self) -> i8;
+
+    ///
+    fn set_last_section_private(&self, lsp: i8);
 
     ///
     fn get_unit_timestamp(&self) -> Rc<RefCell<UnitTimeStamp>>;
@@ -166,6 +183,13 @@ pub trait SubUnit: ReStation + UnitMngUtil {
         false
     }
 
+    ///
+    fn unit_set_property(&self, _key: &str, _value: &str, _flags: UnitWriteFlags) -> Result<()> {
+        Err(Error::NotFound {
+            what: "set property".to_string(),
+        })
+    }
+
     // ================ ONLY VALID FOR SERVICE ================
     ///
     fn set_socket_fd(&self, _fd: i32) {}
@@ -198,11 +222,11 @@ macro_rules! declare_unitobj_plugin_with_param {
         #[cfg_attr(feature = "plugin", no_mangle)]
         pub fn __subunit_create_with_params(
             um: Rc<dyn $crate::unit::UmIf>,
-        ) -> *mut dyn $crate::unit::SubUnit {
+        ) -> *const dyn $crate::unit::SubUnit {
             let construcotr: fn(um: Rc<dyn $crate::unit::UmIf>) -> $unit_type = $constructor;
             let obj = construcotr(um);
-            let boxed: Box<dyn $crate::unit::SubUnit> = Box::new(obj);
-            Box::into_raw(boxed)
+            let rced: Rc<dyn $crate::unit::SubUnit> = Rc::new(obj);
+            Rc::into_raw(rced)
         }
     };
 }

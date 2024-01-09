@@ -18,6 +18,7 @@ use crate::manager::rentry::{
 };
 use crate::unit::entry::UnitEmergencyAction;
 use bitflags::bitflags;
+use core::error::*;
 use core::rel::{ReDb, Reliability};
 use core::serialize::DeserializeWith;
 use core::unit::{UnitRelations, UnitType};
@@ -62,11 +63,27 @@ pub enum UnitLoadState {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct UnitReLoad {
     load_state: UnitLoadState,
+    transient: bool,
+    paths: Vec<PathBuf>,
+    transient_file: Option<PathBuf>,
+    last_section_private: i8,
 }
 
 impl UnitReLoad {
-    fn new(load_state: UnitLoadState) -> UnitReLoad {
-        UnitReLoad { load_state }
+    fn new(
+        load_state: UnitLoadState,
+        transient: bool,
+        paths: Vec<PathBuf>,
+        transient_file: Option<PathBuf>,
+        last_section_private: i8,
+    ) -> UnitReLoad {
+        UnitReLoad {
+            load_state,
+            transient,
+            paths,
+            transient_file,
+            last_section_private,
+        }
     }
 }
 
@@ -231,6 +248,73 @@ pub(crate) struct UeConfigUnit {
     pub JobTimeoutAction: UnitEmergencyAction,
 }
 
+impl UeConfigUnit {
+    pub(crate) fn set_property(&mut self, key: &str, value: &str) -> Result<()> {
+        match key {
+            "RefuseManualStart" => self.RefuseManualStart = basic::config::parse_boolean(value)?,
+            "RefuseManualStop" => self.RefuseManualStop = basic::config::parse_boolean(value)?,
+            "DefaultDependencies" => {
+                self.DefaultDependencies = basic::config::parse_boolean(value)?
+            }
+            "OnSuccessJobMode" => self.OnSuccessJobMode = JobMode::parse_from_str(value)?,
+            "OnFailureJobMode" => self.OnFailureJobMode = JobMode::parse_from_str(value)?,
+            "IgnoreOnIsolate" => self.IgnoreOnIsolate = basic::config::parse_boolean(value)?,
+            "JobTimeoutAction" => {
+                self.JobTimeoutAction = UnitEmergencyAction::parse_from_str(value)?
+            }
+            "StartLimitBurst" => self.StartLimitBurst = value.parse::<u32>()?,
+            "StartLimitAction" => {
+                self.StartLimitAction = UnitEmergencyAction::parse_from_str(value)?
+            }
+            "FailureAction" => self.FailureAction = UnitEmergencyAction::parse_from_str(value)?,
+            "SuccessAction" => self.SuccessAction = UnitEmergencyAction::parse_from_str(value)?,
+            "ConditionACPower" => {
+                self.ConditionACPower = Some(basic::config::parse_boolean(value)?)
+            }
+            "ConditionCapability" => self.ConditionCapability = value.to_string(),
+            "ConditionDirectoryNotEmpty" => self.ConditionDirectoryNotEmpty = value.to_string(),
+            "ConditionFileIsExecutable" => self.ConditionFileIsExecutable = value.to_string(),
+            "ConditionFileNotEmpty" => self.ConditionFileNotEmpty = value.to_string(),
+            "ConditionFirstBoot" => {
+                self.ConditionFirstBoot = Some(basic::config::parse_boolean(value)?)
+            }
+            "ConditionKernelCommandLine" => self.ConditionKernelCommandLine = value.to_string(),
+            "ConditionNeedsUpdate" => self.ConditionNeedsUpdate = value.to_string(),
+            "ConditionPathExists" => self.ConditionPathExists = value.to_string(),
+            "ConditionPathExistsGlob" => self.ConditionPathExistsGlob = value.to_string(),
+            "ConditionPathIsDirectory" => self.ConditionPathIsDirectory = value.to_string(),
+            "ConditionPathIsMountPoint" => self.ConditionPathIsMountPoint = value.to_string(),
+            "ConditionPathIsReadWrite" => self.ConditionPathIsReadWrite = value.to_string(),
+            "ConditionPathIsSymbolicLink" => self.ConditionPathIsSymbolicLink = value.to_string(),
+            "ConditionSecurity" => self.ConditionSecurity = value.to_string(),
+            "ConditionUser" => self.ConditionUser = value.to_string(),
+            "AssertPathExists" => self.AssertPathExists = value.to_string(),
+            "Documentation" => self.Documentation = value.to_string(),
+            "Wants" => self.Wants = vec_str_2_string(value),
+            "Requires" => self.Requires = vec_str_2_string(value),
+            "BindsTo" => self.BindsTo = vec_str_2_string(value),
+            "Requisite" => self.Requisite = vec_str_2_string(value),
+            "PartOf" => self.PartOf = vec_str_2_string(value),
+            "OnFailure" => self.OnFailure = vec_str_2_string(value),
+            "OnSuccess" => self.OnSuccess = vec_str_2_string(value),
+            "Before" => self.Before = vec_str_2_string(value),
+            "After" => self.After = vec_str_2_string(value),
+            "Conflicts" => self.Conflicts = vec_str_2_string(value),
+            "Description" => self.Description = value.to_string(),
+            _ => {
+                return Err(Error::NotFound {
+                    what: "set property".to_string(),
+                })
+            }
+        };
+        Ok(())
+    }
+}
+
+fn vec_str_2_string(str: &str) -> Vec<String> {
+    str.split_whitespace().map(|s| s.to_string()).collect()
+}
+
 #[derive(UnitSection, Default, Clone, Debug, Serialize, Deserialize)]
 pub struct UeConfigInstall {
     #[entry(append)]
@@ -241,6 +325,15 @@ pub struct UeConfigInstall {
     pub RequiredBy: Vec<String>,
     #[entry(append)]
     pub Also: Vec<String>,
+}
+
+impl UeConfigInstall {
+    pub(crate) fn set_property(&mut self, _key: &str, _value: &str) -> Result<()> {
+        // nothing supported
+        Err(Error::NotFound {
+            what: "set unit install property".to_string(),
+        })
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -330,7 +423,7 @@ impl UmReNotify {
 pub(crate) struct UnitRe {
     // database: multi-instance(N)
     base: Rc<ReDb<String, UnitReBase>>, // RELI_DB_HUNIT_BASE; key: unit_id, data: unit_type;
-    load: Rc<ReDb<String, UnitReLoad>>, // RELI_DB_HUNIT_LOAD; key: unit_id, data: load_state;
+    load: Rc<ReDb<String, UnitReLoad>>, // RELI_DB_HUNIT_LOAD; key: unit_id, data: load_state+transient+paths;
     conf: Rc<ReDb<String, UnitReConfig>>, // RELI_DB_HUNIT_CONFIG; key: unit_id, data: unit_conf+install_conf;
     cgroup: Rc<ReDb<String, UnitReCgroup>>, // RELI_DB_HUNIT_CGROUP; key: unit_id, data: cg_path;
     child: Rc<ReDb<String, UnitReChild>>, // RELI_DB_HUNIT_CHILD; key: unit_id, data: pid[s];
@@ -384,8 +477,22 @@ impl UnitRe {
         self.base.keys()
     }
 
-    pub(super) fn load_insert(&self, unit_id: &str, load_state: UnitLoadState) {
-        let u_load = UnitReLoad::new(load_state);
+    pub(super) fn load_insert(
+        &self,
+        unit_id: &str,
+        load_state: UnitLoadState,
+        transient: bool,
+        paths: Vec<PathBuf>,
+        transient_file: Option<PathBuf>,
+        last_section_private: i8,
+    ) {
+        let u_load = UnitReLoad::new(
+            load_state,
+            transient,
+            paths,
+            transient_file,
+            last_section_private,
+        );
         self.load.insert(unit_id.to_owned(), u_load);
     }
 
@@ -394,9 +501,21 @@ impl UnitRe {
         self.load.remove(&unit_id.to_string());
     }
 
-    pub(super) fn load_get(&self, unit_id: &str) -> Option<UnitLoadState> {
+    #[allow(clippy::type_complexity)]
+    pub(super) fn load_get(
+        &self,
+        unit_id: &str,
+    ) -> Option<(UnitLoadState, bool, Vec<PathBuf>, Option<PathBuf>, i8)> {
         let u_load = self.load.get(&unit_id.to_string());
-        u_load.map(|l| l.load_state)
+        u_load.map(|l| {
+            (
+                l.load_state,
+                l.transient,
+                l.paths,
+                l.transient_file,
+                l.last_section_private,
+            )
+        })
     }
 
     pub(super) fn conf_insert(

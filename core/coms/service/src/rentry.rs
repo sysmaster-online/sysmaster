@@ -334,6 +334,32 @@ impl SectionService {
             self.TimeoutStopSec = time_out;
         }
     }
+
+    pub(super) fn set_property(&mut self, key: &str, value: &str) -> Result<()> {
+        match key {
+            "RemainAfterExit" => self.RemainAfterExit = basic::config::parse_boolean(value)?,
+            "Type" => self.Type = ServiceType::parse_from_str(value)?,
+            "NotifyAccess" => self.NotifyAccess = Some(NotifyAccess::parse_from_str(value)?),
+            "PIDFile" => self.PIDFile = Some(parse_pidfile(value)?),
+            "Restart" => self.Restart = ServiceRestart::parse_from_str(value)?,
+            "RestartPreventExitStatus" => {
+                self.RestartPreventExitStatus = ExitStatusSet::parse_from_str(value)?
+            }
+            "ExecStart" => self.ExecStart = core::exec::parse_exec_command(value)?,
+            "ExecStartPre" => self.ExecStartPre = core::exec::parse_exec_command(value)?,
+            "ExecStartPost" => self.ExecStartPost = core::exec::parse_exec_command(value)?,
+            "ExecStop" => self.ExecStop = core::exec::parse_exec_command(value)?,
+            "ExecStopPost" => self.ExecStopPost = core::exec::parse_exec_command(value)?,
+            "ExecReload" => self.ExecReload = core::exec::parse_exec_command(value)?,
+            "ExecCondition" => self.ExecCondition = core::exec::parse_exec_command(value)?,
+            _ => {
+                return Err(Error::NotFound {
+                    what: "set property".to_string(),
+                })
+            }
+        };
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
