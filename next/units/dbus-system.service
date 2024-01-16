@@ -1,3 +1,0 @@
-name = "dbus-system.service"
-kind = "Simple"
-start = "dbus-daemon --config-file=/usr/share/dbus-1/system.conf --print-address --nofork"

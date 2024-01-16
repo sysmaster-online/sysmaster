@@ -1,3 +1,0 @@
-name = "sleep.service"
-kind = "Simple"
-start = "sleep 10"

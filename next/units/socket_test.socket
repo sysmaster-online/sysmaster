@@ -1,3 +1,0 @@
-name = "socket_test.socket"
-path = "./test.socket"
-service = "socket_test.service"

@@ -1,2 +1,0 @@
-name = "ssh-keygen.target"
-wants = "ssh-keygen-ecdsa.service, ssh-keygen-ed25519.service, ssh-keygen-rsa.service"
