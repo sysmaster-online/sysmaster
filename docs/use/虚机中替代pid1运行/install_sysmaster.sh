@@ -65,4 +65,9 @@ ln -sf ${sysmaster_install_target}/init /init
 # Install syslog.target
 ln -sf ${sysmaster_install_target}/system/syslog.socket /etc/sysmaster/system/syslog.target.wants/syslog.socket
 
+ln -sf  /usr/bin/sctl  /usr/sbin/halt
+ln -sf  /usr/bin/sctl  /usr/sbin/reboot
+ln -sf  /usr/bin/sctl  /usr/sbin/poweroff
+ln -sf  /usr/bin/sctl  /usr/sbin/shutdown
+
 sync

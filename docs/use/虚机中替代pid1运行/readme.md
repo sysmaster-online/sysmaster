@@ -86,7 +86,7 @@ menuentry 'Boot with sysmaster'
 1. 在源码根目录下使用安装脚本`install_sysmaster.sh`将`sysmaster`的二进制文件、系统服务、配置文件等安装到系统中，执行以下命令：
 
 ```
-# sh -x tools/run_with_vm/install_sysmaster.sh [debug|release]
+# sh -x docs/use/虚机中替代pid1运行/install_sysmaster.sh [debug|release]
 ```
 
 可以指定安装`debug`或`release`版本，未指定时默认安装`debug`二进制版本。
