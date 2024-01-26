@@ -24,7 +24,7 @@ Linux localhost.localdomain 5.10.0-60.18.0.50.oe2203.x86_64 #1 SMP Wed Mar 30 03
 2. 安装`devmaster`的二进制以及相关配置文件，在`sysmaster`源码根目录下执行如下命令：
 
    ```shell
-   # sh -x tools/run_with_devmaster/install_devmaster.sh [debug|release]
+   # sh -x docs/use/devmaster替代udev运行/install_devmaster.sh [debug|release]
    ```
 
 3. 重启系统，选择`sysmaster`启动项。进入主系统后检查`devmaster`服务状态和网络连通情况。
