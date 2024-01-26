@@ -34,6 +34,7 @@ pub mod hwdb;
 pub mod input_id;
 pub mod keyboard;
 pub mod kmod;
+pub mod net_driver;
 pub mod net_id;
 pub mod net_setup_link;
 pub mod path_id;
@@ -108,8 +109,9 @@ pub enum BuiltinCommand {
     PathId = 8,
     Uaccess = 9,
     UsbId = 10,
-    Example = 11,
-    Max = 12,
+    NetDriver = 11,
+    Example = 12,
+    Max = 13,
 }
 
 impl FromStr for BuiltinCommand {
@@ -135,6 +137,7 @@ impl FromStr for BuiltinCommand {
             "path_id" => Ok(BuiltinCommand::PathId),
             "uaccess" => Ok(BuiltinCommand::Uaccess),
             "usb_id" => Ok(BuiltinCommand::UsbId),
+            "net_driver" => Ok(BuiltinCommand::NetDriver),
             "example" => Ok(BuiltinCommand::Example),
             _ => Err(Error::BuiltinCommandError {
                 msg: "invalid builtin command".to_string(),
@@ -157,6 +160,7 @@ impl Display for BuiltinCommand {
             BuiltinCommand::PathId => "path_id",
             BuiltinCommand::Uaccess => "uaccess",
             BuiltinCommand::UsbId => "usb_id",
+            BuiltinCommand::NetDriver => "net_driver",
             BuiltinCommand::Example => "example",
             _ => "invalid",
         };
@@ -190,6 +194,10 @@ impl BuiltinManager {
         builtins.insert(BuiltinCommand::PathId, Box::new(path_id::PathId {}));
         builtins.insert(BuiltinCommand::Uaccess, Box::new(uaccess::Uaccess {}));
         builtins.insert(BuiltinCommand::UsbId, Box::new(usb_id::UsbId {}));
+        builtins.insert(
+            BuiltinCommand::NetDriver,
+            Box::new(net_driver::NetDriver {}),
+        );
         builtins.insert(BuiltinCommand::Example, Box::new(example::Example {}));
 
         BuiltinManager { builtins }
