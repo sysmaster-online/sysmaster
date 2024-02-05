@@ -236,41 +236,25 @@ impl Condition {
     }
 
     fn test_kernel_command_line(&self) -> i8 {
-        let has_equal = self.params.contains('=');
-        let search_value = if has_equal {
-            self.params.split_once('=').unwrap().0
-        } else {
-            &self.params
+        let (params_key, params_value) = match self.params.split_once('=') {
+            None => return cmdline::Cmdline::default().has_param(&self.params) as i8,
+            Some(values) => (values.0, values.1),
         };
-        let value = match cmdline::Cmdline::default().get_param(search_value) {
+
+        let value = match cmdline::Cmdline::default().get_param(params_key) {
             None => {
                 log::info!("Failed to get cmdline content, assuming ConditionKernelCommandLine check failed.");
                 return 0;
             }
-            Some(v) => {
-                if v.is_empty() {
-                    log::info!(
-                        "/proc/cmdline doesn't contain the given item: {}",
-                        search_value
-                    );
-                    return 0;
-                }
-                v
-            }
+            Some(v) => v,
         };
-        log::debug!("Found kernel command line value: {}", value);
-        if has_equal {
-            /* has an equal, "crashkernel=512M matches crashkernel=512M" */
-            self.params.eq(&value) as i8
-        } else {
-            /* Check if the value has an equal */
-            match value.split_once('=') {
-                /* doesn't has an equal, "rd matches rd" */
-                None => self.params.eq(&value) as i8,
-                /* has an equal, "crashkernel matches crashkernel=512M" */
-                Some(v) => self.params.eq(v.0) as i8,
-            }
-        }
+        log::debug!(
+            "Found kernel command line value: {}={}, params: {}",
+            params_key,
+            value,
+            self.params
+        );
+        (value == params_value) as i8
     }
 
     fn test_needs_update(&self) -> i8 {
