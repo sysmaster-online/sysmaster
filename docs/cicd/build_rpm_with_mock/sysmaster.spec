@@ -11,8 +11,8 @@
 %global _cargo_build /usr/bin/env CARGO_HOME=.cargo RUSTC_BOOTSTRAP=1 %{_bindir}/cargo build %__cargo_common_opts
 
 Name:           sysmaster
-Version:        0.5.1
-Release:        2
+Version:        1.0.0
+Release:        1
 Summary:        redesign and reimplement process1.
 
 License:        Mulan PSL v2

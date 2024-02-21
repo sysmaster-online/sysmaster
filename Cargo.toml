@@ -1,6 +1,6 @@
 [package]
 name = "sysMaster"
-version = "0.5.1"
+version = "1.0.0"
 authors = ["sysmaster"]
 homepage = "http://www.sysmaster.org"
 keywords = ["sysmaster", "pid1", "os"]
