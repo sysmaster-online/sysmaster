@@ -5,7 +5,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
 # 递归向上查找包含 Cargo.toml 文件的目录
 while [ ! -f "$SCRIPT_DIR/Cargo.lock" ] && [ "$SCRIPT_DIR" != "/" ]; do
-    SCRIPT_DIR=$(dirname "$SCRIPT_DIR")
+    SCRIPT_DIR=$(dirname $SCRIPT_DIR)
 done
 
 # cargo vendor
@@ -95,7 +95,7 @@ popd
 # compress sysmaster
 pushd $SCRIPT_DIR/../
     rm -rf sysmaster-$version
-    cp -a $(basename $(pwd)) sysmaster-$version
+    cp -a sysmaster sysmaster-$version
     pushd sysmaster-$version
     cargo clean
     rm -rf .git next docs tools patch target

@@ -1,6 +1,6 @@
 [package]
 name = "timer"
-version = "0.5.0"
+version = "1.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -17,7 +17,7 @@ core = { path = "../../libcore", default-features = false }
 event = { path = "../../../libs/event" }
 unit_parser = { path = "../../../libs/unit_parser" }
 
-nix = { version = "0.24", default-features = false}
+nix = { version = "0.24", default-features = false }
 once_cell = { version = "1.8.0", default-features = false }
 serde = { version = "1.0.130", default-features = false }
 rand = "0.8.5"
