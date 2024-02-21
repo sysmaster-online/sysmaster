@@ -70,14 +70,14 @@ dependencies = [
 
 [[package]]
 name = "basic"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "bitflags",
  "chrono",
  "constants",
  "fnmatch-sys",
  "libc",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
  "pathdiff",
  "pkg-config",
@@ -127,7 +127,7 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "blkid_rs"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "bindgen",
@@ -179,11 +179,11 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cgroup"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "bitflags",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
  "snafu",
  "walkdir",
@@ -284,7 +284,7 @@ dependencies = [
 
 [[package]]
 name = "cmdproto"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "http",
  "nix 0.24.3",
@@ -317,11 +317,11 @@ dependencies = [
 
 [[package]]
 name = "constants"
-version = "0.5.1"
+version = "1.0.0"
 
 [[package]]
 name = "core"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "bitflags",
@@ -331,7 +331,7 @@ dependencies = [
  "event",
  "heed",
  "libc",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
  "serde",
  "snafu",
@@ -375,7 +375,7 @@ dependencies = [
 
 [[package]]
 name = "device"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "bitflags",
@@ -383,7 +383,7 @@ dependencies = [
  "event",
  "fnmatch-sys",
  "libc",
- "log 0.5.1",
+ "log 1.0.0",
  "loopdev",
  "nix 0.24.3",
  "snafu",
@@ -391,7 +391,7 @@ dependencies = [
 
 [[package]]
 name = "devmaster"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "bitflags",
@@ -412,7 +412,7 @@ dependencies = [
  "kmod_rs",
  "lazy_static",
  "libc",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
  "rtnetlink",
  "scsi_generic_rs",
@@ -490,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "event"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "libc",
@@ -566,11 +566,11 @@ dependencies = [
 
 [[package]]
 name = "fstab"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "inotify",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
 ]
 
@@ -676,11 +676,11 @@ dependencies = [
 
 [[package]]
 name = "getty-generator"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "libc",
- "log 0.5.1",
+ "log 1.0.0",
 ]
 
 [[package]]
@@ -767,10 +767,10 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hostname_setup"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
 ]
 
@@ -787,14 +787,14 @@ dependencies = [
 
 [[package]]
 name = "hwdb"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "bincode",
  "constants",
  "glob",
  "linked-hash-map",
- "log 0.5.1",
+ "log 1.0.0",
  "memoffset",
  "nix 0.24.3",
  "serde",
@@ -871,7 +871,7 @@ checksum = "6b6b0f8557f596a2db592f172015c40d0c149e16a956c7848e733d663f2c6636"
 
 [[package]]
 name = "input_event_codes_rs"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "bindgen",
 ]
@@ -947,11 +947,11 @@ dependencies = [
 
 [[package]]
 name = "kmod_rs"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "kmod-sys",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
 ]
 
@@ -1005,7 +1005,7 @@ dependencies = [
 
 [[package]]
 name = "libtests"
-version = "0.5.1"
+version = "1.0.0"
 
 [[package]]
 name = "linked-hash-map"
@@ -1041,7 +1041,7 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "libc",
  "log 0.4.14",
@@ -1059,16 +1059,16 @@ dependencies = [
 
 [[package]]
 name = "machine-id-setup"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
 ]
 
 [[package]]
 name = "macros"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1119,7 +1119,7 @@ dependencies = [
 
 [[package]]
 name = "mount"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "bitflags",
@@ -1128,7 +1128,7 @@ dependencies = [
  "epoll",
  "event",
  "libc",
- "log 0.5.1",
+ "log 1.0.0",
  "macros",
  "nix 0.24.3",
  "once_cell",
@@ -1340,14 +1340,14 @@ checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
 
 [[package]]
 name = "path"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "constants",
  "core",
  "event",
  "libc",
- "log 0.5.1",
+ "log 1.0.0",
  "macros",
  "nix 0.24.3",
  "once_cell",
@@ -1552,21 +1552,21 @@ dependencies = [
 
 [[package]]
 name = "random_seed"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "libc",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
  "xattr",
 ]
 
 [[package]]
 name = "rc-local-generator"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "libc",
- "log 0.5.1",
+ "log 1.0.0",
 ]
 
 [[package]]
@@ -1662,14 +1662,14 @@ dependencies = [
 
 [[package]]
 name = "scsi_generic_rs"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "bindgen",
 ]
 
 [[package]]
 name = "sctl"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "clap",
  "cmdproto",
@@ -1679,7 +1679,7 @@ dependencies = [
 
 [[package]]
 name = "selinux"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "bindgen",
 ]
@@ -1717,7 +1717,7 @@ dependencies = [
 
 [[package]]
 name = "service"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "cgroup",
@@ -1727,7 +1727,7 @@ dependencies = [
  "event",
  "libc",
  "libtests",
- "log 0.5.1",
+ "log 1.0.0",
  "macros",
  "nix 0.24.3",
  "once_cell",
@@ -1786,7 +1786,7 @@ dependencies = [
 
 [[package]]
 name = "socket"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "confique",
@@ -1794,7 +1794,7 @@ dependencies = [
  "core",
  "event",
  "libtests",
- "log 0.5.1",
+ "log 1.0.0",
  "macros",
  "nix 0.24.3",
  "once_cell",
@@ -1814,10 +1814,10 @@ dependencies = [
 
 [[package]]
 name = "switch_root"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
 ]
 
@@ -1866,16 +1866,16 @@ dependencies = [
 
 [[package]]
 name = "sysMaster"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
- "log 0.5.1",
+ "log 1.0.0",
  "mio",
  "nix 0.24.3",
 ]
 
 [[package]]
 name = "sysmaster"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "bitflags",
@@ -1891,7 +1891,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "libtests",
- "log 0.5.1",
+ "log 1.0.0",
  "mount",
  "nix 0.24.3",
  "once_cell",
@@ -1909,30 +1909,30 @@ dependencies = [
 
 [[package]]
 name = "sysmaster-hwdb"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "clap",
  "hwdb",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
 ]
 
 [[package]]
 name = "sysmaster-run"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "clap",
  "cmdproto",
  "constants",
  "core",
- "log 0.5.1",
+ "log 1.0.0",
  "nix 0.24.3",
 ]
 
 [[package]]
 name = "sysmonitor"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "nix 0.24.3",
@@ -1944,12 +1944,12 @@ dependencies = [
 
 [[package]]
 name = "target"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "basic",
  "constants",
  "core",
- "log 0.5.1",
+ "log 1.0.0",
  "macros",
  "nix 0.24.3",
  "once_cell",
@@ -1998,13 +1998,13 @@ dependencies = [
 
 [[package]]
 name = "timer"
-version = "0.5.0"
+version = "1.0.0"
 dependencies = [
  "basic",
  "chrono",
  "core",
  "event",
- "log 0.5.1",
+ "log 1.0.0",
  "macros",
  "nix 0.24.3",
  "once_cell",
@@ -2223,7 +2223,7 @@ checksum = "6a89911bd99e5f3659ec4acf9c4d93b0a90fe4a2a11f15328472058edc5261be"
 
 [[package]]
 name = "watchdog"
-version = "0.5.1"
+version = "1.0.0"
 dependencies = [
  "nix 0.24.3",
 ]
