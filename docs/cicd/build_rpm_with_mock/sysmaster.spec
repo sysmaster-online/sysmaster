@@ -32,7 +32,7 @@ Summary:        %{summary}
 
 %package -n devmaster
 Summary:        Infrastructure of device management in userspace.
-BuildRequires:  util-linux-devel kmod-devel
+BuildRequires:  libblkid-devel kmod-devel
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 Requires(post):   sysmaster
 Requires(preun):  sysmaster
