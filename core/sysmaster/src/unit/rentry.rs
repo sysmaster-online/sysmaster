@@ -251,23 +251,28 @@ pub(crate) struct UeConfigUnit {
 impl UeConfigUnit {
     pub(crate) fn set_property(&mut self, key: &str, value: &str) -> Result<()> {
         match key {
-            "RefuseManualStart" => self.RefuseManualStart = basic::config::parse_boolean(value)?,
-            "RefuseManualStop" => self.RefuseManualStop = basic::config::parse_boolean(value)?,
+            "Description" => self.Description = value.to_string(),
+            "Documentation" => self.Documentation = value.to_string(),
+            "IgnoreOnIsolate" => self.IgnoreOnIsolate = basic::config::parse_boolean(value)?,
             "DefaultDependencies" => {
                 self.DefaultDependencies = basic::config::parse_boolean(value)?
             }
-            "OnSuccessJobMode" => self.OnSuccessJobMode = JobMode::parse_from_str(value)?,
+            "RefuseManualStart" => self.RefuseManualStart = basic::config::parse_boolean(value)?,
+            "RefuseManualStop" => self.RefuseManualStop = basic::config::parse_boolean(value)?,
             "OnFailureJobMode" => self.OnFailureJobMode = JobMode::parse_from_str(value)?,
-            "IgnoreOnIsolate" => self.IgnoreOnIsolate = basic::config::parse_boolean(value)?,
-            "JobTimeoutAction" => {
-                self.JobTimeoutAction = UnitEmergencyAction::parse_from_str(value)?
-            }
-            "StartLimitBurst" => self.StartLimitBurst = value.parse::<u32>()?,
-            "StartLimitAction" => {
-                self.StartLimitAction = UnitEmergencyAction::parse_from_str(value)?
-            }
-            "FailureAction" => self.FailureAction = UnitEmergencyAction::parse_from_str(value)?,
-            "SuccessAction" => self.SuccessAction = UnitEmergencyAction::parse_from_str(value)?,
+            "OnSuccessJobMode" => self.OnSuccessJobMode = JobMode::parse_from_str(value)?,
+            "Wants" => self.Wants = vec_str_2_string(value),
+            "Requires" => self.Requires = vec_str_2_string(value),
+            "BindsTo" => self.BindsTo = vec_str_2_string(value),
+            "Requisite" => self.Requisite = vec_str_2_string(value),
+            "PartOf" => self.PartOf = vec_str_2_string(value),
+            "OnFailure" => self.OnFailure = vec_str_2_string(value),
+            "OnSuccess" => self.OnSuccess = vec_str_2_string(value),
+            "Before" => self.Before = vec_str_2_string(value),
+            "After" => self.After = vec_str_2_string(value),
+            "Conflicts" => self.Conflicts = vec_str_2_string(value),
+
+            /* Conditions */
             "ConditionACPower" => {
                 self.ConditionACPower = Some(basic::config::parse_boolean(value)?)
             }
@@ -288,19 +293,22 @@ impl UeConfigUnit {
             "ConditionPathIsSymbolicLink" => self.ConditionPathIsSymbolicLink = value.to_string(),
             "ConditionSecurity" => self.ConditionSecurity = value.to_string(),
             "ConditionUser" => self.ConditionUser = value.to_string(),
+
+            /* Asserts */
             "AssertPathExists" => self.AssertPathExists = value.to_string(),
-            "Documentation" => self.Documentation = value.to_string(),
-            "Wants" => self.Wants = vec_str_2_string(value),
-            "Requires" => self.Requires = vec_str_2_string(value),
-            "BindsTo" => self.BindsTo = vec_str_2_string(value),
-            "Requisite" => self.Requisite = vec_str_2_string(value),
-            "PartOf" => self.PartOf = vec_str_2_string(value),
-            "OnFailure" => self.OnFailure = vec_str_2_string(value),
-            "OnSuccess" => self.OnSuccess = vec_str_2_string(value),
-            "Before" => self.Before = vec_str_2_string(value),
-            "After" => self.After = vec_str_2_string(value),
-            "Conflicts" => self.Conflicts = vec_str_2_string(value),
-            "Description" => self.Description = value.to_string(),
+
+            "StartLimitInterval" => self.StartLimitInterval = value.parse::<u64>()?,
+            "StartLimitIntervalSec" => self.StartLimitIntervalSec = value.parse::<u64>()?,
+            "StartLimitBurst" => self.StartLimitBurst = value.parse::<u32>()?,
+            "SuccessAction" => self.SuccessAction = UnitEmergencyAction::parse_from_str(value)?,
+            "FailureAction" => self.FailureAction = UnitEmergencyAction::parse_from_str(value)?,
+            "StartLimitAction" => {
+                self.StartLimitAction = UnitEmergencyAction::parse_from_str(value)?
+            }
+            "JobTimeoutSec" => self.JobTimeoutSec = value.parse::<u64>()?,
+            "JobTimeoutAction" => {
+                self.JobTimeoutAction = UnitEmergencyAction::parse_from_str(value)?
+            }
             str_key => {
                 return Err(Error::NotFound {
                     what: format!("set property:{}", str_key),
@@ -309,10 +317,6 @@ impl UeConfigUnit {
         };
         Ok(())
     }
-}
-
-fn vec_str_2_string(str: &str) -> Vec<String> {
-    str.split_whitespace().map(|s| s.to_string()).collect()
 }
 
 #[derive(UnitSection, Default, Clone, Debug, Serialize, Deserialize)]
@@ -328,12 +332,24 @@ pub struct UeConfigInstall {
 }
 
 impl UeConfigInstall {
-    pub(crate) fn set_property(&mut self, _key: &str, _value: &str) -> Result<()> {
-        // nothing supported
-        Err(Error::NotFound {
-            what: "set unit install property".to_string(),
-        })
+    pub(crate) fn set_property(&mut self, key: &str, value: &str) -> Result<()> {
+        match key {
+            "Alias" => self.Alias = vec_str_2_string(value),
+            "WantedBy" => self.WantedBy = vec_str_2_string(value),
+            "RequiredBy" => self.RequiredBy = vec_str_2_string(value),
+            "Also" => self.Also = vec_str_2_string(value),
+            str_key => {
+                return Err(Error::NotFound {
+                    what: format!("set property:{}", str_key),
+                })
+            }
+        };
+        Ok(())
     }
+}
+
+fn vec_str_2_string(str: &str) -> Vec<String> {
+    str.split_whitespace().map(|s| s.to_string()).collect()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

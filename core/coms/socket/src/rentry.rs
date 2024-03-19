@@ -114,42 +114,32 @@ impl SectionSocket {
     ) -> Result<(), core::error::Error> {
         match key {
             "ExecStartPre" => self.ExecStartPre = core::exec::parse_exec_command(value)?,
+            "ExecStartChown" => self.ExecStartChown = core::exec::parse_exec_command(value)?,
             "ExecStartPost" => self.ExecStartPost = core::exec::parse_exec_command(value)?,
             "ExecStopPre" => self.ExecStopPre = core::exec::parse_exec_command(value)?,
             "ExecStopPost" => self.ExecStopPost = core::exec::parse_exec_command(value)?,
+
             "ListenStream" => {
-                self.ListenStream = value
-                    .split_whitespace()
-                    .map(|str| str.to_string())
-                    .collect()
+                self.ListenStream = value.split_whitespace().map(|s| s.to_string()).collect()
             }
             "ListenDatagram" => {
-                self.ListenDatagram = value
-                    .split_whitespace()
-                    .map(|str| str.to_string())
-                    .collect()
+                self.ListenDatagram = value.split_whitespace().map(|s| s.to_string()).collect()
             }
             "ListenNetlink" => self.ListenNetlink = deserialize_netlink_vec(value)?,
             "ListenSequentialPacket" => {
-                self.ListenSequentialPacket = value
-                    .split_whitespace()
-                    .map(|str| str.to_string())
-                    .collect()
+                self.ListenSequentialPacket =
+                    value.split_whitespace().map(|s| s.to_string()).collect()
             }
             "ListenFIFO" => {
-                self.ListenFIFO = value
-                    .split_whitespace()
-                    .map(|str| str.to_string())
-                    .collect()
+                self.ListenFIFO = value.split_whitespace().map(|s| s.to_string()).collect()
             }
             "ListenSpecial" => {
-                self.ListenSpecial = value
-                    .split_whitespace()
-                    .map(|str| str.to_string())
-                    .collect()
+                self.ListenSpecial = value.split_whitespace().map(|s| s.to_string()).collect()
             }
+
             "Accept" => self.Accept = basic::config::parse_boolean(value)?,
             "FlushPending" => self.FlushPending = basic::config::parse_boolean(value)?,
+            "Service" => self.Service = Some(value.to_string()),
             "ReceiveBuffer" => self.ReceiveBuffer = Some(value.parse::<u64>()?),
             "SendBuffer" => self.SendBuffer = Some(value.parse::<u64>()?),
             "PassCredentials" => self.PassCredentials = Some(basic::config::parse_boolean(value)?),
@@ -165,6 +155,7 @@ impl SectionSocket {
             "SocketMode" => self.SocketMode = parse_mode(value)?,
             "SocketUser" => self.SocketUser = value.to_string(),
             "SocketGroup" => self.SocketGroup = value.to_string(),
+
             //kill context
             "KillMode" => self.KillMode = KillMode::parse_from_str(value)?,
             "KillSignal" => self.KillSignal = value.to_string(),

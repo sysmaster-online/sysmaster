@@ -72,17 +72,16 @@ impl SectionPath {
         value: &str,
     ) -> Result<(), core::error::Error> {
         match key {
-            "Unit" => self.Unit = value.to_string(),
-            "MakeDirectory" => self.MakeDirectory = parse_boolean(value)?,
-            "DirectoryMode" => self.DirectoryMode = parse_mode(value)?,
-            "TriggerLimitBurst" => self.TriggerLimitBurst = value.parse::<u32>()?,
-            "TriggerLimitIntervalSec" => self.TriggerLimitIntervalSec = value.parse::<u64>()?,
-            //Paths
             "PathExists" => self.PathExists = parse_pathbuf_vec(value)?,
             "PathExistsGlob" => self.PathExistsGlob = parse_pathbuf_vec(value)?,
             "PathChanged" => self.PathChanged = parse_pathbuf_vec(value)?,
             "PathModified" => self.PathModified = parse_pathbuf_vec(value)?,
             "DirectoryNotEmpty" => self.DirectoryNotEmpty = parse_pathbuf_vec(value)?,
+            "Unit" => self.Unit = value.to_string(),
+            "MakeDirectory" => self.MakeDirectory = parse_boolean(value)?,
+            "DirectoryMode" => self.DirectoryMode = parse_mode(value)?,
+            "TriggerLimitBurst" => self.TriggerLimitBurst = value.parse::<u32>()?,
+            "TriggerLimitIntervalSec" => self.TriggerLimitIntervalSec = value.parse::<u64>()?,
             str_key => {
                 return Err(Error::NotFound {
                     what: format!("set timer property:{}", str_key),

@@ -66,6 +66,10 @@ impl ServiceBus {
         match key {
             "RemainAfterExit"
             | "Type"
+            | "RestartSec"
+            | "TimeoutStartSec"
+            | "TimeoutStopSec"
+            | "WatchdogSec"
             | "NotifyAccess"
             | "PIDFile"
             | "Restart"
@@ -99,9 +103,7 @@ impl ServiceBus {
             | "Environment"
             | "EnvironmentFile"
             | "RuntimeDirectory"
-            | "StateDirectory"
-            | "ExecReload"
-            | "ExecCondition" => self.unit_write_property(key, value, real_flags, false),
+            | "StateDirectory" => self.unit_write_property(key, value, real_flags, false),
             "LimitCORE" | "LimitNOFILE" | "LimitNPROC" => {
                 self.unit_write_property(key, value, real_flags, false)
             }

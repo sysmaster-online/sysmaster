@@ -37,23 +37,14 @@ impl TimerBus {
         value: &str,
         flags: UnitWriteFlags,
     ) -> Result<()> {
-        let mut ret = self.cgroup_set_transient_property(key, value, flags);
-        if let Err(Error::NotFound { what: _ }) = ret {
-            let unit = self.comm.owner().unwrap();
-            if unit.transient() && unit.is_load_stub() {
-                ret = self.unit_set_transient_property(key, value, flags);
-
-                if let Err(Error::NotFound { what: _ }) = ret {
-                    ret = self.exec_set_transient_property(key, value, flags);
-                }
-
-                if let Err(Error::NotFound { what: _ }) = ret {
-                    ret = self.kill_set_transient_property(key, value, flags);
-                }
-            }
+        let unit = self.comm.owner().unwrap();
+        if unit.transient() && unit.is_load_stub() {
+            return self.unit_set_transient_property(key, value, flags);
         }
 
-        ret
+        Err(Error::NotFound {
+            what: format!("set property:{}", key),
+        })
     }
 
     fn unit_set_transient_property(
@@ -69,47 +60,10 @@ impl TimerBus {
             | "OnUnitActiveSec" | "OnUnitInactiveSec" | "OnCalendar" => {
                 self.unit_write_property(key, value, real_flags, false)
             }
-            "Unit" => self.unit_write_property(key, value, real_flags, false),
             str_key => Err(Error::NotFound {
                 what: format!("set transient property:{}", str_key),
             }),
         }
-    }
-
-    fn exec_set_transient_property(
-        &self,
-        key: &str,
-        _value: &str,
-        _flags: UnitWriteFlags,
-    ) -> Result<()> {
-        // not supported now
-        Err(Error::NotFound {
-            what: format!("set exec property:{}", key),
-        })
-    }
-
-    fn kill_set_transient_property(
-        &self,
-        key: &str,
-        _value: &str,
-        _flags: UnitWriteFlags,
-    ) -> Result<()> {
-        // not supported now
-        Err(Error::NotFound {
-            what: format!("set kill property:{}", key),
-        })
-    }
-
-    fn cgroup_set_transient_property(
-        &self,
-        key: &str,
-        _value: &str,
-        _flags: UnitWriteFlags,
-    ) -> Result<()> {
-        // not supported now
-        Err(Error::NotFound {
-            what: format!("set cgroup property:{}", key),
-        })
     }
 
     fn unit_write_property(

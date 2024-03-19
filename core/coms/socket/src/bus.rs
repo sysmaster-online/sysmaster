@@ -87,9 +87,8 @@ impl SocketBus {
             | "ListenSequentialPacket"
             | "ListenFIFO"
             | "ListenSpecial" => self.unit_write_property(key, value, real_flags, false),
-            "ExecStartPre" | "ExecStartPost" | "ExecStopPre" | "ExecStopPost" => {
-                self.unit_write_property(key, value, real_flags, false)
-            }
+            "ExecStartPre" | "ExecStartChown" | "ExecStartPost" | "ExecStopPre"
+            | "ExecStopPost" => self.unit_write_property(key, value, real_flags, false),
             str_key => Err(Error::NotFound {
                 what: format!("set transient property:{}", str_key),
             }),

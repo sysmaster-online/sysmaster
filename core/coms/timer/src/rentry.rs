@@ -111,13 +111,13 @@ impl SectionTimer {
     ) -> Result<(), core::error::Error> {
         match key {
             "AccuracySec" => self.AccuracySec = parse_timer(value)?,
-            "RandomizedDelaySec" => self.RandomizedDelaySec = parse_timer(value)?,
             "OnActiveSec" => self.OnActiveSec = parse_timer(value)?,
             "OnBootSec" => self.OnBootSec = parse_timer(value)?,
             "OnStartupSec" => self.OnStartupSec = parse_timer(value)?,
             "OnUnitActiveSec" => self.OnUnitActiveSec = parse_timer(value)?,
             "OnUnitInactiveSec" => self.OnUnitInactiveSec = parse_timer(value)?,
             "OnCalendar" => self.OnCalendar = parse_timer(value)?,
+            "RandomizedDelaySec" => self.RandomizedDelaySec = parse_timer(value)?,
             "Unit" => {
                 self.Unit = if value.is_empty() {
                     None
@@ -125,8 +125,8 @@ impl SectionTimer {
                     Some(value.to_string())
                 }
             }
-            "WakeSystem" => self.WakeSystem = basic::config::parse_boolean(value)?,
             "Persistent" => self.Persistent = basic::config::parse_boolean(value)?,
+            "WakeSystem" => self.WakeSystem = basic::config::parse_boolean(value)?,
             "RemainAfterElapse" => self.RemainAfterElapse = basic::config::parse_boolean(value)?,
             str_key => {
                 return Err(Error::NotFound {
