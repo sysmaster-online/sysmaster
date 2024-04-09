@@ -543,9 +543,7 @@ impl Install {
 
         let mut paths: Vec<PathBuf> = Vec::new();
         for p in &self.lookup_path.search_path {
-            let mut path = String::new();
-            path = path + p + &unit_install.name();
-            paths.push(PathBuf::from(path));
+            paths.push(Path::new(p).join(&unit_install.name()));
         }
 
         let configer = match UeConfigData::load_config(paths, &unit_install.name()) {
