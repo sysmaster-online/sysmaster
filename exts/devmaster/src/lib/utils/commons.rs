@@ -19,7 +19,7 @@ use std::{
 
 use crate::{error::*, log_dev, rules::FormatSubstitutionType, utils::trie::*};
 use basic::{error::errno_is_privilege, IN_SET};
-use device::{Device, DB_BASE_DIR};
+use device::{Device, DB_BASE_DIR, DEFAULT_BASE_DIR};
 use lazy_static::lazy_static;
 use nix::{errno::Errno, unistd::unlink};
 use snafu::ResultExt;
@@ -575,7 +575,7 @@ pub(crate) fn device_update_tag(
 pub(crate) fn cleanup_db(dev: Rc<Device>) -> Result<()> {
     let id = dev.get_device_id().context(DeviceSnafu)?;
 
-    let db_path = format!("{}{}", DB_BASE_DIR, id);
+    let db_path = format!("{}/{}/{}", DEFAULT_BASE_DIR, DB_BASE_DIR, id);
 
     match unlink(db_path.as_str()) {
         Ok(_) => log_dev!(debug, dev, format!("unlinked '{}'", db_path)),
