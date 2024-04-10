@@ -48,8 +48,8 @@ impl Cmdline {
         if let Ok(mut file) = File::open(path) {
             let mut data = String::new();
             if file.read_to_string(&mut data).is_ok() {
-                *cmdline = data.clone();
-                for item in data.split_whitespace() {
+                *cmdline = data.replace("\0", " ").trim().to_string();
+                for item in cmdline.split_whitespace() {
                     let mut parts = item.splitn(2, '=');
                     let key = parts.next().unwrap_or_default().to_string();
                     let value = parts.next().map(|v| v.to_string());
