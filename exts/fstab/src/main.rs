@@ -136,7 +136,7 @@ fn watch_devices(fstab_items: &[FSTabItem]) -> (Inotify, HashSet<String>) {
             file_path.file_name().unwrap().to_str().unwrap(),
         ));
         inotify
-            .add_watch(dir_path, WatchMask::CREATE)
+            .add_watch(dir_path, WatchMask::CREATE | WatchMask::MOVED_TO)
             .expect("Failed to add watch.");
     }
     (inotify, watch_set)
@@ -171,8 +171,10 @@ fn main() {
                 .read_events_blocking(&mut buffer)
                 .expect("Failed to read events.");
             for event in events {
-                if event.mask == EventMask::CREATE {
-                    log::debug!("File created: {:?}", event.name.unwrap());
+                if event.mask == EventMask::CREATE || event.mask == EventMask::MOVED_TO {
+                    if let Some(name) = event.name {
+                        log::debug!("File created or moved: {:?}", name);
+                    }
                     watch_updated = true;
                 }
             }
