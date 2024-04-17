@@ -132,6 +132,8 @@ impl NetifConfigCtx {
                 if name.ends_with(".link") {
                     let conf_path = dir_path.join(&name);
 
+                    log::debug!("loading .link config: {:?}", conf_path);
+
                     let s = match std::fs::read_to_string(&conf_path) {
                         Ok(content) => content,
                         Err(e) => {
