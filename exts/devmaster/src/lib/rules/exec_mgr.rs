@@ -903,20 +903,16 @@ impl ExecuteManager {
             }
             MatchImportCmdline => {
                 let cmdline = basic::cmdline::Cmdline::default();
-                let s = cmdline.get_param(&token_value);
 
-                if s.is_none() {
+                if !cmdline.has_param(&token_value) {
                     return Ok(token.read().unwrap().as_ref().unwrap().op == OperatorType::Nomatch);
                 }
 
-                let value = match s.as_ref().unwrap().split_once('=') {
-                    Some(ret) => ret.1,
-                    None => "",
-                };
+                let value = cmdline.get_param(&token_value);
 
                 execute_err!(
                     token.read().unwrap().as_ref().unwrap(),
-                    device.add_property(&token_value, if value.is_empty() { "1" } else { value })
+                    device.add_property(&token_value, &value.unwrap_or_default())
                 )?;
 
                 Ok(token.read().unwrap().as_ref().unwrap().op == OperatorType::Match)
