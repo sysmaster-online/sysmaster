@@ -908,11 +908,20 @@ impl ExecuteManager {
                     return Ok(token.read().unwrap().as_ref().unwrap().op == OperatorType::Nomatch);
                 }
 
-                let value = cmdline.get_param(&token_value);
+                let value = match cmdline.get_param(&token_value) {
+                    Some(v) => {
+                        if v.is_empty() {
+                            "1".to_string()
+                        } else {
+                            v
+                        }
+                    }
+                    None => "1".to_string(),
+                };
 
                 execute_err!(
                     token.read().unwrap().as_ref().unwrap(),
-                    device.add_property(&token_value, &value.unwrap_or_default())
+                    device.add_property(&token_value, &value)
                 )?;
 
                 Ok(token.read().unwrap().as_ref().unwrap().op == OperatorType::Match)
