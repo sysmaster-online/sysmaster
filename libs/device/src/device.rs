@@ -1827,7 +1827,18 @@ impl Device {
     /// set the sysname and sysnum of device object
     pub fn set_sysname_and_sysnum(&self) -> Result<(), Error> {
         /* The devpath is validated to begin with '/' when setting syspath. */
-        let idx = self.devpath.borrow().rfind('/').unwrap();
+        let idx = match self.devpath.borrow().rfind('/') {
+            Some(idx) => idx,
+            None => {
+                return Err(Error::Nix {
+                    msg: format!(
+                        "set_sysname_and_sysnum failed: devpath '{}' is not a valid device path",
+                        self.devpath.borrow()
+                    ),
+                    source: Errno::ENODEV,
+                });
+            }
+        };
         let sysname = String::from(&self.devpath.borrow()[idx + 1..]);
         let sysname = sysname.replace('!', "/");
 

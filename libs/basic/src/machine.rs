@@ -155,6 +155,11 @@ impl Machine {
         #[cfg(target_arch = "aarch64")]
         unsafe_set_and_return!(CACHED_FOUND, vm);
 
+        #[cfg(target_arch = "riscv64")]
+        let vm = Machine::detect_vm_device_tree();
+        #[cfg(target_arch = "riscv64")]
+        unsafe_set_and_return!(CACHED_FOUND, vm);
+
         unsafe { CACHED_FOUND }
     }
 
@@ -218,6 +223,19 @@ impl Machine {
         {
             return Machine::PowerRVM;
         }
+        if let Ok(dir) = std::fs::read_dir("/proc/device-tree") {
+            for entry in dir.flatten() {
+                if entry.path().to_string_lossy().contains("fw-cfg") {
+                    return Machine::Qemu;
+                }
+            }
+        }
+        Machine::None
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    /// detect vm by device tree
+    pub fn detect_vm_device_tree() -> Self {
         if let Ok(dir) = std::fs::read_dir("/proc/device-tree") {
             for entry in dir.flatten() {
                 if entry.path().to_string_lossy().contains("fw-cfg") {

@@ -898,15 +898,15 @@ dependencies = [
 
 [[package]]
 name = "ioctl-sys"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f9d0b6b23885487578d10590edc36fd95426257c7017973b20633e34df23b08"
+checksum = "8bd11f3a29434026f5ff98c730b668ba74b1033637b8817940b54d040696133c"
 
 [[package]]
 name = "ioctls"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5780ca662f733ea1b940647b657d5324abc55a7d8d9b0628e8af8fe96ab3ed2"
+checksum = "935b1b0e0f1c6f47c4cffbc08782bd8875d4d475f78191eb1a0c3bcf60de71e8"
 dependencies = [
  "ioctl-sys",
  "libc",

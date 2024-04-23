@@ -163,6 +163,14 @@ macro_rules! LIB_ARCH_TUPLE {
                 "ld-linux-aarch64.so.1",
                 false,
             )
+        } else if cfg!(target_arch = "riscv64") {
+            BaseFilesystem::new(
+                "lib64",
+                MODE777,
+                vec!["usr/sbin/riscv64-linux-gnu", "usr/lib64/lp64d"],
+                "ld-linux-riscv64-lp64d.so.1",
+                false,
+            )
         } else {
             BaseFilesystem::new(
                 "lib64",
