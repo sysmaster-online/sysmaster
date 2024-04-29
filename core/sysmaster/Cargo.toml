@@ -1,6 +1,6 @@
 [package]
 name = "sysmaster"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 
 [dependencies]
@@ -147,7 +147,16 @@ optional = true
 default-features = false
 
 [features]
-default = ["linux", "noplugin", "mount", "socket", "service", "target", "timer", "path"]
+default = [
+    "linux",
+    "noplugin",
+    "mount",
+    "socket",
+    "service",
+    "target",
+    "timer",
+    "path",
+]
 hongmeng = []
 linux = []
 noplugin = []
