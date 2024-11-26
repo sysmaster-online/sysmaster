@@ -15,7 +15,7 @@ path = "init/main.rs"
 
 [dependencies]
 log = { path = "libs/log" }
-mio = { version = "0.8.8", default_features = false, features = [
+mio = { version = "0.8.11", default_features = false, features = [
   "os-poll",
   "os-ext",
 ] }
