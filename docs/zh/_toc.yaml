@@ -1,0 +1,20 @@
+label: sysMaster用户指南
+isManual: true
+description: 使用 sysMaster 管理服务器和设备
+sections:
+  - label: 概述
+    href: ./overview.md
+  - label: 服务管理
+    href: ./service_management.md
+    sections:
+      - label: 安装与部署
+        href: ./sysmaster_install_deploy.md
+      - label: 使用说明
+        href: ./sysmaster_usage.md
+  - label: 设备管理
+    href: ./device_management.md
+    sections:
+      - label: 安装与部署
+        href: ./devmaster_install_deploy.md
+      - label: 使用说明
+        href: ./devmaster_usage.md
