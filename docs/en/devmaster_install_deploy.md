@@ -39,7 +39,7 @@ Currently, devmaster can be used in the VM environment. This section describes t
     # /lib/devmaster/devmaster &>> /tmp/devmaster.log &
     ```
 
-    > ![Note](./public_sys-resources/icon-note.gif)**Note:**
+    > [!NOTE]Note
     >
     > devmaster must be started with the root privilege and cannot be running with udev at the same time. Before starting devmaster, stop the udev service.
     >
