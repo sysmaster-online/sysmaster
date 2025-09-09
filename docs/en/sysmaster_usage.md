@@ -5,8 +5,6 @@ This section provides examples on how to use sysmaster, including:
 * service unit configuration file creation
 * unit service management operations, such as starting, stopping, and viewing services
 
-For more, see the [sysMaster official manual](http://sysmaster.online/man/all/).
-
 ## Unit Configuration File Creation
 
 You can create unit configuration files in the **/usr/lib/sysmaster/system/** directory.
