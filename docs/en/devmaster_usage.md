@@ -106,13 +106,13 @@ Command options:
 
 devmaster rules consist of a group of rule files. After the devmaster daemon is started, it loads the rule files in lexicographic order based on the rule path specified in the configuration file.
 
-> ![Note](./public_sys-resources/icon-note.gif)**Note:**
+> [!Note]Note
 >
 > After adding, deleting, or modifying a rule, you need to restart devmaster for the rule to take effect.
 
 ### Rule Examples
 
-The following describes several common rule examples. For details about the rule syntax, see the [devmaster manual](http://sysmaster.online/man/exts/devmaster/devmaster/).
+The following describes several common rule examples.
 
 #### Example 1: Creating a Soft Link for a Block Device
 
@@ -209,10 +209,9 @@ The following uses the **ens33** NIC as an example to test the effect of the NIC
     # ip link set ens33 up
     ```
 
-> ![Note](./public_sys-resources/icon-note.gif)**Note:**
+> [!Note]Note
 >
 > An activated NIC cannot be renamed. You need to bring it offline first. In addition, the renaming rule of devmaster takes effect only in the **add** event of the NIC.
->
 
 #### Example 3: Modifying the User Permissions on a Device Node
 
@@ -250,5 +249,3 @@ devmaster provides the following default NIC configurations:
 The NIC configuration file contains the **\[Match]** matching section and **\[Link]** control section. Each section contains several configuration items. The configuration items in the **\[Match]** section are used to match NICs. When a NIC meets all matching conditions, all configuration items in the **\[Link]** section are applied to the NIC, for example, setting the NIC naming style and adjusting NIC parameters.
 
 The preceding default NIC configuration indicates that the configuration takes effect on all NICs and checks the NIC naming styles of the **onboard**, **slot**, and **path** styles in sequence. If an available style is found, the NIC is named in this style.
-
-For details about the NIC configuration, see the [devmaster manual](http://sysmaster.online/man/exts/devmaster/netif_config/#1).
